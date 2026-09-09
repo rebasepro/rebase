@@ -1,75 +1,96 @@
 ---
-sourceHash: 588d98e594d17d67
-title: Implementando o Rebase no Railway
-description: Implemente o Rebase sem esforço com o Railway, que oferece suporte nativo à análise de Dockerfile. Mantenha o foco na UE.
+sourceHash: 32d97963eacb9f50
+title: Deploy do Rebase na Railway
+description: Faça o deploy do Rebase na Railway a partir da imagem de runtime publicada e do bundle do seu projeto. Mantenha a conformidade na UE.
 sidebar_label: Railway
 ---
 
-Railway é uma PaaS (Plataforma como Serviço) moderna incrivelmente popular que elimina a complexidade do DevOps. Ele detectará automaticamente o framework Node Rebase e o construirá sem problemas.
+A Railway é uma PaaS moderna que elimina a complexidade do DevOps e oferece suporte a regiões de implantação europeias (Amsterdã), mantendo a conformidade de hospedagem regional.
 
-Além disso, o Railway oferece suporte total a regiões de implantação europeias (Amsterdã), o que significa que você ainda desfruta de uma estrita conformidade regional de hospedagem.
+Nada nesta página sobre o seu projeto é específico da Railway. Um deploy do Rebase é composto por duas partes separáveis — a imagem de runtime publicada e o **bundle** que o `rebase build` produz — e o mesmo bundle pode ser executado via Docker Compose em um laptop, no Rebase Cloud, através do [Helm chart](/docs/deployment/kubernetes) ou aqui.
 
-## 1. Crie um Projeto e uma Região da UE
-1. Faça login na sua [Conta Railway](https://railway.app/).
+## 1. Crie um projeto e uma região na UE
+
+1. Faça login na sua [conta da Railway](https://railway.app/).
 2. Clique em **New Project**.
-3. Vá para **Settings -> Default Region** e defina explicitamente como **Europe (Amsterdam)**. (Se você fizer isso *depois* de criar serviços, pode ser necessário migrá-los manualmente).
+3. Vá em **Settings → Default Region** e defina como **Europe (Amsterdam)**. Fazer isso *após* criar os serviços exigirá migrá-los manualmente.
 
 ## 2. Provisione o PostgreSQL
-1. Dentro do seu projeto, clique em **New** -> **Database** -> **Add PostgreSQL**.
-2. Espere alguns segundos para o banco de dados ser provisionado.
-3. Por padrão, o Railway fornece uma variável interna `DATABASE_URL`. Clique no widget do Postgres -> **Variables** para localizar esta string de conexão.
 
-## 3. Implemente o Código Rebase
-1. Clique em **New** -> **GitHub Repo**.
-2. Selecione seu repositório Rebase.
-3. O Railway detectará imediatamente o repositório e procurará por um `Dockerfile`. Espere o início da construção inicial.
+1. Dentro do seu projeto, clique em **New → Database → Add PostgreSQL**.
+2. Aguarde o provisionamento.
+3. A Railway expõe uma variável interna `DATABASE_URL` na aba **Variables** do widget do Postgres.
 
-:::caution
-**Não há nenhuma imagem de aplicação para construir a partir do seu código**. O `rebase build` produz um diretório `dist-bundle` com as suas coleções, funções e crons compilados — e, se o projeto declarar uma app estática, o seu frontend construído. A imagem de runtime publicada executa-o:
+Se as suas collections declararem uma propriedade `vector`, ative a extensão uma única vez nesse banco de dados: `CREATE EXTENSION vector;`.
+
+## 3. Gere o bundle e inclua-o em uma imagem
+
+**Não há imagem de aplicação a ser construída a partir do seu código-fonte**. O comando `rebase build` gera um diretório `dist-bundle` com suas collections compiladas, functions, crons e — se o seu projeto declarar uma aplicação estática — o seu frontend compilado. A imagem de runtime publicada executa tudo isso:
 
 ```bash
 rebase build
 ```
 
-O Railway puxa de um registo, por isso incorpore o bundle numa imagem derivada. Três linhas, e fixa exatamente o que corre:
+Faça commit de um `Dockerfile` de três linhas na raiz do repositório, para que a etapa de build da Railway seja apenas uma cópia em vez de uma compilação:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Atualizar o Rebase mais tarde é uma alteração nessa linha `FROM`. O seu bundle fica intacto.
-:::
+Gere o bundle no CI e faça o commit ou upload dele como parte da sua release, ou execute `rebase build` antes de enviar o push. De qualquer forma, a imagem que a Railway compila não contém ferramentas de build (toolchain) nem código-fonte — atualizar o Rebase no futuro exige apenas alterar a linha `FROM`, deixando o seu bundle intacto.
 
-## 4. Defina as Variáveis de Ambiente
-A construção inicial pode falhar porque está completamente sem configuração. Vamos corrigir isso.
+Em seguida: vá em **New → GitHub Repo**, selecione o seu repositório e deixe a Railway detectar o Dockerfile na raiz.
 
-1. Clique no novo cartão de serviço GitHub do Rebase.
+## 4. Defina as variáveis de ambiente
+
+1. Clique no card do serviço.
 2. Vá para a aba **Variables**.
-3. Clique em **New Variable** e adicione:
-   - `JWT_SECRET`: Gere uma string aleatória segura de 32+ caracteres.
-   - `NODE_ENV`: Defina como `production`
-4. Clique em **Reference Variable** e selecione `DATABASE_URL` do serviço PostgreSQL que você provisionou. O Railway injetará com segurança a URL interna do Postgres em tempo de execução.
+3. Adicione:
+   - `JWT_SECRET`: uma string aleatória e segura com mais de 32 caracteres.
+   - `REBASE_SERVICE_KEY`: outra string aleatória e segura com mais de 32 caracteres.
+   - `NODE_ENV`: `production`
+   - `CORS_ORIGINS`: o domínio do seu frontend (ex.: `https://your-app.up.railway.app`)
+   - `FRONTEND_URL`: o mesmo valor de `CORS_ORIGINS`
+   - `DISABLE_SELF_REGISTRATION`: `true`
+   - `REBASE_ADMIN_EMAIL`: o endereço do primeiro administrador
+   - `REBASE_ADMIN_PASSWORD`: no mínimo 12 caracteres
 
-## 5. Exponha o Domínio
-1. No cartão de serviço Rebase, navegue até a aba **Settings**.
-2. Role para baixo até **Networking**.
-3. Em **Public Networking**, clique em **Generate Domain**. O Railway fornecerá uma URL de teste `.up.railway.app`. Você também pode anexar com segurança um Domínio Personalizado aqui.
+   As três últimas são essenciais para que este serviço tenha um administrador: em produção, a primeira conta a se registrar não é promovida automaticamente, portanto nada mais criará o primeiro usuário autenticado. Defina essas variáveis antes que o serviço receba tráfego pela primeira vez — consulte [Seu primeiro admin](/docs/getting-started/deployment/#your-first-admin).
 
-O Railway reconstruirá automaticamente com segurança. Sua plataforma hospedada na UE agora está totalmente ativa!
+4. Clique em **Reference Variable** e selecione `DATABASE_URL` do serviço PostgreSQL. A Railway injetará a URL interna do Postgres em tempo de execução.
 
-## 6. Criar o Esquema do Banco de Dados
+A Railway define a variável `PORT` e o runtime se vincula a ela, portanto não há porta a ser configurada. Aponte o health check para `/livez` em vez de `/health`: a segunda opção realiza uma consulta de ida e volta ao banco de dados, o que faria uma verificação de liveness reiniciar um contêiner saudável durante uma oscilação momentânea do banco.
 
-Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+## 5. Exponha o domínio
 
-Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+1. No card do serviço, vá em **Settings → Networking**.
+2. Em **Public Networking**, clique em **Generate Domain** para obter uma URL `.up.railway.app`, ou associe um domínio personalizado.
+
+## 6. O schema
+
+**O runtime cria as tabelas ausentes na inicialização, incluindo as das suas collections.** O valor padrão de `REBASE_MIGRATE_ON_BOOT` é `ensure`, que é puramente aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica a segurança em nível de linha (RLS) a eles — de modo que a primeira inicialização em um banco de dados vazio já começa atendendo às suas collections.
+
+O que o `ensure` nunca faz é alterar algo que já existe: ele não altera o tipo de uma coluna, não remove nada nem edita os valores de um enum existente, pois a reinicialização de um contêiner não deve remodelar o schema como efeito colateral de um deploy.
+
+Portanto, duas situações ainda exigem o uso da CLI, executada a partir de um checkout local ou de um job de CI:
 
 ```bash
-DATABASE_URL="<string de conexão pública do Postgres>" pnpm run db:push
+rebase db push
 ```
 
-Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Use a string de conexão pública do serviço PostgreSQL do Railway (a aba **Variables** também expõe uma variável `DATABASE_PUBLIC_URL`) para alcançar o banco a partir da sua máquina.
+- **RLS em tabelas de junção** para relações muitos-para-muitos (many-to-many).
+- **Qualquer alteração que não seja puramente aditiva** — uma coluna renomeada, um tipo com restrição mais estrita, um campo removido.
 
-Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
+Aponte `DATABASE_URL` para a string de conexão **pública** do seu serviço Postgres (widget do Postgres → **Connect**); a URL interna referenciada só é acessível dentro da Railway. A imagem de runtime é fornecida sem a CLI, portanto isso nunca é executado dentro do contêiner. Para migrações versionadas, faça commit dos arquivos de migração com `rebase db generate` e execute `rebase db migrate` como uma etapa de release.
+
+## Armazenamento de arquivos
+
+Os contêineres da Railway são substituídos a cada deploy, portanto o armazenamento de arquivos local causará perda silenciosa de dados e o runtime o recusa em produção. Conecte um bucket compatível com S3 usando `STORAGE_TYPE=s3` — consulte [Armazenamento](/docs/backend/storage).
+
+## Próximos passos
+
+- [Deploy](/docs/getting-started/deployment) — o checklist de produção e as regras para o primeiro administrador comuns a todas as plataformas.
+- [Configuração](/docs/getting-started/configuration) — todas as variáveis de ambiente lidas pelo runtime.
 
 ---

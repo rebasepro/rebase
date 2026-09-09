@@ -1,95 +1,118 @@
 ---
-sourceHash: a38f51968ee29ac6
+sourceHash: c543c4d920d4a2f9
 title: Despliegue de Rebase en Scaleway
-description: Aprende a desplegar Rebase en Scaleway para una infraestructura en la nube segura y con base en Francia utilizando Contenedores Serverless.
+description: Aprende a desplegar Rebase en Scaleway para obtener una infraestructura en la nube segura y basada en Francia mediante Serverless Containers.
 sidebar_label: Scaleway
 ---
 
-Scaleway es un proveedor de nube europeo de primer nivel con sede en Francia y centros de datos en París, Ámsterdam y Varsovia. Es una excelente opción para organizaciones que priorizan la soberanía de datos de la UE.
+Scaleway es un proveedor de nube europeo con sede en Francia, con centros de datos en París, Ámsterdam y Varsovia, una excelente opción para organizaciones que priorizan la soberanía de datos en la UE.
 
-Recomendamos utilizar la **Base de Datos Gestionada** de Scaleway para un respaldo fiable de Postgres y los **Contenedores Serverless** para escalar dinámicamente la aplicación Node.js de Rebase.
+Utiliza **Managed Database** de Scaleway para Postgres y **Serverless Containers** para el runtime.
 
-## 1. Crear una Base de Datos Postgres Gestionada
+Nada en esta página es específico de Scaleway respecto a tu proyecto. Un despliegue de Rebase consta de dos piezas separables: la imagen de runtime publicada y el **bundle** que produce `rebase build`, y el mismo bundle se ejecuta bajo Docker Compose en una laptop, en Rebase Cloud, bajo el [Helm chart](/docs/deployment/kubernetes) y aquí.
 
-Las Bases de Datos Gestionadas de Scaleway ofrecen copias de seguridad automáticas y alta disponibilidad.
+## 1. Crear una base de datos Managed Postgres
 
-**No hay ninguna imagen de aplicación que construir a partir de tu código**. `rebase build` produce un directorio `dist-bundle` con tus colecciones, funciones y crons compilados y —si tu proyecto declara una app estática— tu frontend construido. La imagen de runtime publicada lo ejecuta:
+1. En la consola de Scaleway, ve a **PostgreSQL**.
+2. Haz clic en **Create a Database Instance**.
+3. Elige una región (por ejemplo, París — `PAR1`).
+4. Selecciona un tipo de nodo (**Play2-Pico** o **Pro2-XXS** funcionan bien).
+5. Añade un nombre de base de datos (`rebase_db`) y una contraseña de usuario segura.
+6. Una vez desplegada, anota la **Connection string** (URI) del panel:
+   `postgres://user:password@ip:port/rebase_db`
+
+Si tus colecciones declaran una propiedad `vector`, habilita la extensión una vez: `CREATE EXTENSION vector;` contra la base de datos.
+
+## 2. Compilar el bundle e integrarlo en una imagen
+
+No hay **ninguna imagen de aplicación para compilar desde tu código fuente**. `rebase build` produce un directorio `dist-bundle` con tus colecciones compiladas, funciones, crons y, si tu proyecto declara una aplicación estática, tu frontend compilado. La imagen de runtime publicada lo ejecuta:
 
 ```bash
 rebase build
 ```
 
-Serverless Containers extrae desde un registro, así que hornea el bundle en una imagen derivada. Tres líneas, y fija exactamente lo que se ejecuta:
+Serverless Containers descarga desde un registro, así que integra el bundle en una imagen derivada. Tres líneas, y fija con exactitud lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Actualizar Rebase más adelante es un cambio en esa línea `FROM`. Tu bundle queda intacto.
-
-1. En la Consola de Scaleway, ve a **PostgreSQL**.
-2. Haz clic en **Crear una Instancia de Base de Datos**.
-3. Elige una Región (ej., París - `PAR1`).
-4. Selecciona un Tipo de Nodo (un **Play2-Pico** o **Pro2-XXS** estándar funciona bien).
-5. Añade un nombre de base de datos (`rebase_db`) y define una contraseña de usuario increíblemente segura.
-6. Una vez desplegada, anota la **cadena de conexión** (URI) del panel de control. Tendrá el siguiente formato:
-   `postgres://user:password@ip:port/rebase_db`
-
-## 2. Construir y Empujar el Contenedor
-
-Los Contenedores Serverless de Scaleway ejecutan imágenes Docker estándar. Primero, construye el backend de Rebase localmente y empújalo al Registro de Contenedores de Scaleway.
-
-1. Ve a **Container Registry** en la Consola de Scaleway y crea un Namespace (ej., `rebase-apps`).
-2. Inicia sesión en el registro desde tu terminal local utilizando las instrucciones proporcionadas.
-3. Compila y envía desde la raíz del proyecto:
+1. Ve a **Container Registry** en la consola de Scaleway y crea un namespace (por ejemplo, `rebase-apps`).
+2. Inicia sesión en el registro desde tu terminal siguiendo las instrucciones que se muestran.
+3. Compila y haz push, desde la raíz del proyecto:
 
 ```bash
 docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest .
-```
-
-Construye desde la raíz del proyecto — el Dockerfile del backend necesita todo el workspace como contexto de compilación (copia `pnpm-workspace.yaml`, `backend/` y `config/`), por lo que usar `./backend` como contexto falla.
-
-4. Empuja la imagen:
-
-```bash
 docker push rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest
 ```
 
-## 3. Desplegar Contenedor Serverless
+Actualizar Rebase más adelante es solo cambiar esa línea `FROM`. Tu bundle no se toca.
 
-Ahora despliega la imagen completamente serverless sin gestionar infraestructura.
+## 3. Desplegar el Serverless Container
 
 1. Navega a **Serverless Containers**.
-2. Haz clic en **Crear un Contenedor**.
-3. Elige la imagen que acabas de empujar desde el Registro de Contenedores.
-4. Establece el Puerto en **3001**.
-5. En Variables de Entorno, añade lo siguiente de forma segura:
+2. Haz clic en **Create a Container**.
+3. Elige la imagen que acabas de subir.
+4. Configura el puerto en **8080**, el puerto en el que escucha la imagen de runtime a menos que `PORT` indique lo contrario.
+5. En Variables de Entorno, añade:
 
 | Clave | Valor |
 |-----|-------|
-| `DATABASE_URL` | La URI de tu paso de Postgres Gestionado |
-| `JWT_SECRET` | Una cadena aleatoria segura de 32+ caracteres para firmar tokens de autenticación |
+| `DATABASE_URL` | La URI de tu paso de Managed Postgres |
+| `JWT_SECRET` | Una cadena aleatoria segura de más de 32 caracteres para firmar tokens de autenticación |
+| `REBASE_SERVICE_KEY` | Una cadena aleatoria segura de más de 32 caracteres |
 | `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | El dominio de tu frontend (por ejemplo, `https://yourdomain.com`) |
+| `FRONTEND_URL` | La URL de tu frontend (utilizada para enlaces de correo electrónico y respaldo de CORS) |
+| `DISABLE_SELF_REGISTRATION` | `true` |
+| `REBASE_ADMIN_EMAIL` | La dirección del primer administrador, establecida **antes del primer arranque** |
+| `REBASE_ADMIN_PASSWORD` | Al menos 12 caracteres |
 
-6. Haz clic en **Desplegar Contenedor**.
+Las últimas tres son la forma en que este despliegue obtiene un administrador: en producción, la primera cuenta que se registra no es promovida, por lo que nada más generará el primer usuario autenticado. Consulta [Tu primer administrador](/docs/getting-started/deployment/#your-first-admin). Marca los secretos como variables de entorno secretas en lugar de normales.
 
-Scaleway aprovisionará inmediatamente el contenedor y te proporcionará una URL de endpoint público (ej., `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
+6. Apunta el health check a `/livez`. No a `/health`: este último realiza un viaje de ida y vuelta a la base de datos, por lo que una prueba de actividad (liveness probe) sobre él reiniciará un contenedor en buen estado durante un breve fallo temporal de la base de datos.
+7. Haz clic en **Deploy Container**.
 
-## 4. Crear el Esquema de la Base de Datos
+Scaleway aprovisiona el contenedor y te proporciona un endpoint público (por ejemplo, `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
 
-Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Debes aplicar el esquema una vez contra la base de datos de producción:
+*Para un cumplimiento estricto de los datos, verifica que los datos de tu organización en Scaleway reflejen tu entidad corporativa europea.*
+
+## 4. El esquema
+
+**El runtime crea las tablas faltantes al arrancar, incluidas las de tus colecciones.** `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, que es aditivo en todo el esquema: crea las tablas, columnas y tipos enum faltantes y aplica su seguridad a nivel de fila (RLS), de modo que el primer inicio contra una base de datos vacía se pone en marcha sirviendo tus colecciones.
+
+Lo que `ensure` nunca hace es cambiar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el reinicio de un contenedor no debe remodelar un esquema como efecto secundario de un despliegue.
+
+Por lo tanto, dos cosas aún requieren el CLI, ejecutado desde un checkout o un trabajo de CI con `DATABASE_URL` apuntando a tu Managed Database:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+- **RLS en tablas de unión (junction tables)** para relaciones de muchos a muchos.
+- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un tipo más restrictivo, un campo eliminado.
 
-Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Usa la cadena de conexión (URI) de tu instancia de Base de Datos Gestionada y asegúrate de que tu IP esté permitida en las ACL de la base de datos mientras ejecutas el comando.
+La imagen de runtime se distribuye sin el CLI, por lo que esto nunca se ejecuta dentro del contenedor. Para migraciones versionadas, haz commit de los archivos de migración con `rebase db generate` y ejecuta `rebase db migrate` como un paso de release en su lugar.
 
-Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
+## Almacenamiento de archivos
 
-*Nota: Para un cumplimiento estricto de los datos, verifica que los detalles de tu Organización de Scaleway reflejen tu entidad corporativa europea.*
+Los Serverless Containers no tienen disco duradero, por lo que el almacenamiento local de archivos supone una pérdida silenciosa de datos y el runtime lo rechaza en producción. Scaleway Object Storage es compatible con S3 y se encuentra en los mismos centros de datos:
+
+```env
+STORAGE_TYPE=s3
+S3_BUCKET=my-uploads
+S3_ENDPOINT=https://s3.fr-par.scw.cloud
+S3_REGION=fr-par
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+```
+
+Consulta [Almacenamiento](/docs/backend/storage) para obtener una visión completa.
+
+## Próximos pasos
+
+- [Despliegue](/docs/getting-started/deployment) — la lista de verificación para producción y las reglas del primer administrador que comparten todas las plataformas.
+- [Configuración](/docs/getting-started/configuration) — cada variable de entorno que lee el runtime.
 
 ---

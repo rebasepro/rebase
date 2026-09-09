@@ -1,17 +1,17 @@
 ---
-sourceHash: c23eea9d0e94ff83
-title: Déploiement de Rebase sur Hetzner Cloud
-description: Déployez Rebase sur Hetzner Cloud avec Terraform ou Docker Compose, pour d'excellentes performances européennes et une souveraineté des données.
+sourceHash: 8861ca94a0de827a
+title: Déployer Rebase sur Hetzner Cloud
+description: Déployez Rebase sur Hetzner Cloud avec Terraform ou Docker Compose, pour d'excellentes performances et la souveraineté des données dans l'UE.
 sidebar_label: Hetzner Cloud
 ---
 
-Hetzner Cloud offre un rapport performance-prix remarquable et constitue un choix solide pour les projets exigeant une souveraineté des données européenne, avec des datacenters à Nuremberg, Falkenstein et Helsinki.
+Hetzner Cloud offre un rapport performances/prix exceptionnel et constitue un choix solide pour les projets nécessitant la souveraineté des données européennes, avec des centres de données à Nuremberg, Falkenstein et Helsinki.
 
-Rien ici n'est spécifique à Hetzner du côté de votre projet. Un déploiement Rebase se compose de deux parties séparables — l'image runtime publiée et le **bundle** produit par `rebase build` — et le même bundle s'exécute sous Docker Compose sur un portable, sur Rebase Cloud, sous le [chart Helm](/docs/deployment/kubernetes) et sur une machine Hetzner. Passer de l'un à l'autre change l'infrastructure, pas l'application.
+Rien ici n'est spécifique à Hetzner concernant votre projet. Un déploiement Rebase est constitué de deux éléments distincts — l'image runtime publiée, et le **bundle** produit par `rebase build` — et ce même bundle s'exécute sous Docker Compose sur un ordinateur portable, sur Rebase Cloud, via le [chart Helm](/docs/deployment/kubernetes) ou sur une machine Hetzner. Passer de l'un à l'autre est un changement d'infrastructure, pas d'application.
 
-## La voie la plus rapide : Terraform
+## La méthode la plus rapide : Terraform
 
-Le module `terraform-hcloud-rebase` provisionne le serveur, un pare-feu, une IP stable et — le point essentiel — un volume qui contient les données Postgres, de sorte que remplacer l'hôte ne détruit pas la base.
+Le module `terraform-hcloud-rebase` provisionne le serveur, un pare-feu, une adresse IP stable et — ce qui importe le plus — un volume stockant les données Postgres, afin que le remplacement de l'hôte ne détruise pas la base de données.
 
 ```hcl
 module "rebase" {
@@ -29,54 +29,62 @@ module "rebase" {
 }
 ```
 
-Une chose doit être correcte avant le premier apply : l'enregistrement A de `domain` doit déjà pointer vers le serveur, sinon le challenge Let's Encrypt de Caddy échoue. L'adresse est créée indépendamment du serveur, vous pouvez donc l'obtenir d'abord avec `terraform apply -target=hcloud_primary_ip.ipv4`, définir le DNS, puis appliquer normalement.
+Un point important à régler avant le premier apply : l'enregistrement A pour `domain` doit déjà pointer vers le serveur, sinon le challenge Let's Encrypt de Caddy échouera. L'adresse est créée indépendamment du serveur, vous pouvez donc l'obtenir d'abord avec `terraform apply -target=hcloud_primary_ip.ipv4`, configurer le DNS, puis appliquer l'ensemble correctement.
 
-Le reste de cette page décrit le même déploiement à la main.
+Le reste de cette page détaille le même déploiement effectué manuellement.
 
-## 1. Créer un serveur
+## 1. Provisionner un serveur
 
 1. Dans la console Hetzner Cloud, cliquez sur **Add Server**.
-2. Choisissez un **emplacement** — Falkenstein, Nuremberg ou Helsinki pour une résidence des données dans l'UE.
-3. Choisissez une **image** : Ubuntu 24.04.
-4. Choisissez un **type** : `CPX21` (3 vCPU / 4 Go) est le plancher praticable, `CX32` (4 vCPU / 8 Go) est confortable pour le runtime et Postgres.
-5. Ajoutez un **volume** pour la base de données. Les données sur le disque du serveur disparaissent avec le serveur.
-6. Ajoutez votre clé SSH et créez-le.
+2. Choisissez un emplacement (**Location**) — Falkenstein, Nuremberg ou Helsinki pour la résidence des données dans l'UE.
+3. Choisissez une image (**Image**) : Ubuntu 24.04.
+4. Choisissez un type (**Type**) : `CPX21` (3 vCPU / 4 Go) est un minimum viable, `CX32` (4 vCPU / 8 Go) est confortable pour le runtime et Postgres.
+5. Ajoutez un volume (**Volume**) pour la base de données. Les données situées sur le disque propre au serveur disparaissent avec lui.
+6. Ajoutez votre clé SSH et créez le serveur.
 
 ## 2. Installer Docker
 
 ```bash
-ssh root@<ip-de-votre-serveur>
+ssh root@<your-server-ip>
 apt update && apt install -y docker.io docker-compose-v2
 ```
 
-## 3. Amener votre bundle sur le serveur
+## 3. Transférer votre bundle sur le serveur
 
-Il n'y a aucune image applicative à construire. `rebase build` produit un répertoire `dist-bundle`, et l'image runtime publiée l'exécute :
+Il n'y a aucune image applicative à construire. `rebase build` génère un répertoire `dist-bundle`, et l'image runtime publiée l'exécute :
 
 ```bash
 rebase build
-rsync -a dist-bundle/ root@<ip-de-votre-serveur>:/opt/rebase/dist-bundle/
+rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 ```
 
-Pour un déploiement réel, préférez l'une des deux formes qui n'impliquent pas de copier des fichiers à la main :
+Pour un déploiement réel, privilégiez l'une des deux approches évitant de copier manuellement les fichiers sur une machine :
 
-- **L'intégrer à une image** — `FROM rebasepro/server:0.19.1` puis `COPY dist-bundle /bundle` ; déployer devient un changement de tag.
-- **La servir en HTTP** — définissez `REBASE_BUNDLE_URL` et le runtime récupère et décompresse le bundle à chaque démarrage. C'est ce que fait le module Terraform ci-dessus, et le mécanisme qu'utilise le chart Helm.
+- **L'intégrer dans une image** — `FROM rebasepro/server:0.19.1` puis `COPY dist-bundle /bundle`, et déployez en changeant simplement de tag.
+- **Le servir via HTTP** — définissez `REBASE_BUNDLE_URL` pour que le runtime télécharge et décompresse le bundle à chaque démarrage. C'est ce que fait le module Terraform ci-dessus, et c'est le même mécanisme qu'utilise le chart Helm.
 
-## 4. Configurer et lancer
+## 4. Configurer et exécuter
 
-Rebase fournit un fichier Compose exactement pour cela : [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). C'est la recette d'auto-hébergement canonique — Postgres et le runtime, avec votre bundle monté — et il vaut mieux la lire que la copier, car ses commentaires expliquent chaque choix.
+Rebase fournit un fichier Compose prévu exactement pour cela : [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). Il s'agit de la recette canonique pour l'auto-hébergement — Postgres et le runtime, avec votre bundle monté — et il est recommandé de le lire plutôt que de simplement le copier, car ses commentaires expliquent chaque choix.
 
-Créez l'environnement qu'il attend :
+Créez l'environnement attendu :
 
 ```env
-POSTGRES_PASSWORD=une_longue_chaine_aleatoire
-JWT_SECRET=une_autre_longue_chaine_d_au_moins_32_caracteres
-REBASE_SERVICE_KEY=une_troisieme_longue_chaine_d_au_moins_32_caracteres
-CORS_ORIGINS=https://app.votredomaine.com
+POSTGRES_PASSWORD=a_long_random_string
+JWT_SECRET=another_long_random_string_at_least_32_chars
+REBASE_SERVICE_KEY=a_third_long_random_string_at_least_32_chars
+CORS_ORIGINS=https://app.yourdomain.com
+REBASE_ADMIN_EMAIL=you@yourdomain.com
+REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
 
-Puis démarrez :
+`REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` sont nouveaux : sur la version 0.17.3, le premier compte à s'inscrire devenait administrateur, y compris en production.
+
+Les six variables sont requises — le fichier Compose les déclare avec `${VAR:?…}` et refuse l'interpolation si elles sont absentes.
+
+Les deux dernières définissent le premier administrateur. Une base de données vierge n'a pas d'utilisateurs, et hors production, la première inscription est promue administratrice — ce qui devient une course critique dès que cette machine répond sur un nom d'hôte, car Caddy active TLS avant même que vous n'ayez saisi quoi que ce soit. En production, cette fenêtre de vulnérabilité est donc fermée et le compte est défini ici ; le runtime le crée une seule fois, tant que la table des utilisateurs est vide, et n'effectue aucune action lors des démarrages ultérieurs. Connectez-vous et modifiez le mot de passe.
+
+Lancez ensuite l'ensemble :
 
 ```bash
 docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
@@ -84,11 +92,11 @@ docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
 
 Le runtime écoute sur le port 8080 à l'intérieur du réseau Compose.
 
-`REBASE_SERVICE_KEY` contourne la sécurité au niveau des lignes. Traitez-la comme un identifiant superutilisateur de base de données, pas comme une clé d'API.
+`REBASE_SERVICE_KEY` contourne la sécurité au niveau des lignes (row-level security). Considérez-le comme un identifiant de superutilisateur de base de données, et non comme une clé d'API.
 
-## 5. Terminer le TLS avec Caddy
+## 5. Terminer TLS avec Caddy
 
-N'exposez jamais le runtime directement. Caddy provisionne les certificats Let's Encrypt automatiquement ; le lancer comme un autre service Compose garde toute la pile dans un seul fichier :
+N'exposez jamais le runtime directement. Caddy provisionne automatiquement les certificats Let's Encrypt ; l'exécuter en tant que service Compose supplémentaire permet de conserver l'ensemble de la pile dans un seul fichier :
 
 ```yaml
   caddy:
@@ -100,21 +108,21 @@ N'exposez jamais le runtime directement. Caddy provisionne les certificats Let's
       - caddy-data:/data
 ```
 
-Avec un `Caddyfile` de :
+Avec un `Caddyfile` tel que :
 
 ```caddyfile
-api.votredomaine.com {
+api.yourdomain.com {
     reverse_proxy api:8080
 }
 ```
 
-Faites pointer l'enregistrement A de ce domaine vers le serveur avant de démarrer Caddy, sinon la demande de certificat échoue.
+Faites pointer l'enregistrement A de ce domaine vers le serveur avant de démarrer Caddy, sinon la demande de certificat échouera.
 
 ## Le stockage n'est pas optionnel
 
-Le runtime **refuse de démarrer en production** avec un stockage local configuré : le système de fichiers du conteneur est détruit à chaque redémarrage, et un backend local en production est une perte de données silencieuse.
+Le runtime **refuse de démarrer en production** si un stockage local est configuré, car le système de fichiers du conteneur est détruit à chaque redémarrage et un backend local en production équivaut à une perte silencieuse de données.
 
-Hetzner Object Storage est compatible S3 et se trouve dans les mêmes datacenters, c'est donc l'association naturelle :
+Hetzner Object Storage est compatible S3 et réside dans les mêmes centres de données, ce qui en fait le complément naturel :
 
 ```env
 STORAGE_TYPE=s3
@@ -125,35 +133,37 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-Si votre projet ne stocke aucun fichier, définissez `FORCE_LOCAL_STORAGE=true` pour le reconnaître explicitement. Voir [Stockage](/docs/backend/storage) pour le tableau complet.
+Si votre projet ne stocke aucun fichier téléversé, définissez `FORCE_LOCAL_STORAGE=true` pour le confirmer explicitement. Consultez [Storage](/docs/backend/storage) pour une vue d'ensemble.
 
 ## Ce que le démarrage fait à votre schéma
 
-Avec `REBASE_MIGRATE_ON_BOOT` à sa valeur par défaut `ensure`, le runtime provisionne vos tables de collections **et leurs politiques de sécurité au niveau des lignes** au démarrage, de façon additive. Un premier démarrage sur une base vide les sert déjà — il n'y a aucune étape de schéma à exécuter avant que le déploiement fonctionne.
+Avec `REBASE_MIGRATE_ON_BOOT` défini sur sa valeur par défaut `ensure`, le runtime provisionne vos tables de collections **ainsi que leurs stratégies de sécurité au niveau des lignes (RLS)** au démarrage, de façon additive. Dès son premier démarrage sur une base de données vide, il est prêt à les servir — aucune étape préalable de schéma n'est requise pour que le déploiement fonctionne.
 
-Ce que le démarrage ne fait délibérément jamais, c'est du destructif : il ne modifie pas un type de colonne, ne supprime pas de colonne et ne change pas un label d'enum existant. Un redémarrage de conteneur ne doit pas pouvoir remodeler un schéma par effet de bord.
+Ce que le démarrage ne fait délibérément jamais, c'est toute opération destructive : il ne modifie pas le type d'une colonne, ne supprime pas de colonne et n'édite pas les valeurs d'une énumération existante. Un redémarrage de conteneur ne doit pas pouvoir remodeler un schéma par effet de bord.
 
-Deux choses nécessitent donc toujours [`rebase db push`](/docs/architecture/schema-as-code), exécuté depuis un checkout ou depuis la CI, où le garde-fou des changements destructifs et une sauvegarde sont à portée :
+Deux cas nécessitent donc toujours l'exécution de [`rebase db push`](/docs/architecture/schema-as-code), lancé depuis un clone local ou un pipeline CI où la validation des changements destructifs et une sauvegarde sont à portée de main :
 
-- la RLS des tables de jonction pour les relations plusieurs-à-plusieurs ;
-- tout changement qui n'est pas purement additif.
+- le RLS pour les tables de jointure des relations many-to-many ;
+- toute modification qui n'est pas purement additive.
 
-Si le module ou le fichier Compose a lié Postgres à la boucle locale — les deux le font — atteignez-le par un tunnel SSH :
+Si le module ou le fichier Compose lie Postgres à l'interface de bouclage (loopback) — ce que font les deux —, accédez-y via un tunnel SSH :
 
 ```bash
-ssh -N -L 5433:127.0.0.1:5432 root@<ip-de-votre-serveur>
+ssh -N -L 5433:127.0.0.1:5432 root@<your-server-ip>
 ```
 
-Un port de base de données ouvert sur Internet est la façon dont les lignes d'un déploiement Rebase finissent lues en contournant la sécurité au niveau des lignes plutôt qu'à travers elle.
+Un port de base de données exposé à Internet permettrait de lire les lignes d'un déploiement Rebase en contournant la sécurité au niveau des lignes au lieu de passer par elle.
 
-## Mise à jour
+## Mise à niveau
 
-Changez le tag de l'image et redémarrez. Votre bundle reste intact, et tout projet sur ce runtime récupère le nouveau moteur.
+Modifiez le tag de l'image et redémarrez. Votre bundle reste intact, et chaque projet sur ce runtime bénéficie du nouveau moteur.
 
-L'exception est la version majeure de Postgres : Postgres refuse de démarrer sur un répertoire de données écrit par une version majeure antérieure, cette mise à niveau est donc toujours un dump et un restore, jamais en place.
+L'exception concerne les versions majeures de Postgres : Postgres refuse de démarrer avec un répertoire de données écrit par une version majeure antérieure. Cette mise à niveau nécessite donc un dump et une restauration, jamais une mise à jour sur place.
 
 ```bash
 rebase db backup --out ./backups
-# recréer le volume sur la nouvelle version majeure
-rebase db restore ./backups/<fichier>.dump
+# recreate the volume on the new major
+rebase db restore ./backups/<file>.dump
 ```
+
+---

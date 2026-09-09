@@ -1,39 +1,41 @@
 ---
-sourceHash: 8e121c4a54f84556
+sourceHash: 10463431afdfaea5
 title: API REST
 sidebar_label: API REST
-description: Endpoints de API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
+description: Endpoints de API REST generados automáticamente para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
 ---
 
 ## Resumen
 
-Rebase genera automáticamente una API completa a partir de las definiciones de sus colecciones:
+Rebase genera automáticamente una API completa a partir de las definiciones de tus colecciones:
 
 - **API REST** — Endpoints CRUD para cada colección en `/api/data/:slug`
 - **Especificación OpenAPI** — Especificación legible por máquina en `/api/docs`
-- **Swagger UI** — Explorador de API interactivo en `/api/swagger` (solo en modo desarrollo)
+- **Swagger UI** — Explorador interactivo de la API en `/api/swagger` (solo en modo de desarrollo)
 
-No se requiere código — defina sus colecciones y la API aparece automáticamente.
+No se requiere código: define tus colecciones y la API aparecerá automáticamente.
 
 ## Endpoints REST
 
-Para cada colección se generan los siguientes endpoints:
+Para cada colección, se generan los siguientes endpoints. Cualquier otra ruta que monte el backend (auth, storage, admin, meta) se encuentra en el [índice de endpoints](/docs/backend/endpoints/).
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | Listar entidades |
 | `GET` | `/api/data/:slug/count` | Contar entidades |
+| `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opcionalmente agrupados. Acepta los mismos filtros que el endpoint de listado, y RLS se aplica a las filas que se agregan; consulta [Consultas](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Obtener una sola entidad |
-| `POST` | `/api/data/:slug` | Crear una entidad |
-| `PATCH` | `/api/data/:slug/:id` | Actualizar una entidad |
-| `DELETE` | `/api/data/:slug/:id` | Eliminar una entidad |
-| `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
-| `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
-| `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
+| `POST` | `/api/data/:slug` | Crear un registro |
+| `PATCH` | `/api/data/:slug/:id` | Actualizar un registro (parcial: solo se escriben las propiedades enviadas) |
+| `DELETE` | `/api/data/:slug/:id` | Eliminar un registro |
+| `POST` | `/api/data/:slug/bulk` | Crear múltiples entidades en una sola transacción |
+| `PATCH` | `/api/data/:slug/bulk` | Actualizar múltiples entidades en una sola transacción |
+| `POST` | `/api/data/:slug/bulk/delete` | Eliminar múltiples entidades en una sola transacción |
+| `POST` | `/api/data/_batch` | Escribir **entre** colecciones en una sola transacción |
 
-### Rutas de Subcolecciones
+### Rutas de subcolecciones
 
-Las relaciones anidadas son accesibles mediante rutas de URL:
+Las relaciones anidadas son accesibles a través de rutas de URL:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
@@ -43,24 +45,24 @@ PATCH  /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
-#### Mecánica de Enrutamiento y Análisis de Segmentos
+#### Mecánica de enrutamiento y análisis de segmentos
 
-Para manejar profundidades arbitrarias de subcolecciones anidadas, Rebase enruta las peticiones entrantes usando la regex de parámetro `:rest{.+}` de Hono. El motor interno de análisis de segmentos analiza las rutas contando los segmentos separados por barras:
-- **Número impar de segmentos** (p. ej., `authors/42/posts` -> 3 segmentos) representa una petición de lista de colección.
-- **Número par de segmentos** (p. ej., `authors/42/posts/7` -> 4 segmentos) representa una operación sobre un ID de entidad específico. El último segmento se extrae como el `entityId` objetivo.
+Para manejar profundidades arbitrarias de subcolecciones anidadas, Rebase enruta las solicitudes entrantes utilizando la expresión regular del parámetro `:rest{.+}` de Hono. El motor interno de análisis de segmentos analiza las rutas contando los segmentos separados por barras:
+- **Recuento impar de segmentos** (ej., `authors/42/posts` -> 3 segmentos) representa una solicitud de listado de colección.
+- **Recuento par de segmentos** (ej., `authors/42/posts/7` -> 4 segmentos) representa una operación sobre un ID de entidad específico. El último segmento se extrae como el `entityId` de destino.
 
-El motor filtra los espacios de nombres reservados del sistema (p. ej., `history`) del análisis de segmentos de la ruta para evitar colisiones con los endpoints integrados.
+El motor filtra los espacios de nombres reservados del sistema (ej., `history`) del análisis de segmentos de ruta para evitar colisiones con los endpoints integrados.
 
 ## Autenticación
 
-Todos los endpoints de datos requieren autenticación de forma predeterminada. Incluya un token Bearer en la cabecera `Authorization`:
+Todos los endpoints de datos requieren autenticación por defecto. Incluye un token Bearer en el encabezado `Authorization`:
 
 ```bash
 curl -H "Authorization: Bearer <access-token>" \
      https://api.example.com/api/data/products
 ```
 
-Para llamadas de servidor a servidor, use la clave de servicio:
+Para llamadas de servidor a servidor, utiliza la clave de servicio:
 
 ```bash
 curl -H "Authorization: Bearer <service-key>" \
@@ -69,7 +71,7 @@ curl -H "Authorization: Bearer <service-key>" \
 
 ## Filtrado
 
-Use parámetros de consulta al estilo PostgREST para filtrar los resultados. El formato es `?field=operator.value`:
+Utiliza parámetros de consulta al estilo PostgREST para filtrar resultados. El formato es `?field=operator.value`:
 
 ```bash
 # Exact match
@@ -95,24 +97,36 @@ GET /api/data/products?tags=cs.electronics
 GET /api/data/products?tags=csa.(electronics,books)
 ```
 
-### Operadores de Filtro
+### Operadores de filtro
 
 | Operador | Significado | Ejemplo |
-|----------|---------|---------|
+|----------|-------------|---------|
 | `eq` | Igual (`==`) | `?active=eq.true` |
-| `neq` | Distinto (`!=`) | `?status=neq.draft` |
+| `neq` | No igual (`!=`) | `?status=neq.draft` |
 | `gt` | Mayor que (`>`) | `?price=gt.100` |
 | `gte` | Mayor o igual (`>=`) | `?price=gte.100` |
 | `lt` | Menor que (`<`) | `?price=lt.50` |
 | `lte` | Menor o igual (`<=`) | `?price=lte.50` |
-| `in` | En array | `?status=in.(a,b,c)` |
-| `nin` | No en array | `?status=nin.(a,b)` |
-| `cs` | Array contiene | `?tags=cs.value` |
-| `csa` | Array contiene alguno | `?tags=csa.(a,b)` |
+| `in` | En el array | `?status=in.(a,b,c)` |
+| `nin` | No en el array | `?status=nin.(a,b)` |
+| `cs` | El array contiene | `?tags=cs.value` |
+| `csa` | El array contiene alguno | `?tags=csa.(a,b)` |
+| `like` | Coincidencia de patrón, sensible a mayúsculas y minúsculas (`like`) | `?sku=like.AB-%` |
+| `ilike` | Coincidencia de patrón, insensible a mayúsculas y minúsculas (`ilike`) | `?name=ilike.%widget%` |
+| `nlike` | No coincide con el patrón (`not-like`) | `?sku=nlike.TMP-%` |
+| `nilike` | No coincide, insensible a mayúsculas y minúsculas (`not-ilike`) | `?name=nilike.%test%` |
+| `isnull` | La columna es `NULL` (`is-null`) | `?deleted_at=isnull.null` |
+| `notnull` | La columna no es `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
-### Operadores Lógicos
+`isnull` y `notnull` ignoran su valor: el operador es la condición completa, y cualquier cosa después del punto se descarta. El SDK escribe `.null`, por lo que esa es la sintaxis que verás en la red.
 
-Use `or` y `and` para condiciones complejas:
+:::caution[`eq.null` es la cadena de cuatro caracteres, no `IS NULL`]
+`?deleted_at=eq.null` busca el texto literal `null`. SQL `= NULL` nunca es verdadero, por lo que no hay interpretación de `eq.null` que signifique la comprobación de nulos; utiliza `isnull` para ello. El SDK serializa `.where("deleted_at", "==", null)` como `isnull.null` exactamente por esta razón.
+:::
+
+### Operadores lógicos
+
+Utiliza `or`, `and` y `not` para condiciones complejas:
 
 ```bash
 # OR: match products that are either cheap or on sale
@@ -120,11 +134,53 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 
 # AND: explicit conjunction
 GET /api/data/products?and=(active.eq.true,price.gt.0)
+
+# NOT: everything that is not a discontinued in-stock item
+GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
 ```
+
+`not` niega la **conjunción** de sus condiciones: `not(a)` es `NOT a`, y `not(a,b)` es `NOT (a AND b)`. Se compila a un `NOT (...)` real de SQL en lugar de a operadores invertidos: la lógica de SQL es trivaluada, por lo que `NOT (a AND b)` y `(NOT a) OR (NOT b)` dejan de coincidir en el momento en que interviene un NULL. Por lo tanto, una negación **incluye filas cuya columna es NULL**, que es lo que significa `NOT`; añade un `notnull` con AND junto a él si no es eso lo que deseas.
+
+**Un grupo por solicitud: `or` tiene prioridad sobre `and`, y ambos sobre `not`.** Son tres formas de escribir el mismo espacio, no tres filtros. En su lugar, anídalos:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
+```
+
+Los grupos pueden anidarse hasta 32 niveles de profundidad; más allá de eso, la solicitud se rechaza con `INVALID_LOGICAL_GROUP`.
+
+Un grupo **restringe** junto con los filtros de campo en lugar de reemplazarlos; consulta [Cómo se combinan los filtros](#cómo-se-combinan-los-filtros).
+
+### El dialecto JSON de `where`
+
+Los filtros de campo anteriores son una de las dos formas de enviar un filtro. La otra es un único objeto JSON, que es lo que el documento OpenAPI publica en cada `GET /api/data/{slug}` y lo que aceptan las rutas de subcolecciones anidadas:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Cada clave es un campo y cada valor es una tupla canónica `[operator, value]`, las mismas tuplas que escribe el SDK. Un valor también puede ser una cadena con punto pre-serializada (`{"status":"eq.active"}`) o un escalar simple (`{"status":"active"}`); las tres compilan a la misma condición.
+
+La diferencia que vale la pena conocer: **JSON conserva los tipos.** `?price=gte.100` envía la cadena `"100"` y el controlador la convierte según el tipo de columna, mientras que `?where={"price":[">=",100]}` envía un número. Para una columna cuyas interpretaciones de texto y numéricas difieren (una cadena de versión, un código con ceros a la izquierda), ese es el parámetro adecuado.
+
+Un `where` mal formado devuelve un error 400 `INVALID_WHERE`, no un filtro descartado silenciosamente: descartarlo ejecutaría la lectura sin filtros y devolvería todo lo que la seguridad a nivel de fila (RLS) permita.
+
+### Cómo se combinan los filtros
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` y `?searchString=` son independientes, y cada uno de los que esté presente debe coincidir:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+No hay forma de aplicar un OR entre ellos. Cualquier cosa que no sea un AND simple de esos grupos debe ir dentro de un único árbol `or=`/`and=`.
 
 ## Ordenación
 
-Use `orderBy` con el formato `field:direction`:
+Utiliza `orderBy` con el formato `field:direction`:
 
 ```bash
 # Sort by price descending
@@ -134,23 +190,103 @@ GET /api/data/products?orderBy=price:desc
 GET /api/data/products?orderBy=name:asc
 ```
 
+La dirección por defecto es `asc`. Una dirección que no sea ni `asc` ni `desc`, o un campo que la colección no tenga, devuelve un **400**, no un 200 con las filas en el orden que la base de datos decida, lo cual es indistinguible de una ordenación que funcionó correctamente.
+
+### Varias claves
+
+La sintaxis abreviada admite una clave. Para más claves, pasa un array JSON; la segunda clave desempatará las filas que la primera considere iguales:
+
+```bash
+# By category, and newest first within each category
+GET /api/data/products?orderBy=[{"field":"category"},{"field":"createdAt","direction":"desc"}]
+```
+
+Ambas sintaxis funcionan en todas las rutas que listan filas, incluidas las anidadas (`/api/data/authors/:id/posts`). Toda ordenación finaliza con el id de la fila en orden descendente, se haya solicitado o no: esto es lo que hace que la ordenación sea total, y paginar sobre un orden que no es total repite y omite filas.
+
+Un parámetro `?orderBy=` repetido no es una ordenación de múltiples claves: el último prevalece, como ocurre con cualquier otro parámetro de consulta. Utiliza el array.
+
+### Dónde se ordenan los valores NULL
+
+Por defecto, los valores NULL se ordenan **al final de forma ascendente y al principio de forma descendente**, que es la convención propia de Postgres. Un tercer segmento separado por dos puntos permite cambiar esto:
+
+```bash
+# Newest first, with the undated rows at the end rather than the top
+GET /api/data/posts?orderBy=publishedAt:desc:last
+```
+
+El formato de array JSON acepta una clave `"nulls"` para lo mismo:
+
+```bash
+GET /api/data/posts?orderBy=[{"field":"publishedAt","direction":"desc","nulls":"last"}]
+```
+
+Cualquier valor distinto de `first` o `last` devuelve un 400, no un orden silenciosamente diferente. El cursor descrito a continuación respeta lo que haya declarado la ordenación, por lo que la paginación sobre una clave que admite nulos sigue siendo correcta bajo cualquier ubicación.
+
 ## Paginación
 
-Use `limit` y `offset`, o `page`:
+Utiliza `limit` y `offset`, o `page`:
 
 ```bash
 # Limit and offset
 GET /api/data/products?limit=20&offset=40
 
-# Page-based (uses default limit of 20)
+# Page-based (uses the default limit of 50)
 GET /api/data/products?page=3
 ```
 
-El límite predeterminado es **20**, el máximo es **100**.
+El límite por defecto es **50** y el máximo es **1000**. Ambos provienen de `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, que la especificación OpenAPI generada también reporta; un `limit` superior al máximo se rechaza en lugar de ajustarse.
 
-### Formato de Respuesta
+Los tres parámetros de ventana se rechazan en lugar de corregirse, y cada uno se identifica a sí mismo: `INVALID_LIMIT`, `INVALID_OFFSET` (un número entero mayor o igual a 0) e `INVALID_PAGE` (un número entero mayor o igual a 1). Una ventana silenciosamente diferente a la solicitada no se puede distinguir de haber llegado al final de la colección, razón por la cual ninguno de ellos se ajusta ni se ignora.
 
-Las respuestas de lista incluyen metadatos de paginación:
+### Paginación por cursor
+
+`offset` vuelve a contar las filas en cada solicitud, por lo que una fila insertada o eliminada entre dos páginas desplaza la ventana y el recorrido omite o repite filas silenciosamente. En su lugar, `?after=` busca por posición: la página siguiente comienza estrictamente después de la última fila servida.
+
+Cada respuesta de listado incluye `meta.nextCursor` mientras haya otra página. Envíalo de vuelta sin modificaciones:
+
+```bash
+GET /api/data/orders?orderBy=createdAt:desc&limit=100
+# → meta.nextCursor = "eyJrIjpbWyJjcmVhdGVkX2F0Iiw…"
+
+GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJjcmVhdGVkX2F0Iiw…
+```
+
+El cursor es **opaco** (codifica las claves de ordenación *y* los valores de la última fila para ellas), por lo que se aplican tres reglas, cada una resultando en un 400 en lugar de una página incorrecta:
+
+| Situación | Código |
+|-----------|--------|
+| `after` con `offset` o `page` | `CURSOR_WITH_OFFSET`: ambos indican dónde comienza la página |
+| `after` con un `orderBy` diferente al que se emitió | `CURSOR_ORDER_MISMATCH` |
+| Un cursor que esta API no emitió | `INVALID_CURSOR` |
+
+Una solicitud que no especifique ningún `orderBy` **adopta el del cursor**, por lo que reenviar `meta.nextCursor` sin volver a definir la ordenación funciona.
+
+Tanto las ordenaciones de múltiples claves como las claves que admiten nulos se paginan correctamente: la comparación se construye sobre cada clave en orden, con la ubicación de NULL que declaró la ordenación. La única ordenación que ningún cursor puede describir es la relevancia (`_score`), calculada por consulta y no almacenada en ninguna parte, por lo que dicho listado simplemente no incluye `nextCursor`.
+
+## Selección de columnas
+
+`?fields=` restringe una lectura a las columnas que especifiques. Es una proyección insertada en la consulta, no un recorte de la respuesta:
+
+```bash
+GET /api/data/posts?fields=id,title&limit=50
+```
+
+La clave primaria siempre se devuelve (una fila que no se puede direccionar no se puede actualizar, eliminar ni paginar, y el cursor se deriva de ella), y las columnas `excludeFromApi` permanecen ocultas se hayan especificado o no. Una columna desconocida devuelve un 400 `UNKNOWN_FIELD` en lugar de una fila a la que silenciosamente le falta un campo.
+
+`?distinct=true` colapsa filas idénticas en esas columnas:
+
+```bash
+# The statuses actually in use
+GET /api/data/posts?fields=status&distinct=true
+```
+
+Se rechaza (400) cuando se usa junto con un `searchString` clasificado o una búsqueda vectorial, que adjuntan una puntuación por fila haciendo que cada fila sea distinta por definición, y cuando `orderBy` nombra una columna que `fields` no devuelve (`DISTINCT_ORDER_BY_NOT_SELECTED`): Postgres no puede ordenar una lectura DISTINCT por una expresión fuera de su lista de selección.
+
+`?fields=` y `?distinct=` también funcionan en la ruta de obtención por ID y en las rutas de subcolecciones anidadas.
+
+### Formato de respuesta
+
+Las respuestas de listado incluyen metadatos de paginación:
 
 ```json
 {
@@ -162,10 +298,13 @@ Las respuestas de lista incluyen metadatos de paginación:
         "total": 150,
         "limit": 20,
         "offset": 0,
-        "hasMore": true
+        "hasMore": true,
+        "nextCursor": "eyJrIjpbWyJpZCIsImRlc2MiXV0sInYiOnsiaWQiOjJ9LCJpIjoyfQ"
     }
 }
 ```
+
+`nextCursor` está presente mientras `hasMore` sea verdadero y la página haya devuelto al menos una fila; está ausente en la última página y en una ordenación que ningún cursor pueda describir.
 
 Las respuestas de una sola entidad devuelven un objeto plano:
 
@@ -178,42 +317,101 @@ Las respuestas de una sola entidad devuelven un objeto plano:
 }
 ```
 
-## Búsqueda de Texto
+## Errores
 
-Use `searchString` para la búsqueda de texto completo en los campos de tipo cadena:
+Cada fallo, de cualquier ruta, se devuelve en una única estructura envolvente:
+
+```json
+{
+    "error": {
+        "message": "Unknown filter operator 'contains' on field 'title'.",
+        "code": "UNKNOWN_FILTER_OPERATOR",
+        "details": { "field": "title", "operator": "contains" },
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+`message` y `code` siempre están presentes. `details` aparece cuando el rechazo trata *sobre* algo en concreto (el campo que era incorrecto, las rutas que fallaron). `requestId` aparece cuando la solicitud incluía un encabezado `X-Request-ID` o se le asignó uno; también se refleja en el encabezado de respuesta y es lo que se debe citar en un informe de errores.
+
+**Bifurca tu lógica según `code`, nunca según `message` o solo por el estado HTTP.** Los códigos están en `SCREAMING_SNAKE_CASE` y son estables; los mensajes están escritos para una persona que lee una consola y pueden cambiar. El estado HTTP se encuentra en la respuesta, no en el cuerpo.
+
+| Estado | Código típico | Significado |
+|--------|---------------|-------------|
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La solicitud está mal formada o pide algo imposible |
+| 401 | `UNAUTHORIZED` | Sin credencial, o con una que no identifica a nadie |
+| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | Una credencial que identifica a alguien sin los permisos necesarios |
+| 404 | `NOT_FOUND` | El recurso solicitado no existe |
+| 409 | `CONFLICT` | El estado entra en conflicto: una clave duplicada, un árbol desincronizado |
+| 501 | varía | La superficie existe pero **no está configurada** en este despliegue |
+| 503 | `SERVICE_UNAVAILABLE` | Una dependencia está caída; la solicitud nunca llegó a ella |
+
+Una superficie que está ausente porque este despliegue no la habilitó responde 501 con un código y un motivo, no 404; un 404 inexplicado en una ruta a la que la interfaz de usuario acaba de llamar se interpreta como un despliegue defectuoso.
+
+Las rutas agregan sus propios códigos más específicos sobre estos (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), así que considera la lista de códigos como abierta. El SDK del cliente los transforma a todos en un único `RebaseApiError` que contiene `status`, `code` y `details`; consulta [Manejo de errores](/docs/backend#error-handling).
+
+## Búsqueda de texto
+
+Utiliza `searchString` para búsquedas de texto completo en campos de texto:
 
 ```bash
 GET /api/data/products?searchString=wireless%20keyboard
 ```
 
-## Búsqueda Vectorial
+## Búsqueda vectorial
 
-Si una colección define una propiedad con un tipo `vector`, puede realizar búsquedas de similitud de alta velocidad usando operaciones de distancia de pgvector compiladas directamente en la consulta de la base de datos.
+Si una colección define una propiedad de tipo `vector`, puedes realizar búsquedas de similitud de alta velocidad utilizando operaciones de distancia de pgvector compiladas directamente en la consulta a la base de datos.
 
 ```bash
 GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
 ```
 
-### Parámetros de Consulta Vectorial
+### Parámetros de consulta vectorial
 
 | Parámetro | Tipo | Descripción |
 |-----------|------|-------------|
-| `vector_search` | `string` | El nombre de la propiedad vectorial contra la que consultar. |
-| `vector` | `string` | Un array de floats serializado en JSON que representa el vector de consulta. |
-| `vector_distance` | `string` | La métrica de distancia a evaluar. Valores soportados: `cosine` (predeterminado, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
-| `vector_threshold` | `number` | Umbral máximo de distancia. Solo se devuelven los registros con una distancia menor que este umbral. |
+| `vector_search` | `string` | El nombre de la propiedad vectorial sobre la que se realiza la consulta. |
+| `vector` | `string` | Un array de números decimales (floats) serializado en JSON que representa el vector de consulta. |
+| `vector_distance` | `string` | La métrica de distancia a evaluar. Valores admitidos: `cosine` (por defecto, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
+| `vector_threshold` | `number` | Umbral de distancia máxima. Solo se devuelven los registros con una distancia menor a este umbral. |
 
-## Inclusión de Relaciones
+## Inclusión de relaciones
 
-Use el parámetro `include` para incrustar entidades relacionadas:
+Utiliza el parámetro `include` para incrustar entidades relacionadas:
 
 ```bash
 # Include specific relations
 GET /api/data/articles?include=author,categories
 
-# Include all relations
+# Include all relations, one hop deep
 GET /api/data/articles?include=*
+
+# A relation of a relation — up to three hops
+GET /api/data/articles?include=comments.author
 ```
+
+Un nombre que no sea una relación de la colección devuelve un **400 `UNKNOWN_RELATION`**, en todos los niveles. Anteriormente se ignoraba, respondiendo 200 con el campo simplemente ausente, indistinguible de una fila que realmente no tiene una fila relacionada, por lo que un error tipográfico parecía exactamente datos vacíos. Una ruta con más de tres saltos devuelve `INCLUDE_TOO_DEEP`.
+
+### Restringir una relación
+
+El formato separado por comas no tiene dónde colocar un `limit` por relación, por lo que `include` también acepta JSON, reconocible por una llave inicial:
+
+```bash
+GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",true]},"orderBy":"createdAt:desc","fields":["id","body"],"include":{"author":true}}}
+```
+
+| Clave | Significado |
+|-------|-------------|
+| `limit` | Filas **por fila primaria**, no en toda la página |
+| `where` | El mismo dialecto de filtro que utiliza el `where` de nivel superior |
+| `logical` | Un grupo `or`/`and`/`not` sobre las filas relacionadas |
+| `orderBy` | La misma sintaxis de ordenación, incluida la ubicación de NULL |
+| `fields` | Columnas de la fila *relacionada*; su clave primaria siempre se conserva |
+| `include` | Relaciones de la fila relacionada, a su vez |
+
+`true` significa "cargarla por completo", por lo que `{"author":true}` y `author` son la misma solicitud. Ambas sintaxis funcionan en la ruta de listado, en la ruta de obtención por ID y en las rutas de subcolecciones anidadas.
+
+Cada salto es una única consulta por lotes para toda la página, nunca una por fila.
 
 Las relaciones incluidas se incrustan directamente en la respuesta:
 
@@ -230,235 +428,63 @@ Las relaciones incluidas se incrustan directamente en la respuesta:
 }
 ```
 
-## Selección de Campos
+## Escritura
 
-Use `fields` para seleccionar columnas específicas:
+Las claves de idempotencia, las escrituras condicionales (`ETag` / `If-Match`), las operaciones de campo (`$inc`, `$push`, `$pull`, `$merge`), el upsert sobre una clave natural, `Prefer: return=minimal` y el endpoint entre colecciones `POST /api/data/_batch` se encuentran en su propia página: **[Escritura a través de REST](/docs/backend/writes/)**.
 
-```bash
-GET /api/data/products?fields=id,name,price
-```
+## Canalización de hooks del ciclo de vida
 
-## Pipeline de Hooks del Ciclo de Vida
-
-Cada operación de mutación REST (`POST`, `PATCH`, `DELETE`) pasa por un pipeline de ejecución de hooks estricto y secuencial:
+Cada operación de mutación REST (`POST`, `PATCH`, `DELETE`) se ejecuta a través de una canalización de ejecución de hooks secuencial y estricta:
 
 ```
 Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
 ```
 
-### Hooks Bloqueantes vs. Diferidos
+### Hooks bloqueantes frente a diferidos
 
 1. **Hooks bloqueantes (`beforeSave`, `beforeDelete`)**
-   Estos hooks se ejecutan de forma síncrona en el ciclo principal de la petición *antes* de confirmar la transacción de la base de datos. Pueden modificar las cargas entrantes, ejecutar validaciones personalizadas o abortar la petición por completo lanzando un error.
+   Estos hooks se ejecutan de forma sincrónica en el ciclo principal de la solicitud *antes* de confirmar la transacción de la base de datos. Pueden modificar los datos entrantes (payloads), ejecutar validaciones personalizadas o abortar la solicitud por completo lanzando un error.
 
 2. **Hooks diferidos (`afterSave`, `afterDelete`)**
-   Estos hooks se ejecutan de forma asíncrona después de que la transacción de la base de datos se ha confirmado con éxito. Usan promesas diferidas (fire-and-forget), lo que significa que se ejecutan en segundo plano y no bloquean la respuesta HTTP del cliente. Ideal para enviar webhooks, activar notificaciones push o encolar tareas externas.
+   Estos hooks se ejecutan de forma asíncrona después de que la transacción de la base de datos se haya confirmado exitosamente. Utilizan promesas diferidas (fire-and-forget), lo que significa que se ejecutan en segundo plano y no bloquean la respuesta HTTP al cliente. Son ideales para enviar webhooks, activar notificaciones push o poner tareas externas en cola.
 
+## Endpoints del sistema
+
+| Método | Ruta | Autenticación | Descripción |
+|--------|------|---------------|-------------|
+| `GET` | `/health` y `/api/health` | ninguna | Verificación de disponibilidad y preparación (liveness/readiness) |
+| `GET` | `/api/docs` | ninguna | La especificación OpenAPI 3.0 en formato JSON |
+| `GET` | `/api/swagger` | ninguna | Swagger UI. Activado en desarrollo, desactivado en producción; `REBASE_ENABLE_SWAGGER` lo anula en cualquier caso |
+| `GET` | `/api/meta/schema-version` | ninguna | El hash del esquema a partir del cual se construyó este backend: deliberadamente sin autenticación, y solo devuelve dicho hash |
+| `GET` | `/api/meta/contract` | admin, clave de servicio o clave de API de admin | El contrato completo de colecciones, para `rebase generate-sdk --from`. Cierre seguro por fallo (fail-closed): `404` cuando no hay autenticación configurada |
+| `GET` | `/metrics` | `REBASE_METRICS_TOKEN` cuando esté configurado | Métricas de Prometheus, cuando `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-- **Especificación OpenAPI**: `GET /api/docs` — Devuelve la especificación JSON completa de OpenAPI 3.0
-- **Swagger UI**: `GET /api/swagger` — Explorador de API interactivo (solo en modo desarrollo)
+La especificación OpenAPI se genera automáticamente a partir de las definiciones de tus colecciones: describe los endpoints de listado, lectura, creación, actualización, eliminación y operaciones masivas de cada colección que sirve el backend, con sus parámetros de consulta y esquemas de respuesta. No es un mapa completo de toda la superficie HTTP (las rutas de autenticación, almacenamiento, funciones y cron se documentan únicamente en este sitio) y las columnas marcadas como `excludeFromApi` quedan excluidas de ella.
 
-La especificación OpenAPI se genera automáticamente a partir de las definiciones de sus colecciones: describe los endpoints de listado, lectura, creación, actualización, borrado y bulk de cada colección que sirve el backend, con sus parámetros de consulta y esquemas de respuesta. No es un mapa completo de la superficie HTTP — las rutas de auth, storage, functions y cron están documentadas solo en este sitio — y las columnas marcadas con `excludeFromApi` quedan fuera de ella.
-
-## Claves de API
-
-Las claves de API proporcionan autenticación de máquina a máquina para agentes, servidores MCP, pipelines de CI e integraciones externas. Admiten alcance de permisos por colección y acceso de administrador completo opcional.
-
-### Crear una Clave de API
-
-```bash
-# Via CLI
-rebase api-keys create --name "My Integration" \
-  --permissions '[{"collection":"orders","operations":["read","write"]}]'
-
-# Via REST (requires admin auth)
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Integration",
-    "permissions": [{ "collection": "orders", "operations": ["read", "write"] }]
-  }'
-```
-
-La respuesta incluye la clave completa en texto plano (`rk_live_...`) **exactamente una vez** — guárdela de inmediato.
-
-### Usar una Clave de API
-
-```bash
-curl http://localhost:3000/api/data/orders \
-  -H "Authorization: Bearer rk_live_abc123..."
-```
-
-### Permisos y RLS: dos puertas independientes
-
-La petición de una clave de API pasa por **dos** comprobaciones de autorización, y ambas deben permitirla:
-
-1. **La lista de permisos de la clave** — colección × operación, comprobada en la capa de ruta.
-2. **Seguridad a nivel de fila** — las claves de API *no* omiten la RLS. Una clave se ejecuta como
-   `uid: "api-key:<id>"` con el rol `service` (más `admin` cuando
-   `admin: true`). Las claves de administrador pasan a través de las políticas de administrador integradas; una
-   clave no administradora solo ve las filas que una regla de seguridad concede explícitamente al
-   rol `service` o al público. Las reglas de estilo propietario
-   (`owner_id = rebase.uid()`) nunca coinciden con una clave de API.
-
-Por lo tanto, una clave no administradora con permisos `"*"` puede aún obtener resultados vacíos — eso es
-la RLS funcionando, no un error. O bien conceda el rol `service` en las reglas de seguridad de las
-colecciones pertinentes, o use una clave de administrador.
-
-### Funciones Personalizadas
-
-Las invocaciones de funciones tienen un alcance como las colecciones, bajo el espacio de nombres `functions`:
-`{"collection": "functions", "operations": ["write"]}` concede todas las
-funciones, `"functions/<name>"` concede una, y el comodín global `"*"` concede
-todas. Una clave sin dicha entrada no puede invocar funciones en absoluto.
-
-### Almacenamiento
-
-El almacenamiento funciona de la misma manera, bajo el espacio de nombres `storage`:
-`{"collection": "storage", "operations": ["read", "write"]}` permite a la clave
-descargar/listar (`read`), subir y crear carpetas (`write`), y eliminar archivos
-(`delete`). El comodín global `"*"` también concede el almacenamiento. Una clave sin dicha
-entrada no puede tocar el almacenamiento. Las rutas de subida reanudable TUS cuentan como `write`
-en cada paso (incluidas la comprobación de offset y la cancelación), por lo que una clave con alcance de escritura
-puede completar una subida por sí sola.
-
-### Agentes y Servidores MCP
-
-Un agente necesita la clave *más estrecha* que sirva para su tarea, no una de
-administrador. Empiece con permisos acotados y póngale una caducidad:
-
-```bash
-rebase api-keys create -n "My Agent" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
-```
-
-Las operaciones son `read`, `write` y `delete`, derivadas del método HTTP:
-`GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` →
-`delete`.
-
-#### Una clave acotada lee cero filas hasta que una regla conceda `service`
-
-Este es el paso que hace que una clave correctamente acotada parezca rota. Una
-clave no administradora se ejecuta como `uid: "api-key:<id>"` con los roles
-`["service"]`, y la política de RLS que se inyecta de forma predeterminada en
-cada colección se compila a:
-
-```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
-```
-
-— el contexto del servidor, o un administrador. Una clave no administradora no
-coincide con ninguna de las dos ramas, así que en una colección sin
-`securityRules` la petición tiene éxito con un conjunto de resultados vacío y
-sin ningún error que lo explique. Conceda el rol explícitamente:
-
-```ts
-securityRules: [
-    { operation: "select", roles: ["service"], using: "true" }
-]
-```
-
-Como `rebase.uid()` lleva el id de la clave, una regla también puede acotar las
-filas a una clave concreta:
-
-```ts
-securityRules: [
-    {
-        operation: "select",
-        condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
-    }
-]
-```
-
-#### No use `"*"` para una clave de solo lectura
-
-El comodín `"*"` no abarca solo las colecciones — también coincide con el
-espacio de nombres `functions` y con `storage`. Un `GET` cuenta como `read`, y
-el manejador de una función personalizada es código arbitrario que puede
-escribir, por lo que una clave comodín de solo lectura puede mutar datos a
-través de una función. Nombrar las colecciones explícitamente deja a la clave
-sin ningún acceso a funciones.
-
-#### `--admin --full-access`: CI, migraciones y herramientas propias
-
-`"admin": true` concede a la clave el rol de administrador — las rutas
-`/api/admin/*` para la gestión del esquema, la gestión de usuarios y más,
-además de cron, copias de seguridad y logs. Combinado con `--full-access`
-(`{"collection": "*", "operations": ["read", "write", "delete"]}`) la clave
-abarca todas las colecciones, más todo el almacenamiento y todas las funciones
-personalizadas. Esa es la forma adecuada para CI, migraciones y herramientas
-propias de confianza — no para agentes.
-
-```bash
-# CLI
-rebase api-keys create -n "CI" --admin --full-access
-
-# REST
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "CI",
-    "admin": true,
-    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
-  }'
-```
-
-#### Sin tiempo real con claves de API
-
-El WebSocket de tiempo real no interpreta los tokens `rk_` — solo acepta JWT de
-usuario y la clave de servicio. Un agente autenticado con una clave de API hace
-polling sobre los endpoints REST en lugar de suscribirse.
-
-### Opciones de la Clave
-
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `name` | `string` | Etiqueta legible por humanos |
-| `permissions` | `ApiKeyPermission[]` | Acceso por colección (`"*"` = todo; `"functions/<name>"` = una función; `"storage"` = almacenamiento de archivos) |
-| `admin` | `boolean` | Conceder el rol de administrador — rutas de administrador + políticas de administrador RLS |
-| `rate_limit` | `number \| null` | Peticiones por ventana de 15 min (`null` = el valor predeterminado del servidor, 1000) |
-| `expiresAt` | `string \| null` | Marca de tiempo de caducidad ISO-8601 |
-
-La CLI requiere un alcance explícito: pase `--permissions '<json>'` u opte por
-`--full-access` — no hay un valor predeterminado silencioso de acceso completo.
-
-Las claves se pueden listar, actualizar y revocar mediante `/api/admin/api-keys`
-o los comandos de la CLI `rebase api-keys` — pero no con una clave de API.
-Cualquier petición a `/api/admin/api-keys` autenticada con una clave `rk_` se
-rechaza con `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, sea cual sea su indicador
-`admin`. La gestión de claves requiere la sesión de un usuario administrador o
-la clave de servicio.
+Los clientes automatizados se autentican con una clave con permisos delimitados en lugar de una sesión: [Claves de API](/docs/backend/api-keys/).
 
 ## Metadatos del esquema
 
-El esquema de colecciones completo del proyecto — cada colección, propiedad y
-relación — se sirve a un administrador autenticado:
+El esquema completo de colecciones del proyecto (cada colección, propiedad y relación) se sirve a un administrador autenticado:
 
 ```bash
 GET /api/meta/contract
 ```
 
-Es **solo para administradores**, y en un despliegue sin autenticación
-configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) en lugar de
-exponer el esquema a cualquiera. Su hermano devuelve una cadena de versión que
-representa el esquema sin describirlo, y es accesible deliberadamente sin
-credenciales — que es lo que consulta un trabajo de CI:
+Es **solo para administradores**, y en un despliegue sin autenticación configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) en lugar de exponer el esquema a cualquiera. Su endpoint hermano devuelve una cadena de versión que representa el esquema sin describirlo, y es deliberadamente accesible sin credenciales, que es lo que sondea un trabajo de CI:
 
 ```bash
 GET /api/meta/schema-version
 ```
 
-Para la forma de los endpoints en lugar del esquema detrás de ellos, el
-documento OpenAPI está en `GET /api/docs`, con Swagger UI en `/api/swagger`
-cuando `enableSwagger` está activado.
+Para conocer la estructura de los endpoints en lugar del esquema subyacente, el documento OpenAPI se encuentra en `GET /api/docs`, con Swagger UI en `/api/swagger` cuando `enableSwagger` está habilitado.
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[SDK del Cliente](/docs/sdk)** — Cliente con tipos seguros para la API REST
-- **[Colecciones](/docs/collections)** — Defina su esquema de datos
-- **[Reglas de Seguridad (RLS)](/docs/collections/security-rules)** — Controle el acceso por fila
+- **[SDK del cliente](/docs/sdk)** — Cliente con seguridad de tipos para la API REST
+- **[Colecciones](/docs/collections)** — Define tu esquema de datos
+- **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — Controla el acceso por fila
+
+---

@@ -1,19 +1,19 @@
 ---
-sourceHash: a82dd911da9d58ef
-title: Sottoscrizioni in tempo reale
-sidebar_label: Tempo reale
-description: Sottoscrivi le modifiche ai dati in diretta con l'SDK Client di Rebase usando listener in tempo reale basati su WebSocket.
+sourceHash: f49369700dcdc098
+title: Sottoscrizioni Realtime
+sidebar_label: Realtime
+description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK Rebase Client utilizzando listener realtime basati su WebSocket.
 ---
 
 ## Panoramica
 
-L'SDK Client di Rebase fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback sottoscritti si attivano immediatamente con i dati aggiornati.
+L'SDK Rebase Client fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback a cui ti sei iscritto vengono eseguiti immediatamente con i dati aggiornati.
 
-La connessione WebSocket viene stabilita automaticamente quando è disponibile una `websocketUrl` (derivata da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento dei token sono gestiti in modo trasparente.
+La connessione WebSocket viene stabilita automaticamente quando è disponibile un `websocketUrl` (derivato da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento del token vengono gestiti in modo trasparente.
 
-## Sottoscrivere una collezione
+## Sottoscrizione a una collection
 
-Usa `listen()` per sottoscrivere una query su una collezione. Il callback si attiva ogni volta che il set di dati corrispondente cambia:
+Usa `listen()` per sottoscrivere una query su una collection. Il callback viene attivato ogni volta che il set di dati corrispondente cambia:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -28,7 +28,7 @@ const unsubscribe = client.data.products.listen(
 unsubscribe();
 ```
 
-Il metodo `listen()` accetta gli stessi `FindParams` di `find()` — puoi filtrare, ordinare e paginare la tua sottoscrizione:
+Il metodo `listen()` accetta gli stessi `FindParams` di `find()` — puoi filtrare, ordinare e impaginare la tua sottoscrizione:
 
 ```typescript
 const unsubscribe = client.data.orders.listen(
@@ -56,27 +56,33 @@ listen(
 ): () => void   // returns unsubscribe function
 ```
 
-`FindResult<M>` è la stessa forma restituita da `find()`: righe piatte in `data` e
-`{ total, limit, offset, hasMore }` in `meta`.
+`FindResult<M>` ha la stessa struttura restituita da `find()`: righe piatte in `data`, e `{ total, limit, offset, hasMore, nextCursor }` in `meta`.
 
-### Una emissione per ogni cambiamento
+### `listen()` accetta ciò che accetta `find()`
 
-Ogni push del server richiama la tua callback **una volta**, con metadati che descrivono
-le righe che li accompagnano. Non c'è una prima emissione separata né alcun flag da
-controllare:
+`params` è un `FindParams` completo. Una sottoscrizione è la stessa query del `find()` corrispondente, quindi accetta gli stessi criteri di restrizione — `where`, `logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, **`include`** e **`fields`**:
 
-- Prima dell'emissione viene eseguito un `count()` per la query, quindi `meta.total` e
-  `meta.hasMore` sono autorevoli.
-- Se un push arriva mentre quel conteggio è ancora in corso, l'emissione più vecchia
-  viene scartata: non ricevi mai una callback con un totale appartenente a una pagina
-  precedente.
-- Se il conteggio **fallisce**, viene riusato l'ultimo totale realmente restituito da un
-  conteggio. Un conteggio fallito non dice nulla sulla dimensione della collezione, e
-  quindi non può sovrascrivere una risposta vera. Non è un errore di sottoscrizione, e
-  `onError` non viene chiamata.
-- Se nessun conteggio è mai riuscito per questa sottoscrizione, `meta.total` è un
-  **limite inferiore** — le righe di questa pagina più quelle saltate per arrivarci — e
-  `meta.hasMore` è `true` quando la pagina è tornata piena.
+```typescript
+client.data.posts.listen(
+    { where: { status: ["==", "published"] }, include: ["author"], limit: 20 },
+    (result) => render(result.data)   // each row carries its author
+);
+```
+
+Questo è più importante di quanto sembri. In precedenza, `include` e `fields` venivano ignorati silenziosamente in questo punto, quindi la stessa query restituiva una struttura tramite `find()` e un'altra tramite `listen()` — e un componente che eseguiva il rendering di entrambi vedeva la struttura delle proprie righe cambiare non appena avveniva una scrittura. Ora passano attraverso la stessa pipeline di lettura, quindi `find({ q })` e `listen({ q })` restituiscono righe identiche campo per campo.
+
+L'eccezione è `vectorSearch`, che viene **rifiutata** anziché ignorata: una sottoscrizione viene rieseguita a ogni scrittura corrispondente e lì nulla calcola le distanze. Usa `.vectorSearch(…).find()` per la query e sottoscrivi senza di essa.
+
+### Un'emissione per modifica
+
+Ogni push del server chiama il tuo callback **una sola volta**, con metadati che descrivono le righe associate. Non c'è un'emissione separata per il primo rendering e nessun flag da controllare.
+
+I metadati arrivano **nello stesso frame delle righe**: il server conteggia la query all'interno della stessa transazione vincolata alla sicurezza a livello di riga (RLS) che le ha lette, quindi `meta.total`, `meta.hasMore` e `meta.nextCursor` descrivono esattamente le righe adiacenti. (In passato ogni push era seguito da una `GET /count` dal client — un round trip aggiuntivo per scrittura, per sottoscrittore, e una finestra temporale in cui il conteggio e le righe descrivevano stati diversi della collection).
+
+Due fallback, nessuno dei quali costituisce un errore di sottoscrizione né chiama `onError`:
+
+- Se il **conteggio del server non è riuscito**, il frame non trasporta alcun totale e viene riutilizzato l'ultimo arrivato. Un conteggio fallito non dice nulla sulla dimensione della collection, quindi non deve sovrascrivere una risposta valida.
+- Se non è mai arrivato alcun totale per questa sottoscrizione — un server meno recente che non invia alcun metadato — il client lo richiede una volta, al primo push. Se anche questa richiesta fallisce, `meta.total` è un **limite inferiore**: le righe su questa pagina più quelle già impaginate per raggiungerle.
 
 ```typescript
 client.data.products.listen(
@@ -88,16 +94,19 @@ client.data.products.listen(
 );
 ```
 
-## Sottoscrivere una singola entità
+## Sottoscrizione a una singola entità
 
-Usa `listenById()` per osservare un record specifico tramite il suo ID:
+Usa `listenById()` per monitorare un record specifico in base al suo ID:
 
 ```typescript
-const unsubscribe = client.data.products.listenById(
+// The SDK hands back a flat row, not an `Entity` — there is no `.values`.
+const unsubscribe = client.data
+    .collection<{ id: number; name: string }>("products")
+    .listenById(
     42,
-    (entity) => {
-        if (entity) {
-            console.log("Product changed:", entity.values.name);
+    (product) => {
+        if (product) {
+            console.log("Product changed:", product.name);
         } else {
             console.log("Product was deleted");
         }
@@ -110,7 +119,7 @@ const unsubscribe = client.data.products.listenById(
 
 ### Firma
 
-```typescript
+```typescript no-verify
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
@@ -118,12 +127,11 @@ listenById(
 ): () => void   // returns unsubscribe function
 ```
 
-La callback riceve una riga piatta — non una `Entity`, quindi senza `.values` — e
-`undefined` quando il record viene eliminato.
+Il callback riceve una riga piatta — non un'`Entity`, quindi non c'è `.values` — e `undefined` quando il record viene eliminato.
 
-## Query Builder fluido
+## Query builder fluent
 
-Puoi anche sottoscrivere tramite il query builder fluido. È equivalente a chiamare `listen()` con parametri, ma consente di concatenare `.where()`, `.orderBy()`, ecc.:
+Puoi anche sottoscrivere tramite il query builder fluent. Questo equivale a chiamare `listen()` con parametri, ma ti consente di concatenare `.where()`, `.orderBy()`, ecc.:
 
 ```typescript
 const unsubscribe = client.data.products
@@ -136,9 +144,13 @@ const unsubscribe = client.data.products
     );
 ```
 
-## Annullare la sottoscrizione
+Una sottoscrizione accetta un ordinamento su più colonne come qualsiasi altra query — tramite `orderBy: [["category", "asc"], ["createdAt", "desc"]]` nei parametri, oppure con una seconda chiamata `.orderBy()`, che aggiunge un criterio di spareggio anziché sostituire il primo. Consulta [Ordinamento](/docs/sdk/querying#sorting).
 
-Ogni sottoscrizione restituisce una funzione `unsubscribe`. Chiamala per smettere di ricevere aggiornamenti e ripulire il listener WebSocket:
+All'arrivo, il server controlla la *forma* dell'`orderBy` di una sottoscrizione e ne rifiuta una malformata con un frame di errore anziché effettuare la sottoscrizione. Un ordinamento non interpretabile trasmetterebbe altrimenti le righe senza alcun ordine pur non segnalando alcun errore — e un frame `collection_update` trasporta solo le righe e nient'altro, quindi un sottoscrittore non avrebbe modo di accorgersene.
+
+## Annullamento della sottoscrizione
+
+Ogni sottoscrizione restituisce una funzione `unsubscribe`. Chiamala per interrompere la ricezione degli aggiornamenti e ripulire il listener WebSocket:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -150,7 +162,7 @@ const unsubscribe = client.data.products.listen(
 unsubscribe();
 ```
 
-In React, usa la pulizia di `useEffect`:
+In React, usa la funzione di pulizia di `useEffect`:
 
 ```tsx
 useEffect(() => {
@@ -166,15 +178,32 @@ useEffect(() => {
 
 Il client WebSocket gestisce l'autenticazione automaticamente:
 
-- All'**accesso** o all'**aggiornamento del token**, il nuovo token viene inviato al server WebSocket tramite un messaggio `authenticate`.
-- Alla **disconnessione**, la connessione WebSocket viene chiusa.
+- Al **login** o al **refresh del token**, il nuovo token viene inviato a un socket già aperto tramite un messaggio `authenticate`. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
+- Al **logout**, la connessione WebSocket viene disconnessa. Il client rimane utilizzabile; una sottoscrizione successiva si riconnette in modo anonimo.
 - Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive.
 
-Non è necessaria alcuna gestione manuale dei token — l'integrazione tra `client.auth` e il livello WebSocket è gestita internamente.
+Non è richiesta alcuna gestione manuale dei token — l'integrazione tra `client.auth` e il layer WebSocket viene gestita internamente.
 
-## Canali di Broadcast
+### La connessione è lazy
 
-I canali di broadcast ti permettono di inviare messaggi arbitrari tra client connessi — ideali per chat, notifiche o funzionalità collaborative:
+La creazione di un client **non** apre alcun WebSocket. Viene stabilito alla prima operazione che ne ha effettivamente bisogno — una sottoscrizione `listen()` / `listenById()`, o un'operazione di canale come `join()`, `track()` o `broadcast()`. Ottenere un canale non equivale a usarlo.
+
+```typescript
+const client = createRebaseClient({ baseUrl });   // no socket
+const channel = client.realtime.channel("doc:1"); // still no socket
+await channel.join();                             // socket opens here
+```
+
+Questo è importante per le app con una quantità significativa di traffico non autenticato — pagine di marketing, viste pubbliche di sola lettura, strumenti basati sull'anonimato — che in precedenza pagavano il costo di una connessione a ogni caricamento di pagina solo per avere il realtime a disposizione.
+
+Due comportamenti correlati:
+
+- `realtime: false` rimane un'esclusione rigorosa (opt-out): nessun socket viene mai aperto, e `client.realtime.channel()` genera un'eccezione. Lo stesso vale per `listen()` e `listenById()` — sono sempre disponibili per essere chiamati, e su un client senza socket generano un errore `RebaseClientError` che indica l'opzione necessaria per abilitarli. `observe()` non lo fa: degrada a una singola fetch.
+- `client.close()` è definitivo. Rilascia il socket e il relativo timer di riconnessione, e nulla di quanto accodato successivamente effettuerà una nuova connessione. In Node, un socket aperto mantiene attivo l'event loop, quindi uno script che non lo chiama mai non terminerà da solo.
+
+## Canali di broadcast
+
+I canali di broadcast consentono di inviare messaggi arbitrari tra client connessi — ideali per chat, notifiche o funzionalità collaborative:
 
 ```typescript
 // Obtain a channel. This alone opens no connection.
@@ -195,17 +224,25 @@ await channel.broadcast("message", {
 await channel.leave();
 ```
 
-I canali sono leggeri ed effimeri — esistono finché almeno un client è sottoscritto.
+I canali sono leggeri ed effimeri — esistono finché almeno un client è sottoscritto. Chiamate ripetute a `channel()` con lo stesso nome restituiscono lo **stesso** oggetto, in modo che due componenti possano associare gestori in modo indipendente senza che l'uscita di uno escluda l'altro.
 
-> **Per impostazione predefinita, i broadcast non vengono ritrasmessi.** Raggiungono solo i membri connessi in quel momento. È ciò che serve per le notifiche che si autocorreggono — un avviso «qualcuno ha salvato» è superato dal salvataggio successivo — e non costa nulla. Per un flusso di operazioni, dove un vuoto silenzioso causa divergenza, abilita la [cronologia dei messaggi](#cronologia-dei-messaggi-e-recupero) sul canale.
+I frame di canale e di presenza non richiedono un account: i visitatori anonimi possono unirsi ai canali pubblici.
 
-## Cronologia dei Messaggi e Recupero
+:::caution[I canali non hanno ancora regole di accesso]
+L'unico controllo applicato dal server è l'**appartenenza**: per trasmettere in broadcast in un canale, leggere il suo elenco di presenza o riprodurne la cronologia, un client deve prima essersi unito a quel canale. L'azione di unirsi è di per sé aperta — qualsiasi client in grado di nominare un canale può unirvisi, indipendentemente dal fatto che sia autenticato o meno.
 
-Un canale può essere configurato per conservare i suoi broadcast, così che un client che si riconnette recuperi ciò che ha perso invece di risincronizzarsi da zero. È questo che rende i canali utilizzabili come trasporto per l'editing collaborativo.
+Pertanto, il nome di un canale non è un segreto né un permesso. Non inserire in un canale nulla (inclusi cronologia persistita e stato di presenza) che ogni utente della tua app non possa vedere, e non derivare il nome di un canale da dati che non condivideresti pubblicamente. Le regole di autorizzazione per canale non sono ancora implementate; se ne hai bisogno oggi, mantieni la parte sensibile dello scambio su `client.data`, dove si applica la sicurezza a livello di riga (RLS).
+:::
 
-La conservazione si configura **sul server**, per pattern di canale — vedi [Backend Realtime](/it/docs/backend/realtime#conservazione-dei-canali). Un client non può attivarla da sé, perché un canale è creato da chi lo nomina, e una profondità di cronologia scelta dal client permetterebbe a qualsiasi visitatore di impegnare il tuo backend in uno storage illimitato.
+> **Per impostazione predefinita, i broadcast non vengono riprodotti.** Raggiungono solo i membri attualmente connessi. Questo è il comportamento desiderato per le notifiche che si autocorregono — un avviso "qualcuno ha salvato" viene superato dal salvataggio successivo — e non ha alcun costo. Per un flusso di operazioni, in cui un'interruzione silenziosa provoca divergenze, abilita la [cronologia dei messaggi](#message-history-and-catch-up) sul canale.
 
-Su un canale con conservazione, passa `{ history: true }` e il SDK fa il resto:
+## Cronologia dei messaggi e catch-up
+
+Un canale può essere configurato per conservare i propri broadcast, in modo che un client che si riconnette recuperi ciò che ha perso invece di risincronizzarsi da zero. Questo è ciò che rende i canali utilizzabili come meccanismo di trasporto per l'editing collaborativo.
+
+La conservazione (retention) è configurata **sul server**, per pattern di canale — vedi [Backend Realtime](/docs/backend/realtime#channel-retention). Un client non può attivarla autonomamente, poiché un canale viene creato da chiunque ne specifichi il nome, e una profondità di cronologia scelta dal client consentirebbe a qualsiasi visitatore di vincolare il backend a uno spazio di archiviazione illimitato.
+
+Su un canale con retention attiva, passa `{ history: true }` e l'SDK farà il resto:
 
 ```typescript
 const channel = client.realtime.channel("doc:42", { history: true });
@@ -218,11 +255,11 @@ channel.onBroadcast("op", (payload) => {
 await channel.join();
 ```
 
-Al `join()` e dopo ogni riconnessione, il SDK chiede al server tutto ciò che segue l'ultimo numero di sequenza visto, e consegna il risultato agli stessi handler. Non c'è un secondo percorso di codice da scrivere: un handler che applica correttamente un'operazione dal vivo la applica correttamente anche in recupero.
+Su `join()` e dopo ogni riconnessione, l'SDK richiede al server tutto ciò che segue l'ultimo numero di sequenza rilevato, e consegna il risultato attraverso gli stessi gestori. Non c'è un secondo percorso di codice da scrivere: un handler che applica correttamente un'operazione dal vivo la applica correttamente anche durante il catch-up.
 
 ### Numeri di sequenza
 
-Ogni broadcast su un canale con conservazione porta un `seq` — per canale, senza vuoti e crescente. È il punto di ripresa del client.
+Ogni broadcast su un canale con conservazione include un `seq` — specifico per canale, continuo e crescente. Rappresenta il punto di ripresa per il client.
 
 ```typescript
 channel.onBroadcast((event) => {
@@ -233,9 +270,9 @@ channel.onBroadcast((event) => {
 console.log(channel.sequence); // highest seq delivered so far
 ```
 
-Salva `channel.sequence` se vuoi che il recupero sopravviva anche a un ricaricamento di pagina, e restituiscilo tramite `history({ sinceSeq })`.
+Salva in modo persistente `channel.sequence` se desideri che il recupero sopravviva sia alla ricarica della pagina sia a una riconnessione, e inoltralo tramite `history({ sinceSeq })`.
 
-### Recuperare la cronologia esplicitamente
+### Recupero esplicito della cronologia
 
 ```typescript
 const { messages, retained, latestSeq } = await channel.history({
@@ -244,18 +281,19 @@ const { messages, retained, latestSeq } = await channel.history({
 });
 ```
 
-`retained: false` significa che il canale non conserva cronologia e non lo farà mai — una risposta esplicita, così puoi distinguere «non hai perso nulla» da «questo canale non ha una regola di conservazione». Nel secondo caso un client che deve convergere deve ripiegare su una risincronizzazione completa.
+`retained: false` indica che il canale non conserva alcuna cronologia e non lo farà mai — una risposta esplicita che consente di distinguere "non hai perso nulla" da "questo canale non ha regole di retention". Nel secondo caso, un client che deve convergere deve ricorrere a una risincronizzazione completa.
 
-`latestSeq` è la sequenza più alta che il server possiede, che questo lotto l'abbia raggiunta o no. Se è molto oltre il tuo ultimo `seq` consegnato, sei indietro più di una pagina e risincronizzare può costare meno che paginare.
+`latestSeq` è la sequenza più alta presente sul server, indipendentemente dal fatto che questo batch l'abbia raggiunta o meno. Se è molto oltre il tuo ultimo `seq` consegnato, sei indietro di più di una pagina e risincronizzare potrebbe essere più conveniente che impaginare.
 
-:::note[Le ritrasmissioni possono sovrapporsi, ed è normale]
-Il server non può sapere esattamente quali messaggi ti sono arrivati prima della caduta della connessione, quindi un intervallo di recupero può includerne alcuni già applicati. Il SDK scarta tutto ciò che è pari o inferiore alla sequenza già consegnata, così gli handler non vedono mai due volte lo stesso messaggio.
+:::note[Le riproduzioni possono sovrapporsi, ed è normale]
+Il server non può sapere con precisione quali messaggi ti abbiano raggiunto prima dell'interruzione del socket, quindi un intervallo di catch-up potrebbe includere messaggi che hai già applicato. L'SDK scarta qualsiasi elemento pari o inferiore alla sequenza già consegnata, così i gestori non vedranno mai un messaggio due volte.
 
-I tuoi messaggi **non** vengono filtrati da una ritrasmissione: una riconnessione assegna un nuovo id client, quindi il caso stesso per cui esiste il recupero è quello in cui quel filtro fallirebbe. Rendi le operazioni idempotenti se riapplicare le tue fosse un problema.
+I tuoi messaggi personali **non** vengono esclusi da un replay: una riconnessione assegna un nuovo ID client, quindi il caso esatto per cui esiste il catch-up è proprio quello in cui tale filtro fallirebbe. Rendi le operazioni idempotenti se riapplicare le tue creerebbe problemi.
 :::
-## Tracciamento della Presenza
 
-La presenza ti permette di tracciare quali utenti sono online e di sincronizzare lo stato condiviso tra tutti i partecipanti:
+## Tracciamento della presenza
+
+La presenza ti consente di monitorare quali utenti sono online e sincronizzare lo stato condiviso tra tutti i partecipanti:
 
 ```typescript
 const channel = client.realtime.channel("editors");
@@ -285,23 +323,54 @@ await channel.track({ userId: currentUser.id, status: "idle" });
 await channel.untrack();
 ```
 
-La presenza è costruita sui canali di broadcast con un diff automatico dello stato — vengono trasmessi solo i cambiamenti.
+L'SDK mantiene l'elenco dei presenti (roster) per te, quindi `presences` è sempre completo e non dovrai mai ricomporlo a partire dai diff.
 
-## Quando usare il tempo reale
+Gestisce inoltre due dettagli di protocollo che è facile sbagliare quando si lavora direttamente con i WebSocket grezzi:
+
+- **Il roster non viene inviato all'ingresso.** Il primo `presence_diff` di un client che entra contiene solo se stesso; l'elenco esistente deve essere richiesto esplicitamente. `join()` esegue questa operazione per te.
+- **La presenza scade dopo 30 secondi.** `track()` non è una registrazione permanente — senza un nuovo invio periodico scomparirai silenziosamente dal roster di tutti gli altri pur rimanendo connesso e sulla pagina. L'SDK invia un heartbeat ogni 20 secondi e si interrompe su `untrack()` / `leave()`.
+
+Una riconnessione azzera anche l'appartenenza al canale e la presenza sul lato server; l'SDK si unisce nuovamente, richiede di nuovo il roster ed esegue nuovamente il tracking in modo automatico.
+
+## Quando usare Realtime
 
 | Caso d'uso | Metodo |
 |----------|--------|
-| Dashboard con dati in diretta | `listen()` con filtri |
+| Dashboard con dati in tempo reale | `listen()` con filtri |
 | Chat o messaggistica | `channel.broadcast()` |
 | Editing collaborativo / flussi di operazioni | `channel(name, { history: true })` |
 | Indicatori di digitazione / stato online | `channel.track()` + `channel.onPresence()` |
-| Pagina di dettaglio con aggiornamenti in diretta | `listenById()` |
+| Pagina di dettaglio con aggiornamenti in tempo reale | `listenById()` |
 | Monitoraggio del pannello di amministrazione | `listen()` con `orderBy` e `limit` |
+| Un elenco che deve persistere anche in caso di disconnessione | `observe()` con [offline](/docs/sdk/offline) abilitato |
 
-> **Suggerimento:** Per recuperi di dati una tantum, usa invece `find()` o `findById()`. Le sottoscrizioni sono ideali per dati che cambiano di frequente e devono essere riflessi immediatamente nell'interfaccia.
+> **Suggerimento:** Per recuperare i dati una sola volta, usa invece `find()` o `findById()`. Le sottoscrizioni sono ideali per i dati che cambiano frequentemente e devono essere aggiornati nell'interfaccia utente all'istante.
 
-## Prossimi passi
+## `listen()` vs `observe()`
+
+Entrambi mantengono una query aggiornata ed entrambi restituiscono una funzione di disiscrizione (unsubscribe) — ma rispondono a esigenze diverse.
+
+`listen()` rappresenta il socket: fornisce ciò che il server invia tramite push e non restituisce nulla quando il socket è inattivo.
+
+`observe()` rappresenta la query: con la modalità [offline](/docs/sdk/offline) abilitata, emette prima dal database locale — prima di qualsiasi richiesta — e riemette su scritture locali, su scritture in coda che raggiungono il server, su rollback e su eventi realtime, a cui si iscrive autonomamente a meno che non si passi `{ realtime: false }`. Ciascun risultato specifica se proviene dalla cache e se contiene scritture non ancora accettate dal server.
+
+```typescript
+const unsubscribe = client.data.products.observe(
+    { where: { active: ["==", true] } },
+    (result) => {
+        render(result.data);
+        setSaving(result.hasPendingWrites);
+    }
+);
+```
+
+Senza la modalità offline abilitata, `observe()` equivale a `find()` più `listen()` in un'unica chiamata, con tali flag impostati sempre su `false`.
+
+## Passaggi successivi
 
 - **[Interrogare i dati](/docs/sdk/querying)** — Operazioni CRUD e query builder
+- **[Offline e sincronizzazione local-first](/docs/sdk/offline)** — Query in tempo reale che persistono a una perdita di connessione
 - **[Autenticazione](/docs/sdk/authentication)** — Accesso e gestione delle sessioni
-- **[Tempo reale nel Backend](/docs/backend/realtime)** — Configurazione WebSocket lato server
+- **[Backend Realtime](/docs/backend/realtime)** — Configurazione WebSocket lato server
+
+---

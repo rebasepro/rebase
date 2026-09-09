@@ -1,83 +1,109 @@
 ---
-sourceHash: 03fb4207de242bd1
-title: Implementando o Rebase no Microsoft Azure
-description: Implante sua instância Rebase de forma segura no Azure usando o Azure Database for PostgreSQL e o Azure Container Apps.
+sourceHash: fcd75234f992e56c
+title: Fazendo o deploy do Rebase no Microsoft Azure
+description: Faça o deploy da sua instância do Rebase com segurança no Azure usando o Azure Database for PostgreSQL e o Azure Container Apps.
 sidebar_label: Azure
 ---
 
-O Microsoft Azure oferece integrações rigorosas e conformidade empresarial. A arquitetura ideal para executar o Rebase no Azure envolve o uso do **Azure Database for PostgreSQL - Flexible Server** para a camada de dados e do **Azure Container Apps** para hospedar o contêiner de backend.
+O Microsoft Azure oferece integrações robustas e conformidade empresarial. A arquitetura ideal para executar o Rebase no Azure usa o **Azure Database for PostgreSQL – Flexible Server** para a camada de dados e o **Azure Container Apps** para o runtime.
 
-Para aderir à conformidade de dados europeia e tempos de resposta locais rápidos, provisione seus recursos em regiões como **Europa Ocidental (Amesterdã)**, **Europa do Norte (Irlanda)** ou **França Central (Paris)**.
+Para cumprir a conformidade de dados europeia e obter tempos de resposta locais rápidos, provisione seus recursos em regiões como **West Europe (Amsterdã)**, **North Europe (Irlanda)** ou **France Central (Paris)**.
 
-## 1. Provisionar Servidor Flexível PostgreSQL
+Nada nesta página é específico do Azure em relação ao seu projeto. Uma implantação do Rebase é composta por duas partes separáveis — a imagem de runtime publicada e o **bundle** que o `rebase build` produz — e o mesmo bundle é executado sob o Docker Compose em um laptop, no Rebase Cloud, sob o [Helm chart](/docs/deployment/kubernetes) e aqui.
 
-**Não há nenhuma imagem de aplicação para construir a partir do seu código**. O `rebase build` produz um diretório `dist-bundle` com as suas coleções, funções e crons compilados — e, se o projeto declarar uma app estática, o seu frontend construído. A imagem de runtime publicada executa-o:
+## 1. Provisionar o PostgreSQL Flexible Server
+
+1. No Portal do Azure, pesquise e selecione **Azure Database for PostgreSQL servers**.
+2. Clique em **Create** e selecione **Flexible Server**.
+3. Escolha seu Resource Group e defina sua região da UE preferida.
+4. Selecione o tamanho de computação (por exemplo, General Purpose ou Burstable `B2s` para implantações menores).
+5. Configure a aba **Authentication** com um nome de usuário administrador e uma senha segura.
+6. Em **Networking**, certifique-se de que a opção "Allow public access from any Azure service within Azure to this server" esteja marcada para que seu Container App possa se conectar, ou configure uma VNet segura.
+7. Anote o nome do seu servidor e monte a URI de conexão:
+   `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
+
+Se suas coleções declararem uma propriedade `vector`, habilite a extensão uma vez: o Azure a restringe atrás do parâmetro de servidor `azure.extensions`, depois execute `CREATE EXTENSION vector;`.
+
+## 2. Construir o bundle e embuti-lo em uma imagem
+
+**Não há imagem de aplicação a ser construída a partir do seu código-fonte**. O `rebase build` produz um diretório `dist-bundle` com suas coleções compiladas, funções, crons e — se o seu projeto declarar um app estático — seu frontend construído. A imagem de runtime publicada o executa:
 
 ```bash
 rebase build
 ```
 
-O Container Apps puxa de um registo, por isso incorpore o bundle numa imagem derivada. Três linhas, e fixa exatamente o que corre:
+O Container Apps faz pull de um registry, portanto embute o bundle em uma imagem derivada. Três linhas e ele fixa exatamente o que é executado:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Atualizar o Rebase mais tarde é uma alteração nessa linha `FROM`. O seu bundle fica intacto.
-
-1. No Portal do Azure, procure e selecione **servidores do Azure Database for PostgreSQL**.
-2. Clique em **Criar** e selecione **Servidor Flexível**.
-3. Escolha seu Grupo de Recursos e defina sua Região da UE preferida.
-4. Selecione seu tamanho de Computação (por exemplo, Uso Geral ou Burstable `B2s` para implantações menores).
-5. Configure a guia **Autenticação** com um nome de usuário de Administrador e uma senha segura.
-6. Em **Rede**, certifique-se de que "Permitir acesso público de qualquer serviço do Azure dentro do Azure a este servidor" esteja marcado para que seu Aplicativo de Contêiner possa se conectar, ou configure uma VNet segura.
-7. Anote o nome do seu servidor e monte o URI de conexão:
-   `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
-
-## 2. Compilar e Enviar para o Azure Container Registry (ACR)
-
-Os Aplicativos de Contêiner do Azure puxarão sua imagem Docker do ACR.
-1. Crie um novo **Registro de Contêiner** na região da UE escolhida.
+1. Crie um **Container Registry** na sua região da UE escolhida.
 2. Faça login a partir da sua CLI:
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Construa e envie a partir da raiz do projeto:
+3. Faça o build e o push, a partir da raiz do projeto:
    ```bash
    docker build -t yourregistryname.azurecr.io/rebase-backend:latest .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
-## 3. Implantar o Aplicativo de Contêiner do Azure
+Atualizar o Rebase posteriormente resume-se a alterar essa linha `FROM`. Seu bundle permanece intacto.
 
-O Azure Container Apps fornece um ambiente de contêiner sem servidor com ingresso HTTPS integrado.
+## 3. Fazer o deploy do Container App
 
-1. Pesquise no portal por **Container Apps** e clique em **Criar**.
-2. Crie um novo Ambiente de Container Apps na sua região da UE.
-3. Na guia **Contêiner**, aponte para o seu registro ACR e selecione a imagem `rebase-backend:latest`.
+O Azure Container Apps fornece um ambiente de contêineres serverless com ingress HTTPS integrado.
+
+1. Pesquise no portal por **Container Apps** e clique em **Create**.
+2. Crie um novo Container Apps Environment na sua região da UE.
+3. Na aba **Container**, aponte para o seu registro ACR e selecione a imagem `rebase-backend:latest`.
 4. Defina as **Variáveis de ambiente**:
 
 | Nome | Valor |
 |------|-------|
 | `DATABASE_URL` | Sua string de conexão do Azure Postgres |
-| `JWT_SECRET` | Uma string segura aleatória com 32+ caracteres |
+| `JWT_SECRET` | Uma string aleatória segura de mais de 32 caracteres |
+| `REBASE_SERVICE_KEY` | Uma string aleatória segura de mais de 32 caracteres |
 | `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | O domínio do seu frontend (ex.: `https://yourdomain.com`) |
+| `FRONTEND_URL` | A URL do seu frontend (usada para links de e-mail e fallback de CORS) |
+| `DISABLE_SELF_REGISTRATION` | `true` |
+| `REBASE_ADMIN_EMAIL` | O endereço do primeiro administrador, definido **antes da primeira inicialização** |
+| `REBASE_ADMIN_PASSWORD` | Pelo menos 12 caracteres |
 
-5. Na guia **Ingresso**, habilite explicitamente o Ingresso.
-6. Defina a Porta de Destino para **3001**.
-7. Conclua a criação. O Azure provisionará automaticamente o contêiner e fornecerá uma URL de aplicativo protegida com TLS!
+Os três últimos são como esta implantação obtém um administrador: em produção, a primeira conta a se registrar não é promovida, portanto, nada mais cria o primeiro usuário autenticado. Consulte [Seu primeiro administrador](/docs/getting-started/deployment/#your-first-admin). Armazene os segredos como segredos do Container Apps e faça referência a eles, em vez de valores de ambiente em texto simples.
 
-## 4. Criar o Esquema do Banco de Dados
+5. Na aba **Ingress**, habilite o ingress.
+6. Defina a Porta de Destino (Target Port) como **8080** — a porta na qual a imagem de runtime escuta, a menos que `PORT` determine o contrário.
+7. Aponte a sonda de integridade (health probe) para `/livez`. Não para `/health`: esta realiza uma viagem de ida e volta ao banco de dados (round-trip), de modo que uma liveness probe nela reiniciará um contêiner saudável durante uma breve oscilação do banco de dados.
+8. Conclua a criação. O Azure provisiona o contêiner e fornece uma URL de aplicação protegida por TLS.
 
-Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+## 4. O schema
 
-Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+**O runtime cria tabelas ausentes na inicialização, incluindo as das suas coleções.** `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica a segurança em nível de linha (RLS) a eles — de modo que a primeira inicialização em um servidor vazio já começa servindo suas coleções.
+
+O que o `ensure` nunca faz é alterar algo que já existe: ele não altera o tipo de uma coluna, não remove nada nem edita os rótulos de um enum existente, pois o reinício de um contêiner não deve remodelar um schema como efeito colateral de um deploy.
+
+Portanto, duas coisas ainda necessitam da CLI, executada a partir de um checkout local ou de um job de CI com o `DATABASE_URL` apontado para o seu Flexible Server (adicione uma regra de firewall permitindo o IP do seu cliente, se necessário):
 
 ```bash
-DATABASE_URL="<sua string de conexão do Azure Postgres>" pnpm run db:push
+rebase db push
 ```
 
-Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Se o seu Flexible Server restringe o acesso público, adicione uma regra de firewall temporária para o seu IP no portal do Azure antes de executar o comando.
+- **RLS de tabelas de junção** para relações muitos-para-muitos.
+- **Qualquer alteração que não seja puramente aditiva** — uma coluna renomeada, um tipo restringido, um campo removido.
 
-Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
+A imagem de runtime é distribuída sem a CLI, portanto isso nunca é executado dentro do contêiner. Para migrações versionadas, faça commit dos arquivos de migração com `rebase db generate` e execute `rebase db migrate` como uma etapa de release.
+
+## Armazenamento de arquivos
+
+As réplicas do Container Apps não possuem disco persistente, portanto o armazenamento de arquivos local resulta em perda silenciosa de dados e o runtime o recusa em produção. Crie uma conta do Azure Storage e use sua interface compatível com S3, ou um bucket compatível com S3 na mesma região, com `STORAGE_TYPE=s3` — consulte [Armazenamento](/docs/backend/storage).
+
+## Próximos passos
+
+- [Implantação](/docs/getting-started/deployment) — o checklist de produção e as regras do primeiro administrador que toda plataforma compartilha.
+- [Configuração](/docs/getting-started/configuration) — todas as variáveis de ambiente lidas pelo runtime.
+
+---

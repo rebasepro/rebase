@@ -1,85 +1,108 @@
 ---
-sourceHash: 2c7f9f01319b6b40
-title: Implementando Rebase na AWS
-description: Implante sua instância Rebase de forma segura na Amazon Web Services utilizando RDS e AWS App Runner com um forte foco europeu.
+sourceHash: 2228ab84c888b578
+title: Implantando o Rebase na AWS
+description: Implante sua instância do Rebase com segurança no Amazon Web Services utilizando o RDS e o AWS App Runner com um forte foco europeu.
 sidebar_label: AWS
 ---
 
-A Amazon Web Services (AWS) oferece escalabilidade incrível e segurança de nível empresarial. Para uma implantação de produção do Rebase, recomendamos desacoplar a arquitetura usando o **Amazon RDS** para o banco de dados PostgreSQL e o **AWS App Runner** (ou ECS Fargate) para servir o backend Node.js.
+A Amazon Web Services (AWS) oferece uma escala incrível e segurança de nível empresarial. Para uma implantação do Rebase em produção, recomendamos desacoplar a arquitetura usando o **Amazon RDS** para o banco de dados PostgreSQL e o **AWS App Runner** (ou ECS Fargate) para executar o runtime.
 
-Para manter a estrita conformidade de dados europeia, certifique-se de operar inteiramente dentro de uma região da UE, como **eu-central-1 (Frankfurt)**, **eu-west-1 (Irlanda)** ou **eu-west-3 (Paris)**.
+Para manter a conformidade rigorosa com os dados europeus, certifique-se de operar inteiramente dentro de uma região da UE, como **eu-central-1 (Frankfurt)**, **eu-west-1 (Irlanda)** ou **eu-west-3 (Paris)**.
 
-## 1. Provisionar Amazon RDS (PostgreSQL)
+Nada nesta página é específico da AWS em relação ao seu projeto. Uma implantação do Rebase é composta por duas partes separáveis: a imagem de runtime publicada e o **bundle** gerado pelo `rebase build` — e o mesmo bundle é executado no Docker Compose em um laptop, no Rebase Cloud, sob o [Helm chart](/docs/deployment/kubernetes) e aqui. Mover-se entre eles é uma mudança de infraestrutura, não de aplicação.
 
-1. Navegue até o console do **RDS** na sua região da UE selecionada.
-2. Clique em **Criar banco de dados** e selecione **Criação padrão**.
-3. Escolha o motor **PostgreSQL**.
-4. Em Modelos, escolha **Produção** ou **Nível gratuito/Desenvolvimento** dependendo da sua carga.
-5. Crie um Nome de Usuário Mestre (ex: `rebase_admin`) e gere uma Senha Mestra de forma segura.
-6. Em Conectividade, certifique-se de que o banco de dados esteja dentro de uma **VPC** que sua futura instância do App Runner possa acessar com segurança (ou torne-o publicamente acessível se estiver controlando rigorosamente os intervalos de IP de entrada).
-7. Uma vez provisionado, anote o **endereço do endpoint** e monte seu URI:
-   `postgresql://rebase_admin:YOUR_PASSWORD@YOUR_ENDPOINT:5432/postgres`
+## 1. Provisionar o Amazon RDS (PostgreSQL)
 
-## 2. Enviar Imagem para o ECR (Elastic Container Registry)
+1. Navegue até o console do **RDS** na região da UE selecionada.
+2. Clique em **Create database** (Criar banco de dados) e selecione **Standard create** (Criação padrão).
+3. Escolha o mecanismo **PostgreSQL**.
+4. Em Templates, escolha **Production** (Produção) ou **Free tier/Dev** (Nível gratuito/Dev), dependendo da sua carga.
+5. Crie um Master Username (por exemplo, `rebase_admin`) e gere uma Master Password de forma segura.
+6. Em Connectivity (Conectividade), certifique-se de que o banco de dados esteja localizado em uma **VPC** que sua futura instância do App Runner possa acessar com segurança (ou torne-o publicamente acessível se estiver controlando rigorosamente as faixas de IP de entrada).
+7. Depois de provisionado, anote o **Endpoint address** e monte sua URI:
+   `postgresql://rebase_admin:SUA_SENHA@SEU_ENDPOINT:5432/postgres`
 
-O AWS App Runner puxa diretamente do ECR.
+Se suas coleções declararem uma propriedade `vector`, a instância precisará da extensão `pgvector` — o RDS a inclui, mas ela precisa ser habilitada uma vez no banco de dados executando: `CREATE EXTENSION vector;`.
 
-**Não há nenhuma imagem de aplicação para construir a partir do seu código**. O `rebase build` produz um diretório `dist-bundle` com as suas coleções, funções e crons compilados — e, se o projeto declarar uma app estática, o seu frontend construído. A imagem de runtime publicada executa-o:
+## 2. Gerar o bundle e incorporá-lo a uma imagem
+
+Não há **nenhuma imagem de aplicação para compilar a partir do seu código-fonte**. O comando `rebase build` produz um diretório `dist-bundle` com suas coleções compiladas, funções, crons e — se o seu projeto declarar um aplicativo estático — o seu frontend compilado. A imagem de runtime publicada o executa:
 
 ```bash
 rebase build
 ```
 
-O App Runner puxa de um registo, por isso incorpore o bundle numa imagem derivada. Três linhas, e fixa exatamente o que corre:
+Para o App Runner, que extrai imagens de um registro, incorpore o bundle em uma imagem derivada. Isso leva apenas três linhas e fixa exatamente o que será executado:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Atualizar o Rebase mais tarde é uma alteração nessa linha `FROM`. O seu bundle fica intacto.
-
-1. Navegue até o **Elastic Container Registry** e crie um novo repositório privado chamado `rebase-backend`.
-2. Obtenha os comandos de push fornecidos pela AWS no console (que lidam com a autenticação Docker).
-3. Construa e envie a partir da raiz do projeto:
+1. Navegue até o **Elastic Container Registry** e crie um repositório privado chamado `rebase-backend`.
+2. Obtenha os comandos de push exibidos pela AWS no console — eles cuidam da autenticação do Docker.
+3. Compile e envie, a partir da raiz do projeto:
    ```bash
    docker build -t rebase-backend .
    ```
-4. Marque e envie-a para o seu repositório ECR recém-criado.
+4. Adicione uma tag e envie para o seu repositório ECR.
 
-## 3. Implementar via AWS App Runner
+Atualizar o Rebase no futuro se resume a alterar a linha `FROM`. O seu bundle permanece intocado e nada no seu projeto precisa ser reconstruído.
 
-O App Runner é a maneira mais simples de executar contêineres na AWS sem gerenciar orquestradores.
+## 3. Fazer o deploy via AWS App Runner
 
-1. Navegue até o **AWS App Runner** e clique em **Criar serviço**.
-2. Selecione **Registro de contêiner** e escolha **Amazon ECR**.
-3. Procure e selecione sua imagem `rebase-backend`.
-4. Em **Configurações do serviço**, defina a Porta para **3001**.
-5. Adicione as Variáveis de Ambiente necessárias na aba de configuração:
-   
+O App Runner é a maneira mais simples de executar contêineres na AWS sem precisar gerenciar orquestradores.
+
+1. Navegue até o **AWS App Runner** e clique em **Create service** (Criar serviço).
+2. Selecione **Container registry** (Registro de contêiner) e escolha **Amazon ECR**.
+3. Navegue e selecione a sua imagem `rebase-backend`.
+4. Em **Service settings** (Configurações de serviço), defina a Porta como **8080** — a porta na qual a imagem de runtime escuta, a menos que especificado de outra forma por `PORT`.
+5. Defina o caminho do **health check** para `/livez`. Não utilize `/health`: este último executa uma consulta completa de ida e volta ao banco de dados, logo, uma verificação de liveness nele reiniciaria um serviço perfeitamente saudável durante uma breve oscilação momentânea do banco de dados.
+6. Adicione as variáveis de ambiente:
+
 | Chave | Valor |
-|-----|-------|
-| `DATABASE_URL` | Sua String de Conexão do RDS |
-| `JWT_SECRET` | Um hash seguro gerado aleatoriamente (32+ caracteres) |
+|-------|-------|
+| `DATABASE_URL` | Sua string de conexão do RDS |
+| `JWT_SECRET` | Uma string segura gerada aleatoriamente (mais de 32 caracteres) |
+| `REBASE_SERVICE_KEY` | Uma string segura gerada aleatoriamente (mais de 32 caracteres) |
 | `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | O domínio do seu frontend (ex.: `https://seudominio.com`) |
+| `FRONTEND_URL` | A URL do seu frontend (usada para links de e-mail e fallback de CORS) |
+| `DISABLE_SELF_REGISTRATION` | `true` |
+| `REBASE_ADMIN_EMAIL` | O endereço do primeiro administrador, definido **antes da primeira inicialização** |
+| `REBASE_ADMIN_PASSWORD` | Pelo menos 12 caracteres |
 
-6. (Opcional) Se sua instância RDS for estritamente privada, configure a rede **VPC Personalizada** no App Runner para que o contêiner possa se comunicar com segurança com o banco de dados.
-7. Clique em **Criar e implantar**.
+As três últimas variáveis são a forma pela qual esta implantação obtém um administrador inicial: em produção, a primeira conta registrada não é promovida automaticamente, portanto, nada mais criará o primeiro usuário autenticado. Consulte [Seu primeiro administrador](/docs/getting-started/deployment/#your-first-admin). Armazene os segredos no AWS Secrets Manager e faça referência a eles em vez de digitá-los diretamente no formulário do console.
 
-A AWS lidará com a terminação TLS (fornecendo uma URL `https` pronta para uso) e iniciará o servidor Rebase.
+7. (Opcional) Se a sua instância RDS for estritamente privada, configure a rede com **Custom VPC** no App Runner para que o contêiner possa alcançar o banco de dados.
+8. Clique em **Create & deploy** (Criar e implantar).
 
-## 4. Criar o Esquema do Banco de Dados
+A AWS gerencia a terminação TLS automaticamente, fornecendo uma URL `https` pronta para uso.
 
-Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+## 4. O schema
 
-Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+**O runtime cria tabelas ausentes na inicialização, incluindo as das suas coleções.** A variável `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é cumulativa em todo o schema — ela cria tabelas ausentes, colunas e tipos enum, aplicando suas regras de segurança em nível de linha (RLS) —, de modo que a primeira inicialização em uma instância RDS vazia já começa disponibilizando suas coleções.
+
+O que o `ensure` nunca faz é alterar algo que já existe: ele não modifica o tipo de uma coluna, não remove nada nem edita rótulos de um enum existente, garantindo que o reinício de um contêiner nunca altere a estrutura do schema como efeito colateral de um deploy.
+
+Portanto, duas coisas ainda requerem a CLI, executada a partir de uma cópia local do código ou de uma etapa de CI com a variável `DATABASE_URL` apontando para o RDS:
 
 ```bash
-DATABASE_URL="<sua string de conexão do RDS>" pnpm run db:push
+rebase db push
 ```
 
-Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Como a instância RDS costuma ficar dentro de uma VPC privada, execute o comando a partir de uma máquina com acesso à rede (por exemplo, através de um host bastion) ou torne o endpoint do RDS temporariamente acessível a partir do seu IP.
+- **RLS em tabelas intermediárias (junction tables)** para relações muitos-para-muitos.
+- **Qualquer alteração que não seja puramente aditiva** — uma coluna renomeada, um tipo mais restrito, um campo removido.
 
-Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
+Se a instância for privada, execute o comando a partir de uma pipeline de CI ou de um bastion host dentro da mesma VPC. A imagem de runtime não inclui a CLI, de modo que isso nunca é executado dentro do contêiner do App Runner. Para migrações versionadas, faça commit dos arquivos de migração com `rebase db generate` e execute `rebase db migrate` como uma etapa de release.
+
+## Armazenamento de arquivos
+
+As instâncias do App Runner não possuem disco persistente, portanto, o armazenamento de arquivos local resultaria em perda silenciosa de dados e o runtime o recusa em produção. Crie um bucket S3 na mesma região e configure `STORAGE_TYPE=s3` com os dados do bucket e as credenciais necessárias — consulte [Armazenamento](/docs/backend/storage).
+
+## Próximos passos
+
+- [Implantação](/docs/getting-started/deployment) — a lista de verificação de produção e as regras para o primeiro administrador comuns a todas as plataformas.
+- [Configuração](/docs/getting-started/configuration) — todas as variáveis de ambiente lidas pelo runtime.
 
 ---

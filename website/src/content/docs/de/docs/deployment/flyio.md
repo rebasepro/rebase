@@ -1,93 +1,124 @@
 ---
-sourceHash: 85dd43f340a09860
+sourceHash: d53d77c2683bb3d3
 title: Rebase auf Fly.io bereitstellen
-description: Erfahren Sie, wie Sie Rebase global bereitstellen oder auf europäische Rechenzentren mit Fly.io beschränken können.
+description: Erfahren Sie, wie Sie Rebase global bereitstellen oder mithilfe von Fly.io auf europäische Rechenzentren beschränken.
 sidebar_label: Fly.io
 ---
 
-Fly.io ermöglicht es Ihnen, Docker-Container über sein globales Anycast-Netzwerk nah bei Ihren Benutzern zu hosten. Fly ist hinsichtlich der Datenweiterleitung hochgradig konfigurierbar, was es zu einer ausgezeichneten Wahl für die Bereitstellung von Rebase-Anwendungen mit einem strengen Fokus auf europäische Daten macht.
+Fly.io führt Docker-Container nah an Ihren Benutzern in einem globalen Anycast-Netzwerk aus und lässt sich hochgradig konfigurieren, wo Daten gespeichert werden – ideal für ein Rebase-Deployment mit striktem europäischem Fokus. Fly verfügt über Rechenzentren in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)** und **Paris (cdg)**.
 
-Fly.io verfügt über Rechenzentren in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)** und **Paris (cdg)**. 
+Nichts auf dieser Seite bezüglich Ihres Projekts ist Fly-spezifisch. Ein Rebase-Deployment besteht aus zwei trennbaren Teilen – dem veröffentlichten Runtime-Image und dem **Bundle**, das `rebase build` erzeugt – und dasselbe Bundle läuft unter Docker Compose auf einem Laptop, in der Rebase Cloud, unter dem [Helm chart](/docs/deployment/kubernetes) sowie hier.
 
 ## 1. Die Fly-App initialisieren
-Führen Sie in Ihrem lokalen Rebase-Repository, nachdem Sie sichergestellt haben, dass die Fly CLI (`flyctl`) installiert ist, folgenden Befehl aus:
+
+Führen Sie bei installiertem `flyctl` in Ihrem Projekt folgenden Befehl aus:
 
 ```bash
-fly launch
+fly launch --no-deploy
 ```
 
 1. **App-Name:** `my-rebase-app`
-2. **Organisation:** Persönlich oder Ihre Unternehmens-Org.
-3. **Region:** Wenn Sie nach einer Region gefragt werden, wählen Sie explizit ein europäisches Rechenzentrum wie **Frankfurt (fra)** oder **Paris (cdg)**.
-4. **Datenbank:** Wenn Sie aufgefordert werden, eine Postgres-Datenbank einzurichten, sagen Sie **Ja**. Fly erstellt automatisch einen Postgres-Cluster in derselben Region und injiziert die `DATABASE_URL` sicher in Ihre App.
-5. **Redis:** Sagen Sie **Nein**.
+2. **Organisation:** persönlich („personal“) oder Ihre Unternehmens-Organisation.
+3. **Region:** Wählen Sie ein europäisches Rechenzentrum – Frankfurt (`fra`) oder Paris (`cdg`).
+4. **Datenbank:** Antworten Sie mit **Yes** für einen Postgres-Cluster. Fly erstellt ihn in derselben Region und fügt `DATABASE_URL` ein.
+5. **Redis:** Antworten Sie mit **No**.
 
-*Stellen Sie noch nicht bereit, wenn Sie dazu aufgefordert werden.* Wir müssen zuerst eine wichtige Umgebungsvariable festlegen.
+`--no-deploy`, da die Secrets und das Bundle zuerst vorhanden sein müssen.
 
-## 2. Das JWT-Geheimnis festlegen
-Bevor Ihre Anwendung in Produktion geht, müssen Sie das JWT-Geheimnis injizieren, damit Rebase Authentifizierungstoken-Operationen sicher signieren kann.
+Falls Ihre Collections eine `vector`-Eigenschaft deklarieren, aktivieren Sie die Extension einmalig in dieser Datenbank: `CREATE EXTENSION vector;`.
 
-Führen Sie den folgenden Befehl lokal aus:
-```bash
-fly secrets set JWT_SECRET=your_super_long_randomly_generated_secure_string -a my-rebase-app
-```
+## 2. Das Bundle bauen und fly.toml auf das Runtime-Image verweisen lassen
 
-## 3. Interne Konfiguration validieren
-Fly hat eine `fly.toml`-Datei im Stammverzeichnis Ihres Projekts generiert. Überprüfen Sie, ob der interne Port explizit mit der Rebase-Standardkonfiguration (`3001`) übereinstimmt:
-
-Es gibt **kein Anwendungs-Image, das aus Ihrem Quellcode gebaut wird**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Collections, Funktionen und Crons — und, wenn Ihr Projekt eine statische App deklariert, Ihrem gebauten Frontend. Das veröffentlichte Runtime-Image führt es aus:
+Es gibt **kein Anwendungs-Image, das aus Ihrem Quellcode gebaut werden muss**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Collections, Functions, Crons und – falls Ihr Projekt eine statische App deklariert – Ihrem erstellten Frontend:
 
 ```bash
 rebase build
 ```
 
-Fly.io zieht aus einer Registry, backen Sie das Bundle also in ein abgeleitetes Image. Drei Zeilen, und sie fixieren genau das, was läuft:
+Committen Sie ein dreizeiliges `Dockerfile` im Root-Verzeichnis Ihres Projekts:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Ein späteres Rebase-Upgrade ist eine Änderung an dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
+Und verweisen Sie in `fly.toml` darauf:
 
-```toml
-# fly.toml
+```toml title="fly.toml"
 app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
 
+[env]
+  NODE_ENV = "production"
+  DISABLE_SELF_REGISTRATION = "true"
+
 [http_service]
-  internal_port = 3001 # Make sure this matches your Hono app port
+  internal_port = 8080          # the port the runtime image listens on
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 1      # realtime subscriptions need a machine to stay up
+
+[[http_service.checks]]
+  path = "/livez"
 ```
 
-## 4. Bereitstellen
+Lieber `/livez` statt `/health`: Letzteres führt einen Datenbank-Roundtrip durch, sodass ein Liveness-Check bei einem kurzen Datenbank-Schluckauf eine ansonsten gesunde Machine neu starten würde.
 
-Ihre Daten sind lokalisiert, Ihre Datenbank ist bereitgestellt und Ihre Geheimnisse sind injiziert. Starten Sie die Bereitstellung:
+`DISABLE_SELF_REGISTRATION` ist neu: In 0.17.3 gibt es keinen solchen Schalter, und das erste registrierte Konto wird zum Administrator.
+
+Ein späteres Upgrade von Rebase erfordert lediglich eine Änderung dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
+
+## 3. Produktions-Secrets setzen
+
+```bash
+fly secrets set \
+  JWT_SECRET=your_super_long_randomly_generated_secure_string \
+  REBASE_SERVICE_KEY=another_super_long_randomly_generated_secure_string \
+  CORS_ORIGINS=https://my-rebase-app.fly.dev \
+  FRONTEND_URL=https://my-rebase-app.fly.dev \
+  REBASE_ADMIN_EMAIL=you@example.com \
+  REBASE_ADMIN_PASSWORD=$(openssl rand -hex 12) \
+  -a my-rebase-app
+```
+
+Die letzten beiden sind neu und sorgen dafür, dass diese App überhaupt einen Administrator erhält: In der Produktion wird das erste registrierte Konto nicht befördert, sodass sonst kein erster angemeldeter Benutzer existiert. Setzen Sie diese, bevor das erste Deployment Traffic verarbeitet – siehe [Ihr erster Admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` zeigt nur Hashes an, bewahren Sie also das mit diesem Befehl generierte Passwort auf; es gibt keine Möglichkeit, es später wieder auszulesen.
+
+## 4. Bereitstellen
 
 ```bash
 fly deploy
 ```
 
-Sobald das Parsen und Hochladen abgeschlossen ist, wird Ihre Anwendung automatisch online gehen. Führen Sie `fly open` aus, um Ihre bereitgestellte App im Browser anzuzeigen!
+Danach `fly open`.
 
-## 5. Datenbankschema erstellen
+## 5. Das Schema
 
-Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+**Die Runtime erstellt beim Start fehlende Tabellen, einschließlich derer Ihrer Collections.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was über das gesamte Schema hinweg additiv arbeitet – es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an – sodass der erste Start gegen eine leere Datenbank direkt Ihre Collections bereitstellt.
+
+Was `ensure` niemals tut, ist etwas zu ändern, das bereits existiert: Es ändert keine Spaltentypen, löscht nichts und bearbeitet keine Labels vorhandener Enums, da eine neu startende Machine ein Schema niemals als Nebeneffekt eines Deployments umstrukturieren darf.
+
+Zwei Dinge erfordern daher weiterhin die CLI, ausgeführt aus einem Checkout oder einem CI-Job:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+- **Junction-Table-RLS** für Many-to-Many-Relationen.
+- **Jede Änderung, die nicht rein additiv ist** – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
-Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Öffnen Sie mit `fly proxy 5432 -a <postgres-app>` einen lokalen Tunnel zur Fly-Postgres-Instanz und setzen Sie `DATABASE_URL` entsprechend auf `localhost:5432`.
+Öffnen Sie für ein privates Fly Postgres einen Tunnel mit `fly proxy 5432 -a <your-db-app>` und lassen Sie `DATABASE_URL` auf `localhost:5432` zeigen. Das Runtime-Image wird ohne die CLI ausgeliefert, sodass dies niemals innerhalb der Machine läuft und auch ein `release_command` dies nicht aufrufen kann. Für versionierte Migrationen committen Sie Migrationsdateien mit `rebase db generate` und führen stattdessen `rebase db migrate` als Release-Schritt aus.
 
-Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
+## Dateispeicher
+
+Das Dateisystem einer Fly Machine übersteht kein Deployment; lokaler Dateispeicher führt daher zu unbemerktem Datenverlust, weshalb die Runtime ihn in der Produktion verweigert. Binden Sie einen S3-kompatiblen Bucket an – Tigris ist derjenige, den Fly bereitstellt – mit `STORAGE_TYPE=s3`. Siehe [Storage](/docs/backend/storage).
+
+## Nächste Schritte
+
+- [Deployment](/docs/getting-started/deployment) – die Produktions-Checkliste und die First-Admin-Regeln, die für alle Plattformen gelten.
+- [Konfiguration](/docs/getting-started/configuration) – jede Umgebungsvariable, die die Runtime liest.
 
 ---

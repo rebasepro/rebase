@@ -1,16 +1,12 @@
 ---
-sourceHash: 8bafcfc6e9367a8b
-title: Indexes
-sidebar_label: Indexes
-description: Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
+sourceHash: 17ca6f6a285eea43
+title: Índices
+sidebar_label: Índices
+description: Declare índices comuns do Postgres em uma coleção — btree, GIN e BRIN, parciais, compostos, de cobertura e únicos — e por que um índice manual costumava desaparecer.
 ---
 
-:::note[Esta página está disponível apenas em inglês]
-A tradução está pendente. O conteúdo abaixo está em inglês.
-:::
-
-A collection declares the indexes its queries need, in the same file as the
-properties they cover:
+Uma coleção declara os índices de que suas consultas precisam, no mesmo arquivo das
+propriedades que eles cobrem:
 
 ```typescript
 import type { PostgresCollectionConfig } from "@rebasepro/types";
@@ -34,87 +30,85 @@ const posts: PostgresCollectionConfig = {
 };
 ```
 
-Postgres only. On another engine the key is refused at boot rather than
-silently ignored.
+Apenas Postgres. Em outro mecanismo, a chave é recusada na inicialização em vez de
+ser ignorada silenciosamente.
 
-## Why this exists
+## Por que isso existe
 
-The DDL generator has always emitted index statements for exactly two things,
-and both are structures a *feature* owns rather than queries you wrote: the GIN
-index behind a [`search` block](/docs/backend/search), and the ANN index behind
-a [`vector` property](/docs/sdk/aggregates-and-search#the-index). The plain case — the btree
-behind a `where` clause — had no declaration site at all.
+O gerador de DDL sempre emitiu instruções de índice para exatamente duas coisas,
+e ambas são estruturas que uma *funcionalidade* possui, em vez de consultas que você escreveu: o
+índice GIN por trás de um [bloco `search`](/docs/backend/search), e o índice ANN por trás
+de uma [propriedade `vector`](/docs/sdk/aggregates-and-search#the-index). O caso comum — o btree
+por trás de uma cláusula `where` — não tinha nenhum local de declaração.
 
-So the only way to have one was to write it by hand. And:
+Portanto, a única maneira de ter um era escrevê-lo manualmente. E:
 
-:::caution[If you have hand-written indexes on a Rebase-managed table]
-`rebase db push` is declarative. An index on a managed table that was absent
-from `schema.sql` counted as drift, and Atlas planned `DROP INDEX` for it —
-which is not in the destructive-statement list, so the auto-approved apply took
-it without asking. Every hand-written index on a managed table was living on
-borrowed time.
+:::caution[Se você tiver índices manuais em uma tabela gerenciada pelo Rebase]
+O `rebase db push` é declarativo. Um índice em uma tabela gerenciada que estivesse ausente
+do `schema.sql` era considerado um desvio (drift), e o Atlas planejava um `DROP INDEX` para ele —
+o que não está na lista de instruções destrutivas, portanto, a aplicação autoaprovada o
+removia sem perguntar. Todo índice manual em uma tabela gerenciada estava com os dias contados.
 
-That is fixed by the ownership rule below: an index Rebase did not create is now
-excluded from the diff by name and never touched. Declaring your hand-written
-indexes is still the better end state — a declared index is created on a fresh
-database and on every tenant, and a hand-written one is not — but nothing drops
-them in the meantime.
+Isso foi corrigido pela regra de propriedade abaixo: um índice que o Rebase não criou agora
+é excluído do diff pelo nome e nunca é tocado. Declarar seus índices manuais ainda é
+o melhor estado final — um índice declarado é criado em um banco de dados novo e em cada
+tenant, enquanto um manual não é —, mas nada os removerá enquanto isso.
 :::
 
-## The shape
+## A estrutura
 
-| Field | Type | Description |
+| Campo | Tipo | Descrição |
 |-------|------|-------------|
-| `on` | `(string \| IndexKey)[]` | **Required.** The key columns, in order. 1–5 entries. |
-| `reason` | `string` | **Required.** Why this index exists, in one line. |
-| `using` | `"btree" \| "gin" \| "brin"` | Access method. Defaults to `btree`. |
-| `where` | `IndexPredicate` | Makes the index partial — it covers only the rows matching this. |
-| `unique` | `boolean` | btree only. A composite uniqueness guarantee. |
-| `include` | `string[]` | btree only. Payload columns carried for index-only scans. |
+| `on` | `(string \| IndexKey)[]` | **Obrigatório.** As colunas-chave, em ordem. 1 a 5 entradas. |
+| `reason` | `string` | **Obrigatório.** Por que este índice existe, em uma linha. |
+| `using` | `"btree" \| "gin" \| "brin"` | Método de acesso. O padrão é `btree`. |
+| `where` | `IndexPredicate` | Torna o índice parcial — ele cobre apenas as linhas que correspondem a isso. |
+| `unique` | `boolean` | Apenas btree. Uma garantia de unicidade composta. |
+| `include` | `string[]` | Apenas btree. Colunas de carga útil (payload) carregadas para index-only scans. |
 
-### `on` takes property keys, never column names
+### `on` recebe chaves de propriedade, nunca nomes de coluna
 
-This is the one that bites. A `belongsTo` relation compiles to its resolved
-`localKey`, so the property `author` is the column `author_id`:
+Esta é a pegadinha. Uma relação `belongsTo` é compilada para sua `localKey` resolvida,
+portanto, a propriedade `author` é a coluna `author_id`:
 
 ```typescript
 // Correct — `author` is the relation property.
 { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
 ```
 
-Writing `author_id` here would work for most properties and quietly index
-nothing for a foreign key, which is the one people reach for. Postgres does not
-index a foreign key column for you — without this index, both "list this
-author's posts" and the `ON DELETE` cascade are sequential scans.
+Escrever `author_id` aqui funcionaria para a maioria das propriedades e silenciosamente não indexaria
+nada para uma chave estrangeira, que é justamente a que as pessoas procuram. O Postgres não
+indexa uma coluna de chave estrangeira para você — sem esse índice, tanto "listar as postagens
+deste autor" quanto a deleção em cascata (`ON DELETE`) são varreduras sequenciais (sequential scans).
 
-A `hasMany` or many-to-many relation has no column on this table, and is
-refused with the collection that does own the foreign key.
+Uma relação `hasMany` ou muitos-para-muitos não possui coluna nesta tabela e é
+recusada, devendo ser declarada na coleção que de fato possui a chave estrangeira.
 
-### Order matters, and only a leading subset is usable
+### A ordem importa, e apenas um subconjunto inicial é utilizável
 
-Postgres can use a leading subset of the key columns, so
-`["ownerId", "createdAt"]` serves a query filtering on `ownerId`, and one
-filtering on both, and **never** one filtering on `createdAt` alone.
+O Postgres pode usar um subconjunto inicial das colunas-chave, portanto
+`["ownerId", "createdAt"]` atende a uma consulta que filtra por `ownerId`, e a uma
+que filtra por ambos, e **nunca** a uma que filtra apenas por `createdAt`.
 
-`direction` and `nulls` earn their place only when a query's `ORDER BY` mixes
-directions. A lone `DESC` index is redundant with its `ASC` twin — Postgres
-scans a btree backwards just as fast — so one index serves the filter *and* the
-sort in the example at the top of this page.
+`direction` e `nulls` só justificam seu uso quando o `ORDER BY` de uma consulta mistura
+direções. Um índice `DESC` isolado é redundante com seu par `ASC` — o Postgres
+varre uma btree de trás para frente com a mesma rapidez —, de modo que um único índice atende ao filtro *e* à
+ordenação no exemplo no topo desta página.
 
 ```typescript
 { on: [{ prop: "createdAt", direction: "desc", nulls: "last" }], reason: "…" }
 ```
 
-Writing the Postgres default down explicitly is free: the derived name hashes
-the *effective* order, so adding `direction: "asc"` to a column that was already
-ascending is not a redefinition and rebuilds nothing.
+Escrever o padrão do Postgres explicitamente não custa nada: o nome derivado gera o hash
+da ordem *efetiva*, portanto adicionar `direction: "asc"` a uma coluna que já era
+ascendente não é uma redefinição e não reconstrói nada.
 
-The cap is five keys. Postgres allows thirty-two; past four the trailing columns
-are dead weight on every write, and the declaration is usually someone hoping a
-query gets faster by accretion. Payload columns that are not searched belong in
-`include`, which does not count against the cap.
+O limite é de cinco chaves. O Postgres permite trinta e duas; além de quatro, as colunas finais
+tornam-se peso morto a cada escrita, e a declaração costuma ser alguém esperando que uma
+consulta fique mais rápida por acúmulo. Colunas de carga útil que não são pesquisadas pertencem a
+`include`, que não conta para o limite.
 
-### `where` is structured, not SQL
+### `where` é estruturado, não SQL
 
 ```typescript
 {
@@ -124,10 +118,10 @@ query gets faster by accretion. Payload columns that are not searched belong in
 }
 ```
 
-The index then holds only published rows, and stays small as drafts accumulate.
+O índice então armazena apenas linhas publicadas e permanece pequeno à medida que os rascunhos se acumulam.
 
-Operators are `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null` and
-`is not null`, combined with `and`:
+Os operadores são `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null` e
+`is not null`, combinados com `and`:
 
 ```typescript
 {
@@ -142,30 +136,30 @@ Operators are `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null` and
 }
 ```
 
-There is deliberately no `or`. An OR predicate almost always means the index
-should not be partial at all; if you genuinely need one, declare two indexes.
+Deliberadamente não há `or`. Um predicado OR quase sempre significa que o índice
+não deveria ser parcial de forma alguma; se você realmente precisar de um, declare dois índices.
 
-A predicate is structure rather than a string because a string could not be
-checked against the collection's properties, could not be fingerprinted without
-putting its own text into the index name — so reformatting it would rename a
-live index — and would be the one place a caller reaches for an extension
-operator class that the planner cannot replay.
+Um predicado é estruturado em vez de uma string porque uma string não poderia ser
+verificada em relação às propriedades da coleção, não poderia gerar uma impressão digital (fingerprint) sem
+colocar seu próprio texto no nome do índice — portanto, reformatá-la renomearia um
+índice em produção — e seria o único lugar onde o chamador usaria uma classe de operadores de extensão
+que o planejador não pode reproduzir.
 
-### `unique` is for composites only
+### `unique` é apenas para compostos
 
-Single-column uniqueness is `validation.unique` on the property, and declaring
-it here as well is refused rather than accepted as a synonym.
-`validation.unique` compiles to an inline `UNIQUE` whose backing index
-Postgres — not Rebase — names `<table>_<column>_key`.
+A unicidade de coluna única é `validation.unique` na propriedade, e declará-la
+aqui também é recusado em vez de ser aceito como um sinônimo.
+`validation.unique` é compilado para um `UNIQUE` inline cujo índice de suporte
+é nomeado pelo Postgres — e não pelo Rebase — como `<table>_<column>_key`.
 
 ```typescript
-{ on: ["tenantId", "slug"], unique: true, reason: "one slug per tenant" }
+{ on: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }
 ```
 
-### `include` buys an index-only scan
+### `include` proporciona um index-only scan
 
-Payload columns live in the leaf pages: not searchable, not ordered, and they
-save a heap fetch at the cost of a fatter index. They may not overlap `on`.
+Colunas de carga útil vivem nas páginas folha: não são pesquisáveis, não são ordenadas, e
+evitam uma busca na tabela (heap fetch) ao custo de um índice maior. Elas não podem se sobrepor a `on`.
 
 ```typescript
 { on: ["status"], include: ["title"], reason: "the status sidebar counts, without touching the heap" }
@@ -173,116 +167,118 @@ save a heap fetch at the cost of a fatter index. They may not overlap `on`.
 
 ### `using`
 
-`btree` (the default) answers equality, range, `ORDER BY` and uniqueness.
+`btree` (o padrão) atende a igualdade, intervalo, `ORDER BY` e unicidade.
 
-`gin` is containment over an `array` property or a JSONB `map`. `brin` is for a
-naturally-ordered column on an append-only table — tiny, and useless the moment
-rows start arriving out of order. Neither has an ordering, so `direction` and
-`nulls` are unrepresentable on them rather than refused later by Postgres.
+`gin` é para contenção sobre uma propriedade `array` ou um `map` JSONB. `brin` é para uma
+coluna naturalmente ordenada em uma tabela somente de inserção (append-only) — minúsculo e inútil no momento
+em que as linhas começarem a chegar fora de ordem. Nenhum dos dois tem ordenação, portanto `direction` e
+`nulls` não são representáveis neles em vez de serem recusados mais tarde pelo Postgres.
 
-There is no `gist` and no `hash`: every interesting gist operator class ships in
-an extension, and hash indexes cannot be unique, composite, or ordered. That
-restriction is what keeps the whole model on the Atlas path — `rebase db push`
-materialises the desired state in a bare scratch database to plan against, and
-`CREATE EXTENSION` cannot go in that file. **Trigram search is
-[`search:`](/docs/backend/search); ANN is a
-[`vector` property](/docs/sdk/aggregates-and-search#the-index).** An index needing
-`gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
-emitted to fail later against a database you have never seen.
+Não há `gist` nem `hash`: toda classe interessante de operador gist vem em uma
+extensão, e índices hash não podem ser únicos, compostos ou ordenados. Essa
+restrição é o que mantém todo o modelo no caminho do Atlas — o `rebase db push`
+materializa o estado desejado em um banco de dados temporário limpo para realizar o planejamento, e
+`CREATE EXTENSION` não pode entrar nesse arquivo. **A busca por trigramas é
+[`search:`](/docs/backend/search); ANN é uma
+[propriedade `vector`](/docs/sdk/aggregates-and-search#the-index).** Um índice que necessite de
+`gin_trgm_ops` ou `vector_cosine_ops` é recusado no momento da compilação em vez de ser
+emitido para falhar mais tarde em um banco de dados que você nunca viu.
 
-### `reason` is required
+### `reason` é obrigatório
 
-It is the only required field with no SQL behind it.
+É o único campo obrigatório sem nenhum SQL por trás.
 
-An index is the only thing a Rebase config can declare that costs money forever
-and whose benefit is invisible from the config. The reason is what gets printed
-beside "0 scans in 34 days, 412 MB", which is the one moment anybody is in a
-position to decide whether to delete it. Without it nobody can decide, so nobody
-does, and the table accretes indexes for the life of the product.
+Um índice é a única coisa que uma configuração do Rebase pode declarar que custa dinheiro para sempre
+e cujo benefício é invisível na configuração. O motivo é o que é exibido
+ao lado de "0 scans em 34 dias, 412 MB", que é o único momento em que alguém está em
+posição de decidir se deve excluí-lo. Sem isso ninguém pode decidir, portanto ninguém o
+faz, e a tabela acumula índices durante toda a vida útil do produto.
 
-It is deliberately **not** part of the index's identity — rewording a
-justification never rebuilds an index.
+Deliberadamente **não** faz parte da identidade do índice — reformular uma
+justificativa nunca reconstrói um índice.
 
-## What a declaration is called
+## Como uma declaração é nomeada
 
-`<table>_<columns>_ix_<7 hex>`, or `_ux_` when unique. For example
+`<table>_<columns>_ix_<7 hex>`, ou `_ux_` quando único. Por exemplo,
 `posts_status_publish_date_ix_a91c3f4`.
 
-The hash is over the index's *semantics* — method, columns, order, uniqueness,
-included columns, predicate — and not over its rendered SQL, so a change to how
-Rebase formats DDL never renames anything in your database.
+O hash é baseado na *semântica* do índice — método, colunas, ordem, unicidade,
+colunas incluídas, predicado — e não em seu SQL renderizado, portanto, uma alteração na forma como
+o Rebase formata o DDL nunca renomeia nada em seu banco de dados.
 
-The hash is load-bearing. `CREATE INDEX IF NOT EXISTS` matches on the **name**,
-not the definition: with a readable name, changing a declaration would keep the
-old index and report success forever. With the hash in the name, a redefinition
-is a different object, so it is created and the old one dropped.
+O hash é estrutural. `CREATE INDEX IF NOT EXISTS` faz a correspondência pelo **nome**,
+não pela definição: com um nome legível, alterar uma declaração manteria o
+índice antigo e reportaria sucesso para sempre. Com o hash no nome, uma redefinição
+é um objeto diferente, então ele é criado e o antigo é removido.
 
-Two consequences worth stating:
+Duas consequências que valem a pena mencionar:
 
-- **Changing a declaration is a DROP and a CREATE**, emitted bare — no
-  `CONCURRENTLY`, and a window with no index in between. Fine on a development
-  database; on a large live table, apply it at a time you choose.
-- The name is [a frozen derived name](/docs/architecture/schema-as-code). It is
-  in `contracts/derived-names.txt` and cannot change across releases.
+- **Alterar uma declaração é um DROP e um CREATE**, emitidos diretamente — sem
+  `CONCURRENTLY`, e com uma janela sem índice entre eles. Tranquilo em um banco de dados
+  de desenvolvimento; em uma tabela grande em produção, aplique no momento de sua escolha.
+- O nome é [um nome derivado congelado](/docs/architecture/schema-as-code). Ele está
+  em `contracts/derived-names.txt` e não pode mudar entre versões.
 
-## Who owns an index
+## Quem é o dono de um índice
 
-`_ix_`/`_ux_` plus seven hex is unreachable by every other namer here — `_fkey`,
-`_gin`, `_trgm`, `_pkey`, `_key`, the vector distances, auth's `idx_` prefix. So
-the name alone decides ownership:
+`_ix_`/`_ux_` mais sete hexadecimais é inalcançável por qualquer outro gerador de nomes aqui — `_fkey`,
+`_gin`, `_trgm`, `_pkey`, `_key`, as distâncias vetoriais, o prefixo `idx_` de auth. Portanto,
+o nome por si só decide a propriedade:
 
-| The index | In the plan? | Named by Rebase? | What happens |
+| O índice | No plano? | Nomeado pelo Rebase? | O que acontece |
 |---|---|---|---|
-| declared | yes | yes | created, then kept |
-| declaration deleted | no | yes | **dropped**, as intended |
-| hand-written, or from introspection | no | no | **excluded — never touched** |
+| declarado | sim | sim | criado, depois mantido |
+| declaração excluída | não | sim | **removido (dropped)**, conforme o esperado |
+| manual ou originado de introspecção | não | não | **excluído — nunca tocado** |
 
-Neither case needs a prompt. Deleting a declaration *should* remove the index
-quietly; what must never be dropped is one Rebase did not create. This is also
-what makes the introspection round trip safe: the existing indexes of a database
-you pointed Rebase at are foreign until somebody declares them.
+Nenhum dos casos precisa de confirmação. Excluir uma declaração *deve* remover o índice
+silenciosamente; o que nunca deve ser removido é um índice que o Rebase não criou. Isso também
+é o que torna a ida e volta (round trip) da introspecção segura: os índices existentes de um banco de dados
+para o qual você apontou o Rebase são considerados externos até que alguém os declare.
 
-## When they are created
+## Quando eles são criados
 
-Both producers emit them, which matters because not every deployment runs
+Ambos os produtores os emitem, o que é importante porque nem todo deployment executa
 `db push`:
 
-- **`rebase db push` / `rebase db generate`** put them in `schema.sql`, on the
-  ordinary Atlas path — so they get migrations, drift detection and rollback
-  like every other object.
-- **`rebase schema generate`** also writes them into `schema.generated.ts`, so
-  the Drizzle schema describes the same table the database has. A covering
-  index's `INCLUDE` columns are the one exception: Drizzle cannot express them,
-  and the generated line carries a comment saying so and pointing at
-  `schema.sql`, which does.
-- **Boot-time schema ensure** creates them with
-  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, on the same terms as the ANN
-  indexes beside it. A managed-runtime tenant provisions at boot and never runs
-  `db push`; without this it would start with none of its declared indexes and
-  nothing would say so.
+- **`rebase db push` / `rebase db generate`** os colocam no `schema.sql`, no
+  caminho comum do Atlas — para que eles tenham migrações, detecção de desvio (drift) e rollback
+  como qualquer outro objeto.
+- **`rebase schema generate`** também os grava no `schema.generated.ts`, para
+  que o schema do Drizzle descreva a mesma tabela que o banco de dados possui. As colunas `INCLUDE`
+  de um índice de cobertura são a única exceção: o Drizzle não consegue expressá-las,
+  e a linha gerada traz um comentário informando isso e apontando para o
+  `schema.sql`, que as suporta.
+- **A garantia de schema na inicialização (Boot-time schema ensure)** os cria com
+  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, nos mesmos termos que os índices ANN
+  ao lado dele. Um tenant em runtime gerenciado faz o provisionamento na inicialização e nunca executa
+  `db push`; sem isso, ele iniciaria sem nenhum de seus índices declarados e
+  nada avisaria sobre isso.
 
-## What is refused, and when
+## O que é recusado e quando
 
-All of these throw at build time, naming the collection and the position in the
-array — an index that silently does not exist is the failure this whole feature
-removes:
+Todos estes geram erro em tempo de build, informando a coleção e a posição no
+array — um índice que silenciosamente não existe é a falha que toda essa funcionalidade
+elimina:
 
-- a property that is not on the collection, or a relation whose foreign key
-  lives on the other table
-- more than five keys in `on`, or the same column twice
-- exactly the primary key columns — `<table>_pkey` already indexes those
-- a column in both `on` and `include`
-- `unique` on one column whose property already declares `validation.unique`
-- `direction` or `nulls` under `gin` or `brin`
-- an `in` list that repeats a value
-- two declarations that derive the same name — they are the same index, twice
-- an empty or missing `reason`
+- uma propriedade que não está na coleção, ou uma relação cuja chave estrangeira
+  reside na outra tabela
+- mais de cinco chaves em `on`, ou a mesma coluna duas vezes
+- exatamente as colunas da chave primária — `<table>_pkey` já indexa essas colunas
+- uma coluna presente em `on` e em `include` simultaneamente
+- `unique` em uma única coluna cuja propriedade já declara `validation.unique`
+- `direction` ou `nulls` sob `gin` ou `brin`
+- uma lista `in` que repete um valor
+- duas declarações que derivam o mesmo nome — são o mesmo índice, duas vezes
+- um `reason` vazio ou ausente
 
-## Related
+## Relacionados
 
-- [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
-  index over a generated `tsvector`
-- [Vector search](/docs/sdk/aggregates-and-search#vector-search) — the ANN index over an
-  embedding column, configured on the property
-- [Schema as code](/docs/architecture/schema-as-code) — how declarations reach
-  the database, and what a derived name is
+- [Busca](/docs/backend/search) — busca textual ranqueada (full-text), que cria seu próprio
+  índice GIN sobre um `tsvector` gerado
+- [Busca vetorial](/docs/sdk/aggregates-and-search#vector-search) — o índice ANN sobre uma
+  coluna de embedding, configurado na propriedade
+- [Schema como código](/docs/architecture/schema-as-code) — como as declarações chegam
+  ao banco de dados e o que é um nome derivado
+
+---

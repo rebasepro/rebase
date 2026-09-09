@@ -1,24 +1,23 @@
 ---
-sourceHash: b5b92ee0a21c210a
-title: Dividir em vários processos
-sidebar_label: Processos separados
-description: "Execute um bundle como vários processos que cooperam entre si — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função personalizada pesada deixe de competir com a API de dados."
+sourceHash: ce7486bb141920aa
+title: Divisão em vários processos
+sidebar_label: Processos Divididos
+description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada não dispute recursos com a API de dados.
 ---
 
-## Visão geral
+## Visão Geral
 
-Um deployment do Rebase é normalmente um único processo que serve tudo: a API de
-dados, a autenticação, o armazenamento, as tuas funções personalizadas, o cron e
-a fila de tarefas. É a forma certa para quase todos os deployments e continua a
-ser a predefinição.
+Uma implantação do Rebase é normalmente um único processo servindo tudo: a API de dados,
+autenticação, armazenamento, suas funções customizadas, cron e a fila de jobs. Esse é o formato
+ideal para quase todas as implantações e continua sendo o padrão.
 
-Quando deixa de ser — uma função personalizada que bloqueia o event loop, ou uma
-camada de funções que deve escalar ou reiniciar independentemente da API — podes
-arrancar **a mesma imagem e o mesmo bundle** várias vezes e fazer com que cada
-processo sirva uma parte diferente do projeto. Não há nada de novo para construir
-nem nada que o cliente precise de saber: os URLs não mudam.
+Quando deixa de ser o formato ideal — uma função customizada que trava o event loop,
+uma camada de funções que deve escalar ou reiniciar independentemente da API —, você pode
+inicializar **a mesma imagem e o mesmo bundle** várias vezes e fazer com que cada
+processo sirva uma parte diferente do projeto. Não há nada de novo para compilar e
+nada que o cliente precise saber: as URLs não mudam.
 
-Uma variável de ambiente decide o que é cada processo:
+Uma variável de ambiente decide o que um processo é:
 
 ```bash
 REBASE_ROLE=api        # data, auth, admin, storage, meta — everything but functions
@@ -27,36 +26,35 @@ REBASE_ROLE=worker     # no HTTP surface: cron and the job queue
 REBASE_ROLE=all        # the default: everything, one process
 ```
 
-## O que cada papel serve
+## O que cada role serve
 
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, o editor de esquema | ✅ | ✅ | — | — |
-| `/api/functions/*` | ✅ | reencaminha (ver abaixo) | ✅ | — |
-| `/api/cron` (a superfície de administração) | ✅ | ✅ | — | — |
+| `/api/admin`, `/api/logs`, o editor de schema | ✅ | ✅ | — | — |
+| `/api/functions/*` | ✅ | encaminha (veja abaixo) | ✅ | — |
+| `/api/cron` (a superfície de admin) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Serve websockets, consome eventos de alteração | ✅ | ✅ | — | — |
-| Cria o esquema no arranque | ✅ | ✅ | — | — |
-| Executa o agendador de cron | ✅ | ✅ | — | ✅ |
-| Executa os workers da fila de tarefas | ✅ | ✅ | — | ✅ |
+| Cria o schema na inicialização | ✅ | ✅ | — | — |
+| Executa o agendador do cron | ✅ | ✅ | — | ✅ |
+| Executa workers da fila de jobs | ✅ | ✅ | — | ✅ |
 
-Health e métricas existem em todos os papéis, sem exceção. Um processo que um
+Health e métricas estão em todas as roles sem exceção. Um processo que um
 orquestrador não consegue sondar é um processo que ele não consegue atualizar.
 
-O realtime está na lista porque custa alguma coisa quer alguém o use quer não: um
-processo que consome eventos de alteração mantém uma ligação `LISTEN` fora da
-pool enquanto viver, e instala os triggers de captura no arranque. Só um processo
-que serve websockets tem a quem entregar, por isso os dois papéis que não servem
-nenhum não fazem nem uma coisa nem outra. **As escritas feitas por esses
-processos continuam a ser ouvidas**: a captura são triggers de base de dados, ou
-seja, uma alteração é publicada pela base de dados e não pelo processo que a fez.
-Uma função que escreve uma linha continua a acordar todos os subscritores da
-`api`.
+O Realtime está na lista porque tem um custo, quer alguém o utilize ou
+não: um processo que consome eventos de alteração mantém uma conexão `LISTEN` fora
+do pool durante todo o tempo em que estiver em execução, e instala os triggers de captura na inicialização. Apenas
+um processo que serve websockets tem destinatários para entregar eventos, portanto as duas roles que
+não servem nenhum não fazem nenhuma das duas coisas. **Gravações feitas por esses processos ainda são ouvidas** —
+a captura é feita por triggers no banco de dados, logo a alteração é publicada pelo banco de dados em vez de ser
+pelo processo que a realizou. Uma função que grava uma linha ainda acorda
+todos os inscritos na `api`.
 
 ## Docker Compose
 
-Dois serviços a partir de uma imagem, um bundle e uma base de dados:
+Dois serviços a partir de uma imagem, um bundle e um banco de dados:
 
 ```yaml
 services:
@@ -92,89 +90,83 @@ services:
 docker compose up --scale functions=3
 ```
 
-Ambos os processos precisam do mesmo `DATABASE_URL`, do mesmo `JWT_SECRET` e da
-mesma `REBASE_SERVICE_KEY`: são um só deployment, e um token emitido por um tem
-de ser aceite pelo outro.
+Ambos os processos precisam da mesma `DATABASE_URL`, do mesmo `JWT_SECRET` e da mesma
+`REBASE_SERVICE_KEY` — eles formam uma única implantação, e um token gerado por um precisa
+ser aceito pelo outro.
 
-## Manter os mesmos URLs
+## Mantendo as mesmas URLs
 
-`REBASE_FUNCTIONS_UPSTREAM` diz ao processo `api` para reencaminhar
-`/api/functions/*` para o processo de funções em vez de o servir. Clientes, SDKs
-gerados e chaves de API veem exatamente a mesma superfície que viam antes da
-divisão, portanto nenhum código de aplicação muda e não é preciso montar um
-proxy inverso para experimentar.
+`REBASE_FUNCTIONS_UPSTREAM` instrui o processo `api` a encaminhar `/api/functions/*`
+para o processo de funções em vez de servi-lo. Clientes, SDKs gerados e
+chaves de API veem exatamente a mesma interface que viam antes da divisão, portanto nenhum código
+de aplicação muda e você não precisa configurar um proxy reverso para testar.
 
-Um deployment de produção pode preferir encaminhar esse caminho no seu ingress;
-nesse caso deixa `REBASE_FUNCTIONS_UPSTREAM` por definir — o processo `api`
-responderá 404 nesses caminhos e o proxy à frente decidirá para onde vão.
+Uma implantação em produção pode preferir rotear o caminho diretamente no seu ingress; nesse
+caso, deixe `REBASE_FUNCTIONS_UPSTREAM` desconfigurado — o processo `api` então
+responderá 404 para esses caminhos e o proxy à frente decidirá para onde eles vão.
 
 ### Saltos de proxy
 
-Quando a API reencaminha, acrescenta o endereço de quem chamou a
-`X-Forwarded-For`. Isso coloca o processo de funções atrás de **mais um salto de
-proxy** do que a API, e é preciso dizer-lho:
+Quando a API encaminha a requisição, ela anexa o endereço do chamador ao `X-Forwarded-For`. Isso
+faz com que o processo de funções fique atrás de **mais um salto de proxy** do que a API,
+e ele precisa ser informado disso:
 
 ```bash
 # api behind one ingress            → TRUSTED_PROXY_HOPS=1
 # functions behind that ingress AND the api → TRUSTED_PROXY_HOPS=2
 ```
 
-`TRUSTED_PROXY_HOPS` é o número de proxies inversos que realmente tens à frente
-de um processo. Cada um acrescenta a `X-Forwarded-For` o endereço que viu, pelo
-que o cliente real é a N-ésima entrada a contar da direita; tudo o que está mais
-à esquerda é fornecido pelo cliente e ignorado — é isso que impede falsificar o
-cabeçalho para rodar as chaves do limitador. O valor predefinido é `0`: nenhum
-proxy é de confiança.
+`TRUSTED_PROXY_HOPS` é o número de proxies reversos que você realmente executa à frente
+de um processo. Cada um anexa o endereço que visualizou ao `X-Forwarded-For`, de modo que o
+cliente real é a enésima entrada a partir da direita; tudo o que estiver mais à esquerda foi
+fornecido pelo cliente e é ignorado, o que impede que um chamador falsifique o cabeçalho para
+burlar os limites de taxa. O valor padrão é `0` — nenhum proxy confiável.
 
-Se isto ficar errado, nada parte de forma visível: os limitadores do processo de
-funções associam todos os pedidos ao endereço do contentor da API, portanto todos
-os teus chamadores partilham um único balde, e o IP registado em cada evento de
-autenticação é sempre o mesmo.
+Se configurar isso incorretamente, nada quebrará de forma visível: os limitadores de taxa no processo de funções
+associarão cada requisição ao endereço do container da API, fazendo com que todos os chamadores compartilhem
+o mesmo bucket, e o IP registrado em cada evento de autenticação será o mesmo.
 
-## Um processo é dono do esquema
+## Um único processo é dono do schema
 
-Exatamente um processo de um deployment dividido cria as tabelas e aplica as
-políticas RLS no arranque, e é o `api` (ou o `all`). Todos os outros processos
-têm de definir:
+Exatamente um processo em uma implantação dividida cria tabelas e aplica
+políticas RLS na inicialização, e esse é o processo `api` (ou `all`). Todos os outros processos devem
+definir:
 
 ```bash
 REBASE_MIGRATE_ON_BOOT=none
 ```
 
-Isto é **obrigatório**, não um conselho: um processo `functions` ou `worker`
-deixado no valor predefinido recusa arrancar, e diz porquê. `CREATE … IF NOT
-EXISTS` lê o catálogo e depois escreve nele em dois passos separados, portanto
-processos que arrancam ao mesmo tempo colidem mesmo — e um deployment em que
-vários competem para criar o mesmo esquema não é um deployment que alguém tenha
-desenhado.
+Isso é **obrigatório**, não apenas uma recomendação: um processo `functions` ou `worker` mantido no
+padrão se recusará a iniciar e emitirá um aviso. O comando `CREATE … IF NOT EXISTS` lê o catálogo
+e depois grava nele em duas etapas separadas, portanto processos inicializando juntos
+colidem — e uma implantação onde vários deles disputam para provisionar o mesmo
+schema não é algo planejado para acontecer.
 
-## Servir uma função por processo
+## Servindo uma função por processo
 
-Um processo pode servir um subconjunto nomeado, que é como uma função cara
-consegue o seu próprio número de réplicas sem que o código se mova para lado
-nenhum:
+Um processo pode servir um subconjunto nomeado, que é como uma função com alto consumo de recursos
+ganha sua própria contagem de réplicas sem que seu código precise ser movido para lugar nenhum:
 
 ```bash
 REBASE_FUNCTIONS_ONLY=send-invoice
 REBASE_FUNCTIONS_EXCLUDE=debug-tools
 ```
 
-Os nomes são nomes de ficheiro sem a extensão — o mesmo nome sob o qual a função
-é montada. Um nome que o bundle não contém **faz falhar o arranque**, e o erro
-enumera os nomes que contém. Um processo configurado para uma função existe para
-essa função, portanto uma gralha que servisse silenciosamente nada seria o pior
-resultado possível.
+Os nomes correspondem aos nomes dos arquivos sem a extensão — o mesmo nome sob o qual a função é montada.
+Um nome que o bundle não contenha **falha a inicialização**, e o erro lista
+os nomes que ele de fato contém. Um processo configurado para uma única função existe para essa
+função, portanto um erro de digitação que silenciosamente não servisse nada seria o pior cenário
+possível.
 
 ## Cron e tarefas em segundo plano
 
-Ambos já são seguros em mais do que um processo: o agendador de cron reivindica
-cada par `(job, slot)` na base de dados, e a fila de tarefas reivindica linhas com
-`FOR UPDATE SKIP LOCKED`. Por isso o `api` continua a executar ambos por
-predefinição e uma divisão em dois serviços fica completa sem um terceiro
-contentor.
+Ambos já são seguros para executar em mais de um processo: o agendador do cron reivindica
+cada par `(job, slot)` no banco de dados, e a fila de jobs reivindica linhas com
+`FOR UPDATE SKIP LOCKED`. Assim, a `api` continua executando ambos por padrão e uma divisão
+em dois serviços fica completa sem a necessidade de um terceiro container.
 
-Acrescenta um processo `worker` quando quiseres tirar o trabalho agendado do
-caminho dos pedidos, e desliga-o na API:
+Adicione um processo `worker` quando quiser tirar o trabalho agendado do caminho da requisição HTTP, e
+desative-o na API:
 
 ```yaml
   api:
@@ -188,40 +180,39 @@ caminho dos pedidos, e desliga-o na API:
       REBASE_MIGRATE_ON_BOOT: none
 ```
 
-Um processo `functions` nunca executa nenhum dos dois. Escala com a carga de
-pedidos e é substituído a qualquer momento; dar-lhe trabalho agendado faria com
-que o seu número de réplicas significasse algo que não deve significar.
+Um processo `functions` nunca executa nenhum dos dois. Ele é escalado pela carga de requisições e
+substituído quando necessário, e atribuir a ele tarefas agendadas faria com que sua contagem de réplicas
+significasse algo que não deveria.
 
-Nota que `rebase.jobs.enqueue` continua a funcionar em todo o lado, incluindo num
-processo que não executa workers: enfileirar é uma escrita, executar é um ciclo
-de sondagem, e só o segundo é o que um papel desliga.
+Observe que `rebase.jobs.enqueue` continua funcionando em qualquer lugar, inclusive em um processo
+que não executa workers — enfileirar é uma gravação, executar é um loop de polling, e
+apenas a segunda operação é o que uma role desativa.
 
-## O que dividir não te dá
+## O que a divisão não oferece
 
-**Limites de taxa partilhados.** O armazenamento do limitador é por processo por
-predefinição, portanto N processos multiplicam por N a dotação de cada chamador.
-Define `REBASE_RATE_LIMIT_STORE=sql` em cada processo que sirva HTTP: conta no
-Postgres, por isso o limite é o limite haja as réplicas que houver. (O chart Helm
-define-o por ti e recusa-se a renderizar uma topologia com vários processos que o
-deixe em `memory`.)
+**Limites de taxa compartilhados, a menos que configurados.** O armazenamento padrão é por processo, portanto
+N processos multiplicam a cota de cada chamador por N sem nenhum aviso em log
+informando isso. Defina `REBASE_RATE_LIMIT_STORE=sql` em todos os processos que servem HTTP — ele
+faz a contagem no Postgres, garantindo que o limite seja o mesmo, independentemente do número de réplicas.
+(O Helm chart define isso automaticamente e se recusa a renderizar uma topologia multiprocesso
+que permaneça em `memory`.)
 
-**Canais entre instâncias.** O broadcast e a presença usam um bus em memória por
-predefinição, que não atravessa processos. Isto é uma questão de *número de
-réplicas* mais do que de divisão — é igualmente verdade num deployment de papel
-único escalado para três — portanto define `REALTIME_CHANNEL_BUS=postgres` (ou
-`realtime.bus` na configuração) sempre que mais do que um processo servir
-websockets.
+**Canais entre instâncias.** O broadcast e a presença usam um barramento em memória por
+padrão, o qual não atravessa processos. Esta é uma questão de *número de réplicas*
+e não necessariamente de divisão de processos — é igualmente verdade para uma implantação de papel único
+escalada para três —, portanto defina `REALTIME_CHANNEL_BUS=postgres` (ou `realtime.bus` na
+configuração) sempre que mais de um processo servir websockets.
 
-**Escalar até zero.** Nada disto reduz um processo a nada nem levanta um a
-pedido. Isso é uma capacidade da plataforma, não do runtime.
+**Escala até zero (Scale to zero).** Nada aqui reduz um processo a zero ou inicializa um
+sob demanda. Essa é uma capacidade da plataforma, não do runtime.
 
-## Lançar uma unidade por si só
+## Fazendo deploy de uma unidade individualmente
 
-Tudo o que está acima reparte *onde* o trabalho corre. Tudo isso continua a ser
-lançado como uma só build: uma imagem, um bundle, implantados em conjunto. É a
-predefinição certa, e a maioria dos deployments deve ficar por aí.
+Tudo o que foi descrito acima divide *onde o trabalho é executado*. Tudo ainda é distribuído como uma
+única build: uma imagem, um bundle, atualizados juntos. Esse é o padrão ideal, e
+a maioria das implantações deve permanecer assim.
 
-Uma unidade também pode ficar numa build própria — uma correção de função que não
+Uma unidade também pode ser mantida em uma build própria — uma correção em uma função que não
 reinicia a API:
 
 ```yaml
@@ -230,55 +221,63 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.19.1"     # só esta unidade; as restantes ficam na tag do release
+    tag: "0.19.1"     # this unit only; the rest stay on the release-wide tag
 ```
 
-Normalmente só vale a pena fixar a tag: o repositório é herdado, portanto é um
-projeto e uma imagem com uma unidade movida. `bundleUrl` faz o mesmo quando
-`bundle.mode: url`.
+Geralmente, apenas a tag vale a pena fixar: o repositório é herdado, portanto trata-se de
+um projeto e uma imagem com apenas uma unidade alterada. `bundleUrl` faz o mesmo trabalho
+quando `bundle.mode: url`.
 
 ### A regra
 
-Duas unidades em builds diferentes são dois conjuntos de coleções contra **uma**
-base de dados, e só uma unidade a aprovisiona. Portanto:
+Duas unidades em builds diferentes representam dois conjuntos de coleções contra **um**
+único banco de dados, e apenas uma unidade o provisiona. Portanto:
 
-> **A unidade dona do esquema é implantada primeiro. Uma unidade pode ficar para
-> trás; nunca deve ir à frente.**
+> **A unidade dona do schema é atualizada primeiro. Uma unidade pode ficar para trás;
+> ela nunca deve estar à frente.**
 
-É o Job de migração, ou a `api` quando o Job está desligado. Uma unidade à
-*frente* do esquema consulta colunas que ainda não existem e depende de políticas
-RLS que ninguém aplicou — a primeira é um erro SQL numa rota, a segunda um
-resultado vazio com um 200. Uma unidade *atrás* é o estado normal de qualquer
-rollout a decorrer.
+Essa unidade é o Job de migração ou a `api` quando o Job estiver desativado. Uma unidade rodando
+*à frente* do schema faz consultas a colunas que ainda não existem e depende de políticas RLS
+que ninguém aplicou — o primeiro caso é um erro SQL em uma rota, o segundo é um
+resultado vazio com status 200. Uma unidade rodando *atrás* é o estado comum de qualquer
+rollout em andamento.
 
-### O que o verifica
+### O que faz essa verificação
 
-O processo que aprovisiona regista na base de dados a versão de esquema que
-aplicou. Todos os outros processos calculam a sua a partir das coleções que
-carregaram e comparam. Havendo desacordo, dizem-no, nomeando ambas:
+O processo responsável pelo provisionamento registra no banco de dados a versão do schema que aplicou.
+Todos os outros processos calculam sua própria versão a partir das coleções carregadas e
+as comparam. Em caso de divergência, um aviso é emitido, identificando ambas as versões:
 
 ```
 ⚠️ [schema] The database was last provisioned from a different set of collections
    than this process was built from (database v1:6f2a…, this process v1:91cd…).
 ```
 
-Avisa e serve, porque durante um rollout esse desacordo é *correto*: as unidades
-que ainda não rolaram devem estar atrás. Define
-`REBASE_REQUIRE_SCHEMA_MATCH=true` (ou `sharedState.requireSchemaMatch` no chart)
-para recusar o arranque, num deployment que prefere não servir a servir errado.
+Ele emite um aviso e continua servindo, porque durante um rollout essa divergência é *esperada* —
+as unidades que ainda não foram atualizadas devem mesmo estar atrás. Defina
+`REBASE_REQUIRE_SCHEMA_MATCH=true` (ou `sharedState.requireSchemaMatch` no
+chart) para recusar a inicialização caso prefira uma implantação que deixe de responder
+a responder de forma incorreta.
 
-Ambos os lados dessa comparação são **calculados**, nunca lidos de um manifesto.
-Uma versão que uma build afirma sobre si mesma não prova que a base de dados
-concorda.
+Ambos os lados dessa comparação são **calculados**, nunca lidos a partir de um manifesto. Uma
+versão que uma build declara sobre si mesma não é evidência de que o banco de dados concorde
+com ela.
 
-Nada verifica a *direção* — uma versão de esquema é um hash: pode dizer que as
-duas divergem, nunca qual está à frente. É por isso que a ordem do rollout é uma
-regra que segues, não uma que o runtime possa impor.
+Nada verifica a *direção* — a versão do schema é um hash, portanto é possível identificar que os
+dois divergem, mas nunca qual está à frente. É por isso que a ordem do rollout é uma
+regra a ser seguida, e não algo que o runtime possa impor.
 
-## Atualizar
+## Atualização
 
-Sem alterações: todos os processos executam a mesma imagem publicada, portanto
-atualizar é a mesma mudança de tag em cada um. Atualiza o `api` por último se
-quiseres que o provisionamento do esquema aconteça primeiro contra a nova versão
-— embora na prática a ordem não importe, porque o passo do esquema é aditivo e
-idempotente.
+Sem mudanças: cada processo executa a mesma imagem publicada, portanto uma atualização é a mesma
+alteração de tag em cada um deles. Atualize a `api` por último caso queira que o
+provisionamento do schema ocorra em relação à nova versão primeiro — embora, na prática, a
+ordem não importe, pois a etapa do schema é aditiva e idempotente.
+
+## Relacionado
+
+- [Guia de Implantação](/docs/getting-started/deployment/) — a implantação em processo único que este documento divide
+- [Ambiente e Configuração](/docs/getting-started/configuration/) — `REBASE_ROLE`, `REBASE_CRON_SCHEDULER` e `REBASE_MIGRATE_ON_BOOT`
+- [Kubernetes](/docs/deployment/kubernetes/) — uma implantação por role
+
+---

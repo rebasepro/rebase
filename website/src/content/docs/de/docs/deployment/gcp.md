@@ -1,86 +1,108 @@
 ---
-sourceHash: 4ce81cfc99dff90a
-title: Rebase auf Google Cloud Platform bereitstellen
-description: Stellen Sie Ihre Rebase-Instanz sicher auf GCP bereit, indem Sie Cloud SQL und Cloud Run nutzen, mit Fokus auf EU-Rechenzentrumsregionen.
+sourceHash: e902dc7a4aad0fa2
+title: Bereitstellung von Rebase auf der Google Cloud Platform
+description: Stellen Sie Ihre Rebase-Instanz sicher auf GCP mithilfe von Cloud SQL und Cloud Run bereit, mit Fokus auf EU-Rechenzentrumsregionen.
 sidebar_label: Google Cloud
 ---
 
-Google Cloud Platform (GCP) bietet eine unglaublich nahtlose Entwicklererfahrung für containerisierte Anwendungen. Für ein robustes Produktions-Setup nutzen wir **Cloud SQL** für die Datenbank und **Cloud Run** als serverloses Container-Grundgerüst.
+Die Google Cloud Platform (GCP) bietet eine nahtlose Developer Experience für containerisierte Anwendungen. Verwenden Sie für ein robustes Produktions-Setup **Cloud SQL** für die Datenbank und **Cloud Run** für die Runtime.
 
-Um die strikte europäische Datenkonformität zu gewährleisten, stellen Sie sicher, dass Sie vollständig innerhalb einer EU-Region operieren, wie zum Beispiel **europe-west3 (Frankfurt)**, **europe-west9 (Paris)** oder **europe-west1 (Belgien)**.
+Um strenge europäische Datenschutzvorgaben einzuhalten, betreiben Sie alles vollständig innerhalb einer EU-Region wie **europe-west3 (Frankfurt)**, **europe-west9 (Paris)** oder **europe-west1 (Belgien)**.
+
+Nichts auf dieser Seite ist für Ihr Projekt GCP-spezifisch. Ein Rebase-Deployment besteht aus zwei voneinander trennbaren Teilen – dem veröffentlichten Runtime-Image und dem **Bundle**, das `rebase build` erzeugt – und dasselbe Bundle läuft unter Docker Compose auf einem Laptop, in der Rebase Cloud, unter dem [Helm-Chart](/docs/deployment/kubernetes) und hier.
 
 ## 1. Cloud SQL (PostgreSQL) bereitstellen
 
-1. Navigieren Sie zur **Cloud SQL**-Konsole in Ihrer bevorzugten EU-Region.
-2. Klicken Sie auf **Instanz erstellen** und wählen Sie **PostgreSQL** aus.
-3. Legen Sie Ihre Instanz-ID fest und generieren Sie ein sicheres integriertes Passwort für den Benutzer `postgres`.
-4. Erweitern Sie die **Konfigurationsoptionen**, um den korrekten Maschinentyp zuzuweisen (eine Standardmaschine mit 2 vCPUs ist ein guter Anfang).
-5. Stellen Sie sicher, dass die Datenbank für private IP- oder autorisierte öffentliche IP-Netzwerke konfiguriert ist, abhängig von Ihrem VCP-Setup mit Cloud Run.
-6. Stellen Sie Ihre Verbindungs-URI zusammen:
+1. Navigieren Sie in Ihrer bevorzugten EU-Region zur **Cloud SQL**-Konsole.
+2. Klicken Sie auf **Create Instance** und wählen Sie **PostgreSQL**.
+3. Legen Sie Ihre Instanz-ID fest und generieren Sie ein sicheres Passwort für den Benutzer `postgres`.
+4. Erweitern Sie die **Configuration Options**, um einen Maschinentyp auszuwählen (zwei vCPUs sind ein guter Anfang).
+5. Konfigurieren Sie eine private IP oder ein autorisiertes öffentliches Netzwerk, je nachdem, wie Cloud Run darauf zugreifen soll.
+6. Setzen Sie Ihre Verbindungs-URI zusammen:
    `postgresql://postgres:YOUR_PASSWORD@YOUR_IP:5432/postgres`
 
-## 2. Erstellen und Bereitstellen in Cloud Run
+Wenn Ihre Collections eine `vector`-Eigenschaft deklarieren, aktivieren Sie die Extension einmalig in der Datenbank: `CREATE EXTENSION vector;`.
 
-Cloud Run skaliert das Rebase Node.js-Backend bei Bedarf automatisch auf null herunter und übernimmt TLS sofort. Sie können die Anwendung in einem einzigen CLI-Schritt von Ihrem lokalen Arbeitsbereich aus mit Google Cloud Build erstellen und bereitstellen.
+## 2. Das Bundle bauen und in ein Image integrieren
 
-Stellen Sie sicher, dass die `gcloud`-CLI installiert und authentifiziert ist:
-
-Es gibt **kein Anwendungs-Image, das aus Ihrem Quellcode gebaut wird**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Collections, Funktionen und Crons — und, wenn Ihr Projekt eine statische App deklariert, Ihrem gebauten Frontend. Das veröffentlichte Runtime-Image führt es aus:
+Es muss **kein Anwendungs-Image aus Ihrem Quellcode gebaut werden**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Collections, Functions, Crons und – falls Ihr Projekt eine statische App deklariert – Ihrem gebauten Frontend. Das veröffentlichte Runtime-Image führt dies aus:
 
 ```bash
 rebase build
 ```
 
-Cloud Run zieht aus einer Registry, backen Sie das Bundle also in ein abgeleitetes Image. Drei Zeilen, und sie fixieren genau das, was läuft:
+Cloud Run pullt aus einer Registry. Betten Sie das Bundle daher in ein abgeleitetes Image ein. Drei Zeilen genügen, um exakt festzulegen, was ausgeführt wird:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Ein späteres Rebase-Upgrade ist eine Änderung an dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
-
 ```bash
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Authenticate Docker against the registry host (one-time)
-gcloud auth configure-docker gcr.io
+# Create an Artifact Registry repository (one-time)
+gcloud artifacts repositories create rebase --repository-format=docker --location=europe-west3
 
-docker build -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+# Authenticate Docker to Artifact Registry (one-time)
+gcloud auth configure-docker europe-west3-docker.pkg.dev
 
-# Push the image to the registry
-docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
+# Build from the project root and push
+docker build -t europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest .
+docker push europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest
+```
 
-# Deploy the newly built image to Cloud Run
+Ein späteres Upgrade von Rebase erfordert lediglich eine Änderung dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
+
+## 3. Auf Cloud Run deployen
+
+```bash
 gcloud run deploy rebase-backend \
-  --image gcr.io/YOUR_PROJECT_ID/rebase-backend \
+  --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \
   --region europe-west3 \
-  --port 3001 \
-  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",NODE_ENV="production" \
+  --set-env-vars NODE_ENV="production",CORS_ORIGINS="https://yourdomain.com",FRONTEND_URL="https://yourdomain.com",DISABLE_SELF_REGISTRATION="true",REBASE_ADMIN_EMAIL="you@yourdomain.com" \
+  --set-secrets DATABASE_URL=rebase-database-url:latest,JWT_SECRET=rebase-jwt-secret:latest,REBASE_SERVICE_KEY=rebase-service-key:latest,REBASE_ADMIN_PASSWORD=rebase-admin-password:latest \
   --allow-unauthenticated
 ```
 
-## 3. Dateispeicher verwalten
-Da Cloud Run-Instanzen streng zustandslos und kurzlebig sind, können Sie keinen lokalen Festplattenspeicher für Rebase-Datei-Uploads verwenden.
+Cloud Run injiziert `PORT` und die Runtime bindet sich daran, sodass kein Port konfiguriert werden muss. Richten Sie die Startup Probe auf `/livez` statt auf `/health` aus: Letzteres führt einen Datenbank-Roundtrip durch, weshalb eine Liveness Probe darauf eine ansonsten intakte Revision bei einem kurzen Datenbankaussetzer neu starten würde.
 
-1. Navigieren Sie zu **Google Cloud Storage** und erstellen Sie einen neuen privaten Bucket in Ihrer gewählten EU-Region.
-2. Befolgen Sie die [Rebase Speicher-Dokumentation](/docs/backend/storage), um Rebase so zu konfigurieren, dass es die von Google Cloud Storage bereitgestellte S3-kompatible API anstelle des lokalen Dateisystems verwendet.
+Über `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` erhält dieser Dienst überhaupt erst einen Administrator: In der Produktion wird das erste registrierte Konto nicht automatisch hochgestuft, sodass es sonst keine Möglichkeit gibt, den ersten angemeldeten Aufrufer zu erstellen. Setzen Sie diese Variablen, bevor die erste Revision Traffic verarbeitet – siehe [Ihr erster Administrator](/docs/getting-started/deployment/#your-first-admin).
 
-Ihre Rebase-Instanz ist jetzt vollständig serverlos und nativ in der EU hochskalierbar!
+`--set-env-vars` ersetzt bei jedem Deploy den **gesamten** Block der Umgebungsvariablen. Ein späteres Deployment, das eine Variable weglässt, entfernt diese also stillschweigend. Behalten Sie die vollständige Liste in Ihrem Deploy-Skript bei.
 
-## 4. Datenbankschema erstellen
+Um eine private Cloud SQL-Instanz zu erreichen, sind `--add-cloudsql-instances YOUR_PROJECT:REGION:INSTANCE` und eine Socket-basierte `DATABASE_URL` erforderlich; eine öffentliche Instanz mit einem autorisierten Netzwerk benötigt keines von beidem.
 
-Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+## 4. Das Schema
+
+**Die Runtime erstellt fehlende Tabellen beim Booten, einschließlich derer Ihrer Collections.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was über das gesamte Schema hinweg additiv wirkt – es erstellt fehlende Tabellen, Spalten sowie Enum-Typen und wendet deren Row-Level Security an –, sodass der erste Start mit einer leeren Instanz direkt bereit ist, Ihre Collections bereitzustellen.
+
+Was `ensure` niemals tut, ist das Ändern bereits vorhandener Elemente: Es verändert weder Spaltentypen noch löscht es irgendetwas oder bearbeitet bestehende Enum-Labels, da eine startende Revision das Schema nicht als Nebeneffekt eines Deploys umstrukturieren darf.
+
+Zwei Dinge erfordern daher weiterhin das CLI, ausgeführt aus einem Checkout oder einem CI-Job:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+- **Junction-Table-RLS** für Many-to-Many-Relationen.
+- **Jede Änderung, die nicht rein additiv ist** – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
-Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Starten Sie den Cloud SQL Auth Proxy lokal und richten Sie `DATABASE_URL` auf `127.0.0.1`, um die Cloud SQL-Instanz sicher zu erreichen.
+Verbinden Sie sich von Ihrem Rechner aus über den [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) und richten Sie `DATABASE_URL` auf `localhost`. Das Runtime-Image wird ohne das CLI ausgeliefert, sodass dies niemals innerhalb des Cloud Run-Containers ausgeführt wird. Für versionierte Migrationen committen Sie stattdessen Migrationsdateien mit `rebase db generate` und führen Sie `rebase db migrate` als Release-Schritt aus.
 
-Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
+## Dateispeicher
 
----
+Cloud Run-Instanzen sind zustandslos und flüchtig. Lokale Dateispeicherung führt daher zu unbemerktem Datenverlust, weshalb die Runtime dies in der Produktion verweigert.
+
+1. Erstellen Sie einen privaten Google Cloud Storage Bucket in Ihrer gewählten EU-Region.
+2. Setzen Sie `STORAGE_TYPE=gcs` und den dazugehörigen Bucket – siehe [Storage](/docs/backend/storage). Auf Cloud Run stellt das standardmäßige Dienstkonto (Service Account) die Anmeldedaten bereit, sodass nichts weiter konfiguriert werden muss.
+
+:::caution
+Cloud Run skaliert auf null. Wenn Ihr Projekt Realtime-Subscriptions nutzt, setzen Sie `--min-instances 1` – WebSocket-Verbindungen werden getrennt, wenn eine Instanz herunterskaliert wird.
+:::
+
+## Nächste Schritte
+
+- [Deployment](/docs/getting-started/deployment) – die Produktions-Checkliste und die First-Admin-Regeln, die für alle Plattformen gelten.
+- [Konfiguration](/docs/getting-started/configuration) – jede Umgebungsvariable, die die Runtime einliest.

@@ -1,7 +1,41 @@
-import { promises as fs } from 'fs';
+import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+/**
+ * Read `website/.env` into the environment, without adding a dependency.
+ *
+ * The key used to have to be exported by hand on every run, which is a step
+ * nobody remembers and the failure is a hard exit before anything is
+ * translated. `.env` is already gitignored here and is where the site's other
+ * secrets live, so it is the obvious home for this one too.
+ *
+ * A value already in the environment wins, so `GEMINI_API_KEY=… node …` still
+ * overrides the file.
+ */
+function loadDotEnv() {
+    const envPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.env');
+    let text;
+    try {
+        text = readFileSync(envPath, 'utf8');
+    } catch {
+        return; // No file is fine: the variable may be exported already.
+    }
+    for (const line of text.split('\n')) {
+        const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+        if (!match) continue;                       // blank, or a `#` comment
+        const [, key, rawValue] = match;
+        if (process.env[key] !== undefined) continue;
+        // Strip one layer of matching quotes, and anything after an unquoted `#`.
+        let value = rawValue.trim();
+        if (/^(".*"|'.*')$/s.test(value)) value = value.slice(1, -1);
+        else value = value.split(' #')[0].trim();
+        if (value) process.env[key] = value;
+    }
+}
+loadDotEnv();
 
 // `--dry-run` lists what is missing or stale and calls nothing, so the state of
 // the translations can be inspected without a key and without spending a run.
@@ -12,17 +46,22 @@ const dryRun = process.argv.includes('--dry-run');
 const onlyIndex = process.argv.indexOf('--only');
 const only = onlyIndex === -1 ? null : process.argv[onlyIndex + 1];
 
-// Initialize Gemini API
-// Make sure to export GEMINI_API_KEY in your terminal before running this script
+// Initialize Gemini API. The key comes from the environment or from
+// `website/.env` (see `loadDotEnv` above) — no need to export it by hand.
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey && !dryRun) {
-    console.error('Error: GEMINI_API_KEY environment variable is missing.');
+    console.error('Error: GEMINI_API_KEY is missing.');
+    console.error('Put it in website/.env (gitignored) as GEMINI_API_KEY=..., or export it.');
     console.error('Pass --dry-run to see what is missing or stale without translating.');
     process.exit(1);
 }
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
-// Using gemini-3.7-flash as it's fast and excellent for translation tasks
-const model = genAI ? genAI.getGenerativeModel({ model: 'gemini-3.7-flash' }) : null;
+// Flash: fast, cheap, and translation is the task it is best at. Overridable
+// with GEMINI_MODEL so a model bump does not need a code change — but the
+// default is pinned rather than floating, so two runs a month apart produce
+// prose from the same model instead of silently changing voice mid-tree.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const model = genAI ? genAI.getGenerativeModel({ model: MODEL }) : null;
 
 const TARGET_LANGUAGES = ['es', 'de', 'fr', 'it', 'pt'];
 const CONTENT_DIR = path.resolve('./src/content/docs');

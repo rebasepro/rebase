@@ -1,20 +1,20 @@
 ---
-sourceHash: 4f7a93fd3a8e67c8
+sourceHash: 05f7e05823faa1cf
 title: Tiempo Real y WebSocket
 sidebar_label: Tiempo Real
-description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
+description: Sincronización de datos en tiempo real, canales de broadcast y seguimiento de presencia mediante WebSocket.
 ---
 
-Rebase incluye un motor de tiempo real integrado que envía los cambios de datos a los clientes conectados a través de WebSocket.
-Cuando cualquier registro se crea, actualiza o elimina, todos los suscriptores que observan esa colección o entidad reciben la actualización al instante — sin necesidad de sondeo (polling).
+Rebase incluye un motor en tiempo real integrado que envía los cambios de datos a los clientes conectados a través de WebSocket.
+Cuando se crea, actualiza o elimina cualquier registro, cada suscriptor que observa esa colección o entidad recibe la actualización al instante — sin necesidad de sondeos (polling).
 
 ## Cómo Funciona
 
-El pipeline de tiempo real tiene tres etapas:
+El pipeline de tiempo real consta de tres etapas:
 
-1. **Trigger de base de datos** — Una mutación llega a la base de datos PostgreSQL (vía API REST, SDK o Studio).
-2. **Fan-out del servidor** — El servidor de Rebase detecta el cambio y lo distribuye a cada suscripción WebSocket activa que coincida con la colección o entidad afectada.
-3. **Callback del cliente** — El SDK del cliente dispara su callback `onUpdate` con los datos frescos.
+1. **Disparador de base de datos** — Una mutación llega a la base de datos PostgreSQL (mediante la API REST, el SDK o Studio).
+2. **Distribución en el servidor (Fan-out)** — El servidor de Rebase detecta el cambio y lo distribuye a cada suscripción WebSocket activa que coincida con la colección o entidad afectada.
+3. **Callback del cliente** — El SDK del cliente ejecuta tu callback `onUpdate` con los datos actualizados.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -23,26 +23,26 @@ El pipeline de tiempo real tiene tres etapas:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-Para despliegues con múltiples instancias, Rebase usa `LISTEN/NOTIFY` de PostgreSQL para difundir los cambios entre las instancias del servidor. Esto se gestiona automáticamente — una conexión PostgreSQL dedicada escucha en el canal `rebase_entity_changes` y retransmite las actualizaciones a los suscriptores locales.
+Para implementaciones con múltiples instancias, Rebase utiliza `LISTEN/NOTIFY` de PostgreSQL para transmitir los cambios entre las instancias del servidor. Esto se gestiona automáticamente: una conexión dedicada de PostgreSQL escucha en el canal `rebase_entity_changes` y retransmite las actualizaciones a los suscriptores locales.
 
-### Cero Configuración
+### Configuración Cero
 
-El tiempo real está habilitado de fábrica. No hay ningún flag que activar ni servicio que iniciar — si su servidor de Rebase está en ejecución, el endpoint WebSocket está disponible.
+El tiempo real viene habilitado de fábrica. No hay ningún flag que activar ni servicio que iniciar — si tu servidor de Rebase está en ejecución, el endpoint de WebSocket está disponible.
 
-> De forma predeterminada, Rebase también emite eventos en tiempo real para las escrituras realizadas **fuera** de la API (vía `psql`, otro servicio o el editor SQL de Studio) siempre que la conexión de base de datos lo soporte — consulte [captura de cambios a nivel de base de datos](#captura-de-cambios-a-nivel-de-base-de-datos-cdc).
+> Por defecto, Rebase también emite eventos en tiempo real para las escrituras realizadas **fuera** de la API (mediante `psql`, otro servicio o el editor SQL de Studio) siempre que la conexión a la base de datos lo soporte — consulta [captura de cambios a nivel de base de datos](#database-level-change-capture-cdc).
 
 ## Suscripciones del SDK del Cliente
 
-El SDK del cliente de Rebase expone dos métodos de suscripción en cada accesor de colección:
+El SDK del cliente de Rebase expone dos métodos de suscripción en cada descriptor de acceso a colecciones:
 
 - **`listen()`** — Suscribirse a una colección completa (con filtros opcionales).
-- **`listenById()`** — Suscribirse a una sola entidad por su ID.
+- **`listenById()`** — Suscribirse a una entidad individual mediante su ID.
 
-Ambos métodos devuelven una **función de cancelación de suscripción** que se llama para dejar de recibir actualizaciones.
+Ambos métodos devuelven una **función para cancelar la suscripción** que llamas para dejar de recibir actualizaciones.
 
 ### Suscribirse a una Colección
 
-Use `listen()` para recibir actualizaciones cada vez que cambien los registros de una colección:
+Usa `listen()` para recibir actualizaciones cada vez que cambien los registros de una colección:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -63,7 +63,7 @@ El callback recibe un `FindResponse<M>` que contiene:
 
 ### Suscribirse a una Colección con Filtros
 
-Pase `FindParams` como primer argumento para filtrar la suscripción:
+Pasa `FindParams` como primer argumento para filtrar la suscripción:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -78,11 +78,11 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-El servidor respeta estos filtros — solo los registros coincidentes se incluyen en las actualizaciones.
+El servidor respeta estos filtros: solo los registros coincidentes se incluyen en las actualizaciones.
 
 ### Suscribirse a una Sola Entidad
 
-Use `listenById()` para observar un registro específico:
+Usa `listenById()` para observar un registro específico:
 
 ```typescript
 const unsubscribe = client.data.products.listenById(
@@ -100,11 +100,11 @@ const unsubscribe = client.data.products.listenById(
 );
 ```
 
-El callback recibe `Entity<M> | undefined`. Un valor `undefined` significa que la entidad fue eliminada.
+El callback recibe `Entity<M> | undefined`. Un valor de `undefined` significa que la entidad fue eliminada.
 
 ### Cancelar la Suscripción
 
-Tanto `listen()` como `listenById()` devuelven una función de cancelación. Llámela para dejar de recibir actualizaciones y liberar los recursos del lado del servidor:
+Tanto `listen()` como `listenById()` devuelven una función de cancelación de suscripción. Llámala para dejar de recibir actualizaciones y liberar recursos en el lado del servidor:
 
 ```typescript
 const unsubscribe = client.data.products.listen(undefined, (response) => {
@@ -116,12 +116,12 @@ unsubscribe();
 ```
 
 :::tip
-Llame siempre a la función de cancelación cuando un componente se desmonta o una página cambia de navegación. Esto evita fugas de memoria y trabajo innecesario del lado del servidor.
+Llama siempre a la función de cancelación de suscripción cuando un componente se desmonte o una página cambie de ruta. Esto evita fugas de memoria y trabajo innecesario en el servidor.
 :::
 
-## `.listen()` del Query Builder
+## Query Builder `.listen()`
 
-El constructor de consultas fluido también admite suscripciones en tiempo real. Encadene sus filtros y luego llame a `.listen()` en lugar de `.find()`:
+El query builder fluido también admite suscripciones en tiempo real. Encadena tus filtros y luego llama a `.listen()` en lugar de `.find()`:
 
 ```typescript
 const unsubscribe = client.data.orders
@@ -139,53 +139,61 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-El método `.listen()` del constructor de consultas solo está disponible cuando el `RebaseClient` está configurado con una `websocketUrl`. Si la conexión WebSocket no está configurada, llamar a `.listen()` lanzará un error.
+El método `.listen()` en el query builder solo está disponible cuando `RebaseClient` está configurado con una `websocketUrl`. Si la conexión WebSocket no está configurada, llamar a `.listen()` lanzará un error.
 :::
 
-## Entrega de Actualizaciones: Parche Instantáneo + Refetch de Corrección
+## Entrega de Actualizaciones: Parche Instantáneo + Reconsulta de Corrección
 
-Un cambio nunca viaja hasta un suscriptor como datos. Viaja como el hecho de que
-algo cambió, y a cada suscriptor se le dice después qué puede ver *él* mediante
-una consulta ejecutada como él:
+Un cambio nunca viaja a un suscriptor como datos. Viaja como el hecho de que algo cambió, y luego a cada suscriptor se le informa lo que *puede* ver mediante una consulta ejecutada bajo su propia identidad:
 
-1. **Invalidación.** Cuando una entidad cambia (creada, actualizada, eliminada),
-   el servidor marca las rutas afectadas. La fila que se escribió no se reenvía:
-   se leyó bajo la autorización de quien escribió, que no dice nada sobre lo que
-   cualquier suscriptor tiene permiso para ver.
+1. **Invalidación.** Cuando una entidad cambia (creada, actualizada, eliminada), el servidor marca las rutas afectadas. La fila que se escribió no se reenvía — fue leída bajo la autorización del escritor, lo cual no dice nada sobre lo que un suscriptor tiene permitido ver.
 
-2. **Refetch RLS con debounce.** Tras **300 ms** (`REFETCH_DEBOUNCE_MS`), el
-   servidor vuelve a consultar la colección con sus filtros y su orden
-   originales. La consulta se ejecuta dentro de una transacción que establece los
-   valores locales de transacción `app.user_id` y `app.user_roles` desde el
-   `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la
-   seguridad a nivel de fila bajo la identidad de ese cliente y solo las filas
-   que está autorizado a ver se envían en el `collection_update`. El debounce
-   también agrupa una ráfaga de escrituras en una sola consulta.
+2. **Reconsulta con RLS con debouncing.** Después de **300ms** (`REFETCH_DEBOUNCE_MS`), el servidor vuelve a consultar la colección con tus filtros y orden originales. La consulta se ejecuta dentro de una transacción que establece las variables locales de la transacción `app.user_id` y `app.user_roles` a partir del `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la Seguridad a Nivel de Fila (RLS) bajo la identidad de ese cliente y solo las filas que tiene autorización de ver se envían en el `collection_update`. El debounce también agrupa una ráfaga de escrituras en una sola consulta.
 
-Las versiones anteriores enviaban un `collection_patch` inmediato con la fila
-escrita antes de este refetch, para una retroalimentación entre pestañas en menos
-de un milisegundo. Esa fila se había leído bajo el alcance de quien escribió, así
-que podía llegar — y llegaba — a suscriptores cuyas propias políticas la habrían
-denegado, y el filtro `where` de la propia suscripción tampoco se le aplicaba.
-El parche se ha eliminado: la latencia percibida de una actualización es ahora la
-ventana del debounce.
+Las versiones anteriores enviaban un `collection_patch` inmediato que transportaba la fila escrita antes de esta reconsulta, para una retroalimentación entre pestañas de menos de un milisegundo. Esa fila se había leído bajo el ámbito del escritor, por lo que podía — y de hecho lo hacía — llegar a suscriptores cuyas propias políticas la habrían denegado, y el filtro `where` de la suscripción tampoco se le aplicaba. El parche ha sido eliminado: la latencia percibida para una actualización es ahora la ventana de debounce.
 
-## Canales de Difusión (Broadcast)
+### La reconsulta es la lectura REST
 
-Los canales de difusión permiten a los clientes enviarse mensajes arbitrarios entre sí en tiempo real — útil para funciones como indicadores de escritura, posiciones de cursor o notificaciones personalizadas.
+La reconsulta ejecuta el mismo pipeline que ejecuta `GET /api/data/<collection>`, con el mismo manejo de `include`. Eso es lo que hace que `find({ q })` y `listen({ q })` devuelvan filas que son idénticas campo por campo.
 
-La difusión se gestiona a nivel del protocolo WebSocket. El servidor admite estos tipos de mensajes:
+Solía ser un método diferente — uno que anidaba cada relación bajo un envoltorio `{ "__type": "relation" }` y, dado que una suscripción no podía llevar ningún `include`, cargaba de forma diligente (eager load) **cada** relación que declara la colección. Por lo tanto, la misma consulta respondía con una estructura a través de HTTP y otra a través del socket, y un cliente que renderizaba ambas veía cambiar la forma de sus filas en el momento en que se producía una escritura.
 
-| Tipo de Mensaje  | Dirección       | Descripción                              |
-|-----------------|-----------------|------------------------------------------|
-| `join_channel`  | Cliente → Servidor | Unirse a un canal con nombre           |
-| `leave_channel` | Cliente → Servidor | Abandonar un canal                      |
-| `broadcast`     | Cliente → Servidor | Enviar un mensaje a todos los miembros del canal |
-| `broadcast`     | Servidor → Cliente | Recibir un mensaje de otro miembro      |
-| `channel_history` | Cliente → Servidor | Solicitar mensajes retenidos posteriores a una secuencia |
+Por lo tanto, una trama de suscripción acepta lo mismo que una solicitud de listado: `filter`, `logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, `include` y `fields`. `vectorSearch` es la excepción y es **rechazada** con `VECTOR_SEARCH_NOT_LIVE` — una suscripción se vuelve a ejecutar en cada escritura coincidente y nada allí calcula distancias.
+
+### `collection_update` lleva sus propios metadatos
+
+La trama es `{ rows, pks, meta }`:
+
+```json
+{
+    "type": "collection_update",
+    "subscriptionId": "…",
+    "rows": [ { "id": 1, "title": "Widget" } ],
+    "pks": [ { "fieldName": "id", "type": "number" } ],
+    "meta": { "total": 150, "limit": 20, "offset": 0, "hasMore": true, "nextCursor": "eyJ…" }
+}
+```
+
+`meta` se cuenta dentro de la misma transacción sujeta a RLS que leyó las filas, por lo que describe exactamente las filas que lo acompañan. Sin esto, un cliente que necesitara un total tenía que emitir un `GET /count` **por cada push** — un viaje de ida y vuelta adicional por escritura, por suscriptor, y una ventana de tiempo en la que el conteo y las filas describían estados diferentes de la colección.
+
+Cuando el conteo en sí falla, la trama lleva `partial: true` y ningún `total`; eso no es un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página.
+
+## Canales de Broadcast
+
+Los canales de broadcast permiten a los clientes enviarse mensajes arbitrarios entre sí en tiempo real — útil para funciones como indicadores de escritura, posiciones de cursor o notificaciones personalizadas.
+
+El broadcast se gestiona a nivel del protocolo WebSocket. El servidor admite estos tipos de mensajes:
+
+| Tipo de Mensaje | Dirección | Descripción |
+|---|---|---|
+| `join_channel` | Cliente → Servidor | Unirse a un canal con nombre |
+| `leave_channel` | Cliente → Servidor | Salir de un canal |
+| `broadcast` | Cliente → Servidor | Enviar un mensaje a todos los miembros del canal |
+| `broadcast` | Servidor → Cliente | Recibir un mensaje de otro miembro |
+| `channel_history` | Cliente → Servidor | Solicitar mensajes retenidos después de una secuencia |
 | `channel_history` | Servidor → Cliente | Los mensajes retenidos que un cliente se perdió |
 
-Cuando un cliente envía un mensaje `broadcast`, el servidor lo retransmite a **todos los demás miembros** de ese canal (el emisor no recibe su propio mensaje).
+Cuando un cliente envía un mensaje `broadcast`, el servidor lo retransmite a **todos los demás miembros** de ese canal (el remitente no recibe su propio mensaje).
 
 ```typescript
 // Broadcast message structure (sent by client)
@@ -209,19 +217,16 @@ Cuando un cliente envía un mensaje `broadcast`, el servidor lo retransmite a **
 
 ## Retención de Canales
 
-Por defecto, una difusión llega a los miembros conectados en ese momento y luego desaparece. Es el equilibrio correcto para notificaciones y cursores, y no cuesta nada.
+Por defecto, una transmisión (broadcast) llega a los miembros actualmente conectados y luego desaparece. Esa es la compensación adecuada para notificaciones y cursores, y no cuesta nada.
 
-Para un flujo de operaciones — edición colaborativa, cualquier cosa donde un hueco silencioso cause divergencia — un canal puede configurarse para **retener** sus mensajes. Las difusiones retenidas reciben un número de secuencia por canal y se almacenan, de modo que un cliente que se reconecta puede pedir todo lo posterior al último que vio.
+Para un flujo de operaciones — edición colaborativa o cualquier caso donde una brecha silenciosa provoque divergencia — se puede configurar un canal para que **retenga** sus mensajes. A las transmisiones retenidas se les asigna un número de secuencia por canal y se almacenan, de modo que un cliente que se reconecte pueda solicitar todo lo posterior al último que vio.
 
 :::caution[Dónde va esto]
-**Runtime gestionado: en ninguna parte.** La retención de canales y
-`realtime.bus` forman parte del adaptador de base de datos que el runtime
-gestionado construye por sí mismo, y ninguno de los dos tiene forma de variable
-de entorno. Haga eject para configurarlos.
-**Ejectado:** `createPostgresAdapter({ realtime })` en `backend/src/index.ts`.
+**Runtime gestionado: en ningún sitio.** La retención de canales y `realtime.bus` forman parte del adaptador de base de datos que el propio runtime gestionado construye, y ninguno tiene una forma en variables de entorno. Haz eject para configurarlos.
+**Ejected:** `createPostgresAdapter({ realtime })` en `backend/src/index.ts`.
 :::
 
-La retención es opcional y se configura aquí, en el servidor:
+La retención es opcional (opt-in) y se configura aquí, en el servidor:
 
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -245,51 +250,51 @@ await initializeRebaseBackend({
 ```
 
 | Campo | Descripción |
-|-------|-------------|
+|---|---|
 | `match` | Nombre exacto del canal (`"doc:42"`) o un prefijo terminado en `*` (`"doc:*"`) |
-| `limit` | Conservar como máximo este número de mensajes más recientes por canal |
-| `ttl` | Conservar los mensajes como máximo este tiempo — `"30s"`, `"15m"`, `"24h"`, `"7d"`, o milisegundos |
+| `limit` | Mantener como máximo esta cantidad de los mensajes más recientes por canal |
+| `ttl` | Mantener los mensajes durante este tiempo como máximo — `"30s"`, `"15m"`, `"24h"`, `"7d"`, o milisegundos |
 
-Una regla necesita al menos `limit` o `ttl`. Una que no tenga ninguno se ignora y se registra, porque la retención ilimitada casi nunca es intencionada y no se puede deshacer una vez que la tabla ha crecido.
+Una regla necesita al menos uno de `limit` o `ttl`. Una regla sin ninguno de los dos se ignora y se registra en los logs, porque la retención ilimitada casi nunca es intencional y no se puede revertir fácilmente una vez que la tabla ha crecido.
 
-:::note[¿Por qué no dejar que los clientes pidan historial?]
-Un canal lo crea quien lo nombra. Si un cliente pudiera elegir su propia profundidad de historial, cualquier visitante podría comprometer su backend con almacenamiento ilimitado. Configurarlo aquí también significa que los canales de presencia y notificación — la inmensa mayoría — no pagan nada: sin reglas configuradas, no se crea ninguna tabla y la difusión sigue el mismo camino síncrono de siempre.
+:::note[¿Por qué no permitir que los clientes soliciten el historial?]
+Un canal es creado por quienquiera que le dé nombre. Si un cliente pudiera elegir su propia profundidad de historial, cualquier visitante podría comprometer tu backend a un almacenamiento ilimitado. Configurarlo aquí también significa que los canales de presencia y notificaciones — la gran mayoría — no pagan nada: sin reglas configuradas, no se crea ninguna tabla y el broadcast sigue la misma ruta sincrónica de siempre.
 :::
 
 ### Almacenamiento
 
-Los canales con retención usan dos tablas en el esquema `rebase`, creadas automáticamente al arrancar cuando hay al menos una regla configurada:
+Los canales retenidos utilizan dos tablas en el esquema `rebase`, creadas automáticamente al iniciar cuando se configura al menos una regla:
 
 | Tabla | Contenido |
-|-------|-----------|
+|---|---|
 | `rebase.channel_messages` | Los mensajes retenidos, indexados por `(channel, seq)` |
 | `rebase.channel_cursors` | La secuencia más alta emitida por canal |
 
-La poda ocurre a medida que llegan los mensajes, limitada por canal para que el coste dependa del tiempo transcurrido y no del volumen de escritura. Solo elimina filas de `channel_messages` — los cursores se conservan indefinidamente (es una fila pequeña por canal), porque reiniciar la secuencia de un canal cambiaría el significado del punto de reanudación guardado por un cliente.
+La depuración (pruning) ocurre a medida que llegan los mensajes, regulada por canal para que el costo dependa del tiempo transcurrido en lugar del volumen de escritura. Solo elimina filas de `channel_messages` — los cursores se conservan indefinidamente (son una pequeña fila por canal), porque reiniciar la secuencia de un canal alteraría el significado del punto de reanudación guardado de un cliente.
 
 ### Garantías de entrega
 
 - **Ordenado.** Los números de secuencia se asignan por canal, y el orden de entrega coincide con el orden de secuencia.
-- **Duradero antes que entregado.** Un mensaje que no se puede almacenar no se entrega a nadie, y se avisa al remitente. Entregarlo lo pondría ante los suscriptores en vivo dejándolo fuera de toda repetición futura, y ningún mensaje posterior podría reparar ese hueco.
-- **Al menos una vez al recuperar.** Un rango de repetición puede solaparse con mensajes que el cliente ya recibió; el SDK descarta los que ya entregó.
+- **Durable antes de entregarse.** Un mensaje que no se puede almacenar no se entrega a nadie, y se le notifica al remitente. Entregarlo lo pondría frente a suscriptores en vivo mientras quedaría fuera de cualquier reproducción futura, y ningún mensaje posterior podría reparar esa brecha.
+- **Al menos una vez al ponerse al día (At-least-once).** Un rango de reproducción puede superponerse con mensajes que un cliente ya recibió; el SDK descarta aquellos que ya ha entregado.
 
 :::caution[El historial tiene el mismo modelo de acceso que el canal]
-Un cliente que se ha unido a un canal puede reproducir sus mensajes retenidos, incluidos los difundidos antes de su llegada: la pertenencia es la única comprobación, y unirse está abierto a cualquier cliente capaz de nombrar el canal. La retención es opcional por patrón de canal, así que activarla hace legible el pasado de ese canal para cualquier visitante que adivine el nombre. Los canales con retención son el caso en el que esto pasa a ser duradero en lugar de momentáneo, así que trate el contenido de un canal con retención como público para sus usuarios.
+Un cliente que se ha unido a un canal puede reproducir sus mensajes retenidos, incluidos los transmitidos antes de su llegada — la pertenencia es la única verificación, y unirse está abierto a cualquier cliente que conozca el nombre del canal. La retención es opcional por patrón de canal, por lo que habilitarla hace que el pasado de ese canal sea legible para cualquier visitante que adivine el nombre. Los canales retenidos son el caso donde esto se vuelve duradero en lugar de momentáneo, por lo que debes tratar el contenido de un canal retenido como público para tus usuarios.
 :::
 
 ## Seguimiento de Presencia
 
-La presencia rastrea qué usuarios están actualmente en línea en un canal y permite que cada usuario comparta un estado personalizado (p. ej., posición del cursor, estado).
+La presencia rastrea qué usuarios están actualmente en línea en un canal y permite que cada usuario comparta un estado personalizado (por ejemplo, posición del cursor, estado).
 
-| Tipo de Mensaje    | Dirección       | Descripción                                          |
-|-------------------|-----------------|------------------------------------------------------|
-| `presence_track`  | Cliente → Servidor | Empezar a rastrear la presencia con estado personalizado |
-| `presence_untrack`| Cliente → Servidor | Dejar de rastrear la presencia                      |
-| `presence_state`  | Cliente → Servidor | Solicitar el estado de presencia completo de un canal |
-| `presence_state`  | Servidor → Cliente | Estado completo de todas las presencias en un canal |
-| `presence_diff`   | Servidor → Cliente | Actualización incremental (entradas y salidas)      |
+| Tipo de Mensaje | Dirección | Descripción |
+|---|---|---|
+| `presence_track` | Cliente → Servidor | Comenzar a rastrear la presencia con estado personalizado |
+| `presence_untrack` | Cliente → Servidor | Detener el rastreo de presencia |
+| `presence_state` | Cliente → Servidor | Solicitar el estado de presencia completo de un canal |
+| `presence_state` | Servidor → Cliente | Entidad completa de todas las presencias en un canal |
+| `presence_diff` | Servidor → Cliente | Actualización incremental (ingresos y salidas) |
 
-Cuando un cliente envía `presence_track`, el servidor lo une automáticamente al canal (sin necesidad de un `join_channel` aparte) y difunde un `presence_diff` a todos los miembros del canal.
+Cuando un cliente envía `presence_track`, el servidor lo une automáticamente al canal (no se necesita un `join_channel` por separado) y transmite un `presence_diff` a todos los miembros del canal.
 
 ```typescript
 // Track presence
@@ -320,18 +325,18 @@ Cuando un cliente envía `presence_track`, el servidor lo une automáticamente a
 }
 ```
 
-Las presencias obsoletas se limpian automáticamente tras 30 segundos de inactividad.
+Las presencias inactivas se limpian automáticamente después de 30 segundos de inactividad.
 
 ## Reconexión Automática
 
-El SDK del cliente se reconecta automáticamente cuando la conexión WebSocket se cae:
+El SDK del cliente se reconecta automáticamente cuando se pierde la conexión WebSocket:
 
 - **Backoff exponencial** — Los retrasos de reconexión comienzan en 1 segundo y se duplican en cada intento, con un límite de 30 segundos.
-- **Máximo 5 intentos** — Tras 5 intentos fallidos de reconexión, el cliente deja de intentarlo.
-- **Resuscripción automática** — En una reconexión exitosa, todas las suscripciones activas se vuelven a registrar en el servidor. No se necesita intervención manual.
-- **Cola de mensajes** — Los mensajes enviados mientras está desconectado se ponen en cola y se entregan tras la reconexión.
+- **Máximo de 5 intentos** — Después de 5 intentos fallidos de reconexión, el cliente deja de intentar.
+- **Resuscripción automática** — Tras una reconexión exitosa, todas las suscripciones activas se vuelven a registrar con el servidor. No se requiere intervención manual.
+- **Cola de mensajes** — Los mensajes enviados mientras se está desconectado se ponen en cola y se entregan tras la reconexión.
 
-Puede escuchar los eventos del ciclo de vida de la conexión:
+Puedes escuchar los eventos del ciclo de vida de la conexión:
 
 ```typescript
 // `ws` is undefined on a client built without realtime, so narrow it once.
@@ -346,23 +351,21 @@ if (ws) {
 
 ## Autenticación y RLS
 
-Las suscripciones WebSocket respetan automáticamente las políticas de seguridad a nivel de fila (RLS). Cuando el cliente está autenticado:
+Las suscripciones WebSocket respetan automáticamente las políticas de Seguridad a Nivel de Fila (RLS). Cuando el cliente está autenticado:
 
-1. La conexión WebSocket se autentica usando el mismo token JWT que la API REST.
-2. Cada refetch de suscripción se ejecuta dentro de una transacción PostgreSQL con `set_config('app.user_id', ...)` y `set_config('app.user_roles', ...)` — garantizando que se apliquen las políticas RLS.
+1. La conexión WebSocket se autentica utilizando el mismo token JWT que la API REST.
+2. Cada reconsulta de suscripción se ejecuta dentro de una transacción de PostgreSQL con `set_config('app.user_id', ...)` y `set_config('app.user_roles', ...)` — garantizando que se apliquen las políticas de RLS.
 3. Si un token expira durante una sesión activa, el cliente se vuelve a autenticar y se vuelve a suscribir automáticamente.
 
 Esto significa que cada usuario solo recibe actualizaciones de los registros que tiene permiso para ver.
 
-Ejecutar más de una instancia — el bus LISTEN/NOTIFY, lo que hace la presencia
-entre procesos y cómo escribir su propio transporte — tiene una página propia:
-[Tiempo real entre instancias](/docs/backend/realtime-transports/).
+Ejecutar más de una instancia — el bus LISTEN/NOTIFY, qué hace la presencia entre procesos y cómo escribir tu propio transporte — tiene su propia página: [Tiempo real entre instancias](/docs/backend/realtime-transports/).
 
 ## Captura de Cambios a Nivel de Base de Datos (CDC)
 
-**La Captura de Datos de Cambios está activada de forma predeterminada.** Rebase captura los cambios en la base de datos y emite eventos en tiempo real para **cada escritura confirmada, sin importar cómo se hizo** — REST, SDK, Studio, `psql`, un cron job en otro servicio, Drizzle/SQL en crudo o el **editor SQL** de Studio. Este es el mismo modelo que Supabase Realtime siguiendo el registro de escritura anticipada (WAL).
+**Change Data Capture (CDC) está activado de forma predeterminada.** Rebase captura cambios en la base de datos y emite eventos en tiempo real para **cada escritura confirmada (committed), independientemente de cómo se haya realizado** — REST, SDK, Studio, `psql`, un trabajo cron en otro servicio, Drizzle/SQL directo o el **editor SQL** de Studio. Este es el mismo modelo que Supabase Realtime siguiendo el log de escritura previa (write-ahead log).
 
-No se requiere configuración. En una conexión de base de datos que lo admita, CDC se autoaprovisiona al iniciar; en una que no (p. ej., un rol restringido que no puede crear triggers), Rebase usa silenciosamente el tiempo real a nivel de aplicación en su lugar — nada que activar, nada que se rompa.
+No se requiere configuración. En una conexión a la base de datos que lo soporte, CDC se autoaprovisiona al iniciar; en una que no lo soporte (por ejemplo, un rol restringido que no puede crear triggers), Rebase utiliza silenciosamente tiempo real a nivel de aplicación — nada que activar, nada que se rompa.
 
 ### Configuración
 
@@ -370,19 +373,19 @@ CDC se controla mediante la variable de entorno `REALTIME_CDC`:
 
 | Valor | Comportamiento |
 | --- | --- |
-| `auto` *(predeterminado)* | Habilita la captura a nivel de base de datos donde la conexión lo admita; **recurre silenciosamente** al tiempo real a nivel de aplicación en caso contrario. Cero configuración. |
-| `trigger` | Fuerza la captura basada en triggers. Funciona en cualquier PostgreSQL, incluidas instancias gestionadas sin replicación lógica. Advierte (en lugar de recurrir silenciosamente) si no puede aprovisionar. |
-| `wal` | Prefiere la replicación lógica WAL. Aún no está incluida — degrada a `trigger` y registra el modo activo. |
-| `off` | Solo tiempo real a nivel de aplicación. Úselo para evitar la sobrecarga del trigger por escritura en cargas de trabajo con muchas escrituras. |
+| `auto` *(predeterminado)* | Habilita la captura a nivel de base de datos donde la conexión lo soporte; **recurre silenciosamente** al tiempo real a nivel de aplicación en caso contrario. Configuración cero. |
+| `trigger` | Fuerza la captura basada en triggers. Funciona en cualquier PostgreSQL, incluidas instancias gestionadas sin replicación lógica. Advierte (en lugar de recurrir silenciosamente) si no se puede aprovisionar. |
+| `wal` | Prefiere la replicación lógica de WAL. Aún no incluida — se degrada a `trigger` y registra el modo activo. |
+| `off` | Solo tiempo real a nivel de aplicación. Usa esto para evitar la sobrecarga del trigger por escritura en cargas de trabajo intensivas en escritura. |
 
-Al iniciar verá una línea de log indicando el modo activo, p. ej.:
+Al iniciar verás una línea de log indicando el modo activo, p. ej.:
 
 ```
 📡 [CDC] Realtime source = database-level change capture (mode: trigger).
    All writes now emit realtime events regardless of origin.
 ```
 
-Si la conexión no puede admitirlo, `auto` registra una línea informativa en su lugar y continúa con el tiempo real a nivel de aplicación:
+Si la conexión no lo admite, `auto` registra una línea informativa en su lugar y continúa con el tiempo real a nivel de aplicación:
 
 ```
 ℹ️ [CDC] Database-level change capture unavailable (likely insufficient
@@ -391,36 +394,32 @@ Si la conexión no puede admitirlo, `auto` registra una línea informativa en su
 
 ### Cómo Funciona
 
-1. **Autoaprovisionamiento** — Al iniciar (contexto de servidor/propietario), Rebase instala un trigger idempotente `AFTER INSERT/UPDATE/DELETE` en cada tabla gestionada. El trigger emite una notificación de cambio compacta en el canal `rebase_cdc`. Un payload que superaría el límite de 8&nbsp;KB de `NOTIFY` de PostgreSQL recurre a un mensaje de solo identidad, de modo que CDC nunca puede abortar la escritura que lo disparó.
-2. **Captura** — Un cliente `LISTEN` dedicado y sin agrupar por instancia consume `rebase_cdc`, mapea la tabla modificada de vuelta a su colección y alimenta el cambio al mismo pipeline `RealtimeService` que usan las mutaciones de la API. Al igual que el listener entre instancias, prefiere `DATABASE_DIRECT_URL` y se reconecta automáticamente.
-3. **Entrega segura para RLS** — La fila cruda del flujo de cambios **nunca** se reenvía a los suscriptores. El cambio se marca como invalidado, y cada suscripción vuelve a leer la fila bajo su **propio** contexto de autenticación. Por lo tanto, el filtrado es por suscriptor, nunca por emisor: un cliente solo recibe las filas que sus políticas RLS permiten.
-4. **Entre instancias** — Debido a que cada instancia observa cada confirmación a través del flujo de cambios, CDC *es* también el canal entre instancias; la difusión heredada por mutación `rebase_entity_changes` no se usa mientras CDC está activo.
-5. **De-duplicación** — Una mutación realizada a través de la API de Rebase se entrega localmente en el instante en que se confirma y también se refleja de vuelta a través del flujo de cambios. La instancia de origen suprime ese eco (un registro efímero de sus propias emisiones), de modo que los suscriptores nunca ven una escritura de la API dos veces.
+1. **Autoaprovisionamiento** — Al inicio (contexto de servidor/propietario), Rebase instala un trigger idempotente `AFTER INSERT/UPDATE/DELETE` en cada tabla gestionada. El trigger emite una notificación de cambio compacta en el canal `rebase_cdc`. Una carga útil que exceda el límite de 8&nbsp;KB de `NOTIFY` de PostgreSQL recurre a un mensaje solo con la identidad, por lo que CDC nunca puede abortar la escritura desencadenante.
+2. **Captura** — Un cliente `LISTEN` dedicado y sin pool por instancia consume `rebase_cdc`, asigna la tabla modificada a su colección correspondiente e introduce el cambio en el mismo pipeline de `RealtimeService` utilizado por las mutaciones de la API. Al igual que el listener entre instancias, prefiere `DATABASE_DIRECT_URL` y se reconecta automáticamente.
+3. **Entrega segura con RLS** — La fila sin procesar del flujo de cambios **nunca** se reenvía a los suscriptores. El cambio se marca como invalidado y cada suscripción vuelve a leer la fila bajo su **propio** contexto de autenticación. Por lo tanto, el filtrado es por suscriptor, nunca por publicador: un cliente solo recibe las filas que sus políticas de RLS permiten.
+4. **Entre instancias** — Dado que cada instancia observa cada confirmación (commit) a través del flujo de cambios, CDC también *es* el canal entre instancias; el broadcast heredado por mutación `rebase_entity_changes` no se utiliza mientras CDC esté activo.
+5. **Deduplicación** — Una mutación realizada a través de la API de Rebase se entrega localmente en el instante en que se confirma y también se devuelve a través del flujo de cambios. La instancia de origen suprime ese eco (un registro de vida corta de sus propias emisiones), por lo que los suscriptores nunca ven una escritura de la API dos veces.
 
 ### Requisitos y Notas
 
-- CDC requiere una cadena de conexión directa (`DATABASE_DIRECT_URL` o la conexión principal) para el cliente `LISTEN` — los agrupadores de conexiones en modo transacción no admiten sesiones `LISTEN` de larga duración.
-- Los triggers se instalan solo en tablas respaldadas por una colección registrada. Las escrituras en tablas no mapeadas se ignoran.
+- CDC requiere una cadena de conexión directa (`DATABASE_DIRECT_URL` o la conexión principal) para el cliente `LISTEN` — los poolers de conexiones en modo de transacción no admiten sesiones `LISTEN` de larga duración.
+- Los triggers se instalan únicamente en tablas respaldadas por una colección registrada. Las escrituras en tablas no mapeadas se ignoran.
 - Una colección cuya tabla aún no ha sido migrada se omite con una advertencia en lugar de bloquear CDC para el resto.
-- El streaming nativo de replicación lógica WAL (`wal2json`/`pgoutput`) está planificado; hoy `REALTIME_CDC=wal` degrada a la ruta basada en triggers, que proporciona una cobertura equivalente a nivel de base de datos.
+- La transmisión nativa de replicación lógica de WAL (`wal2json`/`pgoutput`) está planificada; actualmente `REALTIME_CDC=wal` se degrada a la ruta basada en triggers, que proporciona una cobertura equivalente a nivel de base de datos.
 
-## Timeout de Peticiones Pendientes
+## Tiempo de Espera de Solicitudes Pendientes (Pending Request Timeout)
 
-Para evitar que las peticiones del cliente se queden colgadas indefinidamente, todas las operaciones WebSocket pendientes que esperan una respuesta del servidor (como las obtenciones puntuales de colección `FETCH_COLLECTION`, las obtenciones de una sola entidad `FETCH_ONE`, la creación/actualización `SAVE`, las eliminaciones `DELETE`, los conteos `COUNT` y las comprobaciones de unicidad `CHECK_UNIQUE_FIELD`) tienen un timeout predeterminado de 30 segundos.
+Para evitar que las solicitudes de los clientes queden colgadas indefinidamente, todas las operaciones WebSocket pendientes que esperan una respuesta del servidor (como las lecturas únicas de colección `FETCH_COLLECTION`, lecturas de entidad única `FETCH_ONE`, creación/actualización `SAVE`, eliminaciones `DELETE`, conteos `COUNT` y comprobaciones de unicidad `CHECK_UNIQUE_FIELD`) tienen un tiempo de espera predeterminado de 30 segundos.
 
-Si el servidor no responde dentro de esta ventana de 30 segundos, el cliente elimina automáticamente la petición pendiente y rechaza la promesa con un `ApiError` con el mensaje `"Request timed out"`.
+Si el servidor no responde dentro de esta ventana de 30 segundos, el cliente elimina automáticamente la solicitud pendiente y rechaza la promesa con un `ApiError` con el mensaje `"Request timed out"`.
 
-Los mensajes unidireccionales que no esperan respuesta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` y `presence_state`) se resuelven inmediatamente al transmitirse y no activan timeouts.
+Los mensajes unidireccionales que no esperan una respuesta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` y `presence_state`) se resuelven inmediatamente tras la transmisión y no activan tiempos de espera.
 
-### Cuando se rechaza un frame de canal
+### Cuándo se rechaza una trama de canal
 
-Un frame de canal es fire-and-forget: `await channel.broadcast(...)` se resuelve
-cuando el frame se escribe en el socket, **no** cuando el servidor lo ha
-aceptado. Es deliberado — una aplicación colaborativa difunde una posición de
-cursor sesenta veces por segundo, y esperar un acuse de recibo en cada una
-convertiría cada difusión en un viaje de ida y vuelta.
+Una trama de canal es de tipo "disparar y olvidar" (fire-and-forget): `await channel.broadcast(...)` se resuelve cuando la trama se escribe en el socket, **no** cuando el servidor la ha aceptado. Esto es deliberado — una aplicación colaborativa transmite una posición de cursor sesenta veces por segundo, y esperar una confirmación de cada una convertiría a cada envío en un viaje de ida y vuelta.
 
-Por eso un rechazo no puede ser una promesa rechazada. Llega en `onError`:
+Por lo tanto, un rechazo no puede ser una promesa rechazada. Llega en `onError`:
 
 ```typescript
 const channel = client.realtime.channel("doc:42");
@@ -432,19 +431,19 @@ channel.onError((error) => {
 ```
 
 | Código | Significado |
-|------|-------|
-| `CHANNEL_FORBIDDEN` | No es miembro del canal — únase a él antes de difundir o de leer su historial |
-| `RATE_LIMITED` | Por encima del presupuesto de frames de canal indicado arriba |
-| `CHANNEL_HISTORY_WRITE_FAILED` | Una difusión retenida no pudo persistirse, así que se descartó |
-| `CHANNEL_HISTORY_READ_FAILED` | Una petición de recuperación no pudo atenderse |
-| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | La difusión llegó solo a esta instancia — vea [El límite de 8&nbsp;KB del bus de Postgres](#the-8-kb-limit-on-the-postgres-bus) |
+|---|---|
+| `CHANNEL_FORBIDDEN` | No eres miembro del canal — únete antes de transmitir o leer su historial |
+| `RATE_LIMITED` | Se superó el límite de presupuesto de tramas del canal mencionado anteriormente |
+| `CHANNEL_HISTORY_WRITE_FAILED` | No se pudo persistir una transmisión retenida, por lo que fue descartada |
+| `CHANNEL_HISTORY_READ_FAILED` | No se pudo atender una solicitud de puesta al día |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | La transmisión llegó solo a esta instancia — consulta [El límite de 8 KB en el bus de Postgres](#the-8-kb-limit-on-the-postgres-bus) |
 
-Sin un manejador conectado, estos errores se registran como advertencia. Antes se
-descartaban por completo: no había promesa que rechazar ni canal al que entregar,
-así que una difusión prohibida era indistinguible de una entregada.
+Sin ningún controlador asignado, estos se registran como una advertencia en los logs. Antes se descartaban por completo: no había ninguna promesa que rechazar ni ningún canal al cual entregar, por lo que una transmisión prohibida era indistinguible de una entregada.
 
 ## Próximos Pasos
 
-- [SDK del Cliente](/docs/sdk) — Referencia completa del SDK, incluidos los accesores de colección tipados.
-- [Autenticación](/docs/backend/authentication) — Configurar la autenticación JWT y las políticas RLS.
-- [Arquitectura del Backend](/docs/backend) — Visión general de la arquitectura del servidor de Rebase.
+- [SDK del Cliente](/docs/sdk) — Referencia completa del SDK, incluidos los descriptores de acceso a colecciones tipados.
+- [Autenticación](/docs/backend/authentication) — Configuración de autenticación JWT y políticas RLS.
+- [Arquitectura del Backend](/docs/backend) — Resumen general de la arquitectura del servidor Rebase.
+
+---

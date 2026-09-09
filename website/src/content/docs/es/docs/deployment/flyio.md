@@ -1,92 +1,122 @@
 ---
-sourceHash: 85dd43f340a09860
-title: Despliegue de Rebase en Fly.io
-description: Aprende a desplegar Rebase globalmente o a restringirlo a centros de datos europeos usando Fly.io.
+sourceHash: d53d77c2683bb3d3
+title: Desplegar Rebase en Fly.io
+description: Aprende a desplegar Rebase globalmente o a restringirlo a centros de datos europeos utilizando Fly.io.
 sidebar_label: Fly.io
 ---
 
-Fly.io te permite alojar contenedores Docker cerca de tus usuarios a través de su red global anycast. Fly es altamente configurable en cuanto al enrutamiento de datos, lo que lo convierte en una excelente opción para desplegar aplicaciones Rebase con un estricto enfoque en datos europeos.
+Fly.io ejecuta contenedores Docker cerca de tus usuarios en una red anycast global y es altamente configurable en cuanto a la ubicación de los datos: una excelente opción para un despliegue de Rebase con un enfoque estrictamente europeo. Fly cuenta con centros de datos en **Ámsterdam (ams)**, **Fráncfort (fra)**, **Madrid (mad)** y **París (cdg)**.
 
-Fly.io cuenta con centros de datos en **Ámsterdam (ams)**, **Fráncfort (fra)**, **Madrid (mad)** y **París (cdg)**.
+Nada en esta página es específico de Fly respecto a tu proyecto. Un despliegue de Rebase consta de dos partes separables: la imagen de runtime publicada y el **bundle** que genera `rebase build`, y el mismo bundle se ejecuta bajo Docker Compose en una laptop, en Rebase Cloud, bajo el [Helm chart](/docs/deployment/kubernetes) y aquí.
 
-## 1. Inicializar la aplicación Fly
-Desde tu repositorio local de Rebase, después de asegurarte de que la CLI de Fly (`flyctl`) está instalada, ejecuta:
+## 1. Inicializar la aplicación de Fly
+
+Con `flyctl` instalado, desde tu proyecto:
 
 ```bash
-fly launch
+fly launch --no-deploy
 ```
 
-1.  **Nombre de la Aplicación:** `my-rebase-app`
-2.  **Organización:** Personal o tu Organización corporativa.
-3.  **Región:** Cuando se te pida una región, elige explícitamente un centro de datos europeo como **Fráncfort (fra)** o **París (cdg)**.
-4.  **Base de Datos:** Cuando se te pida configurar una base de datos Postgres, di **Sí**. Fly creará automáticamente un clúster de Postgres en la *misma región* e inyectará de forma segura la `DATABASE_URL` en tu aplicación.
-5.  **Redis:** Di **No**.
+1. **App name:** `my-rebase-app`
+2. **Organization:** personal, o tu organización corporativa.
+3. **Region:** elige un centro de datos europeo: Fráncfort (`fra`) o París (`cdg`).
+4. **Database:** responde **Yes** para un clúster de Postgres. Fly lo creará en la misma región e inyectará `DATABASE_URL`.
+5. **Redis:** responde **No**.
 
-*No despliegues todavía cuando se te pida.* Primero necesitamos configurar una variable de entorno crítica.
+`--no-deploy` porque los secretos y el bundle deben estar listos primero.
 
-## 2. Configuración del Secreto JWT
-Antes de que tu aplicación se inicie en producción, debes inyectar el Secreto JWT para que Rebase pueda firmar de forma segura las operaciones de los tokens de autenticación.
+Si tus colecciones declaran una propiedad `vector`, habilita la extensión una vez en esa base de datos: `CREATE EXTENSION vector;`.
 
-Ejecuta el siguiente comando localmente:
-```bash
-fly secrets set JWT_SECRET=your_super_long_randomly_generated_secure_string -a my-rebase-app
-```
+## 2. Construir el bundle y apuntar fly.toml a la imagen de runtime
 
-## 3. Validar la Configuración Interna
-Fly habrá generado un archivo `fly.toml` en la raíz de tu proyecto. Verifica que el puerto interno se alinee explícitamente con la configuración predeterminada de Rebase (`3001`):
-
-**No hay ninguna imagen de aplicación que construir a partir de tu código**. `rebase build` produce un directorio `dist-bundle` con tus colecciones, funciones y crons compilados y —si tu proyecto declara una app estática— tu frontend construido. La imagen de runtime publicada lo ejecuta:
+**No hay ninguna imagen de aplicación que construir a partir de tu código fuente**. `rebase build` genera un directorio `dist-bundle` con tus colecciones compiladas, funciones, tareas cron y —si tu proyecto declara una aplicación estática— tu frontend compilado:
 
 ```bash
 rebase build
 ```
 
-Fly.io extrae desde un registro, así que hornea el bundle en una imagen derivada. Tres líneas, y fija exactamente lo que se ejecuta:
+Haz commit de un `Dockerfile` de tres líneas en la raíz del proyecto:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
-Actualizar Rebase más adelante es un cambio en esa línea `FROM`. Tu bundle queda intacto.
+Y apunta `fly.toml` hacia él:
 
-```toml
-# fly.toml
+```toml title="fly.toml"
 app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
 
+[env]
+  NODE_ENV = "production"
+  DISABLE_SELF_REGISTRATION = "true"
+
 [http_service]
-  internal_port = 3001 # Make sure this matches your Hono app port
+  internal_port = 8080          # the port the runtime image listens on
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 1      # realtime subscriptions need a machine to stay up
+
+[[http_service.checks]]
+  path = "/livez"
 ```
 
-## 4. Desplegar
+`/livez` en lugar de `/health`: el segundo realiza un viaje de ida y vuelta a la base de datos (round-trip), por lo que una comprobación de actividad (liveness check) sobre él reiniciará una máquina en buen estado durante un breve contratiempo de la base de datos.
 
-Tus datos están localizados, tu base de datos está provisionada y tus secretos están inyectados. Inicia el despliegue:
+`DISABLE_SELF_REGISTRATION` es nuevo: en 0.17.3 no existe dicho modificador, y la primera cuenta en registrarse se convierte en el administrador.
+
+Actualizar Rebase más adelante consiste simplemente en cambiar esa línea `FROM`. Tu bundle no se modifica.
+
+## 3. Configurar los secretos de producción
+
+```bash
+fly secrets set \
+  JWT_SECRET=your_super_long_randomly_generated_secure_string \
+  REBASE_SERVICE_KEY=another_super_long_randomly_generated_secure_string \
+  CORS_ORIGINS=https://my-rebase-app.fly.dev \
+  FRONTEND_URL=https://my-rebase-app.fly.dev \
+  REBASE_ADMIN_EMAIL=you@example.com \
+  REBASE_ADMIN_PASSWORD=$(openssl rand -hex 12) \
+  -a my-rebase-app
+```
+
+Los dos últimos son nuevos y representan la forma en que esta aplicación obtiene un administrador: en producción, la primera cuenta en registrarse no es promovida, por lo que nada más genera el primer usuario autenticado. Configúralos antes de que el primer despliegue reciba tráfico; consulta [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` solo muestra resúmenes (digests), así que conserva la contraseña generada por este comando; no hay forma de volver a leerla.
+
+## 4. Desplegar
 
 ```bash
 fly deploy
 ```
 
-Una vez que el análisis y la carga se completen, tu aplicación estará en línea automáticamente. ¡Ejecuta `fly open` para ver tu aplicación desplegada en el navegador!
+Luego `fly open`.
 
-## 5. Crear el Esquema de la Base de Datos
+## 5. El esquema
 
-Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Debes aplicar el esquema una vez contra la base de datos de producción:
+**El runtime crea las tablas faltantes al iniciar, incluidas las de tus colecciones.** `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, que es aditivo en todo el esquema: crea las tablas, columnas y tipos enum faltantes y aplica su seguridad a nivel de fila (RLS), de modo que el primer inicio sobre una base de datos vacía arranca sirviendo tus colecciones.
+
+Lo que `ensure` nunca hace es modificar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el reinicio de una máquina no debe remodelar el esquema como efecto secundario de un despliegue.
+
+Por lo tanto, dos cosas todavía requieren la CLI, ejecutada desde una copia de trabajo (checkout) o un trabajo de CI:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+- **RLS para tablas intermedias (junction tables)** en relaciones de muchos a muchos.
+- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un tipo más restringido, un campo eliminado.
 
-Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Como la base de datos de Fly no está expuesta públicamente, abre un túnel local con `fly proxy 5432 -a my-rebase-app-db` y apunta `DATABASE_URL` a `localhost:5432` mientras lo ejecutas.
+Para un Postgres privado de Fly, abre un túnel con `fly proxy 5432 -a <your-db-app>` y apunta `DATABASE_URL` a `localhost:5432`. La imagen de runtime se distribuye sin la CLI, por lo que esto nunca se ejecuta dentro de la máquina y un `release_command` tampoco puede invocarlo. Para migraciones versionadas, haz commit de los archivos de migración con `rebase db generate` y ejecuta `rebase db migrate` como paso de release en su lugar.
 
-Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
----
+## Almacenamiento de archivos
+
+El sistema de archivos de una máquina de Fly no persiste tras un despliegue, por lo que el almacenamiento local de archivos produce una pérdida silenciosa de datos y el runtime lo rechaza en producción. Conecta un bucket compatible con S3 —Tigris es el que Fly aprovisiona— con `STORAGE_TYPE=s3`. Consulta [Storage](/docs/backend/storage).
+
+## Próximos pasos
+
+- [Deployment](/docs/getting-started/deployment) — la lista de verificación para producción y las reglas del primer administrador comunes a todas las plataformas.
+- [Configuration](/docs/getting-started/configuration) — todas las variables de entorno que lee el runtime.
