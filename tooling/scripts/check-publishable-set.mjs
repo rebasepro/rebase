@@ -22,7 +22,7 @@
  * found them all. This file asks that question, on every PR rather than at
  * release time — a release-time check is discovered during a release.
  *
- * Five invariants:
+ * Seven invariants:
  *
  *  1. **Lockstep.** Every publishable package carries the same version. The one
  *     that would have caught this, on the first PR after the bump commit landed.
@@ -37,6 +37,11 @@
  *     empty tarball.
  *  5. **`repository.directory` matches reality** — the same class as the
  *     filters, and the same move left it stale.
+ *  6. **Every `exports` entry resolves for `require`** — a map with no
+ *     `default` condition turns a supported call into a broken install.
+ *  7. **A `server.json` agrees with its package** — the MCP Registry validates
+ *     a publish against npm, so a manifest that disagrees fails the release at
+ *     its last step, once npm can no longer be rewritten.
  *
  * Exit 1 on a finding, 2 if the check could not run.
  *
@@ -302,6 +307,127 @@ export function checkPublishableSet({ root = ROOT, sources } = {}) {
                 + `\n      \`"default": ${JSON.stringify(target.import ?? "./dist/index.es.js")}\` as the LAST condition.`
             );
         }
+
+        /* ── 7. An MCP Registry manifest agrees with its package ────── */
+
+        // `mcpName` in package.json is not decoration: it is the ownership
+        // proof the MCP Registry reads out of the published npm tarball. A
+        // package that declares one and ships no `server.json` has claimed a
+        // registry identity that nothing ever publishes — which is the state
+        // `@rebasepro/mcp` sat in from the day the field was added.
+        const registryFile = path.join(root, pkg.dir, "server.json");
+        const hasRegistryFile = fs.existsSync(registryFile);
+
+        if (manifest.mcpName && !hasRegistryFile) {
+            fail(
+                `${pkg.name} declares mcpName "${manifest.mcpName}" but has no server.json`,
+                `${pkg.dir} — the name is published to npm and read by nothing.`
+                + "\n      Add a server.json beside it, or drop the field."
+            );
+        }
+        if (hasRegistryFile) {
+            for (const finding of checkRegistryManifest(registryFile, manifest, pkg)) {
+                fail(finding.message, finding.detail);
+            }
+        }
+    }
+
+    return findings;
+}
+
+/**
+ * A `server.json` and the package.json beside it describe one release.
+ *
+ * The MCP Registry validates a publish against npm: it downloads the tarball at
+ * the version the manifest names and looks for an `mcpName` matching the
+ * manifest's `name`. Every disagreement below is therefore a publish that fails
+ * at the very end of a release run — after `pnpm -r publish` has already put
+ * the packages on npm, where a version cannot be taken back and reused. Cheaper
+ * to fail on the PR.
+ *
+ * The registry's own limits are checked here too, for the same reason: a
+ * description of 101 characters is a rejected publish, and finding that out
+ * from a release job is finding it out too late.
+ *
+ * @param {string} file      path to the server.json
+ * @param {object} manifest  the package.json beside it
+ * @param {{ name: string, dir: string }} pkg
+ * @returns {{ message: string, detail?: string }[]}
+ */
+export function checkRegistryManifest(file, manifest, pkg) {
+    const findings = [];
+    const fail = (message, detail) => findings.push({ message, detail });
+
+    let server;
+    try {
+        server = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (err) {
+        return [{ message: `${pkg.dir}/server.json is not readable JSON`, detail: err.message }];
+    }
+
+    if (!manifest.mcpName) {
+        fail(
+            `${pkg.name} has a server.json but no mcpName in package.json`,
+            `${pkg.dir} — the registry reads mcpName out of the published tarball to prove`
+            + `\n      ownership of "${server.name}", and refuses the publish without it.`
+        );
+    } else if (manifest.mcpName !== server.name) {
+        fail(
+            `${pkg.name}: mcpName and server.json name disagree`,
+            `package.json  ${manifest.mcpName}\n      server.json   ${server.name}`
+            + "\n\n      The registry compares these two strings and rejects the publish."
+        );
+    }
+
+    if (server.version !== manifest.version) {
+        fail(
+            `${pkg.dir}/server.json is at ${server.version}, the package at ${manifest.version}`,
+            "The registry refuses a version that is not on npm — and would accept an OLDER"
+            + "\n      one, re-registering a release that already shipped."
+            + "\n      Bump through `publishable-packages.mjs --set-version`, which writes both."
+        );
+    }
+
+    const npmEntries = (server.packages ?? []).filter(p => p.registryType === "npm");
+    const own = npmEntries.find(p => p.identifier === manifest.name);
+    if (!own) {
+        fail(
+            `${pkg.dir}/server.json lists no npm package for ${manifest.name}`,
+            npmEntries.length
+                ? `It points at: ${npmEntries.map(p => p.identifier).join(", ")}`
+                : "It has no npm package entry at all, so the registry has nothing to install."
+        );
+    } else if (own.version !== manifest.version) {
+        fail(
+            `${pkg.dir}/server.json points at ${manifest.name}@${own.version}, not ${manifest.version}`,
+            "The server version and the package entry's version are two copies of one"
+            + "\n      number, and only one of them was moved."
+        );
+    }
+
+    // Same class as `repository.directory`: a path restated by hand, which the
+    // 2026-08-24 move left pointing at a directory that no longer existed.
+    const subfolder = server.repository?.subfolder;
+    if (subfolder && subfolder !== pkg.dir) {
+        fail(
+            `${pkg.dir}/server.json declares repository.subfolder "${subfolder}"`,
+            `${pkg.dir} is where it actually lives.`
+        );
+    }
+
+    // The registry's schema caps these, and rejects on length rather than
+    // truncating. https://static.modelcontextprotocol.io/schemas/…/server.schema.json
+    for (const [field, max] of [["description", 100], ["title", 100]]) {
+        const value = server[field];
+        if (typeof value === "string" && value.length > max) {
+            fail(
+                `${pkg.dir}/server.json ${field} is ${value.length} characters, over the registry's ${max}`,
+                value
+            );
+        }
+    }
+    if (!server.description) {
+        fail(`${pkg.dir}/server.json has no description`, "The registry requires one.");
     }
 
     return findings;

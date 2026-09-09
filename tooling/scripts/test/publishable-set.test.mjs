@@ -329,3 +329,142 @@ test("an empty derivation throws rather than reporting clean", () => {
     const root = workspace({});
     assert.throws(() => checkPublishableSet({ root }), /empty publishable set/);
 });
+
+/* ── The MCP Registry manifest ────────────────────────────────────── */
+
+/**
+ * A package that publishes to the MCP Registry: a `server.json` beside the
+ * manifest, and the `mcpName` in package.json that proves ownership of the
+ * name it claims.
+ *
+ * The registry reads that field out of the *published npm tarball*, which is
+ * why every disagreement below is a release-time failure rather than a build
+ * one — by the time the registry looks, npm has already been written.
+ */
+function withRegistry(root, dir, { name, version, mcpName, ...overrides } = {}) {
+    const file = path.join(root, dir, "package.json");
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (mcpName !== null) {
+        manifest.mcpName = mcpName ?? "io.github.rebasepro/rebase";
+        fs.writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+    }
+    fs.writeFileSync(path.join(root, dir, "server.json"), `${JSON.stringify({
+        $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+        name: name ?? "io.github.rebasepro/rebase",
+        description: "Tools for a Rebase backend project.",
+        version: version ?? manifest.version,
+        packages: [{
+            registryType: "npm",
+            identifier: manifest.name,
+            version: version ?? manifest.version,
+            transport: { type: "stdio" }
+        }],
+        ...overrides
+    }, null, 2)}\n`);
+    return root;
+}
+
+test("a server.json that agrees with its package is clean", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp");
+    assert.deepEqual(checkPublishableSet({ root }), []);
+});
+
+test("mcpName with no server.json is a name nothing publishes", () => {
+    // The state `@rebasepro/mcp` shipped in for its whole life: the field was
+    // on npm, and no manifest ever claimed the name it reserved.
+    const root = workspace({
+        "packages/mcp": ok("@rebasepro/mcp", "1.0.0", { mcpName: "io.github.rebasepro/rebase" })
+    });
+    assert.deepEqual(messages(root),
+        ['@rebasepro/mcp declares mcpName "io.github.rebasepro/rebase" but has no server.json']);
+});
+
+test("a server.json with no mcpName cannot prove ownership", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp", { mcpName: null });
+    assert.deepEqual(messages(root), ["@rebasepro/mcp has a server.json but no mcpName in package.json"]);
+});
+
+test("mcpName and the manifest name must be the same string", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp", { name: "io.github.someone-else/rebase" });
+    assert.deepEqual(messages(root), ["@rebasepro/mcp: mcpName and server.json name disagree"]);
+});
+
+test("a manifest left behind by the bump is a finding", () => {
+    // The `agent-skills` shape, in the one place where being left behind fails
+    // the release outright instead of going quiet: the registry refuses a
+    // version that is not on npm.
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp", { version: "0.9.0" });
+    assert.deepEqual(messages(root), [
+        "packages/mcp/server.json is at 0.9.0, the package at 1.0.0",
+        "packages/mcp/server.json points at @rebasepro/mcp@0.9.0, not 1.0.0"
+    ]);
+});
+
+test("a manifest that points at some other package installs the wrong thing", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp");
+    const file = path.join(root, "packages/mcp/server.json");
+    const server = JSON.parse(fs.readFileSync(file, "utf8"));
+    server.packages[0].identifier = "@rebasepro/cli";
+    fs.writeFileSync(file, JSON.stringify(server, null, 2));
+    assert.deepEqual(messages(root), ["packages/mcp/server.json lists no npm package for @rebasepro/mcp"]);
+});
+
+test("a description over the registry's limit is caught before the release", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp", { description: "x".repeat(101) });
+    assert.deepEqual(messages(root),
+        ["packages/mcp/server.json description is 101 characters, over the registry's 100"]);
+});
+
+test("a stale repository.subfolder is the same class as repository.directory", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp", {
+        repository: { url: "https://github.com/rebasepro/rebase", source: "github", subfolder: "mcp" }
+    });
+    assert.deepEqual(messages(root), ['packages/mcp/server.json declares repository.subfolder "mcp"']);
+});
+
+test("setVersion moves the manifest, both copies of the number", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp");
+
+    const changed = setVersion("1.1.0", root);
+    assert.equal(changed[0].manifest, "server.json");
+
+    const server = JSON.parse(fs.readFileSync(path.join(root, "packages/mcp/server.json"), "utf8"));
+    assert.equal(server.version, "1.1.0");
+    assert.equal(server.packages[0].version, "1.1.0", "the package entry is the copy that gets forgotten");
+    assert.deepEqual(checkPublishableSet({ root }), []);
+});
+
+test("setVersion reaches a stale manifest whose package.json is already current", () => {
+    // The early return that skips an unchanged package.json must not take the
+    // file beside it with it — "this one is current" says nothing about that one.
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp", { version: "0.9.0" });
+
+    const changed = setVersion("1.0.0", root);
+    assert.deepEqual(changed.map(c => [c.name, c.manifest]), [["@rebasepro/mcp", "server.json"]]);
+    assert.deepEqual(checkPublishableSet({ root }), []);
+});
+
+test("setVersion leaves an artifact on its own cadence alone", () => {
+    const root = workspace({ "packages/mcp": ok("@rebasepro/mcp", "1.0.0") });
+    withRegistry(root, "packages/mcp");
+    const file = path.join(root, "packages/mcp/server.json");
+    const server = JSON.parse(fs.readFileSync(file, "utf8"));
+    server.packages.push({
+        registryType: "oci", identifier: "ghcr.io/rebasepro/mcp", version: "3.2.1",
+        transport: { type: "stdio" }
+    });
+    fs.writeFileSync(file, JSON.stringify(server, null, 2));
+
+    setVersion("1.1.0", root);
+    const after = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(after.packages[1].version, "3.2.1", "a version nobody built must not be asserted");
+});

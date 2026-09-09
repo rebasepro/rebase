@@ -432,3 +432,19 @@ echo "  📦 npm:    https://www.npmjs.com/org/rebasepro"
 echo "  🏷  tag:    v${NEW_VERSION}"
 echo "  📝 release: https://github.com/rebasepro/rebase/releases/tag/v${NEW_VERSION}"
 echo ""
+
+# The publish workflow pushes the MCP Registry entry itself, on an OIDC token it
+# already holds. This path cannot: `mcp-publisher login github` is a device-code
+# flow that wants a browser, so a hand-run release ends with the registry one
+# version behind npm unless somebody finishes it. Printing the command is what
+# makes that a step somebody reads rather than a step somebody remembers — the
+# same reason the workflow prints the runtime-rollout command it cannot run.
+if [ -f packages/mcp/server.json ]; then
+  echo -e "${YELLOW}${BOLD}🔌 MCP Registry — not updated yet${RESET}"
+  echo ""
+  echo "  Clients discover the server through the registry, and this path cannot"
+  echo "  authenticate to it without a browser. From packages/mcp:"
+  echo ""
+  echo "    mcp-publisher login github && mcp-publisher publish"
+  echo ""
+fi

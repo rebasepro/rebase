@@ -35,7 +35,7 @@
  *   node tooling/scripts/publishable-packages.mjs             # one name per line
  *   node tooling/scripts/publishable-packages.mjs --json      # full records
  *   node tooling/scripts/publishable-packages.mjs --dirs      # one path per line
- *   node tooling/scripts/publishable-packages.mjs --set-version 1.2.3
+ *   node tooling/scripts/publishable-packages.mjs --set-version 1.2.3   # + any server.json
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -130,6 +130,14 @@ export function publishablePackages(root = ROOT) {
  * written is the same set the gate checks — the two cannot drift, because there
  * is only one of them.
  *
+ * A package may also sit next to a `server.json` — the MCP Registry's manifest,
+ * which restates the npm version twice: once as the server's version and once
+ * on the package entry pointing at the tarball. The registry refuses a manifest
+ * whose version is not on npm, so a stale one does not go quiet the way
+ * `@rebasepro/agent-skills` did: it fails the release at its last step, after
+ * npm has already been written to and cannot be taken back. The bump reaches it
+ * here, and `check-publishable-set` holds the two together on every PR.
+ *
  * @returns the packages it changed.
  */
 export function setVersion(version, root = ROOT) {
@@ -142,14 +150,56 @@ export function setVersion(version, root = ROOT) {
         const file = path.join(root, pkg.dir, "package.json");
         const raw = fs.readFileSync(file, "utf8");
         const json = JSON.parse(raw);
-        if (json.version === version) continue;
+
+        // Unconditionally, and before the early return below: "package.json is
+        // already at the target" is not evidence about the file beside it, and
+        // treating it as evidence is exactly how the two drift apart.
+        const manifest = setRegistryVersion(path.join(root, pkg.dir, "server.json"), pkg.name, version);
+
+        if (json.version === version) {
+            if (manifest) changed.push({ ...pkg, from: pkg.version, to: version, manifest });
+            continue;
+        }
         json.version = version;
         // Two-space JSON with a trailing newline: what the previous inline
         // bump wrote, so this does not reformat every manifest on first run.
         fs.writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
-        changed.push({ ...pkg, from: pkg.version, to: version });
+        changed.push({ ...pkg, from: pkg.version, to: version, ...(manifest ? { manifest } : {}) });
     }
     return changed;
+}
+
+/**
+ * Move the version in an MCP Registry `server.json`, when a package has one.
+ *
+ * Only the entry whose `identifier` is this npm package is touched. A manifest
+ * may legitimately list a second artifact — an OCI image on its own cadence,
+ * say — and rewriting that one would assert a version nobody built.
+ *
+ * @returns the file name written, or null when there was nothing to do.
+ */
+function setRegistryVersion(file, packageName, version) {
+    if (!fs.existsSync(file)) return null;
+
+    let json;
+    try {
+        json = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (err) {
+        throw new Error(`${file} is not readable JSON: ${err.message}`);
+    }
+
+    let touched = json.version !== version;
+    json.version = version;
+
+    for (const entry of json.packages ?? []) {
+        if (entry.identifier !== packageName) continue;
+        if (entry.version !== version) touched = true;
+        entry.version = version;
+    }
+
+    if (!touched) return null;
+    fs.writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+    return path.basename(file);
 }
 
 /* ── CLI ──────────────────────────────────────────────────────────── */
@@ -165,7 +215,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
             process.exit(2);
         }
         const changed = setVersion(version);
-        for (const pkg of changed) console.log(`  ${pkg.name}  ${pkg.from} → ${pkg.to}`);
+        for (const pkg of changed) {
+            const also = pkg.manifest ? `  (+ ${pkg.manifest})` : "";
+            console.log(`  ${pkg.name}  ${pkg.from} → ${pkg.to}${also}`);
+        }
         console.log(`✓ ${publishablePackages().length} publishable package(s) at ${version} (${changed.length} changed)`);
     } else if (args.includes("--json")) {
         console.log(JSON.stringify(publishablePackages(), null, 2));

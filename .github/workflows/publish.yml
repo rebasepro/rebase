@@ -1004,3 +1004,66 @@ jobs:
             echo "pnpm release:runtime --image-tag=${FLEET_TAG} --roll --apply" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
+
+      # ── MCP Registry ────────────────────────────────────────
+      #
+      # `@rebasepro/mcp` has carried `"mcpName": "io.github.rebasepro/rebase"`
+      # since it was written — the ownership marker the MCP Registry reads out
+      # of a published npm tarball. Nothing ever published a `server.json`
+      # against it, so the name was reserved on npm and claimed nowhere: the
+      # server is absent from the registry every MCP client, Claude Code and
+      # VS Code included, searches to offer an install.
+      #
+      # LAST in the job, and deliberately so. The registry is in preview, it is
+      # a third-party service, and a publish here can fail for reasons that have
+      # nothing to do with this release. Anywhere earlier, an outage there would
+      # skip the fleet image or the GitHub release — a real cost for a metadata
+      # push. Here the step can go red on its own, with npm, the tag, the image
+      # and the release all already done, and the fix is one command from a
+      # laptop: `mcp-publisher login github && mcp-publisher publish`.
+      #
+      # No secret. `login github-oidc` exchanges the same id-token this job
+      # already mints for npm provenance, and the registry checks that the
+      # repository owner in the OIDC claim matches the `io.github.rebasepro/`
+      # namespace the server name asks for.
+      - name: Publish to the MCP Registry
+        if: ${{ !inputs.dry_run }}
+        working-directory: packages/mcp
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # The registry validates by downloading the tarball this manifest
+          # names and looking for `mcpName` inside it, so it has to be visible
+          # on the npm API first. `pnpm -r publish` returning is not that
+          # guarantee — the write and the read are different services. Wait for
+          # the version rather than discovering the race as a failed publish.
+          for attempt in $(seq 1 30); do
+            if [ "$(npm view "@rebasepro/mcp@${VERSION}" version 2>/dev/null)" = "$VERSION" ]; then
+              echo "✓ @rebasepro/mcp@${VERSION} is visible on npm (attempt ${attempt})"
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              echo "::error::@rebasepro/mcp@${VERSION} never became visible on npm — not publishing metadata for a tarball that cannot be fetched."
+              exit 1
+            fi
+            sleep 10
+          done
+
+          # The manifest is bumped by `publishable-packages.mjs --set-version`
+          # alongside every package.json, and `check:publishable-set` holds the
+          # two together on every PR. So this asserts rather than edits: a `jq`
+          # rewrite here would paper over exactly the drift that gate exists to
+          # catch, and would do it on the one path where nobody reads the diff.
+          MANIFEST_VERSION=$(node -p "require('./server.json').version")
+          if [ "$MANIFEST_VERSION" != "$VERSION" ]; then
+            echo "::error::server.json is at ${MANIFEST_VERSION}, this release is ${VERSION}. The bump did not reach it."
+            exit 1
+          fi
+
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
+          echo "**🔌 MCP Registry:** \`io.github.rebasepro/rebase\` at \`${VERSION}\`" >> $GITHUB_STEP_SUMMARY

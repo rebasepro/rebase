@@ -1,0 +1,54 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.rebasepro/rebase",
+  "title": "Rebase",
+  "description": "Schema, database, document, user and dev-server tools for a Rebase backend project.",
+  "websiteUrl": "https://rebase.pro",
+  "repository": {
+    "url": "https://github.com/rebasepro/rebase",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "version": "0.19.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@rebasepro/mcp",
+      "version": "0.19.1",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "REBASE_PROJECT_DIR",
+          "description": "Project root — the directory holding rebase.json. Defaults to the working directory.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "REBASE_BASE_URL",
+          "description": "Backend URL, used when no local dev server is discovered.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "REBASE_API_TOKEN",
+          "description": "API token for the target project. Not needed against a local dev server.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "REBASE_MCP_ALLOW_REMOTE_WRITES",
+          "description": "Allow destructive tools to run against a non-local target. Off by default.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "boolean"
+        }
+      ]
+    }
+  ]
+}

@@ -214,6 +214,37 @@ Add to your AI assistant's MCP config (e.g. `.gemini/settings.json`):
 }
 ```
 
+## MCP Registry
+
+A stable release publishes this server to the
+[MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.rebasepro/rebase` — the listing MCP clients read when they offer an
+install. Two files carry that identity, and they must agree:
+
+| | |
+|---|---|
+| `package.json` → `mcpName` | the ownership proof, read out of the **published npm tarball** |
+| `server.json` | the manifest: the same name, the version, and the npm package to install |
+
+Neither is edited by hand on a release. `publishable-packages.mjs --set-version`
+writes the version into `server.json` alongside every `package.json`, and
+`pnpm check:publishable-set` refuses a tree where the two disagree — the registry
+validates a publish by downloading the tarball the manifest names, so a manifest
+left behind fails the release at its last step, once npm can no longer be
+rewritten.
+
+The stable publish workflow pushes the registry entry itself, after npm, the tag
+and the fleet image, on the OIDC token it already holds for npm provenance. A
+hand-run `release.sh` cannot — the login is a device-code flow — so it prints
+the command to finish the job:
+
+```bash
+mcp-publisher login github && mcp-publisher publish
+```
+
+Install `mcp-publisher` with `brew install mcp-publisher`, and check a manifest
+without publishing anything using `mcp-publisher validate`.
+
 ## Related Packages
 
 - `@rebasepro/client` — Used internally for data and admin API calls
