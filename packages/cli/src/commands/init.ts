@@ -154,7 +154,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
             type: "input",
             name: "projectName",
             message: "Project name:",
-            default: "my-rebase-app",
+            default: "my-app",
             validate: (input: string) => validateProjectName(input) ?? true
         });
     }
@@ -243,7 +243,7 @@ ${chalk.bold("Usage")}
   rebase init ${chalk.blue("[name]")} [options]
 
   ${chalk.gray("The name may be a nested path (apps/my-app) or \".\" for the current directory.")}
-  ${chalk.gray("Defaults to \"my-rebase-app\" when omitted with --yes.")}
+  ${chalk.gray("Asks when omitted; defaults to \"my-app\", and takes it without asking under --yes.")}
 
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
@@ -354,7 +354,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     const hasInstallFlag = noInstall || args["--install"] === true;
 
     if (isNonInteractive) {
-        const projectName = nameArg || "my-rebase-app";
+        // Non-interactive: nothing to ask, so the prompt's default stands in.
+        const projectName = nameArg || "my-app";
         const targetDirectory = path.resolve(process.cwd(), projectName);
         const templateDirectory = path.resolve(cliRoot!, "templates", "template");
         const pmCommands = getPMCommands(pm);
