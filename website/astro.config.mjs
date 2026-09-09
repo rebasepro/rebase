@@ -138,9 +138,11 @@ export default defineConfig({
                     items: [
                         { label: "Defining Collections", slug: "docs/collections" },
                         { label: "Properties", slug: "docs/collections/properties" },
+                        { label: "Arrays and maps", slug: "docs/collections/arrays-and-maps" },
                         { label: "File uploads", slug: "docs/collections/file-uploads" },
                         { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
                         { label: "Relations", slug: "docs/collections/relations" },
+                        { label: "Soft delete", slug: "docs/collections/soft-delete" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
                         { label: "Field access", slug: "docs/collections/field-access" }

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e456b0d449b82c5
+sourceHash: fe1edb8bd07dfdd0
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.

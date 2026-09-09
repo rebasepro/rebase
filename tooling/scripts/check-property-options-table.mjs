@@ -22,7 +22,22 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TYPES = path.join(ROOT, "packages/cms-types/src/types/property_options.ts");
-const DOC = path.join(ROOT, "website/src/content/docs/docs/collections/properties.mdx");
+
+/**
+ * The property reference, which is no longer one file.
+ *
+ * It was `properties.mdx` alone until that page hit the 600-line budget twice
+ * over and split — file fields to `file-uploads.mdx`, the two composite types to
+ * `arrays-and-maps.mdx`, each taking its own `admin` options with it. Reading
+ * only the first page would have reported six real, documented options as
+ * missing and invited somebody to paste them back into a page the length gate
+ * had just refused. A page added here is a page the reference grew.
+ */
+const DOCS = [
+    "website/src/content/docs/docs/collections/properties.mdx",
+    "website/src/content/docs/docs/collections/arrays-and-maps.mdx",
+    "website/src/content/docs/docs/collections/file-uploads.mdx"
+].map((rel) => path.join(ROOT, rel));
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
@@ -60,7 +75,7 @@ if (declared.size === 0) {
     process.exit(2);
 }
 
-const doc = fs.readFileSync(DOC, "utf8");
+const doc = DOCS.map((f) => fs.readFileSync(f, "utf8")).join("\n");
 /** A key is documented when the page names it in backticks, bare or under a prefix. */
 const documented = new Set(
     [...doc.matchAll(/`(?:admin\.|format\.)?([a-zA-Z][a-zA-Z0-9]*)`/g)].map(m => m[1])
@@ -76,14 +91,14 @@ for (const [iface, keys] of declared) {
 }
 
 if (missing.length === 0) {
-    console.log(green(`✓ Property options: all ${total} key(s) across ${declared.size} interface(s) are on the properties page.`));
+    console.log(green(`✓ Property options: all ${total} key(s) across ${declared.size} interface(s) are on the ${DOCS.length} property reference page(s).`));
     process.exit(0);
 }
 
-console.error(red(`\n✗ ${missing.length} of ${total} property option(s) are on no row of the properties page:\n`));
+console.error(red(`\n✗ ${missing.length} of ${total} property option(s) are on no row of the property reference:\n`));
 for (const key of missing) console.error(`    ${key}`);
 console.error(dim(
-    `\n  ${path.relative(ROOT, DOC)}, declared in ${path.relative(ROOT, TYPES)}.` +
+    `\n  ${DOCS.map((f) => path.relative(ROOT, f)).join(", ")}, declared in ${path.relative(ROOT, TYPES)}.` +
     "\n  An option nobody can find is an option nobody uses, and four of these" +
     "\n  appeared in no English page at all when this check was written.\n"
 ));

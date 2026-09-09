@@ -122,12 +122,16 @@ export const enums = {  };
 export const relations = {  };
 ```
 
-Two things in there are worth reading twice. The `id` column you did not
+Three things in there are worth reading twice. The `id` column you did not
 declare: every collection gets a `text` primary key unless a property claims
-`isId`. And the `pgPolicy` block: row level security is enabled on every table,
-and those baseline policies are what keep the trusted server context and the
-`admin` role able to read it at all — see
-[Security Rules](/docs/collections/security-rules).
+`isId`. The `pgPolicy` block: row level security is enabled on every table, and
+those baseline policies are what keep the trusted server context and the `admin`
+role able to read it at all — see
+[Security Rules](/docs/collections/security-rules). And `active`, which carries
+the `defaultValue` you wrote as a **column** default: a literal `defaultValue`
+compiles to a real `DEFAULT`, so a row inserted by the REST API, a seed script
+or `psql` gets it too, not only one typed into the admin panel. A `reference` or
+`vector` default is not a column literal and stays an application-layer value.
 
 And this SQL, which is what Atlas is handed as the desired state:
 

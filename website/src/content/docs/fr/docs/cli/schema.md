@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e456b0d449b82c5
+sourceHash: fe1edb8bd07dfdd0
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.

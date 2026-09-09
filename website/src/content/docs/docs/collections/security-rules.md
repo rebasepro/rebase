@@ -297,6 +297,15 @@ role, enforced *inside* the `USING` / `WITH CHECK` clause through
 `rebase.roles()`. `pgRoles` is a database role, and controls which connections
 the policy is attached to at all. Almost every project wants `roles`.
 
+:::tip[Filling the column `ownerField` names]
+`ownerField` compares a column to `rebase.uid()`; it does not put anything in
+it. Declare that column as a string with
+[`autoValue: "user_on_create"`](/docs/collections/properties#audit-columns) and
+the driver stamps the acting user's uid on insert, overwriting whatever the
+request body sent — which is what makes the policy's premise true. A column the
+caller supplies is one the caller can lie about.
+:::
+
 ## Examples
 
 ### Blog Platform

@@ -1,5 +1,5 @@
 ---
-sourceHash: ea76889017d01b67
+sourceHash: 22cf5bf2953fb715
 title: Regole di Sicurezza (RLS)
 sidebar_label: Regole di Sicurezza
 description: Definisci le politiche di sicurezza a livello di riga (Row Level Security) per le tue collection usando scorciatoie pratiche o espressioni SQL pure.

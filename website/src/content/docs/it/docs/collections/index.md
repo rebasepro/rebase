@@ -1,5 +1,5 @@
 ---
-sourceHash: 13dd95b04d6f92ce
+sourceHash: 444566625d7595fb
 title: Collezioni
 sidebar_label: Collezioni
 description: Le collezioni sono i blocchi costitutivi fondamentali di Rebase — ogni collezione mappa una tabella di database e ne definisce lo schema, le relazioni, la sicurezza e il comportamento dell'interfaccia utente.
@@ -133,6 +133,7 @@ Ma un'annotazione si limita a *validare* l'oggetto — non vede i nomi delle tue
 | `relations` | `Relation[]` | Relazioni SQL — chiavi esterne, tabelle di congiunzione. Vedi [Relazioni](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Policy di Row Level Security. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Indici Postgres di cui questa tabella ha bisogno. Vedi [Indici](/docs/backend/indexes). |
+| `softDelete` | `boolean \| { field?: string }` | Turn `delete` into a timestamp and hide stamped rows from every read. `true` uses `deletedAt`; the object form renames the field. The collection must declare that `date` property itself. Postgres only — see [Soft delete](/docs/collections/soft-delete) |
 | `search` | `SearchConfig` | Ricerca full-text con ranking sui campi che indichi, inclusi i contenuti JSONB e array. Solo Postgres. Vedi [Ricerca](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Contrassegna la collezione come collezione di autenticazione (gestione utenti, reimpostazione password, ecc.) |
 

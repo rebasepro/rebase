@@ -1,5 +1,5 @@
 ---
-sourceHash: 13dd95b04d6f92ce
+sourceHash: 444566625d7595fb
 title: Sammlungen
 sidebar_label: Sammlungen
 description: Sammlungen sind der zentrale Baustein von Rebase – jede Sammlung bildet eine Datenbanktabelle ab und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.
@@ -133,6 +133,7 @@ Eine Annotation *validiert* das Objekt jedoch nur — sie kann Ihre Eigenschafts
 | `relations` | `Relation[]` | SQL-Relationen – Fremdschlüssel, Verknüpfungstabellen. Siehe [Relationen](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Row Level Security-Richtlinien. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Postgres-Indizes, die diese Tabelle braucht. Siehe [Indizes](/docs/backend/indexes). |
+| `softDelete` | `boolean \| { field?: string }` | Turn `delete` into a timestamp and hide stamped rows from every read. `true` uses `deletedAt`; the object form renames the field. The collection must declare that `date` property itself. Postgres only — see [Soft delete](/docs/collections/soft-delete) |
 | `search` | `SearchConfig` | Gerankte Volltextsuche über die von Ihnen benannten Felder, einschließlich JSONB- und Array-Inhalten. Nur Postgres. Siehe [Suche](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Die Sammlung als Authentifizierungs-Sammlung kennzeichnen (Benutzerverwaltung, Passwort zurücksetzen usw.) |
 
