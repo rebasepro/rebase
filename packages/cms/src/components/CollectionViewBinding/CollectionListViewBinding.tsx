@@ -430,9 +430,22 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         [resolvedCollection.properties]
     );
 
-    /** The row's identity cell: the leading column, or the title slot. */
+    /**
+     * The row's identity cell — the thumbnail, the title and the subtitle.
+     *
+     * Labelled by the title slot, because that is what the cell renders. In
+     * column mode it used to be labelled by `listProperties[0]` instead, which
+     * was right only when the two happened to be the same property and a lie
+     * whenever they were not: `listProperties: ["roles", "createdAt"]` on the
+     * users collection put a "Roles" header over the name-and-email cell, and
+     * the roles themselves appeared in no column at all — the header was the
+     * only trace of the property the developer had asked for.
+     *
+     * The first list property is therefore only consumed here when it *is* the
+     * title; otherwise it stays in {@link declaredColumns} and gets a cell.
+     */
     const titleColumn = useMemo<ListColumn | undefined>(() => {
-        const key = columnMode ? resolvedCollection.listProperties?.[0] : titlePropertyKey;
+        const key = titlePropertyKey ?? (columnMode ? resolvedCollection.listProperties?.[0] : undefined);
         if (!key) return undefined;
         const property = resolvedCollection.properties[key] as Property | undefined;
         return {
@@ -454,7 +467,11 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
      */
     const declaredColumns = useMemo<ListColumn[]>(() => {
         if (columnMode) {
-            const keys = resolvedCollection.listProperties!.slice(1);
+            // Everything the identity cell does not already show. Which is the
+            // title property wherever it appears in the list, not merely a
+            // first entry: a column repeating the line above it is the one
+            // duplicate this owes the reader.
+            const keys = resolvedCollection.listProperties!.filter(key => key !== titleColumn?.key);
             return keys.flatMap((key, index) => {
                 const property = resolvedCollection.properties[key] as Property | undefined;
                 if (!property) return [];
@@ -529,7 +546,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         if (date) cols.push(date);
 
         return cols;
-    }, [columnMode, resolvedCollection, slotKeys.tagsKey, statusPropertyKey, datePropertyKey, sortableKeys]);
+    }, [columnMode, resolvedCollection, titleColumn?.key, slotKeys.tagsKey, statusPropertyKey, datePropertyKey, sortableKeys]);
 
     /** What the row already shows without a column of its own. */
     const shownKeys = useMemo(() => new Set<string | undefined>([

@@ -58,6 +58,13 @@ const usersCollection: PostgresCollectionConfig = {
             name: "Password Hash",
             type: "string",
             columnName: "password_hash",
+            // Not `hideFromCollection` — that hides the field from this panel
+            // and serves the hash to every caller a read policy admits, which
+            // here is every co-member. Only `excludeFromApi` takes the column
+            // off the wire. The framework now forces the flag onto a redeclared
+            // auth collection and says so at boot; this is the same statement,
+            // made where a reader of the file can see it.
+            excludeFromApi: true,
             admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
@@ -77,6 +84,8 @@ const usersCollection: PostgresCollectionConfig = {
             name: "Email Verification Token",
             type: "string",
             columnName: "email_verification_token",
+            // A pending token is a one-click account takeover. See passwordHash.
+            excludeFromApi: true,
             admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
@@ -145,7 +154,14 @@ span: 4 }
         group: "Settings",
         openEntityMode: "dialog",
         disableDefaultActions: ["copy"],
-        sort: ["createdAt", "desc"],
+        // The people with access first, then everybody else, each group newest
+        // first. Sorting by `createdAt` alone buried the handful of accounts
+        // that can do anything under every account that has ever signed up.
+        // `roles` is a `text[]` and Postgres compares arrays element by
+        // element, so the empty one sorts lowest and `desc` floats every
+        // account that has a role. No nulls placement: the column is
+        // `NOT NULL DEFAULT '{}'`, so "no role" is the empty array.
+        sort: [["roles", "desc"], ["createdAt", "desc"]],
         // A user is called by their name. Without this the title is derived,
         // and `propertiesOrder` starting `["id", "email", …]` makes the
         // derivation take the email address — so every record was titled by
