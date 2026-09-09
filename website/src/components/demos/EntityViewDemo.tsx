@@ -9,6 +9,8 @@ interface Entity {
   status: "Available" | "Out of Stock" | "Discontinued";
   brand: string | null;
   category: string;
+  price: number;
+  featured: boolean;
 }
 
 // ─── Mock Data ───────────────────────────────────────────
@@ -19,7 +21,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/baseball-cap.jpg",
     "status": "Available",
     "brand": "Authentic Pigment",
-    "category": "clothing_man"
+    "category": "clothing_man",
+    "price": 24.9,
+    "featured": false
   },
   {
     "id": "PROD-2",
@@ -27,7 +31,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/invisible-shelf.jpg",
     "status": "Available",
     "brand": "Umbra",
-    "category": "home_storage"
+    "category": "home_storage",
+    "price": 32.5,
+    "featured": true
   },
   {
     "id": "PROD-3",
@@ -35,7 +41,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/aviator-rb3025.jpg",
     "status": "Available",
     "brand": "Ray-Ban",
-    "category": "sunglasses"
+    "category": "sunglasses",
+    "price": 154.0,
+    "featured": true
   },
   {
     "id": "PROD-4",
@@ -43,7 +51,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/wine-decanter.jpg",
     "status": "Out of Stock",
     "brand": "Sagaform",
-    "category": "serveware"
+    "category": "serveware",
+    "price": 20.34,
+    "featured": false
   },
   {
     "id": "PROD-5",
@@ -51,7 +61,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/chess-set.jpg",
     "status": "Available",
     "brand": "Umbra",
-    "category": "toys_and_games"
+    "category": "toys_and_games",
+    "price": 89.0,
+    "featured": false
   },
   {
     "id": "PROD-6",
@@ -59,7 +71,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/pimentero.jpg",
     "status": "Available",
     "brand": "Seletti",
-    "category": "serveware"
+    "category": "serveware",
+    "price": 18.2,
+    "featured": false
   },
   {
     "id": "PROD-7",
@@ -67,7 +81,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/corkscrew.jpg",
     "status": "Available",
     "brand": "Alessi",
-    "category": "kitchen"
+    "category": "kitchen",
+    "price": 42.75,
+    "featured": true
   },
   {
     "id": "PROD-8",
@@ -75,7 +91,9 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/predator-2.jpg",
     "status": "Available",
     "brand": "Ray-Ban",
-    "category": "sunglasses"
+    "category": "sunglasses",
+    "price": 129.9,
+    "featured": false
   },
   {
     "id": "PROD-9",
@@ -83,18 +101,45 @@ const MOCK_ENTITIES: Entity[] = [
     "image": "/img/demo/products/casio-collection.jpg",
     "status": "Available",
     "brand": "Casio",
-    "category": "watches"
+    "category": "watches",
+    "price": 59.9,
+    "featured": false
   }
 ];
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  // CHIP_COLORS[hue + "Light"] in DARK mode — see packages/ui/src/util/chip_colors.ts.
-  // These used to hold the light-mode stops (#93e088 / #ffa981 / #cccccc), which
-  // is the same palette read off the wrong side of the theme.
-  Available: { bg: "#20c933", text: "#0b1d05" },
-  "Out of Stock": { bg: "#ff6f2c", text: "#581f10" },
-  Discontinued: { bg: "#666666", text: "#eeeeee" },
+/**
+ * An enum value is a chip, and a chip is TINTED — the hue's solid stop at 14%
+ * behind hue-coloured ink. That has been the product's default variant since
+ * 2026-09-08 (`darkTintColor` / `darkTintText` in chip_colors.ts); the solid
+ * stops these replaced painted a status as a block of colour rather than a
+ * label, and left the site showing a green so loud the product never draws it.
+ *
+ * The classes come from the `chip-*` utilities in global.css, which are
+ * generated from CHIP_COLORS — the one place the palette lives on the site.
+ */
+const STATUS_CHIP: Record<string, string> = {
+  Available: "chip-green",
+  "Out of Stock": "chip-orange",
+  Discontinued: "chip-gray",
 };
+
+/**
+ * Enum chips are seeded per value in the product, so no two values in a column
+ * share a hue. Fixed here rather than hashed so the same category keeps the
+ * same colour between the table, the cards and the side panel.
+ */
+const CATEGORY_CHIP: Record<string, string> = {
+  clothing_man: "chip-pink",
+  home_storage: "chip-cyan",
+  sunglasses: "chip-blue",
+  serveware: "chip-teal",
+  toys_and_games: "chip-purple",
+  kitchen: "chip-orange",
+  watches: "chip-indigo",
+};
+
+const statusChip = (status: string) => STATUS_CHIP[status] ?? "chip-gray";
+const categoryChip = (category: string) => CATEGORY_CHIP[category] ?? "chip-gray";
 
 // ─── Kanban Data (for TAGS collection) ───────────────────
 // Matches production EntityBoardCard: thumbnail + title + ID
@@ -115,47 +160,59 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   {
     id: "backlog",
     title: "Backlog",
-    color: "rgb(156, 163, 175)",
+    // The dot is `CHIP_COLORS[key].darkColor` — the hue's own solid stop
+    // (BoardColumnTitle.tsx), not a Tailwind grey that belongs to no palette.
+    color: "#666666",
     cards: [
       { id: "871492", title: "Dark mode", image: "/img/kanban/dark_mode.png" },
       { id: "871388", title: "Search indexing", image: "/img/kanban/search_indexing.png" },
-      { id: "871204", title: "API documentation", image: "/img/kanban/api_docs.png" }
+      { id: "871204", title: "API documentation", image: "/img/kanban/api_docs.png" },
+      // No image: the product falls back to the collection's icon in a raised
+      // well, which is what most board cards actually look like.
+      { id: "871150", title: "Rate limit headers" },
+      { id: "871101", title: "Audit log retention" }
     ]
   },
   {
     id: "in_progress",
     title: "In Progress",
-    color: "rgb(251, 191, 36)",
+    color: "#fcb400",
     cards: [
       { id: "871090", title: "Auth middleware refactor", image: "/img/kanban/auth.png" },
-      { id: "870984", title: "Onboarding flow", image: "/img/kanban/onboarding.png" }
+      { id: "870984", title: "Onboarding flow", image: "/img/kanban/onboarding.png" },
+      { id: "870902", title: "Storage quota banner" }
     ]
   },
   {
     id: "review",
     title: "Review",
-    color: "rgb(96, 165, 250)",
+    color: "#2d7ff9",
     cards: [
-      { id: "870812", title: "RLS policies", image: "/img/kanban/rls.png" }
+      { id: "870812", title: "RLS policies", image: "/img/kanban/rls.png" },
+      { id: "870799", title: "Webhook retries" },
+      { id: "870744", title: "Seed data CLI" }
     ]
   },
   {
     id: "done",
     title: "Done",
-    color: "rgb(74, 222, 128)",
+    color: "#20c933",
     cards: [
       { id: "870650", title: "CI/CD pipeline", image: "/img/kanban/cicd.png" },
-      { id: "870511", title: "Export to CSV", image: "/img/kanban/export.png" }
+      { id: "870511", title: "Export to CSV", image: "/img/kanban/export.png" },
+      { id: "870402", title: "Locale fallbacks" }
     ]
   }
 ];
 
 import {
-  Filter, Pencil, MoreVertical, Image as ImageIcon, User, ChevronDown,
-  Tag, Home, Languages, Moon, ChevronsRight, List, Kanban, Folder,
+  Filter, Funnel, Pencil, MoreVertical, Image as ImageIcon, User, ChevronDown,
+  Tag, Home, Languages, Moon, ChevronsRight, List, Kanban, Folder, Table2,
   Search, Settings, Trash2, Plus, X, Maximize2, Code, Check, Copy,
-  LayoutGrid, TextCursorInput, Link, LayoutList
+  LayoutGrid, TextCursorInput, Link, LayoutList, ShoppingCart
 } from "lucide-react";
+
+import { AdminDrawer, AdminToolbar, SHELL_ROOT, SHELL_SHEET } from "./admin/AdminChrome";
 
 /* ─── Material icon helper ─── */
 function MI({
@@ -210,18 +267,33 @@ function MI({
   );
 }
 
-/* ─── Column Header ─── */
+/* ─── Table geometry ───
+   `getRowHeight("l")` is 96px — the size that carries thumbnails. The 54px rows
+   this replaced were off the product's ladder entirely (36 / 42 / 48 / 96 / 160),
+   and letterboxed every product photo into a 90×40 crop the app never draws. */
+const ROW_HEIGHT = 96;
+/* Sized to land the last column on the sheet's edge at the 1088px the browser
+   frame is capped at: the product scrolls a wider table, a screenshot cannot. */
+const COL = {
+  id: 128,
+  title: 210,
+  image: 120,
+  status: 128,
+  brand: 150,
+  category: 149,
+  price: 100
+};
+
+/* ─── Column Header ─── (VirtualTableHeader.tsx: 40px, uppercase, a funnel each) */
 function ColHeader({
-  icon,
   label,
   width,
-  showFilter = true,
+  control = "filter",
   align = "left"
 }: {
-  icon?: string;
   label: string;
   width: number;
-  showFilter?: boolean;
+  control?: "filter" | "search" | "none";
   align?: "left" | "right" | "center";
 }) {
   return (
@@ -232,28 +304,25 @@ maxWidth: width,
 width }}
     >
       <div
-        className="flex py-0 px-3 h-full text-xs uppercase font-semibold select-none items-center bg-surface-sheet text-text-secondary dark:text-surface-400 relative"
+        className="flex py-0 px-3 h-full text-xs uppercase font-semibold select-none items-center bg-surface-sheet text-text-secondary dark:text-text-secondary-dark relative z-0"
         style={{ minWidth: width,
 maxWidth: width }}
       >
         <div className="overflow-hidden grow">
-          <div
-            className="flex items-center flex-row gap-1"
-            style={{ justifyContent: align }}
-          >
-            {icon && (
-              <MI size={18} className="opacity-60">
-                {icon}
-              </MI>
-            )}
-            <div className="truncate mx-0.5">{label}</div>
+          <div className="flex items-center flex-row">
+            <div
+              className="truncate w-full mr-1 overflow-hidden"
+              style={{ textAlign: align }}
+            >
+              {label}
+            </div>
           </div>
         </div>
-        {showFilter && (
-          <div className="relative inline-block">
-            <button aria-label="Filter column" className="p-1 rounded-full text-surface-400 hover:bg-surface-hover">
-              <MI size={18}>filter_list</MI>
-            </button>
+        {control !== "none" && (
+          <div className="flex-shrink-0">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-surface-accent-500 dark:text-surface-accent-300">
+              {control === "search" ? <Search size={20}/> : <Funnel size={14}/>}
+            </span>
           </div>
         )}
       </div>
@@ -261,7 +330,12 @@ maxWidth: width }}
   );
 }
 
-/* ─── Entity Row ─── */
+/* ─── Entity Row ─── (VirtualTableRow + EntityTableCell)
+
+   Cells are plain: a table cell is padding, an optional selection border and
+   the value. The `bg-surface-field` boxes with a chevron that used to wrap the
+   brand and category values were a field editor drawn at rest — the product
+   only shows the editing affordances on the cell you have selected. */
 function EntityRow({
   entity,
   isHovered,
@@ -279,148 +353,131 @@ function EntityRow({
   onLeave: () => void;
   onClick: () => void;
 }) {
-  const statusColor = STATUS_COLORS[entity.status] || STATUS_COLORS.Draft;
+
+  const cellSurface = isSelected || isHovered ? "bg-surface-card-hover" : "bg-surface-card";
+
+  const cell = (
+    children: React.ReactNode,
+    width: number,
+    { align = "left", padded = true, saved = false }: {
+      align?: "left" | "right" | "center";
+      padded?: boolean;
+      saved?: boolean;
+    } = {}
+  ) => (
+    <div className="flex-shrink-0" style={{ minWidth: width,
+maxWidth: width,
+width }}>
+      <div
+        className={`transition-colors duration-500 flex relative h-full rounded-md ${padded ? "p-4" : "p-0"} border-4 overflow-hidden ${
+          saved ? "bg-primary/20 border-primary" : "border-transparent"
+        }`}
+        style={{
+          justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start",
+          alignItems: "center",
+          width,
+          textAlign: align
+        }}
+      >
+        <div className="flex flex-col max-h-full w-full">
+          <div style={{ display: "flex",
+width: "100%",
+justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start" }}>
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div
-      className={`flex min-w-full text-sm border-b border-hairline cursor-pointer transition-colors ${isSelected ? "bg-primary/5" : isHovered ? "bg-surface-field" : ""}`}
-      style={{ height: 54 }}
+      className={`group flex min-w-full text-sm border-b border-hairline cursor-pointer ${cellSurface}`}
+      style={{ height: ROW_HEIGHT,
+width: "fit-content" }}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
       onClick={onClick}
     >
-      {/* Row Actions — always visible (production: EntityCollectionRowActions) */}
-      <div
-        className="flex-shrink-0 h-full sticky left-0 z-10"
-        style={{ minWidth: 138,
-maxWidth: 138,
-width: 138 }}
-      >
-        <div className="h-full flex items-center justify-center flex-col bg-surface-sheet">
-          <div className="w-34 flex justify-center gap-0.5">
-            <button aria-label="Edit" className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
-              <MI size={18}>edit</MI>
-            </button>
-            <button aria-label="More options" className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
-              <MI size={20}>more_vert</MI>
-            </button>
-            <div className="p-1">
-              <div className="border-2 w-4 h-4 rounded flex items-center justify-center bg-surface-card border-surface-400 border-hairline-strong"/>
-            </div>
-          </div>
-          <div className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark px-2 text-center">
-            {entity.id}
-          </div>
-        </div>
-      </div>
-
-      {/* Title */}
-      <div
-        className="flex-shrink-0 flex items-center px-2"
-        style={{ minWidth: 280,
-maxWidth: 280,
-width: 280 }}
-      >
-        <div className="truncate text-sm text-surface-900 dark:text-white">
-          {entity.title}
-        </div>
-      </div>
-
-      {/* Image */}
-      <div
-        className="flex-shrink-0 flex items-center justify-center px-2"
-        style={{ minWidth: 120,
-maxWidth: 120,
-width: 120 }}
-      >
-        {entity.image ? (
-          <img
-            src={entity.image} {...imgDims(entity.image)}
-            alt=""
-            className="w-[90px] h-[40px] object-cover rounded-md"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-[90px] h-[40px] rounded-md bg-surface-accent-200/50 dark:bg-white/[0.055] flex items-center justify-center">
-            <MI size={18} className="text-surface-400">image</MI>
-          </div>
-        )}
-      </div>
-
-      {/* Status */}
-      <div
-        className={`flex-shrink-0 flex items-center px-2 transition-all duration-300 ${highlightedField === "status" ? "ring-2 ring-green-500 rounded-md" : ""}`}
-        style={{ minWidth: 140,
-maxWidth: 140,
-width: 140 }}
-      >
-        <span
-          className="chip whitespace-nowrap"
-          style={{
-            backgroundColor: statusColor.bg,
-            color: statusColor.text
-          }}
-        >
-          {entity.status}
-        </span>
-      </div>
-
-      {/* Brand */}
-      <div
-        className="flex-shrink-0 flex items-center px-2"
-        style={{ minWidth: 200,
-maxWidth: 200,
-width: 200 }}
-      >
-        {entity.brand ? (
-          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-field">
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-primary">
-                <MI size={20}>sell</MI>
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-surface-900 dark:text-white">
-                  {entity.brand}
-                </div>
-              </div>
-            </div>
-            <MI size={16} className="text-surface-400 flex-shrink-0">
-              keyboard_arrow_down
-            </MI>
-          </div>
-        ) : (
-          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-field justify-between">
-            <span className="text-surface-400">—</span>
-            <MI size={16} className="text-surface-400">
-              keyboard_arrow_down
-            </MI>
-          </div>
-        )}
-      </div>
-
-      {/* Category */}
-      <div
-        className="flex-shrink-0 flex items-center px-2 overflow-hidden"
-        style={{ minWidth: 240,
-maxWidth: 240,
-width: 240 }}
-      >
-        <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-field">
-          <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0 overflow-hidden max-h-[38px]">
-            <span
-              className="chip chip-gray whitespace-nowrap"
-            >
-              <MI size={12} className="text-primary opacity-70">
-                folder
-              </MI>
-              {entity.category}
+      {/* Row actions (CollectionRowActions): the id is what the row rests on,
+          and the tools cover it only while the row is hovered or selected. */}
+      <div className="flex-shrink-0" style={{ minWidth: COL.id,
+maxWidth: COL.id,
+width: COL.id }}>
+        <div className={`h-full flex items-center justify-center flex-col relative ${cellSurface}`}
+          style={{ width: COL.id }}>
+          <div
+            className={`absolute inset-0 flex items-center justify-center gap-0.5 transition-opacity duration-100 ${cellSurface} ${
+              isHovered || isSelected ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-surface-accent-500 dark:text-surface-accent-300">
+              <Pencil size={16}/>
+            </span>
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-surface-accent-500 dark:text-surface-accent-300">
+              <MoreVertical size={18}/>
+            </span>
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full">
+              <span className="border-2 w-4 h-4 rounded-sm flex items-center justify-center bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"/>
             </span>
           </div>
-          <MI size={16} className="text-surface-400 flex-shrink-0">
-            keyboard_arrow_down
-          </MI>
+          <div className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark max-w-full text-ellipsis px-2 flex items-center justify-center gap-1">
+            <span className="min-w-0 truncate text-center">{entity.id}</span>
+          </div>
         </div>
       </div>
+
+      {cell(<span className="truncate">{entity.title}</span>, COL.title)}
+
+      {cell(
+        <div className="relative p-2 max-w-full">
+          <div className="relative flex items-center justify-center" style={{ width: 100,
+height: 100 }}>
+            {entity.image
+              ? <img src={entity.image} {...imgDims(entity.image)} alt="" loading="lazy"
+                className="rounded-md" style={{ maxWidth: "100%",
+maxHeight: "100%" }}/>
+              : <div className="w-full h-full rounded-md bg-surface-field flex items-center justify-center">
+                <ImageIcon size={18} className="text-text-disabled dark:text-text-disabled-dark"/>
+              </div>}
+          </div>
+        </div>,
+        COL.image,
+        { padded: false }
+      )}
+
+      {cell(
+        <span className={`chip ${statusChip(entity.status)}`}>{entity.status}</span>,
+        COL.status,
+        { saved: highlightedField === "status" }
+      )}
+
+      {/* A relation, at a row size that carries small previews: one line of
+          text with the glyph that marks it as pointing elsewhere. */}
+      {cell(
+        entity.brand
+          ? <span className="inline-flex items-center gap-1 min-w-0 max-w-full align-middle">
+            <Link size={12} className="shrink-0 opacity-40"/>
+            <span className="truncate">{entity.brand}</span>
+          </span>
+          : <span className="text-text-disabled dark:text-text-disabled-dark">—</span>,
+        COL.brand
+      )}
+
+      {cell(
+        <div className="flex flex-wrap gap-1.5">
+          <span className={`chip ${categoryChip(entity.category)}`}>{entity.category}</span>
+        </div>,
+        COL.category
+      )}
+
+      {/* A number is right-aligned and monospaced, so the decimal points line
+          up down the column — the product's own number preview. */}
+      {cell(
+        <span className="font-mono tabular-nums">{entity.price.toFixed(2)}</span>,
+        COL.price,
+        { align: "right" }
+      )}
     </div>
   );
 }
@@ -480,7 +537,9 @@ field });
         image: entity.image,
         status: entity.status,
         brand: entity.brand,
-        category: entity.category
+        category: entity.category,
+        price: entity.price,
+        featured: entity.featured
       });
       setFormDirty(false);
     }
@@ -787,174 +846,63 @@ field });
 
   /* ── Drawer nav items (production-identical: DrawerNavigationItem.tsx) ── */
   const NAV_ITEMS = [
-    { icon: "folder",
-label: "PRODUCTS",
-key: "posts" as const,
+    { icon: Folder,
+label: "Products",
 active: activeCollection === "posts" },
-    { icon: "person",
-label: "USERS",
-key: "authors" as const,
+    { icon: User,
+label: "Users",
 active: false },
-    { icon: "sell",
-label: "ORDERS",
-key: "tags" as const,
+    { icon: ShoppingCart,
+label: "Orders",
 active: activeCollection === "tags" }
   ];
 
   return (
-    /* ── Scaffold root: exact Scaffold.tsx line 106 ── */
+    /* ── Scaffold root (Scaffold.tsx): the frame is the ground; the sheet below
+       is one step up from it, inset and hairlined. ── */
     <div
-      className="flex overflow-hidden bg-surface-sheet text-surface-900 dark:text-white pointer-events-none select-none relative"
+      className={SHELL_ROOT}
       style={{ height,
 width: "100%" }}
     >
-      {/* ═══ DrawerWrapper — exact Scaffold.tsx DrawerWrapper (large layout, collapsed) ═══ */}
-      {/* z-20 relative, width: 72, inner has no-scrollbar overflow-y-auto border-r */}
-      <div
-        className="z-20 relative hidden sm:block"
-        style={{
-          width: 72,
-          transition:
-            "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"
-        }}
-      >
-        {/* Inner drawer — exact DrawerWrapper innerDrawer, relative mode */}
-        <div
-          className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-sheet"
-          style={{ width: 72 }}
-        >
-          <div className="flex flex-col h-full">
-            {/* ─ DrawerLogo — exact DefaultDrawer.tsx DrawerLogo, collapsed ─ */}
-            <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
-              {/* Logo — always visible, shrink-0 w-[56px] h-[40px] centered */}
-              <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                <img src="/img/rebase_logo.svg" width="306" height="306" alt="Rebase" className="w-[28px] h-[28px] object-contain"/>
-              </div>
-              {/* Title — hidden when collapsed: opacity-0 w-0 */}
-              <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0 ml-0"/>
-            </div>
-
-            {/* ─ DrawerNavigationGroup — exact DrawerNavigationGroup.tsx ─ */}
-            <div className="mt-1 flex-grow overflow-scroll no-scrollbar">
-              <div className="my-2 mx-2 flex flex-col">
-                {/* Group header hidden when collapsed (opacity-0 invisible pointer-events-none) */}
-                <div className="pl-4 pr-2 py-1 flex flex-row items-center opacity-0 invisible pointer-events-none">
-                  <MI size={14} className="text-surface-500 dark:text-surface-400 mr-1">expand_more</MI>
-                  <span className="text-xs text-surface-500 dark:text-surface-400 font-medium flex-grow line-clamp-1">
-                    CONTENT
-                  </span>
-                </div>
-
-                {/* Collapsible content with nav items — exact DrawerNavigationItem.tsx */}
-                <div className="overflow-hidden bg-surface-field rounded-lg">
-                  {NAV_ITEMS.map((item) => (
-                    <div key={item.label}>
-                      <div
-                        className={`rounded-lg truncate flex flex-row items-center h-10 font-semibold text-xs ${
-                          item.active
-                            ? "bg-surface-accent-200/60 bg-surface-raised dark:bg-opacity-50"
-                            : "hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75"
-                        } text-text-primary dark:text-surface-200`}
-                      >
-                        {/* Icon wrap — exact DrawerNavigationItem.tsx: shrink-0 w-[56px] h-[40px] */}
-                        <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
-                          <MI size={18} filled>{item.icon}</MI>
-                        </div>
-                        {/* Label hidden when collapsed */}
-                        <div className="text-text-primary dark:text-surface-200 opacity-0 hidden font-inherit truncate space-x-2">
-                          {item.label}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ─ DrawerToggle — exact DefaultDrawer.tsx DrawerToggle ─ */}
-            <div className="shrink-0 mt-auto px-2 py-2">
-              <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 hover:bg-surface-hover transition-colors duration-150 py-2">
-                <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                  <MI size={18}>keyboard_double_arrow_right</MI>
-                </div>
-                {/* Label hidden when collapsed */}
-                <div className="overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0"/>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminDrawer items={NAV_ITEMS}/>
 
       {/* ═══ Main — exact Scaffold.tsx line 131-148 ═══ */}
       <main className="flex flex-col grow overflow-auto">
         {/* Collection container — exact Scaffold.tsx line 137 */}
-        <div className="border-hairline bg-surface-sheet grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
-          {/* ── Collection Toolbar ── */}
-          <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-sheet border-b border-hairline flex flex-row justify-between items-center w-full shrink-0">
-            {/* Left side */}
-            <div className="flex items-center gap-1 mr-4">
-              {/* View Mode Toggle — matches production ViewModeToggle */}
-              <div className="flex items-center bg-surface-raised rounded-md p-0.5 gap-0.5">
-                {([
-                  { mode: "list" as const, icon: "format_list_bulleted", label: "List" },
-                  { mode: "table" as const, icon: "list", label: "Table" },
-                  { mode: "cards" as const, icon: "apps", label: "Cards" },
-                  { mode: "kanban" as const, icon: "view_kanban", label: "Board" }
-                ] as const).map(({ mode, icon, label }) => (
-                  <button
-                    key={mode}
-                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      viewMode === mode
-                        ? "bg-surface-card shadow-sm text-primary"
-                        : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
-                    }`}
-                  >
-                    <MI size={14}>{icon}</MI>
-                    {viewMode === mode && <span className="text-xs">{label}</span>}
-                  </button>
-                ))}
-              </div>
-              <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500 hover:bg-surface-hover">
-                <MI size={18}>filter_list</MI>
-              </button>
-            </div>
-            {/* Right side */}
-            <div className="flex items-center gap-1">
-              {/* Search bar — matches production SearchBar expandable */}
-              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 bg-surface-sheet border border-hairline px-2.5 gap-1.5 min-w-[160px]">
-                <MI size={16} className="text-surface-400">search</MI>
-                <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
-              </div>
-              <button aria-label="Settings" className="p-1.5 rounded-full text-surface-500">
-                <MI size={18}>settings</MI>
-              </button>
-              <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50">
-                <MI size={18}>delete</MI>
-              </button>
-              <button aria-label="Add new entry" className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-medium">
-                <MI size={18}>add</MI>
-              </button>
-            </div>
-          </div>
+        <div className={SHELL_SHEET}>
+          {/* ── Collection Toolbar (CollectionViewStartActions + ViewModeToggle +
+              CollectionViewActions): a labelled view trigger, filter and sort,
+              the collection's saved filters, then search and the row of quiet
+              end actions. The four-icon segmented rail and the blue slab that
+              used to sit here are both controls the product retired. ── */}
+          <AdminToolbar
+            viewIcon={viewMode === "kanban" ? Kanban : viewMode === "cards" ? LayoutGrid : viewMode === "list" ? LayoutList : Table2}
+            viewLabel={viewMode === "kanban" ? "Board" : viewMode === "cards" ? "Cards" : viewMode === "list" ? "List" : "Table"}
+            presets={viewMode === "kanban"
+              ? ["My tasks", "Due this week"]
+              : ["Available", "Low stock (< 10)", "New arrivals"]}
+            addLabel={viewMode === "kanban" ? "Add Task" : "Add Product"}
+            count={viewMode === "kanban" ? "11" : "9"}
+          />
 
           {/* ── Content Area ── */}
           {(viewMode === "table" || viewMode === "list") ? (
             /* ── Table / List view ── */
             <div className="h-full w-full flex flex-col bg-surface-card overflow-auto">
-              {/* Table header */}
+              {/* Table header — 40px, and no per-column glyph: the product
+                  draws the property name and its filter, nothing else. */}
               <div
-                className="sticky top-0 z-10 flex min-w-fit border-b border-hairline bg-surface-sheet"
-                style={{ height: 44 }}
+                className="sticky top-0 z-20 flex min-w-fit border-b border-hairline bg-surface-sheet"
+                style={{ height: 40 }}
               >
-                <ColHeader label="" width={138} showFilter={false} align="center"/>
-                <ColHeader icon="short_text" label="Title" width={280}/>
-                <ColHeader icon="image" label="Image" width={120} showFilter={false} align="center"/>
-                <ColHeader icon="list" label="Status" width={140}/>
-                <ColHeader icon="sell" label="Brand" width={200}/>
-                <ColHeader icon="folder" label="Category" width={240}/>
-                <div className="flex items-center justify-center w-16 text-surface-400">
-                  <MI size={22}>add</MI>
-                </div>
+                <ColHeader label="ID" width={COL.id} control="search" align="center"/>
+                <ColHeader label="Title" width={COL.title}/>
+                <ColHeader label="Image" width={COL.image}/>
+                <ColHeader label="Status" width={COL.status}/>
+                <ColHeader label="Brand" width={COL.brand}/>
+                <ColHeader label="Category" width={COL.category}/>
+                <ColHeader label="Price" width={COL.price} align="right"/>
               </div>
 
               {/* Table body */}
@@ -979,31 +927,33 @@ width: "100%" }}
             </div>
           ) : viewMode === "cards" ? (
             /* ── Cards Grid View ── */
-            <div className="h-full w-full overflow-auto bg-surface-card p-3 md:p-4">
+            <div className="h-full w-full overflow-auto bg-surface-sheet p-3 md:p-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {MOCK_ENTITIES.map((entity) => {
                   const merged = { ...entity, ...tableOverrides[entity.id] } as Entity;
-                  const statusColor = STATUS_COLORS[merged.status] || STATUS_COLORS.Draft;
                   const isHovered = hoveredRow === entity.id;
                   return (
                     <div
                       key={entity.id}
-                      className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 border-hairline bg-surface-sheet ${
+                      /* Card.tsx `cardMixin`: a card sits ABOVE the sheet, so it
+                         takes the card surface — it used to take the sheet's,
+                         which in dark mode is darker than the ground it sits on. */
+                      className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 border-hairline bg-surface-card ${
                         isHovered
-                          ? "ring-1 ring-primary/50 shadow-md scale-[1.02]"
-                          : "hover:shadow-sm"
+                          ? "ring-2 ring-primary/50 shadow-lg -translate-y-0.5"
+                          : "hover:shadow-lg"
                       }`}
                       onMouseEnter={() => setHoveredRow(entity.id)}
                       onMouseLeave={() => setHoveredRow(null)}
                       onClick={() => openEntity(entity.id)}
                     >
                       {/* Card thumbnail */}
-                      <div className="w-full h-28 rounded-t-xl bg-surface-accent-200/50 dark:bg-white/[0.055] overflow-hidden">
+                      <div className="w-full aspect-[4/3] bg-surface-raised overflow-hidden relative">
                         {merged.image ? (
                           <img src={merged.image} {...imgDims(merged.image)} alt={merged.title} className="w-full h-full object-cover" loading="lazy"/>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <MI size={28} className="text-surface-300 dark:text-surface-600">image</MI>
+                            <ImageIcon size={28} className="text-text-disabled dark:text-text-disabled-dark"/>
                           </div>
                         )}
                       </div>
@@ -1013,10 +963,7 @@ width: "100%" }}
                           {merged.title}
                         </div>
                         <div className="flex items-center justify-between">
-                          <span
-                            className="chip chip-xs"
-                            style={{ backgroundColor: statusColor.bg, color: statusColor.text }}
-                          >
+                          <span className={`chip chip-xs ${statusChip(merged.status)}`}>
                             {merged.status}
                           </span>
                           <span className="text-[10px] font-mono text-surface-400">#{entity.id}</span>
@@ -1039,8 +986,8 @@ width: "100%" }}
                       key={col.id}
                       className="border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-hairline"
                     >
-                      {/* Column header */}
-                      <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-raised">
+                      {/* Column header (BoardColumn.tsx: the field surface) */}
+                      <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-field">
                         <div className="py-3 px-3 flex-grow select-none flex items-center gap-3 text-sm font-semibold text-surface-800 dark:text-surface-200">
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
@@ -1051,9 +998,9 @@ width: "100%" }}
                         <span className="text-xs text-surface-500 dark:text-surface-400 mr-1">
                           {col.cards.length}
                         </span>
-                        <button aria-label="Add card" className="p-1 rounded-full opacity-60 hover:opacity-100 text-surface-500 dark:text-surface-400">
-                          <MI size={18}>add</MI>
-                        </button>
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full opacity-60 text-surface-accent-500 dark:text-surface-accent-300">
+                          <Plus size={18}/>
+                        </span>
                       </div>
 
                       {/* Cards list */}
@@ -1075,10 +1022,10 @@ width: "100%" }}
                           return (
                             <div key={card.id} className="py-1">
                               <div
-                                className={`p-3 flex items-start border rounded-xl cursor-pointer transition-colors border-hairline bg-surface-sheet ${
+                                className={`p-2 flex items-start border rounded-lg cursor-pointer transition-all duration-200 border-hairline bg-surface-card ${
                                   isHighlighted
                                     ? "ring-2 ring-primary"
-                                    : "hover:bg-primary/5 dark:hover:bg-primary/5"
+                                    : "hover:bg-surface-hover"
                                 }`}
                               >
                                 {card.image ? (
@@ -1145,7 +1092,7 @@ width: "100%" }}
                     }}
                   >
                     <div
-                      className="p-3 flex items-start border rounded-xl ring-2 ring-primary bg-surface-card border-hairline"
+                      className="p-2 flex items-start border rounded-lg ring-2 ring-primary bg-surface-raised border-hairline"
                       style={{
                         boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
                         opacity: 0.95
@@ -1263,20 +1210,13 @@ width: "100%" }}
                   </div>
 
                   {/* Status field */}
-                  <div className={`field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${highlightedFormField === "status" ? "ring-2 ring-green-500" : ""}`}>
+                  <div className={`field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${highlightedFormField === "status" ? "ring-2 ring-primary" : ""}`}>
                     <span className="field-label">
                       Status
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between">
                       {formValues.status && (
-                        <span
-                          className="chip"
-                          style={{
-                            backgroundColor:
-                              STATUS_COLORS[formValues.status]?.bg,
-                            color: STATUS_COLORS[formValues.status]?.text
-                          }}
-                        >
+                        <span className={`chip ${statusChip(formValues.status)}`}>
                           {formValues.status}
                         </span>
                       )}
@@ -1293,16 +1233,12 @@ width: "100%" }}
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between">
                       {formValues.brand ? (
-                        <div className="flex items-center gap-2">
-                          <MI size={20} className="text-primary">
-                            sell
-                          </MI>
-                          <div>
-                            <div className="text-sm font-medium text-surface-900 dark:text-white">
-                              {formValues.brand}
-                            </div>
-                          </div>
-                        </div>
+                        <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
+                          <Link size={13} className="shrink-0 opacity-40"/>
+                          <span className="text-sm font-medium text-surface-900 dark:text-white truncate">
+                            {formValues.brand}
+                          </span>
+                        </span>
                       ) : (
                         <span className="text-surface-400 text-sm">—</span>
                       )}
@@ -1320,15 +1256,7 @@ width: "100%" }}
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between gap-2">
                       <div className="flex flex-wrap gap-1 flex-1">
                         {formValues.category ? (
-                          <span
-                            className="chip chip-gray"
-                          >
-                            <MI
-                              size={12}
-                              className="text-primary opacity-70"
-                            >
-                              folder
-                            </MI>
+                          <span className={`chip ${categoryChip(formValues.category)}`}>
                             {formValues.category}
                           </span>
                         ) : (
@@ -1344,6 +1272,30 @@ width: "100%" }}
                         expand_more
                       </MI>
                     </div>
+                  </div>
+
+                  {/* Number: mono and tabular, as the product previews it. */}
+                  <div className="field min-h-[48px] flex flex-col justify-center">
+                    <span className="field-label">
+                      Price
+                    </span>
+                    <div className="px-3 pt-6 pb-2 text-sm font-mono tabular-nums text-surface-900 dark:text-surface-200">
+                      {typeof formValues.price === "number" ? formValues.price.toFixed(2) : "—"}
+                    </div>
+                  </div>
+
+                  {/* BooleanSwitch, `size="medium"` — geometry and both palettes
+                      come from the `switch-*` utilities in global.css. */}
+                  <div className="field min-h-[48px] flex flex-row items-center justify-between pl-3 pr-3 pt-4 pb-2">
+                    <span className="field-label">
+                      Featured
+                    </span>
+                    <span className="text-sm text-surface-900 dark:text-surface-200 pt-2">
+                      {formValues.featured ? "Yes" : "No"}
+                    </span>
+                    <span className={`switch-track mt-2 ${formValues.featured ? "switch-track-on" : ""}`}>
+                      <span className={`switch-knob ${formValues.featured ? "switch-knob-on" : ""}`}/>
+                    </span>
                   </div>
                 </div>
               </div>

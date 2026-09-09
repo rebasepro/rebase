@@ -54,7 +54,12 @@ const DEPS: { name: string; layer: Layer }[] = [
 export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionStackDemoProps) {
     // Opens with the panel on — the surprising move is switching it *off* and
     // watching the API strip refuse to budge.
-    const [on, setOn] = useState<Record<Optional, boolean>>({ admin: true, studio: false });
+    //
+    // Keyed `cms`, which is what `DEPS` and `CAPABILITIES` call this layer. It
+    // used to be keyed `admin` — after the copy prop rather than the layer — so
+    // `isOn("cms")` read an absent key and came back false: the slab lit up and
+    // not one of its dependencies or capabilities ever did.
+    const [on, setOn] = useState<Record<Optional, boolean>>({ cms: true, studio: false });
     const toggle = (key: Optional) => setOn((prev) => ({ ...prev, [key]: !prev[key] }));
     const isOn = (layer: Layer) => layer === "backend" || on[layer];
 
@@ -72,8 +77,8 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
                     <div className="flex flex-col items-center gap-3.5 [transform-style:preserve-3d] [transform:rotateX(12deg)]">
                         <Slab width="w-[74%]" copy={studio} active={on.studio} optional
                               optionalLabel={labels.optional} onClick={() => toggle("studio")}/>
-                        <Slab width="w-[87%]" copy={admin} active={on.admin} optional
-                              optionalLabel={labels.optional} onClick={() => toggle("admin")}/>
+                        <Slab width="w-[87%]" copy={admin} active={on.cms} optional
+                              optionalLabel={labels.optional} onClick={() => toggle("cms")}/>
                         <Slab width="w-full" copy={backend} active alwaysLabel={labels.alwaysOn}/>
 
                         {/* Base plate — your database */}

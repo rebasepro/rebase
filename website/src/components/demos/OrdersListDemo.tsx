@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Search, Settings, Trash2, Plus, Filter, ChevronDown,
-  ChevronsRight, User,
+  ChevronDown, User,
   Folder, ShoppingCart,
-  LayoutList, Upload, Download, ArrowUpRight, ArrowDownRight,
+  LayoutList, ArrowUpRight, ArrowDownRight,
   Info, Package, X, Maximize2, Code
 } from "lucide-react";
+
+import { AdminDrawer, AdminToolbar, SHELL_ROOT, SHELL_SHEET } from "./admin/AdminChrome";
 
 /* ─── Responsive hook ─── */
 function useMediaQuery(query: string): boolean {
@@ -69,7 +70,10 @@ function KPICard({ title, subtitle, value, change, icon, isHighlighted = false }
     <div className={`flex-1 min-w-0 rounded-lg border p-2.5 transition-all duration-300 ${
       isHighlighted
         ? "border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-sm"
-        : "border-hairline bg-surface-sheet"
+        // A card is a step ABOVE its ground. These sit on the card surface the
+        // rows use, so they take the raised one — the sheet is darker than the
+        // thing it would be sitting on.
+        : "border-hairline bg-surface-raised"
     }`}>
       <div className="flex items-center justify-between mb-1">
         <div className="text-xs font-medium text-surface-900 dark:text-surface-200">{title}</div>
@@ -151,7 +155,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
   const statusColor = STATUS_COLORS[order.status];
   const fieldClass = (name: string) =>
     `field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${
-      highlightedField === name ? "ring-2 ring-green-500" : ""
+      highlightedField === name ? "ring-2 ring-primary" : ""
     }`;
 
   return (
@@ -341,86 +345,30 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
   }, [openOrder, closeOrder, flashField]);
 
   const NAV_ITEMS = [
-    { icon: Folder, label: "PRODUCTS", active: false },
-    { icon: User, label: "USERS", active: false },
-    { icon: ShoppingCart, label: "ORDERS", active: true },
+    { icon: Folder, label: "Products", active: false },
+    { icon: User, label: "Users", active: false },
+    { icon: ShoppingCart, label: "Orders", active: true },
   ];
 
   return (
     <div
-      className="flex overflow-hidden bg-surface-sheet text-surface-900 dark:text-white pointer-events-none select-none relative"
+      className={SHELL_ROOT}
       style={{ height, width: "100%" }}
     >
-      {/* Drawer */}
-      <div className="z-20 relative hidden sm:block" style={{ width: 72 }}>
-        <div className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-sheet" style={{ width: 72 }}>
-          <div className="flex flex-col h-full">
-            <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
-              <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                <img src="/img/rebase_logo.svg" width="306" height="306" alt="Rebase" className="w-[28px] h-[28px] object-contain" />
-              </div>
-            </div>
-            <div className="mt-1 flex-grow overflow-scroll no-scrollbar">
-              <div className="my-2 mx-2 flex flex-col">
-                <div className="overflow-hidden bg-surface-field rounded-lg">
-                  {NAV_ITEMS.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <div key={item.label}>
-                        <div className={`rounded-lg truncate flex flex-row items-center h-10 font-semibold text-xs ${
-                          item.active ? "bg-surface-accent-200/60 bg-surface-raised dark:bg-opacity-50" : "hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75"
-                        } text-text-primary dark:text-surface-200`}>
-                          <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
-                            <Icon size={18} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="shrink-0 mt-auto px-2 py-2">
-              <div className="flex flex-row items-center rounded-lg py-2">
-                <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
-                  <ChevronsRight size={18} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminDrawer items={NAV_ITEMS}/>
 
       {/* Main */}
       <main className="flex flex-col grow overflow-auto">
-        <div className="border-hairline bg-surface-sheet grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
-          {/* Toolbar */}
-          <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-sheet border-b border-hairline flex flex-row justify-between items-center w-full shrink-0">
-            <div className="flex items-center gap-1 mr-4">
-              <div className="flex items-center bg-surface-raised rounded-md p-0.5 gap-0.5">
-                <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-surface-card shadow-sm text-primary">
-                  <LayoutList size={14} /><span className="text-xs">List</span>
-                </button>
-              </div>
-              <button className="p-1.5 rounded-full text-surface-500 flex items-center gap-1 text-xs">
-                <Filter size={14} /><span>Filters</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 bg-surface-sheet border border-hairline px-2.5 gap-1.5 min-w-[160px]">
-                <Search size={16} className="text-surface-400" />
-                <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
-              </div>
-              <button aria-label="Upload" className="p-1.5 rounded-full text-surface-500"><Upload size={16} /></button>
-              <button aria-label="Download" className="p-1.5 rounded-full text-surface-500"><Download size={16} /></button>
-              <button aria-label="Settings" className="p-1.5 rounded-full text-surface-500"><Settings size={16} /></button>
-              <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50"><Trash2 size={16} /></button>
-              <span className="text-xs text-surface-400 mx-1">(0)</span>
-              <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-medium">
-                <Plus size={16} /><span className="text-xs font-medium">Add Order</span>
-              </button>
-            </div>
-          </div>
+        <div className={SHELL_SHEET}>
+          {/* The product's toolbar, drawn once in AdminChrome so this tab and the
+              table tab beside it cannot drift into two different apps. */}
+          <AdminToolbar
+            viewIcon={LayoutList}
+            viewLabel="List"
+            presets={["Open orders", "Awaiting payment", "This week"]}
+            addLabel="Add Order"
+            count="8"
+          />
 
           {/* Content area — list + panel split */}
           <div className="h-full w-full flex bg-surface-card overflow-hidden relative">
@@ -441,10 +389,11 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
                   <div className="px-4 sm:px-6 pt-4 pb-3 max-w-3xl mx-auto w-full">
                     <div className="text-lg font-semibold text-surface-900 dark:text-white mb-3">Orders</div>
                     <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                      <KPICard title="Confirmed" subtitle="" value="15.0"
+                      {/* Counts are counts: "15.0" orders read as a formatting bug. */}
+                      <KPICard title="Confirmed" subtitle="" value="15"
                         change={{ value: "+18.0%", positive: true }} icon={<Info size={14} />}
                         isHighlighted={highlightedKPI === 0} />
-                      <KPICard title="Shipped" subtitle="" value="15.0"
+                      <KPICard title="Shipped" subtitle="" value="12"
                         change={{ value: "+7.4%", positive: true }} icon={<Package size={14} />}
                         isHighlighted={highlightedKPI === 1} />
                       <KPICard title="Revenue" subtitle="" value="$36.6K" icon={<span />}

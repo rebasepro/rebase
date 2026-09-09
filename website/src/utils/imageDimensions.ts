@@ -23,7 +23,6 @@ export const IMAGE_DIMENSIONS: Record<string, [number, number]> = {
     "/img/kanban/onboarding.png": [80, 80],
     "/img/kanban/rls.png": [80, 80],
     "/img/kanban/search_indexing.png": [80, 80],
-    "/img/product_logo_tee.webp": [1024, 1024],
     "/img/competitors/Retool_Logo_0.svg": [87, 17],
     "/img/competitors/contentful-light.svg": [157, 32],
     "/img/competitors/directus-logo-light.svg": [64, 39],
