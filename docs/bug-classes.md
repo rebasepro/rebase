@@ -3205,3 +3205,33 @@ check, paste the output. A fix without its check is a claim.
 **Sweep:** when closing a batch of work, re-run the acceptance line of every item
 rather than reading the diff. And when an item is reported done and its check was
 not run, that is the finding — not the code.
+
+## 61. A dead entry that is only wrong the day it starts working
+
+`app/frontend/vite.config.ts` aliased `@rebasepro/ui/index.css` to
+`packages/ui/index.css`, a file that has never existed — the stylesheet is
+`src/index.css`, published as `dist/index.css`. The import resolved correctly
+anyway: Vite matches an alias against the prefix up to a `/` boundary and takes
+the FIRST hit, so the spread above it had already rewritten the specifier. The
+entry was never consulted. Its comment said the opposite — "subpath exports are
+not covered by the package-name aliases above" — and the same false belief had
+put the missing path in `packages/ui/package.json`'s `files` and `sideEffects`
+too. `saas/frontend` aliased `@rebasepro/client-postgres`, a package deleted
+from this repo.
+
+Four entries, no symptom. That is the shape: a dead entry costs nothing until
+something reorders the list or a matcher changes, and then it is not a style
+problem, it is a dev server that will not start — blamed on whatever moved,
+because the entry that breaks it has been sitting there passing for months.
+
+The `sideEffects` one had a second edge. It read as though the stylesheet were
+named twice, which made the `**/*.css` glob beside it look redundant; deleting
+that glob would have shipped an unstyled admin panel. A dead entry does not just
+fail to work, it can make the thing doing the work look disposable.
+
+**Sweep:** `check:config-paths` loads every vite config and asserts each alias
+target exists. The general rule is broader than aliases: any config that names a
+path — a manifest's `files`, a chunking rule's `id.includes()`, a copy plugin's
+`src` — is unchecked by anything until it happens to be the entry that matters.
+Prefer one entry that does the work over two that agree, and when a package is
+deleted, grep its name across configs, not only across imports.
