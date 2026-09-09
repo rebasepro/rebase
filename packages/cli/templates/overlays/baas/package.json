@@ -23,7 +23,7 @@
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "tsx": "^4.20.6",
-        "typescript": "^5.9.2"
+        "typescript": "^6.0.3"
     },
     "dependencies": {
         "@rebasepro/client": "workspace:*",

@@ -31,7 +31,11 @@ export default defineConfig({
     build: {
         minify: true,
         outDir: "./dist",
-        target: "ESNEXT",
+        // `es2022`, matching the reference app. Vite 8 minifies CSS with
+        // lightningcss, whose target conversion refuses `"ESNEXT"` outright —
+        // `[lightningcss minify] Unsupported target "ESNEXT"`, after a
+        // successful JS transform, so the build fails at the very end.
+        target: "es2022",
         sourcemap: true,
         rollupOptions: {
             output: {

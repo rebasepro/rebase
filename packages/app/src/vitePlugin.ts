@@ -2,6 +2,7 @@
 import path from "path";
 import ts from "typescript";
 import MagicString from "magic-string";
+import type { Plugin, ViteDevServer } from "vite";
 
 export interface RebaseCollectionsPluginOptions {
     /**
@@ -182,7 +183,22 @@ export function transformCollectionSource(
  *    (`{ __rebaseLazy: true, load: () => import(...) }`), enabling code-splitting
  *    and preventing the backend from loading React-dependent modules.
  */
-export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions) {
+/**
+ * Annotated `Plugin` rather than inferred.
+ *
+ * The return used to be a bare object literal, and TypeScript 6 stopped
+ * accepting it where vite wants a `PluginOption`: `configureServer` is an
+ * `ObjectHook`, so a plain method's inferred signature is not assignable, and
+ * the whole config object then failed with "Excessive stack depth comparing
+ * types" — an error naming the caller's `defineConfig` rather than the plugin
+ * that caused it. A scaffolded frontend runs `vite build && tsc` with
+ * `vite.config.ts` in its `include`, so that was a broken `pnpm build` for
+ * every new project on TS 6, reported against a file the user did not write.
+ *
+ * Declaring the type puts the check here, where the hooks are, instead of at
+ * every call site.
+ */
+export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions): Plugin {
     const virtualModuleId = "virtual:rebase-collections";
     const resolvedVirtualModuleId = "\0" + virtualModuleId;
 
@@ -197,6 +213,36 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
             resolvedCollectionsDir = path.isAbsolute(options.collectionsDir)
                 ? options.collectionsDir
                 : path.resolve(config.root, options.collectionsDir);
+        },
+
+        /**
+         * Watch the collections directory itself, not just the files in it.
+         *
+         * The virtual module below is an `import.meta.glob`, and Vite already
+         * invalidates a glob's importer when a matching file appears — but only
+         * for files its watcher sees. The watcher watches the Vite root, plus
+         * whatever individual files the module graph reached; a collections
+         * directory outside the root (`collectionsDir: "../config/collections"`
+         * is the shape every scaffold ships) is therefore watched one existing
+         * file at a time, and a *new* file in it raises no event at all.
+         *
+         * That is the whole of the "created a collection, it is in the source,
+         * it is not in the admin" bug: the editor wrote the file, nothing
+         * invalidated the virtual module, and the collection list stayed
+         * whatever it was when the dev server booted — a reload did not fix it,
+         * because the stale glob was already transformed and cached. Only a
+         * restart did.
+         *
+         * Editing an existing collection was always fine, which is why this hid
+         * for so long: that file IS in the module graph, so it IS watched.
+         *
+         * Watching the directory is the whole fix. Vite's own glob invalidation
+         * does the rest — it is listening on this same watcher, and once the
+         * event reaches it, it invalidates the virtual module and reloads the
+         * page exactly as it does for a collections directory inside the root.
+         */
+        configureServer(server: ViteDevServer) {
+            server.watcher.add(resolvedCollectionsDir);
         },
 
         resolveId(id: string) {

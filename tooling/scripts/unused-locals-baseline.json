@@ -100,7 +100,6 @@
   "packages/server-postgres/src/PostgresBootstrapper.ts::collectionRegistry": 1,
   "packages/server-postgres/src/schema/introspect-db-inference.ts::COLOR_HEX_REGEX": 1,
   "packages/server-postgres/src/services/PersistService.ts::primaryKeyFields": 1,
-  "packages/server-postgres/src/services/realtimeService.ts::fetchFn": 2,
   "packages/server-postgres/src/services/RelationService.ts::options": 1,
   "packages/server-postgres/src/services/RelationWriteService.ts::sourceIdInfo": 1,
   "packages/server/src/auth/api-keys/api-key-store.ts::HEX_CHARS": 1,
