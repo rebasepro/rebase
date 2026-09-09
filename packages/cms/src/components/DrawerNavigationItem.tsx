@@ -38,10 +38,18 @@ export function DrawerNavigationItem({
     // every row then reads at the weight of the category above it. The indent is
     // the same 44px the icon occupied, so labels stay on the original grid and the
     // rail width does not change.
+    // 44px is the LABEL GRID, and it only applies while there is a label. Collapsed,
+    // the row is 40px wide (a 72px rail, less the scroller's `px-2` and the group's
+    // `mx-2`), so a `shrink-0` 44px slot is 4px wider than the row containing it: it
+    // overflowed to the right and centred the icon at 38px against a row centre of
+    // 36px. Every icon, the collapse chevron and the avatar sat 2px right of the
+    // logo above them. Invisible until the focus ring was fixed and started drawing
+    // the row's real box around them.
+    const iconSlot = drawerOpen ? "w-[44px]" : "w-full";
     const iconWrap = indented
-        ? <div className={"shrink-0 w-[44px] h-[30px]"} aria-hidden={true}/>
+        ? <div className={cls("shrink-0 h-[30px]", iconSlot)} aria-hidden={true}/>
         : <div
-            className={"shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150"}>
+            className={cls("shrink-0 flex items-center justify-center h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150", iconSlot)}>
             {icon}
         </div>;
 

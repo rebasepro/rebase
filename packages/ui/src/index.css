@@ -166,7 +166,38 @@ html.dark {
     @apply text-3xl font-headers font-semibold tracking-display tabular-nums;
 }
 
-:focus-visible {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 focus-visible:ring-offset-transparent
-}
+/* The focus ring is drawn INSIDE the focused element, not around it.
 
+   An outset ring is a box-shadow painted beyond the border box, so any ancestor
+   that clips cuts it — a scroller, a truncating cell, a max-height collapse.
+   That is not a corner case: the drawer's navigation groups clip for their
+   collapse animation, and every row in them rendered a ring with three of its
+   four sides missing. Tabbing through the panel produced stray blue slivers
+   rather than an indicator. An inset ring is painted within the element's own
+   box, which is inside any clip rect the element is itself inside, so nothing
+   can cut it. Same 2px, same colour, same radius — 2px in rather than 2px out.
+
+   Written as an override of `--tw-ring-shadow` rather than as `inset-ring-2`
+   because that keeps one vocabulary for turning the ring off. Eleven call sites
+   already say `ring-0` / `focusedDisabled` to suppress it, and `inset-ring-*`
+   is a different variable that none of them would have silenced — every popover
+   and bare table input that had opted out would have got a ring back.
+   Not `outline` either: 65 call sites carry `outline-none` from the utilities
+   layer, which outranks anything a base-layer rule sets, and those controls
+   would have been left with no focus indicator at all.
+
+   A component that wants the ring OUTSIDE (Checkbox, Slider, Avatar — small
+   controls with room around them, where an inset ring would sit on the mark
+   itself) still says `focus-visible:ring-2` for itself; a utility outranks
+   this.
+
+   The pseudo-class is doubled on purpose — it is not a typo to tidy up. The
+   admin imports this sheet into `layer(base)`, where a utility wins whatever
+   the specificity, but the docs site imports it unlayered, and there the rule
+   competes with `.something:focus` on specificity alone. (0,2,0) is what the
+   rule had before this was written, and dropping to (0,1,0) would quietly hand
+   those ties to the other rule. */
+:focus-visible:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-0 ring-offset-transparent;
+    --tw-ring-shadow: inset 0 0 0 2px var(--tw-ring-color, currentcolor);
+}

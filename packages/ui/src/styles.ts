@@ -45,12 +45,30 @@ export const controlPaddingMixin = {
     "2xl": "px-10"
 } as const satisfies Record<ButtonSize, string>;
 
+/**
+ * Suppress the focus ring on a surface that is focusable but is not a control —
+ * a popover panel, a menu container, a bare cell input inside a table that
+ * indicates focus by other means.
+ *
+ * Still expressed as `ring-0`, and that is why the default ring in
+ * `index.css` overrides `--tw-ring-shadow` rather than switching to
+ * `inset-ring-*`: `inset-ring` is a different variable, which this would not
+ * have silenced, and every surface that had opted out would have got a ring
+ * back.
+ */
 export const focusedDisabled = "focus-visible:ring-0 focus-visible:ring-offset-0";
 export const focusedInvisibleMixin = "focus:bg-surface-field-hover";
 
 /**
- * The focus ring — the single most-seen interaction state in the product, and
- * until now the least tended.
+ * The focus ring, drawn OUTSIDE the element, for a control that opts into it.
+ *
+ * The product's default ring is the `:focus-visible` rule in `index.css`, and
+ * that one is drawn *inside* the border box: an outset ring is paint beyond the
+ * box, and any ancestor that clips — a scroller, a truncating cell, a
+ * max-height collapse — cuts it. This one is still outset because its only
+ * caller is a whole field row sitting inside `p-4`/`p-6` of card padding, where
+ * there is room around it and nothing clipping within 16px. Reach for it only
+ * where that is true; anywhere else, let the default apply.
  *
  * Three dead declarations were removed rather than reshuffled:
  *   `outline-hidden` + `outline-none`  — the same instruction twice.

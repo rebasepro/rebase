@@ -58,7 +58,11 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
                 "inline-flex items-center gap-1 rounded-md",
                 "font-medium whitespace-nowrap select-none shrink-0",
                 "transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                // Colour only, no width: the 2px comes from the global inset ring, which a
+                // chip needs because the preset row it sits in is a horizontal
+                // scroller — an outset ring on the first or last chip was cut off
+                // by the scrollport edge.
+                "focus-visible:outline-none focus-visible:ring-primary/50",
                 sizeClasses[size],
                 !disabled && "cursor-pointer",
                 // Hover is one step along the same ramp the chip already sits

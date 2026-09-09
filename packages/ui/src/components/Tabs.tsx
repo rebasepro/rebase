@@ -160,8 +160,13 @@ export function Tab({
             value={value}
             disabled={disabled}
             className={cls(
-                "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-white transition-all",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400 focus-visible:ring-offset-2",
+                "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all",
+                // Colour only. The width and the inset come from the global rule:
+                // the tab list scrolls horizontally, so a ring 2px out — with a
+                // further 2px of offset — was clipped by the scrollport on the
+                // first and last tab. `ring-offset-white` went with it; with an
+                // inset ring there is no offset for it to colour.
+                "focus-visible:outline-none focus-visible:ring-surface-400",
                 "disabled:pointer-events-none disabled:opacity-50",
                 variant === "standard" && "rounded-md px-3 py-1 data-[state=active]:bg-surface-lifted data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:text-surface-50",
                 // A folder tab. The active one is cut from the same surface as the
