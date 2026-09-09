@@ -72,6 +72,7 @@ export const renderPgType = (type: PgType): string => {
         case "smallint": return "SMALLINT";
         case "integer": return "INTEGER";
         case "bigint": return "BIGINT";
+        case "smallserial": return "SMALLSERIAL";
         case "serial": return "SERIAL";
         case "bigserial": return "BIGSERIAL";
         case "real": return "REAL";

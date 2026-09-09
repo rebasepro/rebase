@@ -182,7 +182,14 @@ export const primaryKeyPgType = (collection: CollectionConfig): PgType => {
 /** The `columnType`s a `number` property may name, and what each one is. */
 const NUMBER_COLUMN_TYPES: Record<string, PgType> = {
     "integer": { kind: "integer" },
+    // `smallint` and `smallserial` are not in `NumberProperty["columnType"]`'s
+    // union, and both have always reached the database: the DDL generator
+    // upper-cased whatever it was given. Accepted here for that reason and
+    // listed on purpose — the point of this table is that an unrecognised
+    // `columnType` is refused with the property named rather than passed
+    // through to fail at `CREATE TABLE`.
     "smallint": { kind: "smallint" },
+    "smallserial": { kind: "smallserial" },
     "bigint": { kind: "bigint" },
     "serial": { kind: "serial" },
     "bigserial": { kind: "bigserial" },
@@ -285,7 +292,7 @@ const arrayElementType = (prop: ArrayProperty): PgType | undefined => {
  * here is how `geopoint` ended up with a database column, no Drizzle key, and
  * every write to it discarded with a 201.
  */
-const columnPgType = (
+export const columnPgType = (
     propName: string,
     prop: Property,
     collection: CollectionConfig,

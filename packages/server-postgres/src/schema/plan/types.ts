@@ -56,6 +56,7 @@ export type PgType =
     | { kind: "smallint" }
     | { kind: "integer" }
     | { kind: "bigint" }
+    | { kind: "smallserial" }
     | { kind: "serial" }
     | { kind: "bigserial" }
     | { kind: "real" }

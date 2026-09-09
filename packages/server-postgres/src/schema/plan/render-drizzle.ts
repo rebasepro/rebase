@@ -110,6 +110,7 @@ const builderFor = (type: PgType, column: string, uses: BuilderUses): string => 
         // every caller already treats as numbers.
         case "bigint": return `${needs(uses, "bigint")}(${name}, { mode: "number" })`;
         case "bigserial": return `${needs(uses, "bigserial")}(${name}, { mode: "number" })`;
+        case "smallserial": return `${needs(uses, "smallserial")}(${name})`;
         case "serial": return `${needs(uses, "serial")}(${name})`;
         case "real": return `${needs(uses, "real")}(${name})`;
         case "doublePrecision": return `${needs(uses, "doublePrecision")}(${name})`;
