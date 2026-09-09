@@ -14,7 +14,7 @@
 import { configureJwt, generateAccessToken, generateMcpAccessToken, signPurposeToken } from "../src/auth/jwt";
 import {
     buildApp, stubDriver, authorize, redeem, connectedClient, registerClient,
-    rpc, pkcePair, RESOURCE, REDIRECT, JWT_SECRET
+    refreshWith, rpc, pkcePair, RESOURCE, REDIRECT, JWT_SECRET
 } from "./helpers/mcp-harness";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
@@ -770,5 +770,147 @@ describe("dynamic client registration", () => {
         const { body } = await registerClient(app, { client_name: "   " });
         const { html } = await authorize(app, { clientId: String(body.client_id) });
         expect(html).toContain("Unnamed MCP client");
+    });
+});
+
+/* ── Regressions found by reading, not by failing ─────────────────── */
+
+describe("a refresh can narrow the grant but never widen it", () => {
+    it("refuses a scope that is not a subset of what was granted", async () => {
+        // The bug: the intersection line ended `|| record.scope`, so asking for
+        // a scope you do not hold produced an EMPTY intersection and fell back
+        // to the full held scope. A client holding `mcp:write` and asking for
+        // `mcp:read` was handed `mcp:write` — a refresh that widens.
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read" });
+
+        const res = await refreshWith(app, clientId, refreshToken, { scope: "mcp:write" });
+        expect(res.status).toBe(400);
+        expect((await res.json() as { error: string }).error).toBe("invalid_scope");
+    });
+
+    it("narrows to the intersection when one is asked for", async () => {
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+
+        const res = await refreshWith(app, clientId, refreshToken, { scope: "mcp:read" });
+        expect(res.status).toBe(200);
+        expect((await res.json() as { scope: string }).scope).toBe("mcp:read");
+    });
+
+    it("keeps the full grant when no scope is asked for", async () => {
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+
+        const res = await refreshWith(app, clientId, refreshToken);
+        expect((await res.json() as { scope: string }).scope).toBe("mcp:read mcp:write");
+    });
+
+    it("a narrowed token really has lost the tool", async () => {
+        // The scope string in the response is not the assertion worth making —
+        // what the token can do is.
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+
+        const narrowed = await refreshWith(app, clientId, refreshToken, { scope: "mcp:read" });
+        const token = String((await narrowed.json() as Record<string, unknown>).access_token);
+
+        const listed = (await (await rpc(app, token, {
+            jsonrpc: "2.0", id: 1, method: "tools/list"
+        })).json() as { result: { tools: { name: string }[] } }).result.tools;
+        expect(listed.map(t => t.name)).not.toContain("create_document");
+    });
+});
+
+describe("RFC 7009 revoke does not let a stranger destroy a grant", () => {
+    it("a token presented under someone else's client id is inert", async () => {
+        // The bug: `/revoke` called `consumeRefreshToken` and checked ownership
+        // afterwards. That marks the token spent before establishing it belongs
+        // to the caller — and a spent token makes the legitimate holder's next
+        // refresh look like a replay, which kills the whole family. So anyone
+        // who merely learned a token string could destroy the grant.
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app);
+        const { body: stranger } = await registerClient(app, { client_name: "stranger" });
+
+        const res = await app.request("/api/oauth/revoke", {
+            method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ client_id: String(stranger.client_id), token: refreshToken })
+        });
+        expect(res.status).toBe(200);   // RFC 7009: never an error
+
+        // And the owner's token is untouched — not spent, not revoked.
+        const refreshed = await refreshWith(app, clientId, refreshToken);
+        expect(refreshed.status).toBe(200);
+    });
+
+    it("the owner can still revoke it", async () => {
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app);
+
+        await app.request("/api/oauth/revoke", {
+            method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ client_id: clientId, token: refreshToken })
+        });
+        expect((await refreshWith(app, clientId, refreshToken)).status).toBe(400);
+    });
+
+    it("revoking one token kills its whole family", async () => {
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app);
+        const rotated = await refreshWith(app, clientId, refreshToken);
+        const second = String((await rotated.json() as Record<string, unknown>).refresh_token);
+
+        await app.request("/api/oauth/revoke", {
+            method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ client_id: clientId, token: second })
+        });
+        expect((await refreshWith(app, clientId, second)).status).toBe(400);
+    });
+});
+
+describe("a notification gets no reply, whatever the method", () => {
+    // Three cases below did not check for a missing id and would have answered
+    // with `id: null` — a message the client is not waiting for and cannot
+    // match to anything. The check now happens once, on whatever the switch
+    // produced, so a method added later cannot forget it.
+    it.each([
+        "initialize",
+        "tools/list",
+        "ping",
+        "tools/call",
+        "resources/list"
+    ])("stays silent for a notification-shaped %s", async (method) => {
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app);
+
+        const res = await rpc(app, accessToken, { jsonrpc: "2.0", method });
+        expect(res.status).toBe(202);
+        expect(await res.text()).toBe("");
+    });
+
+    it("still answers the same methods when they carry an id", async () => {
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app);
+
+        for (const method of ["initialize", "tools/list", "ping"]) {
+            const res = await rpc(app, accessToken, { jsonrpc: "2.0", id: 7, method });
+            expect(res.status).toBe(200);
+            expect((await res.json() as { id: number }).id).toBe(7);
+        }
+    });
+
+    it("drops notifications out of a mixed batch without shifting the rest", async () => {
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app);
+
+        const res = await rpc(app, accessToken, [
+            { jsonrpc: "2.0", method: "tools/list" },          // notification
+            { jsonrpc: "2.0", id: "a", method: "ping" },
+            { jsonrpc: "2.0", method: "initialize" },          // notification
+            { jsonrpc: "2.0", id: "b", method: "ping" }
+        ]);
+        const body = await res.json() as { id: string }[];
+        expect(body.map(m => m.id)).toEqual(["a", "b"]);
     });
 });

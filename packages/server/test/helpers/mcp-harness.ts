@@ -75,6 +75,21 @@ export function memoryStore(): OAuthStore {
             }
         },
 
+        async revokeTokenForClient(token, clientId) {
+            const entry = refresh.get(token);
+            // No side effect when it is not this client's token — the whole
+            // point of the method.
+            if (!entry || entry.record.clientId !== clientId) return false;
+            let revoked = false;
+            for (const other of refresh.values()) {
+                if (other.record.family === entry.record.family && !other.revoked) {
+                    other.revoked = true;
+                    revoked = true;
+                }
+            }
+            return revoked;
+        },
+
         async recordConsent(uid, clientId, scope) {
             consents.set(`${uid}:${clientId}`, { scope, grantedAt: new Date().toISOString() });
         },

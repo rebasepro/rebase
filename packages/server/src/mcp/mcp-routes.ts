@@ -174,15 +174,16 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
      * is 405 with `Allow`, not an SSE stream that stays silent forever and
      * leaves the client waiting on a heartbeat that is not coming.
      */
-    router.get("/", (c) => {
-        const caller = c.req.header("authorization");
-        if (!caller) {
-            return c.json(
-                { error: "unauthorized" },
-                401,
-                { "WWW-Authenticate": bearerChallenge(config.publicUrl, config.mcpPath, DEFAULT_MCP_SCOPE) }
-            );
-        }
+    router.get("/", async (c) => {
+        // Authenticated the same way POST is, not by the mere PRESENCE of a
+        // header. The first version checked only that `Authorization` was set,
+        // so an expired or forged token was answered 405 — telling an
+        // unauthenticated caller that the endpoint exists and what it accepts,
+        // and telling a client with a stale token "wrong method" instead of the
+        // challenge that would let it refresh.
+        const caller = await authenticate(c);
+        if (caller instanceof Response) return caller;
+
         return c.json(
             { error: "method_not_allowed", error_description: "This server does not open server-initiated streams." },
             405,
@@ -209,8 +210,17 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         }
 
         // Notifications carry no id and get no reply, whatever they say.
+        //
+        // Applied ONCE, to whatever the switch produced, rather than per case.
+        // Three of the cases below did not check it and would have answered a
+        // notification-shaped `tools/list` with a reply carrying `id: null` —
+        // a message the client is not waiting for and cannot match. Deciding it
+        // here means a method added later cannot forget.
         const isNotification = id === null || id === undefined;
+        const reply = await route();
+        return isNotification ? null : reply;
 
+        async function route(): Promise<Record<string, unknown> | null> {
         switch (method) {
             case "initialize": {
                 const asked = typeof params?.protocolVersion === "string" ? params.protocolVersion : undefined;
@@ -234,7 +244,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 return null;
 
             case "ping":
-                return isNotification ? null : rpcResult(id, {});
+                return rpcResult(id, {});
 
             case "tools/list":
                 return rpcResult(id, {
@@ -249,7 +259,8 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 return callTool(c, id, params, caller);
 
             default:
-                return isNotification ? null : rpcError(id, METHOD_NOT_FOUND, `Unknown method: ${method}`);
+                return rpcError(id, METHOD_NOT_FOUND, `Unknown method: ${method}`);
+        }
         }
     }
 

@@ -16,7 +16,7 @@
  */
 import { configureJwt, generateAccessToken, generateMcpAccessToken } from "../src/auth/jwt";
 import {
-    buildApp, stubDriver, authorize, redeem, refreshWith, registerClient, rpc, pkcePair,
+    buildApp, stubDriver, authorize, redeem, refreshWith, registerClient, connectedClient, rpc, pkcePair,
     PUBLIC_URL, RESOURCE, REDIRECT, JWT_SECRET
 } from "./helpers/mcp-harness";
 
@@ -117,9 +117,27 @@ describe("the full flow", () => {
     it("does not pretend to hold a server-initiated stream", async () => {
         const { driver } = stubDriver();
         const { app } = buildApp({ driver });
-        const res = await app.request("/mcp", { headers: { Authorization: "Bearer whatever" } });
+        const { accessToken } = await connectedClient(app);
+
+        const res = await app.request("/mcp", { headers: { Authorization: `Bearer ${accessToken}` } });
         expect(res.status).toBe(405);
         expect(res.headers.get("Allow")).toContain("POST");
+    });
+
+    it("authenticates GET properly, rather than checking a header is present", async () => {
+        // 405 to an unauthenticated caller would confirm the endpoint exists
+        // and name what it accepts; 405 to a client with an expired token would
+        // say "wrong method" where the honest answer — and the one that lets it
+        // refresh — is the challenge.
+        const { driver } = stubDriver();
+        const { app } = buildApp({ driver });
+
+        const cases: Record<string, string>[] = [{}, { Authorization: "Bearer expired-or-forged" }];
+        for (const headers of cases) {
+            const res = await app.request("/mcp", { headers });
+            expect(res.status).toBe(401);
+            expect(res.headers.get("WWW-Authenticate")).toContain("resource_metadata=");
+        }
     });
 });
 

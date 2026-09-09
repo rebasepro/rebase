@@ -111,6 +111,19 @@ export interface OAuthStore {
      */
     consumeRefreshToken(token: string): Promise<RefreshTokenRecord | null>;
     revokeFamily(family: string): Promise<void>;
+    /**
+     * Revoke the family a token belongs to, for RFC 7009 — without spending it.
+     *
+     * Deliberately not `consumeRefreshToken` followed by a check. That order
+     * marks the token spent BEFORE establishing it belongs to the caller, and a
+     * spent token makes the legitimate holder's next refresh look like a replay,
+     * which kills the family. So anyone who merely learned a token string could
+     * destroy the grant by presenting it here under any client id of their own.
+     * This reads first and writes only on a match.
+     *
+     * @returns whether anything was revoked.
+     */
+    revokeTokenForClient(token: string, clientId: string): Promise<boolean>;
 
     /**
      * Remember that this person approved this client for this scope.
@@ -436,6 +449,26 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
                 `UPDATE ${REFRESH} SET revoked_at = now() WHERE family = $1 AND revoked_at IS NULL`,
                 [family]
             );
+        },
+
+        async revokeTokenForClient(token, clientId) {
+            // One statement: revoke every sibling of the family the presented
+            // token belongs to, but only when that token is this client's. A
+            // token belonging to someone else matches nothing and changes
+            // nothing — no read side effect, so presenting a stranger's token
+            // here is inert rather than destructive.
+            const revoked = await exec(
+                `UPDATE ${REFRESH}
+                    SET revoked_at = now()
+                  WHERE revoked_at IS NULL
+                    AND family = (
+                        SELECT family FROM ${REFRESH}
+                         WHERE token_hash = $1 AND client_id = $2
+                    )
+              RETURNING token_hash`,
+                [await sha256Hex(token), clientId]
+            );
+            return revoked.length > 0;
         },
 
         async recordConsent(uid, clientId, scope) {

@@ -430,3 +430,57 @@ describe("ensureTables refuses to report success it did not have", () => {
         expect(createOAuthStore({ key: "mongodb" } as unknown as DataDriver)).toBeNull();
     });
 });
+
+describe("revokeTokenForClient (RFC 7009)", () => {
+    beforeEach(async () => {
+        await store.registerClient(CLIENT);
+    });
+
+    it("revokes the family the token belongs to", async () => {
+        await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
+        await store.saveRefreshToken("rt-2", REFRESH_RECORD, soon());   // same family
+
+        expect(await store.revokeTokenForClient("rt-1", "mcp_abc")).toBe(true);
+        expect(await store.consumeRefreshToken("rt-2")).toBeNull();
+    });
+
+    it("does NOTHING for a token belonging to another client", async () => {
+        // The property the whole method exists for. Consuming first — the shape
+        // this replaced — would mark the token spent, and a spent token makes
+        // the legitimate holder's next refresh look like a replay, killing the
+        // family. Anyone who learned a token string could destroy the grant.
+        await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
+
+        expect(await store.revokeTokenForClient("rt-1", "mcp_someone_else")).toBe(false);
+
+        // Still spendable, and spending it does not trip replay detection.
+        expect(await store.consumeRefreshToken("rt-1")).not.toBeNull();
+    });
+
+    it("does nothing for a token that never existed", async () => {
+        expect(await store.revokeTokenForClient("made-up", "mcp_abc")).toBe(false);
+    });
+
+    it("leaves another family alone", async () => {
+        await store.saveRefreshToken("a-1", REFRESH_RECORD, soon());
+        await store.saveRefreshToken("b-1", { ...REFRESH_RECORD, family: "fam-2" }, soon());
+
+        await store.revokeTokenForClient("a-1", "mcp_abc");
+
+        expect(await store.consumeRefreshToken("a-1")).toBeNull();
+        expect(await store.consumeRefreshToken("b-1")).not.toBeNull();
+    });
+
+    it("is idempotent — a second revoke reports nothing left to do", async () => {
+        await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
+        expect(await store.revokeTokenForClient("rt-1", "mcp_abc")).toBe(true);
+        expect(await store.revokeTokenForClient("rt-1", "mcp_abc")).toBe(false);
+    });
+
+    it("looks the token up by hash, not by value", async () => {
+        await store.saveRefreshToken("rt-secret", REFRESH_RECORD, soon());
+        const res = await db.query(`SELECT token_hash FROM rebase.oauth_refresh_tokens`);
+        expect(String((res.rows[0] as { token_hash: string }).token_hash)).not.toBe("rt-secret");
+        expect(await store.revokeTokenForClient("rt-secret", "mcp_abc")).toBe(true);
+    });
+});

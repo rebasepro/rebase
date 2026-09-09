@@ -522,9 +522,25 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         // A refresh may narrow the scope but never widen it (RFC 6749 §6). The
         // intersection is taken rather than refusing, so a client repeating its
         // original request keeps working.
-        const asked = form.scope ? narrowScope(String(form.scope)) : record.scope;
         const held = new Set(record.scope.split(" ").filter(Boolean));
-        const scope = asked.split(" ").filter(s => held.has(s)).join(" ") || record.scope;
+        let scope = record.scope;
+        if (form.scope) {
+            const asked = narrowScope(String(form.scope)).split(" ").filter(Boolean);
+            const granted = asked.filter(s => held.has(s));
+            // An empty intersection must NOT fall back to the held scope. The
+            // first version of this line ended `|| record.scope`, which meant a
+            // client holding `mcp:write` and asking for `mcp:read` was handed
+            // `mcp:write` — a refresh that WIDENS the grant, which is precisely
+            // what RFC 6749 §6 forbids. Asking for nothing you hold is a bad
+            // request, not a request for everything.
+            if (granted.length === 0) {
+                return c.json({
+                    error: "invalid_scope",
+                    error_description: "The requested scope is not a subset of the scope originally granted."
+                }, 400);
+            }
+            scope = granted.join(" ");
+        }
 
         // The roles are the ones recorded when consent was given, carried on the
         // refresh record. Minting with an empty list instead would not be a
@@ -659,10 +675,10 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
                         return c.json({ error: "invalid_client" }, 401);
                     }
                 }
-                const record = await store.consumeRefreshToken(token);
-                if (record && record.clientId === clientId) {
-                    await store.revokeFamily(record.family);
-                }
+                // Reads before it writes, and writes only on a match — see
+                // `revokeTokenForClient`. Consuming first would let anyone who
+                // learned a token string destroy the grant it belongs to.
+                await store.revokeTokenForClient(token, clientId);
             }
         }
 
