@@ -8,7 +8,7 @@
  * later, in a tool, with no clue that anything was known.
  */
 import { describe, expect, it } from "@jest/globals";
-import { integer, numeric, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, numeric, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import {
@@ -167,6 +167,65 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
             catalogue,
             collections: [posts]
         })).toEqual([]);
+    });
+
+    it("stays quiet about the auth columns the generator deliberately omits", () => {
+        // A brand-new scaffold booted with seven differences on `users`, all of
+        // them by design: `render-drizzle` drops the columns a users collection
+        // does not declare (drizzle-kit creates no auth table), and the
+        // collection's properties say nothing about the `NOT NULL DEFAULT`
+        // `ensureAuthTablesExist` applies. The remedy the warning printed —
+        // `rebase schema generate` — regenerates from the same collection and
+        // changes none of them, so the warning survived its own fix on every
+        // boot forever.
+        const users = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            auth: true,
+            properties: { id: { type: "string", isId: "uuid" }, roles: { type: "array", of: { type: "string" } } }
+        } as unknown as CollectionConfig;
+
+        const differences = diffGeneratedSchemaAgainstCatalogue({
+            generated: {
+                users: pgTable("users", {
+                    id: uuid("id").primaryKey(),
+                    // nullable in the file, NOT NULL in the database
+                    roles: text("roles").array()
+                })
+            },
+            catalogue: catalogueOf([
+                column({ table_name: "users", column_name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                column({ table_name: "users", column_name: "roles", data_type: "ARRAY", udt_name: "_text", is_nullable: "NO" }),
+                // present in the database, absent from the file, on purpose
+                column({ table_name: "users", column_name: "is_anonymous", data_type: "boolean", udt_name: "bool", is_nullable: "NO" }),
+                column({ table_name: "users", column_name: "tokens_valid_after", data_type: "timestamp with time zone", udt_name: "timestamptz" })
+            ]),
+            collections: [users]
+        });
+        expect(differences).toEqual([]);
+    });
+
+    it("still reports a column the developer added to the users collection", () => {
+        // The carve-out is auth's own columns, not the whole table: a field the
+        // developer declared and then dropped from the database is still drift.
+        const users = {
+            slug: "users", table: "users", name: "Users", auth: true,
+            properties: { id: { type: "string", isId: "uuid" }, bio: { type: "string" } }
+        } as unknown as CollectionConfig;
+
+        const differences = diffGeneratedSchemaAgainstCatalogue({
+            generated: { users: pgTable("users", { id: uuid("id").primaryKey(), bio: text("bio") }) },
+            catalogue: catalogueOf([
+                column({ table_name: "users", column_name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                column({ table_name: "users", column_name: "stripe_customer_id", data_type: "text", udt_name: "text" })
+            ]),
+            collections: [users]
+        });
+        expect(differences).toEqual([
+            expect.objectContaining({ kind: "missing-column", column: "bio" }),
+            expect.objectContaining({ kind: "extra-column", column: "stripe_customer_id" })
+        ]);
     });
 
     it("does not report a width or a synonym as drift", () => {

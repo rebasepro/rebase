@@ -24,6 +24,7 @@ import { CollectionConfig } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
+import { AUTH_USERS_COLUMNS, isAuthCollection } from "./auth-users-columns";
 import type { TableMeta } from "./introspect-db-logic";
 import { bareTableName } from "./config-relations";
 
@@ -191,6 +192,24 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
         const live = catalogueColumns(meta);
         const seen = new Set<string>();
 
+        // On the auth table, auth owns its own columns' contract and the
+        // generated file deliberately does not carry it: `render-drizzle` drops
+        // the columns a users collection does not declare (`is_anonymous`,
+        // `tokens_valid_after`) because drizzle-kit creates no auth table, and
+        // the collection's own property definitions say nothing about the
+        // `NOT NULL DEFAULT` that `ensureAuthTablesExist` applies.
+        //
+        // Comparing them anyway reported seven differences on a project nobody
+        // had touched yet, and prescribed `rebase schema generate` — which
+        // regenerates the file from the same collection and cannot change any
+        // of them. A warning that survives its own remedy teaches the reader to
+        // ignore the next one, so these are not differences. A *type* mismatch
+        // still is: that is the file and the database disagreeing about
+        // something neither side intends.
+        const authOwned = isAuthCollection(collection)
+            ? new Set(AUTH_USERS_COLUMNS.map(c => c.column))
+            : undefined;
+
         for (const [key, column] of Object.entries(getTableColumns(value as PgTable))) {
             const name = (column as { name?: string }).name ?? key;
             seen.add(name);
@@ -213,7 +232,7 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
                     live: found.family
                 });
             }
-            if (found.notNull !== generatedNotNull) {
+            if (found.notNull !== generatedNotNull && !authOwned?.has(name)) {
                 differences.push({
                     ...at,
                     kind: "nullability",
@@ -227,6 +246,7 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
 
         for (const [name, column] of live) {
             if (seen.has(name)) continue;
+            if (authOwned?.has(name)) continue;
             differences.push({
                 ...at,
                 kind: "extra-column",
