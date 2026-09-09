@@ -948,69 +948,71 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 Back
                             </Button>}
 
-                            {(!fullScreen || isNewCollection) && (
-                                <Button variant={"text"}
-                                    color={"neutral"}
-                                    onClick={() => {
-                                        handleCancel();
-                                    }}>
-                                    Cancel
-                                </Button>
-                            )}
+                            <div className="flex items-center gap-2 ml-auto">
+                                {(!fullScreen || isNewCollection) && (
+                                    <Button variant={"text"}
+                                        color={"neutral"}
+                                        onClick={() => {
+                                            handleCancel();
+                                        }}>
+                                        Cancel
+                                    </Button>
+                                )}
 
-                            {currentView === "welcome" &&
-                                <Button variant={"text"} onClick={() => onWelcomeScreenContinue()}>
-                                    Continue from scratch
-                                </Button>}
+                                {currentView === "welcome" &&
+                                    <Button variant={"text"} onClick={() => onWelcomeScreenContinue()}>
+                                        Continue from scratch
+                                    </Button>}
 
-                            {isNewCollection && currentView === "import_data_mapping" &&
-                                <Button
-                                    variant={"filled"}
-                                    color="primary"
-                                    onClick={onImportMappingComplete}
-                                >
-                                    Next
-                                </Button>}
+                                {isNewCollection && currentView === "import_data_mapping" &&
+                                    <Button
+                                        variant={"filled"}
+                                        color="primary"
+                                        onClick={onImportMappingComplete}
+                                    >
+                                        Next
+                                    </Button>}
 
-                            {isNewCollection && currentView === "import_data_preview" &&
-                                <Button
-                                    variant={"filled"}
-                                    color="primary"
-                                    onClick={() => {
-                                        setNextMode();
-                                    }}
-                                >
-                                    Next
-                                </Button>}
+                                {isNewCollection && currentView === "import_data_preview" &&
+                                    <Button
+                                        variant={"filled"}
+                                        color="primary"
+                                        onClick={() => {
+                                            setNextMode();
+                                        }}
+                                    >
+                                        Next
+                                    </Button>}
 
-                            {isNewCollection && (currentView === "general" || currentView === "properties") &&
-                                <LoadingButton
-                                    variant={"filled"}
-                                    color="primary"
-                                    type="submit"
-                                    loading={isSubmitting}
-                                    disabled={isSubmitting || (currentView === "general" && !validValues) || configController?.readOnly}
-                                    startIcon={currentView === "properties"
-                                        ? <CheckIcon/>
-                                        : undefined}
-                                >
-                                    {currentView === "general" && "Next"}
-                                    {currentView === "properties" && "Create collection"}
-                                </LoadingButton>}
-
-                            {!isNewCollection && !fullScreen && <Tooltip title={configController?.readOnly ? readOnlyTitle : undefined}>
-                                <div>
+                                {isNewCollection && (currentView === "general" || currentView === "properties") &&
                                     <LoadingButton
-                                        variant="filled"
+                                        variant={"filled"}
                                         color="primary"
                                         type="submit"
-                                        disabled={isSubmitting || configController?.readOnly}
                                         loading={isSubmitting}
+                                        disabled={isSubmitting || (currentView === "general" && !validValues) || configController?.readOnly}
+                                        startIcon={currentView === "properties"
+                                            ? <CheckIcon/>
+                                            : undefined}
                                     >
-                                        {configController?.readOnly ? "Update collection (Read-only)" : "Update collection"}
-                                    </LoadingButton>
-                                </div>
-                            </Tooltip>}
+                                        {currentView === "general" && "Next"}
+                                        {currentView === "properties" && "Create collection"}
+                                    </LoadingButton>}
+
+                                {!isNewCollection && !fullScreen && <Tooltip title={configController?.readOnly ? readOnlyTitle : undefined}>
+                                    <div>
+                                        <LoadingButton
+                                            variant="filled"
+                                            color="primary"
+                                            type="submit"
+                                            disabled={isSubmitting || configController?.readOnly}
+                                            loading={isSubmitting}
+                                        >
+                                            {configController?.readOnly ? "Update collection (Read-only)" : "Update collection"}
+                                        </LoadingButton>
+                                    </div>
+                                </Tooltip>}
+                            </div>
 
                         </div>
                     )}
