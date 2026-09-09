@@ -11,6 +11,7 @@
  * there is nothing asserting that a correct request succeeds — that is the
  * other file's job — and everything asserting that something does not happen.
  */
+import type { CollectionConfig } from "@rebasepro/types";
 import { configureJwt, generateAccessToken, generateMcpAccessToken, signPurposeToken } from "../src/auth/jwt";
 import {
     buildApp, stubDriver, authorize, redeem, connectedClient, registerClient,
@@ -912,5 +913,58 @@ describe("a notification gets no reply, whatever the method", () => {
         ]);
         const body = await res.json() as { id: string }[];
         expect(body.map(m => m.id)).toEqual(["a", "b"]);
+    });
+});
+
+describe("list_collections reports a real schema", () => {
+    it("names the actual property type, not `unknown`", async () => {
+        // The bug this pins: the code read `property.dataType`, a key no
+        // property in `@rebasepro/types` has ever had, so every field came back
+        // as "unknown" — a schema listing that tells a model nothing about what
+        // it may send. The fixtures used the same wrong key, so the tests
+        // agreed with the bug; it surfaced only when a real `CollectionConfig`
+        // went through the real boot, which refused it outright.
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app);
+
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "list_collections", arguments: {} }
+        });
+        const body = await res.json() as {
+            result: { structuredContent: { collections: { fields: { name: string; type: string }[] }[] } };
+        };
+        const fields = body.result.structuredContent.collections[0].fields;
+
+        expect(fields.map(f => f.type)).not.toContain("unknown");
+        expect(fields.find(f => f.name === "name")?.type).toBe("string");
+    });
+
+    it("hides a property the REST API excludes", async () => {
+        // An agent surface that listed more than `/api/data` does would be a way
+        // to read the schema around the gate.
+        const collections = [{
+            slug: "candidates",
+            name: "Candidates",
+            properties: {
+                name: { type: "string", name: "Name" },
+                internalScore: { type: "number", name: "Score", excludeFromApi: true }
+            }
+        }] as unknown as CollectionConfig[];
+
+        const { app } = buildApp({ collections });
+        const { accessToken } = await connectedClient(app);
+
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "list_collections", arguments: {} }
+        });
+        const body = await res.json() as {
+            result: { structuredContent: { collections: { fields: { name: string }[] }[] } };
+        };
+        const names = body.result.structuredContent.collections[0].fields.map(f => f.name);
+
+        expect(names).toContain("name");
+        expect(names).not.toContain("internalScore");
     });
 });

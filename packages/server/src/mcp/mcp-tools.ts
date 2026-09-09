@@ -170,11 +170,26 @@ export const MCP_TOOLS: McpToolDefinition[] = [
                     name: collectionPath(c),
                     title: c.name,
                     description: c.description ?? null,
-                    fields: Object.entries(c.properties ?? {}).map(([key, property]) => ({
-                        name: key,
-                        type: (property as { dataType?: string }).dataType ?? "unknown",
-                        title: (property as { name?: string }).name ?? key
-                    }))
+                    // `type`, not `dataType`. The latter is a field no property
+                    // in `@rebasepro/types` has ever had, and reading it made
+                    // every field report "unknown" — a schema listing that
+                    // tells a model nothing about what it is allowed to send.
+                    // The fixtures here were written with the same wrong key,
+                    // so the tests agreed with the bug; it surfaced only when a
+                    // real `CollectionConfig` was put through the real boot,
+                    // which refused it outright. Same shape as the
+                    // `buildSearchConditions` bug in server-mongo.
+                    fields: Object.entries(c.properties ?? {})
+                        // A property the REST API hides is hidden here too. An
+                        // agent surface that listed more than `/api/data` does
+                        // would be a way to read the schema around the gate.
+                        .filter(([, property]) => !(property as { excludeFromApi?: boolean }).excludeFromApi)
+                        .map(([key, property]) => ({
+                            name: key,
+                            type: (property as { type?: string }).type ?? "unknown",
+                            title: (property as { name?: string }).name ?? key,
+                            description: (property as { description?: string }).description ?? null
+                        }))
                 }))
             };
         }

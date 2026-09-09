@@ -172,7 +172,11 @@
     // production does not have.
     "packages/server/src/mcp",
     "packages/server/test/mcp-oauth-flow.test.ts",
-    "packages/server/test/mcp-token-separation.test.ts"
+    "packages/server/test/mcp-token-separation.test.ts",
+    "packages/server/test/mcp-revocation.test.ts",
+    "packages/server/test/mcp-hardening.test.ts",
+    "packages/server/test/mcp-boot-wiring.test.ts",
+    "packages/server/test/helpers/mcp-harness.ts"
   ],
   "exclude": [
     "**/node_modules",

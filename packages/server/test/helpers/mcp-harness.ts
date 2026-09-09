@@ -135,8 +135,8 @@ export const COLLECTIONS = [{
     slug: "candidates",
     name: "Candidates",
     properties: {
-        name: { dataType: "string", name: "Name" },
-        stage: { dataType: "string", name: "Stage" }
+        name: { type: "string", name: "Name" },
+        stage: { type: "string", name: "Stage" }
     }
 }] as unknown as CollectionConfig[];
 

@@ -174,9 +174,25 @@ thief, so both lose.
 | `packages/server/test/mcp-oauth-flow.test.ts` | The handshake end to end, and its refusals |
 | `packages/server/test/mcp-revocation.test.ts` | Disconnecting, and who may do it |
 | `packages/server/test/mcp-hardening.test.ts` | Tampered tokens, malformed JSON-RPC, hostile tool inputs |
+| `packages/server/test/mcp-boot-wiring.test.ts` | `init.ts` — the four ways it declines to mount, and the one way it proceeds |
 | `packages/server-postgres/test/mcp-oauth-store.test.ts` | The store's SQL, against a real Postgres (PGlite) |
+| `packages/server-postgres/test/mcp-rls-end-to-end.test.ts` | **The product claim**: real tables, real policies, real `applyAuthContext` |
 
-The last one exists because the others cannot cover it: they drive an in-memory
-`OAuthStore` that reimplements the invariants in TypeScript, which proves
-nothing about the statements in `oauth-store.ts`. A `text[]` bound the wrong way
-passes every in-memory suite and fails on the first real request.
+The last two exist because the others cannot cover what they cover. The store
+suite drives real SQL: an in-memory `OAuthStore` reimplements the invariants in
+TypeScript and proves nothing about the statements in `oauth-store.ts`, where a
+`text[]` bound the wrong way passes every in-memory suite and fails on the first
+real request.
+
+The RLS suite proves the sentence this whole feature is sold on. It builds real
+tables with real policies, drives the actual tools through their actual `run()`,
+and calls the same `applyAuthContext` the data path uses — including the switch
+to the restricted `rebase_user` role. That last part is not incidental: PGlite
+connects as a superuser, **superusers bypass RLS**, and the first version of
+that file passed every read test while returning every row. Bypassing the
+scoping makes 11 of its 14 tests fail.
+
+Fourteen mutation checks have been run against this surface — removing the
+audience check, the purpose quarantine, PKCE, the client binding on code
+redemption, exact redirect matching, the RLS scoping itself — and each was
+caught by tests that name the failure rather than the behaviour.
