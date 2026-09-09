@@ -34,7 +34,9 @@ import type { Ground } from "../theme";
  */
 
 export const CELL = { w: 1920, h: 1080 } as const;
-export const DESK = { w: CELL.w * 3, h: CELL.h * 3 } as const;
+/** Three columns and FOUR rows: the wall of what the film leaves out sits
+ *  under Studio, in the last cell before the pull-back. */
+export const DESK = { w: CELL.w * 3, h: CELL.h * 4 } as const;
 
 export interface View {
     /** World coordinate at the frame's top-left. */
@@ -75,15 +77,15 @@ export const TEMPO = 1;
 export const tempo = (raw: number): number => Math.round(raw * TEMPO);
 
 /** The whole desk, framed on its content rather than its edges: the windows
- *  span roughly 200..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
- *  that box on the frame. */
-const ALL: View = { x: 150, y: 120, zoom: 0.34 };
+ *  span roughly 200..5680 by 180..4200 now that the wall is a fourth row,
+ *  and a 0.26 zoom from (-752, 113) puts that box on the frame, centred. */
+const ALL: View = { x: -752, y: 113, zoom: 0.26 };
 
 /** Where the camera is on the last frame: the same centre as ALL, a little
  *  further away. It never quite stops — the desk keeps receding under the
  *  address for the whole close, which is what makes the windows read as
  *  going rather than as a backdrop that happens to be dim. */
-const FINAL: View = { x: -226, y: -92, zoom: 0.3 };
+const FINAL: View = { x: -1145, y: -108, zoom: 0.235 };
 
 /** The view that holds the terminal: half a cell below the hook, so the
  *  agent's own window and the scan stay in frame above it. Visited twice —
@@ -127,14 +129,17 @@ export const BEATS: Beat[] = [
     { id: "views", start: tempo(2172), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
     { id: "schema", start: tempo(2352), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
     { id: "studio", start: tempo(2517), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(2707), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    /* The wall: 380 frames, enough for the line to name six of its
+       twenty-four entries and for the cascade to finish under it. */
+    { id: "more", start: tempo(2707), view: cell(0, 3), roll: 0.3, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(3087), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** Where the camera starts: on the hook, which is where it stays until the
  *  first move. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(3130);
+export const DESK_DURATION = tempo(3510);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

@@ -4,6 +4,7 @@ import { beat, cameraAt, cameraStill, DESK, DESK_DURATION, windowOpacity } from 
 import { FLY_TO_CORNER } from "./Presenter";
 import { Title } from "./Title";
 import { AgentSession, ScanWindow } from "./windows/Hook";
+import { More } from "./windows/More";
 import { RuleWindows } from "./windows/Rule";
 import { Shell } from "./windows/Shell";
 import { UsersWindows } from "./windows/Users";
@@ -45,6 +46,7 @@ const PANEL = beat("panel");
 const VIEWS = beat("views");
 const SCHEMA = beat("schema");
 const STUDIO = beat("studio");
+const MORE = beat("more");
 
 /* The shell's three commands, on the film's clock. `init` types as the
    camera lands on the terminal; `db push` types on the return visit; the
@@ -208,6 +210,11 @@ export const Desk: React.FC = () => {
                         width={520}
                     />
                     <Studio x={200} y={2330} at={STUDIO.start + 6} />
+                </On>
+
+                {/* ── (0,3) THE WALL — what a hundred seconds leaves out ─── */}
+                <On beats={["more", "all"]}>
+                    <More x={0} y={3240} at={MORE.start + 4} />
                 </On>
             </div>
         </AbsoluteFill>

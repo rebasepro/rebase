@@ -54,6 +54,8 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     { at: 2348, words: ["The", "schema,", "read", "live", "from", "your", "database,", "so", "it", "is", "always", "current."] },
     // studio
     { at: 2513, words: ["And", "a", "place", "to", "work", "on", "the", "database", "itself:", "SQL,", "schema,", "policies", "and", "logs,", "in", "the", "same", "app."] },
+    // the wall: what the film leaves out, six of twenty-four named
+    { at: 2703, words: ["And", "that's", "the", "short", "version.", "There's", "also", "realtime", "sync,", "one", "SDK", "with", "the", "same", "shape", "on", "the", "server,", "in", "the", "browser", "and", "in", "an", "agent,", "a", "visual", "collection", "editor", "that", "writes", "your", "TypeScript,", "storage,", "functions,", "jobs,", "search", "and", "cron."] },
     // close — on the product, and what you get
-    { at: 2703, words: ["Rebase", "is", "open", "source,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "Point", "it", "at", "the", "Postgres", "you", "already", "have,", "and", "you", "get", "the", "whole", "backend:", "a", "typed", "API,", "an", "admin", "panel,", "and", "rules", "the", "database", "itself", "enforces."] },
+    { at: 3083, words: ["Rebase", "is", "open", "source,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "Point", "it", "at", "the", "Postgres", "you", "already", "have,", "and", "you", "get", "the", "whole", "backend:", "a", "typed", "API,", "an", "admin", "panel,", "and", "rules", "the", "database", "itself", "enforces."] },
 ];

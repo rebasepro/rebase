@@ -21,7 +21,7 @@ each. The one joint that is exact: the green line prints just before you say
 **It opens on you, already talking.** No logo, no pause. You are on screen
 from the first frame and the first word is half a second in.
 
-Total: **3130 frames = 104.3 seconds** at 30fps · 294 words · 169 words a
+Total: **3510 frames = 117.0 seconds** at 30fps · 333 words · 171 words a
 minute over the whole run, silences included.
 
 ## The script
@@ -39,7 +39,8 @@ minute over the whole run, silences included.
 | 09 | Every view | 72.3s | 13 | Boards, tables, cards and forms: every collection gets the views that fit it. | 2.1s — the bento plays |
 | 10 | The schema | 78.3s | 12 | The schema, read live from your database, so it is always current. | 1.9s |
 | 11 | Studio | 83.8s | 18 | And a place to work on the database itself: SQL, schema, policies and logs, in the same app. | 0.9s |
-| 12 | Close | 90.1s | 41 | Rebase is open source, and runs on your laptop, your own servers or any cloud. Point it at the Postgres you already have, and you get the whole backend: a typed API, an admin panel, and rules the database itself enforces. | — |
+| 12 | The wall | 90.1s | 39 | And that's the short version. There's also realtime sync, one SDK with the same shape on the server, in the browser and in an agent, a visual collection editor that writes your TypeScript, storage, functions, jobs, search and cron. | 0.4s |
+| 13 | Close | 102.8s | 41 | Rebase is open source, and runs on your laptop, your own servers or any cloud. Point it at the Postgres you already have, and you get the whole backend: a typed API, an admin panel, and rules the database itself enforces. | — |
 
 ## Timing, beat by beat
 
@@ -55,6 +56,7 @@ minute over the whole run, silences included.
 | Every view | 6.0s | the bento |
 | The schema | 5.5s | the map |
 | Studio | 6.3s | the SQL editor: a real query run, the rows, a row's related customer opened |
+| The wall | 12.7s | twenty-four things the film leaves out, cascading; six of them named |
 | Close | 14.1s | the whole desk, then you and the address |
 
 ## The presenter
@@ -98,6 +100,8 @@ as the green line prints, then back to the lens for "Then run it".
   real file list for these nine tables. Lines are left out, never made up.
 - The collection file is the head of the one introspection generates; the
   policy is the one `db push` writes to `drizzle/policies.sql`.
+- The wall's twenty-four entries are the docs' own page titles
+  (`website/src/content/docs/docs`): nothing on it is a plan.
 - Studio's window is a real query in the demo's SQL editor — orders joined to
   their VIP customers — typed, run, and a result row's customer opened from
   the row's action menu. The panel's first two shots are one continuous
