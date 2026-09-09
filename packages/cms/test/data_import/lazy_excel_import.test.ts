@@ -60,6 +60,45 @@ describe("importing a spreadsheet with exceljs loaded on demand", () => {
         expect(second.data).toEqual([{ a: 2 }]);
     });
 
+    test("rejects a file that is not a workbook at all, by name", async () => {
+        // Not a zip, so never handed to the reader: what it says about a
+        // non-workbook is a stack trace from inside its own unzipper. The
+        // rename is the realistic way to get here — a .csv saved as .xlsx.
+        const file = new File(["name,price\nWidget,9.5"], "renamed.xlsx", {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+
+        await expect(convertFileToJson(file)).rejects.toThrow(/not a readable \.xlsx workbook/i);
+        await expect(convertFileToJson(file)).rejects.toThrow(/renamed\.xlsx/);
+    });
+
+    test("reads numbers, text and dates back as themselves", async () => {
+        // The reader swap changed which library produces these values, and the
+        // import maps them by type — a number arriving as "9.5" would be a
+        // string column in every imported row.
+        const file = await workbookFile([["name", "price"], ["Widget", 9.5]]);
+        const { data, propertiesOrder } = await convertFileToJson(file);
+
+        expect(propertiesOrder).toEqual(["name", "price"]);
+        expect(data).toEqual([{ name: "Widget", price: 9.5 }]);
+        expect(typeof (data[0] as { price: unknown }).price).toBe("number");
+    });
+
+    test("a blank header column does not shift the columns after it", async () => {
+        // The ExcelJS version built a sparse array and compacted it with
+        // `filter(Boolean)`, so a gap moved every later name one column left and
+        // each value landed in its neighbour's field — silently, with the right
+        // field names and the wrong values.
+        const file = await workbookFile([
+            ["name", "", "price"],
+            ["Widget", "", 9.5]
+        ]);
+        const { data, propertiesOrder } = await convertFileToJson(file);
+
+        expect(propertiesOrder).toEqual(["name", "price"]);
+        expect(data).toEqual([{ name: "Widget", price: 9.5 }]);
+    });
+
     test("rejects a workbook with no sheets", async () => {
         const workbook = new ExcelJS.Workbook();
         const buffer = await workbook.xlsx.writeBuffer();

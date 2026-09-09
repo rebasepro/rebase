@@ -1,4 +1,4 @@
-import { getWorksheetHeaders } from "./file_headers";
+import { getWorksheetHeaders, type SheetCell } from "./file_headers";
 import { mapJsonParse, unflattenObject } from "./transforms";
 import { parseCsvToObjects } from "./csv";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
@@ -9,28 +9,58 @@ type ConversionResult = {
 }
 
 /**
- * ExcelJS, fetched the first time somebody actually opens a workbook.
+ * The workbook reader, fetched the first time somebody actually opens one.
  *
- * It was a top-level `import ExcelJS from "exceljs"`, and that one line put
- * 940 kB of spreadsheet reader into the admin's entry chunk — preloaded on the
- * login screen, before anyone has authenticated, let alone clicked Import.
+ * Still lazy, and for the original reason: a top-level import put the whole
+ * spreadsheet reader into the admin's entry chunk — preloaded on the login
+ * screen, before anyone has authenticated, let alone clicked Import.
  * `CollectionViewActions` lazy-loads the import and export actions and says so
  * in a comment, but the package's own barrel (`src/index.ts` re-exports
  * `./data_import`) puts this module back in the entry's static graph, so the
  * `lazy()` bought nothing. A static import inside a module the barrel reaches
  * is eager no matter what the component above it does; the only thing that
  * makes a dependency lazy is importing it lazily, here.
+ *
+ * `read-excel-file` rather than `exceljs`, since 2026-09-09. exceljs is pinned
+ * at its last release and carries six deprecated packages of its own —
+ * `fstream`, `glob@7`, `inflight`, `lodash.isequal`, `rimraf@2`, `uuid@8` —
+ * which every project that installed the admin inherited and pnpm warned about
+ * on a first `init`. Nothing here ever *wrote* a workbook: this is the one
+ * place that touched it, to read an uploaded file. A reader with no deprecated
+ * tail does the same job.
+ *
+ * exceljs remains a devDependency, because the test writes real workbooks to
+ * read back — a fixture built by the library under test proves nothing.
  */
-type ExcelJsModule = typeof import("exceljs");
+/**
+ * The default export returns one entry per *sheet*, not the rows — `readSheet`
+ * is the rows-only overload. Taking `[0].data` keeps the old behaviour exactly:
+ * ExcelJS read `workbook.worksheets[0]` and errored when there was none.
+ */
+type SheetEntry = { sheet: string; data: SheetCell[][] };
+type ReadXlsxFile = (input: File | Blob | ArrayBuffer) => Promise<SheetEntry[]>;
 
-let excelJsModule: Promise<ExcelJsModule> | undefined;
+let xlsxReader: Promise<ReadXlsxFile> | undefined;
 
-function loadExcelJs(): Promise<ExcelJsModule> {
-    // exceljs is CommonJS, so the namespace a bundler hands back wraps the real
-    // module under `default`. Native ESM (and the type declarations) put the
-    // members at the top level. Accept either.
-    excelJsModule ??= import("exceljs").then(mod => (mod as { default?: ExcelJsModule }).default ?? mod);
-    return excelJsModule;
+function loadXlsxReader(): Promise<ReadXlsxFile> {
+    // `/browser`, not the bare package name: `read-excel-file` publishes no
+    // root export at all — its `exports` map has only `./browser`,
+    // `./universal`, `./node` and `./web-worker`, so importing the package
+    // itself is a resolution error rather than a default. The browser entry is
+    // the one whose `Input` accepts an `ArrayBuffer`, which is what the
+    // FileReader above produces.
+    xlsxReader ??= import("read-excel-file/browser").then(mod => {
+        const candidate = (mod as { default?: unknown }).default ?? mod;
+        // `default.default` under some interop paths — unwrap one more level
+        // rather than calling a namespace object and failing at the moment a
+        // user picks a file, which is the only moment this code runs.
+        const fn = typeof candidate === "function"
+            ? candidate
+            : (candidate as { default?: unknown })?.default;
+        if (typeof fn !== "function") throw new Error("read-excel-file did not resolve to a function");
+        return fn as ReadXlsxFile;
+    });
+    return xlsxReader;
 }
 
 /**
@@ -107,36 +137,82 @@ export function convertFileToJson(file: File): Promise<ConversionResult> {
             reader.onload = async function (e) {
                 try {
                     const buffer = e.target?.result as ArrayBuffer;
-                    const ExcelJS = await loadExcelJs();
-                    const workbook = new ExcelJS.Workbook();
-                    await workbook.xlsx.load(buffer);
-                    const worksheet = workbook.worksheets[0];
-                    if (!worksheet) {
+                    const readXlsxFile = await loadXlsxReader();
+                    // Every .xlsx is a zip, and its first two bytes say so. A
+                    // file that is not one never reaches the reader, because
+                    // what the reader says about it is a stack trace from
+                    // inside its own unzipper — the shape of error the CSV
+                    // branch above exists to avoid.
+                    const magic = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+                    if (magic[0] !== 0x50 || magic[1] !== 0x4b) {
+                        reject(new Error(
+                            `'${file.name}' is not a readable .xlsx workbook. `
+                            + "Export it again as .xlsx, or save it as .csv."
+                        ));
+                        return;
+                    }
+
+                    let sheets: SheetEntry[];
+                    try {
+                        sheets = await readXlsxFile(buffer);
+                    } catch (readError) {
+                        // A workbook with zero sheets throws from inside the
+                        // reader (`readFiles(...).then is not a function`)
+                        // rather than returning an empty list, so the "no
+                        // sheets" case arrives here rather than below. The file
+                        // is a valid zip — checked above — so the honest reading
+                        // is that there is nothing in it to import.
+                        console.debug("Spreadsheet reader failed", readError);
+                        reject(new Error(
+                            "No worksheets found in file — it has no sheets, or none this reader can open."
+                        ));
+                        return;
+                    }
+
+                    const firstSheet = sheets[0];
+                    if (!firstSheet) {
                         reject(new Error("No worksheets found in file"));
                         return;
                     }
 
-                    const headers = getWorksheetHeaders(worksheet);
+                    const [headerRow, ...dataRows] = firstSheet.data;
+                    if (!headerRow) {
+                        reject(new Error("The spreadsheet is empty"));
+                        return;
+                    }
 
-                    // Convert rows to JSON objects (skip header row)
+                    const headers = getWorksheetHeaders(headerRow);
+                    if (headers.order.length === 0) {
+                        reject(new Error("The spreadsheet has no column headers in its first row"));
+                        return;
+                    }
+
                     const parsedData: Array<Record<string, any>> = [];
-                    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-                        if (rowNumber === 1) return;
+                    for (const row of dataRows) {
+                        // A wholly empty row is not a record. ExcelJS skipped
+                        // these with `includeEmpty: false`; here they arrive as
+                        // a row of nulls.
+                        if (row.every(cell => cell === null || cell === undefined)) continue;
+
                         const obj: Record<string, any> = {};
-                        row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-                            const header = headers[colNumber - 1];
+                        row.forEach((cell, index) => {
+                            // An empty cell contributes no key, as before — the
+                            // difference between "blank" and "absent" is what
+                            // the import's own defaults key off.
+                            if (cell === null || cell === undefined) return;
+                            const header = headers.byColumn.get(index);
                             // A `__proto__` header would be the prototype setter
                             // here rather than a column; refused, as in `csv.ts`.
                             if (header && !isPrototypePollutingKey(header)) {
-                                obj[header] = cell.value;
+                                obj[header] = cell;
                             }
                         });
                         parsedData.push(obj);
-                    });
+                    }
 
                     resolve({
                         data: toImportRows(parsedData),
-                        propertiesOrder: headers
+                        propertiesOrder: headers.order
                     });
                 } catch (err) {
                     console.error("Error parsing Excel file", err);
