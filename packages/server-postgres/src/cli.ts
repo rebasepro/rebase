@@ -27,12 +27,29 @@ import {
     getTableExcludes,
     getForeignIndexExcludes,
     ExcludeIntrospectionError,
-    promptConfirm
+    promptConfirm,
+    queryGeneratedColumnDependencies,
+    dropGeneratedColumns,
+    loadCollectionsForCli
 } from "./cli-helpers";
-import { checkDatabaseConnectivity, diagnoseAtlasFailure, diagnoseDbError, reportCommandFailure } from "./cli-errors";
+import {
+    checkDatabaseConnectivity,
+    diagnoseAtlasFailure,
+    diagnoseDbError,
+    formatForeignGeneratedColumnBanner,
+    reportCommandFailure
+} from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
+import {
+    parseColumnMutations,
+    findGeneratedColumnConflicts,
+    partitionByOwnership,
+    dropGeneratedColumnStatements,
+    migrationDropPreamble,
+    describeConflict
+} from "./schema/generated-column-conflicts";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
@@ -388,6 +405,30 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
                     const searchContent = readSearchDdl();
                     if (searchContent) {
+                        // The same refusal `db push` works around, but decided
+                        // here and written into the file: this migration runs
+                        // later, somewhere else, against a database nobody can
+                        // inspect from this machine. A column retyped by the
+                        // statements above cannot be retyped while the search
+                        // column reads it, and the appended DDL below runs too
+                        // late to help — so the drop is prepended and the
+                        // rebuild is the append that was already happening.
+                        //
+                        // Derived from the collections rather than a catalogue:
+                        // `searchColumnDependencies` knows which columns each
+                        // block reads, which is all the decision needs.
+                        const { searchColumnDependencies } = await import("./schema/generate-postgres-ddl-logic");
+                        const migrationConflicts = findGeneratedColumnConflicts(
+                            parseColumnMutations(migrationContent),
+                            searchColumnDependencies(await loadCollectionsForCli(collectionsPath))
+                        );
+                        const preamble = migrationDropPreamble(migrationConflicts);
+                        if (preamble) {
+                            migrationContent = `${preamble}\n${migrationContent}`;
+                            for (const conflict of migrationConflicts) {
+                                out(chalk.gray(`  ✓ ${describeConflict(conflict)} is dropped and rebuilt inside the migration`));
+                            }
+                        }
                         migrationContent = `${migrationContent}\n\n${searchContent}`;
                         out(chalk.gray("  ✓ Appended search DDL to the migration"));
                     }
@@ -468,6 +509,32 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             );
             const destructive = detectDestructiveStatements(plan);
 
+            // A generated column makes every column it reads immutable to
+            // Atlas: PostgreSQL refuses `ALTER COLUMN … TYPE` and `DROP COLUMN`
+            // while one depends on it, and `schema apply` runs its plan in a
+            // single transaction — so one refusal rolls back the whole push,
+            // including the statements that had nothing to do with it.
+            //
+            // Atlas cannot avoid planning it. The search column is hidden from
+            // its view on purpose (`searchExcludePatterns`), because a desired
+            // state that never mentions the column reads to Atlas as an
+            // instruction to drop it. So the dependant is invisible exactly
+            // where it would have to be visible.
+            //
+            // Rebase owns those columns, so it takes them out of the way and
+            // `applySearchDdl` puts them back below — the same drop-and-re-apply
+            // the search stamp guard already prescribes when a block changes.
+            const generatedConflicts = databaseUrl
+                ? findGeneratedColumnConflicts(
+                    parseColumnMutations(plan),
+                    await queryGeneratedColumnDependencies(databaseUrl)
+                )
+                : [];
+            const { managed: rebuildable, foreign: unowned } = partitionByOwnership(
+                generatedConflicts,
+                collectionsPath ? await getSearchExcludes(collectionsPath) : []
+            );
+
             // `--dry-run` stops here, having printed the SQL and nothing else.
             //
             // It exists because the only way to see this plan was to trigger
@@ -487,6 +554,18 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.green("  ✓ No changes: the database already matches these collections."));
                 }
                 out("");
+                if (rebuildable.length > 0) {
+                    out(chalk.gray(`  ${rebuildable.length} generated column(s) would be dropped before the apply and`));
+                    out(chalk.gray("  rebuilt from search.sql after it — Postgres cannot retype a column"));
+                    out(chalk.gray("  while one reads it:"));
+                    for (const conflict of rebuildable) {
+                        out(chalk.gray(`       ${describeConflict(conflict)}`));
+                    }
+                    out("");
+                }
+                if (unowned.length > 0) {
+                    outWarn(formatForeignGeneratedColumnBanner(unowned));
+                }
                 if (destructive.length > 0) {
                     outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those DESTROY data:`));
                     for (const d of destructive) {
@@ -499,6 +578,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 out(chalk.gray("  The auth schema step was skipped, because it writes. A real push runs it first."));
                 out("");
                 return;
+            }
+
+            // Before the destructive gate, and separately from it: this is not a
+            // change the operator can approve their way through. Rebase has no
+            // copy of the expression, so there is nothing to put back.
+            if (unowned.length > 0) {
+                outError(formatForeignGeneratedColumnBanner(unowned));
+                process.exit(1);
             }
 
             const allowDestructive = argsList["--allow-destructive"] === true || argsList["--yes"] === true;
@@ -538,7 +625,26 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
             }
 
-            await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
+            if (rebuildable.length > 0 && databaseUrl) {
+                for (const conflict of rebuildable) {
+                    out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
+                }
+                await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
+            }
+
+            try {
+                await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
+            } catch (err) {
+                // Atlas rolled its transaction back, so the columns those
+                // expressions read are as they were and the definitions in
+                // search.sql still fit. Put them back before surfacing the
+                // failure: a push that fails must not also leave search broken.
+                if (rebuildable.length > 0 && databaseUrl) {
+                    out(chalk.gray("  The apply failed — rebuilding the generated columns it needed out of the way."));
+                    await applySearchDdl(databaseUrl);
+                }
+                throw err;
+            }
             out("");
             
             if (databaseUrl) {

@@ -28,6 +28,7 @@ import {
     type VectorIndexPlan
 } from "./vector-index";
 import { buildCollectionIndexSpecs, collectionIndexStatements } from "./collection-index";
+import type { GeneratedColumnDependency } from "./generated-column-conflicts";
 import { REBASE_SCHEMA } from "@rebasepro/types";
 
 // --- Helper Functions ---
@@ -404,6 +405,34 @@ export const generatePostgresSearchDdl = (allCollections: CollectionConfig[]): s
  * as a table named `search_vector` in a schema named `posts`, matches nothing,
  * and reports no error for the pattern that never fired.
  */
+/**
+ * The `generated column → column it reads` edges a project's `search` blocks
+ * imply, derived from the collections alone.
+ *
+ * The same edges `queryGeneratedColumnDependencies` reads out of `pg_depend`,
+ * but available where no database is: `rebase db generate` writes a migration
+ * that will run somewhere else, later, against a database it cannot inspect.
+ * A spec's `fields[].column` is the physical column each search field starts
+ * at, which is exactly what the generated expression depends on.
+ */
+export const searchColumnDependencies = (
+    allCollections: CollectionConfig[]
+): GeneratedColumnDependency[] => {
+    const dependencies: GeneratedColumnDependency[] = [];
+    for (const collection of relationalCollections(allCollections)) {
+        const spec = buildSearchColumnSpec(collection);
+        if (!spec) continue;
+        const generated = [spec.column, ...(spec.fuzzy ? [spec.fuzzy.column] : [])];
+        const sources = new Set(spec.fields.map(field => field.column));
+        for (const column of generated) {
+            for (const dependsOn of sources) {
+                dependencies.push({ schema: spec.schema, table: spec.table, column, dependsOn });
+            }
+        }
+    }
+    return dependencies;
+};
+
 export const searchExcludePatterns = (allCollections: CollectionConfig[]): string[] => {
     const patterns: string[] = [];
     for (const collection of relationalCollections(allCollections)) {

@@ -532,6 +532,54 @@ async function countRows(databaseUrl: string | undefined, table: string): Promis
 }
 
 /**
+ * A hand-written generated column reading a column the plan wants to retype or
+ * drop.
+ *
+ * Rebase's own generated columns are dropped and rebuilt around the apply — it
+ * holds their definition in `search.sql`. This one it does not: PostgreSQL
+ * stores a generated expression only in the catalogue, so dropping it to let
+ * the apply through would destroy the only copy. Refuse instead, and say what
+ * the operator can do about it.
+ */
+export function formatForeignGeneratedColumnBanner(
+    conflicts: { schema: string; table: string; column: string; blocking: { column: string; kind: string }[] }[]
+): string {
+    const lines = conflicts.map(c => {
+        const reads = c.blocking.map(b => `"${b.column}"`).join(", ");
+        return `    ${chalk.bold(`${c.schema}.${c.table}.${c.column}`)} reads ${reads}`;
+    });
+    const first = conflicts[0];
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  A generated column depends on a column this push changes\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        lines.join("\n") + `\n` +
+        `\n` +
+        `  PostgreSQL refuses to retype or drop a column while a GENERATED\n` +
+        `  ALWAYS AS … STORED expression reads it, and an Atlas apply is one\n` +
+        `  transaction — so this refusal would roll back every other statement\n` +
+        `  in the push with it.\n` +
+        `\n` +
+        `  ${chalk.yellow("Nothing was applied.")} Rebase rebuilds the generated columns it made\n` +
+        `  itself (a collection's ${chalk.bold("search")} block) around the apply. It has no\n` +
+        `  definition for this one, and a dropped generated expression is not\n` +
+        `  recoverable from anywhere but your own migration.\n` +
+        `\n` +
+        `  Drop it, push, and put it back:\n` +
+        `\n` +
+        `    ${chalk.gray(`ALTER TABLE "${first.schema}"."${first.table}" DROP COLUMN "${first.column}";`)}\n` +
+        `    ${chalk.gray("rebase db push")}\n` +
+        `    ${chalk.gray("-- then re-create the column with its original expression")}\n` +
+        `\n` +
+        `  Or declare it through a ${chalk.bold("search")} block, and Rebase will own it.\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
+/**
  * The remedy for an Atlas invocation that failed, or `null`.
  *
  * Scoped by the invocation, because the same database state means different

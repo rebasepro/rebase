@@ -7,6 +7,7 @@ import readline from "readline";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { isRebaseIndexName } from "./schema/collection-index";
+import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
 import { out, outWarn } from "./cli-output";
 import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
@@ -541,6 +542,74 @@ export async function applySearchDdl(
 export async function getSearchExcludes(collectionsPath: string): Promise<string[]> {
     const { searchExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
     return searchExcludePatterns(await loadCollectionsForCli(collectionsPath));
+}
+
+/**
+ * Every `generated column → column it reads` edge in the database.
+ *
+ * Read from `pg_depend` rather than by matching names in the expression text:
+ * a generated column's `pg_attrdef` row carries one `deptype = 'n'` dependency
+ * per column its expression references, which is the catalogue's own answer and
+ * cannot be fooled by a column name that also appears inside a string literal
+ * or as part of a longer identifier.
+ *
+ * Used by `db push` to find what has to come out of the way before Atlas runs —
+ * see `generated-column-conflicts.ts` for why that is necessary at all.
+ */
+export async function queryGeneratedColumnDependencies(
+    databaseUrl: string
+): Promise<GeneratedColumnDependency[]> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        const res = await client.query(`
+            SELECT n.nspname       AS "schema",
+                   c.relname       AS "table",
+                   gen.attname     AS "column",
+                   dep.attname     AS "dependsOn"
+            FROM pg_attrdef ad
+            JOIN pg_class c         ON c.oid = ad.adrelid
+            JOIN pg_namespace n     ON n.oid = c.relnamespace
+            JOIN pg_attribute gen   ON gen.attrelid = ad.adrelid AND gen.attnum = ad.adnum
+            JOIN pg_depend d        ON d.classid = 'pg_attrdef'::regclass
+                                   AND d.objid = ad.oid
+                                   AND d.refclassid = 'pg_class'::regclass
+                                   AND d.refobjid = ad.adrelid
+                                   AND d.deptype = 'n'
+            JOIN pg_attribute dep   ON dep.attrelid = ad.adrelid AND dep.attnum = d.refobjsubid
+            WHERE gen.attgenerated <> ''
+              AND NOT gen.attisdropped
+              AND NOT dep.attisdropped;
+        `);
+        return res.rows as GeneratedColumnDependency[];
+    } finally {
+        await client.end();
+    }
+}
+
+/**
+ * Drop the generated columns standing in the way of an apply.
+ *
+ * Their indexes and their `COMMENT ON COLUMN` stamp go with them, which is
+ * exactly right: `applySearchDdl` rebuilds all three from `search.sql` and a
+ * surviving stamp would make the rebuilt column look like drift.
+ */
+export async function dropGeneratedColumns(
+    databaseUrl: string,
+    statements: string[]
+): Promise<void> {
+    if (statements.length === 0) return;
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        for (const statement of statements) {
+            await client.query(statement);
+        }
+    } finally {
+        await client.end();
+    }
 }
 
 /**

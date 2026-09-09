@@ -17,8 +17,10 @@ import {
     generatePostgresDdl,
     generatePostgresSearchDdl,
     searchExcludePatterns,
+    searchColumnDependencies,
     getSqlColumnType
 } from "../src/schema/generate-postgres-ddl-logic";
+import { findGeneratedColumnConflicts, parseColumnMutations } from "../src/schema/generated-column-conflicts";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
@@ -321,5 +323,44 @@ describe("searchExcludePatterns — what Atlas is told to keep its hands off", (
         for (const pattern of searchExcludePatterns([collection])) {
             expect(sql).toContain(pattern.split(".")[2]);
         }
+    });
+});
+
+describe("searchColumnDependencies", () => {
+    it("names the physical column every search field starts at", () => {
+        // What the generated expression actually reads, and so what Postgres
+        // will refuse to retype underneath it. `questionnaire.certifications`
+        // reads the `questionnaire` column, not a column of its own.
+        const dependencies = searchColumnDependencies(collections);
+        expect(new Set(dependencies.map(d => d.dependsOn)))
+            .toEqual(new Set(["full_name", "interests", "questionnaire"]));
+        for (const dependency of dependencies) {
+            expect(dependency).toMatchObject({ schema: "public", table: "talents", column: "search_vector" });
+        }
+    });
+
+    it("agrees with the spec the DDL is rendered from", () => {
+        // The point of deriving from `spec.fields` rather than re-reading the
+        // block: one source, so the edges cannot drift from the expression.
+        expect(new Set(searchColumnDependencies(collections).map(d => d.dependsOn)))
+            .toEqual(new Set(spec.fields.map(f => f.column)));
+    });
+
+    it("is what makes a migration that retypes a searched column self-repairing", () => {
+        const migration = 'ALTER TABLE "public"."talents" ALTER COLUMN "full_name" TYPE text;';
+        const conflicts = findGeneratedColumnConflicts(
+            parseColumnMutations(migration),
+            searchColumnDependencies(collections)
+        );
+        expect(conflicts).toEqual([{
+            schema: "public",
+            table: "talents",
+            column: "search_vector",
+            blocking: [{ column: "full_name", kind: "type" }]
+        }]);
+    });
+
+    it("leaves a project with no search block alone", () => {
+        expect(searchColumnDependencies([{ ...collection, search: undefined } as CollectionConfig])).toEqual([]);
     });
 });
