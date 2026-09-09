@@ -17,6 +17,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawn } from "child_process";
+import { durationBucket, recordEvent } from "../../telemetry";
 import {
     requireClient,
     resolveProjectRef,
@@ -964,7 +965,38 @@ export function resolveDeployArgs(rawArgs: string[]) {
 appName: positionals[0] as string | undefined };
 }
 
+/**
+ * `cli.deploy` — the event that says whether anyone ever ships.
+ *
+ * Declared in `TelemetryEventName` from the start and recorded nowhere, so a
+ * consenting user reported scaffolding, dev servers and schema pushes and never
+ * the one act the product exists for.
+ *
+ * What it carries is deliberately thin. No project id, no app name, no
+ * deployment id, no URL: those are the "project names" and "URLs" the consent
+ * screen promises are never sent, and a deployment id is a durable handle on
+ * somebody's infrastructure. `frameworkVersion` is *our* version, not the
+ * user's data, and it is the one field that makes the rest legible — a failure
+ * rate means nothing without knowing which release it is a rate for.
+ */
+async function recordDeploy(o: {
+    followed: boolean;
+    status: string;
+    deduplicated: boolean;
+    frameworkVersion?: string | null;
+    startedAt: number;
+}): Promise<void> {
+    await recordEvent("cli.deploy", {
+        followed: o.followed,
+        status: o.status,
+        deduplicated: o.deduplicated,
+        framework_version: o.frameworkVersion ?? null,
+        duration: durationBucket(Date.now() - o.startedAt)
+    }, { projectRoot: process.cwd() });
+}
+
 export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
+    const startedAt = Date.now();
     const { flags: args, appName } = resolveDeployArgs(rawArgs);
 
     // Refused rather than resolved in one direction or the other: they are
@@ -1122,6 +1154,7 @@ frameworkVersion: frameworkVersion ?? null,
 following: false,
 ...warningPayload(warnings) }
         );
+        await recordDeploy({ followed: false, status: "not_followed", deduplicated, frameworkVersion, startedAt });
         return;
     }
 
@@ -1140,6 +1173,7 @@ following: false,
         projectId,
         url
     });
+    await recordDeploy({ followed: true, status, deduplicated, frameworkVersion, startedAt });
     emit(
         () => {},
         { deploymentId,

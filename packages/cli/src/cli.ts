@@ -16,7 +16,7 @@ import { normalizeImportsCommand } from "./commands/normalize-imports";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { telemetryCommand } from "./commands/telemetry";
-import { isEnabled } from "./telemetry";
+import { isEnabled, recordEvent } from "./telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
@@ -117,6 +117,43 @@ export async function entry(args: string[]) {
     // parses its own flags sees the request whichever branch this takes.
     const effectiveSubcommand = parsedArgs["--help"] && !subcommand ? "--help" : subcommand;
 
+    try {
+        await dispatch(command, effectiveSubcommand, args, parsedArgs, namespacedCommands);
+    } catch (error) {
+        // What failed, never why. `cli.error` records the command that threw and
+        // the error's constructor name — never its message, and never anything
+        // derived from one. The consent screen promises "no project names,
+        // paths, schemas, URLs or error messages", and a failure is exactly
+        // where those leak: a message is usually a path, a connection string or
+        // a column name. Which command fails, and how often, is the signal
+        // worth having and costs none of that.
+        //
+        // `recordEvent` is fire-and-forget and swallows its own failures, but it
+        // is awaited so a short-lived CLI does not exit before the request is
+        // made. The error is re-thrown untouched — `bin/rebase.js` owns how a
+        // failure is printed and what the exit code is.
+        await recordEvent("cli.error", {
+            command: command ?? "none",
+            subcommand: effectiveSubcommand ?? "none",
+            error_type: error instanceof Error ? error.constructor.name : "unknown",
+            usage: Boolean(error && typeof error === "object" && (error as { isUsageError?: unknown }).isUsageError)
+        }, { projectRoot: process.cwd() });
+        throw error;
+    }
+}
+
+/**
+ * The dispatch, lifted out of {@link entry} so the whole of it sits inside one
+ * `try`. Inlining the switch there would have put the `catch` around the flag
+ * parsing too, which throws its own usage errors before a command is even named.
+ */
+async function dispatch(
+    command: string | undefined,
+    effectiveSubcommand: string | undefined,
+    args: string[],
+    parsedArgs: Record<string, unknown>,
+    namespacedCommands: string[]
+): Promise<void> {
     switch (command) {
         // Hidden: the managed development database's own process, spawned by
         // `ensureManagedDatabase` re-invoking this CLI. Not in
