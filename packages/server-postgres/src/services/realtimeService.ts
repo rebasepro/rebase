@@ -40,6 +40,15 @@ export interface SubscriptionAuthContext {
      * makes a realtime leak invisible from the surface people test.
      */
     isAnonymous?: boolean;
+    /**
+     * The custom claims on the socket's token, for the same reason
+     * `isAnonymous` is here: a refetch has to evaluate the same policies
+     * against the same principal the initial fetch did. A tenancy policy reads
+     * a claim, so a subscription that carried none would answer every frame
+     * from the tenant of nobody — which is no rows, silently, on a collection
+     * whose first page loaded fine.
+     */
+    claims?: Record<string, unknown>;
 }
 
 /** What a channel frame is asking to do. */
@@ -1012,7 +1021,15 @@ roles: ["anon"] };
                 await this.db.transaction(async (tx) => {
                     await applyAuthContext(
                         tx,
-                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        {
+                            uid: activeAuth.uid,
+                            roles: activeAuth.roles,
+                            isAnonymous: activeAuth.isAnonymous === true,
+                            // A refetch is a read under the same identity, and a
+                            // tenancy policy reads a claim — without these a
+                            // subscriber would receive rows the initial GET hid.
+                            claims: activeAuth.claims
+                        },
                         this.rlsUserRole
                     );
                     const txEntityService = new DataService(tx, this.registry);
@@ -1163,7 +1180,15 @@ roles: ["anon"] };
                 total = await this.db.transaction(async (tx) => {
                     await applyAuthContext(
                         tx,
-                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        {
+                            uid: activeAuth.uid,
+                            roles: activeAuth.roles,
+                            isAnonymous: activeAuth.isAnonymous === true,
+                            // A refetch is a read under the same identity, and a
+                            // tenancy policy reads a claim — without these a
+                            // subscriber would receive rows the initial GET hid.
+                            claims: activeAuth.claims
+                        },
                         this.rlsUserRole
                     );
                     return countOnce(new DataService(tx, this.registry));
@@ -1275,7 +1300,15 @@ roles: ["anon"] };
                 await this.db.transaction(async (tx) => {
                     await applyAuthContext(
                         tx,
-                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        {
+                            uid: activeAuth.uid,
+                            roles: activeAuth.roles,
+                            isAnonymous: activeAuth.isAnonymous === true,
+                            // A refetch is a read under the same identity, and a
+                            // tenancy policy reads a claim — without these a
+                            // subscriber would receive rows the initial GET hid.
+                            claims: activeAuth.claims
+                        },
                         this.rlsUserRole
                     );
                     const txEntityService = new DataService(tx, this.registry);

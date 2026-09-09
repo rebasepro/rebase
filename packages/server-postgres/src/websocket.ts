@@ -38,6 +38,13 @@ interface WsUserIdentity {
      * initial HTTP fetch had.
      */
     isAnonymous?: boolean;
+    /**
+     * The token's custom claims, for the same reason `isAnonymous` is here: a
+     * socket has no request to look anything up on, and every refetch it
+     * triggers has to evaluate the same policies against the same principal.
+     * A tenancy policy reads a claim.
+     */
+    claims?: Record<string, unknown>;
 }
 
 interface ClientSession {
@@ -316,7 +323,8 @@ channelWindowStart: Date.now() });
                                 uid: jwtPayload.uid,
                                 roles: jwtPayload.roles ?? [],
                                 isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
-                                isAnonymous: jwtPayload.isAnonymous === true
+                                isAnonymous: jwtPayload.isAnonymous === true,
+                                claims: jwtPayload.claims
                             };
                         }
                     }
@@ -437,7 +445,8 @@ roles: verifiedUser.roles }
                                     photoURL: null,
                                     providerId: "websocket",
                                     isAnonymous: false,
-                                    roles: session.user.roles ?? []
+                                    roles: session.user.roles ?? [],
+                                    claims: session.user.claims
                                 }
                                 : {
                                     uid: ANONYMOUS_USER_ID,
@@ -838,7 +847,12 @@ colors: true }));
                                 // A guest is a signed-in caller with no account.
                                 // Carried so a refetch's policies see what the
                                 // initial fetch saw — see `rebase.is_anonymous()`.
-                                isAnonymous: session.user.isAnonymous === true
+                                isAnonymous: session.user.isAnonymous === true,
+                                // And the token's custom claims, for the same
+                                // reason: a tenancy policy reads one, so a
+                                // subscription without them answers every frame
+                                // from the tenant of nobody.
+                                claims: session.user.claims
                             }
                             : {
                                 uid: ANONYMOUS_USER_ID,

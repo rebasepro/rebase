@@ -11,6 +11,7 @@ export * from "./relations";
 export * from "./policy";
 export * from "./rls-functions";
 export * from "./security_rules";
+export * from "./tenancy";
 
 export * from "./entity_callbacks";
 export * from "./websockets";

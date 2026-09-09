@@ -1,5 +1,6 @@
 import { CollectionConfig, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollectionConfig, policy } from "@rebasepro/types";
 import { getTableName } from "./relations";
+import { buildTenantSecurityRule } from "./tenant";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
 
 /**
@@ -45,8 +46,16 @@ import { getPolicyNamesForRules } from "@rebasepro/utils";
  * FORCE RLS. A *user* request never reaches that state: an anonymous one carries
  * `ANONYMOUS_USER_ID`, precisely so it cannot pass for the server here.
  *
+ * **For a collection declaring `tenant`, additionally**
+ *  5. A **restrictive** tenancy gate for every operation. Same kind of thing as
+ *     the admin write gate and injected for the same reason: it is ANDed with
+ *     every other policy, so it narrows what the author's permissive rules
+ *     grant and can never widen them. See `./tenant.ts`.
+ *
  * Opt out with `disableDefaultPolicies: true` to take full responsibility for
- * the collection's RLS.
+ * the collection's RLS. The *restrictive* rules are not part of that opt-out:
+ * dropping a rule that can only remove access could express nothing but "let
+ * more people in", which is what the flag already does by removing the grants.
  */
 // Expressed structurally (not as raw SQL) so the admin UI can evaluate it
 // exactly — the framework's most security-critical policies must be reflected
@@ -107,6 +116,19 @@ function adminWriteGate(tableName: string): SecurityRule {
     };
 }
 
+/**
+ * The restrictive tenancy policy, as a list of zero or one.
+ *
+ * A list so the two call sites can splice it in without a conditional, and a
+ * separate function so it is obvious that it is injected on *both* paths —
+ * including the `disableDefaultPolicies` one, where it is the only permissive-
+ * looking thing that stays. See `./tenant.ts`.
+ */
+function tenantRule(collection: CollectionConfig): SecurityRule[] {
+    const rule = buildTenantSecurityRule(collection);
+    return rule ? [rule] : [];
+}
+
 export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
     const explicit = [...(collection.securityRules ?? [])];
 
@@ -128,9 +150,14 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
         //
         // An author who needs a different gate can add their own restrictive
         // rule; they cannot end up with none by accident.
-        return isAuthCollection(collection)
-            ? [...explicit, adminWriteGate(tableName)]
-            : explicit;
+        // Tenancy survives the opt-out for exactly the reason the write gate
+        // does: it is restrictive, so it can only ever remove access. Dropping
+        // it could express nothing except "let every tenant read every other
+        // tenant's rows", which is not a thing `disableDefaultPolicies` is for
+        // — that flag is about taking over the *grants*.
+        return [...explicit, ...tenantRule(collection), ...(isAuthCollection(collection)
+            ? [adminWriteGate(tableName)]
+            : [])];
     }
 
     // Baseline read + write: the server context and admins can always operate.
@@ -164,6 +191,10 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
         injected.push(adminWriteGate(tableName));
     }
 
+    // Last, so it reads as what it is: a restriction ANDed over everything
+    // above it, author rules included.
+    injected.push(...tenantRule(collection));
+
     return [...explicit, ...injected];
 }
 
@@ -180,11 +211,14 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
  */
 export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
     if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
-        // Not empty for an auth collection: the restrictive write gate is still
-        // injected, and the generated DDL has to say so — a policy in the
-        // database that the author never wrote and cannot find in this list is
-        // exactly the surprise this function exists to prevent.
-        return isAuthCollection(collection) ? [adminWriteGate(getTableName(collection))] : [];
+        // Not empty for an auth collection, nor for a tenant-scoped one: both
+        // restrictive rules are still injected, and the generated DDL has to
+        // say so — a policy in the database that the author never wrote and
+        // cannot find in this list is exactly the surprise this function exists
+        // to prevent.
+        return [...tenantRule(collection), ...(isAuthCollection(collection)
+            ? [adminWriteGate(getTableName(collection))]
+            : [])];
     }
 
     const explicitCount = (collection.securityRules ?? []).length;

@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, getTenantConfig, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -1331,11 +1331,52 @@ function buildCollectionSchema(
     }
 
     emitRelationProperties(collection, properties, required, emitted, registeredSchemas);
+    annotateTenantField(collection, properties, "read");
 
     return {
         type: "object",
         required: required.length > 0 ? required : undefined,
         properties
+    };
+}
+
+/**
+ * Mark the tenant field, on whichever schema is being built.
+ *
+ * A vendor extension for the same reason `x-rebase-access` is one: OpenAPI has
+ * no keyword for "the server fills this in from who you are, and refuses a
+ * value that is not yours". `readOnly` is the closest and it is wrong — the
+ * field *is* writable, by a caller sending their own tenant, and a bypass role
+ * may send any. Generators ignore what they do not know, so a client built from
+ * this document still compiles; a human reading `/docs`, or a gateway wanting
+ * to enforce the same boundary at the edge, learns the field is special and
+ * why.
+ *
+ * Applied after the property loops rather than inside `convertPropertyToSchema`
+ * because tenancy is a fact about the *collection*, and that function is handed
+ * a property with no idea which collection it came from.
+ */
+function annotateTenantField(
+    collection: CollectionConfig,
+    properties: Record<string, unknown>,
+    direction: "read" | "write"
+): void {
+    const tenant = getTenantConfig(collection);
+    if (!tenant) return;
+    const schema = properties[tenant.field];
+    if (!schema || typeof schema !== "object") return;
+
+    const existing = (schema as { description?: unknown }).description;
+    const sentence = direction === "write"
+        ? "The tenant this row belongs to. Omit it and the server stamps the tenant you are calling as; " +
+          "send another tenant's and the write is refused with `TENANT_MISMATCH`. It cannot be changed " +
+          "on an update (`TENANT_IMMUTABLE`)."
+        : "The tenant this row belongs to. Rows of other tenants are not returned at all.";
+
+    properties[tenant.field] = {
+        ...(schema as Record<string, unknown>),
+        description: typeof existing === "string" && existing ? `${existing} — ${sentence}` : sentence,
+        "x-rebase-tenant": true
     };
 }
 
@@ -1494,10 +1535,18 @@ function buildCollectionInputSchema(collection: CollectionConfig): Record<string
     // Neither reached the document, so the spec described a create that could
     // not set a relation at all.
     emitWritableRelations(collection, properties, emitted);
+    annotateTenantField(collection, properties, "write");
+
+    // The tenant field is never required on input, whatever the property
+    // declares: the column is NOT NULL, and the server is what fills it.
+    // Listing it would tell every generated client to demand a value its caller
+    // is not supposed to compute.
+    const tenantField = getTenantConfig(collection)?.field;
+    const requiredOnInput = tenantField ? required.filter(key => key !== tenantField) : required;
 
     return {
         type: "object",
-        required: required.length > 0 ? required : undefined,
+        required: requiredOnInput.length > 0 ? requiredOnInput : undefined,
         properties
     };
 }

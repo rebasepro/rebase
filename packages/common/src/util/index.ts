@@ -16,6 +16,7 @@ export * from "./relations";
 export * from "./resolve-relation";
 export * from "./auth-default-policies";
 export * from "./junction-policies";
+export * from "./tenant";
 export * from "./conditions";
 export * from "./pg-column-to-property";
 export * from "./string-column-length";

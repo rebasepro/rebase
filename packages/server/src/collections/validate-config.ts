@@ -1,7 +1,7 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
-import type { CollectionConfig, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
 
-import { getTableName, isRelationalCollection } from "@rebasepro/common";
+import { getEffectiveSecurityRules, getTableName, isRelationalCollection, securityRuleToConditions } from "@rebasepro/common";
 import { suggestNearMiss } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
@@ -164,6 +164,7 @@ const COLLECTION_KEY_LIST = [
     "search",
     "indexes",
     "softDelete",
+    "tenant",
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",
@@ -1096,6 +1097,169 @@ function checkSoftDelete(
     }
 }
 
+/** Claims a token's own identity owns; a tenancy claim may not name one. */
+const RESERVED_TOKEN_CLAIMS = new Set(["uid", "sub", "roles", "aal", "isAnonymous", "iat", "exp", "purpose"]);
+
+/** Property types that can hold a tenant id. */
+const TENANT_FIELD_TYPES = new Set(["string", "number", "reference", "relation"]);
+
+/**
+ * `tenant`, against what the schema, the policy and the write path can honour.
+ *
+ * Every one of these lands somewhere worse if it is not caught here, and all of
+ * them land *late*: the schema planner sees the declaration at `db push` time,
+ * and the policy it compiles reaches the database at boot on a managed tenant
+ * with nobody in the loop. A tenancy policy that fails to apply is not a
+ * collection missing a feature — RLS stays enabled with no policy, and the
+ * table denies every row to everyone.
+ *
+ * - **A field that is not declared.** `tenant` says what a column *means*, the
+ *   same way `softDelete` does; it does not add one.
+ * - **A field of the wrong type.** A tenant id is a `string`, a `number`, or a
+ *   link to the tenants collection. A `boolean` tenant column compiles to a
+ *   comparison Postgres refuses.
+ * - **A field the API withholds.** `excludeFromApi` and `access.read: []` take
+ *   the field out of every response, and a client that cannot read which tenant
+ *   a row is in cannot render or filter by it — while the column is still
+ *   `NOT NULL` and still stamped. The two declarations contradict each other.
+ * - **A claim naming an identity claim.** `uid`, `roles` and friends are
+ *   written *after* the custom claims when a token is minted, precisely so a
+ *   claims hook cannot assert them. A tenancy rule reading `uid` as a tenant
+ *   would compile and would mean something nobody intended.
+ */
+function checkTenant(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const declared = collection.tenant;
+    if (declared === undefined) return;
+
+    if (!isPlainObject(declared)) {
+        collect.error(`${at}.tenant`, "`tenant` must be an object — `{ field, from }`.");
+        return;
+    }
+
+    if (!isRelationalCollection(collection as unknown as CollectionConfig)) {
+        collect.error(
+            `${at}.tenant`,
+            "`tenant` is Postgres-only: row-level security is what enforces the boundary, and an " +
+            "application-layer filter on an engine without it is one a raw query goes around. Remove " +
+            "`tenant`, or move this collection to a Postgres data source."
+        );
+        return;
+    }
+
+    const field = declared.field;
+    if (typeof field !== "string" || !field) {
+        collect.error(`${at}.tenant.field`, "`tenant.field` must name the property holding the tenant id.");
+    } else {
+        const properties = isPlainObject(collection.properties) ? collection.properties : undefined;
+        const property = properties?.[field];
+        if (!isPlainObject(property)) {
+            collect.error(
+                `${at}.tenant.field`,
+                `\`tenant\` scopes rows by '${field}', and '${at}' has no such property. Declare it — ` +
+                `\`${field}: { type: "string" }\`, or a \`relation\` to the tenants collection — or name ` +
+                "the property that already holds the tenant id. The flag says what a column means; it " +
+                "does not add one."
+            );
+        } else {
+            const type = String(property.type);
+            if (!TENANT_FIELD_TYPES.has(type)) {
+                collect.error(
+                    `${at}.tenant.field`,
+                    `'${field}' is a \`${type}\`, which cannot hold a tenant id. Use a \`string\`, a ` +
+                    "`number`, or a `relation` / `reference` to the collection of tenants."
+                );
+            }
+            const access = isPlainObject(property.access) ? property.access : undefined;
+            const withheld = property.excludeFromApi === true
+                || (Array.isArray(access?.read) && access.read.length === 0);
+            if (withheld) {
+                collect.error(
+                    `${at}.tenant.field`,
+                    `'${field}' is the tenant every row of '${at}' belongs to, and it is also hidden from ` +
+                    `the API by \`${property.excludeFromApi === true ? "excludeFromApi" : "access.read: []"}\`. ` +
+                    "The column is still NOT NULL and still stamped on every write, so the only effect is " +
+                    "that a client can never see which tenant a row it just wrote is in. Drop the " +
+                    "restriction, or drop `tenant`.",
+                    "incoherent"
+                );
+            }
+        }
+    }
+
+    if (declared.bypassRoles !== undefined
+        && (!Array.isArray(declared.bypassRoles) || declared.bypassRoles.some(r => typeof r !== "string"))) {
+        collect.error(`${at}.tenant.bypassRoles`, "`tenant.bypassRoles` must be an array of role ids.");
+    }
+
+    const from = declared.from;
+    if (!isPlainObject(from)) {
+        collect.error(
+            `${at}.tenant.from`,
+            "`tenant.from` says where the caller's tenant comes from: `{ claim: \"org_id\" }` for a claim " +
+            "on their token, or `{ membership: { collection, userField, tenantField } }` for a table of " +
+            "memberships."
+        );
+        return;
+    }
+
+    const hasClaim = from.claim !== undefined;
+    const hasMembership = from.membership !== undefined;
+    if (hasClaim && hasMembership) {
+        collect.error(
+            `${at}.tenant.from`,
+            "`tenant.from` names both `claim` and `membership`. They are two answers to one question — " +
+            "which tenant is this caller in — and only one policy is generated. Keep one."
+        );
+        return;
+    }
+
+    if (hasClaim) {
+        if (typeof from.claim !== "string" || !from.claim) {
+            collect.error(`${at}.tenant.from.claim`, "`claim` must be the claim's name on the access token.");
+        } else if (RESERVED_TOKEN_CLAIMS.has(from.claim)) {
+            collect.error(
+                `${at}.tenant.from.claim`,
+                `'${from.claim}' is an identity claim the server writes itself — it is set after the ` +
+                "custom claims precisely so a claims hook cannot assert it, and it does not mean a tenant. " +
+                "Name the custom claim your identity provider puts the organization in, e.g. `\"org_id\"`."
+            );
+        }
+        return;
+    }
+
+    if (!hasMembership) {
+        collect.error(
+            `${at}.tenant.from`,
+            "`tenant.from` is empty. It takes either `{ claim: \"org_id\" }` or " +
+            "`{ membership: { collection, userField, tenantField } }`."
+        );
+        return;
+    }
+
+    if (!isPlainObject(from.membership)) {
+        collect.error(
+            `${at}.tenant.from.membership`,
+            "`membership` must be `{ collection, userField, tenantField }` — the table of memberships, the " +
+            "property on it holding the user, and the property holding the tenant."
+        );
+        return;
+    }
+
+    for (const key of ["collection", "userField", "tenantField"] as const) {
+        const value = from.membership[key];
+        if (typeof value !== "string" || !value) {
+            collect.error(
+                `${at}.tenant.from.membership.${key}`,
+                `\`membership.${key}\` is required and must be a non-empty string.`
+            );
+        }
+    }
+}
+
 /**
  * The primary key, against what a SQL store can actually be given.
  *
@@ -1316,6 +1480,7 @@ function checkCollection(
 
     checkBoardConfig(collection, at, collect);
     checkSoftDelete(collection, at, collect);
+    checkTenant(collection, at, collect);
     checkSearchFieldsAreReadable(collection, at, collect);
 
     if (Array.isArray(collection.relations)) {
@@ -1341,6 +1506,7 @@ export function findCollectionConfigProblems(
     const collect = new ProblemCollector(options.unknownKeys ?? unknownKeyPolicyFromEnv());
     collections.forEach((collection, index) => checkCollection(collection, index, collect));
     checkCollectionsTogether(collections, options.sources, collect);
+    checkTenantMemberships(collections, collect);
     return collect.problems;
 }
 
@@ -1493,4 +1659,146 @@ export function assertCollectionConfigs(
         `${errors.length} problem(s) in the collection config.\n\n` +
         sections.join("\n\n") + "\n"
     );
+}
+
+/**
+ * The half of a `membership` tenancy declaration no single collection can check.
+ *
+ * `tenant.from.membership` points at *another* collection, and three things
+ * about that collection have to hold. The first two are ordinary: it must
+ * exist, and it must declare the two properties the policy reads.
+ *
+ * The third is the one nobody expects, and it is why this check exists at all.
+ * The generated policy is a correlated `EXISTS` over the membership table, and
+ * **a policy expression is evaluated as the querying user** — so the membership
+ * table's own RLS applies inside it. Every Rebase table has RLS enabled and a
+ * baseline granting only the server context and `admin`. A membership
+ * collection with no rule of its own is therefore invisible to the very caller
+ * the subquery is asking about: the `EXISTS` is false for everyone, and the
+ * tenant-scoped collection returns zero rows to every non-admin, forever, with
+ * nothing anywhere saying why.
+ *
+ * So: the membership collection has to grant the caller read of their own rows,
+ * and the check is deliberately generous — a raw clause or a nested `existsIn`
+ * this cannot read counts as "might". A false negative costs a boot; a false
+ * positive costs nothing that was not already the author's to get right.
+ */
+function checkTenantMemberships(
+    collections: readonly unknown[],
+    collect: ProblemCollector
+): void {
+    const bySlug = new Map<string, Record<string, unknown>>();
+    for (const collection of collections) {
+        if (!isPlainObject(collection)) continue;
+        if (typeof collection.slug === "string" && collection.slug) bySlug.set(collection.slug, collection);
+    }
+
+    for (const collection of collections) {
+        if (!isPlainObject(collection)) continue;
+        const tenant = collection.tenant;
+        if (!isPlainObject(tenant) || !isPlainObject(tenant.from)) continue;
+        const membership = tenant.from.membership;
+        if (!isPlainObject(membership)) continue;
+
+        const at = typeof collection.slug === "string" ? collection.slug : "collection";
+        const path = `${at}.tenant.from.membership`;
+        const slug = membership.collection;
+        const userField = membership.userField;
+        const tenantField = membership.tenantField;
+        // Shape already reported by `checkTenant`; nothing to add here.
+        if (typeof slug !== "string" || typeof userField !== "string" || typeof tenantField !== "string") continue;
+
+        const target = bySlug.get(slug);
+        if (!target) {
+            collect.error(
+                `${path}.collection`,
+                `\`membership.collection: "${slug}"\` names no collection in this project. The policy ` +
+                "compiles to a subquery over its table, so a slug nothing resolves to is a policy over a " +
+                "table that does not exist — which fails to apply and leaves the collection denying " +
+                "every row."
+            );
+            continue;
+        }
+
+        if (!isRelationalCollection(target as unknown as CollectionConfig)) {
+            collect.error(
+                `${path}.collection`,
+                `'${slug}' is not stored in Postgres, so there is no table for the tenancy policy's ` +
+                "subquery to read. Both collections have to live in the same SQL database."
+            );
+            continue;
+        }
+
+        const targetProperties = isPlainObject(target.properties) ? target.properties : {};
+        for (const [key, name] of [["userField", userField], ["tenantField", tenantField]] as const) {
+            if (isPlainObject(targetProperties[name])) continue;
+            collect.error(
+                `${path}.${key}`,
+                `'${slug}' has no property '${name}'. The tenancy policy reads it inside a subquery, and ` +
+                "a policy naming a column that does not exist fails to apply — which leaves the table " +
+                "with RLS enabled and no policy, denying every row."
+            );
+        }
+
+        if (!grantsSelfRead(target as unknown as CollectionConfig, userField)) {
+            collect.error(
+                `${path}.collection`,
+                `'${slug}' does not let a signed-in caller read their own membership rows, and the ` +
+                `tenancy policy on '${at}' is a subquery over it — evaluated as the caller, so ` +
+                `'${slug}'s own RLS applies inside it. Every Rebase table denies by default, so as ` +
+                `written that subquery is false for everybody and '${at}' returns no rows to anyone but ` +
+                "`admin`. Add the rule that makes it readable:\n" +
+                `      securityRules: [{ name: "${slug}_self_read", operations: ["select"], ownerField: "${userField}" }]`,
+                "incoherent"
+            );
+        }
+    }
+}
+
+/**
+ * Could any of `collection`'s rules let a signed-in caller read a row of their
+ * own — one whose `userField` is them?
+ *
+ * A "might", not a proof. Anything this cannot read — raw SQL, a nested
+ * `existsIn` — counts as yes, because being wrong in that direction costs
+ * nothing and being wrong in the other refuses a boot over a rule that works.
+ */
+function grantsSelfRead(collection: CollectionConfig, userField: string): boolean {
+    return getEffectiveSecurityRules(collection)
+        .filter(coversSelect)
+        .some(rule => {
+            const { usingExpr } = securityRuleToConditions(rule);
+            return usingExpr !== null && couldMatchSelf(usingExpr, userField);
+        });
+}
+
+function coversSelect(rule: SecurityRule): boolean {
+    // A restrictive rule narrows and never grants, so it cannot be what makes
+    // the membership table readable.
+    if (rule.mode === "restrictive") return false;
+    const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
+    return ops.includes("select") || ops.includes("all");
+}
+
+function couldMatchSelf(expr: PolicyExpression, userField: string): boolean {
+    switch (expr.kind) {
+        case "true":
+            return true;
+        case "compare": {
+            const pair = [expr.left, expr.right];
+            const namesUser = pair.some(o => (o.kind === "field" || o.kind === "outerField") && o.name === userField);
+            return namesUser && pair.some(o => o.kind === "authUid");
+        }
+        case "and":
+        case "or":
+            return expr.operands.some(o => couldMatchSelf(o, userField));
+        case "not":
+            return couldMatchSelf(expr.operand, userField);
+        case "existsIn":
+        case "raw":
+            // Unreadable from here. Assume the author knows what they wrote.
+            return true;
+        default:
+            return false;
+    }
 }
