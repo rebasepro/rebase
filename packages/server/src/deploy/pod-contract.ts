@@ -94,6 +94,12 @@ export const TOPOLOGY_ENV_VARS = [
     "REBASE_CRON_SCHEDULER",
     "REBASE_JOB_WORKERS",
     "REBASE_RLS_AUDIT",
+    // Decides whether this pod serves an OAuth authorization server that issues
+    // credentials to third-party software. Exactly the class this list is for:
+    // without an entry here it would be settable from the project's own
+    // environment, so a tenant could start handing out tokens from a pod the
+    // platform configured — and the platform would have no record of it.
+    "REBASE_MCP_ENABLED",
     "REBASE_MIGRATE_ON_BOOT",
     "TRUSTED_PROXY_HOPS",
     "REBASE_RATE_LIMIT_STORE",

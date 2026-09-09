@@ -96,6 +96,38 @@ function clampLimit(raw: unknown): number {
     return Math.min(Math.floor(asked), MAX_ROWS);
 }
 
+/** A non-negative row offset. `NaN`, `-1` and `"soon"` all mean "from the start". */
+function clampOffset(raw: unknown): number {
+    const asked = Number(raw ?? 0);
+    if (!Number.isFinite(asked) || asked <= 0) return 0;
+    return Math.floor(asked);
+}
+
+/**
+ * A field name the collection actually declares.
+ *
+ * Every caller-supplied identifier that reaches the driver goes through here.
+ * `filter` had this check from the start and `orderBy` did not, which is the
+ * same class of gap twice over: an identifier is not a value, so it cannot be
+ * bound as a parameter, and whether it is safe depends entirely on what the
+ * driver does with it. The registry is the only thing that knows which names
+ * are real, so the check belongs here rather than in each driver's hope that
+ * it quoted everything.
+ *
+ * `id` is admitted alongside the declared properties because every collection
+ * has one and none of them declare it.
+ */
+function assertKnownField(collection: CollectionConfig, field: string, what: string): string {
+    const properties = collection.properties ?? {};
+    if (field !== "id" && !(field in properties)) {
+        throw new McpToolError(
+            `"${field}" is not a field of ${collectionPath(collection)}, so it cannot be used to ${what}. `
+            + `Known fields: ${["id", ...Object.keys(properties)].join(", ")}.`
+        );
+    }
+    return field;
+}
+
 /**
  * Translate the model's filter object into the driver's filter shape.
  *
@@ -111,16 +143,10 @@ function buildFilter(collection: CollectionConfig, raw: unknown): FilterValues<s
         throw new McpToolError("filter must be an object of { field: [operator, value] }.");
     }
 
-    const properties = collection.properties ?? {};
     const filter: Record<string, [string, unknown]> = {};
 
     for (const [field, condition] of Object.entries(raw as Record<string, unknown>)) {
-        if (!(field in properties) && field !== "id") {
-            throw new McpToolError(
-                `"${field}" is not a field of ${collectionPath(collection)}. ` +
-                `Known fields: ${Object.keys(properties).join(", ")}.`
-            );
-        }
+        assertKnownField(collection, field, "filter");
         if (!Array.isArray(condition) || condition.length !== 2 || typeof condition[0] !== "string") {
             throw new McpToolError(`filter.${field} must be [operator, value], e.g. ["==", "paid"].`);
         }
@@ -187,9 +213,12 @@ export const MCP_TOOLS: McpToolDefinition[] = [
                 collection,
                 filter: buildFilter(collection, args.filter),
                 limit,
-                offset: Number(args.offset ?? 0) || 0,
+                offset: clampOffset(args.offset),
                 orderBy: args.orderBy
-                    ? [[String(args.orderBy), args.order === "desc" ? "desc" : "asc"]]
+                    ? [[
+                        assertKnownField(collection, String(args.orderBy), "sort"),
+                        args.order === "desc" ? "desc" : "asc"
+                    ]]
                     : undefined
             } as Parameters<DataDriver["fetchCollection"]>[0]);
 

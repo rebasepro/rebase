@@ -266,6 +266,29 @@ const bootEnvExtension = z.object({
     REBASE_RLS_AUDIT: z.enum(["true", "false", ""]).optional()
         .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
     /**
+     * Serve `/mcp` and the OAuth authorization server that issues its tokens,
+     * so AI clients can read and write this project **as the signed-in user**.
+     *
+     * Off unless set, and unlike every other surface no role turns it on. The
+     * others describe a process shape; this one is a decision to hand
+     * credentials to third-party software, and it should be made by a person
+     * rather than inherited from a container's job title.
+     *
+     * `REBASE_PUBLIC_URL` must be set alongside it: every document the surface
+     * serves names absolute URLs, and the token audience is one of them. With
+     * it missing the surface declines to mount and says so.
+     */
+    REBASE_MCP_ENABLED: z.enum(["true", "false", ""]).optional()
+        .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
+    /**
+     * This deployment's externally reachable origin, e.g. `https://app.example.com`.
+     *
+     * Read by the MCP surface, which cannot derive it: taking the origin from
+     * the `Host` header would make the issuer identity — and the audience its
+     * own tokens are checked against — a value the caller supplies.
+     */
+    REBASE_PUBLIC_URL: z.string().url().optional(),
+    /**
      * Comma-separated function names this process serves. Unset means all.
      *
      * `functions` role only. A name that is not in the bundle is a boot failure,

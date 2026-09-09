@@ -38,6 +38,8 @@ export interface RoleEnv {
     REBASE_CRON_SCHEDULER?: boolean;
     REBASE_JOB_WORKERS?: boolean;
     REBASE_RLS_AUDIT?: boolean;
+    /** Opt in to the MCP surface. No role grants it — see `resolveRole`. */
+    REBASE_MCP_ENABLED?: boolean;
     REBASE_MIGRATE_ON_BOOT?: "none" | "ensure" | "push" | "";
     REBASE_FUNCTIONS_ONLY?: string;
     REBASE_FUNCTIONS_EXCLUDE?: string;
@@ -183,9 +185,25 @@ export function resolveRole(env: RoleEnv): ResolvedRole {
     // to one process the same way it gives it cron.
     if (env.REBASE_RLS_AUDIT !== undefined) ownership.rlsAudit = env.REBASE_RLS_AUDIT;
 
+    // The MCP surface is the one a role never turns on.
+    //
+    // Every other surface is a statement about process shape — "this container
+    // answers HTTP" — and a role can decide it. This one is a decision to serve
+    // an OAuth authorization server that issues credentials to third-party
+    // software, which is a product decision, not a topology one. So no role
+    // grants it and it is named explicitly here.
+    //
+    // It has to be an environment variable rather than a field in the project's
+    // backend config, because the containerized boot path takes its surfaces
+    // from the ROLE and passes nothing of the user's config through — which
+    // means a managed or Docker deployment, the shapes this feature is actually
+    // for, would have had no way to switch it on at all.
+    const surfaces: RuntimeSurfaceOptions = { ...base.surfaces };
+    if (env.REBASE_MCP_ENABLED !== undefined) surfaces.mcp = env.REBASE_MCP_ENABLED;
+
     return {
         role,
-        surfaces: { ...base.surfaces },
+        surfaces,
         ownership,
         provisionSchema: base.provisionSchema,
         functionsSelection: {
