@@ -121,6 +121,27 @@ name: "Tags" } as Property
     it("returns empty object for null/undefined", () => {
         expect(getDefaultValuesFor(undefined as any)).toEqual({});
     });
+
+    /**
+     * The baseline is what a form submits, and a column the API excludes is one
+     * the server refuses a value for. Seeding `passwordHash: null` here is what
+     * made "create a user" answer 400 in the panel: the field was hidden, so
+     * the operator saw an error about a column they had never seen.
+     */
+    it("leaves out the columns the API excludes", () => {
+        const props: Properties = {
+            email: { type: "string",
+name: "Email" } as Property,
+            passwordHash: { type: "string",
+name: "Password Hash",
+excludeFromApi: true } as Property
+        };
+
+        const defaults = getDefaultValuesFor(props);
+
+        expect(defaults).toEqual({ email: null });
+        expect("passwordHash" in defaults).toBe(false);
+    });
 });
 
 describe("updateDateAutoValues", () => {

@@ -1095,6 +1095,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         });
     }
 
+    // Before anything copies them. Every registry re-normalizes what it is
+    // handed — `normalizeCollection` rebuilds each property as `{ ...property }`
+    // — so a flag set after a registry was built reaches the config object and
+    // none of the copies serving requests. The driver's own registry is built
+    // inside `initializeDriver` below, which is where reads are rendered from:
+    // running this only before `collectionRegistry.register` (as it did) fixed
+    // the write path, whose validation reads the server's copy, and left the
+    // read path serving `password_hash` in every row of the users collection.
+    // Repeated after the loop for collections the drivers introspected.
+    enforceAuthSecretExclusion(activeCollections);
+
     // Declared collections, or the database's own schema.
     //
     // This was a `mode` flag the caller set, which could disagree with the
@@ -1294,9 +1305,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const driverRegistry = DefaultDriverRegistry.create(delegates);
 
     // A redeclared `users` collection must not lose the exclusions the default
-    // one carries. Here rather than in the auth block below, because the
-    // registries copy what they are handed and a flag set after registration
-    // reaches only the copy it was set on. See exclude-auth-secrets.ts.
+    // one carries. Again, for whatever a driver introspected and appended
+    // above; the declared ones were done before the drivers ran, and a property
+    // already carrying the flag is skipped here, so this neither re-fixes nor
+    // re-warns about them. See exclude-auth-secrets.ts.
     enforceAuthSecretExclusion(activeCollections);
 
     activeCollections.forEach(collection => collectionRegistry.register(collection));

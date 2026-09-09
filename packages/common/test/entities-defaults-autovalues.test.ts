@@ -47,6 +47,19 @@ describe("applyDefaultValuesOnCreate", () => {
         expect("title" in applyDefaultValuesOnCreate({}, properties)).toBe(false);
     });
 
+    /**
+     * The sibling of "the form leaves excluded columns out". A column the API
+     * refuses is still the server's to write in process, so its declared
+     * default has to survive here — this reads the property, not the form
+     * baseline, which is what keeps the two answers from being one answer.
+     */
+    it("still defaults a column the API excludes", () => {
+        const withExcluded: Properties = {
+            tokenVersion: { type: "number", defaultValue: 0, excludeFromApi: true }
+        };
+        expect(applyDefaultValuesOnCreate({}, withExcluded).tokenVersion).toBe(0);
+    });
+
     it("merges a map field by field, so a partial object gains its siblings", () => {
         expect(applyDefaultValuesOnCreate({ prefs: { notify: false } }, properties).prefs)
             .toEqual({ notify: false, theme: "dark" });

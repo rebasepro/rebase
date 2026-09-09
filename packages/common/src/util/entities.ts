@@ -15,11 +15,29 @@ export function isPropertyBuilder(property?: Property) {
     return typeof property?.dynamicProps === "function";
 }
 
+/**
+ * What a form opens with: a value for every property it can write.
+ *
+ * `excludeFromApi` columns are left out, and that is the whole of the rule —
+ * they are not part of the API surface in either direction, so there is nothing
+ * for a form to open showing and nothing it may send back. Including them was
+ * not cosmetic: the baseline is what gets submitted, so a new record carried
+ * `passwordHash: null` and `emailVerificationToken: null` into the create, and
+ * the server refused the whole write with "these columns are the server's to
+ * set" — the users collection could not be added to from the panel at all. The
+ * fields were invisible on screen (`admin.disabled.hidden`), which is what made
+ * the error read as being about the roles the operator *had* just edited.
+ *
+ * Server-side defaulting does not come through here: `applyDefaultValuesOnCreate`
+ * asks each property for its own default, so an excluded column with a declared
+ * `defaultValue` is still filled in on an in-process write.
+ */
 export function getDefaultValuesFor<M extends Record<string, unknown>>(properties: Properties): Partial<EntityValues<M>> {
     if (!properties) return {};
     return Object.entries(properties)
         .map(([key, property]) => {
             if (!property) return {};
+            if ((property as Property).excludeFromApi) return {};
             const value = getDefaultValueFor(property);
             return value === undefined ? {} : { [key]: value };
         })
@@ -195,12 +213,15 @@ export function applyDefaultValuesOnCreate<M extends Record<string, unknown>>(
 ): Partial<EntityValues<M>> {
     if (!properties) return values ?? {};
     const result = { ...(values ?? {}) } as Record<string, unknown>;
-    const defaults = getDefaultValuesFor(properties) as Record<string, unknown>;
 
     for (const [key, property] of Object.entries(properties)) {
         if (!property) continue;
         const declared = declaresDefault(property as Property);
         if (!declared) continue;
+        // Asked of the property, not read out of `getDefaultValuesFor`: that
+        // one answers for a *form*, and leaves out the columns the API excludes.
+        // A server-owned column with a declared default is still defaulted here.
+        const defaultValue = getDefaultValueFor(property as Property);
         if (result[key] !== undefined) {
             // A map whose own sub-properties carry defaults is filled in
             // field by field, so `{ notify: false }` keeps `notify` and still
@@ -209,13 +230,13 @@ export function applyDefaultValuesOnCreate<M extends Record<string, unknown>>(
                 (property as Property & { defaultValue?: unknown }).defaultValue === undefined &&
                 isPlainObject(result[key])) {
                 result[key] = {
-                    ...(defaults[key] as Record<string, unknown> ?? {}),
+                    ...(defaultValue as Record<string, unknown> ?? {}),
                     ...(result[key] as Record<string, unknown>)
                 };
             }
             continue;
         }
-        if (defaults[key] !== undefined) result[key] = defaults[key];
+        if (defaultValue !== undefined) result[key] = defaultValue;
     }
     return result as Partial<EntityValues<M>>;
 }
