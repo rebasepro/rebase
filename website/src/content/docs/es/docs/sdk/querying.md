@@ -1,13 +1,13 @@
 ---
-sourceHash: 6d40635c3d2f94ea
-title: Consulta de datos
-sidebar_label: Consulta de datos
-description: Operaciones CRUD, constructor de consultas fluido, operadores de filtrado, ordenación, selección de columnas y agregaciones con el SDK de cliente de Rebase.
+sourceHash: 72b63305690d555c
+title: Consultar datos
+sidebar_label: Consultar datos
+description: Operaciones CRUD, generador de consultas fluido, operadores de filtrado, ordenación, selección de columnas y agregaciones con el SDK de cliente de Rebase.
 ---
 
 ## Acceso a colecciones
 
-Accede a cualquier colección a través de `client.data.<collectionName>` (camelCase, convertido automáticamente a snake_case) o `client.data.collection<Record<string, unknown>>("slug")` (slug explícito):
+Accede a cualquier colección mediante `client.data.<collectionName>` (en camelCase, convertido automáticamente a snake_case) o `client.data.collection<Record<string, unknown>>("slug")` (slug explícito):
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -18,7 +18,7 @@ client.data.users           // → slug "users"
 client.data.collection<Record<string, unknown>>("blog_posts")
 ```
 
-> **Modo estricto (SDK generado):** Cuando pasas el `collectionsDictionary` generado a `createRebaseClient`, el proxy de datos valida los accesos a propiedades en tiempo de acceso. Un error tipográfico como `client.data.prodcuts` lanzará un error inmediatamente con un mensaje útil y una sugerencia de coincidencia más cercana en lugar de producir un confuso 404 más adelante. Usa `client.data.collection<Record<string, unknown>>("slug")` para omitir la validación de slugs dinámicos o determinados en tiempo de ejecución.
+> **Modo estricto (SDK generado):** Cuando pasas el `collectionsDictionary` generado a `createRebaseClient`, el proxy de datos valida los accesos a propiedades en el momento de invocación. Un error tipográfico como `client.data.prodcuts` lanzará inmediatamente un error explicativo junto con una sugerencia de coincidencia cercana en lugar de producir un confuso error 404 más adelante. Utiliza `client.data.collection<Record<string, unknown>>("slug")` para omitir la validación en slugs dinámicos o determinados en tiempo de ejecución.
 
 ## Operaciones CRUD
 
@@ -42,9 +42,9 @@ const { data, meta } = await client.data.products.find({
 
 ### Leer uno por ID
 
-Dos métodos, porque existen dos situaciones y requieren código diferente.
+Existen dos métodos, ya que corresponden a dos situaciones distintas que requieren un código diferente.
 
-`get` es para una fila que esperas que exista: el id provino de un enlace, un parámetro de ruta u otra fila. Devuelve la fila, por lo que nada posterior necesita acotarse (*narrowing*), y una fila inexistente es una excepción sobre la que puedes bifurcar:
+`get` está pensado para una fila cuya existencia se asume con certeza: el ID provino de un enlace, de un parámetro de ruta o de otra fila. Devuelve la fila directamente, evitando tener que estrechar tipos posteriormente, y la ausencia de la fila genera una excepción sobre la que se puede bifurcar la lógica:
 
 ```typescript
 const product = await client.data.products.get(42);
@@ -64,7 +64,7 @@ async function loadProduct(id: string) {
 }
 ```
 
-`findById` es para una fila que legítimamente podría no estar allí: una búsqueda por un id que un usuario escribió, una comprobación de caché:
+`findById` está pensado para una fila que legítimamente podría no existir: una búsqueda mediante un ID ingresado por un usuario, una comprobación de caché, etc.:
 
 ```typescript
 const maybe = await client.data.products.findById(42);
@@ -72,14 +72,14 @@ const maybe = await client.data.products.findById(42);
 ```
 
 :::note
-La seguridad a nivel de fila (*Row-level security*) hace que "no existe tal fila" y "no tienes permiso para leerla" sean la misma respuesta, deliberadamente: un 404 que las distinguiera confirmaría que la fila existe.
+La seguridad a nivel de fila (Row-level security) hace que "no existe tal fila" y "no tienes permisos para leerla" devuelvan deliberadamente la misma respuesta: un 404 que las distinguiera confirmaría la existencia de la fila.
 :::
 
 ### Escritura
 
-`create`, `upsert`, `update`, `delete` y sus formas por lotes (*batch*) se encuentran en **[Escritura de datos](/docs/sdk/writing/)**, junto con operaciones de campo, escrituras condicionales y claves de idempotencia.
+`create`, `upsert`, `update`, `delete` y sus variantes por lotes se detallan en **[Escritura de datos](/docs/sdk/writing/)**, junto con operaciones de campos, escrituras condicionales y claves de idempotencia.
 
-### Count (Contar)
+### Contar (Count)
 
 ```typescript
 const total = await client.data.products.count();
@@ -90,9 +90,9 @@ const activeCount = await client.data.products.count({
 });
 ```
 
-## Constructor de consultas fluido
+## Generador de consultas fluido (Fluent Query Builder)
 
-Encadena métodos para realizar consultas más expresivas:
+Encadena métodos para construir consultas más expresivas:
 
 ```typescript
 const { data } = await client.data.products
@@ -107,48 +107,48 @@ const { data } = await client.data.products
 
 | Método | Descripción | Ejemplo |
 |--------|-------------|---------|
-| `.where(field, op, value)` | Agrega una condición de filtro | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filtra en una ruta de [relación](#querying-through-a-relation) o [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
+| `.where(field, op, value)` | Agrega una condición de filtrado | `.where("age", ">=", 18)` |
+| `.where(path, op, value)` | Filtra sobre una ruta de [relación](#querying-through-a-relation) o [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
 | `.where(group)` | Agrega un [grupo OR/AND](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Ordena los resultados | `.orderBy("name", "asc")` |
 | `.orderBy(aggregate, dir)` | Ordena por una [agregación sobre una relación](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
-| `.limit(n)` | Limita la cantidad de resultados | `.limit(25)` |
+| `.limit(n)` | Limita el número de resultados | `.limit(25)` |
 | `.offset(n)` | Omite los primeros N resultados | `.offset(50)` |
-| `.after(cursor)` | Continúa después de un [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
-| `.fields(...columns)` | Devuelve [solo estas columnas](#returning-fewer-columns) | `.fields("id", "title")` |
-| `.distinct()` | Colapsa filas idénticas en esas columnas | `.fields("status").distinct()` |
+| `.after(cursor)` | Continúa a partir de un [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.fields(...columns)` | Devuelve [únicamente estas columnas](#returning-fewer-columns) | `.fields("id", "title")` |
+| `.distinct()` | Colapsa filas idénticas en función de esas columnas | `.fields("status").distinct()` |
 | `.search(text)` | Búsqueda de texto — consulta [Búsqueda](/docs/backend/search) | `.search("laptop")` |
-| `.vectorSearch(prop, vector, opts?)` | Búsqueda de vecinos más cercanos sobre una propiedad `vector` | `.vectorSearch("embedding", vec)` |
+| `.vectorSearch(prop, vector, opts?)` | Búsqueda por vecinos más cercanos sobre una propiedad `vector` | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Carga filas relacionadas](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Ejecuta la consulta | Devuelve `FindResult<M>` |
-| `.aggregate(params)` | [Reduce en lugar de devolver filas](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Transmite (stream) cada fila coincidente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.aggregate(params)` | [Aplica agregaciones en lugar de retornar filas](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.iterate(options?)` | [Transmite en streaming cada fila coincidente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
 | `.findAll(options?)` | [Recopila cada fila coincidente](#reading-everything-iterate-and-findall) | Devuelve `M[]` |
 | `.count()` | Cuenta las filas coincidentes | Devuelve `number` |
-| `.listen(onUpdate, onError?)` | Suscríbete a actualizaciones en tiempo real | Devuelve `unsubscribe()` |
+| `.listen(onUpdate, onError?)` | Se suscribe a actualizaciones en tiempo real | Devuelve `unsubscribe()` |
 
 ### Operadores de filtrado
 
 | Operador | Alias | Descripción |
 |----------|-------|-------------|
 | `"=="` | `"eq"` | Igual |
-| `"!="` | `"neq"` | No igual |
+| `"!="` | `"neq"` | Distinto |
 | `">"` | `"gt"` | Mayor que |
 | `">="` | `"gte"` | Mayor o igual que |
 | `"<"` | `"lt"` | Menor que |
 | `"<="` | `"lte"` | Menor o igual que |
-| `"in"` | | Valor en el array |
-| `"not-in"` | `"nin"` | Valor no en el array |
+| `"in"` | | El valor está en el array |
+| `"not-in"` | `"nin"` | El valor no está en el array |
 | `"array-contains"` | `"cs"` | El campo de tipo array contiene el valor |
-| `"array-contains-any"` | `"csa"` | El campo de tipo array contiene cualquiera de los valores |
-| `"like"` | `"like"` | Coincidencia de patrones **sensible** a mayúsculas/minúsculas; `%` y `_` son los comodines |
+| `"array-contains-any"` | `"csa"` | El campo de tipo array contiene alguno de los valores |
+| `"like"` | `"like"` | Coincidencia de patrones sensible a mayúsculas/minúsculas; `%` y `_` actúan como comodines |
 | `"ilike"` | `"ilike"` | Coincidencia de patrones insensible a mayúsculas/minúsculas |
 | `"not-like"` | `"nlike"` | No coincide con el patrón |
-| `"not-ilike"` | `"nilike"` | No coincide con el patrón, insensible a mayúsculas/minúsculas |
-| `"is-null"` | `"isnull"` | La columna es `NULL`. No toma ningún valor — lo que sea que pases se normaliza y descarta |
-| `"is-not-null"` | `"notnull"` | La columna no es `NULL`. No toma ningún valor |
+| `"not-ilike"` | `"nilike"` | No coincide con el patrón de forma insensible a mayúsculas/minúsculas |
+| `"is-null"` | `"isnull"` | La columna es `NULL`. No recibe ningún valor: cualquier valor que se envíe se descarta en la normalización |
+| `"is-not-null"` | `"notnull"` | La columna no es `NULL`. No recibe ningún valor |
 
-La columna alias es la grafía **en la red** (*wire format*), utilizada en las cadenas de consulta REST. Nunca aparece en el código de la aplicación: tanto el SDK como el panel de administración utilizan el operador canónico de la izquierda.
+La columna de alias representa la forma en formato **wire**, empleada en las cadenas de consulta REST. Nunca se utiliza en el código de la aplicación: tanto el SDK como el panel de administración utilizan el operador canónico de la izquierda.
 
 ### Sintaxis de la cláusula Where
 
@@ -172,11 +172,11 @@ await client.data.products.find({
 });
 ```
 
-> **Nota:** Las cadenas de PostgREST preserializadas (formato 2) son una vía de escape para pasar valores de filtro que ya están en formato de red. Prefiere la sintaxis de tupla para mayor seguridad de tipos y legibilidad.
+> **Nota:** Las cadenas pre-serializadas de PostgREST (formato 2) son una alternativa para pasar valores de filtro que ya se encuentran en formato wire. Es preferible utilizar la sintaxis de tupla por seguridad de tipos y legibilidad.
 
 ## Condiciones lógicas (OR / AND / NOT)
 
-Cada campo en `where` se une con AND. Para unir condiciones con OR, o para negar un grupo, construye una **condición lógica** con los helpers `or`, `and`, `not` y `cond` que exporta el SDK:
+Cada campo en `where` se evalúa mediante un operador AND. Para combinar condiciones mediante OR, o para negar un grupo, construye una **condición lógica** utilizando las funciones auxiliares `or`, `and`, `not` y `cond` provistas por el SDK:
 
 ```typescript
 import { or, and, not, cond } from "@rebasepro/client";
@@ -192,7 +192,7 @@ const { data } = await client.data.products.find({
 });
 ```
 
-El constructor fluido acepta el mismo árbol:
+El generador fluido acepta el mismo árbol de condiciones:
 
 ```typescript
 const { data } = await client.data.products
@@ -201,11 +201,11 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` toma el operador canónico (la columna izquierda de la tabla de [Operadores de filtrado](#filter-operators)). Un operador que el dialecto no posea generará un `TypeError` cuando se serialice la consulta, en lugar de producir silenciosamente una consulta diferente.
+`cond` toma el operador canónico, es decir, la columna izquierda de la tabla de [Operadores de filtrado](#filter-operators). Pasar un operador no soportado por el dialecto generará un `TypeError` al serializar la consulta, en lugar de producir silenciosamente una consulta distinta.
 
 ### Negación
 
-`not` niega la **conjunción** de sus condiciones: `not(a)` es `NOT a`, y `not(a, b)` es `NOT (a AND b)`. Los grupos se anidan, por lo que la otra mitad de De Morgan es `not(or(a, b))`.
+`not` niega la **conjunción** de sus condiciones: `not(a)` equivale a `NOT a`, y `not(a, b)` equivale a `NOT (a AND b)`. Los grupos se pueden anidar, por lo que la otra ley de De Morgan se expresa como `not(or(a, b))`.
 
 ```typescript
 // Everything that is NOT a draft with fewer than ten views.
@@ -217,46 +217,47 @@ const { data } = await client.data.posts.find({
 });
 ```
 
-Se compila a un `NOT (...)` real de SQL, no a operadores invertidos. Esa distinción no es cosmética: SQL maneja una lógica trivaluada, por lo que `NOT (a AND b)` y `(NOT a) OR (NOT b)` dejan de coincidir en cuanto interviene un `NULL`, y solo una de ellas es la consulta que escribiste.
+Esto se compila en una cláusula SQL `NOT (...)` real, sin invertir los operadores. Dicha distinción no es puramente cosmética: la lógica en SQL es trivaluada, por lo que `NOT (a AND b)` y `(NOT a) OR (NOT b)` dejan de coincidir en cuanto interviene un valor `NULL`, y solo uno de ellos representa la consulta que escribiste.
 
-También significa que una negación **incluye filas cuya columna es NULL**: `not(cond("status", "==", "draft"))` devuelve filas sin ningún estado. Eso es lo que significa `NOT`, y por lo general lo que deseas; si no es así, añade un `is-not-null` con AND junto a ella.
+Esto también implica que una negación **incluye filas cuya columna sea NULL**; por ejemplo, `not(cond("status", "==", "draft"))` devuelve filas que no tienen ningún estado definido. Ese es el comportamiento esperado de `NOT` y suele ser lo deseado; si no es tu caso, añade un `is-not-null` mediante AND en la consulta.
 
-### Cómo se compone con el resto de la consulta
+### Cómo se combina con el resto de la consulta
 
-`where`, `logical` y `search` son tres grupos independientes, unidos entre sí mediante AND:
+`where`, `logical` y `search` son tres grupos independientes, combinados entre sí mediante AND:
 
 ```
 (where fields, AND-ed)  AND  (logical group)  AND  (search)
 ```
 
-No hay forma de aplicar OR entre `where` y `logical`. Todo lo que no sea un simple AND entre los tres debe expresarse dentro de un único árbol `logical`; mueve los campos que necesites con OR dentro de él.
+No existe forma de combinar `where` con `logical` mediante un operador OR. Cualquier expresión que no sea un AND simple entre estos tres componentes debe definirse dentro de un mismo árbol `logical`; traslada a este árbol los campos que requieran ser combinados con OR.
 
-### En la red (On the wire)
+### En el formato de transmisión (wire)
 
-Un grupo lógico viaja como un único parámetro de consulta `or=`, `and=` o `not=`, en la misma sintaxis con puntos que usan los filtros de campo:
+Un grupo lógico viaja como un único parámetro de consulta `or=`, `and=` o `not=`, utilizando la misma sintaxis con puntos que los filtros de campos:
 
 ```
 GET /api/data/products?or=(status.eq.active,featured.eq.true)
 GET /api/data/posts?not=(status.eq.draft,views.lt.10)
 ```
 
-Solo uno de los tres se aplica por solicitud: `or` tiene prioridad sobre `and`, y ambos sobre `not`. Anida un grupo dentro de otro para combinarlos.
+Solo uno de los tres aplica por petición: `or` tiene prioridad sobre `and`, y ambos sobre `not`. Para combinarlos, anida un grupo dentro de otro.
 
-Vale la pena conocer tres codificaciones, ya que son aquellas en las que una cadena de consulta escrita a mano suele equivocarse:
+Conviene conocer tres codificaciones particulares, ya que son las que habitualmente se escriben de forma errónea al armar cadenas de consulta manualmente:
 
-| Condición | Formato de red | Nota |
-|-----------|----------------|------|
-| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` es una búsqueda de la cadena de cuatro caracteres `null` |
-| `cond("id", "in", [])` | `id.in.(\)` | `in.()` es una lista que contiene una cadena vacía, lo cual es una consulta diferente |
+| Condición | Formato wire | Nota |
+|-----------|--------------|------|
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` busca la cadena de cuatro caracteres `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` es una lista que contiene una única cadena vacía, lo cual representa una consulta diferente |
 | `cond("author.name", "==", "bob")` | `author.name.eq.bob` | una [ruta de relación](#querying-through-a-relation) conserva su punto |
 
-Las comas, los paréntesis y las barras invertidas dentro de un valor se escapan con barra invertida, por lo que `cond("name", "==", "Doe, John")` viaja como `name.eq.Doe\, John` y no divide el grupo.
+Las comas, paréntesis y barras invertidas dentro de un valor se escapan con una barra invertida, por lo que `cond("name", "==", "Doe, John")` se transmite como `name.eq.Doe\, John` y no divide el grupo.
 
-Los grupos pueden anidarse hasta 32 niveles de profundidad. Más allá de eso, la solicitud se rechaza con `INVALID_LOGICAL_GROUP`; aplánalo, ya que `or(a,or(b,c))` es `or(a,b,c)`.
+Los grupos pueden anidarse hasta un máximo de 32 niveles de profundidad. Más allá de ese límite, la petición es rechazada con el error `INVALID_LOGICAL_GROUP`; si esto ocurre, aplana la estructura, ya que `or(a,or(b,c))` es equivalente a `or(a,b,c)`.
 
 ## Paginación
 
-Los desplazamientos (*offsets*), números de página y cursores keyset tienen su propia página: [Paginación](/docs/sdk/pagination/).
+Los offsets, números de página y cursores por keyset se explican en su propia sección:
+[Paginación](/docs/sdk/pagination/).
 
 ## Ordenación
 
@@ -272,11 +273,11 @@ const { data } = await client.data.products
     .find();
 ```
 
-La dirección que omitas será `"asc"`, lo mismo que significa `?orderBy=name` sobre HTTP, independientemente de la base de datos subyacente.
+Si omites la dirección, se asume `"asc"` por defecto, que equivale al comportamiento de `?orderBy=name` vía HTTP, independientemente de la base de datos subyacente.
 
-### Ordenar por más de una columna
+### Ordenación por múltiples columnas
 
-Una ordenación es una *lista* de claves. La segunda desempata las filas que la primera considera iguales, la tercera entre las filas que las dos primeras consideran iguales; por lo tanto, `orderBy` acepta una lista de pares `[field, direction]` con la misma facilidad que uno solo:
+El ordenamiento consiste en una *lista* de claves. La segunda desempata las filas consideradas iguales por la primera, la tercera desempata las que resulten iguales en las dos anteriores, y así sucesivamente; por lo tanto, `orderBy` admite una lista de pares `[field, direction]` con la misma facilidad que un solo par:
 
 ```typescript
 // By category, and newest first within each category.
@@ -285,7 +286,7 @@ const { data } = await client.data.products.find({
 });
 ```
 
-El constructor fluido expresa lo mismo llamando a `.orderBy()` nuevamente. Cada llamada **agrega** una clave por debajo de las anteriores en lugar de reemplazarlas:
+En el generador fluido se expresa encadenando llamadas a `.orderBy()`. Cada invocación **agrega** una clave detrás de las anteriores en lugar de reemplazarlas:
 
 ```typescript
 const { data } = await client.data.products
@@ -294,15 +295,15 @@ const { data } = await client.data.products
     .find();
 ```
 
-Cada ordenación finaliza con el id de la fila, de forma descendente, ya sea que lo hayas solicitado o no. Eso es lo que hace que el ordenamiento sea *total*: sin ello, dos filas que comparten un valor se devuelven en el orden que le plazca a la base de datos, y paginar sobre un orden que puede diferir entre dos ejecuciones de la misma consulta repite algunas filas y omite otras.
+Toda ordenación concluye con el ID de la fila en orden descendente, se haya solicitado explícitamente o no. Esto garantiza que el orden sea *total*: sin este criterio, dos filas con el mismo valor se devolverían en el orden arbitrario que determine la base de datos, y paginar sobre un orden que puede diferir entre dos ejecuciones de la misma consulta provocaría la repetición de algunas filas y la omisión de otras.
 
-Una ordenación por múltiples columnas pagina correctamente bajo un [cursor](#cursor-pagination): la comparación se construye sobre cada clave, en orden. El único ordenamiento que un cursor no puede describir es **`_score`**; consulta [Búsqueda](/docs/backend/search). La relevancia se calcula por consulta en lugar de almacenarse, por lo que no hay ningún valor en la fila del cursor contra el cual comparar la página siguiente, y dicho listado no incluye `nextCursor`.
+Una ordenación multicolumna funciona correctamente bajo la paginación con [cursor](#cursor-pagination): la comparación se construye considerando cada una de las claves en secuencia. La única ordenación que un cursor no puede representar es **`_score`** (consulta [Búsqueda](/docs/backend/search)). La relevancia se calcula por consulta en lugar de almacenarse, por lo que no existe ningún valor en la fila del cursor contra el cual comparar la siguiente página, y dicho listado no incluirá un `nextCursor`.
 
-### Dónde se ordenan los NULL
+### Posición de los valores NULL
 
-Por defecto, los valores NULL se ordenan **al final de forma ascendente y al principio de forma descendente** (la propia convención de Postgres). Ese valor predeterminado es lo que coloca cada fila sin fecha en la parte superior de una lista ordenada por "más recientes primero", antes que cualquier dato real, y la única alternativa solía ser un filtro `is-not-null` que descartaba esas filas por completo.
+Por defecto, los valores NULL se ordenan **al final de forma ascendente y al principio de forma descendente**, siguiendo la convención propia de Postgres. Esta configuración predeterminada hace que las filas sin fecha aparezcan en la parte superior de una lista ordenada como "más recientes primero", por delante de las entradas con datos reales, y la única alternativa anterior consistía en usar un filtro `is-not-null` para descartar dichas filas por completo.
 
-Un tercer elemento en la clave indica dónde ubicarlos en su lugar:
+Un tercer elemento en la clave permite especificar su posición:
 
 ```typescript
 // Newest first, and the ones with no date at the end where they belong.
@@ -317,13 +318,13 @@ const { data } = await client.data.posts
     .find();
 ```
 
-Sobre HTTP es un tercer segmento separado por dos puntos, `?orderBy=publishedAt:desc:last`, o una clave `"nulls"` en el formato de array JSON. Cualquier valor distinto de `first`/`last` produce un 400 en lugar de un orden silenciosamente diferente.
+En HTTP se especifica mediante un tercer segmento separado por dos puntos, `?orderBy=publishedAt:desc:last`, o mediante la clave `"nulls"` en el formato de array JSON. Cualquier valor distinto de `first`/`last` produce un error 400 en lugar de aplicar un orden diferente de forma silenciosa.
 
-El [cursor](#cursor-pagination) respeta lo que haya declarado la ordenación, por lo que paginar sobre una clave que admita valores nulos sigue siendo correcto bajo cualquiera de las dos ubicaciones.
+El [cursor](#cursor-pagination) respeta la configuración de orden declarada, garantizando una paginación correcta sobre claves con valores nulos bajo cualquiera de las dos ubicaciones.
 
 ## Devolver menos columnas
 
-`fields` restringe una lectura a las columnas que especifiques. Es una proyección en la base de datos (esas son las columnas *leídas*, no las que sobreviven a un recorte de la respuesta), por lo que una consulta que necesita dos campos de una fila ancha no paga el costo del resto:
+`fields` restringe la lectura a las columnas que especifiques. Se trata de una proyección en la propia base de datos: son las columnas *leídas*, no las que sobreviven tras un recorte de la respuesta, de modo que una consulta que solo requiere dos campos de una fila ancha no incurre en el coste de transferir los restantes:
 
 ```typescript
 const { data } = await client.data.posts.find({
@@ -336,18 +337,22 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts.fields("id", "title").find();
 ```
 
-Dos cosas siempre se cumplen, sin importar lo que especifiques:
+Independientemente de las columnas indicadas, se cumplen siempre dos reglas:
 
-- **La clave primaria siempre se devuelve.** Una fila a la que no se puede hacer referencia no se puede actualizar, eliminar ni avanzar en la paginación; además, `meta.nextCursor` se deriva de ella, por lo que una proyección sin ella deshabilitaría silenciosamente la búsqueda.
-- **Las columnas `excludeFromApi` permanecen ocultas.** Especificar una no la vuelve visible.
+- **La clave primaria siempre se incluye en la respuesta.** Una fila que no se puede direccionar no puede actualizarse, eliminarse ni utilizarse para paginar; además, `meta.nextCursor` se deriva de ella, por lo que una proyección que la omitiese desactivaría silenciosamente la navegación por cursor.
+- **Las columnas marcadas con `excludeFromApi` permanecen ocultas.** Especificar su nombre no las hace visibles.
 
-Una columna desconocida genera un 400 `UNKNOWN_FIELD`. Interpretada como "omítela", una errata como `fields: ["titel"]` devolvería filas sin títulos y sin ninguna indicación de por qué.
+Solicitar una columna desconocida genera un error 400 `UNKNOWN_FIELD`. Si se interpretara como "ignorar el campo", una errata como `fields: ["titel"]` devolvería filas sin título sin advertir el motivo.
 
-Una relación especificada en `include` se carga aparezca o no en `fields`; para restringir las columnas *dentro* de una relación, consulta [opciones por relación](/docs/sdk/relations#narrowing-what-a-relation-loads).
+Las relaciones especificadas en `include` se cargan independientemente de si aparecen o no en `fields`; para limitar las columnas *dentro* de una relación, consulta [opciones por relación](/docs/sdk/relations#narrowing-what-a-relation-loads).
 
 ### `distinct`
 
-`distinct` colapsa filas que son idénticas en las columnas que se devuelven. Solo tiene sentido junto con `fields`, ya que la clave primaria siempre está en la proyección y, por lo tanto, cada fila ya es distinta de por sí:
+<span class="since-badge" data-since="0.20">Since 0.20</span>
+
+`distinct` agrupa filas que resulten idénticas en las columnas devueltas, y una lectura distintiva retorna **únicamente** las columnas especificadas: la clave primaria se omite de la proyección, a diferencia del resto de lecturas. Esto es indispensable: una clave subrogada es distinta en cada fila, por lo que conservarla haría que cada fila fuera única por definición y la consulta respondería 200 sin haber surtido efecto.
+
+Por esta razón, solo tiene sentido utilizarlo junto con `fields`. Sin este parámetro se solicitan todas las columnas visibles, incluida la clave primaria, y no se agrupará ninguna fila:
 
 ```typescript
 // The statuses actually in use.
@@ -357,16 +362,18 @@ const { data } = await client.data.posts
     .find();
 ```
 
-`meta.total` cuenta también las filas distintas, por lo que `hasMore` describe el conjunto que se está paginando. Se rechazan dos combinaciones en lugar de responder de forma inútil:
+Una lectura con distinct no referencia filas concretas —no hay clave mediante la cual direccionarlas—, por lo que devuelve un conjunto de valores en lugar de filas aptas para ser modificadas o eliminadas, y carece de `nextCursor`. Asimismo, **no reporta `meta.total`**: contabilizarlo requeriría un `COUNT(DISTINCT …)` que el driver no emite, y reportar el conteo de filas en su lugar describiría un conjunto distinto al servido (un resultado completo de dos filas se devolvía como `total: 8, hasMore: true`, lo cual inducía a un cliente a paginar indefinidamente). `hasMore` se deduce a partir de la propia página.
 
-- **Una consulta que puntúa cada fila**: un `search()` con clasificación o un `vectorSearch()` adjunta un `_score`/`_distance` por fila, por lo que nunca habrá dos filas iguales y `DISTINCT` no tendría ningún efecto. (Una búsqueda de subcadenas simple no adjunta nada y funciona correctamente).
-- **Ordenar por una columna que no devolviste.** Postgres no puede ordenar una lectura `DISTINCT` mediante una expresión que esté fuera de la lista de selección; la solicitud produce un 400 `DISTINCT_ORDER_BY_NOT_SELECTED` en lugar de un 500 citando código SQL que nunca escribiste.
+Se rechazan deliberadamente dos combinaciones en lugar de devolver respuestas inútiles:
 
-Sobre HTTP: `?fields=status&distinct=true`.
+- **Una consulta que puntúa cada fila:** un `search()` ponderado o un `vectorSearch()` asigna un `_score`/`_distance` a cada fila, por lo que no habrá dos filas iguales y `DISTINCT` carecería de efecto. (Una búsqueda simple por subcadena no asigna puntuación y funciona sin problemas).
+- **Ordenar por una columna no devuelta:** Postgres no puede ordenar una lectura `DISTINCT` según una expresión externa a la lista del select; la solicitud genera un 400 `DISTINCT_ORDER_BY_NOT_SELECTED` en lugar de un error 500 con código SQL que nunca escribiste.
+
+Vía HTTP: `?fields=status&distinct=true`.
 
 ## Agregaciones
 
-`aggregate()` reduce las filas coincidentes en lugar de devolverlas: `count`, `sum`, `avg`, `min`, `max`, opcionalmente agrupadas:
+`aggregate()` reduce las filas coincidentes en lugar de devolverlas: admite `count`, `sum`, `avg`, `min`, `max`, opcionalmente agrupadas:
 
 ```typescript
 const rows = await client.data.orders.aggregate({
@@ -377,7 +384,7 @@ const rows = await client.data.orders.aggregate({
 // [{ status: "paid", sum_total: 41822.5, count: 317 }, …]
 ```
 
-Los filtros del constructor se transmiten a la agregación, lo cual suele ser la forma más concisa de expresarlo:
+Los filtros del generador de consultas se trasladan a la agregación, lo cual suele ser la alternativa más concisa:
 
 ```typescript
 const rows = await client.data.orders
@@ -385,21 +392,22 @@ const rows = await client.data.orders
     .aggregate({ select: [{ fn: "sum", field: "total" }], groupBy: ["status"] });
 ```
 
-Las claves de resultado son **derivadas**, no elegidas: `sum(total)` se devuelve como `sum_total`, un simple `count()` como `count`. Permitir nombrarlas implicaría verificar que el nombre no sea también un campo de `groupBy`, una regla que nadie adivinaría y un valor sobreescrito silenciosamente si no se verificara.
+Las claves del resultado son **derivadas**, no configurables: `sum(total)` se devuelve como `sum_total`, y un `count()` simple como `count`. Permitir asignarles un nombre obligaría a verificar que dicho nombre no coincida con un campo de `groupBy` —una regla contraintuitiva que, sin validación, provocaría sobrescrituras silenciosas de valores—.
 
-`limit` restringe el número de **grupos** (agrupar por una columna de alta cardinalidad equivale a devolver todas las filas de una tabla completa en una sola respuesta) y se ignora sin un `groupBy`, ya que una agregación no agrupada es una sola fila. `orderBy`, `include` y la paginación no se aplican: una agregación no tiene filas para ordenar, ni relaciones que cargar, ni página para continuar.
+`limit` restringe el número de **grupos** devueltos (agrupar por una columna con alta cardinalidad puede abarcar el contenido equivalente a una tabla completa en una sola respuesta) y se ignora si no hay un `groupBy`, dado que una agregación sin agrupar produce una única fila. `orderBy`, `include` y la paginación no aplican: una agregación no tiene filas que ordenar, relaciones que cargar ni páginas que continuar.
 
-El objetivo principal es no obtener filas para luego reducirlas. Los "ingresos por estado" sobre un millón de pedidos son aquí una sola consulta y una fila por estado, en lugar de un `findAll()` más un bucle en cualquier otro lugar, lo cual es incorrecto bajo un `limit` e inasumible sin él. Se ejecuta a través del mismo controlador con ámbito de solicitud que cualquier otra lectura, por lo que la seguridad a nivel de fila se aplica a las filas que se están agregando.
+El objetivo principal es evitar la transferencia innecesaria de filas con el fin de calcular métricas. Obtener los "ingresos por estado" sobre un millón de pedidos se resuelve aquí mediante una única consulta y una fila por estado, en contraposición a ejecutar un `findAll()` con bucles manuales, lo cual resulta erróneo bajo un `limit` e inviable sin él. Se procesa a través del mismo contexto de petición que el resto de lecturas, aplicando la seguridad a nivel de fila a los datos agregados.
 
-Sobre HTTP: `GET /api/data/orders/aggregate?select=sum(total),count()&groupBy=status`.
+Vía HTTP: `GET /api/data/orders/aggregate?select=sum(total),count()&groupBy=status`.
 
-El filtrado JSON, la búsqueda de texto completo y la búsqueda vectorial tienen su propia página: [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
+El filtrado JSON, la búsqueda de texto completo y la búsqueda vectorial disponen de una página dedicada:
+[Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
 
-La lectura de entidades relacionadas —`include` y los accesores que consultan a través de una relación— tiene su propia página: [Consulta de relaciones](/docs/sdk/relations/).
+La lectura de entidades relacionadas (`include` y los métodos de acceso que consultan mediante relaciones) se describe en: [Consultar relaciones](/docs/sdk/relations/).
 
 ## Endpoints personalizados
 
-Llama a endpoints de servidor personalizados registrados mediante el sistema de funciones:
+Invoca endpoints de servidor personalizados registrados a través del sistema de funciones:
 
 ```typescript
 // Using client.functions.invoke()
@@ -422,15 +430,15 @@ const result = await client.call<{ summary: string }>(
 );
 ```
 
-Ambos devuelven **el cuerpo de respuesta de la función, textualmente**. Ninguno busca dentro de él una clave `data`, por lo que una función que responde `{ data: [...] }` te entrega ese objeto y tú mismo lees `.data`.
+Ambos devuelven **el cuerpo de la respuesta de la función textualmente**. Ninguno busca internamente una clave `data`, por lo que si una función responde `{ data: [...] }`, recibirás ese objeto completo y deberás acceder a `.data` por tu cuenta.
 
-`call()` toma una ruta completa y siempre realiza un POST; `invoke()` toma el nombre de una función y puede recibir un método, una subruta y encabezados. Usa `invoke()` a menos que estés llamando a algo que no sea una función.
+`call()` requiere una ruta completa y realiza siempre peticiones POST; `invoke()` recibe el nombre de una función y admite método, subruta y encabezados. Utiliza `invoke()` a menos que estés realizando una llamada a un recurso que no sea una función.
 
-## Próximos pasos
+## Pasos siguientes
 
-- **[Autenticación](/docs/sdk/authentication)** — Iniciar sesión, registrarse, OAuth, sesiones
-- **[Suscripciones en tiempo real](/docs/sdk/realtime)** — Datos en vivo con WebSockets
-- **[Almacenamiento y archivos](/docs/sdk/storage)** — Subir, descargar y gestionar archivos
+- **[Autenticación](/docs/sdk/authentication)** — Inicio de sesión, registro, OAuth, sesiones
+- **[Suscripciones en tiempo real](/docs/sdk/realtime)** — Datos en tiempo real con WebSockets
+- **[Almacenamiento y archivos](/docs/sdk/storage)** — Subida, descarga y administración de archivos
 - **[Relaciones](/docs/collections/relations)** — Definir relaciones entre colecciones
 
 ---

@@ -314,6 +314,8 @@ stored nowhere — and such a listing simply carries no `nextCursor`.
 
 ## Selecting columns
 
+<span class="since-badge" data-since="0.20">Since 0.20</span>
+
 `?fields=` narrows a read to the columns you name. It is a projection pushed
 into the query, not a trim of the response:
 

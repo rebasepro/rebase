@@ -84,7 +84,7 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   toolchain moves with it, to the versions the reference app is built and
   tested against every CI run.
 
-- **`rebase init` asks for the project name** when one is not given, defaulting
+- **Scaffolding asks for the project name** when one is not given, defaulting
   to `my-app`.
 
 ### Fixed
@@ -153,7 +153,7 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   them: they are all by design, and the boot differ was the one reader that had
   not been told.
 
-- **A first `dlx` install was neither quiet nor clean.** `@ariga/atlas` reached
+- **A first install was neither quiet nor clean.** `@ariga/atlas` reached
   it only transitively and is now an optional peer of the driver — nothing in a
   `dlx` wants it, and the runtime image already turns it off. The admin's
   spreadsheet reader moved off an unmaintained package, taking six deprecated

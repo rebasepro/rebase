@@ -183,6 +183,24 @@ const EXTRA_TOKENS = new Map([
     ["DISABLE_SELF_REGISTRATION", "same entry"]
 ]);
 
+/**
+ * The version a badge should name: the next minor after what is published.
+ *
+ * This message used to hardcode `0.18`, which was the release being prepared
+ * the day it was written. Every reader since has been told to write a badge two
+ * releases stale — a wrong number is worse than none here, because the badge's
+ * whole job is to tell someone whether the feature is in the version they have.
+ */
+function nextVersion() {
+    try {
+        const pkg = JSON.parse(readFileSync(path.join(DEFAULT_ROOT, "packages/server/package.json"), "utf8"));
+        const [major, minor] = String(pkg.version).split(".");
+        return `${major}.${Number(minor) + 1}`;
+    } catch {
+        return "the next release";
+    }
+}
+
 const BADGE = /<span[^>]*class="since-badge"[^>]*data-since="([^"]+)"|<Since\s[^>]*v=["']([^"']+)["']/g;
 
 /** `## [Unreleased]` body, and everything below it. */
@@ -360,7 +378,8 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
                     line: start + 1,
                     message:
                         `"${heading}" describes \`${token}\`, which is only in ## [Unreleased] — ` +
-                        `add <span class="since-badge" data-since="0.18">Since 0.18</span> to the section.`
+                        `add <span class="since-badge" data-since="${nextVersion()}">Since ${nextVersion()}</span> `
+                        + "on the line BELOW the heading — inside it, the badge rewrites the anchor."
                 });
                 break; // one finding per section is enough to act on
             }

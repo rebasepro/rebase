@@ -125,6 +125,8 @@ the ID you got. Read the response header.
 
 ## Data, queries and writes
 
+<span class="since-badge" data-since="0.20">Since 0.20</span>
+
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |

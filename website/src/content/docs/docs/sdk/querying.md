@@ -403,9 +403,16 @@ to narrow the columns *inside* a relation, see
 
 ### `distinct`
 
-`distinct` collapses rows that are identical over the columns being returned.
-It is only meaningful alongside `fields`, since the primary key is always in the
-projection and every row is therefore already distinct:
+<span class="since-badge" data-since="0.20">Since 0.20</span>
+
+`distinct` collapses rows that are identical over the columns being returned,
+and a distinct read returns **only** the columns you name — the primary key is
+left out of the projection, unlike every other read. It has to be: a surrogate
+key differs on every row, so keeping it would make each row unique by
+construction and the query would answer 200 having done nothing.
+
+That makes it meaningful only alongside `fields`. Without one you are asking for
+every visible column, key included, and nothing collapses:
 
 ```typescript
 // The statuses actually in use.
@@ -415,8 +422,15 @@ const { data } = await client.data.posts
     .find();
 ```
 
-`meta.total` counts distinct rows too, so `hasMore` describes the set being
-paged. Two combinations are refused rather than answered uselessly:
+A distinct read addresses no rows — there is no key to address them by — so it
+returns a set of values rather than a set of rows to update or delete, and it
+carries no `nextCursor`. It also reports **no `meta.total`**: counting would
+need a `COUNT(DISTINCT …)` the driver does not issue, and reporting the row
+count instead described a different set from the one served — a complete
+two-row result came back as `total: 8, hasMore: true`, which is a client paging
+forever. `hasMore` comes from the page itself.
+
+Two combinations are refused rather than answered uselessly:
 
 - **A query that scores every row** — a ranked `search()` or a `vectorSearch()`
   attaches a `_score`/`_distance` per row, so no two rows are ever equal and
