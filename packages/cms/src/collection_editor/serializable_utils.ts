@@ -256,6 +256,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (sp.userSelect) result.userSelect = sp.userSelect;
             if (sp.email) result.email = sp.email;
             if (sp.url) result.url = sp.url;
+            if (sp.autoValue) result.autoValue = sp.autoValue;
 
             // Convert validation.matches from RegExp to string
             if (sp.validation) {
@@ -283,6 +284,8 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (np.validation) result.validation = np.validation;
             if (np.isId !== undefined) result.isId = np.isId;
             if (np.enum) result.enum = np.enum;
+            if (np.precision !== undefined) result.precision = np.precision;
+            if (np.scale !== undefined) result.scale = np.scale;
             return result;
         }
 

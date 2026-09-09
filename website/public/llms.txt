@@ -204,7 +204,8 @@
 - [GitHubIcon](https://rebase.pro/docs/ui/icons/githubicon): GitHubIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
 - [HandleIcon](https://rebase.pro/docs/ui/icons/handleicon): HandleIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
-- [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
+- [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, sorting, column selection and aggregates with the Rebase Client SDK.
+- [Pagination](https://rebase.pro/docs/sdk/pagination): Page a collection with limit/offset, page numbers, or a keyset cursor — and when each one stops being correct.
 - [Writing data](https://rebase.pro/docs/sdk/writing): create, upsert, update and delete with the SDK — field operations, conditional writes, idempotency keys, batch writes, and writing across collections in one transaction.
 - [Aggregates and search](https://rebase.pro/docs/sdk/aggregates-and-search): Count, sum and group with the SDK, filter inside JSON columns, and run full-text and vector search from the client.
 - [Querying relations](https://rebase.pro/docs/sdk/relations): Include related entities in a query, and read a child collection through its parent with the SDK's relation accessors.

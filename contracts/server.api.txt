@@ -24,11 +24,15 @@ class TusHandler { create, delete, head, options, patch, startCleanup }
 class UnknownStorageSourceError { knownKeys, storageId }
 class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, setWebhooks }
 const ACCOUNT_SCOPED_STORAGE_BASES
+const BATCH_REF_KEY
 const CONCURRENT_DDL_SQLSTATES
 const DEFAULT_DRIVER_ID
 const DEFAULT_MAX_FILE_SIZE
 const DEFAULT_STORAGE_ID
 const DOCUMENT_MIME_TYPES
+const ETAG_HEADER
+const FIELD_OPERATORS
+const IF_MATCH_HEADER
 const IMAGE_MIME_TYPES
 const RUNTIME_BUNDLE_MOUNT
 const RUNTIME_HEALTH_PATH
@@ -38,6 +42,8 @@ const RUNTIME_PRESTOP_DRAIN_SECONDS
 const RUNTIME_PROBE_PATHS { liveness, readiness, startup }
 const RUNTIME_STARTUP_BUDGET_SECONDS
 const TOPOLOGY_ENV_VARS
+const UPLOAD_COLLECTION_FIELD
+const UPLOAD_PROPERTY_FIELD
 const WEBHOOK_DELIVERY_TASK
 const authJwt
 const authRoles
@@ -45,6 +51,7 @@ const authUid
 const errorHandler
 const fileTokenAuth
 const logger { child, debug, error, info, warn }
+const looksLikeFieldOp
 const optionalAuth
 const queryTokenAuth
 const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
@@ -59,6 +66,10 @@ function assertCollectionConfigs
 function assertDistinctSuffixes
 function assertEmailLinkBases
 function assertEveryKindBindable
+function assertFieldOpsValid
+function assertIfMatch
+function assertNoFieldOpsOnCreate
+function assertUploadWithinPropertyLimits
 function assertWriteRequestValid
 function blockedAddressReason
 function bootFromBundle
@@ -100,6 +111,8 @@ function createStorageController
 function createStorageRoutes
 function createTwitterProvider
 function createUnconfiguredEmailService
+function createUploadConstraintResolver
+function declaredUniqueTargets
 function defaultBackoff
 function defineCron
 function defineFunction
@@ -125,6 +138,7 @@ function getUserId
 function getUserInvitationTemplate { html, subject, text }
 function getWelcomeEmailTemplate { html, subject, text }
 function hasAsymmetricSigningKey
+function hasFieldOps
 function hasRole
 function hashPassword
 function html
@@ -135,6 +149,7 @@ function initializeDataSource
 function initializeDataSources
 function initializeRebaseBackend
 function installShutdownHandlers
+function isAcceptedFile
 function isAdmin
 function isApiKeyToken
 function isAuthAdapter
@@ -164,6 +179,7 @@ function loadUsersCollection
 function oauthCodeFlowSchema
 function parseBackupDestination
 function parseBackupTimestamp
+function parseFieldOp
 function parseTransformOptions
 function pendingBackgroundWork
 function pkceTokenParams
@@ -172,6 +188,7 @@ function raw
 function rawQueryLoggingEnabled
 function readBackupBytes
 function readBundleManifest
+function readUploadPropertyContext
 function registerDevEmailSink
 function registerResourceResolver
 function requireDriver
@@ -179,6 +196,8 @@ function requireEnv
 function requireRole
 function resolveAuthHooks
 function resolveAuthOptions
+function resolveBatchRefs
+function resolveConflictTarget
 function resolveCorsOrigin
 function resolveDataSources
 function resolveEmailBranding { appName, logoUrl }
@@ -190,11 +209,13 @@ function resolveStorageBackend
 function resolveStorageSources
 function resourceResolver
 function resourceResolvers
+function rowETag
 function runFromBundle
 function runtimeKey
 function safeCompare
 function schemaDriftRemedy { lines, short }
 function serveSPA
+function splitFieldOps { fieldOps, values }
 function summarizeRlsScan { level, message }
 function transformImage
 function tryVerifyOidcIdToken
@@ -205,8 +226,9 @@ function validateCronExpression
 function validatePasswordStrength
 function verifyOidcIdToken
 function verifyPassword
+function versionProperty
 function waitUntil
-interface AccessTokenPayload { aal, amr, displayName, email, iat, isAnonymous, mfa_verified, photoURL, roles, uid }
+interface AccessTokenPayload { aal, amr, claims, displayName, email, iat, isAnonymous, mfa_verified, photoURL, roles, uid }
 interface ApiKey { admin, created_at, created_by, expires_at, id, key_hash, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyPermission { collection, operations }
@@ -264,8 +286,8 @@ interface JobRecord { attempts, createdAt, id, lastError, maxAttempts, payload, 
 interface JobStore { claim, complete, ensureTable, fail, fetch, insert, reapExpired }
 interface JwtSigningKeyConfig { algorithm, kid, privateKey }
 interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
-interface ListenCollectionRequest { collection, distinct, fields, filter, include, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch }
-interface ListenEntityRequest { collection, databaseId, id, onError, onUpdate, path, subscriptionId }
+interface ListenCollectionRequest { collection, distinct, fields, filter, include, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch, withDeleted }
+interface ListenEntityRequest { collection, databaseId, id, onError, onUpdate, path, subscriptionId, withDeleted }
 interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, isSource, manifest, staticApps }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
@@ -281,10 +303,11 @@ interface OAuthProvider { id, schema, verify }
 interface OAuthProviderProfile { displayName, email, emailVerified, photoUrl, providerId }
 interface OutboundUrlGuardOptions { allowPrivateNetworks, lookup }
 interface PaginatedUsersResult { limit, offset, total, users }
+interface ParsedFieldOp { operand, operator }
 interface PasswordResetTokenInfo { expiresAt, uid }
 interface PasswordValidationResult { errors, valid }
 interface QueryFilter { field, operator, value }
-interface QueryOptions { cursor, distinct, fields, include, limit, logical, offset, orderBy, vectorSearch, where }
+interface QueryOptions { cursor, distinct, fields, include, limit, logical, offset, orderBy, vectorSearch, where, withDeleted }
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, signingKeys, slack, spotify, twitter }
@@ -318,9 +341,10 @@ interface StorageController { deleteObject, getObject, getSignedUrl, getType, kn
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
-interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers }
+interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers, uploadConstraints }
 interface TokenRepository { createMagicLinkToken, createPasswordResetToken, createRefreshToken, deleteAllPasswordResetTokensForUser, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteRefreshToken, deleteRefreshTokenById, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getTokensValidAfter, listRefreshTokensForUser, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setTokensValidAfter }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
+interface UploadConstraints { acceptedFiles, maxSize, source }
 interface UserData { createdAt, displayName, email, emailVerificationSentAt, emailVerificationToken, emailVerified, id, isAnonymous, metadata, passwordHash, photoUrl, updatedAt }
 interface UserIdentityData { createdAt, id, profileData, provider, providerId, uid, updatedAt }
 interface UserRepository { assignDefaultRole, createUser, deleteUser, getUserByEmail, getUserById, getUserByIdentity, getUserByVerificationToken, getUserIdentities, getUserRoleIds, getUserRoles, getUserWithRoles, linkUserIdentity, listUsers, listUsersPaginated, setEmailVerified, setUserRoles, setVerificationToken, updatePassword, updateUser }
@@ -341,6 +365,7 @@ type DrizzleClient
 type EmailLinkKind
 type EmailVerificationTemplateFunction
 type EnvBag
+type FieldOperator
 type HonoEnv { Variables }
 type JobHandler
 type JobStatus
@@ -351,6 +376,7 @@ type PasswordResetTemplateFunction
 type PublicJwk
 type RebaseBootEnv
 type RebaseEnv
+type ResolveUploadConstraints
 type ResolvedAuthHooks
 type ResourceResolution
 type RlsScanner
@@ -377,6 +403,7 @@ const ADMIN_PROPERTY_KEYS
 const ALL_WHERE_FILTER_OPS
 const ANONYMOUS_USER_ID
 const ANONYMOUS_USER_IDS
+const BATCH_REF_KEY
 const BUNDLE_FORMAT_VERSION
 const CANONICAL_TO_REST
 const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
@@ -390,8 +417,11 @@ const DEFAULT_SEARCH_COLUMN
 const DEFAULT_SEARCH_LANGUAGE
 const DEFAULT_SEARCH_WEIGHT
 const DEFAULT_STORAGE_SOURCE_KEY
+const DEFAULT_TENANT_BYPASS_ROLES
 const DEFAULT_VECTOR_LIST_LIMIT
+const FIELD_OPERATORS
 const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const JUNCTION_PIVOT_KEY
 const LEGACY_RLS_JWT_SQL
 const LEGACY_RLS_ROLES_SQL
 const LEGACY_RLS_SCHEMA
@@ -414,7 +444,7 @@ const RLS_ROLES_SQL
 const RLS_UID_SQL
 const RUNTIME_CONTRACT_VERSION
 const SCHEMA_VERSION_HEADER
-const policy { and, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
+const policy { and, authClaim, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
 function amendResourceKind
 function bucket
 function buildResourceGraph
@@ -438,11 +468,13 @@ function findStorageSuffixCollision
 function getCollectionDataPath
 function getDataSourceCapabilities
 function getDeclaredSubcollections
+function hasFieldOperation
 function hasForeignKeyOnTarget
 function isAnonymousUid
 function isBranchAdmin
 function isChannelBusInstance
 function isDocumentAdmin
+function isFieldOperation
 function isFirebaseCollectionConfig
 function isLazyComponentRef
 function isManyToMany
@@ -456,6 +488,8 @@ function isSQLAdmin
 function isSchemaAdmin
 function isSchemaEditingAdmin
 function isSerializedCollectionRef
+function isTenantClaimSource
+function isTenantMembershipSource
 function isToMany
 function isUnsupported
 function isValidEngine
@@ -500,10 +534,11 @@ interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_pref
 interface ApiKeyPermission { collection, operations }
 interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeysAPI { createKey, getKey, listKeys, revokeKey, updateKey }
-interface ArrayProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
+interface ArrayProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
 interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, getCapabilities, id, initialize, prepareUserCreation, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
 interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement }
+interface AuthClaimPolicyOperand { kind, name }
 interface AuthClient { canRestoreSession, getSession, getSessions, getUser, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
 interface AuthCollectionConfig { actions, enabled, onCreateUser, onResetPassword }
 interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
@@ -528,11 +563,15 @@ interface BackendLifecycle { destroy, healthCheck, initialize }
 interface BackupInfo { createdAt, destinationKind, key, name, sizeBytes }
 interface BackupsAPI { download, list }
 interface BaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, properties, securityRules, singularName, slug, strictWrites }
-interface BaseProperty { callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }
+interface BaseProperty { access, callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }
+interface BatchRef { $ref }
+interface BatchResult { data, meta }
+interface BatchWriteOperation { collection, id, onConflict, op, path, ref, values }
+interface BatchWriteProps { operations }
 interface BeforeDeleteProps { collection, context, id, path, row }
 interface BelongsToRelation { kind, localKey, onDelete, onUpdate, overrides, relationName, target }
-interface BinaryProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
-interface BooleanProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
+interface BinaryProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
+interface BooleanProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BootstrappedAuth { authRepository, emailService, roleService, schemaHealthCheck, userService }
 interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches }
 interface BranchInfo { createdAt, name, parentDatabase, sizeBytes }
@@ -548,6 +587,7 @@ interface CollectionAccessor { aggregate, count, create, createMany, delete, del
 interface CollectionPatchMessage { channel, error, id, payload, pks, requestId, row, rows, subscriptionId, type }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
+interface CollectionTenantConfig { bypassRoles, field, from }
 interface CollectionUpdateMessage { channel, error, meta, payload, pks, requestId, row, rows, subscriptionId, type }
 interface CollectionUpdateMeta { hasMore, limit, nextCursor, offset, partial, total }
 interface ComparePolicyExpression { kind, left, op, right }
@@ -562,7 +602,7 @@ interface CronJobLogEntry { durationMs, error, finishedAt, jobId, logs, manual, 
 interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
 interface CronResourceOptions { catchUpWindowSeconds, description, enabled, engine, label, schedule, timeoutSeconds, timezone, transport }
 interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface DataDriver { admin, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany }
+interface DataDriver { admin, batchWrite, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
@@ -571,11 +611,11 @@ interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionS
 interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, dataSourceKey, introspectCollections, realtime, schemaProvisioning }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, transport }
-interface DateProperty { autoValue, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, mode, name, propertyConfig, timezone, type, validation }
+interface DateProperty { access, autoValue, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, mode, name, propertyConfig, timezone, type, validation }
 interface DatePropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface DeclareOptions { engine, label, transport }
-interface DeleteManyProps { collection, ids, path }
-interface DeleteProps { collection, row }
+interface DeleteManyProps { collection, hard, ids, path }
+interface DeleteProps { collection, hard, row }
 interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
 interface DocumentAdmin { executeAggregate, fetchCollectionStats }
 interface DownloadConfig { fileNotFound, metadata, url }
@@ -592,9 +632,10 @@ interface EnumValueConditions { disabled, disabledMessage, hidden }
 interface ExistsInPolicyExpression { collection, kind, where }
 interface FalsePolicyExpression { kind }
 interface FetchCollectionOptions { collection, databaseId, filter, limit, offset, order, orderBy, searchString, startAfter }
-interface FetchCollectionProps { collection, distinct, fields, filter, include, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter, vectorSearch }
+interface FetchCollectionProps { collection, distinct, fields, filter, include, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter, vectorSearch, withDeleted }
 interface FetchHistoryOptions { limit, offset }
-interface FetchOneProps { collection, databaseId, id, path }
+interface FetchOneProps { collection, databaseId, id, path, withDeleted }
+interface FieldAccess { read, write }
 interface FieldPolicyOperand { kind, name }
 interface FilterCondition { column, operator, value }
 interface FilterPreset { filterValues, label, sort }
@@ -605,7 +646,7 @@ interface FirebaseCollectionConfig { auth, callbacks, childCollections, dataSour
 interface FunctionInvokeOptions { headers, method, path }
 interface FunctionResourceOptions { engine, file, label, portable, requires, transport }
 interface FunctionsAPI { invoke }
-interface GeopointProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
+interface GeopointProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface GinIndex { on, reason, using, where }
 interface HasManyRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target }
 interface HasOneRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target }
@@ -622,19 +663,19 @@ interface LiteralPolicyOperand { kind, value }
 interface LogicalCondition { conditions, type }
 interface ManagedCompatibility { eligible, reasons }
 interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through }
-interface MapProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
+interface MapProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
 interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites }
 interface MountableRouter { fetch, routes }
 interface NativeDependency { name, reason }
 interface NotPolicyExpression { kind, operand }
-interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, precision, propertyConfig, scale, type, validation }
+interface NumberProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, precision, propertyConfig, scale, type, validation }
 interface NumberPropertyValidationSchema { integer, lessThan, max, min, moreThan, negative, positive, required, requiredMessage, unique, uniqueInArray }
 interface OrPolicyExpression { kind, operands }
 interface OuterFieldPolicyOperand { kind, name }
 interface OwnerSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
-interface PostgresCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, strictWrites, table }
+interface PostgresCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 interface PostgresPolicy { cmd, permissive, policyname, qual, roles, status, tablename, with_check }
 interface PropertyConditions { acceptedFiles, allowedEnumValues, canAddElements, clearOnDisabled, defaultValue, disabled, disabledMessage, enumConditions, excludedEnumValues, hidden, max, maxFileSize, min, readOnly, referenceFilter, referencePath, required, requiredMessage, sortable }
 interface PropertyValidationSchema { required, requiredMessage, unique, uniqueInArray }
@@ -666,11 +707,11 @@ interface RebaseStaticAppConfig { build, output, path, root, spa, type }
 interface RebaseStorageSourceConfig { engine, label, transport }
 interface RebaseWebSocket { authenticate, disconnect, on, setAuthTokenGetter }
 interface RecordHistoryParams { action, id, previousValues, tableName, updatedBy, values }
-interface ReferenceProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, path, propertyConfig, type, validation }
+interface ReferenceProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, path, propertyConfig, type, validation }
 interface RegisteredPolicyExpression { kind }
 interface RelationAggregateSort { agg, field, relation }
 interface RelationBase { onDelete, onUpdate, overrides, relationName, target }
-interface RelationProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, propertyConfig, relation, resolvedRelation, type, validation }
+interface RelationProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, propertyConfig, relation, resolvedRelation, type, validation }
 interface ResolvedBelongsTo { cardinality, kind, localKey, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, writable }
 interface ResolvedDataSource { capabilities, databaseId, engine, key, transport }
 interface ResolvedHasMany { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, writable }
@@ -687,11 +728,11 @@ interface RestFetchService { aggregate, cursorFor, fetchCollectionForRest, fetch
 interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RolesOverlapPolicyExpression { kind, roles }
-interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
+interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, upsert, vectorSearch, where, where, where }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase }
-interface SaveManyProps { collection, path, rows, upsert }
-interface SaveProps { collection, id, path, previousValues, status, upsert, values }
+interface SaveManyProps { collection, onConflict, path, rows, upsert }
+interface SaveProps { collection, id, onConflict, path, previousValues, status, upsert, values }
 interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
 interface SchemaChange { collection, detail, kind, property, remedy, verdict }
 interface SchemaChangeFile { contents, path }
@@ -715,7 +756,7 @@ interface StorageReference { bucket, fullPath, name, parent, root, toString }
 interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
 interface StorageSourceDefinition { account, default, engine, key, label, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
-interface StringProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, email, enum, excludeFromApi, isId, metadata, name, propertyConfig, storage, type, url, userSelect, validation }
+interface StringProperty { access, autoValue, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, email, enum, excludeFromApi, isId, metadata, name, propertyConfig, storage, type, url, userSelect, validation }
 interface StringPropertyValidationSchema { length, lowercase, matches, matchesMessage, max, min, required, requiredMessage, trim, unique, uniqueInArray, uppercase }
 interface StructuredSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface TableColumnInfo { character_maximum_length, column_default, column_name, data_type, enum_values, is_nullable, udt_name }
@@ -723,6 +764,8 @@ interface TableForeignKeyInfo { column_name, foreign_column_name, foreign_table_
 interface TableJunctionInfo { junction_table_name, source_column_name, target_column_name, target_table_name }
 interface TableMetadata { columns, foreignKeys, junctions, policies }
 interface TablePolicyInfo { cmd, policy_name, qual, roles, with_check }
+interface TenantClaimSource { claim }
+interface TenantMembershipSource { membership }
 interface TopicHandle { engine, key, kind, label, options, publish, subscription, toString, transport, usedBy }
 interface TopicOptions { delivery, engine, label, maxAttempts, transport }
 interface TopicRuntime { publish }
@@ -732,21 +775,23 @@ interface TruePolicyExpression { kind }
 interface UnorderedIndexKey { prop }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface UpdateManyProps { collection, path, updates }
-interface UploadFileProps { bucket, file, key, metadata, public }
+interface UploadFileProps { bucket, context, file, key, metadata, public }
 interface UploadFileResult { bucket, key, storageUrl }
+interface UploadPropertyContext { collection, property }
 interface UploadedFileContext { entityId, file, path, property, propertyKey, storage, values }
+interface UpsertOptions { idempotencyKey, ifMatch, onConflict, returning }
 interface UserCreationFinalizeResult { emailDeliveryFailed, invitationSent, temporaryPassword }
 interface UserCreationPrepareResult { clearPassword, hookHandledEmail, invitationSent, values }
 interface UserCreationWriteContract { extraFields, validate }
 interface UserManagementAdapter { createUser, deleteUser, getUserById, getUserRoles, listUsers, setUserRoles, updateUser }
 interface VectorIndexConfig { distance, efConstruction, lists, m, method }
-interface VectorProperty { callbacks, columnName, conditions, defaultValue, description, dimensions, dynamicProps, excludeFromApi, index, metadata, name, propertyConfig, type, validation }
+interface VectorProperty { access, callbacks, columnName, conditions, defaultValue, description, dimensions, dynamicProps, excludeFromApi, index, metadata, name, propertyConfig, type, validation }
 interface VectorSearchParams { distance, property, threshold, vector }
 interface ViaRelation { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, target }
 interface WebSocketErrorPayload { code, error, message }
 interface WebSocketMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
 interface WithheldSchemaConstraint { kind, reason, remedy, target }
-interface WriteOptions { idempotencyKey }
+interface WriteOptions { idempotencyKey, ifMatch, returning }
 type AdminCollectionKey
 type AdminPropertyKey
 type AfterSaveErrorProps
@@ -756,6 +801,7 @@ type AnyCollectionConfig
 type AuthChangeEvent
 type BackendFactory
 type BackupDestinationKind
+type BatchOperation
 type BeforeSaveProps
 type BucketHandle
 type ChannelBusConfig
@@ -790,6 +836,7 @@ type EntityStatus
 type EntityValues
 type EnumValueConfig { color, disabled, id, label }
 type EnumValues
+type FieldOperation
 type FieldPath
 type FileType
 type FilterCombinationValidProps { collection, databaseId, filterValues, path, sortBy }
@@ -856,10 +903,12 @@ type StorageConfig { acceptedFiles, fileName, imageResize, includeBucketUrl, max
 type StorageOperation
 type StorageSourceTransport
 type StrictProperties
+type TenantSource
 type TopicDelivery
 type TopicHandler
 type UpdateOf
-type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
+type UpdateValues
+type User { claims, createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
 type VectorDistance
 type WhereElementOf
 type WhereFilterOp
@@ -881,7 +930,9 @@ function createBackups { download, list }
 function createCookieStorage
 function createMemoryStorage
 function createRebaseClient
+function etagOf
 function isOfflineError
+function not
 function or
 interface AdminUser { createdAt, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
@@ -889,12 +940,14 @@ interface ApiKeyPermission { collection, operations }
 interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface AuthStorage { getItem, removeItem, setItem }
 interface AuthTokens { accessToken, accessTokenExpiresAt, refreshToken }
+interface BatchRef { $ref }
+interface BatchResult { data, meta }
 interface BroadcastEvent { event, payload, replayed, seq }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryResult { latestSeq, messages, retained }
 interface ChannelOptions { history }
 interface ChannelTransport { onChannelMessage, onReconnect, sendMessage }
-interface CollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
+interface CollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, upsert, vectorSearch, where }
 interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
 interface CreateAdminOptions { adminPath }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
@@ -923,13 +976,16 @@ interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
-interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
+interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, upsert, vectorSearch, where, where, where }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
+interface UpsertOptions { idempotencyKey, ifMatch, onConflict, returning }
 type AuthChangeEvent
 type AuthConfig
+type BatchOperation
 type CreateRebaseClientResult
 type CursorSpec
+type FieldOperation
 type FindAllParams
 type FindParams
 type FindResponse
@@ -937,7 +993,8 @@ type IterateParams
 type PaginationErrorCode
 type PresenceState
 type RebaseErrorCode
-type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
+type UpdateValues
+type User { claims, createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
 
 ## @rebasepro/common
 class CollectionRegistry { get, getCollectionByPath, getCollections, getGlobalCallbacks, getRaw, getRawCollections, normalizeCollection, register, registerMultiple, reset, resolvePathToCollections, setDataSources, setGlobalCallbacks }
@@ -948,6 +1005,7 @@ class OrderBySpecError { code }
 class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
 class RebasePaginationError { code }
 class UnknownFilterOperatorError { code, details, field, operator, statusCode, validOperators }
+const ADMIN_ROLE
 const CALLBACK_REJECTED
 const COLLECTION_PATH_SEPARATOR
 const COMPOSITE_ID_SEPARATOR
@@ -963,21 +1021,26 @@ const REBASE_INTERNAL_PREFIXES
 const REBASE_INTERNAL_SCHEMAS
 const REBASE_INTERNAL_TABLES
 const REBASE_USER_ROLE
+const TENANT_INDEX_REASON
 const buildPropertyCallbacks
-const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, strictWrites, table }
+const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 function aggregateAlias
 function and
+function applyDefaultValuesOnCreate
 function buildCollectionFromTableMetadata
 function buildCompositeId
 function buildConditionContext
 function buildRebaseData
 function buildRoutedRebaseData
 function buildSdkData
+function buildTenantSecurityRule
 function callbackRefusal
 function canCreateEntity
 function canDeleteEntity
 function canEditEntity
 function canReadCollection
+function canReadField
+function canWriteField
 function checkOperation
 function classifyTable
 function collectAllPages
@@ -996,6 +1059,7 @@ function deserializeLogicalCondition
 function deserializeOrderBy
 function deserializeOrderByList
 function detectJunctionTables
+function effectiveAccess
 function embedParentExpression
 function encodeCursor
 function enumToObjectEntries
@@ -1028,6 +1092,8 @@ function getRelationTargetPath
 function getSubcollections
 function getTableName
 function getTableVarName
+function getTenantConfig
+function hasFieldAccessRules
 function includePaths
 function isAddressableId
 function isJunctionBackedRelation
@@ -1041,6 +1107,7 @@ function normalizeEmail
 function normalizeInclude
 function normalizeOrderBy
 function normalizeToEntityRelation
+function not
 function or
 function paginateFind
 function parseIdValues
@@ -1067,6 +1134,8 @@ function resolveStorageFilenameString
 function resolveStoragePathString
 function resolveStorageSource
 function resolveStringColumnLength
+function resolveTenantWrite
+function restrictedFieldNames { declared, refused }
 function revokeInternalTableAccess
 function revokeInternalTableSql
 function sanitizeData
@@ -1080,12 +1149,16 @@ function sortCollectionsBySlug
 function sortProperties
 function sqlToPolicy
 function stripCollectionPath
+function tenantBypassRoles
+function tenantPolicyName
+function tenantScopeExpression
 function toCallbackError
 function toFilterTuples
 function topLevelIncludeNames
 function traverseValueProperty
 function traverseValuesProperties
 function updateDateAutoValues
+function updateUserAutoValues
 function wrapAsEntityData
 function wrapAsSdkData
 interface AnonymousGrantRisk { detail, explanation, pattern }
@@ -1093,11 +1166,12 @@ interface CheckOperationOptions { clauses, onUnknown }
 interface DataSourceResolvable { dataSource, databaseId, engine }
 interface DecodedCursor { id, orderBy, values }
 interface EntityDataOptions { resolveCollection }
+interface FieldViewer { roles }
 interface IncludeNode { children, fields, limit, logical, orderBy, where }
 interface IntrospectedCollection { name, properties, propertiesOrder, relations, securityRules, slug, table }
 interface JunctionDeclaringSide { collection, junctionColumn, relation }
 interface JunctionEndpoint { collection, junctionColumn }
-interface JunctionSpec { declaringSides, endpoints, schema, table }
+interface JunctionSpec { declaringSides, endpoints, properties, schema, table }
 interface NormalizedInclude { tree, wildcard }
 interface PolicyCompileOptions { resolveCollection }
 interface PolicyEvalContext { entity, isAnonymous, roles, uid }
@@ -1106,6 +1180,8 @@ interface RelationRef { id, path }
 interface RelationRefWithData { data, id, path }
 interface RoutedRebaseDataParams { defaultData, resolveKey, sources }
 interface RuleConditions { usingExpr, withCheckExpr }
+interface TenantWriteInput { bypass, callerTenants, callerTenantsComplete, previousValues, slug, status, tenant, values }
+interface TenantWriteRefusal { code, field, message }
 type AuthContext
 type DataSourceRegistry
 type EntityCallbackContext
@@ -1116,6 +1192,7 @@ type PolicyClauses
 type ResolvePropertyProps { authController, entityId, ignoreMissingFields, index, path, previousValues, property, propertyConfigs, propertyKey, values }
 type RoutableData
 type TableCategory
+type TenantWriteDecision
 type TriState
 type UnknownResolution
 

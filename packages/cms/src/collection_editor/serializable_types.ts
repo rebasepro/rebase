@@ -231,6 +231,11 @@ export interface SerializableStringProperty extends SerializableBaseProperty {
     email?: boolean;
     /** The string holds a URL. Feeds the generated OpenAPI contract. */
     url?: boolean;
+    /**
+     * Stamp the column with the acting user's uid. The `created_by` /
+     * `updated_by` twin of {@link SerializableDateProperty.autoValue}.
+     */
+    autoValue?: "user_on_create" | "user_on_update";
     reference?: SerializableReferenceProperty;
 }
 
@@ -242,6 +247,10 @@ export interface SerializableNumberProperty extends SerializableBaseProperty {
     validation?: NumberPropertyValidationSchema;
     isId?: boolean | "manual" | "increment" | string;
     enum?: EnumValues;
+    /** Total significant digits for a `numeric` column — `NUMERIC(precision, scale)`. */
+    precision?: number;
+    /** Digits after the decimal point. Requires `precision`. */
+    scale?: number;
 }
 
 /** JSON-serializable `BooleanProperty`. */
