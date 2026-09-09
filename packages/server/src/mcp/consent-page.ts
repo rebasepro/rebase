@@ -19,6 +19,15 @@
  *  3. **Say what is NOT being granted.** The interesting property of this
  *     integration is that the grant cannot exceed the user's own access, and
  *     stating it is what makes the decision an informed one.
+ *
+ *     What it must NOT say is that the grant can be revoked at any time. It
+ *     cannot yet: `OAuthStore.revokeFamily` exists but nothing user-facing
+ *     calls it, so there is no way for a person to disconnect an application
+ *     they have authorized. That sentence was here and has been removed rather
+ *     than left to be true later — a consent screen making a promise the system
+ *     does not keep is worse than one that stays quiet, because it is the
+ *     sentence that makes saying yes feel safe. Put it back in the same commit
+ *     that ships revocation, not before.
  *  4. **Never post the password anywhere but the existing login endpoint.**
  *     The form below sends credentials to `${basePath}/auth/login` and nowhere
  *     else; this file's own endpoint receives only the resulting session token.
@@ -109,7 +118,7 @@ export function renderConsentPage(params: ConsentPageParams): string {
   <div class="limits">
     It will act <strong>as you</strong>, and can never see more than you can:
     every row it reads is filtered by the same permissions that apply when you
-    use this application yourself. You can revoke this at any time.
+    use this application yourself.
   </div>
 
   <form id="consent" method="post" action="${escapeAttr(params.decisionUrl)}">
