@@ -7,6 +7,89 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Added
+
+- **Soft delete.** One condition, applied from every read path rather than
+  bolted onto each one, so a soft-deleted row is invisible to `find`,
+  `findById`, REST, the SDK and realtime alike instead of leaking through
+  whichever reader was written last.
+
+- **Field-level access control — `access: { read, write }` per property.** The
+  server now enforces the write rules the config already published; previously
+  a property could declare its access and nothing checked it on the way in.
+
+- **`tenant` — one declaration for a multi-tenant collection.** The tenancy
+  claim, the RLS scope and the config validation come from that single
+  declaration, so a collection cannot be tenant-scoped in one layer and open in
+  another.
+
+- **Junction payload columns — `manyToMany.through.properties`.** A join table
+  can carry its own columns and they are planned, generated and typed like any
+  other.
+
+- **A read query language the driver actually implements**: keyset pagination
+  (`after()`, `?after=`), nested `include` trees, `not`, `distinct()`,
+  `fields()`, `aggregate()` and explicit nulls placement — one keyset codec and
+  one include normaliser shared by SDK, REST and the Postgres driver, rather
+  than three readings that disagreed at the edges. Nested includes batch, and
+  `aggregate()` removes the per-push `/count` round trip.
+
+- **A write path to match**: batch writes, ETags, field operations, upsert
+  targets, `return=minimal`, `defaultValue` applied on create, and user
+  `autoValues` stamped instead of dropped.
+
+- **Schema declarations that reach the generated artifacts**: declared indexes
+  now land in the Drizzle file, plus `defaultValue`, `updated_at` triggers and
+  numeric precision.
+
+- **`include` is typed from the collection's relations** in generated code, so
+  a wrong include name is a compile error rather than a runtime empty.
+
+- Storage enforces a property's `maxSize` and `acceptedFiles` **on the server**,
+  not only in the browser.
+
+### Changed
+
+- **One interpreter, three renderers.** `Property` → SQL had three independent
+  emitters and no shared representation, and they disagreed in twelve places —
+  three of them fatal at boot. There is now a single `SchemaPlan` the DDL,
+  Drizzle and policy renderers all read, and the live catalogue is the
+  runtime's schema rather than a fourth opinion about it.
+
+- Studio and the panel join the surface ladder: surface roles, chrome
+  discipline, and a density pass across the editors.
+
+### Fixed
+
+- **A generated column no longer wedges every push behind it.** PostgreSQL
+  refuses `ALTER COLUMN … TYPE` on a column a `GENERATED ALWAYS AS … STORED`
+  expression reads, and a search block's `tsvector` is deliberately hidden from
+  Atlas — so Atlas planned an alter against a column whose dependant it could
+  not see, PostgreSQL refused, and because `schema apply` runs in one
+  transaction every unrelated statement rolled back with it. One
+  `varchar(255)` → `text` widening on a searched column was enough to make
+  `rebase db push` a permanent no-op, with an error naming neither the
+  generated column nor the reason. Both `db push` and `db migrate` now drop the
+  generated column, let the apply through, and rebuild it from `search.sql`.
+
+- **A database refusal now names the field, not the column** — on both the
+  server and the driver, so a validation error points at the thing the author
+  wrote rather than its snake_cased physical name.
+
+- **A primary key no generator can honour is refused at config load**, instead
+  of producing a schema that fails on first insert.
+
+- The driverless realtime refetch fallback establishes the viewer too, so a
+  fallback refetch no longer returns rows RLS should have hidden.
+
+- One zod: `loadEnv` stops merging across copies.
+
+- A literal NUL byte in `conflict-target.ts` made the file read as binary to
+  git and vanish from every search.
+
+- A selected reference cell in the panel previews and edits in one line.
+
+
 ## [0.19.1] - 2026-09-07
 
 ### Fixed
