@@ -695,7 +695,7 @@ interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions
 interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
 interface RebaseBundleFunction { file, name, portable, requires }
 interface RebaseBundleManifest { app, build, bundleFormat, collections, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage }
-interface RebaseBundleStatic { dir, path, spa }
+interface RebaseBundleStatic { cms, dir, name, path, spa }
 interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
 interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }
 interface RebaseProjectContract { collectionSlugs, collections, generatedAt, runtime, schemaVersion }
@@ -703,7 +703,7 @@ interface RebaseProjectLink { apiUrl, org, project }
 interface RebaseProjectManifest { $schema, apps, rebase, telemetry }
 interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
-interface RebaseStaticAppConfig { build, output, path, root, spa, type }
+interface RebaseStaticAppConfig { build, cms, output, path, root, spa, type }
 interface RebaseStorageSourceConfig { engine, label, transport }
 interface RebaseWebSocket { authenticate, disconnect, on, setAuthTokenGetter }
 interface RecordHistoryParams { action, id, previousValues, tableName, updatedBy, values }

@@ -287,7 +287,23 @@ jobs:
       - name: Start PostgreSQL container
         run: |
           docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+          # `-h 127.0.0.1`, and it is the whole point of this loop.
+          #
+          # The official image starts a TEMPORARY server during initdb to run
+          # its init scripts, then shuts it down and starts the real one. That
+          # temporary server sets `listen_addresses=''`, so it answers on the
+          # unix socket and not on TCP. A socket-based `pg_isready` therefore
+          # reports ready against the throwaway server, this loop exits early,
+          # and the next command lands in the shutdown window between the two:
+          #
+          #   createdb: error: connection to server on socket
+          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
+          #   FATAL: the database system is shutting down
+          #
+          # which is what took e2e-selfhost down mid-release. Asking over TCP
+          # cannot see the temporary server at all, so the first success is the
+          # real one.
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
             echo "Waiting for postgres..."
             sleep 1
           done
@@ -444,7 +460,23 @@ jobs:
       - name: Start PostgreSQL container
         run: |
           docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+          # `-h 127.0.0.1`, and it is the whole point of this loop.
+          #
+          # The official image starts a TEMPORARY server during initdb to run
+          # its init scripts, then shuts it down and starts the real one. That
+          # temporary server sets `listen_addresses=''`, so it answers on the
+          # unix socket and not on TCP. A socket-based `pg_isready` therefore
+          # reports ready against the throwaway server, this loop exits early,
+          # and the next command lands in the shutdown window between the two:
+          #
+          #   createdb: error: connection to server on socket
+          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
+          #   FATAL: the database system is shutting down
+          #
+          # which is what took e2e-selfhost down mid-release. Asking over TCP
+          # cannot see the temporary server at all, so the first success is the
+          # real one.
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
             echo "Waiting for postgres..."
             sleep 1
           done
@@ -573,7 +605,23 @@ jobs:
       - name: Start PostgreSQL container
         run: |
           docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+          # `-h 127.0.0.1`, and it is the whole point of this loop.
+          #
+          # The official image starts a TEMPORARY server during initdb to run
+          # its init scripts, then shuts it down and starts the real one. That
+          # temporary server sets `listen_addresses=''`, so it answers on the
+          # unix socket and not on TCP. A socket-based `pg_isready` therefore
+          # reports ready against the throwaway server, this loop exits early,
+          # and the next command lands in the shutdown window between the two:
+          #
+          #   createdb: error: connection to server on socket
+          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
+          #   FATAL: the database system is shutting down
+          #
+          # which is what took e2e-selfhost down mid-release. Asking over TCP
+          # cannot see the temporary server at all, so the first success is the
+          # real one.
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
             echo "Waiting for postgres..."
             sleep 1
           done
@@ -732,7 +780,23 @@ jobs:
       - name: Start PostgreSQL container
         run: |
           docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+          # `-h 127.0.0.1`, and it is the whole point of this loop.
+          #
+          # The official image starts a TEMPORARY server during initdb to run
+          # its init scripts, then shuts it down and starts the real one. That
+          # temporary server sets `listen_addresses=''`, so it answers on the
+          # unix socket and not on TCP. A socket-based `pg_isready` therefore
+          # reports ready against the throwaway server, this loop exits early,
+          # and the next command lands in the shutdown window between the two:
+          #
+          #   createdb: error: connection to server on socket
+          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
+          #   FATAL: the database system is shutting down
+          #
+          # which is what took e2e-selfhost down mid-release. Asking over TCP
+          # cannot see the temporary server at all, so the first success is the
+          # real one.
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
             echo "Waiting for postgres..."
             sleep 1
           done
