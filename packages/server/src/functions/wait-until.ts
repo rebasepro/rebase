@@ -29,6 +29,7 @@
  */
 import type { Context } from "hono";
 import { logger } from "../utils/logger";
+import { unref } from "@rebasepro/utils";
 
 /**
  * Pending background work, on a process-global slot for the reason given in
@@ -148,7 +149,7 @@ export async function drainBackgroundWork(timeoutMs = 5_000): Promise<number> {
     const expired = new Promise<"timeout">(resolve => {
         timer = setTimeout(() => resolve("timeout"), timeoutMs);
         // Do not hold the event loop open just to observe a deadline.
-        (timer as unknown as { unref?: () => void }).unref?.();
+        unref(timer);
     });
 
     try {

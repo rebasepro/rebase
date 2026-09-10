@@ -27,6 +27,7 @@ import { logger } from "../utils/logger.js";
 /** A driver's `executeSql`, narrowed to what a bootstrap needs. */
 export type SqlExec = (sqlText: string, options?: { params?: unknown[] }) => Promise<Record<string, unknown>[]>;
 
+
 /**
  * SQLSTATEs a *simultaneous boot* can raise from statements that are otherwise
  * idempotent. Retrying is always the right answer for these: the second attempt

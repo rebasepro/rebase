@@ -21,6 +21,7 @@ import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
 import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
+import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -2249,7 +2250,7 @@ lastSeen: Date.now() });
         );
 
         // Never hold the process open for housekeeping.
-        (this.presenceSweepInterval as unknown as { unref?: () => void }).unref?.();
+        unref(this.presenceSweepInterval);
     }
 
     /** One pass of the stale-roster sweep. See {@link ensurePresenceSweep}. */

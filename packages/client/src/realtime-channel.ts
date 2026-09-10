@@ -62,6 +62,7 @@ export interface BroadcastEvent {
 export type { ChannelHistoryEntry } from "@rebasepro/types";
 import type { ChannelHistoryEntry } from "@rebasepro/types";
 import { RebaseApiError } from "@rebasepro/types";
+import { unref } from "@rebasepro/utils";
 
 /** The answer to a catch-up request. */
 export interface ChannelHistoryResult {
@@ -272,7 +273,7 @@ export class RebaseRealtimeChannel {
 
         if (this.catchUpTimeout) clearTimeout(this.catchUpTimeout);
         this.catchUpTimeout = setTimeout(() => this.abandonCatchUp(), CATCH_UP_TIMEOUT_MS);
-        (this.catchUpTimeout as unknown as { unref?: () => void }).unref?.();
+        unref(this.catchUpTimeout);
 
         try {
             await this.send("channel_history", {
@@ -325,7 +326,7 @@ export class RebaseRealtimeChannel {
                     .catch(() => { /* a dropped beat is recoverable; the next one carries the same state */ });
             }, PRESENCE_HEARTBEAT_MS);
             // Do not hold a Node process open just to say "still here".
-            (this.heartbeat as unknown as { unref?: () => void }).unref?.();
+            unref(this.heartbeat);
         }
     }
 

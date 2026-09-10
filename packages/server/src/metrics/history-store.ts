@@ -30,7 +30,8 @@
  * The bootstrapper's own `SqlExec` takes an options object; each store wraps it
  * once and reads better for it. Same two shapes, same reason, as `job-store`.
  */
-import { revokeInternalTableSql } from "@rebasepro/common";
+import { revokeInternalTableSql, sqlRows } from "@rebasepro/common";
+
 
 export type Exec = (sql: string, params?: unknown[]) => Promise<unknown>;
 
@@ -287,7 +288,7 @@ export async function readSeries(
     // contributor count. `date_trunc` rather than arithmetic because it matches
     // the recorder's `floor(t / 60_000) * 60_000` exactly, and is
     // timezone-independent on a timestamptz.
-    const rows = await exec(
+    const result = await exec(
         `SELECT at, ${combine}(value) AS value, count(*) AS instances
            FROM ${METRICS_HISTORY_TABLE}
           WHERE series = $1
@@ -296,10 +297,9 @@ export async function readSeries(
           GROUP BY at
           ORDER BY at ASC`,
         [series, sinceMinutes]
-    ) as unknown as { rows?: RawPoint[] } | RawPoint[];
+    );
 
-    const list = Array.isArray(rows) ? rows : (rows?.rows ?? []);
-    return list.map(r => ({
+    return sqlRows<RawPoint>(result).map(r => ({
         at: r.at instanceof Date ? r.at.toISOString() : String(r.at),
         value: Number(r.value),
         instances: Number(r.instances ?? 1)

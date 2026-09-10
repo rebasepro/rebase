@@ -31,6 +31,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 import { PgNotifyListener } from "../pg-notify-listener";
 import { ChannelBus, ChannelBusFrame, ChannelBusHandler, frameByteLength } from "./ChannelBus";
+import { unref } from "@rebasepro/utils";
 
 /** NOTIFY channel carrying channel-bus frames. */
 export const CHANNEL_BUS_NOTIFY_CHANNEL = "rebase_channel_bus";
@@ -180,7 +181,7 @@ export class PostgresChannelBus implements ChannelBus {
         }, this.batchWindowMs);
 
         // Housekeeping must never hold the process open.
-        (this.windowTimer as unknown as { unref?: () => void }).unref?.();
+        unref(this.windowTimer);
     }
 
     /** Send everything queued and settle the promises waiting on it. */

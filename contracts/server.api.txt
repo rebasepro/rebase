@@ -1068,6 +1068,7 @@ function evaluatePolicy
 function fieldKeyForColumn
 function findAnonymousGrants
 function findRelation
+function firstSqlRow
 function fullPathToCollectionSegments
 function getArrayResolvedProperties
 function getChildViewDeclaringProperties
@@ -1147,6 +1148,7 @@ function serializeLogicalCondition
 function serializeOrderBy
 function sortCollectionsBySlug
 function sortProperties
+function sqlRows
 function sqlToPolicy
 function stripCollectionPath
 function tenantBypassRoles
@@ -1256,6 +1258,7 @@ function toArray
 function toPostgresIdentifier
 function toWireKey
 function truncateToBytes
+function unref
 function unslugify
 function writeStoredJson
 function writeStoredString

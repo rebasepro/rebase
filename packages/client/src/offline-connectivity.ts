@@ -1,4 +1,5 @@
 import { RebaseApiError } from "./transport";
+import { unref } from "@rebasepro/utils";
 
 /**
  * Whether the network is worth trying, and when to try again after it wasn't.
@@ -236,7 +237,7 @@ export class ConnectivityMonitor {
             this.onRetryDue?.();
         }, delay);
         // A retry timer must never be the reason a Node script refuses to exit.
-        (this.timer as unknown as { unref?: () => void }).unref?.();
+        unref(this.timer);
     }
 
     private clearPendingTimer(): void {

@@ -43,7 +43,7 @@
  */
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { revokeInternalTableSql } from "@rebasepro/common";
+import { revokeInternalTableSql, firstSqlRow } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper } from "../boot/ddl-bootstrap.js";
 import type { RateLimitDecision, RateLimitStore } from "./rate-limit-store.js";
@@ -269,8 +269,4 @@ export function createSqlRateLimitStore(
  * being on their first request — a limiter that never limits, with no error
  * anywhere. Tolerating both costs one line.
  */
-function firstRow(result: unknown): Record<string, unknown> | undefined {
-    if (Array.isArray(result)) return result[0] as Record<string, unknown> | undefined;
-    const rows = (result as { rows?: unknown[] } | undefined)?.rows;
-    return Array.isArray(rows) ? (rows[0] as Record<string, unknown> | undefined) : undefined;
-}
+const firstRow = firstSqlRow<Record<string, unknown>>;

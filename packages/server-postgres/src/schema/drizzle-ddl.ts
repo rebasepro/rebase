@@ -11,6 +11,7 @@
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createDdlBootstrapper, type DdlBootstrapper } from "@rebasepro/server";
+import { sqlRows } from "@rebasepro/common";
 
 /**
  * A {@link DdlBootstrapper} that runs its statements through `db.execute`.
@@ -27,7 +28,6 @@ export function drizzleDdlBootstrapper(
         // identifiers that were validated before they got here — there is no
         // parameter to bind, and Drizzle's tagged template would treat the whole
         // statement as one.
-        const result = await db.execute(sql.raw(statement));
-        return (result as unknown as { rows?: Record<string, unknown>[] }).rows ?? [];
+        return sqlRows(await db.execute(sql.raw(statement)));
     }, scope);
 }

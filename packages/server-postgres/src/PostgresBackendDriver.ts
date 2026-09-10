@@ -36,7 +36,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
@@ -275,9 +275,7 @@ export class PostgresBackendDriver implements DataDriver {
     private schemaFactsQueryable(): Queryable {
         return {
             query: async <T>(text: string): Promise<{ rows: T[] }> => {
-                const result = await this.db.execute(drizzleSql.raw(text));
-                const rows = (result as unknown as { rows?: T[] }).rows;
-                return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
+                return { rows: sqlRows<T>(await this.db.execute(drizzleSql.raw(text))) };
             }
         };
     }

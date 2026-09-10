@@ -545,7 +545,17 @@ export async function runSeed() {
         // held by this transaction, released when it ends, and released by the
         // server itself if the instance dies mid-run.
         const claim = await db.execute("SELECT pg_try_advisory_xact_lock(80741) AS ok");
-        const claimed = (claim as unknown as { rows?: { ok?: boolean }[] }).rows?.[0]?.ok;
+        // Two shapes reach this call and which one arrives is a property of the
+        // driver, not of the query: node-postgres returns a `{ rows }` envelope,
+        // the other paths return the array. Reading `.rows` alone — which is what
+        // the assertion here used to do — leaves `claimed` undefined whenever the
+        // array turns up, and the reseed then reports a lock nobody is holding
+        // and quietly does nothing. `Array.isArray` is a check rather than a
+        // claim, so both branches are typed.
+        const claimRows: unknown = Array.isArray(claim) ? claim : (claim as { rows?: unknown }).rows;
+        const claimed = Array.isArray(claimRows)
+            ? (claimRows[0] as { ok?: boolean } | undefined)?.ok
+            : undefined;
         if (!claimed) {
             console.log("skipped: another reseed holds the lock");
             await db.execute("ROLLBACK");

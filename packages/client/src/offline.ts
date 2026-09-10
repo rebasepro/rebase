@@ -27,6 +27,7 @@ import {
     runLocalQuery,
     sortRows
 } from "./offline-query";
+import { unref } from "@rebasepro/utils";
 
 /**
  * The SDK's local-first sync engine.
@@ -360,7 +361,7 @@ export class OfflineManager {
                 this.channel.onmessage = (event: MessageEvent) => this.onBroadcast(event.data);
                 // Node's BroadcastChannel is ref'd, and a script that opened a
                 // client should still be able to exit.
-                (this.channel as unknown as { unref?: () => void }).unref?.();
+                unref(this.channel);
             } catch {
                 // Not fatal: a browser that refuses the channel just loses
                 // cross-tab propagation.

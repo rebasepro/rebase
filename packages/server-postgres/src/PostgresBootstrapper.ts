@@ -28,7 +28,7 @@ import { buildCollectionRegistry } from "./collections/buildRegistry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
-import { getTableName as getCollectionTableName } from "@rebasepro/common";
+import { getTableName as getCollectionTableName, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
@@ -409,9 +409,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         }
         return {
             async query<T>(text: string): Promise<{ rows: T[] }> {
-                const result = await db.execute(sql.raw(text));
-                const rows = (result as unknown as { rows?: T[] }).rows;
-                return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
+                return { rows: sqlRows<T>(await db.execute(sql.raw(text))) };
             }
         };
     };
