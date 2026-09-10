@@ -87,6 +87,14 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 - **Scaffolding asks for the project name** when one is not given, defaulting
   to `my-app`.
 
+### Removed
+
+- **The `rebase eject infra` tombstone.** The command and `rebase.infra.json`
+  went in 0.17.0; what survived was a branch that printed a sentence saying so,
+  still there two minor versions later. Asking for it now reports that
+  `rebase.json` declares no app named `infra` — which is true, and is the same
+  answer every other unknown name gets.
+
 ### Fixed
 
 - **A generated column no longer wedges every push behind it.** PostgreSQL

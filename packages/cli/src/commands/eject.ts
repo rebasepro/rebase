@@ -208,23 +208,6 @@ export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
     // positionals, so the first one is the app — there is nothing to filter out.
     const requested = positionals[0];
 
-    // A tombstone, not a shim. `rebase eject infra` wrote `rebase.infra.json`,
-    // which described itself as "read BEFORE the environment" and was read by
-    // nothing at all — `loadInfraConfig` and `bindResources` had no caller
-    // outside their own tests, while the CHANGELOG and the docs advertised the
-    // file as a supported escape hatch.
-    //
-    // Named rather than left to fall through, because without this the word
-    // `infra` lands in the app lookup and the error becomes "unknown app:
-    // infra" — which sends someone looking for a bug in their manifest.
-    if (requested === "infra") {
-        console.error(chalk.red("  ✗ `rebase eject infra` has been removed."));
-        console.error(chalk.gray("    It wrote rebase.infra.json, which nothing ever read. Resources bind"));
-        console.error(chalk.gray("    from the environment on the <BASE>__<KEY> convention; declare them in"));
-        console.error(chalk.gray("    config/resources.ts and see `rebase resources` for the names."));
-        process.exit(1);
-    }
-
     let loaded;
     try {
         loaded = loadManifest(projectRoot);
