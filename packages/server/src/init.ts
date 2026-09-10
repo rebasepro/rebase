@@ -1798,7 +1798,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     + "array, which is what Hono and every router like it provides."
                 );
             }
-            config.app.route(prefix, router as unknown as Hono);
+            config.app.route(prefix, router as Hono);
         };
 
         if (authAdapter && authAdapter.createAuthRoutes && surfaces.auth) {
@@ -2619,7 +2619,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Hand the storage authorize hook its trusted reader. Scoped as the service
     // identity, so an ownership lookup is not itself filtered by the caller's
     // permissions — the hook IS the permission decision.
-    storageAuthorizeData.current = defaultData as unknown as import("@rebasepro/types").StorageAuthorizeData;
+    storageAuthorizeData.current = defaultData as import("@rebasepro/types").StorageAuthorizeData;
 
     // Multi-engine: scope and wrap each non-default delegate so
     // rebase.data on a non-default-engine collection reaches the correct driver.

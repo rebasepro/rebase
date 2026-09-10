@@ -21,21 +21,78 @@ import { DeterministicClock } from "./clock";
  * `src/data/neat-config.ts` by a script so they cannot drift.
  */
 
-interface NeatGradientInstance {
-    yOffset: number;
+/**
+ * The instance, as this file uses it.
+ *
+ * The movable properties are declared here — as `Record<Movable, number>`, off
+ * the same tuple the loop iterates — rather than being asserted at the point of
+ * assignment. They are real accessors on the prototype (see `MOVABLE` below),
+ * so this is a description of the library, not a widening of it; declaring only
+ * `yOffset` and then casting the instance to reach the other nine said the same
+ * thing with the compiler switched off, and let the two lists drift apart.
+ */
+type NeatGradientInstance = Record<Movable, number> & {
     destroy: () => void;
+};
+
+/**
+ * The private fields this file reaches for, named in one place.
+ *
+ * Every one of these is internal to `@firecms/neat` and absent from its public
+ * types — reached deliberately, for the reasons given at each use below. No
+ * assertion about another package's privates can be checked by the compiler, so
+ * the cast is irreducible; what is avoidable is having four different inline
+ * spellings of it, each free to disagree with the others about a field's type.
+ *
+ * If a Neat upgrade renames one of these, nothing here will fail to compile —
+ * the optional members will simply read `undefined` and the render will regress
+ * in the specific way each comment describes. That is the standing cost of
+ * touching privates, and it is why the list is short.
+ */
+interface NeatInternals {
+    /** Set by an IntersectionObserver; gates rAF re-registration. */
+    _isVisible: boolean;
+    /** Flips once the licence validates; until then every draw is watermarked. */
+    _licensed?: boolean;
+    sizeObserver?: { disconnect(): void };
+    _visibilityObserver?: { disconnect(): void };
+    _visibilityHandler?: EventListener;
 }
+
+/** Reach the internals of a Neat instance. See {@link NeatInternals}. */
+const internalsOf = (neat: NeatGradientInstance): NeatInternals =>
+    neat as unknown as NeatInternals;
 
 type NeatCtor = new (config: Record<string, unknown>) => NeatGradientInstance;
 
-// The package publishes UMD and ESM, and which shape a bundler hands back
-// varies. The site does the same triple-check; if it ever stops being
-// necessary, it stops being necessary in both places at once.
-const mod = neatModule as unknown as {
-    NeatGradient?: NeatCtor;
-    default?: { NeatGradient?: NeatCtor; default?: { NeatGradient?: NeatCtor } };
-};
-const NeatGradient = mod.NeatGradient ?? mod.default?.NeatGradient ?? mod.default?.default?.NeatGradient;
+/**
+ * Find the constructor, wherever this build of the package put it.
+ *
+ * The package publishes UMD and ESM, and which shape a bundler hands back —
+ * and how many `default` wrappers it arrives under — varies. The site walks the
+ * same three levels; if it ever stops being necessary, it stops being necessary
+ * in both places at once.
+ *
+ * It is a search rather than an assertion because the assertion was false: the
+ * package's types export `NeatGradient` at the top level and declare no
+ * `default` at all, so a type positing two `default` layers only compiled by
+ * being laundered through `unknown` — which threw away the check on `NeatCtor`
+ * as well. `typeof === "function"` is established at runtime, and `undefined`
+ * is a real outcome the caller already throws for.
+ */
+function findNeatGradient(mod: unknown): NeatCtor | undefined {
+    let level: unknown = mod;
+    for (let depth = 0; depth < 3 && level && typeof level === "object"; depth++) {
+        const candidate = (level as { NeatGradient?: unknown }).NeatGradient;
+        // The one irreducible claim: a `function` has this constructor's
+        // signature. Nothing observable at runtime narrows further.
+        if (typeof candidate === "function") return candidate as NeatCtor;
+        level = (level as { default?: unknown }).default;
+    }
+    return undefined;
+}
+
+const NeatGradient = findNeatGradient(neatModule);
 
 export type NeatFraming = "hero" | "full" | "left" | "right" | "bloom" | "close" | "floor";
 
@@ -250,11 +307,7 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
          * Nothing is lost by removing them. The canvas cannot resize during a
          * render and it is always on screen; both observers exist to save
          * battery on a web page. */
-        const internals = neat as unknown as {
-            sizeObserver?: { disconnect(): void };
-            _visibilityObserver?: { disconnect(): void };
-            _visibilityHandler?: EventListener;
-        };
+        const internals = internalsOf(neat);
         internals.sizeObserver?.disconnect();
         internals._visibilityObserver?.disconnect();
         if (internals._visibilityHandler) {
@@ -279,7 +332,7 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
         const startedAt = Date.now();
         const waitForLicence = () => {
             if (!neatRef.current) return;   // unmounted while we waited
-            if ((neat as unknown as { _licensed?: boolean })._licensed) {
+            if (internalsOf(neat)._licensed) {
                 setLicensed(true);
                 return;
             }
@@ -309,15 +362,14 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
         // a reliable place to ask whether something is on screen. It only
         // gates rAF re-registration — but that queue is the animation, so
         // losing it once freezes the gradient for the rest of the render.
-        (neat as unknown as { _isVisible: boolean })._isVisible = true;
+        internalsOf(neat)._isVisible = true;
 
         // Move the camera BEFORE the draw, so the frame that is captured is the
         // one this position produces rather than the previous one.
         if (camera) {
-            const target = neat as unknown as Record<Movable, number>;
             for (const key of MOVABLE) {
                 const value = camera[key];
-                if (value !== undefined) target[key] = value;
+                if (value !== undefined) neat[key] = value;
             }
         }
 

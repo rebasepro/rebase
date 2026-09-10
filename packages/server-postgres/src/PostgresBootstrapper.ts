@@ -845,7 +845,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 if (wantsBus) {
                     await realtimeService.configureChannelBus(
                         createChannelBus(busSetting, {
-                            db: schemaAwareDb as unknown as NodePgDatabase<Record<string, unknown>>,
+                            db: schemaAwareDb as NodePgDatabase<Record<string, unknown>>,
                             directUrl
                         })
                     );

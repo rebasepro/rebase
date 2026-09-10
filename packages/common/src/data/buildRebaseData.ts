@@ -718,7 +718,7 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
  * the wrapper is the whole operation — the address was never part of the row.
  */
 function entityToRow<M extends Record<string, unknown>>(entity: Entity<M>): M {
-    return entity.values as unknown as M;
+    return entity.values as M;
 }
 
 /**

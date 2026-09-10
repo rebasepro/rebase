@@ -223,7 +223,7 @@ value: "managed" },
 value: "byodb" }
                 ]
             }
-        ] as unknown as Parameters<typeof inquirer.prompt>[0]);
+        ] as Parameters<typeof inquirer.prompt>[0]);
         type = picked as string;
     }
 
@@ -234,7 +234,7 @@ value: "byodb" }
             { type: "input",
 name: "cs",
 message: "PostgreSQL connection string:" }
-        ] as unknown as Parameters<typeof inquirer.prompt>[0]);
+        ] as Parameters<typeof inquirer.prompt>[0]);
         connectionString = (cs as string)?.trim();
         if (!connectionString) {
             fail(

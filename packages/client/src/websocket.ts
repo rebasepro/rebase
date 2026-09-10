@@ -688,7 +688,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const wireEntities = (message.rows || []) as unknown as Record<string, unknown>[];
+                    const wireEntities = (message.rows || []) as Record<string, unknown>[];
                     const incomingRows = wireEntities;
 
                     // The keys arrive with the rows, so they are known before the
@@ -758,7 +758,7 @@ export class RebaseWebSocketClient {
                 const entitySub = this.singleSubscriptions.get(subscriptionKey);
                 if (entitySub) {
                     const wireEntity = message.row ?? null;
-                    const row = wireEntity ? (wireEntity as unknown as Record<string, unknown>) : null;
+                    const row = wireEntity ? (wireEntity as Record<string, unknown>) : null;
                     // Cache the latest data with optimizations
                     entitySub.latestData = row;
                     entitySub.lastUpdated = Date.now();

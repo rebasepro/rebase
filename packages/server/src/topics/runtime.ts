@@ -64,7 +64,7 @@ export function topicJobHandlers(): Record<string, JobHandler<never>> {
                 topic: sub.topic,
                 subscription: sub.name
             });
-        }) as unknown as JobHandler<never>;
+        }) as JobHandler<never>;
     }
     return tasks;
 }

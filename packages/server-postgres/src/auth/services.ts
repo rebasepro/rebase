@@ -131,7 +131,7 @@ export class UserService implements UserRepository {
                        set_config('app.user_roles', '', true),
                        set_config('app.jwt', '', true)
             `);
-            return await fn(tx as unknown as NodePgDatabase);
+            return await fn(tx as NodePgDatabase);
         });
     }
 
@@ -599,7 +599,7 @@ export class RefreshTokenService {
      * grouping — degrades instead of throwing on every sign-in.
      */
     private has(column: string): boolean {
-        return Boolean((this.refreshTokensTable as unknown as Record<string, unknown>)[column]);
+        return Boolean((this.refreshTokensTable as Record<string, unknown>)[column]);
     }
 
     private col(column: string) {
@@ -729,7 +729,7 @@ export class RefreshTokenService {
     }
 
     async getTokensValidAfter(uid: string): Promise<Date | null> {
-        if (!this.usersTable || !(this.usersTable as unknown as Record<string, unknown>).tokensValidAfter) return null;
+        if (!this.usersTable || !(this.usersTable as Record<string, unknown>).tokensValidAfter) return null;
         const [row] = await this.db
             .select({ tokensValidAfter: (this.usersTable as unknown as Record<string, never>).tokensValidAfter })
             .from(this.usersTable)
@@ -739,7 +739,7 @@ export class RefreshTokenService {
     }
 
     async setTokensValidAfter(uid: string, at: Date): Promise<void> {
-        if (!this.usersTable || !(this.usersTable as unknown as Record<string, unknown>).tokensValidAfter) return;
+        if (!this.usersTable || !(this.usersTable as Record<string, unknown>).tokensValidAfter) return;
         await this.db
             .update(this.usersTable)
             .set({ tokensValidAfter: at })
@@ -821,7 +821,7 @@ export class PasswordResetTokenService {
                 expiresAt: this.passwordResetTokensTable.expiresAt
             })
             .from(this.passwordResetTokensTable)
-            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash)) as unknown as Array<{ uid: string; expiresAt: Date }>;
+            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash)) as Array<{ uid: string; expiresAt: Date }>;
 
         if (!token) return null;
 

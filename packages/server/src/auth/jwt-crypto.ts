@@ -95,7 +95,7 @@ export async function verifyJwt(
 ): Promise<JwtClaims> {
     return jwt.verify(token, key, {
         algorithms: options.algorithms as jwt.VerifyOptions["algorithms"]
-    }) as unknown as JwtClaims;
+    }) as JwtClaims;
 }
 
 /**

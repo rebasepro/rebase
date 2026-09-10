@@ -993,7 +993,7 @@ export async function confirmDestructive(opts: { yes: boolean; prompt: string })
 name: "confirmed",
 default: false,
 message: opts.prompt }
-    ] as unknown as Parameters<typeof inquirer.prompt>[0])) as { confirmed: boolean };
+    ] as Parameters<typeof inquirer.prompt>[0])) as { confirmed: boolean };
     if (!confirmed) {
         // stderr: declining is not a result. Unreachable in JSON mode — the
         // guard above already refused rather than prompt — so stdout stays

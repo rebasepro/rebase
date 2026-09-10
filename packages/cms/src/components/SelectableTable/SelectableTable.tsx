@@ -240,7 +240,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         size: size ?? "m",
         selectionStore,
         setPopupCell
-    } as unknown as DataCollectionTableController<Record<string, unknown>>), [setPopupCell, select, onValueChange, size, selectionStore]);
+    } as DataCollectionTableController<Record<string, unknown>>), [setPopupCell, select, onValueChange, size, selectionStore]);
 
     const createFilterField = useCallback(({
         id,

@@ -79,7 +79,7 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
             interface LoopHistogram { mean: number; enable(): void; reset(): void }
             let loop: LoopHistogram | null = null;
             try {
-                loop = monitorEventLoopDelay({ resolution: 20 }) as unknown as LoopHistogram;
+                loop = monitorEventLoopDelay({ resolution: 20 }) as LoopHistogram;
                 loop.enable();
             } catch {
                 // A runtime without it still records the other two.

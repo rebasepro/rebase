@@ -121,7 +121,7 @@ export async function promptForConsent(options: PromptOptions = {}): Promise<boo
                 // say so had to change with it.
                 default: true
             }
-        ] as unknown as Parameters<typeof inquirer.prompt>[0]) as { accepted: boolean };
+        ] as Parameters<typeof inquirer.prompt>[0]) as { accepted: boolean };
 
         setConsent(Boolean(accepted));
 

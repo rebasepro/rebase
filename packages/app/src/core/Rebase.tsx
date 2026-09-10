@@ -311,7 +311,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
         const ws = client?.ws;
         if (ws && typeof (ws as unknown as Record<string, unknown>).executeSql === "function") {
-            const wsAdmin = ws as unknown as import("@rebasepro/types").DatabaseAdmin;
+            const wsAdmin = ws as import("@rebasepro/types").DatabaseAdmin;
             return {
                 executeSql: wsAdmin.executeSql!.bind(wsAdmin),
                 fetchAvailableDatabases: wsAdmin.fetchAvailableDatabases?.bind(wsAdmin),

@@ -162,7 +162,7 @@ async function main(): Promise<void> {
         // What BaaS refuses to serve, and why, is only ever said at boot.
         for (const level of ["info", "warn"] as const) {
             const original = logger[level].bind(logger);
-            (logger as unknown as Record<string, unknown>)[level] = (...args: unknown[]) => {
+            (logger as Record<string, unknown>)[level] = (...args: unknown[]) => {
                 bootLog.push(args.map(String).join(" "));
                 return original(...(args as [string]));
             };

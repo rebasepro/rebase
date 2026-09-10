@@ -425,5 +425,5 @@ const rowsToRoles = (rows: Record<string, unknown>[]): Role[] => {
     return rows.map((row) => ({
         ...row,
         id: row.id
-    } as unknown as Role));
+    } as Role));
 }

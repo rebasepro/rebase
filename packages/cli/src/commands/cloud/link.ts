@@ -142,7 +142,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
 
         if (args["--project"]) {
             const projectId = await resolveProjectRef(args["--project"], client);
-            project = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
+            project = (await client.data.collection("projects").findById(projectId)) as ProjectRow | undefined;
             if (!project) {
                 fail(`Project ${args["--project"]} not found.`, undefined, "project_not_found");
             }
@@ -174,7 +174,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
                         value: p
                     }))
                 }
-            ] as unknown as Parameters<typeof inquirer.prompt>[0]);
+            ] as Parameters<typeof inquirer.prompt>[0]);
             project = picked as ProjectRow;
         }
 
@@ -257,7 +257,7 @@ export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
 
     try {
-        const orgs = (await client.data.collection("organizations").find({ limit: 100 })).data as unknown as Array<{
+        const orgs = (await client.data.collection("organizations").find({ limit: 100 })).data as Array<{
             id: string | number;
             name?: string;
             slug?: string;
@@ -283,7 +283,7 @@ export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
                         value: o
                     }))
                 }
-            ] as unknown as Parameters<typeof inquirer.prompt>[0]);
+            ] as Parameters<typeof inquirer.prompt>[0]);
             chosen = picked;
         }
 

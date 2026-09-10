@@ -187,7 +187,7 @@ export function resourceKeyOf(ref: ResourceRef): string {
  * is returned as it is, which is what keeps callbacks and validators intact.
  */
 export function resolveResourceRefs<T>(value: T): T {
-    if (isResourceHandle(value)) return value.key as unknown as T;
+    if (isResourceHandle(value)) return value.key as T;
     // Identity-preserving: a value with no handle inside comes back as the
     // same object, not a copy. Collections point at each other through
     // `target: () => authors`, and a loader that cloned every collection would
@@ -273,7 +273,7 @@ const GLOBAL_KEY = Symbol.for("@rebasepro/types.resourceRegistry");
 const KINDS_KEY = Symbol.for("@rebasepro/types.resourceKinds.v2");
 
 function registry(): Registry {
-    const g = globalThis as unknown as Record<symbol, unknown>;
+    const g = globalThis as Record<symbol, unknown>;
     let shared = g[GLOBAL_KEY] as { kinds: Map<string, ResourceKindSpec>; declarations: Map<string, ResourceDeclaration> } | undefined;
     if (!shared) {
         // `kinds` is created but never written by this copy: an older copy's

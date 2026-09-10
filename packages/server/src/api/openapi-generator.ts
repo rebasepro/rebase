@@ -1176,7 +1176,7 @@ function excludedApiKeys(collection: CollectionConfig, direction: "read" | "writ
  */
 function idPropertyEntry(collection: CollectionConfig | undefined): [string, Property] | undefined {
     for (const [key, property] of Object.entries(collection?.properties ?? {})) {
-        if ((property as unknown as Record<string, unknown>)?.isId) return [key, property as Property];
+        if ((property as Record<string, unknown>)?.isId) return [key, property as Property];
     }
     return undefined;
 }

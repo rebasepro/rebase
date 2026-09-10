@@ -251,7 +251,7 @@ function serialiseError(value: unknown, depth = 0): Record<string, unknown> {
         return { value: redactSensitiveText(String(value)) };
     }
 
-    const own = value as unknown as Record<string, unknown>;
+    const own = value as Record<string, unknown>;
     const out: Record<string, unknown> = isError
         ? {
             name: (value as Error).name,

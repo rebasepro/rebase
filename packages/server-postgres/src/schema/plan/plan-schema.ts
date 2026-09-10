@@ -1060,7 +1060,7 @@ function planReferenceColumn(
     // (the id is still a string) and gets no constraint — the same shape as one
     // whose target is not in this bundle.
     const target = prop.path ? resolveCollection(prop.path) : undefined;
-    const column = resolveColumnName(propName, prop as unknown as Property);
+    const column = resolveColumnName(propName, prop as Property);
     const required = prop.validation?.required === true;
 
     return {

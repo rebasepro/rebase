@@ -84,7 +84,7 @@ function applyDynamicRelationQuery<T>(
     query: T,
     ...args: Parameters<typeof DrizzleConditionBuilder.buildRelationQuery>
 ): T {
-    return DrizzleConditionBuilder.buildRelationQuery(...args) as unknown as T;
+    return DrizzleConditionBuilder.buildRelationQuery(...args) as T;
 }
 
 /**

@@ -251,7 +251,7 @@ export function useLocalCollectionsConfigController(
         },
 
         saveCollection: async ({ id, collectionData }: SaveCollectionParams) => {
-            await write(id, collectionData as unknown as Record<string, unknown>, () =>
+            await write(id, collectionData as Record<string, unknown>, () =>
                 request("/collection/save", { collectionId: id, collectionData }));
         },
         updateCollection: async ({ id, collectionData }: UpdateCollectionParams) => {

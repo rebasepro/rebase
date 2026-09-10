@@ -111,7 +111,7 @@ export type RebaseCallContext<USER extends User = User> = {
      * practice — the backend has always passed it, and the callbacks guide
      * documented `context.driver.withAuth(user)` in all six locales. The
      * contract simply did not name it, so `buildCallContext` was cast through
-     * `as unknown as RebaseCallContext` and nothing about the object was
+     * `as RebaseCallContext` and nothing about the object was
      * type-checked at all.
      *
      * The guide no longer recommends `withAuth` — {@link data} is already

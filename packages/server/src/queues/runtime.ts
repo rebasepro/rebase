@@ -55,7 +55,7 @@ export function queueJobHandlers(): Record<string, JobHandler<never>> {
                 queue: consumer.queue,
                 jobId: ctx.id
             });
-        }) as unknown as JobHandler<never>;
+        }) as JobHandler<never>;
     }
     return tasks;
 }

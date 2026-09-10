@@ -68,7 +68,7 @@ export interface RoutedRealtimeOptions {
 export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsRealtimeService {
     const { providers, defaultKey, resolveKey } = opts;
 
-    const asWs = (p: RealtimeProvider): WsRealtimeService => p as unknown as WsRealtimeService;
+    const asWs = (p: RealtimeProvider): WsRealtimeService => p as WsRealtimeService;
     const all = (): WsRealtimeService[] => Object.values(providers).map(asWs);
     const fallback = (): WsRealtimeService => asWs(providers[defaultKey] ?? Object.values(providers)[0]);
     const forPath = (path?: string): WsRealtimeService => {

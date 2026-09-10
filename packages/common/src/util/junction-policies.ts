@@ -240,7 +240,7 @@ export function getJunctionCollectionConfig(spec: JunctionSpec): CollectionConfi
         table: spec.table,
         schema: spec.schema,
         properties
-    } as unknown as CollectionConfig;
+    } as CollectionConfig;
 }
 
 /** The property marked as the row id (falls back to `id`). */

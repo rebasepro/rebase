@@ -248,7 +248,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // with its declarations ignored. This is the path a self-hosted container
     // and a managed tenant both take, so a silent "your buckets are gone" would
     // surface as 500s on the storage routes and nothing else.
-    assertNoReplacedResourceConfig(configExports as unknown as Record<string, unknown>);
+    assertNoReplacedResourceConfig(configExports as Record<string, unknown>);
 
     // One source of truth, evaluated. There is no merge left to do: the graph
     // is built from the declarations in the project's own code, and the
@@ -351,7 +351,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // bare, it type-checks through any cast and then dies inside the driver
         // on `undefined.db`.
         provisioningDriverResult: dataSources[0]
-            ? ({ internals: dataSources[0].connection } as unknown as InitializedDriver)
+            ? ({ internals: dataSources[0].connection } as InitializedDriver)
             : undefined,
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
@@ -738,7 +738,7 @@ async function bootStaticApp(
                 server.close(() => resolve());
             });
         }
-    } as unknown as RebaseBackendInstance;
+    } as RebaseBackendInstance;
 
     if (options.handleSignals !== false) {
         installShutdownHandlers(staticBackend, {
@@ -756,7 +756,7 @@ async function bootStaticApp(
         REBASE_BASE_PATH: basePath,
         REBASE_METRICS: metricsEnabled,
         REBASE_METRICS_TOKEN: metricsToken
-    } as unknown as RebaseBootEnv;
+    } as RebaseBootEnv;
 
     return {
         app,

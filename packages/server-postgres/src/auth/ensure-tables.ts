@@ -60,7 +60,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             // the wrong thing.
             const idProp = collection.properties?.id;
             if (idProp) {
-                const isId = ("isId" in idProp) ? (idProp as unknown as Record<string, unknown>).isId : undefined;
+                const isId = ("isId" in idProp) ? (idProp as Record<string, unknown>).isId : undefined;
                 if (isId === "uuid") {
                     userIdType = "UUID";
                 } else if (isId === "increment") {

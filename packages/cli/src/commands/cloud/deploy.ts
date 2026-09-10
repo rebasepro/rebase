@@ -739,8 +739,8 @@ async function readDeployContext(
             latestDeployment(client, projectId)
         ]);
         return {
-            project: project as unknown as DeployProjectRow | undefined,
-            latest: latest as unknown as DeploySourceRow | undefined
+            project: project as DeployProjectRow | undefined,
+            latest: latest as DeploySourceRow | undefined
         };
     } catch {
         return {};
@@ -1307,7 +1307,7 @@ async function streamBuildLogs(
     for (;;) {
         let dep: Deployment | undefined;
         try {
-            dep = (await client.data.collection("deployments").findById(deploymentId)) as unknown as Deployment | undefined;
+            dep = (await client.data.collection("deployments").findById(deploymentId)) as Deployment | undefined;
         } catch (e) {
             reportError(e, "Failed to read deployment status");
         }
@@ -1412,7 +1412,7 @@ path: projectId }
 
     // Build logs: latest deployment, optionally follow if still running.
     try {
-        const dep = (await latestDeployment(client, projectId)) as unknown as Deployment | undefined;
+        const dep = (await latestDeployment(client, projectId)) as Deployment | undefined;
         if (!dep) {
             console.log("");
             console.log(chalk.gray("  No deployments yet for this project."));

@@ -133,7 +133,7 @@ propertyCallbacks: undefined };
                 data: this.data,
                 client: this.client,
                 storageSource: this.client?.storage
-            } as unknown as RebaseCallContext; // Backend context
+            } as RebaseCallContext; // Backend context
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
                 if (globalCallbacks?.afterRead) {
@@ -234,7 +234,7 @@ propertyCallbacks: undefined };
                 data: this.data,
                 client: this.client,
                 storageSource: this.client?.storage
-            } as unknown as RebaseCallContext; // Backend context
+            } as RebaseCallContext; // Backend context
             let processedRow: Record<string, unknown> = row;
             if (globalCallbacks?.afterRead) {
                 processedRow = await globalCallbacks.afterRead({
@@ -325,7 +325,7 @@ propertyCallbacks: undefined };
             data: this.data,
             client: this.client,
             storageSource: this.client?.storage
-        } as unknown as RebaseCallContext;
+        } as RebaseCallContext;
 
         // Fetch previous values for callbacks AND history recording
         let previousValuesForHistory: Partial<M> | undefined;
@@ -533,7 +533,7 @@ propertyCallbacks: undefined };
             data: this.data,
             client: this.client,
             storageSource: this.client?.storage
-        } as unknown as RebaseCallContext;
+        } as RebaseCallContext;
 
         // A `before*` callback is the application speaking, not the server
         // failing: a bare `throw` is the documented way to block a write, so it
@@ -765,7 +765,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
                 data: this.data,
                 client: this.delegate.client,
                 storageSource: this.delegate.client?.storage
-            } as unknown as RebaseCallContext;
+            } as RebaseCallContext;
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
                 if (globalCallbacks?.afterRead) {

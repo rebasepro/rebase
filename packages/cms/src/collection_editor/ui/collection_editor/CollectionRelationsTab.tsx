@@ -293,7 +293,7 @@ target: val };
                                         label="Kind"
                                         value={editingRelationState.kind ?? "hasMany"}
                                         onValueChange={(val) => setEditingRelationState(prev => prev ? { ...prev,
-kind: val as unknown as Relation["kind"] } : null)}
+kind: val as Relation["kind"] } : null)}
                                     >
                                         {(Object.keys(KIND_LABELS) as RelationKind[]).map(k => (
                                             <SelectItem key={k} value={k}>{KIND_LABELS[k]}</SelectItem>

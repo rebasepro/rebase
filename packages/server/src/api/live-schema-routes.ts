@@ -240,7 +240,7 @@ export function proposedCollections(
     current: CollectionConfig[],
     change: ProposedChange
 ): CollectionConfig[] {
-    const next = { ...change.collection, slug: change.collectionId } as unknown as CollectionConfig;
+    const next = { ...change.collection, slug: change.collectionId } as CollectionConfig;
     const replaced = current.map(collection =>
         collection.slug === change.collectionId ? next : collection
     );

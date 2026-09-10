@@ -1064,7 +1064,7 @@ roles: ["anon"] };
     roles: activeAuth.roles },
                             driver: this.driver,
                             data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                        } as unknown as RebaseCallContext;
+                        } as RebaseCallContext;
 
                         return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
                             let processedEntity = fetchedRow;
@@ -1316,7 +1316,7 @@ roles: ["anon"] };
     roles: activeAuth.roles },
                                 driver: this.driver,
                                 data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                            } as unknown as RebaseCallContext;
+                            } as RebaseCallContext;
 
                             // 1. Global callbacks first
                             if (globalCallbacks?.afterRead) {

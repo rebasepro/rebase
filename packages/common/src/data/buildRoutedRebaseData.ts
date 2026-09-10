@@ -85,7 +85,7 @@ export function buildRoutedRebaseData<T extends RoutableData = RebaseData>({
 
     const target = {
         collection: getAccessor
-    } as unknown as T;
+    } as T;
 
     return new Proxy(target as object, {
         get(_target, prop: string | symbol) {

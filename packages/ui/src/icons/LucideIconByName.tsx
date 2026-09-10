@@ -38,7 +38,7 @@ let pending: Promise<IconsMap> | undefined;
 export function loadLucideIcons(): Promise<IconsMap> {
     if (loaded) return Promise.resolve(loaded);
     pending ??= import("lucide-react").then(({ icons }) => {
-        loaded = icons as unknown as IconsMap;
+        loaded = icons as IconsMap;
         return loaded;
     });
     return pending;

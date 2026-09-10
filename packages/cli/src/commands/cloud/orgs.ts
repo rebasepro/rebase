@@ -160,7 +160,7 @@ maxPositionals: 0 });
         const members = (await client.data.collection("organization-members").find({
             where: { organization: ["==", org] },
             limit: 200
-        })).data as unknown as Array<{ id: string | number; userId?: string; role?: string }>;
+        })).data as Array<{ id: string | number; userId?: string; role?: string }>;
 
         emit(
             () => {

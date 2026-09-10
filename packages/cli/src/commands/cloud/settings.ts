@@ -50,7 +50,7 @@ maxPositionals: 0 });
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
     try {
-        const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectSettings | undefined;
+        const p = (await client.data.collection("projects").findById(projectId)) as ProjectSettings | undefined;
         if (!p) fail(`Project ${projectRef} not found.`, undefined, "not_found");
         emit(
             () => {

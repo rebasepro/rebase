@@ -280,7 +280,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                         schema: _schema,
                         auth: _auth,
                         ...rest
-                    } = copyFromProp as unknown as Record<string, unknown>;
+                    } = copyFromProp as Record<string, unknown>;
                     return {
                         ...rest,
                         name: "",

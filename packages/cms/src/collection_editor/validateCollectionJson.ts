@@ -435,6 +435,6 @@ export function validateCollectionJson(jsonString: string): CollectionValidation
     return {
         valid: errors.length === 0,
         errors,
-        collection: errors.length === 0 ? parsed as unknown as AdminCollection : undefined
+        collection: errors.length === 0 ? parsed as AdminCollection : undefined
     };
 }

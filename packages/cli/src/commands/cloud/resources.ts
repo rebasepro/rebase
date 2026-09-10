@@ -624,7 +624,7 @@ projectId });
         const hooks = (await client.data.collection("webhooks").find({
             where: { project: ["==", projectId] },
             limit: 100
-        })).data as unknown as Array<{ id: string | number; name?: string; table?: string; url?: string; enabled?: boolean; events?: string[] }>;
+        })).data as Array<{ id: string | number; name?: string; table?: string; url?: string; enabled?: boolean; events?: string[] }>;
 
         emit(
             () => {
@@ -694,7 +694,7 @@ maxPositionals: 0 });
         const stores = (await client.data.collection("storages").find({
             where: { project: ["==", projectId] },
             limit: 50
-        })).data as unknown as Array<{ id: string | number; type?: string; provider?: string; bucketName?: string; status?: string }>;
+        })).data as Array<{ id: string | number; type?: string; provider?: string; bucketName?: string; status?: string }>;
 
         emit(
             () => {
@@ -1215,7 +1215,7 @@ command: "cloud clusters",
 maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     try {
-        const clusters = (await client.data.collection("clusters").find({ limit: 100 })).data as unknown as Array<{
+        const clusters = (await client.data.collection("clusters").find({ limit: 100 })).data as Array<{
             id: string | number;
             name?: string;
             provider?: string;

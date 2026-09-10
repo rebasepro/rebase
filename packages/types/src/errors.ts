@@ -198,7 +198,7 @@ export function unsupportedMethod<F>(message: string): F {
         throw new RebaseClientError(message, { code: "REALTIME_DISABLED" });
     };
     (stub as unknown as Record<symbol, boolean>)[UNSUPPORTED_METHOD] = true;
-    return stub as unknown as F;
+    return stub as F;
 }
 
 /**

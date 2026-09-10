@@ -20,20 +20,39 @@ interface NeatGradientInstance {
     destroy: () => void;
 }
 
-interface NeatModuleShape {
-    NeatGradient?: new (config: NeatGradientConfig) => NeatGradientInstance;
-    default?: {
-        NeatGradient?: new (config: NeatGradientConfig) => NeatGradientInstance;
-        default?: {
-            NeatGradient?: new (config: NeatGradientConfig) => NeatGradientInstance;
-        };
-    };
+type NeatGradientCtor = new (config: NeatGradientConfig) => NeatGradientInstance;
+
+/**
+ * Find the constructor, wherever this build of the package put it.
+ *
+ * `@firecms/neat` publishes UMD and ESM, and which shape a bundler hands back
+ * — and how many `default` wrappers it arrives under — varies with the bundler
+ * and its interop setting. The three shapes seen in practice are the namespace
+ * itself, `.default`, and `.default.default`. `tooling/videos` walks the same
+ * three; if it ever stops being necessary, it stops being necessary in both
+ * places at once.
+ *
+ * It is a *search*, not an assertion, and that is the point: a type describing
+ * all three shapes at once is a claim about a module tsc can already see, and
+ * it was wrong — the package's own types export `NeatGradient` at the top
+ * level, so the declaration only type-checked by being laundered through
+ * `unknown` first, which also discarded the check on the constructor's
+ * signature. Here `typeof === "function"` is a fact established at runtime,
+ * and returning `undefined` is a real outcome the caller already renders for.
+ */
+function findNeatGradient(mod: unknown): NeatGradientCtor | undefined {
+    let level: unknown = mod;
+    for (let depth = 0; depth < 3 && level && typeof level === "object"; depth++) {
+        const candidate = (level as { NeatGradient?: unknown }).NeatGradient;
+        // The one irreducible claim: a `function` is this constructor's
+        // signature. Nothing observable at runtime can narrow further.
+        if (typeof candidate === "function") return candidate as NeatGradientCtor;
+        level = (level as { default?: unknown }).default;
+    }
+    return undefined;
 }
 
-const neatModuleTyped = neatModule as unknown as NeatModuleShape;
-const NeatGradient = neatModuleTyped.NeatGradient || 
-                     neatModuleTyped.default?.NeatGradient || 
-                     neatModuleTyped.default?.default?.NeatGradient;
+const NeatGradient = findNeatGradient(neatModule);
 
 const NEAT_BASE_CONFIG = {
     // A WebGL context flag, read once when the instance is built — Neat warns

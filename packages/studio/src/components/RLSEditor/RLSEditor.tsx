@@ -502,7 +502,7 @@ status: "live" };
         // render a policy row, the other only the names it compiles to
         // (`getGeneratedPolicyNames`).
         if (activeCollection && isPostgresCollectionConfig(activeCollection)) {
-            getEffectiveSecurityRules(activeCollection as unknown as CollectionConfig).forEach((rule) => {
+            getEffectiveSecurityRules(activeCollection as CollectionConfig).forEach((rule) => {
                 const ops = getPolicyOperations(rule);
                 const policyNames = getPolicyNamesForRule(rule, activeTableData.tableName);
 
@@ -535,7 +535,7 @@ status: "live" };
         // collections don't carry resolvable relations, they simply stay "live".
         if (!activeCollection) {
             try {
-                const registryCollections = (collectionRegistry.collections ?? []) as unknown as Parameters<typeof resolveJunctionSpecs>[0];
+                const registryCollections = (collectionRegistry.collections ?? []) as Parameters<typeof resolveJunctionSpecs>[0];
                 const spec = resolveJunctionSpecs(registryCollections).get(activeTableData.tableName);
                 if (spec) {
                     const generatedNames = getPolicyNamesForRules(getJunctionSecurityRules(spec), spec.table);

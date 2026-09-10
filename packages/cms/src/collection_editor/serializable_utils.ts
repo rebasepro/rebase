@@ -599,7 +599,7 @@ type: "date" };
 
         case "array": {
             const sp = serialized as SerializableArrayProperty;
-            const result = { ...sp } as unknown as ArrayProperty;
+            const result = { ...sp } as ArrayProperty;
             // Recursively convert "of" property
             if (sp.of) {
                 if (Array.isArray(sp.of)) {
@@ -620,7 +620,7 @@ type: "date" };
 
         case "map": {
             const sp = serialized as SerializableMapProperty;
-            const result = { ...sp } as unknown as MapProperty;
+            const result = { ...sp } as MapProperty;
             // Recursively convert nested properties
             if (sp.properties) {
                 result.properties = fromSerializableProperties(sp.properties, lookup);
@@ -630,7 +630,7 @@ type: "date" };
 
         case "string": {
             const sp = serialized as SerializableStringProperty;
-            const result = { ...sp } as unknown as StringProperty;
+            const result = { ...sp } as StringProperty;
             return result;
         }
 
@@ -646,20 +646,20 @@ type: "date" };
             const sp = serialized as SerializableRelationProperty;
             const { relation, ...rest } = sp;
             const result = { ...rest,
-type: "relation" } as unknown as RelationProperty;
+type: "relation" } as RelationProperty;
             if (relation) {
                 result.relation = fromSerializableRelation(
                     relation,
                     sp.name ?? "",
                     lookup
-                ) as unknown as RelationProperty["relation"];
+                ) as RelationProperty["relation"];
             }
             return result as Property;
         }
 
         default:
             // For all other types, the serializable form is already a valid Property
-            return serialized as unknown as Property;
+            return serialized as Property;
     }
 }
 

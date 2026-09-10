@@ -107,7 +107,7 @@ export function waitUntil(
     // `c.executionCtx` is a getter that *throws* on a host that has none —
     // notably `@hono/node-server` — so this cannot be an `if`.
     try {
-        const ctx = (c as unknown as MaybeExecutionCtx).executionCtx;
+        const ctx = (c as MaybeExecutionCtx).executionCtx;
         ctx?.waitUntil?.(tracked);
     } catch {
         // No execution context: this is Node (or a test), where the process

@@ -78,16 +78,16 @@ export const getPrimaryKeyProp = (collection: CollectionConfig): { name: string,
         const idPropEntry = idPropertyEntries(collection)[0];
         if (idPropEntry) {
             const prop = idPropEntry[1];
-            const isUuid = prop.type === "string" && "isId" in prop && (prop as unknown as StringProperty).isId === "uuid";
+            const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
             return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
         }
     }
     // Fallback: a collection that declares no `isId` gets an implicit `id`.
-    const idProp = collection.properties?.["id"] as unknown as Property | undefined;
+    const idProp = collection.properties?.["id"] as Property | undefined;
     if (idProp?.type === "number") {
         return { name: "id", type: "number", isUuid: false };
     }
-    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as unknown as StringProperty).isId === "uuid";
+    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as StringProperty).isId === "uuid";
     return { name: "id", type: "string", isUuid: isUuid ?? false };
 };
 

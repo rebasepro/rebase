@@ -567,7 +567,7 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
     const { client, url } = await requireClient(rawArgs);
     try {
         const projectId = await resolveProjectRef(projectRef, client);
-        const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
+        const p = (await client.data.collection("projects").findById(projectId)) as ProjectRow | undefined;
         if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
 
         const [db, lastDeploy, baseDomain, capacity] = await Promise.all([
