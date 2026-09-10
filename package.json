@@ -105,6 +105,7 @@
     "smoke:baas": "pnpm --filter @rebasepro/server-postgres smoke:baas",
     "check:docs-imports": "node tooling/scripts/check-docs-imports.mjs",
     "check:glued-code": "node tooling/scripts/check-glued-code.mjs",
+    "check:theme-tokens": "node tooling/scripts/check-theme-tokens.mjs",
     "check:legacy-rls": "node tooling/scripts/check-legacy-rls-removable.mjs"
   },
   "devDependencies": {

@@ -128,7 +128,7 @@ export const PolicyEditor = ({
                 <div>
                     <div>{policy ? t("studio_policy_edit") : t("studio_policy_create")}</div>
                     <div className="text-sm font-normal text-text-secondary dark:text-text-secondary-dark tracking-wide mt-1">
-                        {t("studio_policy_defining_rules")} <span className="font-mono text-primary bg-primary-bg dark:bg-primary-bg-dark px-1 py-0.5 rounded">{schema}.{table}</span>
+                        {t("studio_policy_defining_rules")} <span className="font-mono text-primary bg-primary-bg px-1 py-0.5 rounded">{schema}.{table}</span>
                     </div>
                 </div>
                 <IconButton size="small" onClick={() => setHelpOpen(true)}>
@@ -142,7 +142,7 @@ export const PolicyEditor = ({
 
                     {/* Presets - only for new policies */}
                     {!policy && (
-                    <div className="flex flex-col gap-1.5 bg-primary/5 dark:bg-primary-bg-dark/20 p-3 sm:p-4 rounded-lg border border-primary/10 dark:border-primary/20">
+                    <div className="flex flex-col gap-1.5 bg-primary/5 p-3 sm:p-4 rounded-lg border border-primary/10 dark:border-primary/20">
                         <Typography variant="caption" className="text-primary dark:text-primary-light uppercase tracking-wider">{t("studio_policy_template")}</Typography>
                         <Select
                             size="small"
@@ -351,7 +351,7 @@ export const PolicyEditor = ({
                             </Typography>
                         </Paper>
 
-                        <Paper className={cls("p-4 sm:p-5 flex flex-col gap-2 bg-primary/5 dark:bg-primary-bg-dark/10", defaultBorderMixin)}>
+                        <Paper className={cls("p-4 sm:p-5 flex flex-col gap-2 bg-primary/5", defaultBorderMixin)}>
                             <Typography variant="subtitle2" className="text-primary dark:text-primary-light font-medium">{t("studio_policy_help_auth_vars_title")}</Typography>
                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_auth_vars_desc")}
@@ -373,7 +373,7 @@ export const PolicyEditor = ({
                         </Paper>
                     </div>
 
-                    <div className={cls("mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-primary/5 dark:bg-primary-bg-dark/10 p-4 rounded-xl border border-primary/10 dark:border-primary/20", defaultBorderMixin)}>
+                    <div className={cls("mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-primary/5 p-4 rounded-xl border border-primary/10 dark:border-primary/20", defaultBorderMixin)}>
                         <Typography variant="body2" className="text-primary dark:text-primary-light mb-4 sm:mb-0 max-w-md">
                             {t("studio_policy_help_docs_cta")}
                         </Typography>

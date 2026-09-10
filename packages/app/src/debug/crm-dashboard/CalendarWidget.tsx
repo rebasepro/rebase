@@ -259,7 +259,7 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                                         "flex flex-col items-center justify-center py-1.5 rounded-md transition-colors duration-100 focus:outline-none",
                                         day.isCurrentMonth
                                             ? "text-text-primary dark:text-text-primary-dark"
-                                            : "text-surface-300 dark:text-surface-650",
+                                            : "text-surface-300 dark:text-surface-600",
                                         day.isToday && !isSelected && "ring-1 ring-primary/50",
                                         isSelected
                                             ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/60"

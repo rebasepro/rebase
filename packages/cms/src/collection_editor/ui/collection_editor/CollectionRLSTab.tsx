@@ -435,7 +435,7 @@ function InlinePolicyEditor({
             <DialogTitle variant="h6">
                 {policy ? "Edit Policy" : "Create Policy"}
                 <div className="text-sm font-normal text-text-secondary dark:text-text-secondary-dark tracking-wide mt-1">
-                    Define RLS rules for <span className="font-mono text-primary bg-primary-bg dark:bg-primary-bg-dark px-1 py-0.5 rounded">public.{table}</span>
+                    Define RLS rules for <span className="font-mono text-primary bg-primary-bg px-1 py-0.5 rounded">public.{table}</span>
                 </div>
             </DialogTitle>
             <DialogContent className="p-4 md:p-6 border-t dark:border-surface-700 bg-surface-sheet" includeMargin={false}>

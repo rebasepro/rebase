@@ -100,6 +100,7 @@ this list, in this order.
 | `check:subpath-imports` | Every deep import the docs recommend resolves against that package's `exports` map. | — |
 | `check:studio-tools` | The Studio tools table against the `useMemo` in `RebaseStudio.tsx` that declares each tool's slug and drawer group. | — |
 | `check:ui-string-paths` | A path named in a UI string points at something the reader's project has, not at a file in this repository. | — |
+| `check:theme-tokens` | A Tailwind colour utility naming a `--color-*` no `@theme` block defines. Tailwind emits no rule for one, so the class sits in the source looking correct and does nothing: fifteen across five packages, including the CMS list row whose title never changed colour on hover and the calendar whose out-of-month days rendered brighter than the in-month ones in dark mode. | — |
 | `check:glued-code` | Prose glued to an inline tag — "or runrebase dev" — which Astro and JSX produce from a newline and no diff shows. | — |
 | `check:contributor-setup` | CONTRIBUTING, `app/.env.example` and the compose file agreeing about the local database. | — |
 | `check:gates-doc` | This file against `package.json`, and the naming rule above. | Add the row |

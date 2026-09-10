@@ -156,7 +156,7 @@ export function VectorFieldBinding({
 
                             {/* Collapsible scrollable numbers list */}
                             {showValues && isPopulated && (
-                                <div className="mt-1 p-3 rounded-lg bg-surface-well border border-hairline max-h-36 overflow-y-auto font-mono text-[11px] leading-relaxed text-text-secondary dark:text-text-secondary-dark break-all selection:bg-primary-100 dark:selection:bg-primary-900/40">
+                                <div className="mt-1 p-3 rounded-lg bg-surface-well border border-hairline max-h-36 overflow-y-auto font-mono text-[11px] leading-relaxed text-text-secondary dark:text-text-secondary-dark break-all selection:bg-primary/20">
                                     {arrayValue.join(", ")}
                                 </div>
                             )}

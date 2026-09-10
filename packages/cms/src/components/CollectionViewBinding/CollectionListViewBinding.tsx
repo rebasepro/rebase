@@ -1086,13 +1086,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
-                        <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                        <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary dark:group-hover:text-primary-light">
                             {terms.length > 0 && typeof slots.title?.value === "string"
                                 ? <Highlighted text={slots.title.value} terms={terms}/>
                                 : <SlotValue slot={slots.title} size="small"/>}
                         </Typography>
                     ) : (
-                        <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                        <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary dark:group-hover:text-primary-light">
                             {entity.id}
                         </Typography>
                     )}

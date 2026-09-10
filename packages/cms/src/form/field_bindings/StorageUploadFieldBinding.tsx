@@ -49,7 +49,7 @@ import { useClearRestoreValue } from "../useClearRestoreValue";
 // because the hint reflows once files exist ("Drag to reorder"), and any
 // content-driven height makes a filled field taller than the same field
 // empty. Extra thumbnails scroll horizontally instead of growing it.
-const dropZoneClasses = "box-border relative pt-[2px] h-[172px] items-center border border-transparent outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
+const dropZoneClasses = "box-border relative pt-[2px] h-[172px] items-center border border-transparent outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary";
 const disabledClasses = fieldBackgroundDisabledMixin;
 const nonActiveDropClasses = fieldBackgroundHoverMixin
 const activeDropClasses = "pt-0 border-2 border-solid"

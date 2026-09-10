@@ -359,6 +359,19 @@ keys yet" and a reset-password dialog in English apart from "Cancelar".
 41 keys were missing outright, which i18next renders as the key.`
     },
     {
+        run: "check:theme-tokens",
+        why: `Tailwind v4 builds colour utilities from the \`--color-*\` entries in @theme.
+Ask for one that is not there and it does not warn, does not fall back and
+does not fail the build — it emits no rule, and the element keeps whatever
+it inherited. Fifteen were shipping across five packages: the CMS list
+row's title never changed colour on hover, the selected row in
+CollectionListView was indistinguishable from its neighbours, and the
+calendar's out-of-month days rendered BRIGHTER than the in-month ones in
+dark mode, because the dark half of the pair generated nothing. None of it
+shows in a diff, a type error or a test — only in grepping the built
+stylesheet for a utility and finding it absent.`
+    },
+    {
         run: "check:glued-code",
         why: `Astro and JSX drop the newline between a word and an adjacent tag rather
 than collapsing it to a space, so a paragraph broken across two source

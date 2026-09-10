@@ -431,7 +431,7 @@ export function LoginView({
                 </Menu>
             </div>
 
-            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-surface-card/70 backdrop-blur-xl border border-hairline-strong rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary-500/5">
+            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-surface-card/70 backdrop-blur-xl border border-hairline-strong rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary/5">
                 {/* Logo */}
                 <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
                     {logoComponent}
@@ -569,7 +569,7 @@ export function LoginView({
                                                 Don&apos;t have an account?{" "}
                                                 <button
                                                     type="button"
-                                                    className="font-semibold hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
+                                                    className="font-semibold hover:underline cursor-pointer text-primary dark:text-primary-light"
                                                     onClick={() => switchMode("register")}
                                                 >
                                                     Create one
@@ -1034,7 +1034,7 @@ function LoginForm({
                 <div className="w-full text-right mb-3">
                     <button
                         type="button"
-                        className="text-xs font-medium hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
+                        className="text-xs font-medium hover:underline cursor-pointer text-primary dark:text-primary-light"
                         onClick={onForgotPassword}
                     >
                         Forgot password?
@@ -1077,7 +1077,7 @@ function LoginForm({
                         Don&apos;t have an account?{" "}
                         <button
                             type="button"
-                            className="font-semibold hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
+                            className="font-semibold hover:underline cursor-pointer text-primary dark:text-primary-light"
                             onClick={switchToRegister}
                         >
                             Create one
@@ -1092,7 +1092,7 @@ function LoginForm({
                         Already have an account?{" "}
                         <button
                             type="button"
-                            className="font-semibold hover:underline cursor-pointer text-primary-600 dark:text-primary-400"
+                            className="font-semibold hover:underline cursor-pointer text-primary dark:text-primary-light"
                             onClick={switchToLogin}
                         >
                             Sign in

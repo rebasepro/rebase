@@ -694,7 +694,7 @@ export function CrmDashboardDemo() {
                             ) : task.values.priority === "medium" ? (
                                 <span className="text-amber-500 font-semibold uppercase text-xs">Medium</span>
                             ) : (
-                                <span className="text-surface-450 dark:text-surface-500 uppercase text-xs">Low</span>
+                                <span className="text-surface-500 uppercase text-xs">Low</span>
                             )}
                         </Typography>
                     </div>

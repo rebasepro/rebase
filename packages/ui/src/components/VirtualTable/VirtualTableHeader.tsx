@@ -109,7 +109,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                 <div
                     className={cls("flex py-0 px-3 h-full text-xs uppercase font-semibold relative select-none items-center",
                         isDragging
-                            ? "bg-primary-bg dark:bg-primary-bg-dark"
+                            ? "bg-primary-bg"
                             : "bg-surface-sheet",
                         "text-text-secondary hover:text-text-primary dark:text-text-secondary-dark dark:hover:text-text-primary-dark",
                         !isDragging && "hover:bg-surface-hover",

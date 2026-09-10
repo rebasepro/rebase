@@ -70,7 +70,7 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
                                 href="https://rebase.pro/policy/privacy_policy/"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="underline text-primary-600 dark:text-primary-400"
+                                className="underline text-primary dark:text-primary-light"
                             >
                                 Privacy Policy
                             </a>

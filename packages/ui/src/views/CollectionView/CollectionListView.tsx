@@ -151,7 +151,7 @@ export function CollectionListView<T extends Record<string, unknown> = Record<st
                         "flex items-center gap-3 px-4 cursor-pointer",
                         "hover:bg-surface-hover",
                         "transition-colors duration-100",
-                        selected && "bg-primary-50 dark:bg-primary-900/20",
+                        selected && "bg-primary-bg",
                         highlighted && "bg-surface-raised",
                         rowClassName
                     )}
