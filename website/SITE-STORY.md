@@ -211,7 +211,7 @@ its own close and drops `ClosingCta`.
 | Page | The one question it answers | Demos it owns |
 |------|------------------------------|---------------|
 | `/` | What is this and why should I care? | Terminal, CollectionPower, mini-demos, PolicyPathsFigure, AdminCarousel, AgentConsole |
-| `/product` | What do I actually get, in every product? | CollectionLayersSection (the home figure's sample, sorted into Backend and CMS — never the home component itself), ScrollSync, RebaseMosaicDemo, the two-layer map |
+| `/product` | What do I actually get, in every product? | ScrollSync (opens the page — the product working on your own database), CollectionLayersSection (the home figure's sample, sorted into Backend and CMS — never the home component itself), RebaseMosaicDemo, the two-layer map |
 | `/backend` | Is the backend good enough on its own? | HeroConnection, ApiMini, SdkMini, RealtimeMini, RLSEditor, SplitLayer |
 | `/cms` | Will non-developers actually live in this? | AdminDemoCarousel, ScrollSync, the editor, Kanban, Spreadsheet, CustomFields, ReactExt — each mounted once |
 | `/studio` | Can I run my database from here? | SQLEditor, SchemaBuilder, RLSEditor, OrdersList, JSEditor |
