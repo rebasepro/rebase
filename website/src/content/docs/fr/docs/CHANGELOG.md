@@ -163,6 +163,27 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - Date cells in the collection list carry an accessible name; the focus ring is
   drawn inside the box, so an ancestor can no longer clip it.
 
+- **Soft delete did not work at all.** Every `DELETE` on a collection declaring
+  `softDelete` answered 500 and left the row live: a soft delete is a save — it
+  stamps `deleted_at` — and the read-back afterwards went through the ordinary
+  walk, which hides stamped rows, so it could not see what it had just written
+  and threw inside the transaction, rolling the stamp back with it.
+
+- **A row already in the trash could never be purged.** `?hard=true` is the
+  "empty trash" operation, and both delete routes looked the row up with the
+  default read — which hides exactly the rows they were asked to remove — so
+  they answered 404 for a row `?deleted=only` was listing a moment earlier.
+
+- **`min` and `max` over a number column came back as strings.**
+  `?select=avg(price),max(price)` answered `{ avg_price: 5, max_price: "8.5" }`:
+  one column, two functions, two JSON types, and arithmetic on the second one
+  silently concatenating. `min`/`max` are uncast by Postgres and were not parsed
+  back; they are now, decided by the column's declared type so a `min(sku)` of
+  `"00123"` still comes back as text.
+
+- A new project's first `pnpm run dev` no longer opens with a vite warning about
+  `__dirname` in a config file its author did not write.
+
 
 ### Security
 
