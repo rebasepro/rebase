@@ -21,6 +21,26 @@
 // why they stay crisp at any output size.
 
 export const NEAT_BASE_CONFIG = {
+    // A WebGL context flag, read once when the instance is built — Neat warns
+    // and ignores it if set later. Off, every facet edge of the ribbon is a
+    // staircase, which the subtle register hid under 0.55 opacity and the
+    // loud one puts in plain view (Francesco, 2026-09-10: "some shapes are
+    // visibly pixelated"). Multisampling on the default framebuffer; the cost
+    // is fill rate on the four canvases the home page mounts, and the frames
+    // still come in well under budget on a throttled phone.
+    antialias: true,
+    // Multisampling only covers the facet edges. The stripes and bars ACROSS
+    // a facet are Neat's procedural texture, which `bitmap` (the default)
+    // draws through Canvas2D into a fixed 1024px square and then magnifies
+    // across a full-viewport ribbon — so every band edge is a coarse grid no
+    // amount of MSAA touches. `baked` rasterises the same shapes analytically
+    // on the GPU at a resolution derived from the canvas: exact edge
+    // coverage, the same mipmapped texture afterwards, the same per-frame
+    // cost. Needs WebGL2 and falls back to `bitmap` (with a console warning)
+    // without it; does not do squiggles, and this config draws none. Landed in
+    // @firecms/neat 1.0.3-canary.20260731173236, which is why the site is on
+    // that build rather than 1.0.2.
+    textureMode: "baked",
     licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
     colors: [
         { color: "#FB5066", enabled: true },
@@ -102,7 +122,15 @@ export const NEAT_BASE_CONFIG = {
     planeTwist: 1,
     silhouetteFade: 0,
     cylinderFade: 0.08,
-    ribbonFade: 0,
+    // NOT 0. On a `shapeType: "ribbon"` — which this is — a `ribbonFade` of
+    // exactly 0 draws nothing at all: the canvas comes back as a flat fill of
+    // `backgroundColor`, with no error, no warning and no watermark. It sat at
+    // 0 for as long as this file has existed, so every hero on the site was
+    // rendering an empty canvas, and nothing looked broken because the canvas is
+    // held at `opacity: 0.55` over a near-black page — "no gradient" and "a very
+    // dim gradient" are the same picture. Found 2026-09-07 when the blog cards,
+    // which are the same component at full opacity, came up black.
+    ribbonFade: 0.08,
     flatShading: true,
     cameraLock: false,
     cameraX: 0,
@@ -112,4 +140,11 @@ export const NEAT_BASE_CONFIG = {
     cameraRotationY: 0.483,
     cameraRotationZ: 0,
     cameraZoom: 2.3,
+} as const;
+
+/** The site's two registers (HERO_TONES in NeatBackground.tsx): the light,
+ *  never the shape. */
+export const HERO_TONES = {
+    subtle: { colorBrightness: 0.25, colorSaturation: 1, opacity: 0.55 },
+    loud: { colorBrightness: 0.85, colorSaturation: 1.2, opacity: 1 },
 } as const;

@@ -119,20 +119,20 @@ export const BEATS: Beat[] = [
        three tour beats are five to six seconds each: a montage needs the
        time to be seen, and "boards, tables, cards and forms" said over a
        three-second cut was gone before the eye had found the boards. */
-    { id: "hook", start: tempo(12), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "init", start: tempo(530), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "rule", start: tempo(800), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: tempo(1180), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "users", start: tempo(1396), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: tempo(1630), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: tempo(1900), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: tempo(2172), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: tempo(2352), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: tempo(2517), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "hook", start: tempo(12), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.12 },
+    { id: "init", start: tempo(530), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.12 },
+    { id: "rule", start: tempo(800), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.1 },
+    { id: "push", start: tempo(1180), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.12 },
+    { id: "users", start: tempo(1396), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.12 },
+    { id: "agent", start: tempo(1630), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.1 },
+    { id: "panel", start: tempo(1900), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.12 },
+    { id: "views", start: tempo(2172), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.12 },
+    { id: "schema", start: tempo(2352), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.12 },
+    { id: "studio", start: tempo(2517), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.12 },
     /* The wall: 380 frames, enough for the line to name six of its
        twenty-four entries and for the cascade to finish under it. */
-    { id: "more", start: tempo(2707), view: cell(0, 3), roll: 0.3, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(3087), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "more", start: tempo(2707), view: cell(0, 3), roll: 0.3, ground: "base", reveal: 0.12 },
+    { id: "all", start: tempo(3087), view: ALL, roll: 0.16, ground: "base", reveal: 0.16 },
 ];
 
 /** Where the camera starts: on the hook, which is where it stays until the

@@ -40,6 +40,12 @@ function objectAfter(marker) {
 
 // `as const` is a type assertion the emitted file does not want.
 const base = objectAfter("const NEAT_BASE_CONFIG").replace(/ as const/g, "");
+/* The site draws its gradient in two registers — `subtle` for a page hero
+   under type, `loud` for the blog and, since 2026-09-10, the home hero. The
+   film runs the loud one, held down on every slide and let up across the
+   camera moves (see desk/DeskPlane.tsx). Copied for the same reason the base
+   config is: one place, no retyping. */
+const tones = objectAfter("const HERO_TONES").replace(/ as const/g, "");
 
 fs.writeFileSync(
     TARGET,
@@ -66,6 +72,10 @@ fs.writeFileSync(
 // why they stay crisp at any output size.
 
 export const NEAT_BASE_CONFIG = ${base.trimEnd()} as const;
+
+/** The site's two registers (HERO_TONES in NeatBackground.tsx): the light,
+ *  never the shape. */
+export const HERO_TONES = ${tones.trimEnd()} as const;
 `,
 );
 

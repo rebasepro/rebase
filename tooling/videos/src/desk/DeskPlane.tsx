@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { NeatCanvas, NeatTravel } from "../gradient/NeatCanvas";
 import { BEATS, DESK_DURATION, MOVE_LEAD, moveFrames, OPENING } from "./beats";
+import { HERO_TONES } from "../data/neat-config";
 import { GROUND } from "../theme";
 
 /**
@@ -72,11 +73,37 @@ export function ribbonAt(frame: number): NeatTravel {
     };
 }
 
+/**
+ * THE LOUD REGISTER, ON A LEASH. The site's home hero went loud on
+ * 2026-09-10 — colour at 0.85, saturation past 1 — and the film draws the
+ * same register. But a slide is type and windows on a ground, and the art
+ * at that strength would compete with them; so on a held shot the ribbon is
+ * shown at a beat's own `reveal` (low), and across a camera move it comes up
+ * to MOVE_REVEAL on a sine bump and goes back down as the next shot lands.
+ * The gradient is loudest exactly when nothing has to be read.
+ */
+const MOVE_REVEAL = 0.5;
+
+function moveBump(frame: number): number {
+    /* Odd indices close a hold, even ones close a move — so [AT[i], AT[i+1]]
+       with i odd is a move window. The last pair is the outro fade, not a
+       move, and gets no bump. */
+    for (let i = 1; i < AT.length - 2; i += 2) {
+        if (frame >= AT[i] && frame <= AT[i + 1]) {
+            const t = (frame - AT[i]) / Math.max(1, AT[i + 1] - AT[i]);
+            return Math.sin(Math.PI * t);
+        }
+    }
+    return 0;
+}
+
 export function groundAt(frame: number) {
     const r = Math.round(interpolate(frame, AT, R, OPTS));
     const g = Math.round(interpolate(frame, AT, G, OPTS));
     const b = Math.round(interpolate(frame, AT, B, OPTS));
-    return { color: `rgb(${r}, ${g}, ${b})`, reveal: interpolate(frame, AT, REVEAL, OPTS) };
+    const held = interpolate(frame, AT, REVEAL, OPTS);
+    const reveal = held + (MOVE_REVEAL - held) * moveBump(frame);
+    return { color: `rgb(${r}, ${g}, ${b})`, reveal };
 }
 
 export function timeAt(frame: number, fps: number) {
@@ -92,6 +119,7 @@ export const DeskPlane: React.FC = () => {
             <AbsoluteFill style={{ background: ground.color }} />
             <NeatCanvas
                 framing="hero"
+                tone={HERO_TONES.loud}
                 opacity={ground.reveal}
                 camera={ribbonAt(frame)}
                 time={timeAt(frame, fps)}

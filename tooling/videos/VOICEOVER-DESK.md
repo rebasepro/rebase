@@ -127,6 +127,10 @@ as the green line prints, then back to the lens for "Then run it".
   tinted chips), and the film's own windows follow the same ladder
   (`SURFACE`, `RADIUS`, `FRAME` in `src/theme.ts`): sheets with an 8%
   hairline, wells for code and terminals, no shadows.
+- The ribbon runs the site's **loud register** (the home hero's since
+  2026-09-10: colour 0.85, saturation 1.2), on a leash: a held slide shows
+  it at a beat's own low `reveal`, and it comes up to 0.5 on a sine bump
+  across every camera move, when nothing has to be read (`DeskPlane.tsx`).
 - Render the deliverable at 4K: `remotion render src/index.ts RebaseDesk
   out/rebase-desk-4k.mp4 --scale=2`. A 1080p render throws the reshoot
   away.

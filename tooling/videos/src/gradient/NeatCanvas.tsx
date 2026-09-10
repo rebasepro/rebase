@@ -119,6 +119,10 @@ function valueOf(framing: NeatFraming, key: Movable): number {
 
 interface NeatCanvasProps {
     framing?: NeatFraming;
+    /** Which of the site's registers to draw in — colour brightness and
+     *  saturation, the light on the ribbon and never its shape. Defaults to
+     *  the base config's own (the subtle register). */
+    tone?: { colorBrightness: number; colorSaturation: number };
     /** Master opacity. The site runs its hero canvas at 0.55. */
     opacity?: number;
     /** Seconds added to the clock, so two scenes on the same framing are not
@@ -160,6 +164,7 @@ interface NeatCanvasProps {
 
 export const NeatCanvas: React.FC<NeatCanvasProps> = ({
     framing = "full",
+    tone,
     opacity = 0.62,
     timeOffset = 0,
     time,
@@ -211,6 +216,7 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
             new NeatGradient({
                 ...NEAT_BASE_CONFIG,
                 ...FRAMING[framing],
+                ...(tone ?? {}),
                 ...(yOffset !== undefined ? { yOffset } : {}),
                 ref: canvas,
                 // Without this the animation starts at "seconds elapsed in the
@@ -292,7 +298,7 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
             neatRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [framing, yOffset, width, height, ss]);
+    }, [framing, yOffset, width, height, ss, tone?.colorBrightness, tone?.colorSaturation]);
 
     // One draw per frame, at a time we choose.
     useLayoutEffect(() => {
