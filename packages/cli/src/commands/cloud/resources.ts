@@ -27,6 +27,7 @@ import {
     note,
     noteBlank
 } from "./context";
+import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
@@ -694,7 +695,15 @@ maxPositionals: 0 });
         const stores = (await client.data.collection("storages").find({
             where: { project: ["==", projectId] },
             limit: 50
-        })).data as Array<{ id: string | number; type?: string; provider?: string; bucketName?: string; status?: string }>;
+        })).data as Array<{
+            id: string | number;
+            sourceKey?: string;
+            type?: string;
+            provider?: string;
+            bucketName?: string;
+            s3Bucket?: string;
+            status?: string;
+        }>;
 
         emit(
             () => {
@@ -707,8 +716,14 @@ maxPositionals: 0 });
                     return;
                 }
                 for (const s of stores) {
-                    console.log(`  ${chalk.bold(s.bucketName ?? s.type ?? "bucket")} ${chalk.gray(`[${s.id}]`)} ${colorStatus(s.status)}`);
-                    keyValues([["Provider", s.provider], ["Type", s.type]]);
+                    // `bucketName` is written by managed provisioning only, so
+                    // a bucket attached from the console or by `attach` listed
+                    // as "byos" — the type, printed where the name goes. The
+                    // name the tenant actually reads is `s3Bucket`.
+                    const name = s.bucketName || s.s3Bucket || "(no bucket)";
+                    const key = s.sourceKey || DEFAULT_STORAGE_SOURCE_KEY;
+                    console.log(`  ${chalk.bold(name)} ${chalk.gray(`[${s.id}]`)} ${colorStatus(s.status)}`);
+                    keyValues([["Source", key], ["Provider", s.provider], ["Type", s.type]]);
                 }
                 console.log("");
             },
@@ -716,7 +731,8 @@ maxPositionals: 0 });
                 projectId,
                 stores: stores.map((s) => ({
                     id: String(s.id),
-                    bucketName: s.bucketName ?? null,
+                    sourceKey: s.sourceKey || DEFAULT_STORAGE_SOURCE_KEY,
+                    bucketName: s.bucketName || s.s3Bucket || null,
                     type: s.type ?? null,
                     provider: s.provider ?? null,
                     status: s.status ?? null
@@ -746,7 +762,8 @@ description: "Provision platform-managed storage. Takes no options" },
                     ["--secret-access-key <s>", "Secret access key. Required"],
                     ["--endpoint <url>", "S3 endpoint. Omit for AWS"],
                     ["--region <region>", "Region"],
-                    ["--force-path-style", "Required by MinIO and some gateways"]
+                    ["--force-path-style", "Required by MinIO and some gateways"],
+                    ["--source <key>", "Which declared bucket. Default: the default one"]
                 ]
             }
         ],
@@ -841,7 +858,13 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
             "--secret-access-key": String,
             "--endpoint": String,
             "--region": String,
-            "--force-path-style": Boolean
+            "--force-path-style": Boolean,
+            // Which declared bucket this configures. A project has one row per
+            // source, and without this the command took `limit: 1` off an
+            // unordered find and updated whichever row came back — so
+            // attaching a bucket to a two-bucket project could overwrite
+            // `media`'s credentials while reporting success.
+            "--source": String
         },
         rawArgs,
         commandWords: 3, // cloud storage attach
@@ -872,14 +895,23 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 
+    const sourceKey = (parsed["--source"] ?? "").trim() || DEFAULT_STORAGE_SOURCE_KEY;
+
     try {
         const existing = (await client.data.collection("storages").find({
             where: { project: ["==", projectId] },
-            limit: 1
-        })).data[0] as { id?: string | number } | undefined;
+            limit: 50
+        })).data.find((r) => {
+            const key = (r as { sourceKey?: unknown }).sourceKey;
+            return (typeof key === "string" && key ? key : DEFAULT_STORAGE_SOURCE_KEY) === sourceKey;
+        }) as { id?: string | number } | undefined;
 
         const row: Record<string, unknown> = {
             project: projectId,
+            // Written, not left to the column default: a row that does not say
+            // which source it configures is a row the console and the deploy
+            // path both have to guess about.
+            sourceKey,
             type: "byos",
             status: "active",
             s3Bucket: bucket,

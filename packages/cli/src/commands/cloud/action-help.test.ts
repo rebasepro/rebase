@@ -56,7 +56,8 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--secret-access-key": String,
         "--endpoint": String,
         "--region": String,
-        "--force-path-style": Boolean
+        "--force-path-style": Boolean,
+        "--source": String
     },
     webhooks: null,
     "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },

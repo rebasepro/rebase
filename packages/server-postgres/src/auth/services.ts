@@ -1,7 +1,7 @@
 import { eq, getTableName, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { getTableConfig } from "drizzle-orm/pg-core";
-import type { RebasePgTable } from "../types";
+import { getTableConfig, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { asRebasePgTable, type RebasePgTable } from "../types";
 import { users, refreshTokens, passwordResetTokens, userIdentities, magicLinkTokens } from "../schema/auth-schema";
 import {
     UserRepository,
@@ -97,8 +97,8 @@ export class UserService implements UserRepository {
             this.userIdentitiesTable = (tables.userIdentities || userIdentities) as RebasePgTable;
         } else {
             const table = tableOrTables as RebasePgTable | undefined;
-            this.usersTable = table || (users as unknown as RebasePgTable);
-            this.userIdentitiesTable = userIdentities as unknown as RebasePgTable;
+            this.usersTable = table || asRebasePgTable(users);
+            this.userIdentitiesTable = asRebasePgTable(userIdentities);
         }
     }
 
@@ -588,8 +588,8 @@ export class RefreshTokenService {
             this.refreshTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || refreshTokens) as RebasePgTable;
             this.usersTable = ((tableOrTables as Partial<AuthSchemaTables>).users || users) as RebasePgTable;
         } else {
-            this.refreshTokensTable = (tableOrTables as RebasePgTable) || (refreshTokens as unknown as RebasePgTable);
-            this.usersTable = users as unknown as RebasePgTable;
+            this.refreshTokensTable = (tableOrTables as RebasePgTable) || asRebasePgTable(refreshTokens);
+            this.usersTable = asRebasePgTable(users);
         }
     }
 
@@ -603,12 +603,17 @@ export class RefreshTokenService {
     }
 
     private col(column: string) {
-        return (this.refreshTokensTable as unknown as Record<string, never>)[column];
+        return this.refreshTokensTable[column];
     }
 
     /** The columns to read back, narrowed to the ones this table has. */
     private selection() {
-        const selection: Record<string, never> = {
+        // `AnyPgColumn`, not `Record<string, never>`. `never` is assignable to
+        // everything, so the old type made this object fit whatever `.select()`
+        // wanted while checking nothing about what was in it — including that
+        // these are columns at all. `RebasePgTable` already indexes to
+        // `AnyPgColumn`, so this needs no conversion either way.
+        const selection: Record<string, AnyPgColumn> = {
             id: this.refreshTokensTable.id,
             uid: this.refreshTokensTable.uid,
             tokenHash: this.refreshTokensTable.tokenHash,
@@ -616,7 +621,7 @@ export class RefreshTokenService {
             createdAt: this.refreshTokensTable.createdAt,
             userAgent: this.refreshTokensTable.userAgent,
             ipAddress: this.refreshTokensTable.ipAddress
-        } as unknown as Record<string, never>;
+        };
         for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt", "aal"]) {
             if (this.has(optional)) selection[optional] = this.col(optional);
         }
@@ -659,13 +664,66 @@ export class RefreshTokenService {
         await this.db.insert(this.refreshTokensTable).values(values);
     }
 
+    /**
+     * Build a {@link RefreshTokenInfo} out of a row of {@link selection}.
+     *
+     * `selection()` is assembled at runtime from the columns this table actually
+     * has, so drizzle types the row as an open record and nothing static
+     * connects it to the interface. Both call sites used to assert the
+     * connection — `row as unknown as RefreshTokenInfo` — which claims every
+     * optional field is present and correctly typed on a row where, by
+     * construction, some of them were never selected.
+     *
+     * Constructing it says the true thing instead: the five required fields come
+     * from columns `selection()` always includes, and each optional one is
+     * copied only when the row carries it. A host application's own
+     * `refresh_tokens` table predating session grouping is the case this whole
+     * class is shaped around, and it is exactly the case the assertion
+     * misdescribed.
+     */
+    private static toInfo(row: Record<string, unknown>): RefreshTokenInfo {
+        // node-postgres returns `timestamptz` as a Date; a custom table mapped
+        // through a different driver can hand back the ISO string instead.
+        const asDate = (value: unknown): Date => value instanceof Date ? value : new Date(String(value));
+        const info: RefreshTokenInfo = {
+            // Copied as the driver returned them, not coerced. `String(...)`
+            // here would turn a missing column into the *string* `"undefined"`,
+            // which then travels into comparisons and logs looking like a value;
+            // and rejecting a row whose `id` came back as a number would log out
+            // every user of a host table that declares it `serial`. Which type a
+            // column has is the database's business, and these five are always
+            // in `selection()`, so absence is not a case that arises.
+            id: row.id as string,
+            uid: row.uid as string,
+            tokenHash: row.tokenHash as string,
+            expiresAt: asDate(row.expiresAt),
+            createdAt: asDate(row.createdAt)
+        };
+        if (row.userAgent !== undefined) info.userAgent = row.userAgent as string | null;
+        if (row.ipAddress !== undefined) info.ipAddress = row.ipAddress as string | null;
+        if (row.sessionId !== undefined && row.sessionId !== null) info.sessionId = String(row.sessionId);
+        if (row.rotatedAt !== undefined) info.rotatedAt = row.rotatedAt === null ? null : asDate(row.rotatedAt);
+        if (row.revoked !== undefined) info.revoked = Boolean(row.revoked);
+        if (row.sessionStartedAt !== undefined && row.sessionStartedAt !== null) {
+            info.sessionStartedAt = asDate(row.sessionStartedAt);
+        }
+        // Checked rather than asserted, because this one decides an assurance
+        // level. The column is a plain text column on a table the host may own,
+        // so a value that is neither label is reachable — and asserting the
+        // union would have carried it through as if it were one. Anything that
+        // is not exactly "aal2" is left unset, which the reader treats as
+        // `aal1`: the restrictive answer, as the interface documents.
+        if (row.aal === "aal1" || row.aal === "aal2") info.aal = row.aal;
+        return info;
+    }
+
     async findByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
         const [token] = await this.db
             .select(this.selection())
             .from(this.refreshTokensTable)
             .where(eq(this.refreshTokensTable.tokenHash, tokenHash));
 
-        return (token as unknown as RefreshTokenInfo) || null;
+        return token ? RefreshTokenService.toInfo(token) : null;
     }
 
     /**
@@ -731,7 +789,7 @@ export class RefreshTokenService {
     async getTokensValidAfter(uid: string): Promise<Date | null> {
         if (!this.usersTable || !(this.usersTable as Record<string, unknown>).tokensValidAfter) return null;
         const [row] = await this.db
-            .select({ tokensValidAfter: (this.usersTable as unknown as Record<string, never>).tokensValidAfter })
+            .select({ tokensValidAfter: this.usersTable.tokensValidAfter })
             .from(this.usersTable)
             .where(eq(this.usersTable.id, uid));
         const value = (row as { tokensValidAfter?: Date | string | null } | undefined)?.tokensValidAfter;
@@ -761,7 +819,7 @@ export class RefreshTokenService {
             .where(eq(this.refreshTokensTable.uid, uid))
             .orderBy(this.refreshTokensTable.createdAt);
 
-        return tokens as unknown as RefreshTokenInfo[];
+        return tokens.map(RefreshTokenService.toInfo);
     }
 
     async deleteById(id: string, uid: string): Promise<void> {
@@ -783,7 +841,7 @@ export class PasswordResetTokenService {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
             this.passwordResetTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || passwordResetTokens) as RebasePgTable;
         } else {
-            this.passwordResetTokensTable = (tableOrTables as RebasePgTable) || (passwordResetTokens as unknown as RebasePgTable);
+            this.passwordResetTokensTable = (tableOrTables as RebasePgTable) || asRebasePgTable(passwordResetTokens);
         }
     }
 
@@ -884,7 +942,7 @@ export class MagicLinkTokenService {
         private db: NodePgDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
-        this.magicLinkTokensTable = (magicLinkTokens as unknown as RebasePgTable);
+        this.magicLinkTokensTable = asRebasePgTable(magicLinkTokens);
     }
 
     private getQualifiedTableName(): string {

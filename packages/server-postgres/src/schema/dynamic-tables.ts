@@ -54,7 +54,7 @@ import {
     type PgTable
 } from "drizzle-orm/pg-core";
 
-import { relations, sql, type Relations } from "drizzle-orm";
+import { getTableColumns, relations, sql, type Relations } from "drizzle-orm";
 import { toWireKey } from "@rebasepro/utils";
 
 import type { TableColumn, TableMeta } from "./introspect-db-logic";
@@ -200,12 +200,38 @@ function scalarBuilder(udtName: string, name: string, col: TableColumn): PgColum
     }
 }
 
+/**
+ * The fluent methods this file calls on a column builder.
+ *
+ * Drizzle's `PgColumnBuilderBase` exposes none of them by design: they live on
+ * the concrete `PgColumnBuilder` subclasses, each generic over the column's
+ * TypeScript type, its name and whether it is notNull / hasDefault — a chain
+ * resolved when you *write* a schema, and not resolvable when you build one
+ * from a catalogue read at runtime, which is all this file does.
+ *
+ * So a conversion here is irreducible; what was avoidable was doing it four
+ * separate times, each declaring its own one-method slice of the builder and
+ * each free to disagree with the others about a name or a signature. Declaring
+ * the methods as an *extension* of the base also drops the `as unknown as`: the
+ * two types overlap, so tsc will still refuse this if drizzle ever gives
+ * `PgColumnBuilderBase` a conflicting member.
+ */
+interface FluentColumnBuilder extends PgColumnBuilderBase {
+    array(): PgColumnBuilderBase;
+    notNull(): PgColumnBuilderBase;
+    primaryKey(): PgColumnBuilderBase;
+    generatedAlwaysAs(expr: unknown): PgColumnBuilderBase;
+}
+
+/** See {@link FluentColumnBuilder}. */
+const fluent = (builder: PgColumnBuilderBase): FluentColumnBuilder => builder as FluentColumnBuilder;
+
 function columnBuilderFor(col: TableColumn): PgColumnBuilderBase {
     // Array types are named after their element with a leading underscore
     // (_int4 = int4[]), so the element mapping is reused verbatim.
     if (col.udt_name.startsWith("_")) {
         const element = scalarBuilder(col.udt_name.slice(1), col.column_name, col);
-        return (element as unknown as { array(): PgColumnBuilderBase }).array();
+        return fluent(element).array();
     }
     return scalarBuilder(col.udt_name, col.column_name, col);
 }
@@ -223,7 +249,7 @@ export function buildDrizzleTablesFromSchema(
     const schema = pgSchemaName === "public" ? null : pgSchema(pgSchemaName);
     // The column set is only known at runtime, so drizzle's generic table
     // signature can't be satisfied statically; call it through a loose type.
-    const createTable = (schema ? schema.table.bind(schema) : pgTable) as unknown as (
+    const createTable = (schema ? schema.table.bind(schema) : pgTable) as (
         name: string,
         columns: Record<string, PgColumnBuilderBase>,
         extras?: (self: Record<string, unknown>) => unknown[]
@@ -239,21 +265,19 @@ export function buildDrizzleTablesFromSchema(
             let builder = columnBuilderFor(col);
 
             if (col.is_nullable === "NO") {
-                builder = (builder as unknown as { notNull(): PgColumnBuilderBase }).notNull();
+                builder = fluent(builder).notNull();
             }
             // Single-column primary keys are marked inline; composite keys are
             // declared in the table extras below.
             if (meta.pks.length === 1 && meta.pks[0] === col.column_name) {
-                builder = (builder as unknown as { primaryKey(): PgColumnBuilderBase }).primaryKey();
+                builder = fluent(builder).primaryKey();
             }
             // A stored generated column must be left out of every INSERT, which
             // is what `.generatedAlwaysAs` tells drizzle. The expression is
             // carried through so a drizzle-kit run over these tables describes
             // the column it actually found; nothing at runtime evaluates it.
             if (col.is_generated === "ALWAYS") {
-                builder = (builder as unknown as {
-                    generatedAlwaysAs(expr: unknown): PgColumnBuilderBase
-                }).generatedAlwaysAs(sql.raw(col.generation_expression ?? ""));
+                builder = fluent(builder).generatedAlwaysAs(sql.raw(col.generation_expression ?? ""));
             }
 
             const key = columnKey(tableName, col.column_name);
@@ -362,8 +386,16 @@ export function buildDrizzleRelationsFromSchema(
 
             for (const rel of ones) {
                 map[rel.key] = one(tables[rel.targetTable], {
-                    fields: [(table as unknown as Record<string, never>)[rel.fkColumn]],
-                    references: [(tables[rel.targetTable] as unknown as Record<string, never>)[rel.targetColumn]],
+                    // `getTableColumns` is drizzle's own accessor for this.
+                    // Indexing the table object — which is what the casts here
+                    // were for — also reaches its methods and symbols, so a
+                    // foreign key named after one of them yields something that
+                    // is not a column; and the target type they used,
+                    // `Record<string, never>`, makes every lookup `never`,
+                    // which is assignable to anything and therefore checks
+                    // nothing at all.
+                    fields: [getTableColumns(table)[rel.fkColumn]],
+                    references: [getTableColumns(tables[rel.targetTable])[rel.targetColumn]],
                     relationName: rel.relationName
                 });
             }

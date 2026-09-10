@@ -712,14 +712,81 @@ email: "test@example.com" })],
 
         describe("findByHash", () => {
             it("should find token by hash", async () => {
+                // A row `selection()` can actually produce: `id`, `uid`,
+                // `tokenHash`, `expiresAt` and `createdAt` are selected
+                // unconditionally, and the five optional columns are selected
+                // only when the table has them. The fixture used to carry two of
+                // those, which no query in this class could return — it passed
+                // because the method asserted the row into the interface and
+                // handed it straight back, so the shape was never read.
                 const expiresAt = new Date();
-                mockSelectWhere.mockResolvedValueOnce([{ uid: "user-123",
-expiresAt }]);
+                const createdAt = new Date(expiresAt.getTime() - 60_000);
+                mockSelectWhere.mockResolvedValueOnce([{
+                    id: "token-1",
+                    uid: "user-123",
+                    tokenHash: "token-hash",
+                    expiresAt,
+                    createdAt
+                }]);
 
                 const result = await refreshTokenService.findByHash("token-hash");
 
-                expect(result).toEqual({ uid: "user-123",
-expiresAt });
+                expect(result).toEqual({
+                    id: "token-1",
+                    uid: "user-123",
+                    tokenHash: "token-hash",
+                    expiresAt,
+                    createdAt
+                });
+            });
+
+            it("carries the optional columns through when the row has them", async () => {
+                const expiresAt = new Date();
+                const createdAt = new Date(expiresAt.getTime() - 60_000);
+                const sessionStartedAt = new Date(expiresAt.getTime() - 120_000);
+                mockSelectWhere.mockResolvedValueOnce([{
+                    id: "token-1", uid: "user-123", tokenHash: "token-hash", expiresAt, createdAt,
+                    sessionId: "session-1", rotatedAt: null, revoked: false, sessionStartedAt, aal: "aal2"
+                }]);
+
+                expect(await refreshTokenService.findByHash("token-hash")).toEqual({
+                    id: "token-1", uid: "user-123", tokenHash: "token-hash", expiresAt, createdAt,
+                    sessionId: "session-1", rotatedAt: null, revoked: false, sessionStartedAt, aal: "aal2"
+                });
+            });
+
+            it("does not invent optional columns the table does not have", async () => {
+                // The case this whole class is shaped around: a host application
+                // supplying its own `refresh_tokens` that predates session
+                // grouping. `selection()` leaves those columns out, so they are
+                // absent from the row — and the assertion that used to stand
+                // here told every reader they were present and typed.
+                const expiresAt = new Date();
+                const createdAt = new Date(expiresAt.getTime() - 60_000);
+                mockSelectWhere.mockResolvedValueOnce([{
+                    id: "token-1", uid: "user-123", tokenHash: "token-hash", expiresAt, createdAt
+                }]);
+
+                const result = await refreshTokenService.findByHash("token-hash");
+
+                expect(result).not.toHaveProperty("sessionId");
+                expect(result).not.toHaveProperty("revoked");
+                expect(result).not.toHaveProperty("aal");
+            });
+
+            it("refuses an `aal` that is neither label", async () => {
+                // It decides an assurance level, and the column is plain text on
+                // a table the host may own. Asserting the union would have
+                // carried anything through as if it were a level; leaving it
+                // unset reads as `aal1`, the restrictive answer.
+                const expiresAt = new Date();
+                const createdAt = new Date(expiresAt.getTime() - 60_000);
+                mockSelectWhere.mockResolvedValueOnce([{
+                    id: "token-1", uid: "user-123", tokenHash: "token-hash", expiresAt, createdAt,
+                    aal: "aal3"
+                }]);
+
+                expect(await refreshTokenService.findByHash("token-hash")).not.toHaveProperty("aal");
             });
 
             it("should return null when token not found", async () => {

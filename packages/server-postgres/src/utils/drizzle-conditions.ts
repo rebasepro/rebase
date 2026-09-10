@@ -1,4 +1,4 @@
-import { and, eq, not, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
+import { and, eq, not, or, sql, SQL, ilike, inArray, getTableColumns, getTableName as drizzleTableName } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     ALL_WHERE_FILTER_OPS,
@@ -1879,36 +1879,28 @@ whereConditions };
         // Ensure we've connected back to the parent table
         // For junction tables, we might end up at the junction table instead of the parent table
         if (currentTable !== parentTable) {
-            // Try to get table names from the Drizzle table objects
-            let currentTableName = "unknown";
-            let parentTableName = "unknown";
+            // `getTableName` is Drizzle's own accessor, and both of these are
+            // declared `PgTable<any>`, so there is nothing to assert.
+            //
+            // What stood here reached for the name four ways — the
+            // `Symbol.for("drizzle:Name")` slot, then `._.name`, `.tableName`
+            // and `.name` — through eight `as unknown as` casts and a
+            // `"unknown"` sentinel for when all four missed. `getTableName`
+            // reads the first of those and nothing else, because on a real
+            // `PgTable` the other three are all `undefined`; they were dead
+            // branches, and the casts were what kept anyone from seeing that
+            // (each `as string` on a `||` chain asserts a type for a value the
+            // compiler was told nothing about).
+            const currentTableName = drizzleTableName(currentTable);
+            const parentTableName = drizzleTableName(parentTable);
 
-            // Try multiple ways to extract table names from Drizzle objects
-            if (currentTable && typeof currentTable === "object") {
-                // Check common Drizzle table name properties
-                currentTableName = (currentTable as unknown as Record<string | symbol, unknown>)[Symbol.for("drizzle:Name")] as string ||
-                    ((currentTable as unknown as Record<string, unknown>)._ as Record<string, unknown>)?.name as string ||
-                    (currentTable as unknown as Record<string, unknown>).tableName as string ||
-                    (currentTable as unknown as Record<string, unknown>).name as string ||
-                    "unknown";
-            }
-
-            if (parentTable && typeof parentTable === "object") {
-                parentTableName = (parentTable as unknown as Record<string | symbol, unknown>)[Symbol.for("drizzle:Name")] as string ||
-                    ((parentTable as unknown as Record<string, unknown>)._ as Record<string, unknown>)?.name as string ||
-                    (parentTable as unknown as Record<string, unknown>).tableName as string ||
-                    (parentTable as unknown as Record<string, unknown>).name as string ||
-                    "unknown";
-            }
-
-            // For junction table scenarios, be more lenient with validation
-            // If we can't determine table names reliably, or if this looks like a junction table scenario,
-            // we'll allow it and let the SQL execution validate the correctness
-            const couldBeJunctionScenario = currentTableName.includes("_") ||
-                currentTableName === "unknown" ||
-                parentTableName === "unknown";
-
-            if (!couldBeJunctionScenario) {
+            // Junction tables are named for the two ends they join, so an
+            // underscore is the signal that this walk plausibly stopped on one
+            // rather than going wrong. The two `=== "unknown"` arms that used
+            // to sit beside it went with the sentinel: a name that could not be
+            // read was never a case that could arise here, only one the
+            // fallback chain made it look like it could.
+            if (!currentTableName.includes("_")) {
                 throw new Error(`Join path did not result in connecting to parent table. Current: ${currentTableName}, Parent: ${parentTableName}`);
             }
         }
@@ -1943,8 +1935,16 @@ whereConditions };
 
         if (currentTable === toTable) {
             // current -> toTable, so join the fromTable
-            const left = fromTable[fromColName as keyof typeof fromTable] as AnyPgColumn;
-            const right = (currentTable as unknown as Record<string, unknown>)[toColName] as AnyPgColumn;
+            // `getTableColumns` is Drizzle's own accessor and is already how the
+            // rest of this file reads a column map. Indexing the table object
+            // directly — which is what the two casts here were for — also
+            // reaches its methods and symbols, so a relation whose column is
+            // named `name` or `enableRLS` got one of those back and passed the
+            // `!left || !right` guard below with something that is not a column.
+            const cols = getTableColumns(fromTable);
+            const currentCols = getTableColumns(currentTable);
+            const left = cols[fromColName];
+            const right = currentCols[toColName];
 
             if (!left || !right) {
                 // Check if this might be a many-to-many relationship requiring a junction table
@@ -1970,7 +1970,7 @@ whereConditions };
         } else if (currentTable === fromTable) {
             // current -> fromTable, so join the toTable
             const left = toTable[toColName as keyof typeof toTable] as AnyPgColumn;
-            const right = (currentTable as unknown as Record<string, unknown>)[fromColName] as AnyPgColumn;
+            const right = getTableColumns(currentTable)[fromColName];
 
             if (!left || !right) {
                 // Check if this might be a many-to-many relationship requiring a junction table

@@ -415,7 +415,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud storage attach",
         usage:
             "cloud storage attach --bucket <name> --access-key-id <id> --secret-access-key <secret> "
-            + "[--endpoint <url>] [--region <region>] [--force-path-style]",
+            + "[--endpoint <url>] [--region <region>] [--force-path-style] [--source <key>]",
         summary:
             "Point the project at storage you already own — S3, R2, MinIO, any S3-compatible bucket. "
             + "The alternative to `storage create`, for a bucket the platform does not manage.",
@@ -425,10 +425,12 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--secret-access-key <secret>", "Required. Stored encrypted and never returned"],
             ["--endpoint <url>", "For anything that is not AWS S3 — R2, MinIO, Backblaze"],
             ["--region <region>", "Bucket region. Default: the provider's own default"],
-            ["--force-path-style", "Address as endpoint/bucket rather than bucket.endpoint. Needed by MinIO"]
+            ["--force-path-style", "Address as endpoint/bucket rather than bucket.endpoint. Needed by MinIO"],
+            ["--source <key>", "Which declared bucket to configure. Default: the project's default bucket"]
         ],
         examples: [
-            "rebase cloud storage attach --bucket assets --access-key-id AKIA… --secret-access-key …",
+            "rebase cloud storage attach --bucket assets --access-key-id … --secret-access-key …",
+            "rebase cloud storage attach --source media --bucket media-eu --access-key-id … --secret-access-key …",
             "rebase cloud storage attach --bucket assets --access-key-id … --secret-access-key … \\\n"
                 + "    --endpoint https://<account>.r2.cloudflarestorage.com --region auto"
         ],
