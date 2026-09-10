@@ -105,7 +105,7 @@ describe("promptForConsent", () => {
         const { consent, telemetry } = await load();
         vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true } as never);
 
-        await expect(consent.promptForConsent("cli.init", { preset: "blog" })).resolves.toBe(true);
+        await expect(consent.promptForConsent()).resolves.toBe(true);
         expect(telemetry.readConfig().enabled).toBe(true);
         expect(telemetry.readConfig().machineId).toMatch(/^[0-9a-f-]{36}$/);
     });
@@ -114,19 +114,24 @@ describe("promptForConsent", () => {
         const { consent, telemetry } = await load();
         vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false } as never);
 
-        await expect(consent.promptForConsent("cli.init", {})).resolves.toBe(false);
+        await expect(consent.promptForConsent()).resolves.toBe(false);
         expect(telemetry.readConfig().enabled).toBe(false);
         expect(telemetry.readConfig().machineId).toBeUndefined();
     });
 
-    it("defaults to no, so a bare Enter does not enrol anyone", async () => {
+    it("defaults to yes, so a bare Enter enrols", async () => {
+        // Deliberately opt-OUT at the prompt: the project is self-hosted and
+        // learns nothing otherwise. It is still a question — nothing is sent
+        // to anyone who never reaches it (see the suppression tests below),
+        // and `n` is one keystroke. The pairing that must hold is this default
+        // and the wording: no surface may still call it "off by default".
         const { consent } = await load();
-        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false } as never);
+        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true } as never);
 
-        await consent.promptForConsent("cli.init", {});
+        await consent.promptForConsent();
 
         const questions = promptSpy.mock.calls[0][0] as unknown as Array<{ default: unknown }>;
-        expect(questions[0].default).toBe(false);
+        expect(questions[0].default).toBe(true);
     });
 
     it("does not persist anything when the prompt itself fails", async () => {
@@ -136,7 +141,7 @@ describe("promptForConsent", () => {
         const { consent, telemetry } = await load();
         vi.spyOn(inquirer, "prompt").mockRejectedValue(new Error("stdin closed"));
 
-        await expect(consent.promptForConsent("cli.init", {})).resolves.toBe(false);
+        await expect(consent.promptForConsent()).resolves.toBe(false);
         expect(telemetry.readConfig().enabled).toBeUndefined();
         expect(fs.existsSync(telemetry.configPath())).toBe(false);
     });
@@ -146,7 +151,7 @@ describe("promptForConsent", () => {
         const promptSpy = vi.spyOn(inquirer, "prompt");
         setTTY(false);
 
-        await expect(consent.promptForConsent("cli.init", {})).resolves.toBe(false);
+        await expect(consent.promptForConsent()).resolves.toBe(false);
         expect(promptSpy).not.toHaveBeenCalled();
         expect(fs.existsSync(telemetry.configPath())).toBe(false);
     });
