@@ -41,7 +41,12 @@ const notesTable = pgTable("notes", {
 const trashTable = pgTable("trash_notes", {
     id: varchar("id").primaryKey(),
     body: varchar("body"),
-    deleted_at: timestamp("deleted_at", { withTimezone: true })
+    // Keyed by the PROPERTY name, column named separately — the same shape
+    // `notesTable` uses. Keying this `deleted_at` made the registry unable to
+    // find the property `deletedAt`, and the save was refused with
+    // "'trash_notes' has no column 'deletedAt'" — which is the driver's error
+    // doing its job on a mistake in this file.
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
 
 const trashCollection: CollectionConfig = {
