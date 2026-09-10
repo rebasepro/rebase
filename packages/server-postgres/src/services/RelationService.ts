@@ -70,8 +70,12 @@ function relationTargetIds(value: unknown, relationName: string, collectionSlug:
  * Drizzle's `$dynamic()` queries lose the `innerJoin` method from
  * their static type, but it exists at runtime. This helper bridges
  * the gap with a single confined cast.
+ *
+ * Exported so `data-transformer` uses this one rather than restating the same
+ * fact — it wrote `query.innerJoin(...) as unknown as typeof query`, which is
+ * the same claim about the same drizzle behaviour in a second spelling.
  */
-function applyDynamicJoin<T>(query: T, joinTable: PgTable, condition: SQL): T {
+export function applyDynamicJoin<T>(query: T, joinTable: PgTable, condition: SQL): T {
     return (query as unknown as { innerJoin(t: PgTable, c: SQL): T }).innerJoin(joinTable, condition) as T;
 }
 

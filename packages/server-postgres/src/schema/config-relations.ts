@@ -59,7 +59,11 @@ function primaryKeyFieldKey(collection: CollectionConfig): string {
  */
 function columnOf(table: PgTable | undefined, key: string): unknown {
     if (!table) return undefined;
-    const direct = (table as unknown as Record<string, unknown>)[key];
+    // Drizzle's column map is keyed by the JS property name, which is exactly
+    // the "keyed by its property names" case this function's docblock
+    // describes — so `getTableColumns` answers it, and indexing the table
+    // object (which also reaches its methods and symbols) was never needed.
+    const direct = getTableColumns(table)[key];
     if (direct) return direct;
     for (const column of Object.values(getTableColumns(table))) {
         if ((column as { name?: unknown })?.name === key) return column;

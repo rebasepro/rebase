@@ -2044,8 +2044,10 @@ export class PostgresBackendDriver implements DataDriver {
                 }
             }
         }
-        // SAFETY: Raw SQL result rows are typed as QueryResultRow[]; the query shape matches TableColumnInfo
-        const typedColumns = columns as unknown as TableColumnInfo[];
+        // Rows from hand-written SQL. The element type is the one claim nothing
+        // at this layer can check — no column list is available to check it
+        // against — but the shape is `sqlRows`' job, not an assertion's.
+        const typedColumns = sqlRows<TableColumnInfo>(columns);
 
         // 2. Fetch Foreign Keys
         const fkResult = await this.db.execute(drizzleSql`

@@ -7,7 +7,7 @@
 import { Relations, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PgTable } from "drizzle-orm/pg-core";
-import type { RebasePgTable } from "./types";
+import { asRebasePgTable, type RebasePgTable } from "./types";
 import {
     type AuthAdapter,
     BackendBootstrapper,
@@ -1165,7 +1165,20 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
                 usersSchemaName = authCollection.schema;
             }
 
-            const authTables = createAuthSchema(usersSchemaName) as unknown as AuthSchemaTables;
+            // Named field by field through `asRebasePgTable`, not asserted
+            // wholesale. `createAuthSchema` returns ten tables and
+            // `AuthSchemaTables` declares five, so the assertion also claimed
+            // the other five were absent while handing them straight through —
+            // and if one of the five were ever renamed there, nothing here would
+            // have said so.
+            const schema = createAuthSchema(usersSchemaName);
+            const authTables: AuthSchemaTables = {
+                users: asRebasePgTable(schema.users),
+                refreshTokens: asRebasePgTable(schema.refreshTokens),
+                passwordResetTokens: asRebasePgTable(schema.passwordResetTokens),
+                appConfig: asRebasePgTable(schema.appConfig),
+                userIdentities: asRebasePgTable(schema.userIdentities)
+            };
             if (usersTable) {
                 authTables.users = usersTable as RebasePgTable;
             }

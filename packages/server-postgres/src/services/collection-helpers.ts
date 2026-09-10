@@ -33,11 +33,14 @@ export interface DrizzleColumnMeta {
 
 /** Safely extract Drizzle column metadata from a column object. */
 export function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
-    const raw = col as unknown as Record<string | symbol, unknown>;
+    // `columnType`, `dataType` and `primary` are declared members of drizzle's
+    // `Column`, so there is nothing to convert. The `typeof` checks stay: this
+    // is called on columns from runtime-introspected tables as well as declared
+    // ones, and the generic parameters those carry are not always resolved.
     return {
-        columnType: typeof raw.columnType === "string" ? raw.columnType : undefined,
-        dataType: typeof raw.dataType === "string" ? raw.dataType : undefined,
-        primary: typeof raw.primary === "boolean" ? raw.primary : undefined
+        columnType: typeof col.columnType === "string" ? col.columnType : undefined,
+        dataType: typeof col.dataType === "string" ? col.dataType : undefined,
+        primary: typeof col.primary === "boolean" ? col.primary : undefined
     };
 }
 
@@ -89,7 +92,7 @@ function columnFieldName(table: PgTable, column: AnyPgColumn): string {
     for (const [key, candidate] of Object.entries(getTableColumns(table))) {
         if (candidate === column) return key;
     }
-    return (column as unknown as { name: string }).name;
+    return column.name;
 }
 
 export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): CollectionConfig {

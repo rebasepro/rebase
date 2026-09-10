@@ -7,6 +7,7 @@ import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/collection-helpers";
+import { applyDynamicJoin } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
 
 /**
@@ -496,7 +497,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                     break;
                                 }
 
-                                query = query.innerJoin(joinTable, eq(fromCol, toCol)) as unknown as typeof query;
+                                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
                                 currentTable = joinTable;
                             }
 
