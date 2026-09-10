@@ -302,7 +302,7 @@ const flatNavLinks = [
 
     <!-- ═══ Mobile menu: CONTROL (dropdown sub-menus) ═══ -->
     <div class="lg:hidden hidden fixed inset-0 z-50 overflow-y-auto h-screen" id="mobile-menu">
-        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-page-ground/95 backdrop-blur-lg">
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-surface-frame/95 backdrop-blur-lg">
             <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
                 {dropdownNavLinks.map((link, index) => (
                     link.columns ? (
@@ -380,7 +380,7 @@ const flatNavLinks = [
 
     <!-- ═══ Mobile menu: FLAT-NAV (simple list) ═══ -->
     <div class="lg:hidden hidden fixed inset-0 z-50 overflow-y-auto h-screen" id="mobile-menu-flat">
-        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-page-ground/95 backdrop-blur-lg">
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-surface-frame/95 backdrop-blur-lg">
             <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
                 <div class="w-full flex flex-col items-center space-y-8">
                     {flatNavLinks.map(link => (
@@ -449,7 +449,7 @@ const flatNavLinks = [
     }
 
     html[data-scrolled] .site-header {
-        background-color: color-mix(in oklab, var(--color-page-ground) 40%, transparent);
+        background-color: color-mix(in oklab, var(--surface-frame) 40%, transparent);
         -webkit-backdrop-filter: blur(8px);
         backdrop-filter: blur(8px);
     }

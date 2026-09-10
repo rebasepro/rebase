@@ -10,7 +10,7 @@ const translatePath = useTranslatedPath(getLangFromUrl(Astro.url));
      backdrop, no scroll lock, no `inert` on the shell — a consent notice is
      not worth taking the site away from the person who just arrived. -->
 <div id="cookie-banner" class="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-[9999] w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] max-w-[380px] hidden">
-    <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-[0_25px_50px_rgba(0,0,0,0.25),0_0_0_1px_rgba(0,0,0,0.05)_inset] w-full overflow-hidden border border-surface-200 dark:border-surface-800 opacity-0 scale-95 transition-all duration-300 ease-out">
+    <div class="bg-surface-card rounded-2xl shadow-[0_25px_50px_rgba(0,0,0,0.25),0_0_0_1px_rgba(0,0,0,0.05)_inset] w-full overflow-hidden border border-surface-200 dark:border-surface-800 opacity-0 scale-95 transition-all duration-300 ease-out">
         <div class="p-4 sm:p-5">
             <div class="mb-3 sm:mb-4">
                 <h2 class="text-base sm:text-lg text-surface-900 dark:text-white mb-1.5 sm:mb-2">{t("cookies.title")}</h2>
@@ -30,7 +30,7 @@ const translatePath = useTranslatedPath(getLangFromUrl(Astro.url));
                 <button
                         id="cookie-accept"
                         type="button"
-                        class="w-full h-auto border-none px-5 py-2.5 sm:py-3 rounded-lg bg-page-ground dark:bg-white text-white dark:text-black text-sm leading-none cursor-pointer font-semibold hover:opacity-90 transition-opacity duration-200">
+                        class="w-full h-auto border-none px-5 py-2.5 sm:py-3 rounded-lg bg-surface-frame dark:bg-white text-white dark:text-black text-sm leading-none cursor-pointer font-semibold hover:opacity-90 transition-opacity duration-200">
                     {t("cookies.accept")}
                 </button>
             </div>

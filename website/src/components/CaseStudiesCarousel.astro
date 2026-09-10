@@ -133,9 +133,9 @@ const cases = [
                     <div class="cs-media">
                         <div class={`pointer-events-none absolute -inset-8 bg-gradient-to-tr ${c.glow} blur-3xl opacity-60`}></div>
 
-                        <div class="relative h-full w-full flex flex-col rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/90 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
+                        <div class="relative h-full w-full flex flex-col rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-sheet/90 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
                             <!-- browser chrome -->
-                            <div class="flex-none px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/60">
+                            <div class="flex-none px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-card/60">
                                 <div class="ml-4 text-xs font-mono text-surface-500 truncate">{c.host}</div>
                             </div>
 
@@ -176,20 +176,20 @@ const cases = [
                                                 <div class="text-3xs text-surface-400">every weekday · 08:00</div>
                                             </div>
                                             <div class="ml-4 h-2.5 w-px bg-white/10"></div>
-                                            <div class="rounded-lg border border-white/10 bg-surface-900/60 px-2.5 py-1.5 w-fit">
+                                            <div class="rounded-lg border border-white/10 bg-surface-card/60 px-2.5 py-1.5 w-fit">
                                                 <div class="text-3xs font-mono text-white">conditional_switch</div>
                                                 <div class="text-3xs text-surface-500">last_activity &gt; 14 days</div>
                                             </div>
                                             <div class="ml-4 h-2.5 w-px bg-white/10"></div>
-                                            <div class="rounded-lg border border-white/10 bg-surface-900/60 px-2.5 py-1.5 w-fit">
+                                            <div class="rounded-lg border border-white/10 bg-surface-card/60 px-2.5 py-1.5 w-fit">
                                                 <div class="text-3xs font-mono text-white">delay</div>
                                                 <div class="text-3xs text-surface-500">2 hours</div>
                                             </div>
                                             <div class="ml-4 h-2.5 w-px bg-white/10"></div>
                                             <div class="ml-4 flex flex-wrap gap-1.5">
-                                                <span class="rounded-md border border-white/10 bg-surface-900/60 px-2 py-1 text-3xs font-mono text-surface-300">create_task</span>
-                                                <span class="rounded-md border border-white/10 bg-surface-900/60 px-2 py-1 text-3xs font-mono text-surface-300">add_tag</span>
-                                                <span class="rounded-md border border-white/10 bg-surface-900/60 px-2 py-1 text-3xs font-mono text-surface-300">create_activity</span>
+                                                <span class="rounded-md border border-white/10 bg-surface-card/60 px-2 py-1 text-3xs font-mono text-surface-300">create_task</span>
+                                                <span class="rounded-md border border-white/10 bg-surface-card/60 px-2 py-1 text-3xs font-mono text-surface-300">add_tag</span>
+                                                <span class="rounded-md border border-white/10 bg-surface-card/60 px-2 py-1 text-3xs font-mono text-surface-300">create_activity</span>
                                             </div>
                                         </div>
 
@@ -198,7 +198,7 @@ const cases = [
                                             <span>last run 08:00 · 12 items · 0 errors</span>
                                         </div>
                                     </div>
-                                    <div class="w-2/5 flex-none border-l border-white/5 p-4 bg-surface-950/40 hidden sm:flex flex-col">
+                                    <div class="w-2/5 flex-none border-l border-white/5 p-4 bg-surface-well/40 hidden sm:flex flex-col">
                                         <div class="text-3xs uppercase tracking-[0.18em] text-surface-500">Node catalogue</div>
                                         <div class="mt-1 text-2xl font-semibold text-white tabular-nums">25</div>
                                         <p class="mt-2 text-3xs leading-relaxed text-surface-500">Triggers, branches, delays and actions — all of them rows, so the team adds one without a deploy.</p>
@@ -288,7 +288,7 @@ const cases = [
 
         <!-- Controls, aligned to the content gutter -->
         <div class="cs-controls">
-            <div class="inline-flex items-center rounded-full border border-surface-700/70 bg-surface-900/70 p-1 backdrop-blur-sm">
+            <div class="inline-flex items-center rounded-full border border-surface-700/70 bg-surface-card/70 p-1 backdrop-blur-sm">
                 <button id="case-prev" type="button"
                         class="cs-arrow" aria-controls="case-track" aria-label="Previous project">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"

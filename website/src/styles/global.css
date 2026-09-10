@@ -16,8 +16,30 @@
    `h1..h6` rule below is unlayered and beats every utility, so headings inherit
    the system by matching its display-tier selector instead of overriding it. */
 @theme {
-    --color-page-ground: #08090a;
-    --color-page-raised: #14161b;
+    /* THE GROUNDS ARE NOT DECLARED HERE. They were, until 2026-09-10:
+       `--color-page-ground: #08090a` and `--color-page-raised: #14161b`, two
+       hand-picked hexes that predated the surface system by six weeks and
+       belonged to no ladder. `#14161b` is the one cool value in a stack that is
+       otherwise strictly neutral, and its lightness lands BETWEEN
+       `--surface-sheet` (#131313) and `--surface-card` (#181818) — so on a
+       raised chapter every card header, painted `bg-surface-sheet` like the
+       product's own tables paint theirs, came out DARKER than the section it
+       sat on. That inversion is the exact failure the surface system was
+       written to end; see the header comment above the ladder in ui/theme.css.
+
+       The marketing page still has its own ground SCALE — base, raised, the two
+       chroma slabs — because "which kind of section is this" is a marketing
+       question the product has no opinion about. What it no longer has is its
+       own ground VALUES. The scale now names roles from the shared ladder, one
+       declaration site, in `--ground`/`--ground-lift` below:
+
+         base ground    -> --surface-frame   #0a0a0a
+         raised chapter -> --surface-sheet   #131313
+         a card on either -> one step up, whichever ground it landed on
+
+       Reach for `bg-surface-frame`, not a resurrected `bg-page-ground`. The ink
+       tokens below stay: type is a different axis and the ladder has no opinion
+       on a marketing page's copy colour. */
     --color-page-ink: #f7f8f8;
     --color-page-copy: #b4b8bd;
 
@@ -45,9 +67,11 @@
        name. `--color-primary` (#0070F4) is untouched and still owns every
        button and every in-product accent; a chroma hue never means "clickable".
 
-       Contrast as ink on the #08090a ground — five of six clear AA for body:
-         cyan 10.15:1   yellow 12.57:1   blush 11.90:1
-         violet 5.00:1  coral 6.85:1     ultramarine 1.89:1 (FAILS)
+       Contrast as ink on the #0a0a0a base ground — five of six clear AA for
+       body. Coral and blush read 6.85 and 11.90 here until 2026-09-10; both
+       were stale, and both still clear AA at the real figures:
+         cyan 10.15:1   yellow 12.57:1   blush 9.77:1
+         violet 5.00:1  coral 6.07:1     ultramarine 1.89:1 (FAILS)
 
        Ultramarine is the exception: at 1.89:1 it cannot be ink on this ground
        at all. It is only usable as a FIELD with white type on it (10.49:1) —
@@ -112,7 +136,11 @@
     z-index: 1;
     border-radius: 14px;
     border: 1px solid rgb(255 255 255 / 0.1);
-    background: var(--color-surface-950);
+    /* One step above whichever ground this landed on — see `--ground-lift`.
+       Was `--color-surface-950` (#000000), which is below every ground on the
+       site, so a frame was a hole cut into its own section and the card headers
+       inside it came out lighter than the card. */
+    background: var(--ground-lift);
     overflow: hidden;
     box-shadow:
         inset 0 1px 0 rgb(255 255 255 / 0.05),
@@ -163,12 +191,12 @@
    two chroma sections are the top of this scale, not two decisions taken on
    their own.
 
-     BASE     #08090A, the page ground.  EVIDENCE.
+     BASE     `--surface-frame`.         EVIDENCE.
               You are looking at something real: the logo wall, the panel
               itself, the three people, the customers. Nothing is being argued
               — you are being shown.
 
-     RAISED   #14161B, one step up.      MECHANISM.
+     RAISED   `--surface-sheet`.         MECHANISM.
               You are being shown how it works: the collection file and what it
               generates, the SDK and REST and realtime, the three packages. The
               lift says "this is a machine being opened", and it groups the
@@ -238,13 +266,25 @@
    So every ground states what it paints, and paints `var(--ground)`. `:root`
    carries the page ground, so a component that never sits on a slab still
    resolves, and the variable inherits, so a nested figure reads the ground of
-   whichever section it landed in. */
+   whichever section it landed in.
+
+   `--ground-lift` is the second half, added 2026-09-10 with the move onto the
+   shared ladder. A card cannot know its own colour, because the right colour is
+   one step above WHATEVER it landed on — the same `.frame` appears on the base
+   ground, on a raised chapter and on a coral slab. Hard-coding it is what put
+   every frame at `#000`, below all three. So each ground states its own next
+   rung and `.frame` reads it; a demo dropped into a new section gets the right
+   lift without being told. This is rule 1 of the surface system ("every nested
+   surface is one step lifted from the surface it sits on") expressed as a
+   variable rather than as a value repeated at each call site. */
 :root {
-    --ground: var(--color-page-ground);
+    --ground: var(--surface-frame);
+    --ground-lift: var(--surface-sheet);
 }
 
 @utility ground-raised {
-    --ground: var(--color-page-raised);
+    --ground: var(--surface-sheet);
+    --ground-lift: var(--surface-card);
     background: var(--ground);
 }
 
@@ -329,15 +369,23 @@
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with
    it. `--color-surface-500` (#797979) is tuned for #000/#0a0a0a, where it
    measures 4.82:1 and 4.55:1 — deliberately close to the line, because it is
-   the balance point where the light and dark curves cross. Move the ground up
-   to #14161b and the same value falls to 4.16:1 and fails AA.
-   #8a8a8a restores it at 5.24:1.
+   the balance point where the light and dark curves cross. On the raised ground
+   the same value falls under AA, so it is restated here:
+
+     ground      surface-500   this rule
+     #0a0a0a     4.55:1        (base ground, rule does not apply)
+     #131313     4.27:1  FAIL  #7e7e7e -> 4.58:1
+
+   The value dropped from #8a8a8a to #7e7e7e on 2026-09-10 with the move onto
+   the shared ladder: it was compensating for #14161b, a ground two rungs of
+   lightness above `--surface-sheet`, and kept at that brightness it would now
+   overshoot the tier rather than restore it.
 
    This is the general rule for any new surface, not a patch for this one: a
    muted value is only muted RELATIVE to something, and the whole tier has to
    move when the ground does. */
 .ground-raised .eyebrow {
-    color: #8a8a8a;
+    color: #7e7e7e;
 }
 
 @utility chapter {
@@ -403,6 +451,12 @@
     position: relative;
     overflow: hidden;
     --hue: var(--color-surface-700);
+    /* The one ground where the lift goes DOWN. A slab is a colour, and a
+       product demo on it has to read as a dark screen laid on that colour, not
+       as a lighter patch of it — so the frame takes the ladder's bottom rung
+       instead of the rung above the slab. The border and shadow overrides at
+       the foot of this block are the other half of the same decision. */
+    --ground-lift: var(--surface-frame);
 }
 
 /* Dark ground, white ink. `oklch(from …)` sets lightness explicitly and lifts
@@ -446,12 +500,12 @@
 .ground-close {
     --ground: var(--hue);
     background: var(--ground);
-    border-top: 1px solid rgb(8 9 10 / 0.2);
-    border-bottom: 1px solid rgb(8 9 10 / 0.2);
-    color: rgb(8 9 10 / 0.82);
+    border-top: 1px solid rgb(10 10 10 / 0.2);
+    border-bottom: 1px solid rgb(10 10 10 / 0.2);
+    color: rgb(10 10 10 / 0.82);
 }
 
-.ground-close :is(h1, h2, h3):not(.frame *) { color: #08090a; }
+.ground-close :is(h1, h2, h3):not(.frame *) { color: #0a0a0a; }
 
 /* The frame is a dark panel wherever it sits, so inside one the copy returns to
    the page's own ink rather than inheriting the slab's. */
@@ -460,7 +514,7 @@
 /* Opaque, not the 0.7 the dark slab can afford. An 11px label at 0.7 alpha on
    coral measured 4.11:1 and failed AA — small text has no headroom to spend on
    translucency, and a bright ground has less of it than a dark one. */
-.ground-close .eyebrow:not(.frame *) { color: rgb(8 9 10 / 0.95); }
+.ground-close .eyebrow:not(.frame *) { color: rgb(10 10 10 / 0.95); }
 
 /* `--color-primary` is #0070F4, and a slab is the one place on the site where
    that stops working: on teal it is close enough to fight the ground, and on
@@ -476,7 +530,7 @@
 }
 
 .ground-claim .accent-link:not(.frame *) { color: #fff; }
-.ground-close .accent-link:not(.frame *) { color: #08090a; }
+.ground-close .accent-link:not(.frame *) { color: #0a0a0a; }
 .ground-chroma .accent-link:hover { text-decoration-color: currentColor; }
 
 /* `.frame` draws a white hairline and assumes near-black behind it. Neither
@@ -484,7 +538,7 @@
    darker edge reads as an inset screen, and on the bright one the dark panel
    already separates itself and only needs the shadow to sit it down. */
 .ground-chroma .frame {
-    border-color: rgb(8 9 10 / 0.4);
+    border-color: rgb(10 10 10 / 0.4);
     box-shadow:
         inset 0 1px 0 rgb(255 255 255 / 0.05),
         0 2px 8px rgb(0 0 0 / 0.3),
@@ -492,7 +546,7 @@
 }
 
 .ground-close .frame {
-    border-color: rgb(8 9 10 / 0.55);
+    border-color: rgb(10 10 10 / 0.55);
     box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.55);
 }
 
@@ -509,36 +563,36 @@
 
 /* Hairlines. `white/10` is invisible on coral; the same weight in near-black. */
 .ground-close :is([class*="border-white"], .border-y, .border-t, .border-r) {
-    border-color: rgb(8 9 10 / 0.22);
+    border-color: rgb(10 10 10 / 0.22);
 }
 
-/* Secondary copy. `#b4b8bd` is tuned for #08090a and reads as dirt here. */
+/* Secondary copy. `#b4b8bd` is tuned for #0a0a0a and reads as dirt here. */
 .ground-close p:not(.eyebrow) {
-    color: rgb(8 9 10 / 0.78);
+    color: rgb(10 10 10 / 0.78);
 }
 
 /* Code chips and the copy button — mono values that were light-on-dark. */
 .ground-close :is(code, .copy-btn) {
-    color: rgb(8 9 10 / 0.86);
+    color: rgb(10 10 10 / 0.86);
 }
 
 .ground-close .copy-btn {
-    background: rgb(8 9 10 / 0.07);
-    border-color: rgb(8 9 10 / 0.18);
+    background: rgb(10 10 10 / 0.07);
+    border-color: rgb(10 10 10 / 0.18);
 }
 
 .ground-close .copy-btn:hover {
-    background: rgb(8 9 10 / 0.12);
-    border-color: rgb(8 9 10 / 0.3);
-    color: #08090a;
+    background: rgb(10 10 10 / 0.12);
+    border-color: rgb(10 10 10 / 0.3);
+    color: #0a0a0a;
 }
 
 /* The "not launched" badge on the Cloud lane. Amber-on-dark becomes near-black
    on a lighter tint of the ground, so it still reads as a status chip rather
    than as a second accent competing with the section's own hue. */
 .ground-close .bg-amber-400\/15 {
-    background: rgb(8 9 10 / 0.1);
-    color: rgb(8 9 10 / 0.8);
+    background: rgb(10 10 10 / 0.1);
+    color: rgb(10 10 10 / 0.8);
 }
 
 /* The primary action goes NEAR-BLACK here, not `--color-primary`.
@@ -555,7 +609,7 @@
    direction, and echoes the near-black product frames the rest of the page
    uses — so the button reads as the same material as the product. */
 .ground-close a[class*="bg-primary"] {
-    background: #08090a;
+    background: #0a0a0a;
     color: #fff;
 }
 
@@ -565,18 +619,18 @@
 
 /* The secondary button was a white hairline outline. */
 .ground-close a[class*="border-white"] {
-    border-color: rgb(8 9 10 / 0.35);
-    color: #08090a;
+    border-color: rgb(10 10 10 / 0.35);
+    color: #0a0a0a;
 }
 
 .ground-close a[class*="border-white"]:hover {
-    border-color: rgb(8 9 10 / 0.6);
+    border-color: rgb(10 10 10 / 0.6);
 }
 
 /* The dashed "no command yet" well. */
 .ground-close .border-dashed {
-    border-color: rgb(8 9 10 / 0.28);
-    color: rgb(8 9 10 / 0.55);
+    border-color: rgb(10 10 10 / 0.28);
+    color: rgb(10 10 10 / 0.55);
 }
 
 /* ── Form controls, as the product actually draws them ───────────────────────
@@ -600,13 +654,13 @@
 @utility field {
     position: relative;
     border-radius: 9px;                      /* rounded-lg, as theme.css sets it */
-    background: rgb(255 255 255 / 0.04);     /* --surface-field, dark */
-    border: 1px solid rgb(255 255 255 / 0.08); /* --hairline, dark */
+    background: var(--surface-field);
+    border: 1px solid var(--hairline);
 }
 
 /* Hover state of the same container, for demos where a field is clickable. */
 @utility field-hover {
-    background: rgb(255 255 255 / 0.07);     /* --surface-field-hover, dark */
+    background: var(--surface-field-hover);
 }
 
 /* The shrunk floating label. `text-sm` scaled to 0.75 is 10.5px on a 15px line,
@@ -860,10 +914,10 @@
     .hero-scrim {
         background: linear-gradient(
             to top,
-            var(--color-page-ground) 0%,
-            rgb(8 9 10 / 0.92) 50%,
-            rgb(8 9 10 / 0.62) 61%,
-            rgb(8 9 10 / 0.22) 76%,
+            var(--surface-frame) 0%,
+            rgb(10 10 10 / 0.92) 50%,
+            rgb(10 10 10 / 0.62) 61%,
+            rgb(10 10 10 / 0.22) 76%,
             transparent 100%
         );
     }
@@ -872,10 +926,10 @@
         .hero-scrim {
             background: linear-gradient(
                 to top,
-                var(--color-page-ground) 0%,
-                rgb(8 9 10 / 0.92) 36%,
-                rgb(8 9 10 / 0.62) 52%,
-                rgb(8 9 10 / 0.22) 70%,
+                var(--surface-frame) 0%,
+                rgb(10 10 10 / 0.92) 36%,
+                rgb(10 10 10 / 0.62) 52%,
+                rgb(10 10 10 / 0.22) 70%,
                 transparent 100%
             );
         }
