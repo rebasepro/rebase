@@ -22,6 +22,7 @@ const zapIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" viewBox="0
 const cloudIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /></svg>`;
 const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125v-12.75c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125m-17.25 0h17.25m-17.25 0l1.125 1.125c.15.15.313.225.487.225h14.25c.174 0 .337-.075.487-.225l1.125-1.125m-17.25 0h17.25M9 13.125h6M9 16.5h6" /></svg>`;
 import ClosingCta from "../ClosingCta.astro";
+import { DEMO_URL } from "../../utils/links";
 ---
 
   <div class="flex flex-col isolate">
@@ -32,7 +33,7 @@ import ClosingCta from "../ClosingCta.astro";
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <h1 class="mb-6 text-display-2 text-white" set:html={t("startupspage.00")}></h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("startupspage.01")}></p>
-        <a href="/demo" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
+        <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
           {t("cta.button.demo")}
           <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />

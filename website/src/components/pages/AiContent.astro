@@ -6,6 +6,7 @@ import { NeatBackground } from '../../components/NeatBackground';
 import { AgentConsoleDemo } from '../../components/demos/AgentConsoleDemo';
 import McpSessionDemo from '../demos/McpSessionDemo';
 import { mcpClients } from '../../utils/mcpClients';
+import { DEMO_URL } from "../../utils/links";
 
 const translatePath = useTranslatedPath(lang);
 
@@ -269,7 +270,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                 <span class="select-all text-white">{t("aipage.26")}</span>
             </div>
             <div class="flex flex-col justify-center gap-4 sm:flex-row">
-                <a href={translatePath("/demo")}
+                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">{t("aipage.29")}</a>
                 <a href="/docs/ai"
                    class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">

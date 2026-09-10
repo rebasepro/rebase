@@ -688,10 +688,6 @@ export const en = {
   // Grouped Features Section
 
   // Alternatives Section
-  "demo.page.title": "A real backend, running in your browser.",
-  "demo.page.subtitle": "The API, the SDK and the panel on one database; change a row and watch all three.",
-  "demo.meta.title": "Live demo — Rebase",
-  "demo.meta.description": "The API, the SDK and the panel on one database; change a row and watch all three. A live Rebase backend running in your browser, with the REST response and the typed SDK query beside it.",
 
   // ── europe ──────────────────────────────────────────────────────
   "europe.badge": "MIT-licensed · Runs on your Postgres · Operated in Europe, or by you",
@@ -1433,8 +1429,6 @@ export const en = {
   "close.about.blurb": "Rebase is MIT-licensed and self-hosted. Point it at a Postgres database you already run.",
   "close.admin.title": "Add the panel when you need it.",
   "close.admin.blurb": "Scaffold a project, define one collection, and the back office is already there — or leave it out and nothing about the API changes.",
-  "close.demo.title": "Now run it on your own data.",
-  "close.demo.blurb": "The demo is someone else's database. This is one command against yours.",
   "close.developers.title": "Start the loop.",
   "close.developers.blurb": "One command scaffolds the project, generates the SDK from your schema and brings the panel up beside it.",
   "close.studio.title": "Run your database from the panel.",
@@ -2040,7 +2034,6 @@ export const en = {
   "comparepage.link.product": "See what you get",
   "contactpage.book": "Book a call now",
   "contactpage.schedule": "Schedule a meeting",
-  "demopage.openPanel": "Open the full hosted panel",
   "devpage.link.cli": "The whole CLI, command by command",
   "devpage.link.react": "Custom React inside the panel",
   "devpage.link.ui": "The component library",

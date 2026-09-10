@@ -78,6 +78,16 @@
         "source": "/:lang(es|de|fr)/editing",
         "destination": "/:lang/cms",
         "type": 301
+      },
+      {
+        "source": "/demo",
+        "destination": "https://demo.rebase.pro",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/demo",
+        "destination": "https://demo.rebase.pro",
+        "type": 301
       }
     ],
     "headers": [

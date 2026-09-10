@@ -58,6 +58,7 @@ const capabilities = [
     { title: "Import, export, bulk edit", desc: "CSV, JSON or Excel in with field mapping; one click out. Thousands of rows without a migration script." },
 ];
 import ClosingCta from "../ClosingCta.astro";
+import { DEMO_URL } from "../../utils/links";
 ---
 
 <div class="flex flex-col isolate">
@@ -79,7 +80,7 @@ import ClosingCta from "../ClosingCta.astro";
                 human needs to touch the data, skip it when nobody does, and remove it without your API noticing.
             </p>
             <div class="flex flex-wrap items-center justify-start gap-x-6 gap-y-3">
-                <a href={translatePath("/demo")}
+                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
                    data-track id="admin-hero-demo">
                     {t("cta.button.demo")}

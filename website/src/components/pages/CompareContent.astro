@@ -95,6 +95,7 @@ const headToHead = [
 import { imgDims } from "../../utils/imageDimensions";
 import { ALTERNATIVES_PAGES } from "../../data/alternatives";
 import ClosingCta from "../ClosingCta.astro";
+import { DEMO_URL } from "../../utils/links";
 ---
 
 <div class="flex flex-col isolate">
@@ -257,7 +258,7 @@ import ClosingCta from "../ClosingCta.astro";
             <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("comparepage.21")}</h2>
             <p class="text-lg text-surface-400 mb-10 max-w-2xl mx-auto">{t("comparepage.22")}</p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href={translatePath("/demo")}
+                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
                    data-track id="compare-cta-demo">
                     {t("cta.button.demo")}

@@ -54,9 +54,9 @@ class Analytics {
             }
 
             // Declared conversions: an element names the action a click on it
-            // counts as, and every live experiment records it. The hero's demo
-            // CTA is a site link (`/demo`), which the demo.rebase.pro matcher
-            // below never sees.
+            // counts as, and every live experiment records it. Kept separate
+            // from the demo matcher below so a CTA that is not a demo link can
+            // still declare what it converts.
             const declared = target.closest("[data-ab-conversion]") as HTMLElement | null;
             if (declared) {
                 this.trackAllExperimentConversions(declared.getAttribute("data-ab-conversion") || "conversion");

@@ -589,10 +589,6 @@ export const de = {
   "manifesto.signatureSubtitle": "Madrid · Open-Source-Entwicklerwerkzeuge seit 2020",
   "banner.title.control": "Deine Daten gehören dir.<br/> Betreibe sie, wo du willst.",
   "banner.cta": "Manifest lesen",
-  "demo.page.title": "Ein echtes Backend, live im Browser.",
-  "demo.page.subtitle": "Die API, das SDK und das Panel auf einer Datenbank; ändere eine Zeile und sieh allen dreien zu.",
-  "demo.meta.title": "Live-Demo — Rebase",
-  "demo.meta.description": "Die API, das SDK und das Panel auf einer Datenbank; ändere eine Zeile und sieh allen dreien zu. Ein laufendes Rebase-Backend im Browser, mit der REST-Antwort und der typisierten SDK-Query daneben.",
 
   // ── europe ──────────────────────────────────────────────────────
   "europe.badge": "MIT-lizenziert · Läuft auf deinem Postgres · Betrieben in Europa, oder von dir",
@@ -1334,8 +1330,6 @@ export const de = {
   "close.about.blurb": "Rebase ist MIT-lizenziert und self-hosted. Richte es auf ein Postgres, das du schon betreibst.",
   "close.admin.title": "Nimm das Panel dazu, wenn du es brauchst.",
   "close.admin.blurb": "Scaffolde ein Projekt, definiere eine Collection, und das Back-Office ist schon da — oder lass es weg, und an der API ändert sich nichts.",
-  "close.demo.title": "Jetzt lass es auf deinen eigenen Daten laufen.",
-  "close.demo.blurb": "Die Demo ist die Datenbank von jemand anderem. Das hier ist ein Befehl gegen deine.",
   "close.developers.title": "Starte die Schleife.",
   "close.developers.blurb": "Ein Befehl scaffoldet das Projekt, erzeugt das SDK aus deinem Schema und startet das Panel daneben.",
   "close.studio.title": "Betreib deine Datenbank aus dem Panel.",
@@ -1941,7 +1935,6 @@ export const de = {
   "comparepage.link.product": "Sieh, was du bekommst",
   "contactpage.book": "Jetzt ein Gespräch buchen",
   "contactpage.schedule": "Ein Meeting vereinbaren",
-  "demopage.openPanel": "Das komplette gehostete Panel öffnen",
   "devpage.link.cli": "Das ganze CLI, Befehl für Befehl",
   "devpage.link.react": "Eigenes React im Panel",
   "devpage.link.ui": "Die Komponentenbibliothek",

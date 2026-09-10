@@ -12,6 +12,7 @@ import { AdminDemoCarousel } from "../demos/AdminDemoCarousel";
 import { AgentConsoleDemo } from "../demos/AgentConsoleDemo";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../../i18n/ui";
 import { ArrowRight, Database, LayoutDashboard, TerminalSquare } from "lucide-react";
+import { DEMO_URL } from "../../utils/links";
 
 // Rendered by the home route, which supplies both; falls back for the dev route.
 const { lang: langProp, t: tProp } = Astro.props;
@@ -152,7 +153,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             {/* The click every arm of an experiment counts as a
                                 conversion (analytics.ts reads the attribute). */}
                             <a
-                                href={translatePath("/demo")}
+                                href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                                 data-ab-conversion="hero_cta_click"
                                 class="inline-flex items-center justify-start gap-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             >
@@ -664,7 +665,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
 
                 <div class="mt-12 flex flex-wrap gap-3">
                     <a
-                        href={translatePath("/demo")}
+                        href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
                     >
                         {t("cta.button.demo")}

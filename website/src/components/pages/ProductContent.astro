@@ -24,6 +24,7 @@ const adminParts = ["views", "forms", "react", "roles", "studio"].map(
 // What you stop maintaining. Concrete, not aspirational.
 const replaced = [1, 2, 3, 4, 5, 6, 7, 8]
 import ClosingCta from "../ClosingCta.astro";
+import { DEMO_URL } from "../../utils/links";
 ---
 
 <div class="flex flex-col isolate">
@@ -39,7 +40,7 @@ import ClosingCta from "../ClosingCta.astro";
             <h1 class="mb-6 text-display-2 text-white" set:html={t("productpage.01")}></h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("productpage.02")}</p>
             <div class="flex items-center justify-start gap-x-4">
-                <a href={translatePath("/demo")}
+                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
                    data-track id="product-hero-demo">
                     {t("cta.button.demo")}

@@ -32,6 +32,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
   <span class="text-blue-300">callbacks</span>: { <span class="text-blue-300">onSave</span>: <span class="text-surface-500">/* ... */</span> }
 };`;
 import ClosingCta from "../ClosingCta.astro";
+import { DEMO_URL } from "../../utils/links";
 ---
 
   <div class="flex flex-col isolate">
@@ -47,7 +48,7 @@ import ClosingCta from "../ClosingCta.astro";
         <h1 class="mb-6 text-display-2 text-white" set:html={t("studiopage.02")}></h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("studiopage.03")}</p>
         <div class="flex items-center justify-start gap-x-4">
-          <a href="/demo"
+          <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
              class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
             {t("cta.button.demo")}
             

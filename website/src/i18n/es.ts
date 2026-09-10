@@ -591,10 +591,6 @@ export const es = {
   "manifesto.signatureSubtitle": "Madrid · Construyendo herramientas open-source desde 2020",
   "banner.title.control": "Tus datos son tuyos.<br/> Ejecútalo donde quieras.",
   "banner.cta": "Leer el Manifiesto",
-  "demo.page.title": "Un backend real, ejecutándose en tu navegador.",
-  "demo.page.subtitle": "La API, el SDK y el panel sobre una sola base de datos; cambia una fila y mira los tres.",
-  "demo.meta.title": "Demo en vivo — Rebase",
-  "demo.meta.description": "La API, el SDK y el panel sobre una sola base de datos; cambia una fila y mira los tres. Un backend de Rebase en vivo en tu navegador, con la respuesta REST y la consulta del SDK tipado al lado.",
 
   // ── europe ──────────────────────────────────────────────────────
   "europe.badge": "Licencia MIT · Corre sobre tu Postgres · Operado en Europa, o por ti",
@@ -1336,8 +1332,6 @@ export const es = {
   "close.about.blurb": "Rebase tiene licencia MIT y es autoalojado. Apúntalo a una base de datos Postgres que ya ejecutas.",
   "close.admin.title": "Añade el panel cuando lo necesites.",
   "close.admin.blurb": "Genera un proyecto, define una colección, y el back office ya está ahí — o déjalo fuera y nada de la API cambia.",
-  "close.demo.title": "Ahora ejecútalo sobre tus propios datos.",
-  "close.demo.blurb": "La demo es la base de datos de otra persona. Esto es un comando contra la tuya.",
   "close.developers.title": "Empieza el bucle.",
   "close.developers.blurb": "Un comando genera el proyecto, produce el SDK desde tu esquema y levanta el panel al lado.",
   "close.studio.title": "Gestiona tu base de datos desde el panel.",
@@ -1943,7 +1937,6 @@ export const es = {
   "comparepage.link.product": "Mira lo que obtienes",
   "contactpage.book": "Reserva una llamada ahora",
   "contactpage.schedule": "Agenda una reunión",
-  "demopage.openPanel": "Abrir el panel alojado completo",
   "devpage.link.cli": "Todo el CLI, comando a comando",
   "devpage.link.react": "React propio dentro del panel",
   "devpage.link.ui": "La librería de componentes",

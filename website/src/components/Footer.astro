@@ -1,5 +1,6 @@
 ---
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
+import { DEMO_URL } from "../utils/links";
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
@@ -35,7 +36,7 @@ const footerNavs = [
         links: [
             { label: t("footer.cms"), url: "/cms" },
             { label: t("nav.studio"), url: "/studio" },
-            { label: t("footer.demo"), url: "/demo" },
+            { label: t("footer.demo"), url: DEMO_URL, external: true },
         ],
     },
     {

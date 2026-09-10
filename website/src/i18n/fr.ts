@@ -590,10 +590,6 @@ export const fr = {
   "manifesto.signatureSubtitle": "Madrid · Outils open source pour développeurs depuis 2020",
   "banner.title.control": "Vos données vous appartiennent.<br/> Hébergez-les où vous voulez.",
   "banner.cta": "Lire le Manifeste",
-  "demo.page.title": "Un vrai backend, dans votre navigateur.",
-  "demo.page.subtitle": "L'API, le SDK et le panneau sur une seule base de données ; changez une ligne et regardez les trois.",
-  "demo.meta.title": "Démo en direct — Rebase",
-  "demo.meta.description": "L'API, le SDK et le panneau sur une seule base de données ; changez une ligne et regardez les trois. Un backend Rebase en direct dans votre navigateur, avec la réponse REST et la requête SDK typée à côté.",
 
   // ── europe ──────────────────────────────────────────────────────
   "europe.badge": "Sous licence MIT · Tourne sur votre Postgres · Exploité en Europe, ou par vous",
@@ -1335,8 +1331,6 @@ export const fr = {
   "close.about.blurb": "Rebase est sous licence MIT et auto-hébergé. Pointez-le vers une base Postgres que vous exploitez déjà.",
   "close.admin.title": "Ajoutez le panneau quand vous en avez besoin.",
   "close.admin.blurb": "Échafaudez un projet, définissez une collection, et le back-office est déjà là — ou laissez-le de côté et rien ne change dans l'API.",
-  "close.demo.title": "Maintenant, faites-le tourner sur vos propres données.",
-  "close.demo.blurb": "La démo, c'est la base de données de quelqu'un d'autre. Ceci est une commande sur la vôtre.",
   "close.developers.title": "Lancez la boucle.",
   "close.developers.blurb": "Une commande échafaude le projet, génère le SDK depuis votre schéma et lance le panneau à côté.",
   "close.studio.title": "Pilotez votre base de données depuis le panneau.",
@@ -1942,7 +1936,6 @@ export const fr = {
   "comparepage.link.product": "Découvrez ce que vous obtenez",
   "contactpage.book": "Réservez un appel maintenant",
   "contactpage.schedule": "Planifier une réunion",
-  "demopage.openPanel": "Ouvrir le panneau hébergé complet",
   "devpage.link.cli": "Tout le CLI, commande par commande",
   "devpage.link.react": "Votre React dans le panneau",
   "devpage.link.ui": "La bibliothèque de composants",
