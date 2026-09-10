@@ -3,6 +3,7 @@ import { AbsoluteFill, Easing, getInputProps, interpolate, useCurrentFrame, useV
 import { NeatCanvas, NeatTravel } from "../gradient/NeatCanvas";
 import { BEATS, DESK_DURATION, MOVE_LEAD, moveFrames, OPENING } from "./beats";
 import { HERO_TONES } from "../data/neat-config";
+import { FLY_TO_CORNER } from "./Presenter";
 import { GROUND } from "../theme";
 
 /**
@@ -22,6 +23,11 @@ import { GROUND } from "../theme";
  *  15% of the frame — and that is where it stays on a held slide. The camera
  *  never travels; the ribbon turns with each beat's roll, as it always did. */
 const DEFAULT_STATION = { x: 0, y: -16, zoom: 2.05 };
+/** The open stands at the old height: the presenter is centred on the art
+ *  and there is no headline yet, so the ribbon can show more than a sliver.
+ *  It settles to the station above in the same window the presenter flies
+ *  to the corner — one move, once. */
+const OPEN_Y = -12;
 /** Overridable through input props, so a measurement sweep can render the
  *  plane alone at candidate stations without editing this file. */
 const STATION = { ...DEFAULT_STATION, ...((getInputProps() as { station?: Partial<typeof DEFAULT_STATION> }).station ?? {}) };
@@ -79,7 +85,7 @@ const LINEAR = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 export function ribbonAt(frame: number): NeatTravel {
     return {
         cameraX: STATION.x + interpolate(frame, AT, SIDE, OPTS),
-        cameraY: STATION.y,
+        cameraY: interpolate(frame, [FLY_TO_CORNER, FLY_TO_CORNER + 36], [OPEN_Y, STATION.y], OPTS),
         cameraZoom: STATION.zoom,
         cameraRotationZ: interpolate(frame, AT, ROLL, OPTS),
     };
