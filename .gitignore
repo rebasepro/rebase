@@ -139,6 +139,11 @@ app/uploads/
 !examples/firebase/src/env.d.ts
 # The `virtual:starlight/*` module shims the website's own build needs.
 !website/src/starlight.d.ts
+# What the site puts on `window` — GA4's `gtag`, the scroll observer, the two
+# A/B helpers exposed for inline handlers. Untracked, every one of those reads
+# is an error on a clean checkout, because the alternative to this file is the
+# `(window as any)` it replaced.
+!website/src/window.d.ts
 # The API-surface gate's fixture barrel. Untracked, `pnpm test:gates` passes
 # locally off files CI never receives and the gate's own tests prove nothing.
 !scripts/test/fixtures/**/*.d.ts
