@@ -433,7 +433,8 @@ export {
     MetricsRegistry,
     createMetricsMiddleware,
     createMetricsRoutes,
-    classifySurface
+    classifySurface,
+    isUncountedPath
 } from "./metrics";
 export type { MetricSurface, MetricsHandle } from "./metrics";
 export { createContractRoutes } from "./api/contract-routes";

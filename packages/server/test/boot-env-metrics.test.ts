@@ -1,6 +1,6 @@
 import { isLocalhostOrigin, loadBootEnv, resolveCorsOrigin, resolveEnableSwagger } from "../src/boot/env";
 import type { RebaseBootEnv } from "../src/boot/env";
-import { MetricsRegistry, classifySurface } from "../src/metrics";
+import { MetricsRegistry, classifySurface, isUncountedPath } from "../src/metrics";
 
 function env(overrides: Partial<RebaseBootEnv>): RebaseBootEnv {
     return { NODE_ENV: "development", ...overrides } as RebaseBootEnv;
@@ -158,6 +158,28 @@ describe("isLocalhostOrigin", () => {
     });
 });
 
+describe("uncounted paths", () => {
+    it("does not count the platform looking at this process", () => {
+        // The middleware is installed on `/*` before `/metrics` is mounted, so
+        // every control-plane scrape counted itself: ~20/min forever, 23,000
+        // requests a day on a real tenant, three orders of magnitude above its
+        // actual traffic — and it set the error rate and mean latency the
+        // console displayed.
+        expect(isUncountedPath("/metrics")).toBe(true);
+        expect(isUncountedPath("/health")).toBe(true);
+        expect(isUncountedPath("/livez")).toBe(true);
+        expect(isUncountedPath("/readyz")).toBe(true);
+    });
+
+    it("counts everything the app actually serves", () => {
+        // Prefix matching would swallow an app's own `/healthy-snacks` page.
+        expect(isUncountedPath("/")).toBe(false);
+        expect(isUncountedPath("/metrics/summary")).toBe(false);
+        expect(isUncountedPath("/healthy-snacks")).toBe(false);
+        expect(isUncountedPath("/api/data/products")).toBe(false);
+    });
+});
+
 describe("classifySurface", () => {
     it("names the API surface that served a request", () => {
         expect(classifySurface("/api/data/products").surface).toBe("data");
@@ -165,7 +187,14 @@ describe("classifySurface", () => {
         expect(classifySurface("/api/storage/upload").surface).toBe("storage");
         expect(classifySurface("/api/functions/invoice").surface).toBe("functions");
         expect(classifySurface("/api/meta/contract").surface).toBe("meta");
-        expect(classifySurface("/health").surface).toBe("other");
+        // Outside the API base path is the APP's own traffic — its pages, its
+        // assets — not an unclassified API call. `other` now means the second
+        // thing only, so a console breakdown whose biggest row is `other` is
+        // reporting a real anomaly rather than "everything else".
+        expect(classifySurface("/health").surface).toBe("app");
+        expect(classifySurface("/").surface).toBe("app");
+        expect(classifySurface("/assets/app.js").surface).toBe("app");
+        expect(classifySurface("/api/nonesuch").surface).toBe("other");
     });
 
     it("labels the collection but never the entity id", () => {
