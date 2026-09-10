@@ -1,0 +1,132 @@
+---
+sourceHash: d77da0e28dd9035f
+title: Arrays und Maps
+sidebar_label: Arrays und Maps
+description:"\"Die beiden zusammengesetzten Property-Typen: wiederholbare Listen, Block-Editoren, strukturierte Gruppen und Freiform-Schlüssel-Wert-Objekte und wie sie jeweils auf eine Postgres-Spalte abgebildet werden.\""
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+Ein `array` ist eine geordnete Liste und eine `map` ist ein strukturiertes Objekt. Beide werden
+als `jsonb` gespeichert, mit Ausnahme eines Arrays von Primitiven, das zu einem nativen
+Postgres-Array (`text[]`, `integer[]`) wird, damit die Datenbank darin indizieren und suchen
+kann.
+
+## Array-Properties
+
+### Einfache Wiederholung
+
+Verwenden Sie `of`, um eine wiederholbare Liste von Elementen zu definieren.
+
+```typescript
+tags: {
+    type: "array",
+    name: "Tags",
+    of: { type: "string" }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="repeat" />
+
+### Multi-Datei-Upload
+
+Ein Array, dessen `of` den `storage`-Block enthält, ist ein Multi-Datei-Upload – siehe
+[Datei-Uploads](/docs/collections/file-uploads).
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+### Block-Editor
+
+Verwenden Sie `oneOf`, um einen Block-Editor mit mehreren Inhaltstypen zu erstellen. Jeder Schlüssel erzeugt einen Kartentyp, aus dem Benutzer auswählen können.
+
+```typescript
+content: {
+    type: "array",
+    name: "Content",
+    oneOf: {
+        properties: {
+            text: {
+                type: "map",
+                properties: {
+                    body: { type: "string", name: "Text", admin: { markdown: true } }
+                }
+            },
+            image: {
+                type: "map",
+                properties: {
+                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
+                    caption: { type: "string", name: "Caption" }
+                }
+            }
+        }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="block" />
+
+### Array-Optionen
+
+| Property | Typ | Beschreibung |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Property-Schema für Array-Elemente |
+| `oneOf` | `object` | Array typisierter Objekte mit mehreren Diskriminator-Typen. Akzeptiert `properties` und optional `propertiesOrder`, `typeField` (Standard: `"type"`) sowie `valueField` (Standard: `"value"`) |
+| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | Die Datenbankspalte. Ein primitives `of` verwendet standardmäßig das passende native Postgres-Array; alles andere `jsonb` |
+| `admin.expanded` | `boolean` | Gibt an, ob das Feld anfangs ausgeklappt sein soll (Standard: true) |
+| `admin.minimalistView` | `boolean` | Untergeordnete Properties direkt ohne aufklappbares Panel anzeigen |
+| `admin.sortable` | `boolean` | Können Elemente neu angeordnet werden (Standard: true) |
+| `admin.canAddElements` | `boolean` | Können neue Elemente hinzugefügt werden (Standard: true) |
+
+## Map-Properties
+
+### Gruppe (strukturiert)
+
+Verwenden Sie `properties`, um ein strukturiertes Objekt mit benannten Feldern zu definieren.
+
+```typescript
+address: {
+    type: "map",
+    name: "Address",
+    properties: {
+        street: { type: "string", name: "Street" },
+        zip: { type: "string", name: "Postal code" }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="group" />
+
+### Schlüssel-Wert (Freiform)
+
+Setzen Sie `keyValue: true`, um einen Editor für beliebige Schlüssel-Wert-Paare darzustellen.
+
+```typescript
+metadata: {
+    type: "map",
+    name: "Key value",
+    keyValue: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="key_value" />
+
+### Map-Optionen
+
+| Property | Typ | Beschreibung |
+|----------|------|-------------|
+| `properties` | `Properties` | Record von Properties, die in der Map enthalten sind |
+| `propertiesOrder` | `string[]` | Geordnete Schlüssel für das Rendering |
+| `admin.previewProperties` | `string[]` | Welche Properties in der Tabellenvorschau angezeigt werden sollen |
+| `admin.spreadChildren` | `boolean` | Untergeordnete Properties als separate Spalten in der Tabellenansicht rendern |
+| `admin.minimalistView` | `boolean` | Properties ohne umschließendes Panel anzeigen |
+| `admin.expanded` | `boolean` | Gibt an, ob das Feld anfangs ausgeklappt sein soll (Standard: true) |
+| `keyValue` | `boolean` | Als Editor für beliebige Schlüssel-Wert-Paare rendern. Trotz der Formulierung keine reine Darstellungsoption: Sie besagt, dass die Map keine deklarierte Struktur hat, woraus das OpenAPI-Schema generiert wird |
+| `columnType` | `"json" \| "jsonb"` | Die Datenbankspalte. Standardmäßig `jsonb` |
+
+## Nächste Schritte
+
+- **[Properties](/docs/collections/properties)** — alle anderen Property-Typen und die Optionen, die sie teilen
+- **[Validierung und Bedingungen](/docs/collections/validation-and-conditions/)** — die Regeln, die für Elemente und für die Liste selbst gelten
+- **[Datei-Uploads](/docs/collections/file-uploads)** — ein Array von `storage`-Strings ist ein Multi-Datei-Feld
+
+---

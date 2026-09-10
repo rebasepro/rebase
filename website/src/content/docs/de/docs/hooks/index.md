@@ -56,7 +56,7 @@ Eine Liste von Entitäten einer Sammlung laden und abonnieren. Sofern der Treibe
 ```typescript
 import { useCollection } from "@rebasepro/app";
 import type { User } from "@rebasepro/types";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function ProductList() {
     // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
@@ -117,7 +117,7 @@ Eine einzelne Entität per ID laden und abonnieren. Sie wird sofort aus dem Cach
 
 ```typescript
 import { useFetch } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function ProductDetail({ productId }) {
     const { entity, dataLoading, dataLoadingError } = useFetch({
@@ -161,7 +161,7 @@ Hook zur Auswertung von Rollen und Berechtigungen des aktuellen Benutzers. Er ni
 
 ```typescript
 import { usePermissions } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function CreateProductButton() {
     const { canCreate } = usePermissions();
@@ -386,7 +386,7 @@ Komplexe Relationsauswahlen verwalten, mit eingebauter Suche, Entprellung und Pa
 
 ```typescript
 import { useRelationSelector } from "@rebasepro/app";
-import { categoriesCollection } from "../config/collections";
+import { categoriesCollection } from "../../../docs/config/collections";
 
 function CategorySelector({ onSelect }) {
     const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({

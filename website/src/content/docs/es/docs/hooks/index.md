@@ -56,7 +56,7 @@ Carga y se suscribe a una lista de entidades de una colección. Establece autom�
 ```typescript
 import { useCollection } from "@rebasepro/app";
 import type { User } from "@rebasepro/types";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function ProductList() {
     // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
@@ -117,7 +117,7 @@ Carga y se suscribe a una única entidad por ID. Se renderiza al instante con lo
 
 ```typescript
 import { useFetch } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function ProductDetail({ productId }) {
     const { entity, dataLoading, dataLoadingError } = useFetch({
@@ -161,7 +161,7 @@ Hook para evaluar roles y permisos del usuario actual. Te evita tener que pasar 
 
 ```typescript
 import { usePermissions } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function CreateProductButton() {
     const { canCreate } = usePermissions();
@@ -386,7 +386,7 @@ Gestiona selecciones de relaciones complejas, con búsqueda, debouncing y pagina
 
 ```typescript
 import { useRelationSelector } from "@rebasepro/app";
-import { categoriesCollection } from "../config/collections";
+import { categoriesCollection } from "../../../docs/config/collections";
 
 function CategorySelector({ onSelect }) {
     const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({

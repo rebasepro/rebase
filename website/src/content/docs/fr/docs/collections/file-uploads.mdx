@@ -1,0 +1,108 @@
+---
+sourceHash: 85956e20e10421fa
+title: Champs de téléversement de fichiers
+sidebar_label: Téléversements de fichiers
+description:"\"Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements uniques et multiples, et quelles options sont résolues par le panneau plutôt que par le serveur.\""
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+Un champ de fichier est une propriété **string** ordinaire dotée d'un bloc `storage`. La
+colonne contient du texte — la clé de l'objet dans le bucket, ou son URL si vous le demandez
+— et le bloc indique où vont les octets et ce que le formulaire accepte.
+
+Cette distinction a plus d'importance qu'il n'y paraît. La majeure partie de `storage` est
+lue par le module de téléversement du panneau d'administration en direction de l'API, de sorte
+qu'une écriture ne provenant pas d'un formulaire n'y passe pas — ces options portent
+l'étiquette ci-dessous. Les deux options qui déterminent ce qu'un fichier peut *être*,
+`maxSize` et `acceptedFiles`, font exception : le serveur les vérifie à chaque téléversement.
+
+## Un seul fichier
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+## Plusieurs fichiers
+
+Un tableau de la même chose. Le bloc `storage` passe dans `of`, car il
+décrit chaque élément plutôt que la liste :
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+## Options de stockage
+
+Tout ce qui se trouve à l'intérieur de `storage`.
+
+| Propriété | Type | Description |
+|-----------|------|-------------|
+| `storagePath` | `string \| function` | **Requis.** Emplacement du fichier dans le bucket. Une chaîne avec des variables de substitution — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — ou une fonction dépendant du contexte du téléversement. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données :** c'est le téléverseur du panneau qui le résout, et `client.storage.upload()` définit sa propre clé |
+| `fileName` | `string \| function` | Le nom de fichier de l'objet téléversé, avec les mêmes variables de substitution. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `storageSource` | `string` | Le bucket enregistré à utiliser, lorsqu'un projet en compte plusieurs. Le handle `bucket("media")` fonctionne ici également |
+| `public` | `boolean` | Stocker sous le préfixe public et distribuer via une URL stable, sans token et pouvant être mise en cache. `false` par défaut, ce qui correspond à des objets privés et des URL signées à courte durée de vie |
+| `acceptedFiles` | `FileType[]` | Types MIME acceptés par cette propriété. La syntaxe avec astérisque fonctionne — `image/*`. **Appliqué par le serveur**, et pas seulement par le sélecteur de fichiers |
+| `maxSize` | `number` | Taille maximale de fichier acceptée, en octets. **Appliqué par le serveur**, aussi bien pour les téléversements standards que pour les téléversements reprenables |
+| `metadata` | `Record<string, unknown>` | Métadonnées de l'objet à stocker avec le fichier |
+| `includeBucketUrl` | `boolean` | Écrire `s3://my-bucket/path/to/file.png` dans la colonne au lieu de `path/to/file.png`. `false` par défaut |
+| `storeUrl` | `boolean` | Écrire l'URL de téléchargement dans la colonne au lieu de la clé. `false` par défaut, et il est conseillé de le laisser ainsi : une URL contenant un token cesse de fonctionner dès que le token expire, et la référence d'origine est alors perdue |
+| `imageResize` | `ImageResize` | Redimensionner et rogner avant le téléversement, pour `image/jpeg`, `image/png` et `image/webp`. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `processFile` | `(file: File) => Promise<File>` | Transformer le fichier avant son téléversement. S'exécute dans le navigateur. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transformer le chemin ou l'URL résolu(e) avant son enregistrement. S'exécute dans le navigateur. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `previewUrl` | `(fileName: string) => string` | Construire l'URL de prévisualisation, lorsque l'adresse réelle du fichier n'est pas la valeur du champ. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+
+### Redimensionnement
+
+`imageResize` accepte `maxWidth` et `maxHeight` en pixels, un `mode` valant
+`"contain"` (réduire pour ajuster, par défaut) ou `"cover"` (remplir les limites et
+rogner), un `format` valant `"original"`, `"jpeg"`, `"png"` ou `"webp"`, et une
+`quality` entre 0 et 100 pour les formats avec perte — 80 par défaut. Cela se produit dans
+le navigateur, avant l'envoi des octets, de sorte qu'un téléversement qui ne provient pas du
+panneau est stocké à sa taille d'origine.
+
+### Ce que le serveur vérifie
+
+Auparavant, `maxSize` et `acceptedFiles` n'étaient appliqués que par une seule chose : le
+navigateur. La route de téléversement ne connaissait qu'une limite de taille globale et
+ignorait tout de la propriété à laquelle le fichier était destiné ; ainsi, un `curl -F file=@payload.exe`
+contournant le sélecteur pouvait déposer un exécutable de 40 Mo dans le bucket des avatars sans
+que la configuration stipulant le contraire ne soit jamais consultée.
+
+Les deux sont désormais vérifiés côté serveur, par rapport à la propriété indiquée par le téléversement.
+Un téléversement qui n'indique aucune propriété — un client plus ancien, un appel direct —
+se rabat toujours sur la limite globale, car une requête sans contexte de propriété ne dispose
+d'aucune règle de propriété à vérifier, et la refuser casserait les clients antérieurs à cette évolution.
+
+### Où le fichier est autorisé à aller
+
+`storagePath` est une valeur par défaut, pas une limite stricte : rien sur le serveur ne
+confine un téléversement à ce préfixe. Déterminer qui peut écrire où relève du rôle des
+règles d'autorisation de stockage — voir [Storage](/docs/backend/storage).
+
+## Prochaines étapes
+
+- **[Properties](/docs/collections/properties)** — chaque type de propriété et ses options
+- **[Storage](/docs/backend/storage)** — buckets, URL signées et ce que le serveur fait d'un téléversement
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — qui peut lire les lignes auxquelles ces fichiers sont rattachés
+
+---

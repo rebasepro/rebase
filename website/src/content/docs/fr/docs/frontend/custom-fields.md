@@ -80,8 +80,8 @@ properties: {
         type: "string",
         name: "Brand Color",
         admin: {
-            Field: () => import("../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../frontend/src/ColorPreview")
+            Field: () => import("../../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../../frontend/src/ColorPreview")
         }
     }
 }

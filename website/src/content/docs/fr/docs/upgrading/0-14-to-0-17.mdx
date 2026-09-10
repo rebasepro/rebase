@@ -1,0 +1,90 @@
+---
+sourceHash: 8d89cbdaf2b12ec8
+slug: fr/docs/upgrading/0-14-to-0-17
+title: Mise à niveau de 0.14 vers 0.17
+sidebar_label: 0.14 → 0.17
+description: Les renommages du package admin, les ressources déclarées et le changement de format de bundle empêchant un ancien build de démarrer sur un runtime actuel.
+---
+
+# Mise à niveau 0.14 → 0.17
+
+Les versions 0.15 et 0.16 ajoutent et corrigent des fonctionnalités ; aucune n'introduit de rupture. Tout ce qui figure dans cette partie est arrivé avec la version **0.17.0**.
+
+Sous les versions 0.x, le numéro mineur correspond aux changements cassants — `^0.16.0` résout `>=0.16.0 <0.17.0` — donc rien de tout cela n'atteindra un projet tant que vous ne passerez pas délibérément à la version 0.17.
+
+## 14. `@rebasepro/admin` devient `@rebasepro/cms`
+
+Et `@rebasepro/admin-types` devient `@rebasepro/cms-types`. « Admin » désignait deux choses à la fois : l'ensemble du panneau d'administration et sa partie dédiée à la gestion de contenu.
+
+```diff lang="ts"
+- import { RebaseAdmin } from "@rebasepro/admin";
+- import { defineCollection } from "@rebasepro/admin-types";
++ import { RebaseCMS } from "@rebasepro/cms";
++ import { defineCollection } from "@rebasepro/cms-types";
+```
+
+Remplacez le spécificateur et `RebaseAdmin` par `RebaseCMS`. Il n'y a pas d'alias : un shim maintiendrait les deux significations de « admin », ce qui est précisément le problème corrigé. Les anciens packages s'arrêtent à 0.16.0 sur npm et ne recevront plus rien après cela, donc `^0.16.0` continue d'être résolu au lieu de casser — il cesse simplement d'évoluer.
+
+**Vos fichiers de collection ne changent pas.** La clé `admin:` reste délibérément intacte, tout comme `AdminCollection*`, `ADMIN_COLLECTION_KEYS`, le rôle d'authentification `admin` et `/api/admin` — ceux-ci désignant autre chose que le produit CMS.
+
+La valeur du mode du panneau a évolué avec le package (`"content"` → `"cms"`). Elle est conservée par navigateur et migre lors de la lecture, de sorte qu'un navigateur existant continue de fonctionner.
+
+## 15. Les ressources sont déclarées, et non configurées
+
+`dataSources` et `storageSources` ont disparu de `RebaseBackendConfig`. Déclarez-les plutôt dans `rebase.json` et dans le package de configuration.
+
+**Un bundle compilé avant cela ne démarrera pas sur un runtime actuel.** Recompilez-le :
+
+```bash
+rebase build
+```
+
+`rebase eject infra` a également disparu, tout comme `rebase.infra.json` et l'indirection `{"$env": "..."}`. Les ressources se lient à partir de l'environnement selon la convention `<BASE>__<KEY>`, ce que chaque déploiement utilisait déjà.
+
+## 16. `admin.titleProperty` est rejeté au démarrage
+
+Utilisez `admin.display.title` — la même chaîne de caractères fonctionne ici.
+
+```diff lang="ts"
+  admin: {
+-     titleProperty: "name"
++     display: { title: "name" }
+  }
+```
+
+Cela peut bloquer un projet démarré aujourd'hui, et c'est le but recherché : le silence aurait signifié que le titre repasserait discrètement à la valeur dérivée sans que rien n'explique pourquoi.
+
+## 17. `ctx.client` dans un cron devient `ctx.rebase`
+
+Et `userId` n'est plus accepté nulle part comme syntaxe d'identité — c'est désormais `uid` partout.
+
+```diff lang="ts"
+- export default defineCron({ schedule: "0 3 * * *", async handler({ client }) {
+-     await client.dataAsAdmin.collection("orders").find();
++ export default defineCron({ schedule: "0 3 * * *", async handler({ rebase }) {
++     await rebase.dataAsAdmin.collection("orders").find();
+  } });
+```
+
+## 18. Renommage d'un flag CLI
+
+Le flag `--legacy` sur `build` et `start` s'appelle désormais `--workspace`. Le mode est toujours pris en charge, non retiré, et l'ancien nom laissait penser le contraire.
+
+```diff
+- rebase build --legacy
++ rebase build --workspace
+```
+
+Il est conseillé de vérifier vos scripts et votre CI avec grep : `arg` s'exécute de manière permissive sur ces deux commandes, de sorte que l'ancienne syntaxe est **ignorée plutôt que rejetée** — le build réussit et utilise silencieusement l'autre mode.
+
+## 19. `EmailService.send` retourne un résultat
+
+Rupture uniquement pour le code qui *implémente* `EmailService` : une méthode `send` retournant `Promise<void>` ne le satisfait plus. Les appelants ne sont pas affectés — ils peuvent ignorer le résultat — et le hook `auth.email.sendEmail` reste permissif, de sorte qu'un fournisseur existant `async () => {}` fonctionne toujours et ne signale simplement rien.
+
+## Étapes suivantes
+
+- [La checklist de mise à niveau](/docs/upgrading/#upgrade-checklist) — ce qu'il faut exécuter ensuite
+- [Mise à niveau 0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) — l'étape précédant celle-ci
+- [Changelog](/docs/changelog/) — les notes de version résumées dans ces sections
+
+---

@@ -46,7 +46,7 @@ Depois aponte uma coleção para um deles, pelo handle — o mesmo nome, escrito
 
 ```ts
 import { defineCollection } from "@rebasepro/cms-types";
-import { analytics } from "../resources";
+import { analytics } from "../../../docs/resources";
 
 const pageViewsCollection = defineCollection({
     name: "Page Views",
@@ -60,7 +60,7 @@ const pageViewsCollection = defineCollection({
 ...ou uma propriedade de arquivo:
 
 ```ts
-import { media } from "../resources";
+import { media } from "../../../docs/resources";
 
 coverImage: {
     name: "Cover image",
@@ -75,7 +75,7 @@ Dentro de uma função, os mesmos handles alcançam o recurso:
 
 ```ts
 import { defineFunction } from "@rebasepro/server/functions";
-import { analytics, media } from "../../config/resources";
+import { analytics, media } from "../../../config/resources";
 
 export default defineFunction((app, { rebase }) => {
     app.post("/report", async (c) => {

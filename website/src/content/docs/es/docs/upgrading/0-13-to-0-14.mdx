@@ -1,0 +1,99 @@
+---
+sourceHash: d99541a4fce4d7f6
+slug: es/docs/upgrading/0-13-to-0-14
+title: Actualización de 0.13 a 0.14
+sidebar_label: 0.13 → 0.14
+description: Cada clave de red pasa a ser camelCase, el inicio de sesión anónimo pasa a ser opcional (opt-in) y se elimina un paquete.
+---
+
+# Actualización de 0.13 → 0.14
+
+Las secciones 0–10 anteriores corresponden al salto de 0.12 → 0.13. Las tres siguientes son de 0.13 → 0.14. Si ya estás en la versión 0.13, empieza aquí.
+
+Dos de ellos introducen cambios disruptivos (breaking changes). El primero impide que el código compile, lo cual es el caso favorable; el segundo cambia quién puede obtener una cuenta y solo se manifiesta como un error 403 con el que se toparán tus usuarios y tú no.
+
+---
+
+## 11. La API utiliza camelCase en todas partes: `author_id` ahora es `authorId`
+
+### Qué ha cambiado
+
+El nombre de transmisión (wire name) de un campo es la clave de su propiedad, y `columnName` solo renombra la *columna*. Esa regla no ha cambiado, pero dos de las cuatro fuentes de claves nunca tuvieron una clave de propiedad para usar, y ambas recurrían al nombre de la columna:
+
+- una **clave foránea derivada de una relación** no tenía una propiedad propia, por lo que `belongsTo` en `author` exponía la columna `author_id` bajo su propio nombre;
+- la **introspección** escribía el nombre sin formato de la columna como la clave de la propiedad.
+
+Por lo tanto, `GET /api/data/users` respondía con `displayName` mientras que `GET /api/data/posts` a su lado respondía con `author_id`, y nada visible desde el exterior indicaba cuál le correspondería a un campo. Ahora ambos derivan una clave en camelCase.
+
+```diff
+- GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
++ GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+- ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
++ ?where={"authorId":["==",3]}
+```
+
+**La base de datos no cambia.** Las columnas permanecen en snake_case, `\d posts` sigue mostrando `author_id`, no se ejecuta ninguna migración y `rebase doctor` no reporta desviaciones (drift).
+
+### Qué debes hacer
+
+**Vuelve a ejecutar `rebase generate-sdk`.** `row.author_id` dejará de compilar y `row.authorId` pasará a ser válido; el compilador señalará cada punto de llamada por ti. Esta es la mitad que no tienes que buscar.
+
+**Luego busca la mitad que el compilador no puede ver.** Claves de `where` y `orderBy` escritas a mano, consumidores directos de `fetch` y cualquier cosa que lea una fila por clave:
+
+```bash
+grep -rn "_id\"\|_id'\|\._id\b" src/ config/
+grep -rnE '(where|orderBy)[^)]*"[a-z]+_[a-z]+"' src/ config/
+```
+
+Una clave de filtro que ya no se resuelva devolverá un **400 con `UNKNOWN_FILTER_FIELD`**, y el error enumerará los nombres válidos. Falla de forma cerrada a propósito: una condición omitida amplía el conjunto de resultados, que es el único fallo que no deseas que ocurra en silencio. Sin embargo, una fila leída mediante la clave antigua simplemente será `undefined`, sin generar ninguna excepción.
+
+### Si tu proyecto fue generado mediante introspección en lugar de crearse manualmente
+
+Este es el cambio individual más grande para ti. `rebase schema introspect` ya no replica los nombres de columna en las respuestas de red: una columna `customer_id` se genera como una propiedad `customerId` con `columnName: "customer_id"`, y se expone, filtra y ordena como `customerId`. **Volver a ejecutar la introspección es lo que produce las nuevas colecciones.** La columna, las restricciones y las políticas permanecen intactas.
+
+> Una clave de propiedad que *tú* escribiste sigue siendo tu clave, independientemente de su formato. Nada convertirá a camelCase un nombre que alguien ya eligió; solo las dos fuentes que nunca tuvieron un nombre asignado. No existe emisión dual de claves ni flags de compatibilidad, porque servir ambas variantes mantendría ambas convenciones de forma permanente, lo cual era precisamente el defecto.
+
+---
+
+## 12. El inicio de sesión anónimo es opcional (opt-in)
+
+### Qué ha cambiado
+
+`POST /auth/anonymous` responde con un **403** hasta que configures `auth.allowAnonymous: true`.
+
+El inicio de sesión anónimo es un registro sin confirmación previa: inserta una fila en `users` y asigna `defaultRole` exactamente igual que `POST /auth/register`. Pero ambas rutas anónimas estaban montadas incondicionalmente y no consultaban ninguno de los filtros o restricciones de registro, por lo que un backend que había cerrado el acceso seguía otorgando cuentas permanentes: `POST /auth/anonymous` para la fila y la sesión, y luego `POST /auth/anonymous/link` para asociarle credenciales, autenticándose este segundo paso únicamente con el token que el primero acababa de emitir.
+
+### Qué debes hacer
+
+Si utilizas sesiones anónimas (carritos de compras para invitados, pruebas, borradores no autenticados), habilítalas explícitamente:
+
+```diff ts
+ auth: {
++    allowAnonymous: true
+ }
+```
+
+Si no las utilizas, no tienes que hacer nada, y el error 403 es el comportamiento esperado.
+
+**Verifica cuál es tu caso antes de desplegar.** El síntoma de una mala estimación es que el inicio de sesión falle para los usuarios que nunca tuvieron credenciales que volver a ingresar:
+
+```bash
+grep -rn "signInAnonymously\|/auth/anonymous" src/ config/ frontend/
+```
+
+---
+
+## 13. `@rebasepro/client-postgres` ha sido eliminado
+
+Elimínalo de `package.json`. Si importabas desde él, el SDK accede a Postgres mediante el cliente habitual; no hay un paquete separado que instalar.
+
+---
+
+## Siguiente
+
+- [Actualización de 0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) — el salto posterior a este
+- [La lista de verificación de actualización](/docs/upgrading/#upgrade-checklist) — qué ejecutar después
+- [Registro de cambios (Changelog)](/docs/changelog/) — las notas de la versión que estas secciones resumen
+
+---

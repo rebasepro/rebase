@@ -122,6 +122,41 @@ export function readSourceHash(text) {
 }
 
 /** Writes (or replaces) the `sourceHash` line in a file's frontmatter. */
+/**
+ * Re-point `../`-relative imports at the translated file's own depth.
+ *
+ * A locale page lives one directory deeper than its English source
+ * (`docs/collections/x.mdx` -> `de/docs/collections/x.mdx`), so an import
+ * copied across verbatim resolves one level short. It is invisible in every
+ * check that reads the file as text — the frontmatter is valid, the prose is
+ * fine — and surfaces only as UNRESOLVED_IMPORT from `astro build`, which
+ * then leaves `dist/` empty and makes `check:site` report ~31 phantom
+ * failures about pages "not in dist/" that have nothing wrong with them.
+ *
+ * Computed from the two paths rather than by adding a fixed `../`: the depth
+ * difference is only constant while every source sits at the same level, and
+ * the pages that broke were exactly the ones a directory deeper than the
+ * `<locale>/docs/index.mdx` case that a hardcoded guess was right about.
+ */
+function repointRelativeImports(text, sourceFilePath, targetFilePath) {
+    const SRC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
+    const toDir = path.dirname(path.resolve(targetFilePath));
+    // Anchored on `src/` rather than re-derived from the English file's own
+    // depth, which makes it idempotent: running it twice, or over a file some
+    // earlier pass already corrected, lands on the same answer. The
+    // source-relative version does not — it reads whatever `../` depth the
+    // text currently has as if it were still the English one, so a file that
+    // was already fixed gets pushed one level further out on every pass.
+    return text.replace(
+        /(from\s*|import\s*\(\s*)(['"])(?:\.\.\/)+((?:components|utils|styles)\/[^'"]*)\2/g,
+        (whole, lead, quote, rest) => {
+            let rebuilt = path.relative(toDir, path.join(SRC_DIR, rest)).split(path.sep).join('/');
+            if (!rebuilt.startsWith('.')) rebuilt = './' + rebuilt;
+            return `${lead}${quote}${rebuilt}${quote}`;
+        }
+    );
+}
+
 function stampSourceHash(text, hash) {
     const stripped = text.replace(/^(---\n[\s\S]*?)^sourceHash:.*\n([\s\S]*?^---\n)/m, '$1$2');
     return stripped.replace(/^---\n/, `---\nsourceHash: ${hash}\n`);
@@ -348,7 +383,8 @@ async function main() {
                 }
 
                 // Write translated file, stamped with the source it came from.
-                await fs.writeFile(targetFilePath, stampSourceHash(translatedContent, hash), 'utf-8');
+                const repointed = repointRelativeImports(translatedContent, sourceFilePath, targetFilePath);
+                await fs.writeFile(targetFilePath, stampSourceHash(repointed, hash), 'utf-8');
                 console.log(`✅ Saved: ${targetFilePath}`);
 
                 // Add a small delay to avoid hitting rate limits

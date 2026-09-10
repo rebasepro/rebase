@@ -1,0 +1,99 @@
+---
+sourceHash: d99541a4fce4d7f6
+slug: de/docs/upgrading/0-13-to-0-14
+title: Upgrade von 0.13 auf 0.14
+sidebar_label: 0.13 → 0.14
+description: Jeder Wire-Key wird zu camelCase, anonyme Anmeldung wird Opt-in und ein Paket wird entfernt.
+---
+
+# Upgrade 0.13 → 0.14
+
+Die Abschnitte 0–10 oben behandeln den Schritt von 0.12 → 0.13. Die drei folgenden Abschnitte behandeln 0.13 → 0.14. Wenn du bereits auf 0.13 bist, beginne hier.
+
+Zwei davon sind Breaking Changes. Der erste verhindert das Kompilieren des Codes, was der gute Fall ist; der zweite ändert, wer ein Konto erhalten kann, und macht sich lediglich als 403 bemerkbar, auf den deine Benutzer stoßen und du nicht.
+
+---
+
+## 11. Die API ist durchgängig camelCase — `author_id` ist jetzt `authorId`
+
+### Was sich geändert hat
+
+Der Wire-Name eines Feldes ist sein Property-Key, und `columnName` benennt nur die *Spalte* um. Diese Regel hat sich nicht geändert — aber zwei der vier Quellen für Keys hatten nie einen Property-Key, den sie verwenden konnten, und beide fielen auf den Spaltennamen zurück:
+
+- ein **aus einer Relation abgeleiteter Fremdschlüssel** hatte keine eigene Property, sodass `belongsTo` auf `author` die Spalte `author_id` unter ihrem eigenen Namen auslieferte;
+- **Introspection** schrieb den rohen Spaltennamen als Property-Key.
+
+So antwortete `GET /api/data/users` mit `displayName`, während `GET /api/data/posts` daneben mit `author_id` antwortete, und von außen war nicht ersichtlich, welche Variante ein Feld verwenden würde. Beide leiten nun einen camelCase-Key ab.
+
+```diff
+- GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
++ GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+- ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
++ ?where={"authorId":["==",3]}
+```
+
+**Die Datenbank ändert sich nicht.** Spalten bleiben snake_case, `\d posts` zeigt weiterhin `author_id`, es wird keine Migration ausgeführt und `rebase doctor` meldet keinen Drift.
+
+### Was zu tun ist
+
+**Führe `rebase generate-sdk` erneut aus.** `row.author_id` kompiliert nicht mehr und `row.authorId` kompiliert — der Compiler nennt dir jede Aufrufstelle. Das ist die Hälfte, nach der du nicht suchen musst.
+
+**Finde dann die Hälfte, die der Compiler nicht sehen kann.** Manuell geschriebene `where`- und `orderBy`-Keys, direkte `fetch`-Aufrufer und alles, was eine Zeile per Key liest:
+
+```bash
+grep -rn "_id\"\|_id'\|\._id\b" src/ config/
+grep -rnE '(where|orderBy)[^)]*"[a-z]+_[a-z]+"' src/ config/
+```
+
+Ein Filter-Key, der nicht mehr aufgelöst werden kann, führt zu einem **400 mit `UNKNOWN_FILTER_FIELD`**, und der Fehler listet die gültigen Namen auf. Er schlägt absichtlich fehl (Fail-Closed) — eine verworfene Bedingung erweitert eine Ergebnismenge, und das ist der eine Fehler, der keinesfalls unbemerkt bleiben darf. Eine über den alten Key gelesene Zeile ist jedoch einfach `undefined`, und es wird kein Fehler ausgelöst.
+
+### Wenn dein Projekt introspektiert statt manuell verfasst wurde
+
+Dies ist die größte Einzeländerung für dich. `rebase schema introspect` spiegelt Spaltennamen nicht mehr direkt über die Leitung (Wire) wider: Eine `customer_id`-Spalte wird als `customerId`-Property mit `columnName: "customer_id"` generiert und als `customerId` ausgeliefert, gefiltert und sortiert. **Das erneute Ausführen der Introspection erzeugt die neuen Collections.** Die Spalte, die Constraints und die Policies bleiben unberührt.
+
+> Ein Property-Key, den *du* geschrieben hast, bleibt dein Key, unabhängig von seiner Form. Nichts wandelt einen Namen in camelCase um, den bereits jemand gewählt hat — nur die beiden Quellen, die nie einen Namen zur Verfügung hatten. Es gibt keine gleichzeitige Ausgabe beider Keys und kein Kompatibilitäts-Flag, da die Bereitstellung beider Schreibweisen beide Konventionen dauerhaft beibehalten würde, was genau der Mangel war.
+
+---
+
+## 12. Anonyme Anmeldung ist Opt-in
+
+### Was sich geändert hat
+
+`POST /auth/anonymous` antwortet mit **403**, bis du `auth.allowAnonymous: true` setzt.
+
+Anonyme Anmeldung ist eine Registrierung, bei der nie nachgefragt wurde: Sie fügt eine `users`-Zeile ein und weist `defaultRole` genauso zu wie `POST /auth/register`. Beide anonymen Routen waren jedoch bedingungslos eingebunden und prüften keine der Registrierungsbeschränkungen. Ein Backend, das die Tür geschlossen hatte, vergab also immer noch dauerhafte Konten — `POST /auth/anonymous` für die Zeile und die Session, dann `POST /auth/anonymous/link`, um Zugangsdaten hinzuzufügen, wobei Letzteres nur durch das Token authentifiziert wurde, das Ersteres gerade ausgestellt hatte.
+
+### Was zu tun ist
+
+Wenn du anonyme Sessions verwendest — Gast-Warenkörbe, Testversionen, nicht authentifizierte Entwürfe — aktiviere dies explizit (Opt-in):
+
+```diff ts
+ auth: {
++    allowAnonymous: true
+ }
+```
+
+Wenn du sie nicht verwendest, musst du nichts tun, und der 403 ist genau der Zweck.
+
+**Prüfe vor dem Deployment, welcher Fall auf dich zutrifft.** Das Symptom einer falschen Annahme ist, dass die Anmeldung für Benutzer fehlschlägt, die nie Zugangsdaten hatten, um sie erneut einzugeben:
+
+```bash
+grep -rn "signInAnonymously\|/auth/anonymous" src/ config/ frontend/
+```
+
+---
+
+## 13. `@rebasepro/client-postgres` wurde entfernt
+
+Entferne es aus der `package.json`. Wenn du daraus importiert hast: Das SDK erreicht Postgres über den regulären Client — es gibt kein separates Paket zu installieren.
+
+---
+
+## Nächste Schritte
+
+- [Upgrade 0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) — der nächste Schritt danach
+- [Die Upgrade-Checkliste](/docs/upgrading/#upgrade-checklist) — was danach auszuführen ist
+- [Changelog](/docs/changelog/) — die Release Notes, die in diesen Abschnitten zusammengefasst sind
+
+---

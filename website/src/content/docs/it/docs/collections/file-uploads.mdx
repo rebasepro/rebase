@@ -1,0 +1,106 @@
+---
+sourceHash: 85956e20e10421fa
+title: Campi di caricamento file
+sidebar_label: Caricamenti file
+description:"\"Dichiarare un campo file o immagine su una collezione: il blocco storage, i caricamenti di file singoli e multipli e quali delle sue opzioni vengono risolte dal pannello anziché dal server.\""
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+Un campo file è una normale proprietà **string** con un blocco `storage`. La
+colonna contiene testo — la chiave dell'oggetto nel bucket o il suo URL se
+richiesto — e il blocco specifica dove vanno i byte e cosa accetterà il form.
+
+Questa separazione conta più di quanto sembri. La maggior parte di `storage` viene
+letta dall'uploader del pannello di amministrazione durante l'invio all'API, quindi
+una scrittura che non proviene da un form non passa attraverso di esso — tali opzioni
+presentano l'etichetta di seguito. Le due che decidono cosa un file possa *essere*,
+`maxSize` e `acceptedFiles`, fanno eccezione: il server le controlla a ogni caricamento.
+
+## Un singolo file
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+## File multipli
+
+Un array della stessa cosa. Il blocco `storage` si sposta in `of`, poiché
+descrive ciascun elemento anziché l'elenco:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+## Opzioni di storage
+
+Tutto ciò che si trova all'interno di `storage`.
+
+| Proprietà | Tipo | Descrizione |
+|----------|------|-------------|
+| `storagePath` | `string \| function` | **Obbligatorio.** Dove va a finire il file nel bucket. Una stringa con segnaposto — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — o una funzione del contesto di caricamento. **Solo form di amministrazione — non applicato dall'API o dal database:** è l'uploader del pannello che lo risolve, e `client.storage.upload()` definisce la propria chiave |
+| `fileName` | `string \| function` | Il nome file dell'oggetto caricato, con gli stessi segnaposto. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+| `storageSource` | `string` | Quale bucket registrato utilizzare, quando un progetto ne ha più di uno. Anche l'handle `bucket("media")` funziona qui |
+| `public` | `boolean` | Memorizza sotto il prefisso pubblico e distribuisce tramite un URL stabile, senza token e memorizzabile nella cache. `false` per impostazione predefinita, il che implica oggetti privati e URL firmati a breve durata |
+| `acceptedFiles` | `FileType[]` | Tipi MIME accettati da questa proprietà. È supportata la forma con asterisco — `image/*`. **Applicato dal server**, non solo dal selettore di file |
+| `maxSize` | `number` | Dimensione massima accettata del file, in byte. **Applicato dal server**, sia per i percorsi di caricamento standard sia per quelli riprendibili |
+| `metadata` | `Record<string, unknown>` | Metadati dell'oggetto da archiviare insieme al file |
+| `includeBucketUrl` | `boolean` | Scrive `s3://my-bucket/path/to/file.png` nella colonna anziché `path/to/file.png`. `false` per impostazione predefinita |
+| `storeUrl` | `boolean` | Scrive l'URL di download nella colonna anziché la chiave. `false` per impostazione predefinita, ed è consigliabile lasciarlo così: un URL che include un token smette di funzionare alla scadenza del token, e il riferimento originale va perso |
+| `imageResize` | `ImageResize` | Ridimensiona e ritaglia prima del caricamento, per `image/jpeg`, `image/png` e `image/webp`. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+| `processFile` | `(file: File) => Promise<File>` | Trasforma il file prima che venga caricato. Viene eseguito nel browser. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Trasforma il percorso o l'URL risolto prima che venga salvato. Viene eseguito nel browser. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+| `previewUrl` | `(fileName: string) => string` | Costruisce l'URL di anteprima, per quando l'indirizzo reale del file non coincide con il valore del campo. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+
+### Ridimensionamento
+
+`imageResize` accetta `maxWidth` e `maxHeight` in pixel, una `mode` impostata su
+`"contain"` (ridimensiona per adattare, valore predefinito) o `"cover"` (riempie i limiti e
+ritaglia), un `format` tra `"original"`, `"jpeg"`, `"png"` o `"webp"` e una
+`quality` compresa tra 0 e 100 per i formati con perdita — 80 per impostazione predefinita. Avviene
+nel browser prima che i byte vengano inviati, quindi un caricamento che non proviene dal
+pannello viene archiviato con le sue dimensioni originali.
+
+### Cosa controlla il server
+
+In passato, `maxSize` e `acceptedFiles` venivano applicati da un'unica cosa: il
+browser. La route di caricamento conosceva solo un limite di dimensione globale e nulla riguardo
+alla proprietà a cui un file era destinato; quindi `curl -F file=@payload.exe` oltrepassava il selettore
+inserendo un eseguibile da 40 MB nel bucket degli avatar, senza che la configurazione contraria
+venisse mai consultata.
+
+Entrambi vengono ora verificati lato server, a fronte della proprietà indicata dal caricamento. Un
+caricamento che non specifica alcuna proprietà — un client precedente, una chiamata diretta — ripiega
+ancora sul limite globale, poiché una richiesta priva di contesto di proprietà non ha alcuna
+regola di proprietà da verificare, e rifiutarla comprometterebbe i client precedenti a questa modifica.
+
+### Dove è consentito collocare il file
+
+`storagePath` è un valore predefinito, non un vincolo invalicabile: nulla sul server limita un
+caricamento a quel prefisso. Decidere chi può scrivere dove è lo scopo di una regola di
+autorizzazione dello storage — consultare [Storage](/docs/backend/storage).
+
+## Prossimi passi
+
+- **[Properties](/docs/collections/properties)** — ciascun tipo di proprietà e le relative opzioni
+- **[Storage](/docs/backend/storage)** — bucket, URL firmati e cosa fa il server con un caricamento
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — chi può leggere le righe a cui sono associati questi file

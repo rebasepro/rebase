@@ -1,26 +1,37 @@
 ---
-sourceHash: 15a5bc8a0e9f0677
+sourceHash: cc25b7d6203830ae
 title: Introdução
 sidebar_label: Introdução
-description: Rebase é um Backend-as-a-Service e painel de administração de código aberto, construído com React e TypeScript. Defina seu esquema em TypeScript, e o Rebase gera uma UI CRUD completa, API REST, autenticação, armazenamento e sincronização em tempo real — tudo alimentado por PostgreSQL.
+description: O Rebase é um Backend-as-a-Service e painel administrativo open-source construído com React e TypeScript. Defina seu schema em TypeScript e o Rebase gera uma UI CRUD completa, API REST, autenticação, armazenamento e sincronização em tempo real — desenvolvido sobre o PostgreSQL.
 ---
 
 import { AdminDemoCarousel } from "../../../../components/demos/AdminDemoCarousel";
 
 <AdminDemoCarousel client:only="react" height={400} showTabs={false} defaultTab={1} autoPlay={false} scale={0.75} />
 
-## O que é Rebase?
+## O que é o Rebase?
 
-Rebase é um **Backend-as-a-Service (BaaS) de código aberto** e **painel de administração** construído com React e TypeScript. Ele oferece tudo o que você precisa para construir aplicações back-office prontas para produção sobre **PostgreSQL**:
+O Rebase é um **Backend-as-a-Service (BaaS) open-source** e **painel administrativo** construído com React e TypeScript. Ele oferece tudo o que você precisa para criar aplicações de back-office prontas para produção sobre o **PostgreSQL**:
 
-- **Schema as Code** — Defina seus modelos de dados como coleções TypeScript. O Rebase gera tabelas PostgreSQL, uma UI CRUD completa, endpoints de API REST e SDKs cliente com tipos seguros a partir de uma única fonte de verdade.
-- **Instant Admin Panel** — Uma UI de administração bonita e rápida baseada em React, com tabelas de planilha, listas, formulários, quadros Kanban, edição inline e sincronização em tempo real.
-- **Integrated Backend** — Autenticação (palavras-passe, magic links, códigos de uso único, MFA, chaves de API e doze fornecedores OAuth/OIDC), armazenamento de arquivos (local ou S3), Segurança em Nível de Linha (RLS), histórico de entidades e WebSocket em tempo real — tudo integrado.
-- **Radically Extensible** — Se você pode construir em React, pode adicionar ao Rebase. Campos personalizados, visualizações personalizadas, plugins e acesso total a hooks internos.
+- **Schema as Code** — Defina seus modelos de dados como coleções em TypeScript. O Rebase gera tabelas PostgreSQL, uma interface CRUD completa, endpoints de API REST e SDKs de cliente com segurança de tipos a partir de uma única fonte de verdade.
+- **Painel Administrativo Instantâneo** — Uma interface administrativa bonita e rápida baseada em React com tabelas estilo planilha, listas, formulários, quadros Kanban, edição inline e sincronização em tempo real.
+- **Backend Integrado** — Autenticação (senhas, magic links, códigos de uso único, MFA, chaves de API e doze provedores OAuth/OIDC), armazenamento de arquivos (local ou S3), Row Level Security, histórico de entidades e tempo real via WebSocket — tudo integrado.
+- **Radicalmente Extensível** — Se você consegue construir em React, pode adicionar ao Rebase. Campos personalizados, visualizações customizadas, plugins e acesso total a hooks internos.
 
 :::tip
-O Rebase funciona das duas formas, e o seu código não muda entre elas. **Auto-hospede-o** — é o proprietário dos dados, do código e da máquina onde corre. Ou faça o deploy do mesmo projeto na **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)): o mesmo Rebase, operado por nós, hoje em produção com tenants reais e a abrir por lotes durante a beta privada. Pense nele como uma alternativa de código aberto ao Supabase ou Retool em que é *você* quem decide quem a opera.
+O Rebase funciona de ambas as maneiras, e seu código não muda entre elas. **Faça auto-hospedagem (self-host)** — você é dono dos dados, do código e da máquina em que ele roda. Ou implante o mesmo projeto no **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), que é o mesmo Rebase executado para você; ele já está ativo com clientes reais hoje e sendo liberado em lotes enquanto está em beta privado. Pense nisso como uma alternativa open-source ao Supabase ou Retool onde *você* decide quem o opera.
 :::
+
+## Escolha o seu caminho
+
+O Rebase é composto por dois produtos que compartilham um servidor. Comece por aquele que você procura:
+
+| Eu quero… | Comece aqui | O que você recebe |
+|---|---|---|
+| **Um backend e um painel administrativo** | [Quickstart](/docs/getting-started/quickstart/) | Coleções em TypeScript, uma UI CRUD gerada, uma API REST, autenticação, armazenamento e tempo real |
+| **Apenas a API, sobre o meu próprio banco de dados** | [Backend only](/docs/getting-started/headless/) | Uma API REST headless e SDK sobre seu PostgreSQL existente — sem painel administrativo, sem arquivos de coleção |
+
+Nenhuma das opções é um caminho sem volta: um projeto headless ganha um painel administrativo adicionando arquivos de coleção, e um projeto completo pode servir tabelas para as quais não possui coleção.
 
 ## Como Funciona
 
@@ -54,48 +65,55 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-O `init` gera um `.env` pronto para uso — nada a editar. Depois:
+O `init` gera um arquivo `.env` pronto para uso — nenhuma edição necessária. Em seguida:
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-É esse o primeiro start inteiro. Não há banco de dados para instalar nem passo de schema: sem `DATABASE_URL` definida, o `rebase dev` sobe um PostgreSQL gerenciado (PGlite) na pasta do projeto, gera o schema a partir das suas collections e cria as tabelas no boot.
+Essa é toda a primeira execução. Não há banco de dados para instalar e nenhuma etapa de schema: sem um `DATABASE_URL` configurado, o `rebase dev` inicia um PostgreSQL gerenciado (PGlite) no diretório do projeto, gera o schema a partir de suas coleções e cria as tabelas na inicialização.
 
-**Leia as URLs na saída.** O `rebase dev` escolhe uma porta livre por projeto em vez de portas fixas, então elas variam entre projetos e entre máquinas. A primeira conta que você registrar torna-se a de administrador.
+**Leia as URLs no terminal.** O `rebase dev` escolhe uma porta livre por projeto em vez de portas fixas, portanto elas variam entre projetos e entre máquinas. A primeira conta que você cadastrar se tornará o administrador — na sua máquina. Um deploy em produção define seu administrador usando `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` (consulte [Configuration](/docs/getting-started/configuration/)).
 
-Para usar seu próprio PostgreSQL, descomente `DATABASE_URL` no `.env` e rode `pnpm run dev` novamente.
+Para usar seu próprio Postgres em vez disso, descomente `DATABASE_URL` no `.env` e execute `pnpm run dev` novamente.
 
-→ Siga o [guia de Início Rápido](/docs/getting-started/quickstart) completo para um passo a passo detalhado, incluindo como conectar seu próprio banco de dados.
+→ Siga o [guia Quickstart](/docs/getting-started/quickstart) completo para um passo a passo detalhado, incluindo como conectar seu próprio banco de dados.
 
-## Funcionalidades Principais
+## Principais Recursos
 
-| Funcionalidade | Descrição |
-|---------|-------------|
-| **Spreadsheet Views** | Tabela rápida e virtualizada com edição inline, filtragem, ordenação e pesquisa de texto |
-| **List View** | Visualização de lista vertical limpa e responsiva para coleções |
-| **Kanban Board** | Visualização em quadro de arrastar e soltar agrupada por qualquer propriedade enum |
-| **Relations** | Um-para-um, um-para-muitos, muitos-para-muitos com tabelas de junção e junções de múltiplos saltos |
-| **Row Level Security** | Políticas RLS estilo Supabase definidas na configuração da sua coleção |
-| **Authentication** | JWT + tokens de atualização, doze fornecedores OAuth/OIDC, magic links, códigos de uso único, MFA TOTP, chaves de API com âmbito, controle de acesso baseado em função |
-| **File Storage** | Sistema de arquivos local ou compatível com S3, com campos de upload e navegador |
-| **Real-time Sync** | Atualizações ao vivo via WebSocket em todos os clientes conectados |
-| **Entity History** | Trilha de auditoria completa para cada criação, atualização e exclusão |
-| **REST API** | Endpoints CRUD auto-gerados para cada coleção |
-| **Data Import/Export** | Importação CSV, JSON e Excel com mapeamento de campos; exportação CSV/JSON |
-| **Collection Editor** | Editor de esquema visual que gera TypeScript via manipulação AST |
-| **Client SDK** | SDK JavaScript com tipo seguro para suas aplicações frontend |
-| **Plugin System** | Estenda cada parte da UI — barra de ferramentas, formulários, campos, página inicial |
-| **AI Data Enhancement** | Preenchimento automático alimentado por LLM para campos de texto |
-| **Cron Jobs** | Tarefas em segundo plano agendadas com monitoramento, registro e painel do Studio |
+| Recurso | Descrição |
+|---------|-----------|
+| **Visualizações em Planilha** | Tabela rápida e virtualizada com edição inline, filtragem, ordenação e busca textual |
+| **Visualização em Lista** | Visualização vertical limpa e responsiva para coleções |
+| **Quadro Kanban** | Visualização em quadro com arrastar e soltar agrupada por qualquer propriedade enum |
+| **Relações** | Um-para-um, um-para-muitos, muitos-para-muitos com tabelas de junção e joins de múltiplos saltos |
+| **Row Level Security** | Políticas de RLS no estilo Supabase definidas na configuração da sua coleção |
+| **Autenticação** | JWT + tokens de atualização, doze provedores OAuth/OIDC, magic links, códigos de uso único, MFA via TOTP, chaves de API com escopo, controle de acesso baseado em funções |
+| **Armazenamento de Arquivos** | Sistema de arquivos local ou compatível com S3 com campos de upload e navegador de arquivos |
+| **Sincronização em Tempo Real** | Atualizações em tempo real via WebSocket entre todos os clientes conectados |
+| **Histórico de Entidades** | Trilha de auditoria completa para cada criação, atualização e exclusão |
+| **API REST** | Endpoints CRUD gerados automaticamente para cada coleção |
+| **Importação/Exportação de Dados** | Importação de CSV, JSON e Excel com mapeamento de campos; exportação de CSV/JSON |
+| **Editor de Coleções** | Editor visual de schema que gera TypeScript via manipulação de AST |
+| **SDK de Cliente** | SDK JavaScript com segurança de tipos para suas aplicações frontend |
+| **Sistema de Plugins** | Estenda cada parte da UI — barra de ferramentas, formulários, campos, página inicial |
+| **Aprimoramento de Dados com IA** | Autocompletar alimentado por LLM para campos de texto |
+| **Tarefas Agendadas (Cron Jobs)** | Tarefas em segundo plano agendadas com monitoramento, logs e painel Studio |
+| **Funções Personalizadas** | Rotas Hono baseadas em arquivos montadas automaticamente com middleware de autenticação e acesso ao banco de dados |
+| **Serviço de E-mail** | SMTP integrado para redefinição de senha, verificação e e-mails transacionais |
+| **Ramificação de Banco de Dados** | Cópias isoladas e instantâneas do seu banco de dados para desenvolvimento, homologação ou testes |
+| **Webhooks** | Notificações de saída assinadas com HMAC em operações de INSERT, UPDATE e DELETE |
+| **Canais de Broadcast** | Canais WebSocket para troca de mensagens em tempo real entre clientes conectados |
+| **Rastreamento de Presença** | Monitore usuários online e sincronize o estado compartilhado entre os participantes |
 
 ## Próximos Passos
 
-- **[Início Rápido](/docs/getting-started/quickstart)** — Comece a usar em 2 minutos
-- **[Estrutura do Projeto](/docs/getting-started/project-structure)** — Entenda o código gerado
-- **[Coleções](/docs/collections)** — Defina seu esquema de dados
+- **[Quickstart](/docs/getting-started/quickstart)** — Comece a rodar em 2 minutos
+- **[Backend only](/docs/getting-started/headless/)** — A API headless sobre um banco de dados que você já possui
+- **[Project Structure](/docs/getting-started/project-structure)** — Entenda o código gerado e os conceitos fundamentais que o restante destas páginas assume
+- **[Collections](/docs/collections)** — Defina seu schema de dados
 - **[Backend](/docs/backend)** — Configure autenticação, armazenamento e a API
-- **[Arquitetura](/docs/architecture)** — Entenda como tudo se encaixa
+- **[Architecture](/docs/architecture)** — Entenda como tudo se conecta
 
 ---

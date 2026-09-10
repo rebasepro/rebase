@@ -1,0 +1,109 @@
+---
+sourceHash: 85956e20e10421fa
+title: Campos de upload de arquivos
+sidebar_label: Uploads de arquivos
+description:"\"Declarando um campo de arquivo ou imagem em uma coleção: o bloco de storage, uploads de arquivo único e múltiplos arquivos, e quais de suas opções o painel resolve em vez do servidor.\""
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+Um campo de arquivo é uma propriedade **string** comum com um bloco `storage`. A
+coluna armazena texto — a chave do objeto no bucket, ou sua URL se você solicitar
+isso — e o bloco indica para onde os bytes vão e o que o formulário aceitará.
+
+Essa divisão importa mais do que parece. A maior parte do `storage` é lida pelo
+uploader do painel de administração a caminho da API, portanto, uma gravação que não venha
+de um formulário não passa por ele — essas opções trazem a indicação abaixo. As duas que
+decidem o que um arquivo pode *ser*, `maxSize` e `acceptedFiles`, são a exceção:
+o servidor as verifica a cada upload.
+
+## Um arquivo
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+## Vários arquivos
+
+Um array da mesma coisa. O bloco `storage` é movido para `of`, pois
+descreve cada elemento em vez da lista:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+## Opções de storage
+
+Tudo dentro de `storage`.
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `storagePath` | `string \| function` | **Obrigatório.** Onde no bucket o arquivo é armazenado. Uma string com placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — ou uma função do contexto do upload. **Apenas formulário de admin — não imposto pela API ou banco de dados:** é o uploader do painel que o resolve, e `client.storage.upload()` define sua própria chave |
+| `fileName` | `string \| function` | O nome de arquivo do objeto enviado, com os mesmos placeholders. **Apenas formulário de admin — não imposto pela API ou banco de dados.** |
+| `storageSource` | `string` | Qual bucket registrado utilizar, quando um projeto tiver mais de um. O identificador `bucket("media")` também funciona aqui |
+| `public` | `boolean` | Armazena sob o prefixo público e serve por meio de uma URL estável, sem token e armazenável em cache. `false` por padrão, o que significa objetos privados e URLs assinadas de curta duração |
+| `acceptedFiles` | `FileType[]` | Tipos MIME que esta propriedade aceita. O formato com asterisco funciona — `image/*`. **Imposto pelo servidor**, não apenas pelo seletor de arquivos |
+| `maxSize` | `number` | Maior arquivo aceito, em bytes. **Imposto pelo servidor**, tanto em uploads comuns quanto nos retomáveis |
+| `metadata` | `Record<string, unknown>` | Metadados do objeto para armazenar junto com o arquivo |
+| `includeBucketUrl` | `boolean` | Grava `s3://my-bucket/path/to/file.png` na coluna em vez de `path/to/file.png`. `false` por padrão |
+| `storeUrl` | `boolean` | Grava a URL de download na coluna em vez da chave. `false` por padrão, e vale a pena manter assim: uma URL que carrega um token para de funcionar quando o token expira, e a referência original é perdida |
+| `imageResize` | `ImageResize` | Redimensiona e corta antes do upload, para `image/jpeg`, `image/png` e `image/webp`. **Apenas formulário de admin — não imposto pela API ou banco de dados.** |
+| `processFile` | `(file: File) => Promise<File>` | Transforma o arquivo antes de ser enviado. Executa no navegador. **Apenas formulário de admin — não imposto pela API ou banco de dados.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transforma o caminho ou URL resolvido antes de ser salvo. Executa no navegador. **Apenas formulário de admin — não imposto pela API ou banco de dados.** |
+| `previewUrl` | `(fileName: string) => string` | Gera a URL de pré-visualização, para quando o endereço real do arquivo não for o valor do campo. **Apenas formulário de admin — não imposto pela API ou banco de dados.** |
+
+### Redimensionamento
+
+O `imageResize` aceita `maxWidth` e `maxHeight` em pixels, um `mode` de
+`"contain"` (reduzir para caber, o padrão) ou `"cover"` (preencher os limites e
+cortar), um `format` de `"original"`, `"jpeg"`, `"png"` ou `"webp"`, e uma
+`quality` entre 0 e 100 para formatos com perdas — 80 por padrão. Isso ocorre no
+navegador, antes de os bytes serem enviados, de modo que um upload que não tenha vindo do
+painel seja armazenado em seu tamanho original.
+
+### O que o servidor verifica
+
+Antes, `maxSize` e `acceptedFiles` eram impostos por exatamente uma coisa: o
+navegador. A rota de upload conhecia apenas um limite global de tamanho e nada sobre a
+propriedade a que o arquivo se destinava; assim, um `curl -F file=@payload.exe`
+ignorando o seletor colocava um executável de 40 MB no bucket de avatares e a
+configuração que dizia o contrário nunca era consultada.
+
+Ambos agora são verificados no lado do servidor, em relação à propriedade que o upload
+especifica. Um upload que não especifica nenhuma propriedade — um cliente mais antigo,
+uma chamada direta — ainda recorre ao limite global, pois uma requisição sem contexto de
+propriedade não tem regra de propriedade para verificar, e recusá-la quebraria clientes
+anteriores a isso.
+
+### Para onde o arquivo pode ir
+
+`storagePath` é um padrão, não um limite restritivo: nada no servidor confina um
+upload a esse prefixo. Decidir quem pode gravar onde é a finalidade de uma
+regra de autorização de storage — consulte [Storage](/docs/backend/storage).
+
+## Próximos passos
+
+- **[Propriedades](/docs/collections/properties)** — todos os tipos de propriedade e suas opções
+- **[Storage](/docs/backend/storage)** — buckets, URLs assinadas e o que o servidor faz com um upload
+- **[Regras de Segurança (RLS)](/docs/collections/security-rules)** — quem pode ler as linhas às quais esses arquivos estão vinculados
+
+---

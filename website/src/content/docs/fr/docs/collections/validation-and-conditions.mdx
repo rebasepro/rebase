@@ -1,0 +1,184 @@
+---
+sourceHash: 5f1468eda58b7564
+title: Validation et conditions
+sidebar_label: Validation & conditions
+description: "Valeurs d'énumération, règles de validation par propriété et champs conditionnels qui rendent une propriété requise, désactivée ou masquée en fonction des valeurs de l'entité elle-même."
+---
+
+## Valeurs d'énumération
+
+Utilisé avec des propriétés de type chaîne ou nombre pour afficher des listes déroulantes :
+
+```typescript no-verify
+// Simple array
+enum: ["draft", "published", "archived"]
+
+// With labels
+enum: [
+    { id: "draft", label: "Draft" },
+    { id: "published", label: "Published" },
+    { id: "archived", label: "Archived" }
+]
+
+// With colors (for Kanban columns and chips)
+enum: [
+    { id: "draft", label: "Draft", color: "grayDark" },
+    { id: "published", label: "Published", color: "greenDark" },
+    { id: "archived", label: "Archived", color: "orangeDark" }
+]
+```
+
+## Validation
+
+Chaque règle réside dans le bloc `validation` de la propriété, et les règles
+acceptées par une propriété dépendent de son type — `min` compte les caractères
+pour une chaîne, compare les grandeurs pour un nombre, et compte les éléments pour un tableau.
+
+```typescript
+properties: {
+    title: {
+        type: "string",
+        name: "Title",
+        validation: { required: true, min: 2, max: 200 }
+    },
+    slug: {
+        type: "string",
+        name: "Slug",
+        validation: {
+            unique: true,
+            matches: /^[a-z0-9-]+$/,
+            matchesMessage: "Lowercase letters, digits and hyphens only",
+            trim: true,
+            lowercase: true
+        }
+    },
+    readingMinutes: {
+        type: "number",
+        name: "Reading time",
+        validation: { integer: true, moreThan: 0, max: 120 }
+    }
+}
+```
+
+### Tous les types
+
+| Règle | Type | Description |
+|------|------|-------------|
+| `required` | `boolean` | La valeur doit être présente |
+| `requiredMessage` | `string` | Le message affiché par le formulaire lorsqu'elle est absente. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `unique` | `boolean` | Une seule ligne dans la table peut avoir cette valeur |
+| `uniqueInArray` | `boolean` | Une seule entrée *par tableau* peut l'avoir. S'applique à un enfant direct d'une propriété `array`, ou à un enfant de premier niveau d'un `map` à l'intérieur de celui-ci. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+
+### Chaînes
+
+| Règle | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Nombre minimum / maximum de caractères, inclusif. Un `max` dimensionne également la colonne : il transforme `TEXT` en `VARCHAR(max)`, donc le réduire sur une table contenant déjà des lignes plus longues est une migration que la base de données refusera |
+| `length` | `number` | Exactement ce nombre de caractères — un code pays, une référence à longueur fixe |
+| `matches` | `string \| RegExp` | Un motif que la valeur entière doit respecter. Une chaîne est compilée par requête, donc une chaîne qui ne compile pas est rejetée au démarrage plutôt que de devenir silencieusement une règle inactive |
+| `matchesMessage` | `string` | Le message affiché par le formulaire lorsque `matches` échoue |
+| `trim` | `boolean` | Supprime les espaces au début et à la fin **avant** l'enregistrement. Une transformation, pas une vérification — cela modifie ce qui est écrit, ce qui permet de résoudre le cas du « même tag en double, dont un avec un espace final ». **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `lowercase` / `uppercase` | `boolean` | Convertit la casse de la valeur avant l'enregistrement, comme `trim`. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+
+Les formats d'e-mail et d'URL ne sont **pas** des règles de validation. `email` et `url` sont
+des indicateurs (flags) sur la propriété elle-même, aux côtés de `type` — des déclarations sur les données
+à partir desquelles le contrat OpenAPI est généré, plutôt qu'un comportement de formulaire :
+
+```typescript
+properties: {
+    email: { type: "string", name: "Email", email: true },
+    website: { type: "string", name: "Website", url: true }
+}
+```
+
+Voir [Propriétés de chaîne](/docs/collections/properties/#string-options).
+
+### Nombres
+
+| Règle | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Valeur acceptée la plus petite / la plus grande, **inclusive** |
+| `moreThan` / `lessThan` | `number` | Les équivalents stricts de `min` et `max` |
+| `positive` / `negative` | `boolean` | Strictement supérieur / inférieur à zéro. `0` est rejeté par les deux — utilisez `min: 0` pour l'autoriser |
+| `integer` | `boolean` | Pas de partie décimale. Ne modifie pas le type de la colonne ; `columnType` le fait |
+
+### Dates
+
+| Règle | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `Date` | Date acceptée la plus ancienne / la plus récente, inclusive. Un instant fixe, pas « aujourd'hui » |
+
+### Tableaux
+
+| Règle | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Nombre minimum / maximum d'éléments, inclusif. Des éléments, pas des caractères |
+
+## Champs conditionnels
+
+Vous pouvez rendre les champs dynamiques afin qu'ils réagissent aux valeurs de l'entité. Il existe deux façons de procéder :
+
+### 1. Conditions JSON Logic (Déclaratif)
+
+Vous pouvez utiliser la propriété `conditions` pour définir des règles déclaratives JSON Logic qui peuvent être sérialisées et modifiées visuellement dans l'éditeur de collection.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    conditions: {
+        disabled: { "==": [{ "var": "values.is_free" }, true] },
+        required: { "!=": [{ "var": "values.is_free" }, true] },
+        min: 0,
+        clearOnDisabled: true // Set to null if field gets disabled
+    }
+}
+```
+
+L'objet conditions vous donne accès à :
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
+- `required`, `requiredMessage`, `min`, `max`
+- `defaultValue`
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
+- `referencePath`, `referenceFilter`
+- `canAddElements`, `sortable` (pour les tableaux)
+- `acceptedFiles`, `maxFileSize` (pour les téléversements)
+
+`disabledMessage` est la phrase qu'un utilisateur voit à la place du contrôle. Sans
+elle, un champ grisé n'explique rien, ce qui fait toute la différence entre un formulaire
+qui guide l'utilisateur et un formulaire qui le bloque.
+
+:::caution[Les conditions relèvent du comportement du formulaire]
+**Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** Elles s'exécutent dans le
+navigateur, sur l'entité en cours de modification, et définissent ce que le panneau propose. Une règle
+qui doit s'appliquer à tous les appelants doit se trouver dans `validation`, qui est vérifié par le serveur,
+ou dans une [règle de sécurité](/docs/collections/security-rules/), que la base
+de données applique pour tout le monde — panneau, SDK ou `curl`.
+:::
+
+### 2. Constructeurs de propriétés (Programmatique)
+
+Pour les comportements complexes qui ne peuvent pas être exprimés via JSON Logic, vous pouvez utiliser `dynamicProps` qui évalue une fonction JavaScript.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    dynamicProps: ({ values, user }) => ({
+        disabled: values.is_free === true || !user.roles.includes("admin"),
+        validation: values.is_free ? {} : { required: true, min: 0 }
+    })
+}
+```
+
+Le même avertissement s'applique, et de manière encore plus marquée : la fonction est intégrée
+dans le panneau et appelée à chaque rendu du formulaire. **Formulaire d'administration uniquement — non appliqué
+par l'API ou la base de données.**
+
+## Prochaines étapes
+
+- [Propriétés](/docs/collections/properties/) — les types de propriétés auxquels ces règles s'appliquent
+- [Définir des collections](/docs/collections/) — où les propriétés sont déclarées
+- [Règles de sécurité (RLS)](/docs/collections/security-rules/) — les règles appliquées par la base de données, que la validation ne remplace pas
+
+---

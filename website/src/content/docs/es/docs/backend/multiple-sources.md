@@ -51,7 +51,7 @@ una sola vez:
 
 ```ts
 import { defineCollection } from "@rebasepro/cms-types";
-import { analytics } from "../resources";
+import { analytics } from "../../../docs/resources";
 
 const pageViewsCollection = defineCollection({
     name: "Page Views",
@@ -65,7 +65,7 @@ const pageViewsCollection = defineCollection({
 ...o una propiedad de archivo:
 
 ```ts
-import { media } from "../resources";
+import { media } from "../../../docs/resources";
 
 coverImage: {
     name: "Cover image",
@@ -84,7 +84,7 @@ En una función, esos mismos handles alcanzan el recurso:
 
 ```ts
 import { defineFunction } from "@rebasepro/server/functions";
-import { analytics, media } from "../../config/resources";
+import { analytics, media } from "../../../config/resources";
 
 export default defineFunction((app, { rebase }) => {
     app.post("/report", async (c) => {

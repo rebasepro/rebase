@@ -56,7 +56,7 @@ Charge une liste d'entités d'une collection et s'y abonne. Un abonnement WebSoc
 ```typescript
 import { useCollection } from "@rebasepro/app";
 import type { User } from "@rebasepro/types";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function ProductList() {
     // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
@@ -117,7 +117,7 @@ Charge une seule entité par ID et s'y abonne. Elle s'affiche instantanément de
 
 ```typescript
 import { useFetch } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function ProductDetail({ productId }) {
     const { entity, dataLoading, dataLoadingError } = useFetch({
@@ -161,7 +161,7 @@ Hook d'évaluation des rôles et permissions de l'utilisateur courant. Il vous �
 
 ```typescript
 import { usePermissions } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { productsCollection } from "../../../docs/config/collections";
 
 function CreateProductButton() {
     const { canCreate } = usePermissions();
@@ -386,7 +386,7 @@ Gérer des sélections de relations complexes, avec recherche, anti-rebond et pa
 
 ```typescript
 import { useRelationSelector } from "@rebasepro/app";
-import { categoriesCollection } from "../config/collections";
+import { categoriesCollection } from "../../../docs/config/collections";
 
 function CategorySelector({ onSelect }) {
     const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({

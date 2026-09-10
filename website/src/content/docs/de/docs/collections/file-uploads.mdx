@@ -1,0 +1,109 @@
+---
+sourceHash: 85956e20e10421fa
+title: Datei-Upload-Felder
+sidebar_label: Datei-Uploads
+description:"\"Deklarieren eines Datei- oder Bildfelds in einer Collection: der storage-Block, Einzel- und Mehrfach-Datei-Uploads und welche Optionen vom Panel statt vom Server aufgelöst werden.\""
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+Ein Dateifeld ist eine gewöhnliche **string**-Eigenschaft mit einem `storage`-Block. Die
+Spalte enthält Text – den Schlüssel (Key) des Objekts im Bucket oder dessen URL, falls
+gewünscht – und der Block gibt an, wohin die Bytes übertragen werden und was das Formular akzeptiert.
+
+Diese Trennung ist wichtiger, als es scheint. Der Großteil von `storage` wird vom Uploader
+des Admin-Panels auf dem Weg zur API gelesen, sodass ein Schreibvorgang, der nicht von einem
+Formular stammt, diesen nicht durchläuft – diese Optionen tragen den unten stehenden Hinweis. Die beiden
+Optionen, die bestimmen, was eine Datei *sein* darf – `maxSize` und `acceptedFiles` –, sind die Ausnahme:
+Der Server prüft sie bei jedem Upload.
+
+## Eine Datei
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+## Mehrere Dateien
+
+Ein Array desselben Typs. Der `storage`-Block wandert in `of`, da er
+jedes einzelne Element und nicht die Liste beschreibt:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+## Storage-Optionen
+
+Alles innerhalb von `storage`.
+
+| Eigenschaft | Typ | Beschreibung |
+|---|---|---|
+| `storagePath` | `string \| function` | **Erforderlich.** Wohin im Bucket die Datei gespeichert wird. Ein String mit Platzhaltern – `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` – oder eine Funktion des Upload-Kontexts. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen:** Der Uploader des Panels löst dies auf, und `client.storage.upload()` vergibt einen eigenen Schlüssel. |
+| `fileName` | `string \| function` | Der Dateiname des hochgeladenen Objekts mit denselben Platzhaltern. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+| `storageSource` | `string` | Welcher registrierte Bucket verwendet werden soll, wenn ein Projekt mehr als einen hat. Das `bucket("media")`-Handle funktioniert hier ebenfalls. |
+| `public` | `boolean` | Unter dem öffentlichen Präfix speichern und über eine stabile, tokenlose, cachebare URL bereitstellen. Standardmäßig `false`, was private Objekte und kurzlebige signierte URLs bedeutet. |
+| `acceptedFiles` | `FileType[]` | MIME-Typen, die diese Eigenschaft akzeptiert. Die Sternchen-Form funktioniert – `image/*`. **Wird vom Server erzwungen**, nicht nur von der Dateiauswahl. |
+| `maxSize` | `number` | Größte akzeptierte Datei in Bytes. **Wird vom Server erzwungen**, sowohl bei normalen als auch bei fortsetzbaren (resumable) Upload-Pfaden. |
+| `metadata` | `Record<string, unknown>` | Objekt-Metadaten, die zusammen mit der Datei gespeichert werden sollen. |
+| `includeBucketUrl` | `boolean` | Schreibt `s3://my-bucket/path/to/file.png` in die Spalte anstelle von `path/to/file.png`. Standardmäßig `false`. |
+| `storeUrl` | `boolean` | Schreibt die Download-URL in die Spalte anstelle des Keys. Standardmäßig `false`, und es empfiehlt sich, dies so zu belassen: Eine URL, die ein Token enthält, funktioniert nicht mehr, sobald das Token abläuft, womit die ursprüngliche Referenz verloren ist. |
+| `imageResize` | `ImageResize` | Vor dem Hochladen skalieren und zuschneiden, für `image/jpeg`, `image/png` und `image/webp`. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+| `processFile` | `(file: File) => Promise<File>` | Transformiert die Datei vor dem Hochladen. Läuft im Browser. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transformiert den aufgelösten Pfad oder die URL vor dem Speichern. Läuft im Browser. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+| `previewUrl` | `(fileName: string) => string` | Erstellt die Vorschau-URL für Fälle, in denen die tatsächliche Adresse der Datei nicht der Wert des Feldes ist. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+
+### Bildgrößenanpassung
+
+`imageResize` akzeptiert `maxWidth` und `maxHeight` in Pixeln, einen `mode` von
+`"contain"` (herunterskalieren zum Einpassen, Standard) oder `"cover"` (Bereich ausfüllen
+und beschneiden), ein `format` von `"original"`, `"jpeg"`, `"png"` oder `"webp"` sowie
+eine `quality` zwischen 0 und 100 für verlustbehaftete Formate – standardmäßig 80. Dies geschieht
+im Browser, bevor die Bytes gesendet werden; ein Upload, der nicht über das Panel
+erfolgt ist, wird daher in seiner Originalgröße gespeichert.
+
+### Was der Server prüft
+
+`maxSize` und `acceptedFiles` wurden früher von genau einer Stelle erzwungen: dem
+Browser. Die Upload-Route kannte lediglich eine globale Größenbeschränkung und wusste
+nichts über die Eigenschaft, für die eine Datei bestimmt war. Ein `curl -F file=@payload.exe`
+am Dateiauswahldialog vorbei platzierte somit eine 40-MB-Binärdatei im Avatar-Bucket, und die
+Konfiguration, die etwas anderes vorgab, wurde nie abgefragt.
+
+Beide werden nun serverseitig anhand der Eigenschaft geprüft, die beim Upload angegeben wird. Bei
+einem Upload, der keine Eigenschaft benennt – etwa durch einen älteren Client oder einen direkten
+Aufruf –, wird weiterhin auf die globale Begrenzung zurückgegriffen, da für eine Anfrage ohne
+Eigenschaftskontext keine Eigenschaftsregel geprüft werden kann und eine Verweigerung ältere
+Clients beeinträchtigen würde.
+
+### Wohin die Datei gespeichert werden darf
+
+`storagePath` ist ein Standardwert, keine feste Begrenzung: Nichts auf dem Server beschränkt
+einen Upload auf dieses Präfix. Zu entscheiden, wer wohin schreiben darf, ist Aufgabe von
+Storage-Autorisierungsregeln – siehe [Storage](/docs/backend/storage).
+
+## Nächste Schritte
+
+- **[Properties](/docs/collections/properties)** – alle Eigenschaftstypen und ihre Optionen
+- **[Storage](/docs/backend/storage)** – Buckets, signierte URLs und wie der Server mit Uploads verfährt
+- **[Security Rules (RLS)](/docs/collections/security-rules)** – wer die Zeilen lesen darf, mit denen diese Dateien verknüpft sind
+
+---

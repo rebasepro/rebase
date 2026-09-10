@@ -1,0 +1,108 @@
+---
+sourceHash: 85956e20e10421fa
+title: Campos de subida de archivos
+sidebar_label: Subidas de archivos
+description:"\"Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de archivos individuales o múltiples, y cuáles de sus opciones son resueltas por el panel en lugar del servidor.\""
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+Un campo de archivo es una propiedad **string** ordinaria con un bloque `storage`. La
+columna contiene texto —la clave del objeto en el bucket, o su URL si así se solicita—
+y el bloque indica adónde van los bytes y qué aceptará el formulario.
+
+Esa división importa más de lo que parece. La mayor parte de `storage` es leída por el
+cargador del panel de administración en su camino hacia la API, por lo que una escritura
+que no provenga de un formulario no pasa por él —esas opciones llevan la etiqueta a continuación.
+Las dos que deciden lo que un archivo puede *ser*, `maxSize` y `acceptedFiles`, son la excepción:
+el servidor las comprueba en cada subida.
+
+## Un archivo
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+## Varios archivos
+
+Un array de lo mismo. El bloque `storage` se mueve a `of`, porque describe
+cada elemento en lugar de la lista:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+## Opciones de storage
+
+Todo lo que hay dentro de `storage`.
+
+| Propiedad | Tipo | Descripción |
+|-----------|------|-------------|
+| `storagePath` | `string \| function` | **Obligatorio.** Dónde va el archivo dentro del bucket. Una cadena con marcadores de posición — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — o una función del contexto de la subida. **Solo formulario de administración — no aplicado por la API ni por la base de datos:** es el cargador del panel el que lo resuelve, y `client.storage.upload()` define su propia clave |
+| `fileName` | `string \| function` | El nombre de archivo del objeto subido, con los mismos marcadores de posición. **Solo formulario de administración — no aplicado por la API ni por la base de datos.** |
+| `storageSource` | `string` | Qué bucket registrado utilizar, cuando un proyecto tiene más de uno. El identificador `bucket("media")` también funciona aquí |
+| `public` | `boolean` | Almacenar bajo el prefijo público y servir a través de una URL estable, sin token y almacenable en caché. `false` por defecto, lo que significa objetos privados y URLs firmadas de corta duración |
+| `acceptedFiles` | `FileType[]` | Tipos MIME que acepta esta propiedad. La forma con asterisco funciona — `image/*`. **Aplicado por el servidor**, no solo por el selector de archivos |
+| `maxSize` | `number` | Archivo más grande aceptado, en bytes. **Aplicado por el servidor**, tanto en la ruta de subida estándar como en la reanudable |
+| `metadata` | `Record<string, unknown>` | Metadatos del objeto a almacenar junto con el archivo |
+| `includeBucketUrl` | `boolean` | Escribe `s3://my-bucket/path/to/file.png` en la columna en lugar de `path/to/file.png`. `false` por defecto |
+| `storeUrl` | `boolean` | Escribe la URL de descarga en la columna en lugar de la clave. `false` por defecto, y vale la pena dejarlo así: una URL que lleva un token deja de funcionar cuando el token expira, y la referencia original se pierde |
+| `imageResize` | `ImageResize` | Redimensionar y recortar antes de subir, para `image/jpeg`, `image/png` e `image/webp`. **Solo formulario de administración — no aplicado por la API ni por la base de datos.** |
+| `processFile` | `(file: File) => Promise<File>` | Transforma el archivo antes de que se suba. Se ejecuta en el navegador. **Solo formulario de administración — no aplicado por la API ni por la base de datos.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transforma la ruta o URL resuelta antes de que se guarde. Se ejecuta en el navegador. **Solo formulario de administración — no aplicado por la API ni por la base de datos.** |
+| `previewUrl` | `(fileName: string) => string` | Construye la URL de vista previa, para cuando la dirección real del archivo no es el valor del campo. **Solo formulario de administración — no aplicado por la API ni por la base de datos.** |
+
+### Redimensionamiento
+
+`imageResize` toma `maxWidth` y `maxHeight` en píxeles, un `mode` de
+`"contain"` (reducir para ajustar, por defecto) o `"cover"` (llenar los límites y
+recortar), un `format` de `"original"`, `"jpeg"`, `"png"` o `"webp"`, y una
+`quality` entre 0 y 100 para los formatos con pérdida — 80 por defecto. Ocurre en
+el navegador, antes de que se envíen los bytes, por lo que una subida que no provenga del
+panel se almacena en su tamaño original.
+
+### Qué comprueba el servidor
+
+`maxSize` y `acceptedFiles` solían aplicarse únicamente por una cosa: el
+navegador. La ruta de subida conocía un único límite de tamaño global y nada sobre la
+propiedad a la que estaba destinado un archivo, por lo que `curl -F file=@payload.exe`
+eludiendo el selector colocaba un ejecutable de 40 MB en el bucket de avatares y la
+configuración que decía lo contrario nunca era consultada.
+
+Ahora ambos se comprueban en el servidor, contra la propiedad que la subida indica. Una
+subida que no especifique ninguna propiedad —un cliente más antiguo, una llamada directa—
+todavía recurre al límite global, ya que una solicitud sin contexto de propiedad no tiene
+ninguna regla de propiedad que verificar, y rechazarla rompería los clientes anteriores a este cambio.
+
+### Adónde se permite que vaya el archivo
+
+`storagePath` es un valor predeterminado, no un límite: nada en el servidor confina una
+subida a ese prefijo. Decidir quién puede escribir y dónde es el propósito de una regla de
+autorización de almacenamiento — consulta [Storage](/docs/backend/storage).
+
+## Siguientes pasos
+
+- **[Propiedades](/docs/collections/properties)** — cada tipo de propiedad y sus opciones
+- **[Storage](/docs/backend/storage)** — buckets, URLs firmadas y qué hace el servidor con una subida
+- **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — quién puede leer las filas de las que dependen estos archivos
+
+---
