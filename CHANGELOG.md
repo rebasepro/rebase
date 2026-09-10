@@ -90,6 +90,43 @@
 
 ### Fixed
 
+- **A collection created from the panel's editor no longer stops the project
+  from booting.** The schema editor moved a *collection's* presentation keys
+  into its `admin` block when it wrote a file, and left a *property's* —
+  `markdown`, `multiline`, `previewAsTag` — exactly where the panel put them,
+  at the top level of the property. The boot validator treats a key that moved
+  in 0.11 as fatal, and the loader imports every collection in the directory,
+  so one file written this way stopped `rebase dev` from starting at all:
+  "Could not regenerate the database schema", then a backend that never came
+  up. `saveProperty` had been fixed for this; `saveCollection` had not, and
+  creating a collection is a `saveCollection`.
+
+  Two things made it certain rather than likely. The walk that nests a
+  property's keys did not know about `oneOf` — the container the block-based
+  templates are built out of — so it skipped every block inside them. And all
+  four of the editor's starter templates were written in the pre-0.11 flat
+  shape behind an `as unknown as AdminCollection` cast, which is the only check
+  they had. The cast is gone: they are `satisfies AdminCollection` now, so a key
+  in the wrong place is a compile error. The templates also had `url: "image"`
+  on a boolean flag — the renderer is `admin.urlPreview`.
+
+  What the schema editor writes is now asserted against the boot validator
+  itself, for both entry points, rather than against a copy of its rules.
+
+- **The Markdown field's "Paste behavior" panel is gone.** Its two switches
+  wrote `markdown.html` and `markdown.transformPastedText` at the top level of
+  the property — the fatal shape above — clobbering the `admin.markdown` flag
+  that makes the field a markdown field at all. Nothing ever read either one:
+  the editor's `markdownConfig` prop was destructured and never used, and no
+  caller passed it. Removed rather than wired, so the panel stops promising
+  behaviour that was never implemented.
+
+- **The agent skills are inside the example gate now.** `check:doc-examples`
+  read the docs and not `tooling/rebase-agent-skills`, which is the surface an
+  agent copies from verbatim. Two of its examples wrote a property key at the
+  top level — one of them directly beside a correct `admin: { readOnly: true }`
+  in the same literal. The gate now validates 123 collections instead of 87.
+
 - **A generated column no longer wedges every push behind it.** PostgreSQL
   refuses `ALTER COLUMN … TYPE` on a column a `GENERATED ALWAYS AS … STORED`
   expression reads, and a search block's `tsvector` is deliberately hidden from

@@ -82,10 +82,20 @@ const FRAGMENT_OPT_OUT = /<!--\s*doc-examples:\s*fragment\s*-->/;
  */
 const EXCLUDED = [/(^|\/)CHANGELOG\.md$/];
 
-/** Docs whose fences this gate reads. English only — the locales are mirrors. */
+/**
+ * Docs whose fences this gate reads. English only — the locales are mirrors.
+ *
+ * The agent skills are in here for the same reason the docs are, only more so:
+ * a person reads a doc and adapts it, an agent copies a fence verbatim into
+ * somebody's `config/collections/`. They were outside every gate until
+ * 2026-09-10, and two of their examples wrote a property key at the top level —
+ * one of them directly beside a correct `admin: { readOnly: true }` in the same
+ * literal.
+ */
 export const COLLECTION_DOC_GLOBS = [
     "website/src/content/docs/docs/**/*.md",
-    "website/src/content/docs/docs/**/*.mdx"
+    "website/src/content/docs/docs/**/*.mdx",
+    "tooling/rebase-agent-skills/skills/**/SKILL.md"
 ];
 
 /**

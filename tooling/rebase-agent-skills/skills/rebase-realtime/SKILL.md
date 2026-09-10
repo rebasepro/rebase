@@ -649,6 +649,7 @@ All channel members receive incremental `presence_diff` messages when users join
 
 > The diff you receive on *your own* join contains only you. It is not the roster — request `presence_state` for that.
 
+<!-- doc-examples: fragment -->
 ```typescript
 {
     type: "presence_diff",
@@ -669,6 +670,7 @@ ws.send(JSON.stringify({
 
 Response:
 
+<!-- doc-examples: fragment -->
 ```typescript
 {
     type: "presence_state",

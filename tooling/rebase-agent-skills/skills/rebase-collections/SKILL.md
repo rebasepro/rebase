@@ -672,7 +672,7 @@ title: {
     name: "Title",
     type: "string",
     validation: { required: true, min: 3, max: 200 },
-    multiline: false
+    admin: { multiline: false }
 }
 ```
 
@@ -851,8 +851,7 @@ createdAt: {
     type: "date",
     mode: "date_time",
     autoValue: "on_create",
-    clearable: false,
-    admin: { readOnly: true }
+    admin: { clearable: false, readOnly: true }
 }
 
 updatedAt: {
