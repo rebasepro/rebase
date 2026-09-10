@@ -18,7 +18,7 @@
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { pgTable, varchar } from "drizzle-orm/pg-core";
+import { pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
@@ -30,6 +30,29 @@ const notesTable = pgTable("notes", {
     id: varchar("id").primaryKey(),
     body: varchar("body")
 });
+
+/**
+ * A collection that soft-deletes, which nothing here covered.
+ *
+ * Both bugs this pins shipped because the only delete test in the tree used a
+ * collection without `softDelete`, so the entire soft path — the majority of
+ * the delete code — ran in no test at all.
+ */
+const trashTable = pgTable("trash_notes", {
+    id: varchar("id").primaryKey(),
+    body: varchar("body"),
+    deleted_at: timestamp("deleted_at", { withTimezone: true })
+});
+
+const trashCollection: CollectionConfig = {
+    name: "Trash notes", slug: "trash_notes", table: "trash_notes",
+    softDelete: true,
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        body: { name: "Body", type: "string" },
+        deletedAt: { name: "Deleted at", type: "date" }
+    }
+} as unknown as CollectionConfig;
 
 const notesCollection: CollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
@@ -58,13 +81,15 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
             }
         }
         await admin.query(`CREATE TABLE public.notes (id VARCHAR(255) PRIMARY KEY, body VARCHAR(255));`);
+        await admin.query(`CREATE TABLE public.trash_notes (id VARCHAR(255) PRIMARY KEY, body VARCHAR(255), deleted_at TIMESTAMPTZ);`);
         await admin.end();
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([notesCollection]);
+        registry.registerMultiple([notesCollection, trashCollection]);
         registry.registerTable(notesTable, "notes");
+        registry.registerTable(trashTable, "trash_notes");
         const realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(db as never, realtime as never, registry);
         realtime.setDataDriver(driver);
@@ -109,5 +134,83 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
                 }
             }
         );
+    });
+
+    /**
+     * A soft delete stamps the row instead of removing it, and both of these
+     * failed on a released canary.
+     */
+    describe("a collection that soft-deletes", () => {
+
+        const make = async (id: string) => {
+            await driver.save({
+                path: "trash_notes", collection: trashCollection,
+                values: { id, body: "trash me" }
+            } as never);
+            return id;
+        };
+
+        /**
+         * Asserted in SQL, not through a read API.
+         *
+         * `FetchCollectionProps` has no `withDeleted`, so the driver's own list
+         * cannot ask for stamped rows at all — and a test that went through a
+         * read path would be asserting that path's filter rather than what the
+         * delete actually did. The table is the fact.
+         */
+        const state = async (id: string): Promise<"live" | "stamped" | "gone"> => {
+            const r = await pool.query(
+                "SELECT deleted_at FROM public.trash_notes WHERE id = $1", [id]
+            );
+            if (r.rowCount === 0) return "gone";
+            return r.rows[0].deleted_at === null ? "live" : "stamped";
+        };
+
+        it("stamps the row instead of removing it, and does not throw doing so", async () => {
+            // It threw. A soft delete IS a save, and `PersistService` read the
+            // row back through the ordinary walk — which hides stamped rows —
+            // so it could not see what it had just written and raised "Could
+            // not fetch row after save." inside the transaction. That rolled
+            // the stamp back: every DELETE on a soft-delete collection was a
+            // 500 and the row stayed live. The feature did not work at all.
+            const id = await make("t-1");
+
+            await expect(driver.delete({
+                row: { id, path: "trash_notes", values: {} },
+                collection: trashCollection
+            } as never)).resolves.toBeUndefined();
+
+            expect(await state(id)).toBe("stamped");
+        });
+
+        it("purges a row that is already in the trash", async () => {
+            // `?hard=true` on a stamped row is the "empty trash" operation, and
+            // the route looked the row up with the default read — which hides
+            // exactly the rows it was asked to remove — so it answered 404 for
+            // a row `?deleted=only` was listing a moment earlier. A trashed row
+            // could never be purged.
+            const id = await make("t-2");
+            await driver.delete({
+                row: { id, path: "trash_notes", values: {} },
+                collection: trashCollection
+            } as never);
+            expect(await state(id)).toBe("stamped");
+
+            await driver.delete({
+                row: { id, path: "trash_notes", values: {} },
+                collection: trashCollection, hard: true
+            } as never);
+
+            expect(await state(id)).toBe("gone");
+        });
+
+        it("purges a live row directly", async () => {
+            const id = await make("t-3");
+            await driver.delete({
+                row: { id, path: "trash_notes", values: {} },
+                collection: trashCollection, hard: true
+            } as never);
+            expect(await state(id)).toBe("gone");
+        });
     });
 });

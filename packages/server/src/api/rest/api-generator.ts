@@ -1212,10 +1212,17 @@ values: entity as Record<string, unknown> },
             // error, for a delete that in fact succeeded. Under a key the
             // replay is answered from the key and the row is never read again.
             return this.runIdempotent(c, { id: String(id) }, async () => {
+                const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
                 const existingEntity = await driver.fetchOne({
                     path: getCollectionDataPath(collection),
                     id: String(id),
-                    collection: resolvedCollection
+                    collection: resolvedCollection,
+                    // `withDeleted` when the caller asked to purge: a hard delete of an
+                    // ALREADY soft-deleted row is the "empty trash" operation, and the
+                    // default read hides exactly the rows it is meant to remove. Without
+                    // this the route answered 404 for a row `?deleted=only` was listing a
+                    // moment earlier, so a trashed row could never be purged at all.
+                    withDeleted: hardDelete ? true : undefined
                 });
 
                 if (!existingEntity) {
@@ -1500,17 +1507,25 @@ id: parsed.id });
 
             this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
 
+            // `?hard=true` — a real DELETE on a soft-delete collection. Same
+            // permission as the delete it replaces; see `soft-delete-params.ts`.
+            const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
+
             const existingEntity = await driver.fetchOne({
                 path: parsed.collectionPath,
-                id: parsed.id
+                id: parsed.id,
+                // `withDeleted` when the caller asked to purge: a hard delete of an
+                // ALREADY soft-deleted row is the "empty trash" operation, and the
+                // default read hides exactly the rows it is meant to remove. Without
+                // this the route answered 404 for a row `?deleted=only` was listing a
+                // moment earlier, so a trashed row could never be purged at all.
+                withDeleted: hardDelete ? true : undefined
             });
 
             if (!existingEntity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
 
             await driver.delete({
-                // `?hard=true` — a real DELETE on a soft-delete collection. Same
-                // permission as the delete it replaces; see `soft-delete-params.ts`.
-                hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
+                hard: hardDelete,
                 row: {
                     // The address from the path, for the same reason as the
                     // collection-level delete above: a row carries no id.

@@ -539,7 +539,22 @@ export class PersistService {
         // read path. The admin does not need them here either: its rows arrive
         // over the realtime subscription refetch, which still serves the
         // view-model walk.
-        const finalEntity = await this.fetchService.fetchOneForRest(collection.slug, savedId, undefined, databaseId);
+        //
+        // `withDeleted` on the read-back, which is not the same question the
+        // caller's own read asks. A soft delete IS a save — it stamps
+        // `deleted_at` — and the default read hides stamped rows, so this walk
+        // could not see the row it had just written and threw "Could not fetch
+        // row after save." inside the transaction, which rolled the stamp back.
+        // Delete answered 500 on every soft-delete collection and the row
+        // stayed live: the feature did not work at all.
+        //
+        // Showing it is also the correct answer on its own terms. Whoever just
+        // wrote this row is the one party who must be able to see the result of
+        // their own write, whatever its deleted state — and an ordinary save is
+        // unaffected, because an undeleted row is visible either way.
+        const finalEntity = await this.fetchService.fetchOneForRest(
+            collection.slug, savedId, undefined, databaseId, { withDeleted: true }
+        );
         if (!finalEntity) throw new Error("Could not fetch row after save.");
         return finalEntity;
     }
