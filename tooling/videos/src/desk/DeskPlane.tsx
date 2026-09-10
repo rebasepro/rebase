@@ -18,11 +18,12 @@ import { GROUND } from "../theme";
 
 /** Measured (RebaseDesk-Plane, scripts in the session's scratchpad): at
  *  y -12 the ribbon covered 10-12% of the frame as a band across the whole
- *  top, its fringe down to half the frame and across every headline. At
- *  y -16 it covers 3-5%, a cluster in the top strip — the mass in the top
- *  15% of the frame — and that is where it stays on a held slide. The camera
- *  never travels; the ribbon turns with each beat's roll, as it always did. */
-const DEFAULT_STATION = { x: 0, y: -16, zoom: 2.05 };
+ *  top, its fringe down to half the frame and across every headline; at
+ *  -16 it was 3-5%, a cluster the user found too small. -14 is between —
+ *  6-8%, a shape across the top strip — and the static fade below takes the
+ *  fringe off the type. The camera never travels; the ribbon turns with
+ *  each beat's roll, as it always did. */
+const DEFAULT_STATION = { x: 0, y: -14, zoom: 2.05 };
 /** The open stands at the old height: the presenter is centred on the art
  *  and there is no headline yet, so the ribbon can show more than a sliver.
  *  It settles to the station above in the same window the presenter flies
@@ -111,6 +112,17 @@ export function timeAt(frame: number, fps: number) {
     return interpolate(frame, AT, WARPED, LINEAR) / fps;
 }
 
+/**
+ * FADED INTO THE GROUND. The ribbon's facets have hard geometric edges, and
+ * against a flat black ground they read as pasted on. A STATIC fade — solid
+ * across the top of the frame, gone by a third of the way down — dissolves
+ * them into the ground on the way to the headline zone, so a larger shape
+ * can sit at the top (the camera one step lower than the corner-cluster
+ * station) without a hard edge anywhere near the type. It never moves: the
+ * only motion in the ribbon is its turn on each beat's roll.
+ */
+const FADE = "linear-gradient(to bottom, #000 0%, #000 9%, rgba(0,0,0,0.55) 20%, transparent 34%)";
+
 export const DeskPlane: React.FC = () => {
     const { fps } = useVideoConfig();
     const frame = useCurrentFrame();
@@ -124,7 +136,7 @@ export const DeskPlane: React.FC = () => {
                 opacity={ground.reveal}
                 camera={ribbonAt(frame)}
                 time={timeAt(frame, fps)}
-                style={{ mixBlendMode: "screen" }}
+                style={{ mixBlendMode: "screen", WebkitMaskImage: FADE, maskImage: FADE }}
             />
         </>
     );
