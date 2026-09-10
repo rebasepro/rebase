@@ -126,11 +126,43 @@ allEndpoints: [] };
     }
 
     if (error || !spec) {
+        // The API spec fetch rejects with whatever the transport says, and for
+        // an expired console session that is the string "401". Rendering it
+        // verbatim produced the worst screen in the console: a red box
+        // containing three digits, no title, no cause, no way out — on the same
+        // product whose storage browser writes four sentences explaining which
+        // authorization hook refused a listing.
+        //
+        // The raw text is kept, below the sentence, because it is what someone
+        // pastes into a bug report. It is just no longer the whole message.
+        const status = (error ?? "").trim();
+        const isAuth = /^(401|403)\b/.test(status) || /unauthori[sz]ed|forbidden/i.test(status);
         return (
             <div className="flex items-center justify-center h-full w-full p-8">
-                <Alert color="error">
-                    <Typography variant="body2">{error ?? "Unknown error"}</Typography>
-                </Alert>
+                <div className="max-w-md text-center">
+                    <Typography variant="subtitle2" className="block text-text-primary dark:text-text-primary-dark">
+                        {isAuth ? "This session cannot read the API specification" : "Could not load the API specification"}
+                    </Typography>
+                    <Typography variant="body2" className="block mt-2 text-text-secondary dark:text-text-secondary-dark">
+                        {isAuth
+                            ? "The console's access to this project's API was refused. It usually means the session expired — sign in again — or that console access has been turned off for this project in Settings."
+                            : "The project answered, but not with a specification this explorer could read. Its API is unaffected; only this page is."}
+                    </Typography>
+                    <Button
+                        variant="outlined"
+                        color="neutral"
+                        size="small"
+                        className="mt-4"
+                        onClick={() => window.location.reload()}
+                    >
+                        Try again
+                    </Button>
+                    {status && (
+                        <Typography variant="caption" className="block mt-4 font-mono text-text-disabled dark:text-text-disabled-dark">
+                            {status}
+                        </Typography>
+                    )}
+                </div>
             </div>
         );
     }
