@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -662,6 +662,12 @@ target });
             // The key always survives: a related row nobody can address cannot
             // be followed, updated or deduplicated by the caller.
             for (const pk of getPrimaryKeys(targetCollection, this.registry)) keep.add(pk.fieldName);
+            // So does the link's own data. `fields` narrows the TARGET's
+            // columns — it is keyed off the target's collection and validated
+            // against it — and `_pivot` is not one of them: dropping it would
+            // make `include=members&fields=id` silently lose the `role` that is
+            // the reason the relation carries a payload at all.
+            keep.add(JUNCTION_PIVOT_KEY);
             out = out.map(row => {
                 const projected: Record<string, unknown> = {};
                 for (const [key, value] of Object.entries(row)) {
@@ -752,7 +758,18 @@ target });
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row))) ?? [];
                         const shaped = this.shapeRelatedRows(
-                            related.map(e => toRestValues({ ...e.values }, targetCollection)), node, targetCollection
+                            // The junction's own columns ride along under
+                            // `_pivot` — the link's data, not the target's, so
+                            // it is nested rather than merged: two posts sharing
+                            // a tag see one tag row and two different links, and
+                            // a flattened `role` would collide with a column of
+                            // the target's own. It stays outside `toRestValues`
+                            // for the same reason: the target's collection does
+                            // not describe the link's columns.
+                            related.map(e => (e.pivot
+                                ? { ...toRestValues({ ...e.values }, targetCollection), [JUNCTION_PIVOT_KEY]: e.pivot }
+                                : toRestValues({ ...e.values }, targetCollection))),
+                            node, targetCollection
                         );
                         row[key] = shaped;
                         loaded.push(...shaped);

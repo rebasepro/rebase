@@ -2,7 +2,7 @@ import { and, eq, inArray, notInArray, or, sql, SQL, getTableName as drizzleTabl
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
+import { getTableName, getJunctionConfigForRelation, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -21,12 +21,7 @@ import { stripUnreadable } from "./row-pipeline";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
-import {
-    applyJunctionMembership,
-    bindJoinPathJunction,
-    bindThroughJunction,
-    removeJunctionLink
-} from "./junction-writes";
+import { bindThroughJunction } from "./junction-writes";
 // A soft-deleted row must not come back through a relation either: a deleted
 // comment reappearing under its post is the same bug as one reappearing in the
 // listing. See `soft-delete.ts`.
@@ -137,6 +132,17 @@ export interface RelatedRow<M extends Record<string, unknown> = Record<string, u
     id: string | number;
     path: string;
     values: M;
+    /**
+     * The junction row's own columns, for a `manyToMany` whose `through`
+     * declares `properties`. Absent for every other relation kind and for a
+     * junction that carries nothing but its two keys.
+     *
+     * Kept beside `values` rather than merged into them, because it is not the
+     * target's data: two posts sharing a tag see the same tag row and different
+     * links. The include pipeline serves it under
+     * {@link JUNCTION_PIVOT_KEY}.
+     */
+    pivot?: Record<string, unknown>;
 }
 
 export class RelationService {
@@ -182,6 +188,34 @@ export class RelationService {
             path: targetCollection.slug,
             values: values as M
         };
+    }
+
+    /**
+     * The junction row's own columns, as the caller may see them.
+     *
+     * Read through the same two steps the target's columns go through:
+     * `parseDataFromServer` gives the declared type (a `date` is a Date, a
+     * NUMERIC is a number) and `stripUnreadable` drops what this caller may not
+     * read. The second is the point — `access.read: ["hr"]` on a payload
+     * property has to mean the same thing it means on a collection's, and the
+     * synthetic junction config carries the property verbatim, so the same
+     * `effectiveAccess` answers both.
+     *
+     * Only the payload keys: the two foreign keys are the link's identity, and
+     * the caller already has both — one is the row they asked from, the other
+     * is the target's own id.
+     */
+    private async readPivot(
+        junctionRow: Record<string, unknown>,
+        junctionConfig: CollectionConfig,
+        payloadKeys: string[]
+    ): Promise<Record<string, unknown>> {
+        const raw: Record<string, unknown> = {};
+        for (const key of payloadKeys) {
+            if (key in junctionRow) raw[key] = junctionRow[key];
+        }
+        const parsed = await parseDataFromServer(raw, junctionConfig) as Record<string, unknown>;
+        return stripUnreadable(parsed, junctionConfig);
     }
 
     /**
@@ -1028,6 +1062,13 @@ export class RelationService {
             const results = await query;
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
             const targetTableName = getTableName(targetCollection);
+            // The junction's own columns, when it declares any. Built once per
+            // batch rather than per row: it is derived from the relation, and
+            // the relation does not change between rows.
+            const payloadKeys = Object.keys(relation.through.properties);
+            const junctionConfig = payloadKeys.length > 0
+                ? getJunctionConfigForRelation(relation.through)
+                : undefined;
 
             for (const row of results as Array<Record<string, unknown>>) {
                 // The junction table data is namespaced under its table name
@@ -1036,7 +1077,11 @@ export class RelationService {
 
                 const parentId = String(junctionData[relation.through.sourceColumn]);
                 const arr = resultMap.get(parentId) || [];
-                arr.push(await this.toRelatedRow(targetData, targetCollection, targetPks));
+                const related = await this.toRelatedRow(targetData, targetCollection, targetPks);
+                if (junctionConfig) {
+                    related.pivot = await this.readPivot(junctionData, junctionConfig, payloadKeys);
+                }
+                arr.push(related);
                 resultMap.set(parentId, arr);
             }
 

@@ -352,6 +352,26 @@ export interface DeleteManyProps<M extends Record<string, unknown> = Record<stri
 }
 
 /**
+ * Addressing ONE link of a many-to-many, to set the columns it carries.
+ *
+ * `path` is the relation on a row — `posts/1/tags` — and `targetId` the row on
+ * the far side, so the pair names exactly one junction row. Not a `SaveProps`,
+ * because a save at that address means "write the target row", and a link's own
+ * columns are not the target's: two posts sharing a tag see one tag and two
+ * different links.
+ *
+ * @internal
+ */
+export interface UpdateRelationPivotProps {
+    /** The nested relation path, e.g. `posts/1/tags`. */
+    path: string;
+    /** The far side's key. */
+    targetId: string | number;
+    /** The junction columns to set, keyed by the property key `through.properties` declares. */
+    pivot: Record<string, unknown>;
+}
+
+/**
  * One operation of a {@link DataDriver.batchWrite}.
  *
  * `path` rather than a slug, because a batch entry addresses rows exactly as
@@ -515,6 +535,21 @@ export interface DataDriver {
      * @param path Collection path
      */
     deleteAll?(path: string): Promise<void>;
+
+    /**
+     * Set the columns ONE many-to-many link carries, leaving the membership
+     * alone — `manyToMany`'s `through.properties`.
+     *
+     * `PATCH /api/data/<c>/<id>/<relation>/<targetId>` with a `_pivot` body
+     * reaches this. The membership array cannot express it: sending one element
+     * would unlink everything else, and re-sending the whole set to change one
+     * value reintroduces the lost update the membership diff exists to avoid.
+     *
+     * Optional. A driver whose junctions carry nothing but the two keys leaves
+     * it undefined, and the REST layer answers `RELATION_PIVOT_UNSUPPORTED`
+     * rather than pretending the write landed.
+     */
+    updateRelationPivot?(props: UpdateRelationPivotProps): Promise<void>;
 
     /**
      * Delete many rows in one transaction, addressed by id.

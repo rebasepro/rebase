@@ -1,12 +1,12 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { cursorToStartAfter, topLevelIncludeNames } from "@rebasepro/common";
 import { assertReadableFields, requestViewer } from "./field-access-query";
-import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
+import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
 import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./etag";
@@ -14,7 +14,7 @@ import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from 
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
-import { findRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import { findRelation, getJunctionConfigForRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
     createIdempotencyStore,
     IDEMPOTENCY_HEADER,
@@ -490,6 +490,110 @@ export class RestApiGenerator {
         }
 
         return current;
+    }
+
+    /**
+     * `PATCH <collection>/<id>/<relation>/<targetId>` with a `_pivot` body: set
+     * the columns that one many-to-many link carries.
+     *
+     * The membership array on the parent (`PATCH posts/1 { tags: [...] }`) sets
+     * *which* links exist; this sets what one of them holds. They are separate
+     * because the array cannot express a single-link edit without either
+     * unlinking everything it omits or re-sending the whole set — and re-sending
+     * the set to change one `role` is exactly the lost update that the
+     * membership diff exists to avoid.
+     *
+     * Validated against the junction's own properties, through the same
+     * `assertWriteRequestValid` a row's values go through: `required`, `enum`,
+     * `min`/`max`/`matches` and per-field `access.write` mean the same thing on
+     * a payload column as on a collection's, or the promise that they are
+     * "declared exactly like collection properties" is not one.
+     */
+    private async updateRelationPivotFromBody(
+        c: Context<HonoEnv>,
+        driver: DataDriver,
+        collectionPath: string,
+        targetId: string,
+        body: Record<string, unknown>
+    ): Promise<Response> {
+        const extras = Object.keys(body).filter(key => key !== JUNCTION_PIVOT_KEY);
+        if (extras.length > 0) {
+            throw ApiError.badRequest(
+                `A \`${JUNCTION_PIVOT_KEY}\` write sets the link's own columns, so it cannot also carry ` +
+                `${extras.map(k => `'${k}'`).join(", ")} — those belong to the row on the far side. ` +
+                "Send them as a separate request to the same address without `_pivot`.",
+                "VALIDATION_UNKNOWN_FIELDS",
+                { fields: extras, path: collectionPath }
+            );
+        }
+
+        const pivot = body[JUNCTION_PIVOT_KEY];
+        if (!pivot || typeof pivot !== "object" || Array.isArray(pivot)) {
+            throw ApiError.badRequest(
+                `\`${JUNCTION_PIVOT_KEY}\` must be an object of the junction's columns.`,
+                "VALIDATION_CONSTRAINT",
+                { path: collectionPath }
+            );
+        }
+
+        const junction = this.resolveJunctionCollection(collectionPath);
+        if (!junction) {
+            throw ApiError.badRequest(
+                `'${collectionPath}' does not reach its target through a \`manyToMany\` that declares ` +
+                "`through.properties`, so there is no link payload to write.",
+                "RELATION_HAS_NO_PIVOT",
+                { path: collectionPath }
+            );
+        }
+        assertWriteRequestValid(pivot as Record<string, unknown>, junction, { viewer: requestViewer(c) });
+
+        if (!driver.updateRelationPivot) {
+            throw ApiError.badRequest(
+                "This data source cannot write junction columns.",
+                "RELATION_PIVOT_UNSUPPORTED",
+                { path: collectionPath }
+            );
+        }
+
+        await driver.updateRelationPivot({
+            path: collectionPath,
+            targetId,
+            pivot: pivot as Record<string, unknown>
+        });
+
+        return new Response(null, { status: 204 });
+    }
+
+    /**
+     * The synthetic collection standing in for the junction a nested path's last
+     * hop reaches through, or `undefined` when that hop is not a `manyToMany`
+     * carrying `through.properties`.
+     *
+     * Built from the relation rather than by walking every collection: the same
+     * `getJunctionConfigForRelation` the schema planner and the driver use, so
+     * the shape validated here is the shape the columns were emitted from.
+     */
+    private resolveJunctionCollection(collectionPath: string): CollectionConfig | undefined {
+        const segments = collectionPath.split("/").filter(s => s && s !== "undefined");
+        if (segments.length < 3) return undefined;
+
+        let current = this.collections.find(c => c.slug === segments[0]);
+        let relation: ResolvedRelation | undefined;
+
+        for (let i = 2; i < segments.length && current; i += 2) {
+            relation = findRelation(resolveCollectionRelations(current), segments[i]);
+            if (!relation) return undefined;
+            try {
+                const target = relation.target();
+                current = this.collections.find(c => c.slug === target?.slug) ?? target;
+            } catch {
+                return undefined;
+            }
+        }
+
+        if (!relation || !isManyToMany(relation)) return undefined;
+        if (Object.keys(relation.through.properties).length === 0) return undefined;
+        return getJunctionConfigForRelation(relation.through);
     }
 
     /**
@@ -1466,6 +1570,20 @@ id: parsed.id });
             this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
 
             const body = await parseJsonBody(c);
+
+            // ── The link's own columns ───────────────────────────────────────
+            // `PATCH <c>/<id>/<relation>/<targetId>` with a `_pivot` body edits
+            // the many-to-many *link*, not the row on the far side. The same URL
+            // with the target's own columns still edits the target: the two are
+            // told apart by the key, which is why `_pivot` is reserved and why
+            // no property may be called that.
+            //
+            // They are also mutually exclusive. A body carrying both is a
+            // request to do two different writes at one address, and guessing an
+            // order for them is how one of the two silently does not happen.
+            if (JUNCTION_PIVOT_KEY in body) {
+                return this.updateRelationPivotFromBody(c, driver, parsed.collectionPath, parsed.id, body);
+            }
 
             const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
             if (targetCollection) {

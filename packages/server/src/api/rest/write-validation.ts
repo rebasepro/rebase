@@ -1,16 +1,58 @@
-import { CollectionConfig, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, isManyToMany, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
 import {
     type FieldViewer,
     canWriteField,
     effectiveAccess,
     enumToObjectEntries,
     fieldKeyForColumn,
+    getJunctionConfigForRelation,
     resolveCollectionRelations,
     resolvePrimaryKeys,
     restrictedFieldNames
 } from "@rebasepro/common";
 import { hydrateRegExp } from "@rebasepro/utils";
 import { ApiError } from "../errors";
+
+/**
+ * The relations of `collection` that reach through a junction carrying its own
+ * columns, each with the synthetic collection those columns are declared on.
+ *
+ * Keyed by the relation's wire name, which is what a membership write names
+ * (`{ tags: [...] }`). A junction with no `through.properties` is not here at
+ * all: there is nothing a `_pivot` could legally say about it, and the write
+ * path refuses one with the relation named.
+ */
+function junctionsWithPayload(collection: CollectionConfig): Array<[string, CollectionConfig]> {
+    const out: Array<[string, CollectionConfig]> = [];
+    for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
+        if (!isManyToMany(relation)) continue;
+        if (Object.keys(relation.through.properties).length === 0) continue;
+        out.push([key, getJunctionConfigForRelation(relation.through)]);
+    }
+    return out;
+}
+
+/**
+ * The `_pivot` objects in a membership value, with the index each came from.
+ *
+ * Tolerant on purpose: a value that is not an array, an element that is a bare
+ * id, and a `_pivot` that is not an object are all *someone else's* error to
+ * report — `relationLinkElements` in the driver refuses an element with no id,
+ * and a non-object `_pivot` is refused where it is serialized. Reporting them
+ * twice, differently, is how two layers come to disagree about what a request
+ * meant.
+ */
+function pivotsIn(value: unknown): Array<{ index: number; pivot: Record<string, unknown> }> {
+    if (!Array.isArray(value)) return [];
+    const out: Array<{ index: number; pivot: Record<string, unknown> }> = [];
+    value.forEach((element, index) => {
+        if (!element || typeof element !== "object" || Array.isArray(element)) return;
+        const pivot = (element as Record<string, unknown>)[JUNCTION_PIVOT_KEY];
+        if (!pivot || typeof pivot !== "object" || Array.isArray(pivot)) return;
+        out.push({ index, pivot: pivot as Record<string, unknown> });
+    });
+    return out;
+}
 
 /**
  * The two ways a field can be closed to a write, told apart.
@@ -198,6 +240,17 @@ export function assertKnownWriteFields(
     }
 
     for (const field of options?.extraKnownFields ?? []) known.add(field);
+
+    // A membership element may name the link's own columns under `_pivot`. They
+    // belong to the junction, not to this collection, so they are checked
+    // against the junction's properties — by the same function, so a payload
+    // column with `access.write: ["admin"]` or `excludeFromApi` is refused on
+    // exactly the terms a collection column with the same declaration is.
+    for (const [key, junction] of junctionsWithPayload(collection)) {
+        for (const { pivot } of pivotsIn(values[key])) {
+            assertKnownWriteFields(pivot, junction, { viewer: options?.viewer });
+        }
+    }
 
     const unknown = Object.keys(values).filter(key => !known.has(key));
     if (unknown.length === 0) return;
@@ -526,7 +579,9 @@ function isCallerSupplied(property: Property): boolean {
 function collectMissingRequired(
     values: Record<string, unknown>,
     collection: CollectionConfig,
-    into: WriteViolation[]
+    into: WriteViolation[],
+    /** Prefix for the reported field path, for values nested under a `_pivot`. */
+    at?: string
 ): void {
     // A `beforeSave` can supply a required field, and this runs before it. The
     // canonical case is a slug derived from a title — the reference app's own
@@ -564,10 +619,11 @@ function collectMissingRequired(
         const alias = relationAlias.get(key);
         if (alias && supplied(alias)) continue;
 
+        const field = at ? `${at}.${key}` : key;
         into.push({
-            field: key,
+            field,
             code: "required",
-            message: property.validation.requiredMessage ?? `'${key}' is required.`
+            message: property.validation.requiredMessage ?? `'${field}' is required.`
         });
     }
 }
@@ -627,6 +683,32 @@ export function assertWriteValuesValid(
     for (const [key, value] of Object.entries(values)) {
         const property = (properties as Record<string, Property>)[key];
         if (property) collectViolations(key, property, value, violations);
+    }
+
+    // The link's own columns, on a membership element that names them. Judged
+    // by the same `collectViolations` — `enum`, `min`, `max`, `matches`,
+    // `email`, `url` — because "declared exactly like collection properties" is
+    // a claim about what the server enforces, not only about what it creates.
+    //
+    // `required` is checked only where it is knowable. A membership array is a
+    // set operation: an element may be adding a link (nothing has a value yet)
+    // or restating one that already exists (everything does), and this function
+    // sees one request, not the rows it lands on. On a `status: "new"` write the
+    // parent row does not exist, so neither does any of its links, and every
+    // element is an insert — that is the one case where a missing required
+    // payload column is certainly missing. Everywhere else the database's NOT
+    // NULL has the last word, exactly as it does for a `PATCH` of a row.
+    for (const [key, junction] of junctionsWithPayload(collection)) {
+        for (const { index, pivot } of pivotsIn(values[key])) {
+            const at = `${key}[${index}].${JUNCTION_PIVOT_KEY}`;
+            for (const [pivotKey, pivotValue] of Object.entries(pivot)) {
+                const property = (junction.properties as Record<string, Property>)?.[pivotKey];
+                if (property) collectViolations(`${at}.${pivotKey}`, property, pivotValue, violations);
+            }
+            if (options?.status === "new" || options?.status === "copy") {
+                collectMissingRequired(pivot, junction, violations, at);
+            }
+        }
     }
 
     if (options?.status === "new" || options?.status === "copy") {
