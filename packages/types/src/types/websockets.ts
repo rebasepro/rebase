@@ -109,6 +109,122 @@ export interface CollectionPatchMessage extends WebSocketMessage {
     pks?: WirePrimaryKeys;
 }
 
+// =============================================================================
+// Channel-addressed frames
+// =============================================================================
+
+/**
+ * A presence roster, keyed by the server's client id.
+ *
+ * The id is per socket rather than per user: the same person in two tabs is two
+ * entries, and a reconnect replaces an entry rather than updating it. What the
+ * values hold is entirely the application's — the server stores and echoes back
+ * whatever `presence_track` was given, and never reads into it.
+ */
+export type PresenceState = Record<string, Record<string, unknown>>;
+
+/**
+ * Server → client: a message broadcast into a channel.
+ *
+ * The body is `payload`, inherited from {@link WebSocketMessage} — the server
+ * passes it through untouched, so its shape is the application's business. The
+ * sender is never sent its own broadcast back.
+ */
+export interface BroadcastMessage extends WebSocketMessage {
+    type: "broadcast";
+    channel: string;
+    /**
+     * The application-chosen event name. The only thing
+     * `channel.onBroadcast(event, …)` filters on; the server does not interpret
+     * it.
+     */
+    event: string;
+    /**
+     * Per-channel sequence number, present only on a channel the server has a
+     * retention rule for.
+     *
+     * Dense and monotonically increasing, so a client that remembers the last
+     * one it applied can name exactly where to resume from — see
+     * {@link ChannelHistoryMessage}. Absent on an ephemeral channel, where
+     * there is nothing to resume from and messages are delivered straight
+     * through.
+     */
+    seq?: number;
+}
+
+/**
+ * Server → client: the whole roster of a channel.
+ *
+ * Sent only in answer to a `presence_state` request. Joining does not push one,
+ * and a client that has just tracked itself is told only about its own join, so
+ * a client that waits for diffs alone believes it is the only one there until
+ * somebody else happens to move. This is why the SDK's `join()` asks for a
+ * roster rather than waiting to be given one.
+ */
+export interface PresenceStateMessage extends WebSocketMessage {
+    type: "presence_state";
+    channel: string;
+    /**
+     * Everyone currently tracked, this client included. Empty for a channel
+     * nobody is tracking presence in — an answer, not an omission.
+     */
+    presences: PresenceState;
+}
+
+/**
+ * Server → client: what moved in a channel's roster.
+ *
+ * Carries only the movement, never the roster, so a receiver maintains its own
+ * copy by applying these to what it already had (which is why it needs a
+ * {@link PresenceStateMessage} to start from).
+ */
+export interface PresenceDiffMessage extends WebSocketMessage {
+    type: "presence_diff";
+    channel: string;
+    /**
+     * Entries added or changed. A state update is a join over the same client
+     * id, since that is what a receiver has to do with it either way.
+     */
+    joins: PresenceState;
+    /**
+     * Entries removed — by `presence_untrack`, by a closed socket, or by the
+     * 30s expiry that reaps a client which stopped sending heartbeats.
+     *
+     * Keyed by client id like `joins`, and carrying each departing entry's last
+     * state rather than just its id: enough to say who left without having kept
+     * the roster.
+     */
+    leaves: PresenceState;
+}
+
+/**
+ * Server → client: a refusal about one channel.
+ *
+ * Channel frames are fire-and-forget — there is no pending request to reject
+ * and no subscription id to match — so a refused join, broadcast or history
+ * read is addressed by channel like any other channel frame. Without the
+ * `channel` field these fell through every branch of the client's message
+ * handler into a console warning, which is why it is the one thing that makes
+ * this a channel frame rather than a generic error.
+ *
+ * `type` is lowercase from the realtime service and uppercase from the socket
+ * gateway (auth, rate limiting). Both are sent; a client must accept both.
+ */
+export interface ChannelErrorMessage extends WebSocketMessage {
+    type: "error" | "ERROR";
+    channel: string;
+    /**
+     * The refusal. `error` is a bare string when there is no code, and
+     * `{ message, code }` when there is — `CHANNEL_FORBIDDEN`, `RATE_LIMITED`,
+     * `CHANNEL_HISTORY_READ_FAILED` / `_WRITE_FAILED`,
+     * `CHANNEL_BUS_PAYLOAD_TOO_LARGE`.
+     *
+     * The channel is echoed inside the envelope as well as beside it, for a
+     * reader that has only the payload.
+     */
+    payload?: WebSocketErrorPayload & { channel?: string };
+}
+
 /**
  * One retained broadcast, as it travels on the wire.
  *
@@ -153,3 +269,20 @@ export interface ChannelHistoryMessage extends WebSocketMessage {
      */
     latestSeq?: number;
 }
+
+/**
+ * Every frame routed by channel name rather than by `requestId` or
+ * `subscriptionId`.
+ *
+ * A discriminated union: each member fixes `type` to a literal, so a `switch`
+ * over a value of this type narrows to the member and its fields. Narrowing
+ * *into* it is the part that needs a predicate — a frame arrives as a
+ * {@link WebSocketMessage}, whose `type` is a bare `string`, and a `string`
+ * discriminates nothing.
+ */
+export type ChannelMessage =
+    | BroadcastMessage
+    | PresenceStateMessage
+    | PresenceDiffMessage
+    | ChannelHistoryMessage
+    | ChannelErrorMessage;

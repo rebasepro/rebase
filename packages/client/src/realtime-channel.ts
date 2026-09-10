@@ -24,8 +24,16 @@
  *    heartbeat and `leave()` stops it.
  */
 
-/** Presence state keyed by the server's client id. */
-export type PresenceState = Record<string, Record<string, unknown>>;
+/**
+ * Presence state keyed by the server's client id.
+ *
+ * Re-exported rather than re-declared, for the same reason
+ * {@link ChannelHistoryEntry} is below: the frames that carry a roster are
+ * declared in `@rebasepro/types`, and a second copy of the shape here is a
+ * second thing to keep in step with the wire.
+ */
+export type { PresenceState } from "@rebasepro/types";
+import type { ChannelHistoryEntry, ChannelMessage, PresenceState } from "@rebasepro/types";
 
 export interface PresenceDiff {
     joins: PresenceState;
@@ -60,7 +68,6 @@ export interface BroadcastEvent {
  * drifted `at` to optional, while the server always sends it.
  */
 export type { ChannelHistoryEntry } from "@rebasepro/types";
-import type { ChannelHistoryEntry } from "@rebasepro/types";
 import { RebaseApiError } from "@rebasepro/types";
 import { unref } from "@rebasepro/utils";
 
@@ -97,7 +104,7 @@ export interface ChannelOptions {
 /** The socket operations a channel needs; satisfied by RebaseWebSocketClient. */
 export interface ChannelTransport {
     sendMessage(message: Record<string, unknown>): Promise<unknown>;
-    onChannelMessage(channel: string, handler: (message: Record<string, unknown>) => void): () => void;
+    onChannelMessage(channel: string, handler: (message: ChannelMessage) => void): () => void;
     onReconnect(handler: () => void): () => void;
 }
 
@@ -471,16 +478,15 @@ export class RebaseRealtimeChannel {
     }
 
     /** Fold an incoming frame into the roster and fan it out. */
-    private handle(message: Record<string, unknown>): void {
+    private handle(message: ChannelMessage): void {
         switch (message.type) {
             case "presence_state": {
-                this.presences = (message.presences as PresenceState) ?? {};
+                this.presences = message.presences;
                 this.emitPresence();
                 break;
             }
             case "presence_diff": {
-                const joins = (message.joins as PresenceState) ?? {};
-                const leaves = (message.leaves as PresenceState) ?? {};
+                const { joins, leaves } = message;
                 // A diff carries only what moved, so the roster is maintained
                 // here rather than handed to callers to reassemble.
                 for (const [id, state] of Object.entries(joins)) this.presences[id] = state;
@@ -489,9 +495,9 @@ export class RebaseRealtimeChannel {
                 break;
             }
             case "broadcast": {
-                const seq = typeof message.seq === "number" ? message.seq : undefined;
+                const seq = message.seq;
                 const event: BroadcastEvent = {
-                    event: message.event as string,
+                    event: message.event,
                     payload: message.payload,
                     ...(seq !== undefined ? { seq } : {})
                 };
@@ -519,9 +525,7 @@ export class RebaseRealtimeChannel {
                     this.catchUpTimeout = null;
                 }
 
-                const entries = (message.messages as ChannelHistoryEntry[] | undefined) ?? [];
-                const retained = message.retained === true;
-                const latestSeq = typeof message.latestSeq === "number" ? message.latestSeq : undefined;
+                const { messages: entries, retained, latestSeq } = message;
 
                 for (const resolve of this.historyWaiters.splice(0)) {
                     resolve({ messages: entries, retained, latestSeq });
@@ -549,14 +553,11 @@ export class RebaseRealtimeChannel {
                 // The server refused something about this channel. Channel
                 // frames are fire-and-forget — there is no promise to reject —
                 // so this is where a refusal becomes visible.
-                const payload = message.payload as { error?: unknown } | undefined;
-                const raw = payload?.error;
-                const asObject = typeof raw === "object" && raw !== null
-                    ? raw as { message?: string; code?: string }
-                    : undefined;
+                const raw = message.payload?.error;
+                const asObject = typeof raw === "object" ? raw : undefined;
                 const text = asObject?.message
                     ?? (typeof raw === "string" ? raw : undefined)
-                    ?? (typeof message.error === "string" ? message.error : undefined)
+                    ?? message.error
                     ?? "The server refused a channel operation.";
                 const error = new RebaseApiError(text, {
                     ...(asObject?.code ? { code: asObject.code } : {})

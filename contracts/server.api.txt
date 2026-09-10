@@ -576,9 +576,11 @@ interface BootstrappedAuth { authRepository, emailService, roleService, schemaHe
 interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches }
 interface BranchInfo { createdAt, name, parentDatabase, sizeBytes }
 interface BrinIndex { on, reason, using, where }
+interface BroadcastMessage { channel, error, event, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BtreeIndex { include, on, reason, unique, using, where }
 interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
 interface ChannelBus { kind, maxFrameBytes, publish, start, stop }
+interface ChannelErrorMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
 interface ChannelRetentionRule { limit, match, ttl }
@@ -677,6 +679,8 @@ interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
 interface PostgresCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 interface PostgresPolicy { cmd, permissive, policyname, qual, roles, status, tablename, with_check }
+interface PresenceDiffMessage { channel, error, joins, leaves, payload, requestId, row, rows, subscriptionId, type }
+interface PresenceStateMessage { channel, error, payload, presences, requestId, row, rows, subscriptionId, type }
 interface PropertyConditions { acceptedFiles, allowedEnumValues, canAddElements, clearOnDisabled, defaultValue, disabled, disabledMessage, enumConditions, excludedEnumValues, hidden, max, maxFileSize, min, readOnly, referenceFilter, referencePath, required, requiredMessage, sortable }
 interface PropertyValidationSchema { required, requiredMessage, unique, uniqueInArray }
 interface PublicSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
@@ -808,6 +812,7 @@ type ChannelBusConfig
 type ChannelBusFrame
 type ChannelBusHandler
 type ChannelBusSetting
+type ChannelMessage
 type ChildViewSource
 type CollectionCallbacks { afterDelete, afterRead, afterSave, afterSaveError, beforeDelete, beforeSave }
 type CollectionConfig
@@ -870,6 +875,7 @@ type PolicyExpression
 type PolicyOperand
 type PostgresProperties
 type PostgresProperty
+type PresenceState
 type Properties
 type Property
 type PropertyBuilderProps { authController, entityId, index, path, previousValues, propertyValue, values }

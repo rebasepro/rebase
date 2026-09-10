@@ -10,6 +10,7 @@ import {
     CollectionUpdateMessage,
     CollectionUpdateMeta,
     SingleUpdateMessage,
+    ChannelMessage,
     TableMetadata,
     BranchInfo,
     RebaseApiError
@@ -74,6 +75,26 @@ const CHANNEL_MESSAGE_TYPES = new Set([
 ]);
 
 /**
+ * The other direction: the frame types the *server* addresses by channel.
+ *
+ * Not the mirror of {@link CHANNEL_MESSAGE_TYPES} — a request and its answer
+ * have different names (`presence_state` is the one type in both) — so the two
+ * sets are listed separately rather than derived from each other. These are
+ * exactly the members of `ChannelMessage`; adding one here without declaring it
+ * there leaves the handler with a frame it cannot read.
+ */
+const CHANNEL_FRAME_TYPES = new Set([
+    "broadcast",
+    "presence_state",
+    "presence_diff",
+    "channel_history",
+    // A refusal about a channel. Fire-and-forget frames have no pending request
+    // to reject, so this is the only way one becomes visible to the caller.
+    "error",
+    "ERROR"
+]);
+
+/**
  * Low-level realtime WebSocket client.
  *
  * @internal Not a stable app-facing API. `createRebaseClient()` constructs and
@@ -95,6 +116,19 @@ function isCollectionUpdate(message: WebSocketMessage): message is CollectionUpd
     return message.type === "collection_update";
 }
 
+/**
+ * Narrow a frame to one of the channel-addressed shapes.
+ *
+ * Both halves of the test are load-bearing. The type says which member of
+ * {@link ChannelMessage} it is; `channel` is what a channel frame is *addressed
+ * by*, and an `ERROR` from a server older than the change that names the
+ * channel has none — it is a generic error, and falls through to the catch-all
+ * warning rather than being delivered to a channel that was never named.
+ */
+function isChannelMessage(message: WebSocketMessage): message is ChannelMessage {
+    return typeof message.channel === "string" && CHANNEL_FRAME_TYPES.has(message.type);
+}
+
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;
@@ -102,7 +136,7 @@ export class RebaseWebSocketClient {
     private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
     /** Channel-name → handlers, for broadcast and presence frames. */
-    private channelHandlers = new Map<string, Set<(message: Record<string, unknown>) => void>>();
+    private channelHandlers = new Map<string, Set<(message: ChannelMessage) => void>>();
 
     /** Set by `close()`. Blocks any later operation from silently redialling. */
     private closedByCaller = false;
@@ -133,7 +167,7 @@ export class RebaseWebSocketClient {
     private warnedNoWebSocket = false;
 
     /** Subscribe to broadcast/presence frames for one channel. */
-    public onChannelMessage(channel: string, handler: (message: Record<string, unknown>) => void): () => void {
+    public onChannelMessage(channel: string, handler: (message: ChannelMessage) => void): () => void {
         if (!this.channelHandlers.has(channel)) this.channelHandlers.set(channel, new Set());
         this.channelHandlers.get(channel)!.add(handler);
         return () => {
@@ -677,29 +711,12 @@ export class RebaseWebSocketClient {
         // rather than by requestId or subscriptionId, so it is dispatched
         // before the subscription paths — none of which would match it, and
         // the message would otherwise fall through and be dropped silently.
-        if (typeof message.channel === "string" &&
-            (type === "broadcast" || type === "presence_state" || type === "presence_diff"
-                || type === "channel_history" || type === "ERROR" || type === "error")) {
+        if (isChannelMessage(message)) {
             const handlers = this.channelHandlers.get(message.channel);
             if (handlers) {
                 for (const handler of [...handlers]) {
                     try {
-                        // A channel frame carries fields no type here declares
-                        // — `presences`, `joins`, `leaves`, `seq`, `event`,
-                        // `messages`, `retained`, `latestSeq`, depending on the
-                        // frame — so the handler takes an open record and reads
-                        // them by name. `WebSocketMessage` has no index
-                        // signature (deliberately: a catch-all on a wire type
-                        // switches off excess-property checking at every
-                        // construction site), so handing one over is a real
-                        // conversion at a real boundary rather than an
-                        // assertion about a shape.
-                        //
-                        // The fix is to declare those frames in
-                        // `@rebasepro/types/websockets.ts` beside
-                        // `CollectionUpdateMessage`, and narrow to them the way
-                        // `isCollectionUpdate` does above.
-                        handler(message as unknown as Record<string, unknown>);
+                        handler(message);
                     } catch (error) {
                         console.error("Error in channel handler:", error);
                     }

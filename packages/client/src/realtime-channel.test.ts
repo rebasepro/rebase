@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
  * The channel surface, and specifically the two protocol details it exists to
  * hide: the roster is not pushed on join, and presence expires after 30s.
  */
+import type { ChannelMessage } from "@rebasepro/types";
 import {
     RebaseRealtimeChannel,
     type BroadcastEvent,
@@ -13,7 +14,7 @@ import {
 /** Stand-in socket that records what was sent and can push frames back. */
 function fakeTransport() {
     const sent: Record<string, unknown>[] = [];
-    let channelHandler: ((m: Record<string, unknown>) => void) | undefined;
+    let channelHandler: ((m: ChannelMessage) => void) | undefined;
     let reconnectHandler: (() => void) | undefined;
 
     const transport: ChannelTransport = {
@@ -32,7 +33,7 @@ function fakeTransport() {
         transport,
         sent,
         types: () => sent.map((m) => m.type),
-        push: (message: Record<string, unknown>) => channelHandler?.(message),
+        push: (message: ChannelMessage) => channelHandler?.(message),
         reconnect: () => reconnectHandler?.(),
         hasChannelHandler: () => channelHandler !== undefined
     };
@@ -173,8 +174,8 @@ describe("RebaseRealtimeChannel", () => {
                 retained: true,
                 latestSeq: 2,
                 messages: [
-                    { seq: 1, event: "op", payload: { n: 1 } },
-                    { seq: 2, event: "op", payload: { n: 2 } }
+                    { seq: 1, event: "op", payload: { n: 1 }, at: "2026-01-01T00:00:01Z" },
+                    { seq: 2, event: "op", payload: { n: 2 }, at: "2026-01-01T00:00:02Z" }
                 ]
             });
 
@@ -195,8 +196,8 @@ describe("RebaseRealtimeChannel", () => {
                 channel: "doc:42",
                 retained: true,
                 messages: [
-                    { seq: 1, event: "op", payload: { n: 1 } },
-                    { seq: 2, event: "op", payload: { n: 2 } }
+                    { seq: 1, event: "op", payload: { n: 1 }, at: "2026-01-01T00:00:01Z" },
+                    { seq: 2, event: "op", payload: { n: 2 }, at: "2026-01-01T00:00:02Z" }
                 ]
             });
 
@@ -220,8 +221,8 @@ describe("RebaseRealtimeChannel", () => {
                 channel: "doc:42",
                 retained: true,
                 messages: [
-                    { seq: 3, event: "op", payload: { n: 3 } },
-                    { seq: 4, event: "op", payload: { n: 4 } }
+                    { seq: 3, event: "op", payload: { n: 3 }, at: "2026-01-01T00:00:03Z" },
+                    { seq: 4, event: "op", payload: { n: 4 }, at: "2026-01-01T00:00:04Z" }
                 ]
             });
 

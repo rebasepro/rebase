@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
+import type { ChannelMessage } from "@rebasepro/types";
 
 /**
  * Server errors about channel frames used to be discarded by the client.
@@ -190,10 +191,10 @@ describe("channel.onError", () => {
 
     const openChannel = async (name: string) => {
         const { RebaseRealtimeChannel } = await import("./realtime-channel");
-        let deliver: (message: Record<string, unknown>) => void = () => {};
+        let deliver: (message: ChannelMessage) => void = () => {};
         const transport = {
             sendMessage: jest.fn(async () => undefined),
-            onChannelMessage: (_channel: string, handler: (m: Record<string, unknown>) => void) => {
+            onChannelMessage: (_channel: string, handler: (m: ChannelMessage) => void) => {
                 deliver = handler;
                 return () => {};
             },
@@ -201,10 +202,10 @@ describe("channel.onError", () => {
         };
         const channel = new RebaseRealtimeChannel(name, transport, {});
         await channel.join();
-        return { channel, deliver: (m: Record<string, unknown>) => deliver(m) };
+        return { channel, deliver: (m: ChannelMessage) => deliver(m) };
     };
 
-    const refusal = {
+    const refusal: ChannelMessage = {
         type: "error",
         channel: "doc:42",
         payload: {
