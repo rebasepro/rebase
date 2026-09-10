@@ -11,6 +11,7 @@
     "preview": "astro preview",
     "check:site": "node scripts/check_site.mjs",
     "check:surfaces": "node scripts/check_surfaces.mjs",
+    "check:slab-ink": "node scripts/check_slab_ink.mjs",
     "check:blog-images": "node scripts/generate_blog_images.mjs --check",
     "generate:blog-images": "node scripts/generate_blog_images.mjs",
     "astro": "astro",

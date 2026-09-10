@@ -533,6 +533,48 @@
 .ground-close .accent-link:not(.frame *) { color: #0a0a0a; }
 .ground-chroma .accent-link:hover { text-decoration-color: currentColor; }
 
+/* ── The SECONDARY link, which is not an `.accent-link` ──────────────────────
+   A slab's copy may carry a quieter link beside the accent one — "How it
+   compares" next to "For developers", the blog line under the security claim.
+   Both were written in the dark ground's muted vocabulary, `text-surface-400`
+   with `hover:text-white`, and neither had a line here, so both kept a value
+   tuned for #0a0a0a:
+
+     #a3a3a3 on coral   1.29:1     #a3a3a3 on the deep blue   4.19:1
+     white on coral     3.26:1  (what `hover:text-white` was reaching for)
+
+   1.29:1 is not a legibility problem, it is invisible text. The muted tier is
+   the one part of the vocabulary a bright ground cannot borrow at all: on coral
+   the body tier at 0.78 alpha is already the FLOOR (0.72 measures 4.22 and
+   fails), so a secondary link cannot be quieter than body copy and stay legible.
+   It separates itself by weight and by not carrying the accent's arrow, not by
+   sitting further back. On the deep blue there is room, and 0.66 is reused from
+   the eyebrow so the slab has one muted tier rather than two.
+
+   SCOPED TO `a`, deliberately, and this is the part to keep if these rules are
+   ever rewritten. The obvious selector is the vocabulary itself —
+   `[class*="text-surface-"]`, matching the hairline rule above. It is wrong:
+   /product paints its collection figure on the claim slab, and that figure is
+   NOT wrapped in a `.frame`, so 33 spans of a dark product picture — table
+   rows, code comments, an id chip — sit inside `.ground-claim` speaking exactly
+   that vocabulary and would be repainted in slab ink. `:not(.frame *)` does not
+   catch them. Links do not have this problem: the claim slab on /product
+   contains no `<a>` at all, and every link on the home page's two slabs is
+   either the slab's own copy or a button with its own rule below.
+
+   Placed BEFORE the button rules on purpose. `.ground-close a:not(.frame *)`
+   and `.ground-close a[class*="bg-primary"]` are both (0,2,1), so source order
+   is what decides, and the buttons must win. */
+.ground-claim a:not(.frame *) { color: rgb(255 255 255 / 0.66); }   /* 5.21:1 */
+.ground-close a:not(.frame *) { color: rgb(10 10 10 / 0.78); }      /* 4.69:1 */
+
+/* `hover:text-white` is right on the deep blue (10.57:1) and is the single
+   worst value available on coral (3.26:1), so the hover inverts with the
+   ground: the blue slab brightens to white, the coral one deepens to full ink —
+   the same direction `.copy-btn:hover` already takes. */
+.ground-claim a:hover:not(.frame *) { color: #fff; }                /* 10.57:1 */
+.ground-close a:hover:not(.frame *) { color: #0a0a0a; }             /* 6.07:1 */
+
 /* `.frame` draws a white hairline and assumes near-black behind it. Neither
    slab is near-black, so the edge is restated per variant: on the deep ground a
    darker edge reads as an inset screen, and on the bright one the dark panel
@@ -587,12 +629,24 @@
     color: #0a0a0a;
 }
 
-/* The "not launched" badge on the Cloud lane. Amber-on-dark becomes near-black
-   on a lighter tint of the ground, so it still reads as a status chip rather
-   than as a second accent competing with the section's own hue. */
-.ground-close .bg-amber-400\/15 {
+/* The "PRIVATE BETA" badge on the Cloud lane. A tint of the ground rather than
+   a second hue, so it reads as a status chip and not as an accent competing
+   with coral.
+
+   THIS RULE WAS ORPHANED. It was written against `bg-amber-400/15`, the badge
+   stopped being amber and became `bg-white/10 text-surface-300`, and nothing
+   connected the two — `bg-amber-400/15` appears nowhere in the site's markup
+   now. The badge fell back to its dark-ground values and measured 2.20:1. A
+   remap block keyed on the exact utility a element happens to carry is only as
+   good as the last edit to that element, which is the standing hazard here.
+
+   The ink is OPAQUE, not the 0.8 this rule used to carry. Over the tinted
+   ground (`rgb(10 10 10 / 0.1)` on coral resolves to #e3495d) 0.8 measures
+   4.17:1 and fails, and this is 10px uppercase mono — the same reasoning as the
+   eyebrow above: small text has no headroom to spend on translucency. */
+.ground-close :is(.bg-white\/10, .bg-amber-400\/15) {
     background: rgb(10 10 10 / 0.1);
-    color: rgb(10 10 10 / 0.8);
+    color: #0a0a0a;                     /* 5.07:1 on the tinted ground */
 }
 
 /* The primary action goes NEAR-BLACK here, not `--color-primary`.
