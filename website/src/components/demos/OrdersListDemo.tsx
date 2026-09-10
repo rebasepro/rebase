@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  User, Folder, ShoppingCart,
-  LayoutList, CircleDot, Hash, Type,
-  CircleCheck, Truck, Banknote, X, Maximize2, Code
+  User, Folder, ShoppingCart, LayoutList,
+  TextAlignStart, Hash, List, Flag, ChevronDown, Copy,
+  PanelLeftClose, WandSparkles, EllipsisVertical, X,
+  CircleCheck, Truck, Banknote
 } from "lucide-react";
 
 import { AdminDrawer, AdminToolbar, SHELL_ROOT, SHELL_SHEET } from "./admin/AdminChrome";
@@ -24,6 +25,8 @@ function useMediaQuery(query: string): boolean {
 /* ─── Types ─── */
 interface Order {
   id: string;
+  /** The row's real primary key, which is what the bar's id chip copies. */
+  uid: string;
   /** The first line of the order, standing in as the record's preview. */
   image: string;
   paymentStatus: "paid" | "pending" | "refunded";
@@ -38,14 +41,14 @@ interface Order {
 
 /* ─── Mock Data ─── */
 const MOCK_ORDERS: Order[] = [
-  { id: "ORD-2026-0006", image: "/img/demo/products/aviator-rb3025.jpg", paymentStatus: "paid", customer: "Elizabeth", status: "Confirmed", date: "8 May", items: 3, total: "$284.00", email: "elizabeth@mail.com", address: "123 Main St, London" },
-  { id: "ORD-2026-0036", image: "/img/demo/products/baseball-cap.jpg", paymentStatus: "paid", customer: "James", status: "Delivered", date: "1d ago", items: 1, total: "$59.99", email: "james@mail.com", address: "45 Park Ave, NYC" },
-  { id: "ORD-2026-0061", image: "/img/demo/products/wine-decanter.jpg", paymentStatus: "paid", customer: "Elizabeth", status: "Shipped", date: "3d ago", items: 2, total: "$149.50", email: "elizabeth@mail.com", address: "123 Main St, London" },
-  { id: "ORD-2026-0056", image: "/img/demo/products/chess-set.jpg", paymentStatus: "refunded", customer: "Jennifer", status: "Cancelled", date: "8 May", items: 5, total: "$412.00", email: "jennifer@mail.com", address: "78 Oak Rd, Berlin" },
-  { id: "ORD-2026-0026", image: "/img/demo/products/corkscrew.jpg", paymentStatus: "refunded", customer: "Susan", status: "Cancelled", date: "1d ago", items: 1, total: "$34.99", email: "susan@mail.com", address: "9 Elm St, Paris" },
-  { id: "ORD-2026-0019", image: "/img/demo/products/invisible-shelf.jpg", paymentStatus: "paid", customer: "Michael", status: "Confirmed", date: "5d ago", items: 4, total: "$199.00", email: "michael@mail.com", address: "22 Maple Dr, Tokyo" },
-  { id: "ORD-2026-0042", image: "/img/demo/products/casio-collection.jpg", paymentStatus: "pending", customer: "Sarah", status: "Processing", date: "2d ago", items: 2, total: "$89.50", email: "sarah@mail.com", address: "55 Pine Ln, Sydney" },
-  { id: "ORD-2026-0088", image: "/img/demo/products/predator-2.jpg", paymentStatus: "paid", customer: "David", status: "Delivered", date: "6 May", items: 3, total: "$245.00", email: "david@mail.com", address: "11 Cedar Ct, Toronto" },
+  { id: "ORD-2026-0006", uid: "e83f10dc…58d5", image: "/img/demo/products/aviator-rb3025.jpg", paymentStatus: "paid", customer: "Elizabeth", status: "Confirmed", date: "8 May", items: 3, total: "$284.00", email: "elizabeth@mail.com", address: "123 Main St, London" },
+  { id: "ORD-2026-0036", uid: "7b41a9c2…10ae", image: "/img/demo/products/baseball-cap.jpg", paymentStatus: "paid", customer: "James", status: "Delivered", date: "1d ago", items: 1, total: "$59.99", email: "james@mail.com", address: "45 Park Ave, NYC" },
+  { id: "ORD-2026-0061", uid: "c204ef58…9d31", image: "/img/demo/products/wine-decanter.jpg", paymentStatus: "paid", customer: "Elizabeth", status: "Shipped", date: "3d ago", items: 2, total: "$149.50", email: "elizabeth@mail.com", address: "123 Main St, London" },
+  { id: "ORD-2026-0056", uid: "19be7a04…4f6c", image: "/img/demo/products/chess-set.jpg", paymentStatus: "refunded", customer: "Jennifer", status: "Cancelled", date: "8 May", items: 5, total: "$412.00", email: "jennifer@mail.com", address: "78 Oak Rd, Berlin" },
+  { id: "ORD-2026-0026", uid: "a6f3c118…2b77", image: "/img/demo/products/corkscrew.jpg", paymentStatus: "refunded", customer: "Susan", status: "Cancelled", date: "1d ago", items: 1, total: "$34.99", email: "susan@mail.com", address: "9 Elm St, Paris" },
+  { id: "ORD-2026-0019", uid: "4d90e2ba…c015", image: "/img/demo/products/invisible-shelf.jpg", paymentStatus: "paid", customer: "Michael", status: "Confirmed", date: "5d ago", items: 4, total: "$199.00", email: "michael@mail.com", address: "22 Maple Dr, Tokyo" },
+  { id: "ORD-2026-0042", uid: "f5127ac9…8e40", image: "/img/demo/products/casio-collection.jpg", paymentStatus: "pending", customer: "Sarah", status: "Processing", date: "2d ago", items: 2, total: "$89.50", email: "sarah@mail.com", address: "55 Pine Ln, Sydney" },
+  { id: "ORD-2026-0088", uid: "2ac6b83d…7159", image: "/img/demo/products/predator-2.jpg", paymentStatus: "paid", customer: "David", status: "Delivered", date: "6 May", items: 3, total: "$245.00", email: "david@mail.com", address: "11 Cedar Ct, Toronto" },
 ];
 
 /* An enum value resolves to a hue in the collection config, and the panel draws
@@ -297,29 +300,36 @@ function OrderRow({ order, isHovered, isActive, columns, onHover, onLeave }: {
   );
 }
 
-/* ─── The record, as the panel reads it ───────────────────────────────────
-   `EntityViewBinding` + `FieldBlock`, which is where the form's grammar
-   actually lives now:
+/* ─── The record, as the panel edits it ───────────────────────────────────
+   Read off the shipped markup of a split-pane record:
 
-     - The label sits ABOVE the control, 13px medium in the PRIMARY ink, with
-       the property's type icon before it at 14px in the disabled tier and the
-       required marker after it. There is no floating label and no box: the
-       outlined field with a shrunk label inside its border is the form this
-       one replaced.
-     - Fields lay out on a four-column grid (`@2xl:grid-cols-4`) with per-field
-       spans, `gap-x-8 gap-y-7` in read mode — wider gutters than edit mode,
-       because a read row has no control edges to separate it.
-     - A read value is `min-h-8 … text-sm` in the primary ink: one control's
-       height, so a row of short values lines up with the taller ones beside it.
+     EntityForm / FieldBlock  the 52px top bar on the SHEET, the folder tab
+                              strip, and the record pane's own `bg-surface-card`
+     FieldBlock               label ABOVE the control, 13px medium in the
+                              PRIMARY ink, the property's type icon before it at
+                              14px in the disabled tier, required marker after,
+                              description under the control in the caption tier
+     FormSections             `flex flex-col gap-8`; every section after the
+                              first carries an uppercase rule-header
+     the grid                 `gap-x-4 gap-y-5 grid-cols-1 @2xl:grid-cols-4`
+                              with per-field spans
+     the controls             an editable field is `bg-surface-field` + hairline
+                              at `min-h-[32px]`; a COMPUTED one is a
+                              `hairline-strong` outline with no fill at
+                              `min-h-12 opacity-80` — the panel says "you cannot
+                              type here" with the box, not with a disabled grey
 
-   The panel renders the label identically in read and edit, deliberately — a
-   record whose labels restyle themselves under Edit reads as two screens. */
-function RecordField({ label, icon, span, required, highlighted, children }: {
+   The outlined box with a shrunk label floating inside its border is the form
+   this one replaced; nothing in the panel draws one any more. */
+
+/** One field: label, control, description. */
+function FormField({ label, icon, span, required, description, highlighted, children }: {
   label: string;
   icon: React.ReactNode;
   /** Columns on the four-column grid. */
   span: 1 | 2 | 3 | 4;
   required?: boolean;
+  description?: string;
   highlighted?: boolean;
   children: React.ReactNode;
 }) {
@@ -328,22 +338,48 @@ function RecordField({ label, icon, span, required, highlighted, children }: {
       : span === 3 ? "@2xl/col:col-span-3"
         : "@2xl/col:col-span-4";
   return (
-    <div className={`relative flex flex-col min-w-0 ${spanClass}`}>
-      <div className="flex items-center gap-1.5 font-medium leading-tight mb-1.5 text-[13px] text-text-primary dark:text-text-primary-dark">
-        <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark [&>svg]:size-3.5">{icon}</span>
-        <span className="truncate">{label}</span>
-        {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
-      </div>
-      {/* The demo's own affordance, not the panel's: the loop walks the record
-          and something has to say which field it is reading. A ring would need
-          a box to sit on, and the box is exactly what this pass removed. */}
-      <div className={`min-w-0 rounded-md -mx-1.5 px-1.5 transition-colors duration-300 ${
-        highlighted ? "bg-primary/12" : "bg-transparent"
-      }`}>
-        <div className="min-h-8 flex flex-col justify-center min-w-0 text-sm text-text-primary dark:text-text-primary-dark">
+    <div className={spanClass}>
+      <div className="relative flex flex-col min-w-0">
+        <div className="flex items-center gap-1.5 font-medium mb-1.5 text-[13px] text-text-primary dark:text-text-primary-dark">
+          <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark [&>svg]:size-3.5">{icon}</span>
+          <span className="truncate">{label}</span>
+          {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
+        </div>
+        <div className={`min-w-0 rounded-lg transition-shadow duration-300 ${highlighted ? "ring-2 ring-primary" : ""}`}>
           {children}
         </div>
+        {description && (
+          <p className="typography-caption text-text-disabled dark:text-text-disabled-dark mt-1.5 ml-0.5 leading-snug">
+            {description}
+          </p>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** A section rule: uppercase name, then a hairline across the rest of the row. */
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2.5 w-full mb-3.5">
+      <span className="text-xs font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark whitespace-nowrap">{title}</span>
+      <span className="flex-1 border-t border-hairline"/>
+    </div>
+  );
+}
+
+const FORM_GRID = "grid min-w-0 gap-x-4 gap-y-5 grid-cols-1 @2xl/col:grid-cols-4";
+/** An editable control: filled, hairlined, 32px. */
+const CONTROL = "rounded-lg relative max-w-full bg-surface-field border border-hairline min-h-[32px] flex items-center px-3 text-sm";
+/** A computed one: outlined, unfilled, 48px, held back to 80%. */
+const COMPUTED = "w-full flex items-center rounded-lg border border-hairline-strong px-3 min-h-12 opacity-80";
+
+/** One meta row of the record block. */
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 min-w-0">
+      <span className="text-xs text-text-disabled dark:text-text-disabled-dark shrink-0">{label}</span>
+      <span className="font-mono text-xs text-text-secondary dark:text-text-secondary-dark truncate">{value}</span>
     </div>
   );
 }
@@ -352,66 +388,127 @@ function OrderDetailPanel({ order, highlightedField }: {
   order: Order; highlightedField: string | null;
 }) {
   return (
-    <div className="flex flex-col h-full">
-      {/* Panel top bar */}
-      <div className="h-14 flex items-center px-3 border-b border-hairline shrink-0 gap-1">
-        <button className="p-1.5 rounded text-surface-400"><X size={18} /></button>
-        <button className="p-1.5 rounded text-surface-400"><Maximize2 size={14} /></button>
-        <div className="flex-1" />
-        <button className="px-3 py-2 text-xs text-surface-500"><Code size={14} /></button>
-        <button className="px-3 py-2 text-xs text-surface-900 dark:text-white font-medium border-b-2 border-primary">Order</button>
+    /* The record pane is a CARD on the sheet: the bar and the tab strip above it
+       stay on the sheet, and the active tab joins the card by taking its fill. */
+    <div className="relative flex flex-col h-full w-full bg-surface-card">
+      {/* The 52px bar: where you are, what this record is, and what you can do
+          to it. The record's name lives HERE at 15px — a display-size title
+          inside the form was the older layout. */}
+      <div className="h-[52px] shrink-0 flex items-center gap-2 pl-1.5 pr-2 bg-surface-sheet">
+        <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-surface-accent-500 dark:text-surface-accent-300">
+          <PanelLeftClose size={16}/>
+        </span>
+        <p className="typography-caption text-text-disabled dark:text-text-disabled-dark whitespace-nowrap hidden sm:block">Orders&nbsp;/</p>
+        <span className="font-headers font-semibold text-[15px] tracking-tight truncate min-w-0">{order.id}</span>
+        <span className="hidden md:inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark bg-surface-field">
+          {order.uid}
+          <Copy size={12}/>
+        </span>
+        <div className="flex-1"/>
+        <span className="text-xs text-text-disabled dark:text-text-disabled-dark whitespace-nowrap hidden md:inline">Saved</span>
+        <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-surface-raised text-surface-accent-500 dark:text-surface-accent-300">
+          <WandSparkles size={16}/>
+        </span>
+        {/* Disabled because nothing is dirty — the panel's resting state. */}
+        <span className="flex items-stretch rounded-lg overflow-hidden">
+          <span className="typography-button inline-flex items-center justify-center bg-surface-raised text-text-disabled dark:text-text-disabled-dark min-h-[32px] px-2">Save</span>
+          <span className="typography-button inline-flex items-center justify-center bg-surface-raised text-text-disabled dark:text-text-disabled-dark min-h-[32px] px-1.5 border-l border-hairline">
+            <ChevronDown size={16}/>
+          </span>
+        </span>
+        <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-surface-accent-500 dark:text-surface-accent-300">
+          <EllipsisVertical size={16}/>
+        </span>
+        <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full ml-2 text-surface-accent-500 dark:text-surface-accent-300">
+          <X size={16}/>
+        </span>
       </div>
 
-      {/* The record column: the same widths and padding the panel gives it in a
-          split pane, so toggling between read and edit cannot move it. */}
-      <div className="flex-1 overflow-y-auto flex flex-row w-full justify-center items-start">
+      {/* Folder tabs: the active one takes the card's fill and its hairline, and
+          sits a pixel over the strip's rule so the two shapes join. */}
+      <div className="h-10 shrink-0 flex items-stretch border-b px-2 min-w-0 bg-surface-sheet border-hairline">
+        <span className="flex-shrink-0 flex items-center gap-1.5 px-3.5 font-medium box-border rounded-t-lg -mb-px border border-b-0 bg-surface-card border-hairline text-text-primary dark:text-text-primary-dark h-full text-sm min-w-[90px] justify-center">
+          <ShoppingCart size={16}/>Order
+        </span>
+        <span className="flex-shrink-0 flex items-center gap-1.5 px-3.5 font-medium box-border rounded-t-lg -mb-px border border-transparent border-b-0 text-text-secondary dark:text-text-secondary-dark h-full text-sm min-w-[90px] justify-center">
+          <User size={16}/>Customer
+        </span>
+      </div>
+
+      {/* The form column, at the panel's own widths and padding. */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex justify-center items-start">
         <div className="@container/col w-full max-w-3xl flex flex-col pt-6 pb-12 px-5 sm:px-8">
-          {/* Saved badge */}
-          <div className="flex justify-end mb-2" style={{ minHeight: 22 }}>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-500 dark:text-surface-300 text-[10px] font-semibold" style={{ minWidth: 72 }}>
-              ✓ Saved
-            </span>
+          <div className="flex flex-col gap-8">
+            <section className="min-w-0">
+              <div className={FORM_GRID}>
+                <FormField label="Customer" icon={<TextAlignStart/>} span={2} required
+                  highlighted={highlightedField === "customer"}>
+                  <div className={CONTROL}>{order.customer}</div>
+                </FormField>
+
+                <FormField label="Email" icon={<TextAlignStart/>} span={2} required
+                  highlighted={highlightedField === "email"}>
+                  <div className={CONTROL}>{order.email}</div>
+                </FormField>
+
+                <FormField label="Status" icon={<List/>} span={2}
+                  highlighted={highlightedField === "status"}>
+                  <div className={`${CONTROL} justify-between gap-2`}>
+                    <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
+                    <ChevronDown size={16} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
+                  </div>
+                </FormField>
+
+                <FormField label="Payment" icon={<List/>} span={2}
+                  highlighted={highlightedField === "payment"}>
+                  <div className={`${CONTROL} justify-between gap-2`}>
+                    <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
+                    <ChevronDown size={16} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
+                  </div>
+                </FormField>
+
+                <FormField label="Shipping Address" icon={<TextAlignStart/>} span={4}
+                  highlighted={highlightedField === "address"}>
+                  <div className="rounded-md relative max-w-full min-h-[64px] bg-surface-field border border-hairline px-3 py-2 text-sm">
+                    {order.address}
+                  </div>
+                </FormField>
+              </div>
+            </section>
+
+            <section className="min-w-0">
+              <SectionHeader title="Totals"/>
+              <div className={FORM_GRID}>
+                <FormField label="Total" icon={<Hash/>} span={1}
+                  description="Sum of the order's line items"
+                  highlighted={highlightedField === "total"}>
+                  <div className={COMPUTED}><span className="font-mono tabular-nums">{order.total}</span></div>
+                </FormField>
+
+                <FormField label="Items" icon={<Hash/>} span={1}
+                  description="Line items in this order"
+                  highlighted={highlightedField === "items"}>
+                  <div className={COMPUTED}><span className="font-mono tabular-nums">{order.items}</span></div>
+                </FormField>
+
+                <FormField label="Priority" icon={<Flag/>} span={1}
+                  description="Ships before the rest of the queue">
+                  <div className={COMPUTED}>
+                    <span className="border-2 shrink-0 w-5 h-5 rounded flex items-center justify-center bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"/>
+                  </div>
+                </FormField>
+              </div>
+            </section>
           </div>
 
-          {/* The record's name, lifted out of the grid and into a header. */}
-          <div className="typography-h4 text-text-primary dark:text-text-primary-dark mb-2">{order.id}</div>
-          <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-8">
-            <code className="text-[11px] text-surface-500">orders/{order.id}</code>
-          </div>
-
-          <div className="grid min-w-0 gap-x-8 gap-y-7 grid-cols-1 @2xl/col:grid-cols-4">
-            <RecordField label="Customer" icon={<User/>} span={2} required
-              highlighted={highlightedField === "customer"}>
-              <span className="truncate">
-                <span className="font-medium">{order.customer}</span>
-                <span className="text-text-secondary dark:text-text-secondary-dark"> ({order.email})</span>
-              </span>
-            </RecordField>
-
-            <RecordField label="Status" icon={<CircleDot/>} span={1}
-              highlighted={highlightedField === "status"}>
-              <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
-            </RecordField>
-
-            <RecordField label="Payment" icon={<CircleDot/>} span={1}
-              highlighted={highlightedField === "payment"}>
-              <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
-            </RecordField>
-
-            <RecordField label="Total" icon={<Hash/>} span={1}
-              highlighted={highlightedField === "total"}>
-              <span className="font-medium tabular-nums">{order.total}</span>
-            </RecordField>
-
-            <RecordField label="Items" icon={<Hash/>} span={1}
-              highlighted={highlightedField === "items"}>
-              <span className="tabular-nums">{order.items} item{order.items > 1 ? "s" : ""}</span>
-            </RecordField>
-
-            <RecordField label="Shipping Address" icon={<Type/>} span={2}
-              highlighted={highlightedField === "address"}>
-              <span className="truncate">{order.address}</span>
-            </RecordField>
+          {/* The record block: what the row is, rather than what it says. */}
+          <div className="mt-8 pt-5 border-t max-w-sm border-hairline">
+            <div className="flex flex-col gap-2.5">
+              <p className="typography-caption text-xs font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Record</p>
+              <MetaRow label="ID" value={order.uid}/>
+              <MetaRow label="Created" value="11/07/2026"/>
+              <MetaRow label="Updated" value="01/09/2026"/>
+            </div>
           </div>
         </div>
       </div>
