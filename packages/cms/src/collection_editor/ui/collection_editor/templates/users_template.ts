@@ -36,7 +36,10 @@ export const usersCollectionTemplate = {
         photoURL: {
             name: "Photo URL",
             type: "string",
-            url: "image"
+            // `url` says the data is a URL — it is part of the API contract, and
+            // it is a boolean. How the panel renders it is `admin.urlPreview`.
+            url: true,
+            admin: { urlPreview: "image" }
         }
     }
-} as unknown as AdminCollection;
+} satisfies AdminCollection;

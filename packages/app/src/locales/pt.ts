@@ -993,8 +993,6 @@ export const pt: RebaseTranslations = {
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportamento ao colar",
-    markdown_strip_html: "Remover HTML ao colar",
-    markdown_convert_pasted: "Converter texto colado para markdown",
 
     // ─── Entity identity bar and inspector ──────────────────────
     entity_saved: "Guardado",

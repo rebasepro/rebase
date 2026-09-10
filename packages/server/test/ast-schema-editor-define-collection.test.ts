@@ -4,7 +4,7 @@ import * as path from "path";
 
 import { nestAdminPropertyKeys } from "@rebasepro/types";
 
-import { AstSchemaEditor } from "../src/api/ast-schema-editor";
+import { AstSchemaEditor, nestAdminKeysDeep } from "../src/api/ast-schema-editor";
 import { findCollectionConfigProblems } from "../src/collections/validate-config";
 
 /**
@@ -206,6 +206,111 @@ describe("what the property editor writes, the boot validator accepts", () => {
         // ticking "Read only" left a project that would not boot.
         expect(errors({ name: "Title", type: "string", ui: { readOnly: true } })).not.toHaveLength(0);
         expect(errors({ name: "Title", type: "string", readOnly: true })).not.toHaveLength(0);
+    });
+});
+
+/**
+ * The other half of the same rule, for the other entry point.
+ *
+ * `saveProperty` nested a property's presentation keys; `saveCollection` nested
+ * only the COLLECTION's, and passed `properties` through untouched. Creating a
+ * collection is a `saveCollection` — so every collection the panel created from
+ * a template wrote `markdown: true` at the top level of a property, which the
+ * boot validator treats as fatal. One such file stops the whole project: the
+ * loader imports every collection in the directory, so `rebase dev` reported
+ * "Could not regenerate the database schema" and the backend never started.
+ *
+ * The assertion is deliberately the boot validator itself rather than a shape
+ * check. The two had drifted apart once already; nothing but running one against
+ * the other keeps them together.
+ */
+describe("what the collection editor writes, the boot validator accepts", () => {
+    const errorsIn = (collection: Record<string, unknown>) =>
+        findCollectionConfigProblems([nestAdminKeysDeep(collection)], { unknownKeys: "warn" })
+            .filter(p => p.severity === "error");
+
+    /** The shape of the panel's own "Products" template, before this fix. */
+    const template = {
+        slug: "products",
+        name: "Products",
+        table: "products",
+        icon: "ShoppingCart",
+        defaultSize: "l",
+        properties: {
+            description: { name: "Description", type: "string", markdown: true },
+            tags: { name: "Tags", type: "array", of: { type: "string", previewAsTag: true } },
+            metadata: {
+                name: "Metadata",
+                type: "map",
+                properties: { note: { name: "Note", type: "string", multiline: true } }
+            }
+        }
+    };
+
+    it("nests a property's presentation, not just the collection's", () => {
+        expect(errorsIn(template)).toHaveLength(0);
+    });
+
+    it("nests presentation inside a `oneOf` block", () => {
+        // The blog and pages templates are built out of `oneOf` blocks, and the
+        // walk did not know that container: `properties` and `of` were followed,
+        // `oneOf.properties` was not. Every block in them kept its flat key.
+        expect(errorsIn({
+            slug: "blog",
+            name: "Blog",
+            table: "blog",
+            properties: {
+                content: {
+                    name: "Content",
+                    type: "array",
+                    oneOf: {
+                        typeField: "type",
+                        valueField: "value",
+                        propertiesOrder: ["text"],
+                        properties: {
+                            text: { name: "Text", type: "string", markdown: true }
+                        }
+                    }
+                }
+            }
+        })).toHaveLength(0);
+    });
+
+    it("keeps the rest of the `oneOf` block", () => {
+        const nested = nestAdminKeysDeep({
+            slug: "blog",
+            properties: {
+                content: {
+                    name: "Content",
+                    type: "array",
+                    oneOf: {
+                        typeField: "kind",
+                        valueField: "body",
+                        propertiesOrder: ["text"],
+                        properties: { text: { name: "Text", type: "string", markdown: true } }
+                    }
+                }
+            }
+        });
+        const oneOf = (nested.properties as any).content.oneOf;
+        expect(oneOf.typeField).toBe("kind");
+        expect(oneOf.valueField).toBe("body");
+        expect(oneOf.propertiesOrder).toEqual(["text"]);
+        expect(oneOf.properties.text).toEqual({ name: "Text", type: "string", admin: { markdown: true } });
+    });
+
+    it("writes the nested shape to the file it creates", async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-ast-template-"));
+        try {
+            await new AstSchemaEditor(dir).saveCollection("products", template);
+            const written = fs.readFileSync(path.join(dir, "products.ts"), "utf8");
+            // Eight spaces is a property's own level; the key belongs one deeper,
+            // inside its block.
+            expect(written).not.toMatch(/^ {12}markdown:/m);
+            expect(written).toMatch(/admin: \{\s*\n?\s*markdown: true/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
     });
 });
 

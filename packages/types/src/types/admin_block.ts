@@ -174,13 +174,33 @@ export function nestAdminCollectionKeys(collection: Record<string, unknown>): Re
     return nestAdminKeysOf(collection, ADMIN_COLLECTION_KEYS);
 }
 
+/** A record of properties, keyed by name — a map's `properties`, or a `oneOf` block's. */
+function nestEachProperty(properties: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(
+        Object.entries(properties).map(([key, child]) => [
+            key,
+            isNestable(child) ? nestAdminPropertyKeys(child) : child
+        ])
+    );
+}
+
+/** Anything the walk can descend into: a plain object, not an array. */
+function isNestable(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * {@link nestAdminKeysOf} for a property, applied to its children too.
  *
- * A map property carries `properties`, an array property carries `of`, and both
- * hold properties with `admin` blocks of their own. A flat `readOnly` left on a
- * child is as dead — and as fatal at the next boot — as one left on the parent,
- * so the walk goes all the way down.
+ * A map property carries `properties`, an array property carries `of`, and an
+ * array of typed blocks carries `oneOf.properties` — a record of properties like
+ * a map's. All of them hold properties with `admin` blocks of their own. A flat
+ * `readOnly` left on a child is as dead — and as fatal at the next boot — as one
+ * left on the parent, so the walk goes all the way down.
+ *
+ * `oneOf` was the container this walk did not know about, and it is the one the
+ * block-based collection templates are built out of: every block inside them
+ * kept its flat `markdown`, and the collection they created would not boot.
  *
  * @group Models
  */
@@ -188,24 +208,23 @@ export function nestAdminPropertyKeys(property: Record<string, unknown>): Record
     const nested = nestAdminKeysOf(property, ADMIN_PROPERTY_KEYS);
 
     const children = nested.properties;
-    if (children && typeof children === "object" && !Array.isArray(children)) {
-        nested.properties = Object.fromEntries(
-            Object.entries(children as Record<string, unknown>).map(([key, child]) => [
-                key,
-                child && typeof child === "object" && !Array.isArray(child)
-                    ? nestAdminPropertyKeys(child as Record<string, unknown>)
-                    : child
-            ])
-        );
+    if (isNestable(children)) {
+        nested.properties = nestEachProperty(children);
+    }
+
+    // `oneOf` is not itself a property — it is a block holding `properties`
+    // alongside `typeField`, `valueField` and `propertiesOrder`, none of which
+    // may be walked as one.
+    const oneOf = nested.oneOf;
+    if (isNestable(oneOf) && isNestable(oneOf.properties)) {
+        nested.oneOf = { ...oneOf, properties: nestEachProperty(oneOf.properties) };
     }
 
     const of = nested.of;
     if (Array.isArray(of)) {
-        nested.of = of.map(entry => entry && typeof entry === "object" && !Array.isArray(entry)
-            ? nestAdminPropertyKeys(entry as Record<string, unknown>)
-            : entry);
-    } else if (of && typeof of === "object") {
-        nested.of = nestAdminPropertyKeys(of as Record<string, unknown>);
+        nested.of = of.map(entry => isNestable(entry) ? nestAdminPropertyKeys(entry) : entry);
+    } else if (isNestable(of)) {
+        nested.of = nestAdminPropertyKeys(of);
     }
 
     return nested;

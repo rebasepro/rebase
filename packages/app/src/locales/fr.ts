@@ -988,8 +988,6 @@ export const fr: RebaseTranslations = {
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportement au collage",
-    markdown_strip_html: "Supprimer le HTML au collage",
-    markdown_convert_pasted: "Convertir le texte collé en markdown",
 
     // ─── Entity identity bar and inspector ──────────────────────
     entity_saved: "Enregistré",

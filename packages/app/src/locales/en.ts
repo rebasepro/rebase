@@ -996,8 +996,6 @@ export const en: RebaseTranslations = {
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Paste behavior",
-    markdown_strip_html: "Strip HTML on paste",
-    markdown_convert_pasted: "Convert pasted text to markdown",
 
     // ─── Entity identity bar and inspector ──────────────────────
     entity_saved: "Saved",

@@ -27,7 +27,7 @@ export const productsCollectionTemplate = {
             type: "string",
             name: "Description",
             description: "Description of this product, supports markdown",
-            markdown: true
+            admin: { markdown: true }
         },
         main_image: {
             type: "string",
@@ -85,4 +85,4 @@ export const productsCollectionTemplate = {
             autoValue: "on_create"
         }
     }
-} as unknown as AdminCollection;
+} satisfies AdminCollection;

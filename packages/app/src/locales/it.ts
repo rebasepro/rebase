@@ -988,8 +988,6 @@ export const it: RebaseTranslations = {
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportamento incolla",
-    markdown_strip_html: "Rimuovi HTML all'incolla",
-    markdown_convert_pasted: "Converti testo incollato in markdown",
 
     // ─── Entity identity bar and inspector ──────────────────────
     entity_saved: "Salvato",

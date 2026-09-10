@@ -37,12 +37,12 @@ export const blogCollectionTemplate = {
                     text: {
                         type: "string",
                         name: "Text",
-                        markdown: true
+                        admin: { markdown: true }
                     },
                     quote: {
                         type: "string",
                         name: "Quote",
-                        multiline: true
+                        admin: { multiline: true }
                     },
                     images: {
                         name: "Images",
@@ -65,7 +65,7 @@ export const blogCollectionTemplate = {
                         of: {
                             type: "reference",
                             path: "products",
-                            previewProperties: ["name", "main_image"]
+                            admin: { previewProperties: ["name", "main_image"] }
                         }
                     }
                 },
@@ -105,8 +105,8 @@ export const blogCollectionTemplate = {
             type: "array",
             of: {
                 type: "string",
-                previewAsTag: true
+                admin: { previewAsTag: true }
             }
         }
     }
-} as unknown as AdminCollection;
+} satisfies AdminCollection;

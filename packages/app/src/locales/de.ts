@@ -988,8 +988,6 @@ export const de: RebaseTranslations = {
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Einfügeverhalten",
-    markdown_strip_html: "HTML beim Einfügen entfernen",
-    markdown_convert_pasted: "Eingefügten Text in Markdown umwandeln",
 
     // ─── Entity identity bar and inspector ──────────────────────
     entity_saved: "Gespeichert",

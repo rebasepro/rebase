@@ -20,11 +20,6 @@ export type CustomEditorComponent = {
   component: React.FC
 };
 
-export interface MarkdownEditorConfig {
-  html?: boolean;
-  transformPastedText?: boolean;
-}
-
 export type RichTextEditorTextSize = "sm" | "base" | "lg";
 
 
@@ -40,7 +35,6 @@ export type RichTextEditorProps = {
   aiController?: EditorAIController,
   customComponents?: CustomEditorComponent[];
   disabled?: boolean;
-  markdownConfig?: MarkdownEditorConfig;
 };
 
 
@@ -60,8 +54,7 @@ export const RichTextEditor = ({
   highlight,
   handleImageUpload,
   aiController,
-  disabled,
-  markdownConfig
+  disabled
 }: RichTextEditorProps) => {
 
   const { t } = useTranslation();

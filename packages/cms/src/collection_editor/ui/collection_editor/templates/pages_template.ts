@@ -72,7 +72,7 @@ export const pagesCollectionTemplate = {
                             content: {
                                 type: "string",
                                 name: "Section Content",
-                                markdown: true
+                                admin: { markdown: true }
                             },
                             image: {
                                 type: "string",
@@ -133,7 +133,7 @@ export const pagesCollectionTemplate = {
                 content: {
                     type: "string",
                     name: "Sidebar Content",
-                    markdown: true
+                    admin: { markdown: true }
                 }
             }
         },
@@ -161,7 +161,7 @@ export const pagesCollectionTemplate = {
         footer_override: {
             type: "string",
             name: "Footer Override",
-            markdown: true
+            admin: { markdown: true }
         },
         publish_date: {
             type: "date",
@@ -180,4 +180,4 @@ export const pagesCollectionTemplate = {
             description: "Should this page be live on the site?"
         }
     }
-} as unknown as AdminCollection;
+} satisfies AdminCollection;

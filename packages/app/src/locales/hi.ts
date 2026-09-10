@@ -988,8 +988,6 @@ export const hi: RebaseTranslations = {
 
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "पेस्ट व्यवहार",
-    markdown_strip_html: "पेस्ट करते समय HTML हटाएं",
-    markdown_convert_pasted: "पेस्ट किए गए टेक्स्ट को मार्कडाउन में बदलें",
 
     // ─── Entity identity bar and inspector ──────────────────────
     entity_saved: "सहेजा गया",

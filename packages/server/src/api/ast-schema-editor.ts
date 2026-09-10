@@ -55,6 +55,36 @@ export function nestAdminKeys(collectionData: Record<string, unknown>): Record<s
     return nestAdminCollectionKeys(collectionData);
 }
 
+/**
+ * {@link nestAdminKeys} for a whole collection — its properties included.
+ *
+ * `nestAdminKeys` only ever moved the COLLECTION's presentation keys. A
+ * property's — `markdown`, `multiline`, `previewAsTag` — went to disk exactly as
+ * the panel sent them, at the top level of the property, which the boot
+ * validator treats as fatal. `saveProperty` nests them; `saveCollection` did
+ * not, and *creating* a collection is a `saveCollection`.
+ *
+ * So a collection created from a template wrote a file that could not boot, and
+ * took the whole project down with it — the loader imports every collection in
+ * the directory, so one bad file stops `rebase dev` from starting at all. The
+ * panel reported success.
+ */
+export function nestAdminKeysDeep(collectionData: Record<string, unknown>): Record<string, unknown> {
+    const nested = nestAdminKeys(collectionData);
+    const properties = nested.properties;
+    if (properties && typeof properties === "object" && !Array.isArray(properties)) {
+        nested.properties = Object.fromEntries(
+            Object.entries(properties as Record<string, unknown>).map(([key, property]) => [
+                key,
+                property && typeof property === "object" && !Array.isArray(property)
+                    ? nestAdminPropertyKeys(property as Record<string, unknown>)
+                    : property
+            ])
+        );
+    }
+    return nested;
+}
+
 export class AstSchemaEditor {
     private project: Project;
     private collectionsDir: string;
@@ -453,7 +483,7 @@ export class AstSchemaEditor {
                 throw new Error(`Refusing to overwrite ${newFilePath}: a file for "${collectionId}" already exists but could not be parsed.`);
             }
             const varName = `${AstSchemaEditor.collectionVarName(safeId)}Collection`;
-            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${varName}: CollectionConfig = ${this.convertJsonToAstString(nestAdminKeys(collectionData))};\n\nexport default ${varName};\n`);
+            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${varName}: CollectionConfig = ${this.convertJsonToAstString(nestAdminKeysDeep(collectionData))};\n\nexport default ${varName};\n`);
         } else {
             // Update root level properties gracefully
 
@@ -476,8 +506,10 @@ export class AstSchemaEditor {
             // collection — so what arrives here has `icon` and `listProperties` at
             // the top level. On disk they belong inside `admin`. Writing them flat
             // would produce a file the backend loads and ignores and the panel
-            // never reads back, which looks exactly like the edit not saving.
-            collectionData = nestAdminKeys(collectionData);
+            // never reads back, which looks exactly like the edit not saving. A
+            // property's presentation keys are worse than ignored: they are fatal
+            // at the next boot, which is why this goes all the way down.
+            collectionData = nestAdminKeysDeep(collectionData);
 
             for (const key of Object.keys(collectionData)) {
                 if (key === "relations") {
