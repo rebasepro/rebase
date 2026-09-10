@@ -393,6 +393,56 @@ export const searched = C({
     search: { fields: ["title", "body"], fuzzy: true }
 });
 
+// ───────────────────────── N. multi-tenancy ─────────────────────────
+//
+// Both `from` forms, and the two column shapes each has to work over: a plain
+// `string` column, and a `belongsTo` whose foreign key is the tenant. The
+// declaration's schema effects (NOT NULL, an index) land on a column *another*
+// declaration produced, which is exactly where a per-emitter reading of it
+// would fork.
+export const orgs = C({
+    slug: "orgs", table: "orgs", name: "Organizations",
+    properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
+});
+/** Claim form over a plain, nullable-looking string column. */
+export const claimTenanted = C({
+    slug: "claim_tenanted", table: "claim_tenanted", name: "x",
+    properties: {
+        id: { type: "string", isId: "uuid" },
+        orgId: { type: "string", columnName: "org_id" },
+        title: { type: "string" }
+    },
+    tenant: { field: "orgId", from: { claim: "org_id" } }
+});
+/** Membership form, and the tenant is a `belongsTo` foreign key. */
+export const memberships = C({
+    slug: "memberships", table: "memberships", name: "Memberships",
+    properties: {
+        id: { type: "string", isId: "uuid" },
+        userId: { type: "string" },
+        org: { type: "relation", relationName: "org" }
+    },
+    relations: [
+        { kind: "belongsTo", relationName: "org", target: () => orgs, localKey: "org_id" }
+    ],
+    securityRules: [{ name: "memberships_self_read", operations: ["select"], ownerField: "userId" }]
+});
+export const membershipTenanted = C({
+    slug: "membership_tenanted", table: "membership_tenanted", name: "x",
+    properties: {
+        id: { type: "string", isId: "uuid" },
+        org: { type: "relation", relationName: "org" },
+        body: { type: "string" }
+    },
+    relations: [
+        { kind: "belongsTo", relationName: "org", target: () => orgs, localKey: "org_id" }
+    ],
+    tenant: {
+        field: "org",
+        from: { membership: { collection: "memberships", userField: "userId", tenantField: "org" } }
+    }
+});
+
 export const groups: Record<string, CollectionConfig[]> = {
     strProps: [strProps],
     strIds: [strIdTrue, strIdManual, strIdSql, strIdSqlBare, strIdUuidReqUnique, strIdUuidVarchar, noIdAtAll, idNamedButNotFlagged, idNumberNamedButNotFlagged],
@@ -409,7 +459,8 @@ export const groups: Record<string, CollectionConfig[]> = {
     smallintOnly: [smallintOnly],
     appSchema: [appSchema, uuidTarget],
     indexed: [indexed],
-    searched: [searched]
+    searched: [searched],
+    tenanted: [orgs, claimTenanted, memberships, membershipTenanted]
 };
 
 /**

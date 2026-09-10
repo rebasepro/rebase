@@ -1,6 +1,6 @@
 import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
-import { getTableName } from "../relations";
+import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
 
 /**
  * Options for {@link policyToPostgres}.
@@ -266,10 +266,7 @@ function propertyClaimCastType(
             );
         case "relation":
             return primaryKeyClaimCastType(
-                resolveTargetCollection(
-                    relationTargetSlug((prop as { relation?: { target?: unknown } }).relation),
-                    resolveCollection
-                ),
+                relationTarget(name, prop, collection),
                 resolveCollection,
                 depth
             );
@@ -381,7 +378,41 @@ function resolveColumnName(propName: string, collection?: CollectionConfig): str
     if (prop && "columnName" in prop && typeof (prop as { columnName?: unknown }).columnName === "string") {
         return quoteColumnIdentifier((prop as { columnName: string }).columnName);
     }
+    const relationColumn = belongsToColumn(propName, prop, collection);
+    if (relationColumn) return quoteColumnIdentifier(relationColumn);
     return quoteColumnIdentifier(toSnakeCase(propName));
+}
+
+/**
+ * The foreign key column a `relation` property addresses, when it has one.
+ *
+ * A `belongsTo` property is a *link*, and its column is the relation's
+ * `localKey` — `org` addresses `org_id`. `toSnakeCase` cannot know that, so a
+ * rule naming a relation (`ownerField: "org"`, a tenancy declaration over a
+ * `belongsTo`) compiled to a comparison against a column called `org`, which
+ * does not exist. `CREATE POLICY` then fails, and a table with RLS enabled and
+ * no policy denies every row — the loudest possible symptom for the quietest
+ * possible cause, since the rule reads exactly right.
+ *
+ * Only `belongsTo`. Every other kind puts its column on the target table, in a
+ * junction row, or nowhere at all, and there is no column here to name.
+ */
+function belongsToColumn(
+    propName: string,
+    prop: Property | undefined,
+    collection?: CollectionConfig
+): string | undefined {
+    if (!collection || prop?.type !== "relation") return undefined;
+    try {
+        const relations = resolveCollectionRelations(collection);
+        const declaredName = (prop as { relation?: { relationName?: string } }).relation?.relationName;
+        const relation = findRelation(relations, declaredName ?? propName);
+        return relation?.kind === "belongsTo" ? relation.localKey : undefined;
+    } catch {
+        // A relation whose target is not in this bundle. The old spelling is
+        // no worse than failing to compile at all.
+        return undefined;
+    }
 }
 
 /**
