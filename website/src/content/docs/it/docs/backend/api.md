@@ -1,41 +1,41 @@
 ---
-sourceHash: b480967e0adbfeed
+sourceHash: 2499dc27f2076f94
 title: API REST
 sidebar_label: API REST
-description: Endpoint API REST generati automaticamente per ogni collection, con filtri, ordinamento, paginazione e inclusione delle relazioni.
+description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
 ---
 
 ## Panoramica
 
-Rebase genera automaticamente un'API completa a partire dalle definizioni delle tue collection:
+Rebase genera automaticamente un'API completa dalle definizioni delle tue collection:
 
 - **API REST** — Endpoint CRUD per ogni collection su `/api/data/:slug`
 - **Specifica OpenAPI** — Specifica leggibile da macchina su `/api/docs`
-- **Swagger UI** — Explorer interattivo delle API su `/api/swagger` (solo in modalità di sviluppo)
+- **Swagger UI** — Explorer API interattivo su `/api/swagger` (solo in modalità di sviluppo)
 
-Non è richiesto alcun codice: definisci le tue collection e l'API apparirà automaticamente.
+Non è richiesto alcun codice — definisci le tue collection e l'API apparirà automaticamente.
 
 ## Endpoint REST
 
-Per ciascuna collection, vengono generati i seguenti endpoint. Tutte le altre route montate dal backend — autenticazione, archiviazione, amministrazione, metadati — sono indicate nell'[indice degli endpoint](/docs/backend/endpoints/).
+Per ogni collection vengono generati i seguenti endpoint. Tutte le altre route montate dal backend — auth, storage, admin, meta — si trovano nell'[endpoint index](/docs/backend/endpoints/).
 
 | Metodo | Percorso | Descrizione |
-|--------|------|-------------|
+|--------|----------|-------------|
 | `GET` | `/api/data/:slug` | Elenca le entità |
 | `GET` | `/api/data/:slug/count` | Conta le entità |
-| `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opzionalmente raggruppati. Accetta gli stessi filtri dell'endpoint di elenco e le regole RLS si applicano alle righe aggregate — vedi [Querying](/docs/sdk/querying/) |
+| `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opzionalmente raggruppati. Accetta gli stessi filtri dell'endpoint di elenco e la RLS si applica alle righe aggregate — vedi [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Recupera una singola entità |
 | `POST` | `/api/data/:slug` | Crea un record |
 | `PATCH` | `/api/data/:slug/:id` | Aggiorna un record (parziale — vengono scritte solo le proprietà inviate) |
 | `DELETE` | `/api/data/:slug/:id` | Elimina un record |
-| `POST` | `/api/data/:slug/bulk` | Crea più entità in una singola transazione |
-| `PATCH` | `/api/data/:slug/bulk` | Aggiorna più entità in una singola transazione |
-| `POST` | `/api/data/:slug/bulk/delete` | Elimina più entità in una singola transazione |
-| `POST` | `/api/data/_batch` | Scrittura **tra più** collection in una singola transazione |
+| `POST` | `/api/data/:slug/bulk` | Crea molteplici entità in un'unica transazione |
+| `PATCH` | `/api/data/:slug/bulk` | Aggiorna molteplici entità in un'unica transazione |
+| `POST` | `/api/data/:slug/bulk/delete` | Elimina molteplici entità in un'unica transazione |
+| `POST` | `/api/data/_batch` | Scrive **tra** collection diverse in un'unica transazione |
 
 ### Route di subcollection
 
-Le relazioni nidificate sono accessibili tramite percorsi URL:
+Le relazioni annidate sono accessibili tramite percorsi URL:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
@@ -45,33 +45,33 @@ PATCH  /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
-#### Meccaniche di routing e analisi dei segmenti
+#### Meccanica di routing e parsing dei segmenti
 
-Per gestire livelli arbitrari di annidamento delle subcollection, Rebase instrada le richieste in entrata utilizzando la regex del parametro `:rest{.+}` di Hono. Il motore interno di analisi dei segmenti analizza i percorsi contando i segmenti separati da barre:
-- Un **conteggio dispari dei segmenti** (es. `authors/42/posts` -> 3 segmenti) rappresenta una richiesta di elenco di una collection.
-- Un **conteggio pari dei segmenti** (es. `authors/42/posts/7` -> 4 segmenti) rappresenta un'operazione su un ID di entità specifico. L'ultimo segmento viene estratto come `entityId` di destinazione.
+Per gestire livelli arbitrari di annidamento delle subcollection, Rebase instrada le richieste in arrivo utilizzando la regex del parametro `:rest{.+}` di Hono. Il motore interno di parsing dei segmenti analizza i percorsi contando i segmenti separati da slash:
+- **Conteggio segmenti dispari** (es. `authors/42/posts` -> 3 segmenti) rappresenta una richiesta di elenco di una collection.
+- **Conteggio segmenti pari** (es. `authors/42/posts/7` -> 4 segmenti) rappresenta un'operazione su un ID di entità specifico. L'ultimo segmento viene estratto come `entityId` di destinazione.
 
-Il motore esclude i namespace di sistema riservati (es. `history`) dall'analisi dei segmenti del percorso per prevenire collisioni con gli endpoint integrati.
+Il motore esclude i namespace di sistema riservati (es. `history`) dall'analisi dei segmenti di percorso per evitare collisioni con gli endpoint predefiniti.
 
 ## Autenticazione
 
-Tutti gli endpoint di dati richiedono l'autenticazione per impostazione predefinita. Includi un token Bearer nell'header `Authorization`:
+Tutti gli endpoint dei dati richiedono l'autenticazione per impostazione predefinita. Includi un token Bearer nell'header `Authorization`:
 
 ```bash
 curl -H "Authorization: Bearer <access-token>" \
      https://api.example.com/api/data/products
 ```
 
-Per le chiamate server-to-server, usa la service key:
+Per le chiamate server-to-server, utilizza la chiave di servizio (service key):
 
 ```bash
 curl -H "Authorization: Bearer <service-key>" \
      https://api.example.com/api/data/products
 ```
 
-## Filtri
+## Filtraggio
 
-Usa i parametri di query in stile PostgREST per filtrare i risultati. Il formato è `?field=operator.value`:
+Utilizza i parametri di query in stile PostgREST per filtrare i risultati. Il formato è `?field=operator.value`:
 
 ```bash
 # Exact match
@@ -100,28 +100,28 @@ GET /api/data/products?tags=csa.(electronics,books)
 ### Operatori di filtro
 
 | Operatore | Significato | Esempio |
-|----------|---------|---------|
-| `eq` | Uguale (`==`) | `?active=eq.true` |
-| `neq` | Diverso (`!=`) | `?status=neq.draft` |
+|-----------|-------------|---------|
+| `eq` | Uguale a (`==`) | `?active=eq.true` |
+| `neq` | Diverso da (`!=`) | `?status=neq.draft` |
 | `gt` | Maggiore di (`>`) | `?price=gt.100` |
-| `gte` | Maggiore o uguale (`>=`) | `?price=gte.100` |
+| `gte` | Maggiore o uguale a (`>=`) | `?price=gte.100` |
 | `lt` | Minore di (`<`) | `?price=lt.50` |
-| `lte` | Minore o uguale (`<=`) | `?price=lte.50` |
-| `in` | Presente nell'array | `?status=in.(a,b,c)` |
-| `nin` | Non presente nell'array | `?status=nin.(a,b)` |
+| `lte` | Minore o uguale a (`<=`) | `?price=lte.50` |
+| `in` | Nell'array | `?status=in.(a,b,c)` |
+| `nin` | Non nell'array | `?status=nin.(a,b)` |
 | `cs` | L'array contiene | `?tags=cs.value` |
 | `csa` | L'array contiene almeno uno | `?tags=csa.(a,b)` |
-| `like` | Corrispondenza di pattern, sensibile alle maiuscole (`like`) | `?sku=like.AB-%` |
-| `ilike` | Corrispondenza di pattern, insensibile alle maiuscole (`ilike`) | `?name=ilike.%widget%` |
+| `like` | Corrispondenza di pattern, con distinzione tra maiuscole e minuscole (`like`) | `?sku=like.AB-%` |
+| `ilike` | Corrispondenza di pattern, senza distinzione tra maiuscole e minuscole (`ilike`) | `?name=ilike.%widget%` |
 | `nlike` | Non corrisponde al pattern (`not-like`) | `?sku=nlike.TMP-%` |
-| `nilike` | Non corrisponde al pattern, senza distinzione maiuscole/minuscole (`not-ilike`) | `?name=nilike.%test%` |
+| `nilike` | Non corrisponde, senza distinzione tra maiuscole e minuscole (`not-ilike`) | `?name=nilike.%test%` |
 | `isnull` | La colonna è `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | La colonna non è `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
-`isnull` e `notnull` ignorano il rispettivo valore: l'operatore costituisce l'intera condizione e qualsiasi elemento dopo il punto viene scartato. L'SDK scrive `.null`, ed è quindi questa la sintassi che vedrai transitare sulla rete.
+`isnull` e `notnull` ignorano il rispettivo valore — l'operatore costituisce l'intera condizione e qualsiasi cosa dopo il punto viene scartata. L'SDK scrive `.null`, quindi è questa la dicitura che vedrai transitare in rete.
 
 :::caution[`eq.null` è la stringa di quattro caratteri, non `IS NULL`]
-`?deleted_at=eq.null` cerca il testo letterale `null`. In SQL `= NULL` non è mai vero, quindi non esiste alcuna interpretazione di `eq.null` che possa equivalere a una verifica di nullità: usa `isnull` a tale scopo. L'SDK serializza `.where("deleted_at", "==", null)` come `isnull.null` proprio per questo motivo.
+`?deleted_at=eq.null` cerca il testo letterale `null`. In SQL `= NULL` non è mai vero, quindi nessuna interpretazione di `eq.null` può indicare il test di nullità — usa `isnull` per quello scopo. L'SDK serializza `.where("deleted_at", "==", null)` come `isnull.null` esattamente per questo motivo.
 :::
 
 ### Operatori logici
@@ -139,36 +139,36 @@ GET /api/data/products?and=(active.eq.true,price.gt.0)
 GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
 ```
 
-`not` nega la **congiunzione** delle sue condizioni: `not(a)` corrisponde a `NOT a`, e `not(a,b)` corrisponde a `NOT (a AND b)`. Viene compilato in un vero `NOT (...)` di SQL anziché in operatori invertiti; poiché la logica SQL è a tre valori, `NOT (a AND b)` e `(NOT a) OR (NOT b)` smettono di coincidere non appena è coinvolto un valore NULL. Di conseguenza, una negazione **include le righe in cui la colonna è NULL**, coerentemente con il significato di `NOT`; specifica un `notnull` in AND al suo fianco se non è questo il comportamento desiderato.
+`not` nega la **congiunzione** delle sue condizioni: `not(a)` equivale a `NOT a`, e `not(a,b)` a `NOT (a AND b)`. Viene compilato in un vero `NOT (...)` SQL anziché in operatori invertiti — la logica SQL è a tre valori, quindi `NOT (a AND b)` e `(NOT a) OR (NOT b)` smettono di coincidere non appena entra in gioco un NULL. Una negazione quindi **include le righe la cui colonna è NULL**, che è ciò che significa `NOT`; aggiungi un `notnull` in AND se non è questo il comportamento desiderato.
 
-**Un gruppo per richiesta: `or` ha la precedenza su `and`, ed entrambi su `not`.** Si tratta di tre sintassi per lo stesso slot, non di tre filtri distinti. Utilizza invece l'annidamento:
+**Un solo gruppo per richiesta: `or` prevale su `and`, ed entrambi prevalgono su `not`.** Sono tre formulazioni dello stesso slot, non tre filtri separati. Usa invece l'annidamento:
 
 ```bash
 GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
 GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
-I gruppi possono essere annidati fino a 32 livelli di profondità; superato tale limite la richiesta viene rifiutata con `INVALID_LOGICAL_GROUP`.
+I gruppi possono essere annidati fino a 32 livelli di profondità; oltre questo limite la richiesta viene rifiutata con `INVALID_LOGICAL_GROUP`.
 
 Un gruppo **restringe** i risultati insieme ai filtri di campo anziché sostituirli — vedi [Come si combinano i filtri](#how-the-filters-combine).
 
 ### Il dialetto JSON `where`
 
-I filtri di campo visti in precedenza sono uno dei due metodi disponibili per inviare un filtro. L'altro è un singolo oggetto JSON, ovvero il formato pubblicato dal documento OpenAPI per ogni `GET /api/data/{slug}` e accettato dalle route di subcollection nidificate:
+I filtri di campo sopra descritti sono uno dei due modi per inviare un filtro. L'altro consiste in un singolo oggetto JSON, che è ciò che il documento OpenAPI pubblica su ogni `GET /api/data/{slug}` e ciò che accettano le route di subcollection annidate:
 
 ```bash
 GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 ```
 
-Ogni chiave rappresenta un campo, ogni valore una tupla canonica `[operatore, valore]` — le stesse tuple scritte dall'SDK. Un valore può anche essere una stringa con notazione a punti pre-serializzata (`{"status":"eq.active"}`) o un valore scalare semplice (`{"status":"active"}`); tutte e tre le forme vengono compilate nella medesima condizione.
+Ogni chiave è un campo, ogni valore è una tupla canonica `[operator, value]` — le stesse tuple scritte dall'SDK. Un valore può anche essere una stringa con notazione a punto pre-serializzata (`{"status":"eq.active"}`) o uno scalare semplice (`{"status":"active"}`); tutte e tre le varianti compilano nella stessa condizione.
 
-La differenza fondamentale da considerare: **il JSON conserva i tipi.** `?price=gte.100` invia la stringa `"100"` e il driver ne esegue il cast in base al tipo di colonna, mentre `?where={"price":[">=",100]}` invia un numero. Per le colonne in cui l'interpretazione testuale e quella numerica differiscono (ad esempio una stringa di versione o un codice con zeri iniziali), questo è il parametro consigliato.
+La differenza fondamentale da conoscere: **JSON trasporta i tipi.** `?price=gte.100` invia la stringa `"100"` e il driver ne effettua il cast in base al tipo di colonna, mentre `?where={"price":[">=",100]}` invia un numero. Per una colonna la cui interpretazione testuale e numerica differisce — una stringa di versione, un codice con padding di zeri — questo è il parametro a cui affidarsi.
 
-Un parametro `where` malformato restituisce un errore 400 `INVALID_WHERE` anziché un filtro ignorato silenziosamente: ignorarlo eseguirebbe la lettura senza filtri, restituendo tutto ciò che le regole di sicurezza a livello di riga consentono di visualizzare.
+Un `where` malformato restituisce un errore 400 `INVALID_WHERE`, e non un filtro ignorato silenziosamente: scartarlo significherebbe eseguire la lettura senza filtri e restituire tutto ciò che la row-level security consente di leggere.
 
 ### Come si combinano i filtri
 
-`?field=op.value`, `?where=`, `?or=`/`?and=` e `?searchString=` sono indipendenti, e ciascuno di essi, se presente, deve essere soddisfatto:
+`?field=op.value`, `?where=`, `?or=`/`?and=` e `?searchString=` sono indipendenti, e ciascuno di essi presente deve corrispondere:
 
 ```text
 (field filters and `where`, AND-ed together)
@@ -176,11 +176,11 @@ Un parametro `where` malformato restituisce un errore 400 `INVALID_WHERE` anzich
   AND (the search string)
 ```
 
-Non è possibile mettere in OR uno di questi elementi rispetto a un altro. Qualsiasi logica diversa da un semplice AND tra questi gruppi deve essere inserita all'interno di un singolo albero `or=`/`and=`.
+Non c'è modo di applicare l'operatore OR tra questi gruppi. Qualsiasi condizione che non sia un semplice AND di questi gruppi deve essere inserita all'interno di un unico albero `or=`/`and=`.
 
 ## Ordinamento
 
-Usa `orderBy` nel formato `field:direction`:
+Usa `orderBy` con il formato `field:direction`:
 
 ```bash
 # Sort by price descending
@@ -190,37 +190,37 @@ GET /api/data/products?orderBy=price:desc
 GET /api/data/products?orderBy=name:asc
 ```
 
-Se la direzione viene omessa, il valore predefinito è `asc`. Una direzione diversa da `asc` o `desc`, oppure un campo non presente nella collection, restituisce un errore **400** — non un 200 con le righe disposte nell'ordine casuale stabilito dal database, che risulterebbe indistinguibile da un ordinamento eseguito correttamente.
+Una direzione mancante equivale a `asc`. Una direzione che non sia né `asc` né `desc`, oppure un campo non presente nella collection, restituisce un errore **400** — non un 200 con le righe ordinate arbitrariamente dal database, il che sarebbe indistinguibile da un ordinamento riuscito.
 
-### Più chiavi
+### Più chiavi di ordinamento
 
-La forma sintetica accetta una sola chiave. Per specificarne di più, passa un array JSON: la seconda chiave viene utilizzata per dirimere le righe considerate equivalenti dalla prima:
+La sintassi abbreviata supporta una sola chiave. Per utilizzarne più di una, passa un array JSON — la seconda chiave discrimina tra le righe considerate uguali dalla prima:
 
 ```bash
 # By category, and newest first within each category
 GET /api/data/products?orderBy=[{"field":"category"},{"field":"createdAt","direction":"desc"}]
 ```
 
-Entrambe le sintassi sono supportate su tutte le route che elencano righe, comprese quelle nidificate (`/api/data/authors/:id/posts`). Ogni ordinamento termina sempre con l'ID di riga decrescente, anche se non richiesto esplicitamente: ciò garantisce un ordinamento totale, evitando che la paginazione su un ordine parziale ripeta o salti righe.
+Entrambe le formulazioni sono supportate da tutte le route che elencano righe, incluse quelle annidate (`/api/data/authors/:id/posts`). Ogni ordinamento termina sull'id di riga decrescente, sia che venga richiesto o meno: questo è ciò che rende l'ordinamento totale, e la paginazione su un ordinamento non totale ripete e salta righe.
 
-La ripetizione del parametro `?orderBy=` non definisce un ordinamento a più chiavi: prevale sempre l'ultimo parametro specificato, come avviene per qualsiasi altro parametro di query. Utilizza l'array.
+Un parametro `?orderBy=` ripetuto non costituisce un ordinamento a più chiavi — l'ultimo specificato prevale, come accade per ogni altro parametro di query. Usa l'array.
 
-### Collocazione dei valori NULL
+### Posizionamento dei valori NULL nell'ordinamento
 
-Per impostazione predefinita, i valori NULL vengono ordinati **per ultimi in ordine crescente e per primi in ordine decrescente**, conformemente al comportamento predefinito di Postgres. Un terzo segmento separato da due punti permette di sovrascrivere tale comportamento:
+Per impostazione predefinita, i valori NULL vengono ordinati **per ultimi in ordine crescente e per primi in ordine decrescente**, seguendo la convenzione nativa di Postgres. Un terzo segmento separato da due punti permette di specificare diversamente:
 
 ```bash
 # Newest first, with the undated rows at the end rather than the top
 GET /api/data/posts?orderBy=publishedAt:desc:last
 ```
 
-La forma con array JSON accetta la chiave `"nulls"` per ottenere lo stesso risultato:
+Il formato ad array JSON accetta una chiave `"nulls"` per la stessa funzionalità:
 
 ```bash
 GET /api/data/posts?orderBy=[{"field":"publishedAt","direction":"desc","nulls":"last"}]
 ```
 
-Qualsiasi valore diverso da `first` o `last` restituisce un errore 400, anziché applicare silenziosamente un ordine differente. Il cursore descritto di seguito rispetta le impostazioni dichiarate per l'ordinamento, garantendo una paginazione corretta su chiavi nullable in entrambi i casi.
+Qualsiasi valore diverso da `first` o `last` genera un 400, e non un ordine silenziosamente differente. Il cursore descritto di seguito rispetta quanto dichiarato dall'ordinamento, garantendo che la paginazione su una chiave che ammette valori null rimanga corretta con entrambe le impostazioni.
 
 ## Paginazione
 
@@ -234,15 +234,15 @@ GET /api/data/products?limit=20&offset=40
 GET /api/data/products?page=3
 ```
 
-Il limite predefinito è **50**, il limite massimo è **1000**. Entrambi derivano da `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, valori riportati anche nella specifica OpenAPI generata: un valore di `limit` superiore al massimo viene rifiutato anziché ridotto al limite.
+Il limite predefinito è **50**, il massimo è **1000**. Entrambi provengono da `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, valori riportati anche nella specifica OpenAPI generata — un `limit` superiore al massimo viene rifiutato anziché ridotto al limite (clamped).
 
-Tutti e tre i parametri di intervallo vengono rifiutati anziché corretti automaticamente, e ciascuno specifica il proprio codice di errore: `INVALID_LIMIT`, `INVALID_OFFSET` (un numero intero maggiore o uguale a 0) e `INVALID_PAGE` (un numero intero maggiore o uguale a 1). Un intervallo silenziosamente diverso da quello richiesto sarebbe indistinguibile dal raggiungimento della fine della collection; per questo motivo nessuno di essi viene corretto o ignorato.
+Tutti e tre i parametri della finestra vengono rifiutati anziché corretti automaticamente, e ciascuno specifica il proprio codice: `INVALID_LIMIT`, `INVALID_OFFSET` (un numero intero maggiore o uguale a 0) e `INVALID_PAGE` (un numero intero maggiore o uguale a 1). Una finestra silenziosamente diversa da quella richiesta non potrebbe essere distinta dal raggiungimento della fine della collection, motivo per cui nessuno di essi viene limitato o ignorato.
 
 ### Paginazione tramite cursore
 
-`offset` riesegue il conteggio delle righe a ogni richiesta; pertanto, l'inserimento o l'eliminazione di una riga tra due richieste di pagina sposta la finestra di lettura, facendo saltare o ripetere silenziosamente delle righe. Al contrario, `?after=` esegue una ricerca indicizzata (seek): la pagina successiva inizia tassativamente dopo l'ultima riga restituita.
+`offset` riconta le righe a ogni richiesta; pertanto, una riga inserita o eliminata tra due pagine sposta la finestra e la scansione salta o ripete silenziosamente delle righe. `?after=` esegue invece una ricerca diretta (seek): la pagina successiva inizia tassativamente dopo l'ultima riga restituita.
 
-Ogni risposta di elenco contiene `meta.nextCursor` finché è presente una pagina successiva. È sufficiente reinviarlo invariato:
+Ogni risposta di elenco include `meta.nextCursor` finché è disponibile un'altra pagina. Rinvialo invariato:
 
 ```bash
 GET /api/data/orders?orderBy=createdAt:desc&limit=100
@@ -251,44 +251,42 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJjcmVhdGVkX2F0Iiw…
 ```
 
-Il cursore è **opaco** — codifica le chiavi di ordinamento *e* i valori corrispondenti dell'ultima riga — pertanto si applicano tre regole, ciascuna delle quali restituisce un errore 400 anziché una pagina non corretta:
+Il cursore è **opaco** — codifica le chiavi di ordinamento *e* i valori dell'ultima riga per tali chiavi — da cui derivano tre regole, ciascuna delle quali genera un errore 400 anziché restituire una pagina errata:
 
 | Situazione | Codice |
-|-----------|------|
-| `after` combinato con `offset` o `page` | `CURSOR_WITH_OFFSET` — entrambi definiscono il punto di inizio della pagina |
-| `after` con un `orderBy` diverso da quello con cui è stato generato | `CURSOR_ORDER_MISMATCH` |
-| Un cursore non generato da questa API | `INVALID_CURSOR` |
+|------------|--------|
+| `after` con `offset` o `page` | `CURSOR_WITH_OFFSET` — entrambi specificano l'inizio della pagina |
+| `after` con un `orderBy` diverso da quello con cui è stato emesso | `CURSOR_ORDER_MISMATCH` |
+| Un cursore non emesso da questa API | `INVALID_CURSOR` |
 
-Una richiesta che non specifica `orderBy` **eredita quello del cursore**, per cui è possibile rinviare `meta.nextCursor` senza dover specificare nuovamente l'ordinamento.
+Una richiesta che non specifica alcun `orderBy` **adotta quello del cursore**, pertanto rinviare `meta.nextCursor` senza ripetere l'ordinamento funziona correttamente.
 
-Gli ordinamenti a più chiavi e su campi nullable vengono paginati correttamente: il confronto viene costruito su ciascuna chiave nell'ordine stabilito, rispettando la collocazione dei NULL dichiarata. L'unico tipo di ordinamento che nessun cursore può descrivere è quello per rilevanza (`_score`) — calcolato per singola query e non persistito — pertanto tali elenchi non forniscono alcun `nextCursor`.
+Gli ordinamenti a più chiavi e le chiavi con valori null paginano entrambi correttamente: il confronto viene costruito su ciascuna chiave in sequenza, rispettando il posizionamento dei valori NULL dichiarato nell'ordinamento. L'unico ordinamento che nessun cursore può descrivere è la pertinenza (`_score`) — calcolata per ogni query e non memorizzata da nessuna parte — e tale elenco semplicemente non include alcun `nextCursor`.
 
 ## Selezione delle colonne
 
-<span class="since-badge" data-since="0.20">Since 0.20</span>
-
-`?fields=` limita la lettura alle sole colonne indicate. Si tratta di una proiezione applicata direttamente alla query, non di un semplice filtro sul payload di risposta:
+`?fields=` restringe la lettura alle sole colonne indicate. Si tratta di una proiezione inserita direttamente nella query, non di un ritaglio della risposta:
 
 ```bash
 GET /api/data/posts?fields=id,title&limit=50
 ```
 
-La chiave primaria viene sempre restituita (una riga priva di identificatore non può essere aggiornata, eliminata o superata con la paginazione, ed è necessaria per ricavare il cursore), e le colonne con `excludeFromApi` rimangono escluse indipendentemente dal fatto che vengano richieste esplicitamente. Una colonna inesistente restituisce un errore 400 `UNKNOWN_FIELD` anziché una riga silenziosamente priva del campo.
+La chiave primaria viene sempre restituita (una riga che non può essere indirizzata non può essere aggiornata, eliminata o superata con la paginazione — e il cursore è derivato da essa), e le colonne con `excludeFromApi` rimangono nascoste indipendentemente dal fatto che vengano specificate o meno. Una colonna sconosciuta restituisce un 400 `UNKNOWN_FIELD` anziché una riga priva silenziosamente del campo.
 
-`?distinct=true` raggruppa le righe identiche rispetto alle colonne selezionate:
+`?distinct=true` raggruppa le righe identiche rispetto a tali colonne:
 
 ```bash
 # The statuses actually in use
 GET /api/data/posts?fields=status&distinct=true
 ```
 
-Viene rifiutato (400) se combinato con un `searchString` ordinato per rilevanza o con una ricerca vettoriale (i quali associano a ogni riga un punteggio che la rende intrinsecamente distinta), oppure quando `orderBy` include una colonna non presente in `fields` (`DISTINCT_ORDER_BY_NOT_SELECTED`) — Postgres non può infatti ordinare una lettura DISTINCT tramite un'espressione esclusa dalla clausola select.
+Viene rifiutato (400) in combinazione con un `searchString` con punteggio di pertinenza o con una ricerca vettoriale, che associano un punteggio per ciascuna riga rendendo ogni riga distinta per definizione, e quando `orderBy` indica una colonna non restituita da `fields` (`DISTINCT_ORDER_BY_NOT_SELECTED`) — Postgres non può ordinare una lettura DISTINCT tramite un'espressione esclusa dalla propria clausola select.
 
-`?fields=` e `?distinct=` sono supportati anche sulla route di lettura per ID e sulle route di subcollection nidificate.
+`?fields=` e `?distinct=` funzionano anche sulla route get-by-id e sulle route di subcollection annidate.
 
 ### Formato della risposta
 
-Le risposte agli elenchi includono i metadati di paginazione:
+Le risposte di elenco includono i metadati di paginazione:
 
 ```json
 {
@@ -306,9 +304,9 @@ Le risposte agli elenchi includono i metadati di paginazione:
 }
 ```
 
-`nextCursor` è presente finché `hasMore` è true e la pagina ha restituito almeno una riga; è assente nell'ultima pagina e con tipologie di ordinamento non rappresentabili da un cursore.
+`nextCursor` è presente finché `hasMore` è true e la pagina ha restituito almeno una riga; è assente nell'ultima pagina e con ordinamenti che nessun cursore può descrivere.
 
-Le risposte relative a una singola entità restituiscono un oggetto diretto:
+Le risposte per una singola entità restituiscono un oggetto semplice (flat):
 
 ```json
 {
@@ -321,7 +319,7 @@ Le risposte relative a una singola entità restituiscono un oggetto diretto:
 
 ## Errori
 
-Tutti gli errori, provenienti da qualunque route, vengono restituiti all'interno di una struttura uniforme:
+Ogni errore, proveniente da qualsiasi route, viene restituito in una struttura (envelope) unificata:
 
 ```json
 {
@@ -334,27 +332,27 @@ Tutti gli errori, provenienti da qualunque route, vengono restituiti all'interno
 }
 ```
 
-`message` e `code` sono sempre presenti. `details` compare quando l'errore è relativo a un contesto specifico (il campo errato, i percorsi non validi). `requestId` compare quando la richiesta conteneva l'header `X-Request-ID` o ne è stato generato uno; viene riportato anche nell'header della risposta ed è l'identificatore da fornire in caso di segnalazione di bug.
+`message` e `code` sono sempre presenti. `details` compare quando il rifiuto riguarda un elemento specifico — il campo non valido, i percorsi non riusciti. `requestId` compare quando la richiesta conteneva un header `X-Request-ID` o ne è stato assegnato uno; viene riportato anche nell'header della risposta ed è il riferimento da indicare nelle segnalazioni di bug.
 
-**Gestisci la logica dell'applicazione basandoti su `code`, mai su `message` o sul solo codice di stato HTTP.** I codici sono stabili e formattati in `SCREAMING_SNAKE_CASE`; i messaggi sono destinati alla lettura nei log di console e possono variare nel tempo. Lo status HTTP è specificato nell'header della risposta, non nel corpo.
+**Crea ramificazioni condizionali su `code`, mai su `message` o sul solo status code.** I codici sono in `SCREAMING_SNAKE_CASE` e stabili; i messaggi sono pensati per una persona che legge una console e possono variare. Lo status HTTP si trova sulla risposta, non nel corpo.
 
 | Stato | Codice tipico | Significato |
-|--------|--------------|-------|
-| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La richiesta è malformata o richiede un'operazione non valida |
-| 401 | `UNAUTHORIZED` | Nessuna credenziale fornita o credenziale non valida |
-| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | Credenziale valida ma priva dei permessi necessari |
-| 404 | `NOT_FOUND` | La risorsa richiesta non esiste |
-| 409 | `CONFLICT` | Conflitto di stato (chiave duplicata, stato non allineato) |
-| 501 | variabile | La funzionalità esiste ma **non è configurata** in questa istanza |
-| 503 | `SERVICE_UNAVAILABLE` | Una dipendenza non è raggiungibile; la richiesta non è stata elaborata |
+|-------|---------------|-------------|
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La richiesta è malformata o richiede un'operazione impossibile |
+| 401 | `UNAUTHORIZED` | Nessuna credenziale, o credenziale che non identifica nessuno |
+| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | Credenziale che identifica un utente privo dei permessi necessari |
+| 404 | `NOT_FOUND` | L'elemento indirizzato non esiste |
+| 409 | `CONFLICT` | Conflitto di stato — una chiave duplicata, un albero dirty |
+| 501 | varia | La funzionalità esiste ma **non è configurata** in questo deployment |
+| 503 | `SERVICE_UNAVAILABLE` | Una dipendenza non è raggiungibile; la richiesta non l'ha mai raggiunta |
 
-Una funzionalità assente perché non abilitata nell'istanza corrente restituisce 501 con codice e motivazione, non 404: un errore 404 privo di spiegazioni su una route appena invocata dall'interfaccia utente risulterebbe fuorviante, suggerendo un problema di deployment.
+Una superficie/funzionalità assente perché non abilitata in questo deployment risponde con 501 accompagnato da un codice e da una motivazione, non con 404 — un 404 inspiegato su una route appena invocata dalla UI verrebbe interpretato come un deploy non funzionante.
 
-Le singole route aggiungono codici più specifici a questi (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, ecc.), pertanto l'elenco dei codici è da considerarsi aperto. L'SDK client li converte in un unico errore `RebaseApiError` che espone `status`, `code` e `details` — vedi [Gestione degli errori](/docs/backend#error-handling).
+Le route aggiungono i propri codici più specifici oltre a questi (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), quindi considera l'elenco dei codici come aperto. L'SDK client converte tutti gli errori in un unico `RebaseApiError` contenente `status`, `code` e `details` — vedi [Error handling](/docs/backend#error-handling).
 
 ## Ricerca testuale
 
-Usa `searchString` per eseguire ricerche full-text sui campi di tipo stringa:
+Usa `searchString` per la ricerca full-text nei campi stringa:
 
 ```bash
 GET /api/data/products?searchString=wireless%20keyboard
@@ -362,7 +360,7 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Ricerca vettoriale
 
-Se una collection definisce una proprietà di tipo `vector`, puoi eseguire ricerche per similarità ad alte prestazioni utilizzando le operazioni di distanza di pgvector elaborate direttamente nella query del database.
+Se una collection definisce una proprietà di tipo `vector`, puoi eseguire ricerche per similarità ad alta velocità utilizzando le operazioni di distanza di pgvector compilate direttamente nella query del database.
 
 ```bash
 GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
@@ -373,8 +371,8 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | Parametro | Tipo | Descrizione |
 |-----------|------|-------------|
 | `vector_search` | `string` | Il nome della proprietà vettoriale su cui eseguire la query. |
-| `vector` | `string` | Un array JSON serializzato di numeri decimali (float) che rappresenta il vettore di ricerca. |
-| `vector_distance` | `string` | La metrica di distanza da calcolare. Valori supportati: `cosine` (predefinito, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
+| `vector` | `string` | Un array di float serializzato in JSON che rappresenta il vettore di query. |
+| `vector_distance` | `string` | La metrica di distanza da valutare. Valori supportati: `cosine` (predefinito, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Soglia massima di distanza. Vengono restituiti solo i record con distanza inferiore a questa soglia. |
 
 ## Inclusione delle relazioni
@@ -392,30 +390,30 @@ GET /api/data/articles?include=*
 GET /api/data/articles?include=comments.author
 ```
 
-Un nome che non corrisponde a una relazione valida della collection restituisce un errore **400 `UNKNOWN_RELATION`** a qualsiasi livello di nidificazione. In passato tali valori venivano ignorati, restituendo un codice 200 privo del campo richiesto: questo comportamento rendeva un refuso indistinguibile da un record privo di relazioni associate. I percorsi che superano i tre livelli di nidificazione restituiscono `INCLUDE_TOO_DEEP`.
+Un nome che non corrisponde a una relazione della collection genera un errore **400 `UNKNOWN_RELATION`**, a qualsiasi livello. In precedenza veniva ignorato, rispondendo con 200 e lasciando semplicemente mancante il campo — un comportamento indistinguibile da una riga priva di record correlati, facendo apparire un errore di battitura esattamente come dati vuoti. Un percorso con più di tre passaggi (hop) genera `INCLUDE_TOO_DEEP`.
 
-### Restringere una relazione
+### Limitare una relazione
 
-Il formato con valori separati da virgola non consente di specificare un `limit` per singola relazione; per questo motivo `include` accetta anche una struttura JSON, identificata dalla presenza della parentesi graffa iniziale:
+Il formato separato da virgole non consente di specificare un `limit` per singola relazione; pertanto, `include` accetta anche JSON — riconoscibile dalla parentesi graffa iniziale:
 
 ```bash
 GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",true]},"orderBy":"createdAt:desc","fields":["id","body"],"include":{"author":true}}}
 ```
 
 | Chiave | Significato |
-|-----|---------|
-| `limit` | Righe **per ciascuna riga genitore**, non sul totale della pagina |
-| `where` | Lo stesso dialetto di filtro utilizzato dal parametro `where` principale |
-| `logical` | Un gruppo logico `or`/`and`/`not` applicato alle righe correlate |
-| `orderBy` | La stessa sintassi di ordinamento, inclusa la collocazione dei valori NULL |
-| `fields` | Colonne della riga *correlata*; la relativa chiave identificativa viene sempre inclusa |
-| `include` | Ulteriori relazioni della riga correlata |
+|--------|-------------|
+| `limit` | Righe **per riga genitore**, non sull'intera pagina |
+| `where` | Lo stesso dialetto di filtro utilizzato dal `where` di primo livello |
+| `logical` | Un gruppo `or`/`and`/`not` sulle righe correlate |
+| `orderBy` | La stessa sintassi di ordinamento, inclusa la posizione dei valori NULL |
+| `fields` | Colonne della riga *correlata*; la sua chiave viene sempre preservata |
+| `include` | A sua volta, relazioni della riga correlata |
 
-Il valore `true` indica di caricare la relazione per intero; pertanto `{"author":true}` e `author` producono la medesima richiesta. Entrambe le modalità sono supportate sulle route di elenco, sulle route di lettura per ID e sulle route di subcollection nidificate.
+`true` significa "carica l'entità per intero", quindi `{"author":true}` e `author` rappresentano la medesima richiesta. Entrambe le formulazioni funzionano sulla route di elenco, sulla route get-by-id e sulle route di subcollection annidate.
 
-Ogni livello di relazione corrisponde a una singola query in batch per l'intera pagina, mai a una query per ciascuna riga.
+Ogni hop corrisponde a una query raggruppata (batched) per l'intera pagina, mai a una query per ciascuna riga.
 
-Le relazioni incluse vengono incorporate direttamente all'interno della risposta:
+Le relazioni incluse vengono incorporate direttamente nella risposta:
 
 ```json
 {
@@ -432,62 +430,62 @@ Le relazioni incluse vengono incorporate direttamente all'interno della risposta
 
 ## Scrittura
 
-Idempotency key, scritture condizionali (`ETag` / `If-Match`), operazioni sui campi (`$inc`, `$push`, `$pull`, `$merge`), operazioni di upsert su chiave naturale, l'header `Prefer: return=minimal` e l'endpoint per operazioni multi-collection `POST /api/data/_batch` sono documentati nella pagina dedicata: **[Scrittura tramite REST](/docs/backend/writes/)**.
+Chiavi di idempotenza, scritture condizionali (`ETag` / `If-Match`), operazioni sui campi (`$inc`, `$push`, `$pull`, `$merge`), upsert su chiave naturale, `Prefer: return=minimal` e l'endpoint multi-collection `POST /api/data/_batch` sono tutti trattati in una pagina dedicata: **[Writing over REST](/docs/backend/writes/)**.
 
 ## Pipeline degli hook del ciclo di vita
 
-Tutte le operazioni REST di mutazione (`POST`, `PATCH`, `DELETE`) vengono elaborate attraverso una pipeline di esecuzione sequenziale e rigorosa degli hook:
+Ogni operazione di mutazione REST (`POST`, `PATCH`, `DELETE`) attraversa una pipeline di esecuzione sequenziale e rigorosa degli hook:
 
 ```
 Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
 ```
 
-### Hook bloccanti e hook differiti
+### Hook bloccanti e differiti (deferred)
 
 1. **Hook bloccanti (`beforeSave`, `beforeDelete`)**
-   Questi hook vengono eseguiti in maniera sincrona durante il ciclo principale della richiesta, *prima* dell'invio della transazione al database. Possono modificare i payload in entrata, eseguire logiche di convalida personalizzate o interrompere l'elaborazione della richiesta generando un errore.
+   Questi hook vengono eseguiti in modo sincrono nel ciclo principale della richiesta *prima* di eseguire il commit della transazione del database. Possono modificare i payload in ingresso, eseguire validazioni personalizzate o interrompere completamente la richiesta generando un errore.
 
 2. **Hook differiti (`afterSave`, `afterDelete`)**
-   Questi hook vengono eseguiti in modo asincrono una volta completata con successo la transazione sul database. Utilizzano promise differite (modalità fire-and-forget), vengono elaborati in background e non bloccano l'invio della risposta HTTP al client. Sono ideali per l'invio di webhook, la generazione di notifiche push o l'accodamento di processi verso servizi esterni.
+   Questi hook vengono eseguiti in modo asincrono dopo che la transazione del database è stata confermata con successo (commit). Utilizzano promesse differite (fire-and-forget), il che significa che vengono eseguiti in background e non bloccano la risposta HTTP inviata al client. Ideali per l'invio di webhook, l'attivazione di notifiche push o l'accodamento di task esterni.
 
 ## Endpoint di sistema
 
 | Metodo | Percorso | Autenticazione | Descrizione |
-|--------|------|------|-------------|
-| `GET` | `/health` e `/api/health` | nessuna | Verifica dello stato del servizio (liveness/readiness check) |
-| `GET` | `/api/docs` | nessuna | Specifica JSON OpenAPI 3.0 |
-| `GET` | `/api/swagger` | nessuna | Swagger UI. Attiva in ambiente di sviluppo, disattivata in produzione; modificabile tramite `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | nessuna | L'hash dello schema utilizzato per compilare questo backend — deliberatamente privo di autenticazione, restituisce esclusivamente tale hash |
-| `GET` | `/api/meta/contract` | admin, service key o admin API key | La definizione completa dei contratti delle collection, utilizzata da `rebase generate-sdk --from`. Comportamento fail-closed: restituisce `404` quando non è configurata alcuna autenticazione |
-| `GET` | `/metrics` | `REBASE_METRICS_TOKEN` se definito | Metriche in formato Prometheus, abilitate se `REBASE_METRICS=true` |
+|--------|----------|----------------|-------------|
+| `GET` | `/health` and `/api/health` | nessuna | Verifica di liveness/readiness |
+| `GET` | `/api/docs` | nessuna | La specifica JSON di OpenAPI 3.0 |
+| `GET` | `/api/swagger` | nessuna | Swagger UI. Attivo in fase di sviluppo, disattivato in produzione; `REBASE_ENABLE_SWAGGER` ne sovrascrive lo stato in entrambi i casi |
+| `GET` | `/api/meta/schema-version` | nessuna | L'hash dello schema da cui è stato compilato questo backend — deliberatamente non autenticato, restituisce solo tale hash |
+| `GET` | `/api/meta/contract` | admin, service key o admin API key | Il contratto completo delle collection, per `rebase generate-sdk --from`. Fail-closed: `404` se non è configurata alcuna autenticazione |
+| `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando impostato | Metriche di Prometheus, se `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-La specifica OpenAPI viene generata automaticamente a partire dalle definizioni delle tue collection: documenta gli endpoint di elenco, lettura, creazione, aggiornamento, eliminazione e operazioni bulk per ogni collection gestita dal backend, indicando i rispettivi parametri di query e gli schemi di risposta. Non costituisce una mappatura esaustiva dell'intera superficie HTTP — le route dedicate ad autenticazione, archiviazione, funzioni e cron job sono documentate esclusivamente su questo sito — e le colonne contrassegnate con `excludeFromApi` non vi vengono incluse.
+La specifica OpenAPI viene generata automaticamente a partire dalle definizioni delle tue collection: descrive gli endpoint di elenco, lettura, creazione, aggiornamento, eliminazione e operazioni di massa (bulk) di ogni collection gestita dal backend, con i rispettivi parametri di query e schemi di risposta. Non costituisce una mappa completa dell'intera superficie HTTP — le route relative ad auth, storage, functions e cron sono documentate esclusivamente su questo sito — e le colonne contrassegnate con `excludeFromApi` ne vengono escluse.
 
-I client automatizzati si autenticano tramite chiavi API dedicate con permessi specifici (scoped) anziché tramite sessioni:
-[Chiavi API](/docs/backend/api-keys/).
+I client automatizzati (machine callers) si autenticano mediante una chiave con permessi dedicati (scoped key) anziché tramite una sessione:
+[API keys](/docs/backend/api-keys/).
 
 ## Metadati dello schema
 
-Lo schema completo delle collection del progetto — comprendente ogni collection, proprietà e relazione — è accessibile per gli utenti amministratori autenticati:
+Lo schema completo delle collection del progetto — ogni collection, proprietà e relazione — viene fornito a un amministratore autenticato:
 
 ```bash
 GET /api/meta/contract
 ```
 
-L'accesso è **riservato esclusivamente agli amministratori**; nei deployment in cui non è configurato alcun sistema di autenticazione l'endpoint non risponde (404 `CONTRACT_UNAVAILABLE`) per evitare l'esposizione non protetta dello schema. L'endpoint complementare restituisce invece una stringa di versione che identifica univocamente lo schema senza rivelarne la struttura, ed è liberamente accessibile senza credenziali — risultando ideale per verifiche automatizzate nelle pipeline di CI:
+È accessibile **solo agli amministratori** e, su un deployment privo di autenticazione configurata, non viene restituito affatto (404 `CONTRACT_UNAVAILABLE`) anziché esporre lo schema pubblicamente. Il suo endpoint complementare restituisce una stringa di versione che identifica lo schema senza descriverlo ed è deliberatamente accessibile senza alcuna credenziale — ed è ciò su cui esegue il polling un job di CI:
 
 ```bash
 GET /api/meta/schema-version
 ```
 
-Per consultare la struttura degli endpoint anziché lo schema dei dati sottostante, il documento OpenAPI è disponibile all'indirizzo `GET /api/docs`, mentre l'interfaccia Swagger UI è raggiungibile su `/api/swagger` qualora l'opzione `enableSwagger` sia abilitata.
+Per verificare la struttura degli endpoint anziché lo schema sottostante, il documento OpenAPI è disponibile su `GET /api/docs`, con la Swagger UI consultabile su `/api/swagger` quando `enableSwagger` è abilitato.
 
 ## Passaggi successivi
 
-- **[Client SDK](/docs/sdk)** — Client type-safe per l'API REST
-- **[Collection](/docs/collections)** — Definisci lo schema dei tuoi dati
-- **[Regole di sicurezza (RLS)](/docs/collections/security-rules)** — Configura il controllo degli accessi a livello di riga
+- **[Client SDK](/docs/sdk)** — Client con tipizzazione statica per l'API REST
+- **[Collections](/docs/collections)** — Definisci lo schema dei tuoi dati
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — Controlla l'accesso per singola riga
 
 ---

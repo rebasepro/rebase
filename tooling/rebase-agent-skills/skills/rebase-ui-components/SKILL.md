@@ -1574,7 +1574,6 @@ import type { RichTextEditorProps, JSONContent, EditorAIController } from "@reba
 | `highlight` | `{ from: number, to: number }` | — | Highlight a character range (used by AI autocomplete) |
 | `aiController` | `EditorAIController` | — | AI autocomplete controller |
 | `disabled` | `boolean` | `false` | Read-only mode |
-| `markdownConfig` | `MarkdownEditorConfig` | — | Markdown parser options (`html`, `transformPastedText`) |
 
 ### Usage Example
 

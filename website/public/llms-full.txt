@@ -8197,8 +8197,6 @@ stored nowhere — and such a listing simply carries no `nextCursor`.
 
 ### Selecting columns
 
-<span class="since-badge" data-since="0.20">Since 0.20</span>
-
 `?fields=` narrows a read to the columns you name. It is a projection pushed
 into the query, not a trim of the response:
 
@@ -13364,8 +13362,6 @@ stored nowhere — and such a listing simply carries no `nextCursor`.
 
 ### Selecting columns
 
-<span class="since-badge" data-since="0.20">Since 0.20</span>
-
 `?fields=` narrows a read to the columns you name. It is a projection pushed
 into the query, not a trim of the response:
 
@@ -14151,8 +14147,6 @@ the ID you got. Read the response header.
 | `WEAK_PASSWORD` | 400 | The password does not meet the configured policy. | Choose a stronger one. |
 
 ### Data, queries and writes
-
-<span class="since-badge" data-since="0.20">Since 0.20</span>
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
@@ -29143,8 +29137,6 @@ to narrow the columns *inside* a relation, see
 [per-relation options](/docs/sdk/relations#narrowing-what-a-relation-loads).
 
 #### `distinct`
-
-<span class="since-badge" data-since="0.20">Since 0.20</span>
 
 `distinct` collapses rows that are identical over the columns being returned,
 and a distinct read returns **only** the columns you name — the primary key is

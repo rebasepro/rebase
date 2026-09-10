@@ -314,8 +314,6 @@ stored nowhere — and such a listing simply carries no `nextCursor`.
 
 ## Selecting columns
 
-<span class="since-badge" data-since="0.20">Since 0.20</span>
-
 `?fields=` narrows a read to the columns you name. It is a projection pushed
 into the query, not a trim of the response:
 
@@ -533,7 +531,6 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 
 2. **Deferred Hooks (`afterSave`, `afterDelete`)**
    These hooks execute asynchronously after the database transaction has successfully committed. They use deferred promises (fire-and-forget), meaning they run in the background and do not block the client's HTTP response. Ideal for sending webhooks, triggering push notifications, or queuing external tasks.
-
 
 ## System endpoints
 

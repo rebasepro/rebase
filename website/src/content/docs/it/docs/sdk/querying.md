@@ -1,13 +1,13 @@
 ---
-sourceHash: 72b63305690d555c
-title: Interrogazione dei Dati
-sidebar_label: Interrogazione dei Dati
-description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregati con l'SDK Client di Rebase.
+sourceHash: 3cba57377cf922df
+title: Interrogare i dati
+sidebar_label: Interrogare i dati
+description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK client Rebase.
 ---
 
-## Accesso alle Collection
+## Accesso alle collezioni
 
-Accedi a qualsiasi collection tramite `client.data.<collectionName>` (camelCase, convertito automaticamente in snake_case) o `client.data.collection<Record<string, unknown>>("slug")` (slug esplicito):
+Accedi a qualsiasi collezione tramite `client.data.<collectionName>` (camelCase, convertito automaticamente in snake_case) o `client.data.collection<Record<string, unknown>>("slug")` (slug esplicito):
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -18,7 +18,7 @@ client.data.users           // → slug "users"
 client.data.collection<Record<string, unknown>>("blog_posts")
 ```
 
-> **Modalità strict (SDK generato):** Quando passi il `collectionsDictionary` generato a `createRebaseClient`, il data proxy convalida gli accessi alle proprietà al momento della chiamata. Un errore di battitura come `client.data.prodcuts` genererà immediatamente un errore utile con un suggerimento di corrispondenza più vicina, invece di produrre un 404 fuorviante in seguito. Usa `client.data.collection<Record<string, unknown>>("slug")` per bypassare la convalida per slug dinamici o determinati a runtime.
+> **Strict mode (SDK generato):** Quando passi il `collectionsDictionary` generato a `createRebaseClient`, il proxy dei dati convalida gli accessi alle proprietà al momento dell'accesso. Un errore di battitura come `client.data.prodcuts` genererà immediatamente un errore utile con un suggerimento della corrispondenza più vicina, invece di produrre un fuorviante 404 in seguito. Usa `client.data.collection<Record<string, unknown>>("slug")` per ignorare la convalida nel caso di slug dinamici o determinati a runtime.
 
 ## Operazioni CRUD
 
@@ -40,11 +40,11 @@ const { data, meta } = await client.data.products.find({
 // meta has { total, limit, offset, hasMore }
 ```
 
-### Lettura di un singolo elemento per ID
+### Lettura singola per ID
 
-Esistono due metodi, poiché rispondono a due situazioni distinte che richiedono codice differente.
+Sono disponibili due metodi, poiché rispondono a due esigenze diverse che richiedono codice differente.
 
-`get` è pensato per una riga di cui prevedi l'esistenza: l'ID proviene da un link, da un parametro di route o da un'altra riga. Restituisce direttamente la riga, evitando type narrowing a valle, e l'assenza della riga genera un'eccezione gestibile:
+`get` serve per una riga di cui si prevede l'esistenza: l'ID proviene da un link, da un parametro di route o da un'altra riga. Restituisce la riga, evitando la necessità di verifiche di tipo a valle; una riga mancante genera un'eccezione su cui è possibile gestire le diramazioni:
 
 ```typescript
 const product = await client.data.products.get(42);
@@ -64,7 +64,7 @@ async function loadProduct(id: string) {
 }
 ```
 
-`findById` è destinato a una riga che potrebbe legittimamente non esistere: una ricerca tramite un ID inserito da un utente o un controllo nella cache:
+`findById` serve per una riga che potrebbe legittimamente non esistere: una ricerca tramite un ID digitato da un utente o un controllo nella cache:
 
 ```typescript
 const maybe = await client.data.products.findById(42);
@@ -72,14 +72,14 @@ const maybe = await client.data.products.findById(42);
 ```
 
 :::note
-La sicurezza a livello di riga (Row-level security) fa sì che "riga inesistente" e "non autorizzato alla lettura" diano deliberatamente la stessa risposta: un errore 404 che facesse distinzione confermerebbe l'esistenza della riga.
+La sicurezza a livello di riga (Row-level security) fa sì che "riga inesistente" e "non hai i permessi di lettura" restituiscano deliberatamente la stessa risposta: un 404 che facesse distinzione tra i due casi confermerebbe l'esistenza della riga.
 :::
 
 ### Scrittura
 
-`create`, `upsert`, `update`, `delete` e le relative operazioni in batch sono trattate in **[Scrittura dei dati](/docs/sdk/writing/)**, insieme alle operazioni sui campi, scritture condizionali e chiavi di idempotenza.
+`create`, `upsert`, `update`, `delete` e le relative varianti batch sono descritte in **[Scrittura dei dati](/docs/sdk/writing/)**, insieme alle operazioni sui campi, alle scritture condizionali e alle chiavi di idempotenza.
 
-### Count (Conteggio)
+### Count
 
 ```typescript
 const total = await client.data.products.count();
@@ -92,7 +92,7 @@ const activeCount = await client.data.products.count({
 
 ## Fluent Query Builder
 
-Concatena i metodi per comporre query più espressive:
+Concatena i metodi per creare query più espressive:
 
 ```typescript
 const { data } = await client.data.products
@@ -103,31 +103,31 @@ const { data } = await client.data.products
     .find();
 ```
 
-### Metodi Disponibili
+### Metodi disponibili
 
 | Metodo | Descrizione | Esempio |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Aggiunge una condizione di filtro | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filtra su un percorso di [relazione](#querying-through-a-relation) o [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
+| `.where(path, op, value)` | Filtra su una [relazione](#querying-through-a-relation) o su un percorso [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
 | `.where(group)` | Aggiunge un [gruppo OR/AND](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Ordina i risultati | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Ordina in base a un [aggregato su una relazione](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Ordina in base a un'[aggregazione su una relazione](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limita il numero di risultati | `.limit(25)` |
 | `.offset(n)` | Salta i primi N risultati | `.offset(50)` |
 | `.after(cursor)` | Continua dopo un [cursore](#cursor-pagination) | `.after(meta.nextCursor)` |
 | `.fields(...columns)` | Restituisce [solo queste colonne](#returning-fewer-columns) | `.fields("id", "title")` |
-| `.distinct()` | Raggruppa le righe identiche su tali colonne | `.fields("status").distinct()` |
-| `.search(text)` | Ricerca di testo — vedi [Ricerca](/docs/backend/search) | `.search("laptop")` |
-| `.vectorSearch(prop, vector, opts?)` | Ricerca nearest-neighbour su una proprietà `vector` | `.vectorSearch("embedding", vec)` |
+| `.distinct()` | Raggruppa le righe identiche rispetto a tali colonne | `.fields("status").distinct()` |
+| `.search(text)` | Ricerca testuale — vedi [Ricerca](/docs/backend/search) | `.search("laptop")` |
+| `.vectorSearch(prop, vector, opts?)` | Ricerca dei vicini più prossimi (nearest-neighbour) su una proprietà `vector` | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Carica le righe correlate](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Esegue la query | Restituisce `FindResult<M>` |
-| `.aggregate(params)` | [Esegue una riduzione anziché restituire le righe](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Restituisce in streaming ogni riga corrispondente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.aggregate(params)` | [Esegue un'aggregazione invece di restituire le righe](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.iterate(options?)` | [Esegue lo streaming di ogni riga corrispondente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
 | `.findAll(options?)` | [Raccoglie ogni riga corrispondente](#reading-everything-iterate-and-findall) | Restituisce `M[]` |
 | `.count()` | Conta le righe corrispondenti | Restituisce `number` |
-| `.listen(onUpdate, onError?)` | Iscriviti agli aggiornamenti in tempo reale | Restituisce `unsubscribe()` |
+| `.listen(onUpdate, onError?)` | Sottoscrive gli aggiornamenti in tempo reale | Restituisce `unsubscribe()` |
 
-### Operatori di Filtro
+### Operatori di filtro
 
 | Operatore | Alias | Descrizione |
 |-----------|-------|-------------|
@@ -141,16 +141,16 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Valore non presente nell'array |
 | `"array-contains"` | `"cs"` | Il campo array contiene il valore |
 | `"array-contains-any"` | `"csa"` | Il campo array contiene uno qualsiasi dei valori |
-| `"like"` | `"like"` | Corrispondenza di pattern **case-sensitive**; `%` e `_` sono caratteri jolly |
+| `"like"` | `"like"` | Corrispondenza di pattern **case-sensitive**; `%` e `_` sono i caratteri jolly |
 | `"ilike"` | `"ilike"` | Corrispondenza di pattern case-insensitive |
 | `"not-like"` | `"nlike"` | Non corrisponde al pattern |
 | `"not-ilike"` | `"nilike"` | Non corrisponde al pattern, in modo case-insensitive |
-| `"is-null"` | `"isnull"` | La colonna è `NULL`. Non accetta valori: qualsiasi valore passato viene ignorato |
+| `"is-null"` | `"isnull"` | La colonna è `NULL`. Non accetta valori — qualsiasi valore passato viene normalizzato e ignorato |
 | `"is-not-null"` | `"notnull"` | La colonna non è `NULL`. Non accetta valori |
 
-La colonna degli alias rappresenta la sintassi di rete (**wire format**), utilizzata nelle query string REST. Non compare mai nel codice applicativo: sia l'SDK che il pannello di amministrazione utilizzano l'operatore canonico a sinistra.
+La colonna alias indica la grafia utilizzata a livello di **trasmissione (wire)**, impiegata nelle query string REST. Non compare mai nel codice dell'applicazione: sia l'SDK che il pannello di amministrazione utilizzano l'operatore canonico a sinistra.
 
-### Sintassi della Clausola Where
+### Sintassi della clausola Where
 
 Il parametro `where` in `find()` supporta due formati:
 
@@ -172,11 +172,11 @@ await client.data.products.find({
 });
 ```
 
-> **Nota:** Le stringhe PostgREST pre-serializzate (formato 2) sono una soluzione di emergenza per passare valori di filtro già in formato wire. È preferibile utilizzare la sintassi a tuple per motivi di type safety e leggibilità.
+> **Nota:** Le stringhe PostgREST pre-serializzate (formato 2) sono una via di fuga (escape hatch) per passare valori di filtro già nel formato wire. È preferibile utilizzare la sintassi a tuple per motivi di type safety e leggibilità.
 
-## Condizioni Logiche (OR / AND / NOT)
+## Condizioni logiche (OR / AND / NOT)
 
-Tutti i campi in `where` vengono combinati con AND. Per unire le condizioni con OR, o per negare un gruppo, costruisci una **condizione logica** tramite gli helper `or`, `and`, `not` e `cond` esportati dall'SDK:
+Ogni campo presente in `where` viene combinato con un AND. Per combinare condizioni con OR, o per negare un gruppo, costruisci una **condizione logica** con gli helper `or`, `and`, `not` e `cond` esportati dall'SDK:
 
 ```typescript
 import { or, and, not, cond } from "@rebasepro/client";
@@ -201,11 +201,11 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` accetta l'operatore canonico — la colonna di sinistra della tabella degli [Operatori di Filtro](#filter-operators). L'utilizzo di un operatore non previsto dal dialetto genera un `TypeError` in fase di serializzazione della query, anziché produrre silenziosamente una query diversa.
+`cond` accetta l'operatore canonico — la colonna di sinistra della tabella degli [Operatori di filtro](#filter-operators). Un operatore non supportato dal dialetto genera un `TypeError` durante la serializzazione della query, invece di produrre silenziosamente una query diversa.
 
 ### Negazione
 
-`not` nega la **congiunzione** delle sue condizioni: `not(a)` equivale a `NOT a`, e `not(a, b)` a `NOT (a AND b)`. I gruppi possono essere annidati, quindi la controparte della legge di De Morgan è `not(or(a, b))`.
+`not` nega la **congiunzione** delle sue condizioni: `not(a)` equivale a `NOT a`, e `not(a, b)` a `NOT (a AND b)`. I gruppi possono essere annidati, quindi l'altra legge di De Morgan è `not(or(a, b))`.
 
 ```typescript
 // Everything that is NOT a draft with fewer than ten views.
@@ -217,46 +217,46 @@ const { data } = await client.data.posts.find({
 });
 ```
 
-Viene compilato in un vero `NOT (...)` SQL, non in operatori invertiti. Questa distinzione non è superficiale: la logica di SQL è a tre valori, pertanto `NOT (a AND b)` e `(NOT a) OR (NOT b)` cessano di coincidere non appena entra in gioco un valore `NULL`, e solo una delle due opzioni corrisponde alla query scritta.
+Viene compilato in un vero `NOT (...)` SQL, non in operatori invertiti. Questa distinzione non è cosmetica: SQL adotta una logica a tre valori, quindi `NOT (a AND b)` e `(NOT a) OR (NOT b)` smettono di coincidere non appena entra in gioco un valore `NULL`, e solo una delle due rappresenta la query che hai effettivamente scritto.
 
-Ciò significa inoltre che una negazione **include le righe la cui colonna è NULL** — `not(cond("status", "==", "draft"))` restituisce le righe che non hanno alcuno stato impostato. È questo il significato di `NOT` ed è generalmente ciò che ci si aspetta; in caso contrario, aggiungi una condizione `is-not-null` in AND al suo fianco.
+Ciò significa anche che una negazione **include le righe la cui colonna è NULL** — `not(cond("status", "==", "draft"))` restituisce le righe prive di alcuno stato. Questo è il significato di `NOT`, ed è solitamente ciò che si desidera; in caso contrario, aggiungi un `is-not-null` con AND.
 
-### Composizione con il resto della query
+### Come si compone con il resto della query
 
 `where`, `logical` e `search` sono tre gruppi indipendenti, combinati tra loro con AND:
 
 ```
-(campi where, in AND)  AND  (gruppo logico)  AND  (search)
+(where fields, AND-ed)  AND  (logical group)  AND  (search)
 ```
 
-Non è possibile applicare un OR tra `where` e `logical`. Qualsiasi combinazione che non sia un semplice AND tra i tre deve essere espressa all'interno di un unico albero `logical` — sposta al suo interno i campi che necessitano dell'OR.
+Non è possibile combinare con un OR `where` e `logical`. Tutto ciò che non è un semplice AND tra i tre elementi deve essere espresso all'interno di un unico albero `logical`: sposta al suo interno i campi che desideri combinare con OR.
 
-### Formato di rete (On the wire)
+### A livello di trasmissione (On the wire)
 
-Un gruppo logico viaggia come un singolo parametro di query `or=`, `and=` o `not=`, adottando la stessa sintassi con il punto impiegata dai filtri di campo:
+Un gruppo logico viaggia come singolo parametro di query `or=`, `and=` o `not=`, con la stessa sintassi a punti utilizzata dai filtri di campo:
 
 ```
 GET /api/data/products?or=(status.eq.active,featured.eq.true)
 GET /api/data/posts?not=(status.eq.draft,views.lt.10)
 ```
 
-Viene applicato un solo operatore dei tre per richiesta — `or` ha la precedenza su `and`, ed entrambi su `not`. Annida un gruppo dentro l'altro per combinarli.
+Per ciascuna richiesta si applica solo uno dei tre: `or` ha la precedenza su `and`, ed entrambi su `not`. Annida un gruppo dentro un altro per combinarli.
 
-Esistono tre codifiche rilevanti da conoscere, poiché sono quelle in cui è facile commettere errori scrivendo a mano una query string:
+Vale la pena conoscere tre codifiche, poiché sono quelle in cui una query string scritta a mano rischia più facilmente di sbagliare:
 
 | Condizione | Formato wire | Nota |
 |------------|--------------|------|
-| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` ricerca la stringa di quattro caratteri `null` |
-| `cond("id", "in", [])` | `id.in.(\)` | `in.()` è una lista contenente una singola stringa vuota, il che produce una query diversa |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [percorso di relazione](#querying-through-a-relation) mantiene il suo punto |
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` cerca la stringa di quattro caratteri `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` è una lista contenente una singola stringa vuota, che corrisponde a una query diversa |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [percorso di relazione](#querying-through-a-relation) mantiene il proprio punto |
 
-Virgole, parentesi e barre rovesciate all'interno di un valore vengono precedute da un carattere di escape backslash; pertanto `cond("name", "==", "Doe, John")` viaggia come `name.eq.Doe\, John` e non spezza il gruppo.
+Virgole, parentesi e barre rovesciate all'interno di un valore vengono precedute da un backslash di escape: di conseguenza `cond("name", "==", "Doe, John")` viaggia come `name.eq.Doe\, John` senza frammentare il gruppo.
 
-I gruppi possono essere annidati fino a 32 livelli di profondità. Oltre tale soglia, la richiesta viene respinta con `INVALID_LOGICAL_GROUP` — in tal caso appiattiscila, poiché `or(a,or(b,c))` equivale a `or(a,b,c)`.
+I gruppi possono essere annidati fino a un massimo di 32 livelli. Superata tale soglia, la richiesta viene rifiutata con l'errore `INVALID_LOGICAL_GROUP` — in tal caso è consigliabile appiattirla, dato che `or(a,or(b,c))` equivale a `or(a,b,c)`.
 
 ## Paginazione
 
-Offset, numeri di pagina e cursori keyset sono trattati nella pagina dedicata:
+Offset, numeri di pagina e cursori keyset sono trattati in una pagina dedicata:
 [Paginazione](/docs/sdk/pagination/).
 
 ## Ordinamento
@@ -273,11 +273,11 @@ const { data } = await client.data.products
     .find();
 ```
 
-Se la direzione viene omessa, il valore predefinito è `"asc"` — esattamente come `?orderBy=name` su HTTP, a prescindere dal database utilizzato.
+Se la direzione viene omessa, assume come valore predefinito `"asc"` — lo stesso significato di `?orderBy=name` su HTTP, indipendentemente dal database sottostante.
 
-### Ordinamento per più colonne
+### Ordinamento su più colonne
 
-L'ordinamento è un'*elenco* di chiavi. La seconda risolve le parità tra righe che la prima considera uguali, la terza tra quelle identiche per le prime due — pertanto `orderBy` accetta un elenco di coppie `[field, direction]` con la stessa naturalezza di una singola coppia:
+Un ordinamento è un'*elenco* di chiavi. La seconda dirime i casi di parità tra le righe considerate uguali dalla prima, la terza tra quelle considerate uguali dalle prime due — di conseguenza `orderBy` accetta un elenco di coppie `[campo, direzione]` con la stessa naturalezza di una coppia singola:
 
 ```typescript
 // By category, and newest first within each category.
@@ -286,7 +286,7 @@ const { data } = await client.data.products.find({
 });
 ```
 
-Nel fluent builder si ottiene lo stesso risultato concatenando ulteriori chiamate a `.orderBy()`. Ogni chiamata **aggiunge** una chiave subordinata a quelle precedenti anziché sostituirle:
+Nel fluent builder si ottiene lo stesso risultato richiamando `.orderBy()`. Ciascuna chiamata **aggiunge** una chiave a valle delle precedenti anziché sostituirle:
 
 ```typescript
 const { data } = await client.data.products
@@ -295,15 +295,15 @@ const { data } = await client.data.products
     .find();
 ```
 
-Ogni ordinamento termina con l'ID di riga decrescente, che sia stato esplicitamente richiesto o meno. È questo a rendere l'ordinamento *totale*: senza di esso due righe con lo stesso valore verrebbero restituite nell'ordine arbitrario scelto dal database, e paginare su un ordinamento suscettibile di variazioni tra due esecuzioni della stessa query finirebbe per duplicare alcune righe e saltarne altre.
+Ogni ordinamento termina con l'ID della riga in ordine decrescente, indipendentemente dal fatto che sia stato richiesto o meno. È questo che rende l'ordinamento *totale*: senza questo criterio, due righe che condividono lo stesso valore verrebbero restituite nell'ordine arbitrario scelto dal database, e la paginazione su un ordinamento che può variare tra due esecuzioni della stessa query comporterebbe la ripetizione di alcune righe e l'omissione di altre.
 
-Un ordinamento a più colonne pagina correttamente tramite [cursore](#cursor-pagination): il confronto viene costruito su ciascuna chiave, in sequenza. L'unico criterio di ordinamento non descrivibile da un cursore è **`_score`** — vedi [Ricerca](/docs/backend/search). La rilevanza viene calcolata per ogni singola query anziché salvata, quindi non vi è alcun valore sulla riga del cursore su cui confrontare la pagina successiva, e tale elenco non produrrà alcun `nextCursor`.
+Un ordinamento a più colonne funziona regolarmente con un [cursore](#cursor-pagination): il confronto viene costruito su ciascuna chiave, in ordine. L'unico ordinamento che un cursore non può descrivere è **`_score`** — vedi [Ricerca](/docs/backend/search). La rilevanza viene calcolata per ciascuna query anziché essere memorizzata, pertanto non esiste alcun valore sulla riga del cursore rispetto al quale confrontare la pagina successiva, e un tale elenco non include alcun `nextCursor`.
 
-### Posizionamento dei valori NULL nell'ordinamento
+### Posizione dei valori NULL nell'ordinamento
 
-Per impostazione predefinita i valori NULL vengono posizionati **per ultimi in ordine crescente e per primi in ordine decrescente** — convenzione tipica di Postgres. Questo comportamento predefinito posiziona ogni riga sprovvista di data in cima a un elenco ordinato "dal più recente", prima di qualsiasi dato valido; in passato l'unica via d'uscita era un filtro `is-not-null` che rimuoveva del tutto tali righe.
+Per impostazione predefinita, i valori NULL vengono posizionati **per ultimi in ordine crescente e per primi in ordine decrescente** — secondo la convenzione adottata da Postgres. Questo comportamento predefinito posiziona ogni riga priva di data in cima a un elenco ordinato per "più recenti", davanti a tutti i dati validi; in precedenza, l'unico modo per evitarlo era utilizzare un filtro `is-not-null` che escludeva completamente tali righe.
 
-Un terzo elemento nella chiave consente di specificarne il posizionamento alternativo:
+Un terzo elemento nella chiave consente di specificarne la collocazione alternativa:
 
 ```typescript
 // Newest first, and the ones with no date at the end where they belong.
@@ -318,13 +318,13 @@ const { data } = await client.data.posts
     .find();
 ```
 
-Su HTTP corrisponde a un terzo elemento separato da due punti, `?orderBy=publishedAt:desc:last`, oppure alla proprietà `"nulls"` nel formato array JSON. Qualsiasi valore diverso da `first`/`last` produce un errore 400 anziché un ordinamento silenziosamente errato.
+Su HTTP si utilizza un terzo segmento separato da due punti, `?orderBy=publishedAt:desc:last`, oppure una chiave `"nulls"` nel formato array JSON. Qualsiasi valore diverso da `first`/`last` restituisce un errore 400 anziché applicare un ordinamento silenziosamente diverso.
 
-Il [cursore](#cursor-pagination) tiene conto delle impostazioni di ordinamento indicate, garantendo che la paginazione su una chiave nullable rimanga accurata con entrambi i posizionamenti.
+Il [cursore](#cursor-pagination) rispetta qualsiasi impostazione definita per l'ordinamento, garantendo che la paginazione su una chiave nullable rimanga coerente con entrambe le collocazioni.
 
 ## Restituire meno colonne
 
-`fields` circoscrive la lettura alle sole colonne indicate. Si tratta di una proiezione a livello di database — sono le colonne effettivamente *lette*, non quelle superstiti dopo un troncamento della risposta — quindi una query che necessita di due campi su una riga estesa non pagherà l'elaborazione del resto:
+`fields` restringe la lettura alle sole colonne indicate. Si tratta di una proiezione eseguita direttamente dal database — sono le colonne effettivamente *lette*, non quelle superstiti dopo un troncamento della risposta — per cui una query che richiede due soli campi di una riga molto ampia non paga il costo di lettura degli altri:
 
 ```typescript
 const { data } = await client.data.posts.find({
@@ -337,22 +337,20 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts.fields("id", "title").find();
 ```
 
-Due principi rimangono sempre validi, a prescindere dalle colonne indicate:
+Valgono sempre due principi invariabili, indipendentemente dai campi specificati:
 
-- **La chiave primaria viene sempre inclusa.** Una riga priva di identificatore non può essere aggiornata, eliminata o oltrepassata tramite paginazione — e `meta.nextCursor` viene ricavato da essa, quindi una proiezione priva della chiave disabiliterebbe silenziosamente la navigazione per cursore.
-- **Le colonne con `excludeFromApi` restano nascoste.** Specificare il loro nome non ne annulla l'esclusione.
+- **La chiave primaria viene sempre restituita.** Una riga non indirizzabile non può essere aggiornata, eliminata o superata con la paginazione — inoltre `meta.nextCursor` deriva da essa, quindi una proiezione priva della chiave disabiliterebbe silenziosamente la navigazione per cursore (seeking).
+- **Le colonne con `excludeFromApi` rimangono nascoste.** Specificare il loro nome non le rende visibili.
 
-Una colonna inesistente genera un errore 400 `UNKNOWN_FIELD`. Se venisse semplicemente ignorata ("omettila"), un errore di battitura come `fields: ["titel"]` restituirebbe righe prive di titoli senza alcuna spiegazione.
+Una colonna sconosciuta genera un errore 400 `UNKNOWN_FIELD`. Se venisse interpretata come "omettila", un errore di battitura come `fields: ["titel"]` restituirebbe righe prive di titoli senza alcun indizio sul motivo.
 
-Una relazione specificata in `include` viene caricata a prescindere dalla sua presenza in `fields`; per circoscrivere le colonne *interne* a una relazione, consulta le [opzioni per relazione](/docs/sdk/relations#narrowing-what-a-relation-loads).
+Una relazione indicata in `include` viene caricata a prescindere dal fatto che compaia o meno in `fields`; per limitare le colonne *all'interno* di una relazione, consulta le [opzioni per relazione](/docs/sdk/relations#narrowing-what-a-relation-loads).
 
 ### `distinct`
 
-<span class="since-badge" data-since="0.20">Da 0.20</span>
+`distinct` raggruppa le righe identiche rispetto alle colonne restituite, e una lettura distinct restituisce **solo** le colonne specificate — la chiave primaria viene esclusa dalla proiezione, a differenza di qualsiasi altra lettura. È necessario che sia così: una chiave surrogata differisce su ogni riga, quindi mantenerla renderebbe ogni riga univoca per definizione e la query risponderebbe 200 senza aver applicato alcun raggruppamento.
 
-`distinct` raggruppa le righe identiche rispetto alle colonne restituite, e una lettura con distinct restituisce **unicamente** le colonne indicate — la chiave primaria viene esclusa dalla proiezione, a differenza di quanto avviene in tutte le altre letture. Deve essere così: una chiave surrogata differisce in ogni riga, quindi mantenerla renderebbe ogni riga univoca per definizione e la query restituirebbe uno stato 200 senza aver raggruppato nulla.
-
-Per questo motivo il metodo ha senso solo se associato a `fields`. Senza di esso verrebbe richiesta ogni colonna visibile, chiave inclusa, e nessuna riga verrebbe accorpata:
+Ciò lo rende significativo solo in abbinamento a `fields`. Senza di esso verrebbe richiesta ogni colonna visibile, chiave inclusa, e non si verificherebbe alcun raggruppamento:
 
 ```typescript
 // The statuses actually in use.
@@ -362,18 +360,18 @@ const { data } = await client.data.posts
     .find();
 ```
 
-Una lettura distinct non fa riferimento a righe specifiche — mancando una chiave primaria tramite cui indirizzarle — restituendo di fatto un insieme di valori anziché un insieme di righe da aggiornare o eliminare, e non include alcun `nextCursor`. Inoltre, **non restituisce `meta.total`**: il conteggio richiederebbe una query `COUNT(DISTINCT …)` non eseguita dal driver, e riportare il semplice conteggio delle righe descriverebbe un insieme differente da quello servito — un risultato completo di due righe verrebbe restituito come `total: 8, hasMore: true`, inducendo il client a paginare indefinitamente. `hasMore` viene invece ricavato direttamente dalla pagina stessa.
+Una lettura distinct non fa riferimento a righe specifiche — non essendoci una chiave tramite cui indirizzarle — pertanto restituisce un insieme di valori anziché un insieme di righe da aggiornare o eliminare, e non include alcun `nextCursor`. Inoltre non riporta **alcun `meta.total`**: il conteggio richiederebbe un `COUNT(DISTINCT …)` che il driver non esegue, e riportare il semplice numero di righe descriverebbe un insieme diverso da quello servito — un risultato completo di due righe tornerebbe come `total: 8, hasMore: true`, inducendo il client a paginare all'infinito. `hasMore` viene ricavato dalla pagina stessa.
 
-Due combinazioni vengono respinte con errore anziché restituire un risultato privo di senso:
+Due combinazioni vengono rifiutate anziché produrre un risultato privo di utilità:
 
-- **Una query che assegna un punteggio a ciascuna riga** — una `search()` classificata o una `vectorSearch()` associa uno `_score` o una `_distance` a ogni riga, rendendo le righe mai identiche tra loro e rendendo `DISTINCT` inefficace. (Una ricerca standard per sottostringa non associa punteggi ed è pertanto consentita.)
-- **L'ordinamento per una colonna non inclusa tra quelle restituite.** Postgres non consente di ordinare una query `DISTINCT` in base a un'espressione esclusa dalla select list; la richiesta restituisce un errore 400 `DISTINCT_ORDER_BY_NOT_SELECTED` invece di un errore 500 che riporta codice SQL mai scritto direttamente.
+- **Una query che assegna un punteggio a ogni riga** — una `search()` ordinata per rilevanza o una `vectorSearch()` associa uno `_score`/`_distance` a ogni riga, per cui due righe non risulterebbero mai identiche e `DISTINCT` non avrebbe alcun effetto. (Una semplice ricerca per sottostringa non associa nulla ed è consentita.)
+- **L'ordinamento in base a una colonna non restituita.** Postgres non può ordinare una lettura `DISTINCT` tramite un'espressione esclusa dalla clausola select; la richiesta restituisce un errore 400 `DISTINCT_ORDER_BY_NOT_SELECTED` invece di un errore 500 che cita codice SQL mai scritto.
 
 Su HTTP: `?fields=status&distinct=true`.
 
-## Aggregati
+## Aggregazioni
 
-`aggregate()` riduce l'insieme delle righe corrispondenti anziché restituirle — `count`, `sum`, `avg`, `min`, `max`, con raggruppamento opzionale:
+`aggregate()` riduce le righe corrispondenti anziché restituirle — `count`, `sum`, `avg`, `min`, `max`, opzionalmente raggruppate:
 
 ```typescript
 const rows = await client.data.orders.aggregate({
@@ -384,7 +382,7 @@ const rows = await client.data.orders.aggregate({
 // [{ status: "paid", sum_total: 41822.5, count: 317 }, …]
 ```
 
-I filtri impostati sul query builder vengono mantenuti, rappresentando di solito la sintassi più sintetica:
+I filtri impostati sul builder vengono ereditati dall'aggregazione, il che rappresenta solitamente la forma più concisa:
 
 ```typescript
 const rows = await client.data.orders
@@ -392,22 +390,22 @@ const rows = await client.data.orders
     .aggregate({ select: [{ fn: "sum", field: "total" }], groupBy: ["status"] });
 ```
 
-Le chiavi nei risultati sono **derivate**, non definibili: `sum(total)` viene restituito come `sum_total`, un semplice `count()` come `count`. Consentire di personalizzarne il nome comporterebbe dover verificare che esso non coincida con un campo presente in `groupBy` — un vincolo inaspettato, che in assenza di controlli causerebbe sovrascritture silenziose.
+Le chiavi dei risultati sono **derivate**, non personalizzabili: `sum(total)` viene restituito come `sum_total`, un semplice `count()` come `count`. Consentire di rinominarle comporterebbe dover verificare che il nome scelto non coincida con un campo presente in `groupBy` — una regola controintuitiva che, se ignorata, porterebbe a sovrascrivere silenziosamente dei valori.
 
-`limit` definisce la soglia massima per il numero di **gruppi** (il raggruppamento su una colonna ad alta cardinalità può equivalere all'invio di un'intera tabella in un'unica risposta) e viene ignorato in assenza di `groupBy`, poiché un'aggregazione non raggruppata produce una sola riga. `orderBy`, `include` e la paginazione non sono applicabili: un aggregato non ha righe da ordinare, relazioni da caricare né pagine su cui proseguire.
+`limit` vincola il numero di **gruppi** (il raggruppamento su una colonna ad alta cardinalità potrebbe restituire l'equivalente di un'intera tabella di righe in un'unica risposta) e viene ignorato in assenza di `groupBy`, poiché un'aggregazione non raggruppata produce una sola riga. `orderBy`, `include` e la paginazione non si applicano: un'aggregazione non ha righe da ordinare, relazioni da caricare né pagine da continuare.
 
-Lo scopo principale è evitare di recuperare singole righe al solo fine di ridurle. Ottenere il "fatturato per stato" su un milione di ordini si traduce qui in un'unica query e in una riga per stato, a differenza di una `findAll()` associata a un ciclo applicativo — approccio errato se sottoposto a `limit` e ingestibile senza di esso. L'operazione viene eseguita attraverso lo stesso handle con ambito di richiesta (request-scoped) di qualsiasi altra lettura, garantendo l'applicazione della sicurezza a livello di riga a tutte le righe aggregate.
+Il vantaggio fondamentale consiste nell'evitare di scaricare le righe solo per aggregarle. Il "fatturato per stato" su un milione di ordini corrisponde in questo modo a un'unica query e a una sola riga per stato, mentre altrove richiederebbe una `findAll()` seguita da un ciclo — approccio non corretto in presenza di un `limit` e insostenibile senza di esso. L'operazione viene eseguita attraverso lo stesso handle contestuale alla richiesta usato da ogni altra lettura, per cui la sicurezza a livello di riga (RLS) si applica anche alle righe aggregate.
 
 Su HTTP: `GET /api/data/orders/aggregate?select=sum(total),count()&groupBy=status`.
 
-Il filtraggio su JSON, la ricerca full-text e la ricerca vettoriale sono trattati in una pagina dedicata:
-[Aggregati e ricerca](/docs/sdk/aggregates-and-search/).
+I filtri JSON, la ricerca full-text e la ricerca vettoriale sono descritti in una pagina dedicata:
+[Aggregazioni e ricerca](/docs/sdk/aggregates-and-search/).
 
-La lettura di entità correlate — tramite `include` e gli accessor per interrogare attraverso una relazione — è descritta in: [Interrogazione delle relazioni](/docs/sdk/relations/).
+La lettura di entità correlate — `include` e gli accessor per interrogare attraverso una relazione — ha una pagina dedicata: [Interrogazione delle relazioni](/docs/sdk/relations/).
 
-## Endpoint Personalizzati
+## Endpoint personalizzati
 
-Chiama gli endpoint server personalizzati registrati tramite il sistema delle funzioni:
+Chiama gli endpoint server personalizzati registrati tramite il sistema di funzioni:
 
 ```typescript
 // Using client.functions.invoke()
@@ -430,15 +428,15 @@ const result = await client.call<{ summary: string }>(
 );
 ```
 
-Entrambi restituiscono **il corpo della risposta della funzione, testualmente (verbatim)**. Nessuno dei due estrae preventivamente una chiave `data`: se una funzione risponde con `{ data: [...] }`, viene restituito l'intero oggetto e spetta a te accedere a `.data`.
+Entrambi i metodi restituiscono **il corpo della risposta della funzione, tale e quale (verbatim)**. Nessuno dei due estrae automaticamente una chiave `data`, per cui una funzione che risponde con `{ data: [...] }` restituisce direttamente quell'oggetto e spetta all'utente accedere a `.data`.
 
-`call()` accetta un percorso completo ed esegue sempre una richiesta POST; `invoke()` accetta il nome di una funzione e può accogliere un metodo HTTP, un sub-path e intestazioni. Utilizza `invoke()` a meno che la destinazione della chiamata non sia una risorsa differente da una funzione.
+`call()` accetta un percorso completo ed effettua sempre una richiesta POST; `invoke()` accetta il nome di una funzione e può ricevere un metodo HTTP, un sotto-percorso e intestazioni. Usa `invoke()` a meno che non si stia chiamando qualcosa che non sia una funzione.
 
-## Passaggi Successivi
+## Passaggi successivi
 
 - **[Autenticazione](/docs/sdk/authentication)** — Accesso, registrazione, OAuth, sessioni
-- **[Sottoscrizioni Realtime](/docs/sdk/realtime)** — Dati in tempo reale tramite WebSocket
-- **[Storage e File](/docs/sdk/storage)** — Caricamento, download e gestione dei file
-- **[Relazioni](/docs/collections/relations)** — Definizione delle relazioni tra collection
+- **[Sottoscrizioni Realtime](/docs/sdk/realtime)** — Dati in tempo reale con i WebSocket
+- **[Storage & File](/docs/sdk/storage)** — Carica, scarica e gestisci file
+- **[Relazioni](/docs/collections/relations)** — Definisci relazioni tra collezioni
 
 ---

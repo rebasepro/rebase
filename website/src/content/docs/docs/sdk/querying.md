@@ -403,8 +403,6 @@ to narrow the columns *inside* a relation, see
 
 ### `distinct`
 
-<span class="since-badge" data-since="0.20">Since 0.20</span>
-
 `distinct` collapses rows that are identical over the columns being returned,
 and a distinct read returns **only** the columns you name — the primary key is
 left out of the projection, unlike every other read. It has to be: a surrogate
