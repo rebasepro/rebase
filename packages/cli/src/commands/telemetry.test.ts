@@ -57,12 +57,16 @@ describe("rebase telemetry", () => {
         expect(await run("status")).toMatch(/not configured/);
     });
 
-    it("refuses to show a payload when nothing would be sent", async () => {
-        // Printing a specimen payload while sending nothing would misrepresent
-        // the state in the direction that matters.
+    it("shows a specimen payload before anyone has said yes", async () => {
+        // The consent prompt is short and points here, so this is what someone
+        // deciding actually reads. Refusing until sharing is on would have made
+        // the only way to find out what is sent be to start sending it.
         const text = await run("show");
-        expect(text).toMatch(/no payload to show/i);
-        expect(text).not.toMatch(/"machineId"/);
+        expect(text).toMatch(/what WOULD be sent/i);
+        expect(text).toMatch(/"machineId"/);
+        // and it must not read as though anything is being sent already
+        expect(text).toMatch(/Nothing is being sent/i);
+        expect(text).toMatch(/only if you say yes|generated only if you say yes/i);
     });
 
     it("prints the real payload once sharing is on", async () => {
