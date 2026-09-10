@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   ChevronDown, User,
   Folder, ShoppingCart,
-  LayoutList, ArrowUpRight, ArrowDownRight,
-  Info, Package, X, Maximize2, Code
+  LayoutList,
+  CircleCheck, Truck, Banknote, X, Maximize2, Code
 } from "lucide-react";
 
 import { AdminDrawer, AdminToolbar, SHELL_ROOT, SHELL_SHEET } from "./admin/AdminChrome";
@@ -25,9 +25,10 @@ function useMediaQuery(query: string): boolean {
 /* ─── Types ─── */
 interface Order {
   id: string;
+  /** The first line of the order, standing in as the record's preview. */
+  image: string;
   paymentStatus: "paid" | "pending" | "refunded";
   customer: string;
-  customerColor: string;
   status: "Confirmed" | "Delivered" | "Shipped" | "Cancelled" | "Processing";
   date: string;
   items: number;
@@ -38,53 +39,258 @@ interface Order {
 
 /* ─── Mock Data ─── */
 const MOCK_ORDERS: Order[] = [
-  { id: "ORD-2026-0006", paymentStatus: "paid", customer: "Elizabeth", customerColor: "#3b82f6", status: "Confirmed", date: "8 May", items: 3, total: "$284.00", email: "elizabeth@mail.com", address: "123 Main St, London" },
-  { id: "ORD-2026-0036", paymentStatus: "paid", customer: "James", customerColor: "#22c55e", status: "Delivered", date: "1d ago", items: 1, total: "$59.99", email: "james@mail.com", address: "45 Park Ave, NYC" },
-  { id: "ORD-2026-0061", paymentStatus: "paid", customer: "Elizabeth", customerColor: "#3b82f6", status: "Shipped", date: "3d ago", items: 2, total: "$149.50", email: "elizabeth@mail.com", address: "123 Main St, London" },
-  { id: "ORD-2026-0056", paymentStatus: "paid", customer: "Jennifer", customerColor: "#a855f7", status: "Cancelled", date: "8 May", items: 5, total: "$412.00", email: "jennifer@mail.com", address: "78 Oak Rd, Berlin" },
-  { id: "ORD-2026-0026", paymentStatus: "paid", customer: "Susan", customerColor: "#22c55e", status: "Cancelled", date: "1d ago", items: 1, total: "$34.99", email: "susan@mail.com", address: "9 Elm St, Paris" },
-  { id: "ORD-2026-0019", paymentStatus: "paid", customer: "Michael", customerColor: "#f59e0b", status: "Confirmed", date: "5d ago", items: 4, total: "$199.00", email: "michael@mail.com", address: "22 Maple Dr, Tokyo" },
-  { id: "ORD-2026-0042", paymentStatus: "pending", customer: "Sarah", customerColor: "#ec4899", status: "Processing", date: "2d ago", items: 2, total: "$89.50", email: "sarah@mail.com", address: "55 Pine Ln, Sydney" },
-  { id: "ORD-2026-0088", paymentStatus: "paid", customer: "David", customerColor: "#06b6d4", status: "Delivered", date: "6 May", items: 3, total: "$245.00", email: "david@mail.com", address: "11 Cedar Ct, Toronto" },
+  { id: "ORD-2026-0006", image: "/img/demo/products/aviator-rb3025.jpg", paymentStatus: "paid", customer: "Elizabeth", status: "Confirmed", date: "8 May", items: 3, total: "$284.00", email: "elizabeth@mail.com", address: "123 Main St, London" },
+  { id: "ORD-2026-0036", image: "/img/demo/products/baseball-cap.jpg", paymentStatus: "paid", customer: "James", status: "Delivered", date: "1d ago", items: 1, total: "$59.99", email: "james@mail.com", address: "45 Park Ave, NYC" },
+  { id: "ORD-2026-0061", image: "/img/demo/products/wine-decanter.jpg", paymentStatus: "paid", customer: "Elizabeth", status: "Shipped", date: "3d ago", items: 2, total: "$149.50", email: "elizabeth@mail.com", address: "123 Main St, London" },
+  { id: "ORD-2026-0056", image: "/img/demo/products/chess-set.jpg", paymentStatus: "refunded", customer: "Jennifer", status: "Cancelled", date: "8 May", items: 5, total: "$412.00", email: "jennifer@mail.com", address: "78 Oak Rd, Berlin" },
+  { id: "ORD-2026-0026", image: "/img/demo/products/corkscrew.jpg", paymentStatus: "refunded", customer: "Susan", status: "Cancelled", date: "1d ago", items: 1, total: "$34.99", email: "susan@mail.com", address: "9 Elm St, Paris" },
+  { id: "ORD-2026-0019", image: "/img/demo/products/invisible-shelf.jpg", paymentStatus: "paid", customer: "Michael", status: "Confirmed", date: "5d ago", items: 4, total: "$199.00", email: "michael@mail.com", address: "22 Maple Dr, Tokyo" },
+  { id: "ORD-2026-0042", image: "/img/demo/products/casio-collection.jpg", paymentStatus: "pending", customer: "Sarah", status: "Processing", date: "2d ago", items: 2, total: "$89.50", email: "sarah@mail.com", address: "55 Pine Ln, Sydney" },
+  { id: "ORD-2026-0088", image: "/img/demo/products/predator-2.jpg", paymentStatus: "paid", customer: "David", status: "Delivered", date: "6 May", items: 3, total: "$245.00", email: "david@mail.com", address: "11 Cedar Ct, Toronto" },
 ];
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  // CHIP_COLORS in DARK mode, the TINTED variant the product draws by default
-  // since 2026-09-08 — packages/ui/src/util/chip_colors.ts (`darkTintColor`,
-  // `darkTintText`). The solid stops these replaced painted a status as a
-  // block; a 14% wash behind hue-coloured ink is a label.
-  Confirmed: { bg: "rgba(45, 127, 249, 0.14)", text: "#9cc7ff" },
-  Delivered: { bg: "rgba(32, 201, 51, 0.14)", text: "#93e088" },
-  Shipped: { bg: "rgba(99, 102, 241, 0.14)", text: "#a5b4fc" },
-  Cancelled: { bg: "rgba(248, 43, 96, 0.14)", text: "#ff9eb7" },
-  Processing: { bg: "rgba(252, 180, 0, 0.14)", text: "#ffd66e" },
+/* An enum value resolves to a hue in the collection config, and the panel draws
+   that hue as a TINTED chip. `chip` + `chip-<hue>` in global.css carry the exact
+   geometry and the exact composite the product ships — never restate either. */
+const STATUS_CHIP: Record<Order["status"], string> = {
+  Confirmed: "chip-blue",
+  Delivered: "chip-green",
+  Shipped: "chip-indigo",
+  Cancelled: "chip-red",
+  Processing: "chip-yellow",
 };
 
-/* ─── KPI Card ─── */
-function KPICard({ title, subtitle, value, change, icon, isHighlighted = false }: {
-  title: string; subtitle: string; value: string;
-  change?: { value: string; positive: boolean };
-  icon: React.ReactNode; isHighlighted?: boolean;
+const PAYMENT_CHIP: Record<Order["paymentStatus"], string> = {
+  paid: "chip-green",
+  pending: "chip-yellow",
+  refunded: "chip-red",
+};
+
+/* A chip shows the enum's LABEL, never its key. The panel reads labels off
+   `enumValues` in the collection config, and a value that reaches the screen as
+   its own identifier is a config with no labels — not something to imitate. */
+const PAYMENT_LABEL: Record<Order["paymentStatus"], string> = {
+  paid: "Paid",
+  pending: "Pending",
+  refunded: "Refunded",
+};
+
+/* ─── Stat card ───────────────────────────────────────────────────────────
+   InsightsScorecardView.tsx, the non-embedded scorecard: a card on the sheet,
+   `rounded-xl bg-surface-card` with a hairline. The header grammar is one line
+   — 14px icon in the secondary tier, then the label in the micro tier — and the
+   value sits under it, not beside it. Label left / icon far right with the
+   value and its delta sharing a baseline is the layout the product retired,
+   because it made every tile read as two unrelated corners. */
+function StatCard({ title, value, comparison, icon, isHighlighted = false }: {
+  title: string;
+  value: string;
+  comparison?: { value: string; positive: boolean };
+  icon?: React.ReactNode;
+  isHighlighted?: boolean;
 }) {
   return (
-    <div className={`flex-1 min-w-0 rounded-lg border p-2.5 transition-all duration-300 ${
-      isHighlighted
-        ? "border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-sm"
-        // A card is a step ABOVE its ground. These sit on the card surface the
-        // rows use, so they take the raised one — the sheet is darker than the
-        // thing it would be sitting on.
-        : "border-hairline bg-surface-raised"
-    }`}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="text-xs font-medium text-surface-900 dark:text-surface-200">{title}</div>
-        <div className="text-surface-400 dark:text-surface-500">{icon}</div>
+    <div
+      className={`rounded-xl flex flex-col min-w-0 bg-surface-card border px-5 py-4 transition-all duration-300 ${
+        isHighlighted ? "border-primary/40 ring-1 ring-primary/30" : "border-hairline"
+      }`}
+      style={{ minHeight: 92 }}
+    >
+      <div className="flex flex-col min-w-0 mb-2.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {icon && (
+            <span className="shrink-0 flex items-center text-text-secondary dark:text-text-secondary-dark [&>svg]:size-3.5">
+              {icon}
+            </span>
+          )}
+          <span className="typography-micro truncate text-surface-400 dark:text-surface-400">{title}</span>
+        </div>
       </div>
-      <div className="flex items-baseline gap-2">
-        <div className="text-lg font-semibold text-surface-900 dark:text-white tracking-tight">{value}</div>
-        {change && (
-          <div className={`flex items-center gap-0.5 text-[10px] font-medium ${change.positive ? "text-emerald-500" : "text-red-400"}`}>
-            {change.positive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-            {change.value}
+      <div className="font-headers font-semibold leading-tight tracking-display tabular-nums break-all text-text-primary dark:text-text-primary-dark text-xl">
+        {value}
+      </div>
+      {comparison && (
+        <div className="mt-1">
+          <span className={`font-mono tabular-nums font-medium text-xs ${comparison.positive ? "text-emerald-500" : "text-red-500"}`}>
+            {comparison.value}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Columns ─────────────────────────────────────────────────────────────
+   One definition, read by the header and by every row, so a label can never end
+   up over a column that is not there.
+
+   What a narrowing row gives up first is a priority, not a breakpoint, and the
+   title is budgeted BEFORE any column is granted its width: a list that runs
+   out of room shows fewer columns rather than squeezing its titles to an
+   ellipsis. Constants and arithmetic are CollectionListViewBinding's, so the
+   split pane here drops exactly what the panel's split pane drops. */
+const ROW_PADDING_WIDTH = 40;   // `mx-2` + `px-3`, both sides
+const CHECKBOX_WIDTH = 32;      // `w-8`
+const IMAGE_WIDTH = 40;         // `w-10`
+const COLUMN_GAP = 16;          // `gap-4`
+const TITLE_COMFORTABLE_WIDTH = 320;
+
+const PRIORITY_DECLARED = 2000;
+const PRIORITY_DATE = PRIORITY_DECLARED;
+const PRIORITY_STATUS = PRIORITY_DECLARED + 1;
+
+type ListColumn = {
+  key: "payment" | "status" | "date";
+  label: string;
+  width: string;
+  widthPx: number;
+  align: "left" | "right";
+  priority: number;
+};
+
+const COLUMNS: ListColumn[] = [
+  { key: "payment", label: "Payment", width: "w-28", widthPx: 112, align: "left", priority: PRIORITY_DECLARED },
+  { key: "status", label: "Status", width: "w-32", widthPx: 128, align: "left", priority: PRIORITY_STATUS },
+  { key: "date", label: "Updated at", width: "w-20", widthPx: 80, align: "right", priority: PRIORITY_DATE },
+];
+
+/** The columns that fit beside a comfortable title at this container width. */
+function fitColumns(containerWidth: number | undefined): ListColumn[] {
+  // Unmeasured: the title alone, which is the answer we would rather flash than
+  // a row of columns squeezing it down to an ellipsis.
+  if (containerWidth === undefined) return [];
+
+  const chrome = ROW_PADDING_WIDTH + CHECKBOX_WIDTH + COLUMN_GAP + IMAGE_WIDTH + COLUMN_GAP;
+  const available = containerWidth - chrome - TITLE_COMFORTABLE_WIDTH;
+  const cost = (col: ListColumn) => col.widthPx + COLUMN_GAP;
+
+  let total = COLUMNS.reduce((acc, col) => acc + cost(col), 0);
+  if (total <= available) return COLUMNS;
+
+  const dropped = new Set<string>();
+  for (const col of [...COLUMNS].sort((a, b) => a.priority - b.priority)) {
+    if (total <= available) break;
+    dropped.add(col.key);
+    total -= cost(col);
+  }
+  return COLUMNS.filter(col => !dropped.has(col.key));
+}
+
+/** Measure a box the way the panel does, so the fit reacts to the split. */
+function useContainerWidth<T extends HTMLElement>() {
+  const ref = React.useRef<T | null>(null);
+  const [width, setWidth] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    setWidth(node.offsetWidth);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) setWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
+const cellClass = (col: ListColumn) =>
+  `flex-shrink-0 ${col.width} flex items-center overflow-hidden ${col.align === "right" ? "justify-end" : "justify-start"}`;
+
+/** ListHeader (CollectionListViewBinding): 11px uppercase labels on the sheet,
+    one rule under them, and an empty cell over the checkbox and the thumbnail. */
+function ListHeader({ columns }: { columns: ListColumn[] }) {
+  const label = "inline-flex items-center gap-1 max-w-full text-[11px] leading-none uppercase tracking-wider font-medium text-surface-400 dark:text-surface-500";
+  return (
+    <div className="flex items-center gap-4 px-5 py-1.5 select-none border-b bg-surface-sheet border-hairline">
+      <div className="flex-shrink-0 w-8"/>
+      <div className="flex-shrink-0 w-10"/>
+      <div className="flex-1 min-w-0 flex items-center">
+        <span className={label}><span className="truncate">Order</span></span>
+      </div>
+      {columns.length > 0 && (
+        <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
+          {columns.map((col) => (
+            <div key={col.key} className={cellClass(col)}>
+              <span className={label}><span className="truncate">{col.label}</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Checkbox, `size="smallest"`: a 16px square inside a 28px round hover well. */
+function RowCheckbox() {
+  return (
+    <div className="p-2 w-7 h-7 inline-flex items-center justify-center rounded-full">
+      <div className="border-2 shrink-0 relative w-4 h-4 rounded-sm flex items-center justify-center bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"/>
+    </div>
+  );
+}
+
+/* ─── One row ─────────────────────────────────────────────────────────────
+   A row has NO fill of its own: it is text on the sheet, and only the row being
+   touched or opened takes a shape — an alpha highlight, inset and rounded,
+   because it is an object the moment it appears. The hairline under every row
+   that used to live here turned each highlight into a pill floating on a ruled
+   page; `py-0.5` in the fixed-height slot gives two neighbours their air. */
+function OrderRow({ order, isHovered, isActive, columns, onHover, onLeave }: {
+  order: Order; isHovered: boolean;
+  /** The record currently open beside the list — not a checkbox selection. */
+  isActive: boolean;
+  columns: ListColumn[];
+  onHover: () => void; onLeave: () => void;
+}) {
+  return (
+    <div className="py-0.5" style={{ height: 64, overflow: "hidden" }}>
+      <div
+        className={`flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full mx-2 rounded-lg py-3 px-3 ${
+          isActive ? "bg-surface-active" : isHovered ? "bg-surface-hover" : ""
+        }`}
+        onMouseEnter={onHover}
+        onMouseLeave={onLeave}
+      >
+        <div className="flex-shrink-0 w-8">
+          {/* Opening a record highlights its row; it does not tick its box.
+              Selection and the open record are two different states in the
+              panel, and they only share the highlight. */}
+          <RowCheckbox/>
+        </div>
+
+        {/* The record's preview, in the 40px media well the panel draws for it:
+            raised, hairlined, and `object-cover` so a portrait and a landscape
+            shot occupy the same square. */}
+        <div className="flex-shrink-0 relative w-10 h-10">
+          <div className="w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-raised border-hairline">
+            <img className="w-full h-full object-cover" loading="lazy" src={order.image} alt=""/>
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="truncate">
+            <div className="typography-body2 font-semibold text-surface-900 dark:text-surface-50 truncate">
+              <span className="text-sm">{order.id}</span>
+            </div>
+          </div>
+          <div className="truncate mt-0.5">
+            <div className="typography-caption text-surface-500 dark:text-surface-400 truncate">
+              {order.customer} · {order.total} · {order.items} item{order.items > 1 ? "s" : ""}
+            </div>
+          </div>
+        </div>
+
+        {columns.length > 0 && (
+          <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
+            {columns.map((col) => (
+              <div key={col.key} className={cellClass(col)}>
+                {col.key === "payment" && <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>}
+                {col.key === "status" && <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>}
+                {col.key === "date" && (
+                  <p className="typography-caption whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">{order.date}</p>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -92,67 +298,10 @@ function KPICard({ title, subtitle, value, change, icon, isHighlighted = false }
   );
 }
 
-/* ─── Order Row ─── */
-function OrderRow({ order, isHovered, isSelected, onHover, onLeave }: {
-  order: Order; isHovered: boolean; isSelected: boolean;
-  onHover: () => void; onLeave: () => void;
-}) {
-  const statusColor = STATUS_COLORS[order.status];
-  return (
-    <div
-      className={`flex items-center min-w-full border-b border-hairline cursor-pointer transition-colors px-4 ${
-        isSelected ? "bg-primary/5" : isHovered ? "bg-surface-field" : ""
-      }`}
-      style={{ height: 58 }}
-      onMouseEnter={onHover}
-      onMouseLeave={onLeave}
-    >
-      <div className="flex-shrink-0 w-10 flex items-center justify-center">
-        <div className={`border-2 w-4 h-4 rounded flex items-center justify-center transition-colors ${
-          isSelected ? "bg-primary border-primary" : "bg-surface-card border-surface-400 border-hairline-strong"
-        }`}>
-          {isSelected && (
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          )}
-        </div>
-      </div>
-      <div className="flex-shrink-0 w-8 flex items-center justify-center text-surface-400 dark:text-surface-500">
-        <ShoppingCart size={16} />
-      </div>
-      <div className="flex-grow min-w-0 ml-3">
-        <div className="text-sm font-semibold text-surface-900 dark:text-white">{order.id}</div>
-        <div className="flex items-center gap-2 mt-0.5">
-          {/* An enum value, so it is a chip — not a bordered, uppercase pill. */}
-          <span className={`chip chip-xs ${
-            order.paymentStatus === "paid" ? "chip-emerald" :
-            order.paymentStatus === "pending" ? "chip-yellow" :
-            "chip-red"
-          }`}>
-            {order.paymentStatus}
-          </span>
-          <span className="text-xs text-surface-500 dark:text-surface-400 font-medium">
-            {order.customer}
-          </span>
-        </div>
-      </div>
-      <div className="flex-shrink-0 mx-2 sm:mx-4">
-        <span className="rounded-md inline-flex items-center px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-medium whitespace-nowrap"
-          style={{ backgroundColor: statusColor.bg, color: statusColor.text }}>
-          {order.status}
-        </span>
-      </div>
-      <div className="flex-shrink-0 w-16 text-right text-xs text-surface-400 dark:text-surface-500 hidden sm:block">{order.date}</div>
-    </div>
-  );
-}
-
 /* ─── Order Detail Panel (split view) ─── */
-function OrderDetailPanel({ order, onClose, highlightedField }: {
-  order: Order; onClose: () => void; highlightedField: string | null;
+function OrderDetailPanel({ order, highlightedField }: {
+  order: Order; highlightedField: string | null;
 }) {
-  const statusColor = STATUS_COLORS[order.status];
   const fieldClass = (name: string) =>
     `field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${
       highlightedField === name ? "ring-2 ring-primary" : ""
@@ -169,9 +318,12 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
         <button className="px-3 py-2 text-xs text-surface-900 dark:text-white font-medium border-b-2 border-primary">Order</button>
       </div>
 
-      {/* Panel body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-col w-full pt-6 pb-16 px-4 sm:px-6">
+      {/* Panel body. EditViewBinding / DetailViewBinding both centre the form
+          in a max-width column rather than letting the fields run the width of
+          whatever pane they were given — a field is a line to read, and the
+          record pane is the half of the split that grows. */}
+      <div className="flex-1 overflow-y-auto flex flex-row w-full justify-center">
+        <div className="flex flex-col w-full max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl pt-6 pb-16 px-4 sm:px-8 md:px-10">
           {/* Saved badge */}
           <div className="flex justify-end mb-2" style={{ minHeight: 22 }}>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-500 dark:text-surface-300 text-[10px] font-semibold border border-transparent" style={{ minWidth: 72 }}>
@@ -180,7 +332,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
           </div>
 
           {/* Title */}
-          <div className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">{order.id}</div>
+          <div className="typography-h4 text-surface-900 dark:text-white mb-2">{order.id}</div>
 
           {/* Path */}
           <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-6">
@@ -202,10 +354,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
             <div className={fieldClass("status")}>
               <span className="field-label">Status</span>
               <div className="px-3 pt-6 pb-2 flex items-center justify-between">
-                <span className="chip"
-                  style={{ backgroundColor: statusColor.bg, color: statusColor.text }}>
-                  {order.status}
-                </span>
+                <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
                 <ChevronDown size={16} className="text-surface-400" />
               </div>
             </div>
@@ -214,13 +363,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
             <div className={fieldClass("payment")}>
               <span className="field-label">Payment</span>
               <div className="px-3 pt-6 pb-2">
-                <span className={`chip ${
-                  order.paymentStatus === "paid" ? "chip-emerald" :
-                  order.paymentStatus === "pending" ? "chip-yellow" :
-                  "chip-red"
-                }`}>
-                  {order.paymentStatus}
-                </span>
+                <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
               </div>
             </div>
 
@@ -251,13 +394,14 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
 /* ═══ MAIN COMPONENT ═══ */
 export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [highlightedKPI, setHighlightedKPI] = useState<number | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [highlightedField, setHighlightedField] = useState<string | null>(null);
 
   const isMobile = useMediaQuery("(max-width: 639px)");
   const isMedium = useMediaQuery("(min-width: 640px) and (max-width: 767px)");
+  const [listRef, listWidth] = useContainerWidth<HTMLDivElement>();
+  const columns = fitColumns(listWidth);
 
   const panelOpen = selectedOrderId !== null;
   const selectedOrder = MOCK_ORDERS.find((o) => o.id === selectedOrderId);
@@ -286,7 +430,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
 
     const loop = async () => {
       while (isMounted) {
-        // ── Full list view (~2s): flash KPIs + browse rows ──
+        // ── Full list view (~2s): flash the scorecards + browse rows ──
         setHighlightedKPI(0);
         await wait(500); if (!guard()) return;
         setHighlightedKPI(1);
@@ -370,68 +514,113 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
             count="8"
           />
 
-          {/* Content area — list + panel split */}
-          <div className="h-full w-full flex bg-surface-card overflow-hidden relative">
-            {/* Left: list content (shrinks when panel opens; hidden on mobile when panel is open) */}
+          {/* Content area — list + record, split. Neither pane paints a ground:
+              they are regions of the SHEET, and the only filled objects on it
+              are the scorecards. Painting the list `bg-surface-card` made the
+              largest area on screen a card, and left the cards sitting on it
+              with nowhere to go but further up the ladder. */}
+          <div className="flex-1 min-h-0 w-full flex overflow-hidden relative">
+            {/* Left: the list (shrinks when a record opens; hidden on mobile) */}
             <div
-              className="flex flex-col overflow-auto transition-all duration-150 ease-out"
+              className="flex flex-col h-full min-w-0 overflow-hidden transition-all duration-150 ease-out"
               style={{
+                // The list only has to identify a record — a title, a subtitle,
+                // a thumbnail. The record beside it carries the whole form, and
+                // that is the side worth the width. `DEFAULT_PANEL_SIZE` in
+                // SplitListView gives the list 22%; this is a demo frame a
+                // third of a real window, so it keeps a little more.
                 width: panelOpen
-                  ? isMobile ? "0%" : isMedium ? "35%" : "45%"
+                  ? isMobile ? "0%" : isMedium ? "34%" : "32%"
                   : "100%",
                 opacity: panelOpen && isMobile ? 0 : 1,
-                ...(panelOpen && isMobile ? { overflow: "hidden" } : {}),
               }}
             >
-              {/* Title + KPIs — hidden when split panel is open */}
-              {!panelOpen && (
-                <>
-                  <div className="px-4 sm:px-6 pt-4 pb-3 max-w-3xl mx-auto w-full">
-                    <div className="text-lg font-semibold text-surface-900 dark:text-white mb-3">Orders</div>
-                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                      {/* Counts are counts: "15.0" orders read as a formatting bug. */}
-                      <KPICard title="Confirmed" subtitle="" value="15"
-                        change={{ value: "+18.0%", positive: true }} icon={<Info size={14} />}
-                        isHighlighted={highlightedKPI === 0} />
-                      <KPICard title="Shipped" subtitle="" value="12"
-                        change={{ value: "+7.4%", positive: true }} icon={<Package size={14} />}
-                        isHighlighted={highlightedKPI === 1} />
-                      <KPICard title="Revenue" subtitle="" value="$36.6K" icon={<span />}
-                        isHighlighted={highlightedKPI === 2} />
+              <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+                {/* CollectionViewBinding's list surface: a centred, titled
+                    reading column. Opening a record collapses the title and the
+                    scorecards — one gesture, driven by the same state.
+
+                    The panel also drops the centring when a record opens, so
+                    the list can go edge to edge in the master pane. This keeps
+                    it: the frame bleeds past the shell, and a list running flat
+                    into the pane edge beside a form that is a centred column
+                    reads as two different documents. Both halves stay measured
+                    columns here, which is what balances them. */}
+                <div className="flex flex-col w-full max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4">
+                  {/* Collapsible title — grid-rows for a smooth height. */}
+                  <div className={`grid transition-[grid-template-rows,transform,margin] duration-150 ease-out ${
+                    panelOpen ? "grid-rows-[0fr] -translate-y-2 mt-0 mb-0" : "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
+                  }`}>
+                    <div className="overflow-hidden flex items-center gap-4">
+                      {/* The panel renders a real `h4` here. This is a picture of
+                          the panel inside a marketing page, so it takes the tier
+                          without the tag: a mock UI that injects headings puts
+                          them in the PAGE's outline, and `check:site` reads that
+                          outline as an h2 followed by an h4. */}
+                      <div className="typography-h4 text-text-primary dark:text-text-primary-dark grow mb-0">Orders</div>
                     </div>
                   </div>
-                  <div className="h-px bg-surface-raised mx-4" />
-                </>
-              )}
 
-              {/* Orders list */}
-              <div className={`flex-1 ${!panelOpen ? "max-w-3xl mx-auto w-full" : ""}`}>
-                {MOCK_ORDERS.map((order) => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                    isHovered={hoveredRow === order.id}
-                    isSelected={selectedOrderId === order.id}
-                    onHover={() => setHoveredRow(order.id)}
-                    onLeave={() => setHoveredRow(null)}
-                  />
-                ))}
+                  {/* The insights plugin's scorecards, on the same collapse. */}
+                  <div className={`grid transition-[grid-template-rows] duration-150 ease-out ${
+                    panelOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+                  }`}>
+                    <div className="overflow-hidden flex-shrink-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pb-4">
+                        <StatCard title="Confirmed" value="15" icon={<CircleCheck/>}
+                          comparison={{ value: "+18.0%", positive: true }}
+                          isHighlighted={highlightedKPI === 0}/>
+                        <StatCard title="Shipped" value="12" icon={<Truck/>}
+                          comparison={{ value: "+7.4%", positive: true }}
+                          isHighlighted={highlightedKPI === 1}/>
+                        <StatCard title="Revenue" value="$36.6K" icon={<Banknote/>}
+                          comparison={{ value: "+4.1%", positive: true }}
+                          isHighlighted={highlightedKPI === 2}/>
+                        <StatCard title="Refunded" value="2" icon={<ShoppingCart/>}
+                          comparison={{ value: "−1.2%", positive: false }}
+                          isHighlighted={highlightedKPI === 3}/>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ListView: the outline is the object, and it stays on in
+                      both states for the same reason the centring does — an
+                      outlined list beside an outlined form is one document. */}
+                  <div ref={listRef} className="w-full rounded-lg overflow-hidden border border-hairline">
+                    <ListHeader columns={columns}/>
+                    <div className="my-1.5">
+                      {MOCK_ORDERS.map((order) => (
+                        <OrderRow
+                          key={order.id}
+                          order={order}
+                          isHovered={hoveredRow === order.id}
+                          isActive={selectedOrderId === order.id}
+                          columns={columns}
+                          onHover={() => setHoveredRow(order.id)}
+                          onLeave={() => setHoveredRow(null)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Right: detail panel (split view; full-width overlay on mobile) */}
+            {/* Right: the record, opened beside the list. It carries its own
+                left edge the way a card carries its hairline — and no ground of
+                its own, because it is a region of the sheet. */}
             <div
-              className="border-l border-hairline bg-surface-card shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col transition-all duration-150 ease-out overflow-hidden"
+              className="flex-1 flex flex-col min-w-0 h-full border-l border-hairline transition-all duration-150 ease-out overflow-hidden"
               style={{
                 width: panelOpen
-                  ? isMobile ? "100%" : isMedium ? "65%" : "55%"
+                  ? isMobile ? "100%" : isMedium ? "66%" : "68%"
                   : "0%",
                 opacity: panelOpen ? 1 : 0,
                 ...(panelOpen && isMobile ? { borderLeft: "none" } : {}),
               }}
             >
               {selectedOrder && (
-                <OrderDetailPanel order={selectedOrder} onClose={closeOrder} highlightedField={highlightedField} />
+                <OrderDetailPanel order={selectedOrder} highlightedField={highlightedField} />
               )}
             </div>
           </div>

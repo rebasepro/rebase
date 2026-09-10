@@ -318,12 +318,12 @@
     margin-right: calc(-1 * max(0px, (100vw - 72rem) / 2 - 1.5rem));
 }
 
-/* The capped symmetric step. `min(…, 4rem)` is the cap from test 1: the frame
+/* The capped symmetric step. `min(…, 8rem)` is the cap from test 1: the frame
    moves far enough past the shell to read as the product rather than as a
    figure in the column, and not so far that it loses its heading. Below 72rem
    the gutter is negative, `max(0px, …)` returns 0 and this is a no-op. */
 @utility bleed-x {
-    margin-inline: calc(-1 * min(4rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
+    margin-inline: calc(-1 * min(8rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
 }
 
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with

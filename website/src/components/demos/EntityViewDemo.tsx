@@ -123,6 +123,20 @@ const STATUS_CHIP: Record<string, string> = {
   Discontinued: "chip-gray",
 };
 
+/* A chip shows the enum's LABEL, never its key. The panel reads labels off
+   `enumValues` in the collection config; a value that reaches the screen as its
+   own snake_case identifier is a config with no labels, which is not something
+   to imitate on the page that says the panel is rendered from the config. */
+const CATEGORY_LABEL: Record<string, string> = {
+  clothing_man: "Men's clothing",
+  home_storage: "Home storage",
+  sunglasses: "Sunglasses",
+  serveware: "Serveware",
+  toys_and_games: "Toys & games",
+  kitchen: "Kitchen",
+  watches: "Watches",
+};
+
 /**
  * Enum chips are seeded per value in the product, so no two values in a column
  * share a hue. Fixed here rather than hashed so the same category keeps the
@@ -140,6 +154,7 @@ const CATEGORY_CHIP: Record<string, string> = {
 
 const statusChip = (status: string) => STATUS_CHIP[status] ?? "chip-gray";
 const categoryChip = (category: string) => CATEGORY_CHIP[category] ?? "chip-gray";
+const categoryLabel = (category: string) => CATEGORY_LABEL[category] ?? category;
 
 // ─── Kanban Data (for TAGS collection) ───────────────────
 // Matches production EntityBoardCard: thumbnail + title + ID
@@ -466,7 +481,7 @@ maxHeight: "100%" }}/>
 
       {cell(
         <div className="flex flex-wrap gap-1.5">
-          <span className={`chip ${categoryChip(entity.category)}`}>{entity.category}</span>
+          <span className={`chip ${categoryChip(entity.category)}`}>{categoryLabel(entity.category)}</span>
         </div>,
         COL.category
       )}
@@ -1257,7 +1272,7 @@ width: "100%" }}
                       <div className="flex flex-wrap gap-1 flex-1">
                         {formValues.category ? (
                           <span className={`chip ${categoryChip(formValues.category)}`}>
-                            {formValues.category}
+                            {categoryLabel(formValues.category)}
                           </span>
                         ) : (
                           <span className="text-surface-400 text-sm">

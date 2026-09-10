@@ -9,9 +9,9 @@ import {
    The admin.yourdomain.com carousel is three tabs of the SAME app, and each
    tab used to carry its own copy of the drawer, the toolbar and the buttons.
    Copies drift: when the product moved its toolbar to a labelled view button,
-   a round search pill and a quiet add button, the list tab kept a blue
-   "Add Order" slab and the table tab kept a four-icon segmented control — two
-   different apps inside one browser frame, neither of them the one we ship.
+   a round search pill and quiet end actions, the list tab kept its own slab and
+   the table tab kept a four-icon segmented control — two different apps inside
+   one browser frame, neither of them the one we ship.
 
    Everything here is read off the shipped markup:
      Scaffold.tsx                    — frame / sheet, the lg inset and its radius
@@ -82,6 +82,16 @@ export function AdminDrawer({ items }: { items: DrawerItem[] }) {
             </div>
           </div>
 
+          {/* The account, then the expand toggle — the two things the rail
+              always ends with. Without the avatar it ended on a lone chevron. */}
+          <div className="shrink-0 flex items-center px-[16px] py-1">
+            <div className="shrink-0 flex items-center justify-center w-[44px] rounded-md py-1">
+              <span className="bg-surface-raised flex items-center justify-center font-medium text-surface-accent-900 dark:text-text-primary-dark rounded-full w-8 h-8 text-xs">
+                D
+              </span>
+            </div>
+          </div>
+
           <div className="shrink-0 mt-auto px-2 py-2">
             <div className="flex flex-row items-center rounded-lg py-2">
               <div className="shrink-0 flex items-center justify-center w-[44px] h-[24px] text-surface-500 dark:text-text-secondary-dark">
@@ -99,12 +109,10 @@ export function AdminDrawer({ items }: { items: DrawerItem[] }) {
 export function ToolbarIconButton({
   label,
   disabled,
-  filled,
   children
 }: {
   label: string;
   disabled?: boolean;
-  filled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -114,10 +122,30 @@ export function ToolbarIconButton({
       aria-disabled={disabled || undefined}
       className={`text-surface-accent-500 dark:text-surface-accent-300 inline-flex items-center justify-center
         ease-in-out duration-150 [&>svg]:shrink-0 w-8 h-8 min-w-8 min-h-8 p-2
-        ${filled ? "bg-surface-raised hover:bg-surface-raised-hover rounded-md" : "bg-transparent hover:bg-surface-hover rounded-full"}
+        bg-transparent hover:bg-surface-hover rounded-full
         ${disabled ? "opacity-50" : ""}`}
     >
       {children}
+    </button>
+  );
+}
+
+/**
+ * The add action, as `CollectionViewActions` draws it on a large layout: a
+ * labelled `Button size="small" variant="filled" color="primary"`. The icon-only
+ * filled square is the COMPACT form — what the split-list toolbar falls back to
+ * when the pane is narrow — and drawing it at full width left the panel's one
+ * primary action reading as a quiet glyph in a row of quiet glyphs.
+ */
+export function ToolbarAddButton({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      className="typography-button h-fit rounded-lg whitespace-nowrap inline-flex items-center justify-center
+        gap-2 w-fit border border-primary bg-primary text-white py-0 min-h-[32px] px-2"
+    >
+      <Plus size={20}/>
+      {label}
     </button>
   );
 }
@@ -227,9 +255,7 @@ export function AdminToolbar({
         <ToolbarIconButton label="Settings" disabled>
           <Settings size={18}/>
         </ToolbarIconButton>
-        <ToolbarIconButton label={addLabel} filled>
-          <Plus size={20}/>
-        </ToolbarIconButton>
+        <ToolbarAddButton label={addLabel}/>
       </div>
     </div>
   );

@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Lock, LayoutList, Table2, Columns3 } from "lucide-react";
+import { LayoutList, Table2, Columns3 } from "lucide-react";
 import { EntityViewDemo } from "./EntityViewDemo";
 import { OrdersListDemo } from "./OrdersListDemo";
 
+/* The panel's own view modes, under the panel's own names: `list`, `table`,
+   `cards`, `kanban` in ViewModeToggle, labelled List / Table / Cards / Board.
+   "Spreadsheet" and "Kanban" were names the product does not use — on the page
+   whose claim is that this IS the product, and beside a view button already
+   reading "Table". */
 const TABS = [
   { id: "list", label: "List", icon: LayoutList },
-  { id: "spreadsheet", label: "Spreadsheet", icon: Table2 },
-  { id: "kanban", label: "Kanban", icon: Columns3 },
+  { id: "table", label: "Table", icon: Table2 },
+  { id: "kanban", label: "Board", icon: Columns3 },
 ] as const;
 
 const AUTO_ADVANCE_MS = 12_000;
@@ -71,10 +76,9 @@ export function AdminDemoCarousel({
     [switchTo]
   );
 
-  // Chrome bar (~44px) + content area (height) + tabs row with margin (~56px if visible)
-  const chromeBarHeight = 44;
+  // Content area (height) + tabs row with margin (~56px if visible)
   const tabsHeight = showTabs ? 56 : 0;
-  const totalMinHeight = height + chromeBarHeight + tabsHeight;
+  const totalMinHeight = height + tabsHeight;
 
   const rootStyle: React.CSSProperties = {
     minHeight: totalMinHeight,
@@ -82,32 +86,18 @@ export function AdminDemoCarousel({
   };
 
   return (
-    // `items-start`, not `items-center`. The browser frame is `w-full` so it is
-    // unaffected either way, but the tab row below it is not: centred, it was
-    // the only thing in the section off the 72rem shell edge, floating under a
-    // left-aligned heading and a left-aligned frame.
-    <div className="not-content flex flex-col items-start" style={rootStyle}>
-      {/* Browser frame */}
+    // `items-center`: the tab row is furniture belonging to the frame, not to
+    // the reading column, and the frame no longer shares the column's left edge
+    // — it bleeds past the shell on both sides. Left-aligned, the tabs hung off
+    // a bled edge that agrees with nothing; centred under the frame they read as
+    // its own control.
+    <div className="not-content flex flex-col items-center" style={rootStyle}>
+      {/* The panel's own edge. There used to be a drawn browser above it —
+          traffic lights and an `admin.yourdomain.com` pill — which was a second
+          frame around a thing that already has one, and a fake one: it told the
+          reader nothing the screenshot underneath does not, at the cost of 44px
+          and a mac window nobody is looking at. */}
       <div className="w-full rounded-2xl overflow-hidden border border-hairline bg-surface-frame shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
-        {/* Browser Chrome */}
-        <div 
-          className="px-4 py-3 border-b border-hairline bg-surface-raised backdrop-blur-md"
-          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-        >
-          <div style={{ display: "flex", flexDirection: "row", gap: "6px", width: "64px", flexShrink: 0 }}>
-            <div style={{ width: "10px", height: "10px", borderRadius: "9999px", backgroundColor: "rgba(244, 63, 94, 0.8)", flexShrink: 0 }} />
-            <div style={{ width: "10px", height: "10px", borderRadius: "9999px", backgroundColor: "rgba(251, 191, 36, 0.8)", flexShrink: 0 }} />
-            <div style={{ width: "10px", height: "10px", borderRadius: "9999px", backgroundColor: "rgba(52, 211, 153, 0.8)", flexShrink: 0 }} />
-          </div>
-          <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-            <div className="bg-surface-well/85 border border-hairline rounded-md px-3 py-1 text-[11px] font-mono text-surface-500" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <Lock size={12} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: "11px", fontFamily: "monospace" }}>admin.yourdomain.com</span>
-            </div>
-          </div>
-          <div style={{ width: "64px", flexShrink: 0 }} />
-        </div>
-
         {/* Demo content area */}
         <div className="relative w-full" style={{ height }} inert={true} aria-hidden="true">
           {TABS.map((tab, index) => (
