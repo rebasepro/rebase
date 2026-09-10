@@ -190,6 +190,19 @@ const UNSUPPORTED_METHOD = Symbol.for("rebase.unsupportedMethod");
  * @param message What to tell the caller, naming the fix.
  * @group Errors
  */
+/**
+ * The tag {@link unsupportedMethod} puts on the stub it returns.
+ *
+ * Written as an optional member on a callable, which is what a tagged stub
+ * actually is — so both the write and the read below are single casts and tsc
+ * checks the symbol and the value type on each. Reading it as
+ * `Record<symbol, boolean>` made every symbol key on the object a `boolean`
+ * (which is not true of a function, and is why that needed `as unknown as` to
+ * be written at all), and the write and the read were then free to disagree
+ * about the tag.
+ */
+type UnsupportedTagged = ((...args: never[]) => unknown) & { [UNSUPPORTED_METHOD]?: boolean };
+
 export function unsupportedMethod<F>(message: string): F {
     const stub = (): never => {
         // The two reasons a method is a stub — `realtime: false`, and a driver
@@ -197,7 +210,7 @@ export function unsupportedMethod<F>(message: string): F {
         // cannot do realtime. One code covers both, and the message says which.
         throw new RebaseClientError(message, { code: "REALTIME_DISABLED" });
     };
-    (stub as unknown as Record<symbol, boolean>)[UNSUPPORTED_METHOD] = true;
+    (stub as UnsupportedTagged)[UNSUPPORTED_METHOD] = true;
     return stub as F;
 }
 
@@ -221,5 +234,5 @@ export function unsupportedMethod<F>(message: string): F {
  */
 export function isUnsupported(method: unknown): boolean {
     if (typeof method !== "function") return true;
-    return (method as unknown as Record<symbol, boolean>)[UNSUPPORTED_METHOD] === true;
+    return (method as UnsupportedTagged)[UNSUPPORTED_METHOD] === true;
 }

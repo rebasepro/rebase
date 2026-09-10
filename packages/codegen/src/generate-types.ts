@@ -1,4 +1,4 @@
-import { CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
+import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
 import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSafeIdentifier } from "./utils";
 
@@ -148,9 +148,23 @@ function foreignKeyType(relation: ResolvedRelation): string {
     return (idProp[1] as Property).type === "number" ? "number" : "string";
 }
 
+/**
+ * The property's `isId`, on the two property kinds that declare one.
+ *
+ * `Property` is a union and only `StringProperty` and `NumberProperty` carry
+ * `isId`, so it cannot be read off the union directly — which is what
+ * `(prop as unknown as Record<string, unknown>).isId` was for, twice. The union
+ * discriminates on `type`, so narrowing gets there with no claim at all, and
+ * with the declared type (`boolean | "manual" | "uuid" | string`) intact
+ * instead of flattened to `unknown`.
+ */
+function declaredIsId(prop: Property): StringProperty["isId"] | NumberProperty["isId"] {
+    return prop.type === "string" || prop.type === "number" ? prop.isId : undefined;
+}
+
 /** Whether a property is the collection's primary key. */
 function isPrimaryKey(prop: Property): boolean {
-    return Boolean((prop as unknown as Record<string, unknown>).isId);
+    return Boolean(declaredIsId(prop));
 }
 
 /**
@@ -158,7 +172,7 @@ function isPrimaryKey(prop: Property): boolean {
  * `true` and `"manual"` both mean the caller supplies it.
  */
 function isAutoAssignedId(prop: Property): boolean {
-    const isId = (prop as unknown as Record<string, unknown>).isId;
+    const isId = declaredIsId(prop);
     return Boolean(isId) && isId !== "manual" && isId !== true;
 }
 
@@ -321,10 +335,31 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // would invent an accessor the client does not serve, so they are
         // skipped — loudly, because doing it silently is how a developer
         // concludes the generator is broken.
-        const subcollections = (collection as unknown as { subcollections?: unknown[] }).subcollections;
-        if (Array.isArray(subcollections) && subcollections.length > 0) {
+        //
+        // `getDeclaredSubcollections` rather than a local shape. What stood here
+        // declared `subcollections?: unknown[]` and tested it with
+        // `Array.isArray` — but the field is `() => CollectionConfig[]`, a thunk,
+        // so that test was always false and this warning has never once fired.
+        // The two declarations of the same field disagreed, and the
+        // `as unknown as` between them is what let the wrong one compile.
+        //
+        // The thunk is called inside the same `try` shape the relation resolver
+        // above uses: it exists to defer a circular import, and evaluating it
+        // during codegen can throw for exactly that reason. A count that cannot
+        // be taken is not worth failing a generate over.
+        const declared = getDeclaredSubcollections(collection);
+        let subcollectionCount = 0;
+        if (declared) {
+            try {
+                subcollectionCount = declared().length;
+            } catch {
+                // Declared, but not resolvable from here. Still worth saying.
+                subcollectionCount = -1;
+            }
+        }
+        if (subcollectionCount !== 0) {
             console.warn(
-                `[rebase] "${collection.slug}" declares ${subcollections.length} subcollection(s), which are ` +
+                `[rebase] "${collection.slug}" declares ${subcollectionCount < 0 ? "" : `${subcollectionCount} `}subcollection(s), which are ` +
                 "not part of the generated Database: they are reached over a nested path " +
                 `(\`data/${collection.slug}/<id>/<relation>\`), not as a top-level accessor. Register a ` +
                 "subcollection as a collection of its own if you want a typed accessor for it."
