@@ -27,7 +27,9 @@ import {
     noteBlank,
     requireInteractive,
     resolveTimeoutMs,
-    type CloudClient
+    type CloudClient,
+    cloudRows,
+    requireCloudRow
 } from "./context";
 
 interface DatabaseRow {
@@ -84,10 +86,10 @@ maxPositionals: 0 });
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
     try {
-        const dbs = (await client.data.collection("databases").find({
+        const dbs = cloudRows<DatabaseRow>((await client.data.collection("databases").find({
             where: { project: ["==", projectId] },
             limit: 50
-        })).data as unknown as DatabaseRow[];
+        })).data);
 
         emit(
             () => {
@@ -135,10 +137,10 @@ async function firstAttachedDatabase(
     client: CloudClient,
     projectId: string
 ): Promise<DatabaseRow | undefined> {
-    const rows = (await client.data.collection("databases").find({
+    const rows = cloudRows<DatabaseRow>((await client.data.collection("databases").find({
         where: { project: ["==", projectId] },
         limit: 1
-    })).data as unknown as DatabaseRow[];
+    })).data);
     return rows[0];
 }
 
@@ -154,12 +156,12 @@ export async function attachDatabaseRow(
     client: CloudClient,
     input: { projectId: string; type: string; connectionString?: string }
 ): Promise<DatabaseRow> {
-    return (await client.data.collection("databases").create({
+    return requireCloudRow<DatabaseRow>(await client.data.collection("databases").create({
         project: input.projectId,
         type: input.type,
         connectionString: input.type === "byodb" ? input.connectionString : undefined,
         connectionStatus: "untested"
-    })) as unknown as DatabaseRow;
+    }), "database");
 }
 
 /** What `rebase cloud db create` parses. Exported so its help page cannot drift. */

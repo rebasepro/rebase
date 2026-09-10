@@ -59,8 +59,20 @@ interface ProjectShape {
     frontend: boolean;
 }
 
-/** The block names the payload may switch on. A typo has to be an error. */
-const SHAPE_FLAGS = ["collections", "frontend"] as const;
+/**
+ * The block names the payload may switch on. A typo has to be an error.
+ *
+ * Typed as keys of {@link ProjectShape}, which is what makes that true: `as
+ * const` alone gave these two string literals and tied them to nothing, so a
+ * flag renamed on the interface left this list naming a block that no longer
+ * exists, and the template kept switching on it.
+ */
+const SHAPE_FLAGS: readonly (keyof ProjectShape)[] = ["collections", "frontend"];
+
+/** Narrow a marker name to a flag, having checked it is one. */
+function isShapeFlag(name: string): name is keyof ProjectShape {
+    return (SHAPE_FLAGS as readonly string[]).includes(name);
+}
 
 /**
  * Render one payload file for this project.
@@ -85,7 +97,6 @@ const SHAPE_FLAGS = ["collections", "frontend"] as const;
  * typechecker would see.
  */
 export function renderPayload(contents: string, shape: ProjectShape, projectName: string): string {
-    const flags = shape as unknown as Record<string, boolean>;
     const out: string[] = [];
     let open: { name: string; keep: boolean } | null = null;
 
@@ -104,11 +115,15 @@ export function renderPayload(contents: string, shape: ProjectShape, projectName
             continue;
         }
         if (open) throw new Error(`Eject template: {{${kind}${name}}} inside an open ${open.name} block.`);
-        if (!(SHAPE_FLAGS as readonly string[]).includes(name)) {
+        if (!isShapeFlag(name)) {
             throw new Error(`Eject template: unknown block {{${kind}${name}}}.`);
         }
+        // `shape[name]` directly: the check above narrows `name` to a key of
+        // `ProjectShape`, which is what the `as unknown as Record<string,
+        // boolean>` on the shape was standing in for — and that cast also meant
+        // nothing checked that the block names and the interface agree.
         open = { name,
-keep: kind === "#" ? flags[name] === true : flags[name] !== true };
+keep: kind === "#" ? shape[name] === true : shape[name] !== true };
     }
 
     if (open) throw new Error(`Eject template: {{#${open.name}}} was never closed.`);

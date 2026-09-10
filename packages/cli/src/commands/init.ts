@@ -145,9 +145,25 @@ export interface BuildQuestionsParams {
  * Exported for testability — all prompt `type` values must match
  * types registered by the installed version of inquirer.
  */
-export function buildInitQuestions(params: BuildQuestionsParams): Record<string, unknown>[] {
+/**
+ * The questions this command asks, as inquirer types them.
+ *
+ * Declared, rather than left as `Record<string, unknown>` and asserted into
+ * `Parameters<typeof inquirer.prompt>[0]` at the call. Inquirer infers the
+ * answer shape from the array it is handed, so an array of open records matches
+ * none of its overloads — which is the refusal that assertion was there to get
+ * past, at the cost of every question in this file being unchecked: a
+ * misspelled `mesage`, a `choices` on a `confirm`, a `default` of the wrong
+ * type for its question kind all compiled.
+ */
+export type InitQuestion =
+    | { type: "input"; name: string; message: string; default: string; validate?: (input: string) => string | true }
+    | { type: "confirm"; name: string; message: string; default: boolean; when?: (answers: Record<string, unknown>) => boolean }
+    | { type: "select"; name: string; message: string; choices: ReadonlyArray<{ name: string; value: unknown; short: string }>; default: unknown; when?: (answers: Record<string, unknown>) => boolean };
+
+export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[] {
     const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm } = params;
-    const questions: Record<string, unknown>[] = [];
+    const questions: InitQuestion[] = [];
 
     if (!nameArg) {
         questions.push({
@@ -400,7 +416,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     });
 
 
-    const answers = await inquirer.prompt(questions as unknown as Parameters<typeof inquirer.prompt>[0]);
+    const answers = await inquirer.prompt(questions);
 
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
     const projectName = path.basename(targetDirectory);

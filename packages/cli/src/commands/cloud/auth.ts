@@ -106,7 +106,15 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
         requireInteractive("credentials", `--email and --password, or ${EMAIL_ENV} and ${PASSWORD_ENV}`);
     }
 
-    const prompts: Array<Record<string, unknown>> = [];
+    // The questions' real type, not `Record<string, unknown>`. Inquirer infers
+    // the answer shape from the array it is given, so an array of open records
+    // matches no overload — which is what the
+    // `as unknown as Parameters<typeof inquirer.prompt>[0]` here was answering.
+    // Naming the two question kinds this command asks makes the call check.
+    const prompts: Array<
+        | { type: "input"; name: string; message: string }
+        | { type: "password"; name: string; message: string; mask: string }
+    > = [];
     if (needsEmail) {
         prompts.push({ type: "input",
 name: "email",
@@ -119,7 +127,7 @@ message: "Password:",
 mask: "•" });
     }
     const answers = prompts.length
-        ? await inquirer.prompt(prompts as unknown as Parameters<typeof inquirer.prompt>[0])
+        ? await inquirer.prompt(prompts)
         : {};
 
     const email = (args["--email"] || envEmail || (answers as { email?: string }).email || "").trim();

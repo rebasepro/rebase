@@ -1306,3 +1306,62 @@ export function openUrl(target: string, label = "Opening"): void {
         /* URL already printed */
     }
 }
+
+/**
+ * The one thing every control-plane row is required to have.
+ *
+ * The subcommands each declare their own row shape — `OrgRow`, `ProjectRow`,
+ * `DatabaseRow`, `DeploymentRow` — and every one of them is an `id` plus
+ * fields that are all optional, because a control plane older than a given
+ * column simply does not send it. The reads are written that way too
+ * (`o.name ?? "(unnamed)"`, `row.slug ? … : ""`).
+ */
+export interface CloudRow {
+    id: string | number;
+}
+
+/**
+ * Read the control plane's rows as a subcommand's row shape.
+ *
+ * `client.data.collection(...)` is typed against the *generated* schema of the
+ * project the SDK is pointed at, and the control-plane collections this CLI
+ * reads are not in one — so every row arrives as an open
+ * `Record<string, unknown>`. A declared `interface` gets no implicit index
+ * signature, so it does not overlap that, and a direct `as` is refused: which
+ * is how ten call sites came to write `as unknown as XRow[]`, an assertion
+ * about a wire payload with nothing checking it in either direction.
+ *
+ * There is exactly one invariant to check and this checks it. Everything else
+ * the shapes declare is optional and already read as such, so there is nothing
+ * further to verify — but a row with no usable `id` is not a row any of these
+ * commands can act on, and passing it through was how a listing came to print
+ * `[undefined]` and a lookup came to compare against the string `"undefined"`.
+ */
+export function cloudRows<T extends CloudRow>(rows: readonly Record<string, unknown>[] | undefined): T[] {
+    return (rows ?? []).filter((row): row is Record<string, unknown> & T =>
+        typeof row?.id === "string" || typeof row?.id === "number");
+}
+
+/** {@link cloudRows} for an endpoint that returns a single row. */
+export function cloudRow<T extends CloudRow>(row: Record<string, unknown> | undefined): T | undefined {
+    return cloudRows<T>(row ? [row] : [])[0];
+}
+
+/**
+ * {@link cloudRows} for a write that must have produced a row.
+ *
+ * `create()` returning something with no usable `id` means the control plane
+ * accepted the write and then described it in a way this CLI cannot act on.
+ * The callers all go straight on to use that id — `setContextOrg(url,
+ * String(created.id))` — so asserting the shape, which is what stood here,
+ * turned a control-plane fault into an organization whose active id is the
+ * seven-letter string `"undefined"`, stored in the user's config file.
+ */
+export function requireCloudRow<T extends CloudRow>(
+    row: Record<string, unknown> | undefined,
+    what: string
+): T {
+    const parsed = cloudRow<T>(row);
+    if (!parsed) throw new Error(`The control plane accepted the ${what} but returned no id for it.`);
+    return parsed;
+}

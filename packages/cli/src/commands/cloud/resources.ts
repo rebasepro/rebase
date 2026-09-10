@@ -25,7 +25,8 @@ import {
     fail,
     reportError,
     note,
-    noteBlank
+    noteBlank,
+    requireCloudRow
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
@@ -590,14 +591,14 @@ maxPositionals: 0 });
             const url = args["--endpoint"] || fail("--endpoint is required.", "Where the POST goes.", "usage");
             const events = (args["--events"] || "insert,update,delete").split(",").map((s) => s.trim());
 
-            const created = (await client.data.collection("webhooks").create({
+            const created = requireCloudRow(await client.data.collection("webhooks").create({
                 project: projectId,
                 name,
                 table,
                 url,
                 events,
                 enabled: true
-            })) as unknown as { id: string | number };
+            }), "webhook");
             success(`Created webhook ${chalk.bold(name)} [${created.id}]`);
             emit(() => {}, {
                 success: true,
@@ -807,7 +808,13 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
             // six weeks. `invoke` now refuses a name containing `/` outright.
         }>("storage-provision", undefined, { method: "POST", path: projectId });
 
-        const info = (res as unknown as { data?: typeof res.data }).data ?? res.data;
+        // `res.data`, once. What stood here was
+        // `(res as unknown as { data?: typeof res.data }).data ?? res.data` —
+        // both halves read the same property off the same object, so the `??`
+        // could never reach its right-hand side. The cast made it look like a
+        // fallback between two response shapes by making `data` optional on one
+        // of them; `invoke<T>` returns `T`, and `T` here declares `data`.
+        const info = res.data;
 
         success(`Managed storage provisioned for ${displayProjectRef(rawArgs)}.`);
         emit(

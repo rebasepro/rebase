@@ -338,7 +338,28 @@ message: `"${type}" is no longer an app type — ${REMOVED_APP_TYPES[type]}` });
                 issues.push({ path: `${base}.port`,
 message: "must be an integer" });
             }
-            return raw as unknown as RebaseAppConfig;
+            // Constructed, not asserted. Everything above pushes an issue for a
+            // field it does not like and then leaves the field alone, so
+            // `raw as unknown as RebaseAppConfig` handed the caller the *whole
+            // parsed object* under a type describing only these fields — an
+            // unknown key that `warnUnknownFields` merely warned about travelled
+            // on as if it were part of the config, and a field that failed its
+            // check above travelled on with the type saying it had passed.
+            // Naming them is also what keeps this list and the interface in step:
+            // a field added to `RebaseBackendAppConfig` and not validated here
+            // now fails to compile instead of silently arriving unchecked.
+            return {
+                type: "backend",
+                runtime: custom ? "custom" : "managed",
+                config: raw.config as string | undefined,
+                functions: raw.functions as string | undefined,
+                crons: raw.crons as string | undefined,
+                schema: raw.schema as string | undefined,
+                usersCollection: raw.usersCollection as string | undefined,
+                dockerfile: raw.dockerfile as string | undefined,
+                context: raw.context as string | undefined,
+                port: raw.port as number | undefined
+            };
         }
         case "static": {
             checkRelativePath(raw.root, `${base}.root`, issues, { required: true });
@@ -353,7 +374,16 @@ message: "must be a boolean" });
             }
             const appPath = checkAppPath(raw.path, `${base}.path`, issues);
             checkCmsPath(raw.cms, appPath ?? "/", `${base}.cms`, issues);
-            return raw as unknown as RebaseAppConfig;
+            // See the backend branch: constructed for the same reasons.
+            return {
+                type: "static",
+                root: raw.root as string,
+                build: raw.build as string | undefined,
+                output: raw.output as string,
+                path: appPath,
+                spa: raw.spa as boolean | undefined,
+                cms: raw.cms as string | undefined
+            };
         }
         default:
             return undefined;

@@ -15,7 +15,9 @@ import {
     emit,
     printGroupHelp,
     note,
-    requireInteractive
+    requireInteractive,
+    cloudRows,
+    requireCloudRow
 } from "./context";
 
 interface OrgRow {
@@ -54,7 +56,7 @@ command: "cloud orgs",
 maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     try {
-        const orgs = (await client.data.collection("organizations").find({ limit: 100 })).data as unknown as OrgRow[];
+        const orgs = cloudRows<OrgRow>((await client.data.collection("organizations").find({ limit: 100 })).data);
         const active = getContextOrg(url);
 
         emit(
@@ -111,7 +113,7 @@ async function createOrg(rawArgs: string[]): Promise<void> {
     });
     const { client, url } = await requireClient(rawArgs);
 
-    const prompts: Array<Record<string, unknown>> = [];
+    const prompts: Array<{ type: "input"; name: string; message: string }> = [];
     if (!args["--name"]) {
         requireInteractive("an organization name", "--name <name>");
         prompts.push({ type: "input",
@@ -119,7 +121,7 @@ name: "name",
 message: "Organization name:" });
     }
     const answers = prompts.length
-        ? await inquirer.prompt(prompts as unknown as Parameters<typeof inquirer.prompt>[0])
+        ? await inquirer.prompt(prompts)
         : {};
 
     const name = (args["--name"] || (answers as { name?: string }).name || "").trim();
@@ -127,11 +129,11 @@ message: "Organization name:" });
     const slug = (args["--slug"] || slugify(name)).trim();
 
     try {
-        const created = (await client.data.collection("organizations").create({
+        const created = requireCloudRow<OrgRow>(await client.data.collection("organizations").create({
             name,
             slug,
             createdAt: new Date().toISOString()
-        })) as unknown as OrgRow;
+        }), "organization");
         setContextOrg(url, String(created.id));
         success(`Created organization ${chalk.bold(name)} and set it active`);
         emit(() => {}, {

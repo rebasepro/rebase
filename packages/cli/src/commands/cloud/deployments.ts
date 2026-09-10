@@ -21,7 +21,8 @@ import {
     success,
     fail,
     reportError,
-    type CloudClient
+    type CloudClient,
+    cloudRows
 } from "./context";
 
 /** A deployment row, as the data API hands it back (camel or snake columns). */
@@ -246,7 +247,7 @@ async function fetchDeployments(client: CloudClient, projectId: string, limit = 
         orderBy: ["createdAt", "desc"],
         limit
     });
-    return res.data as unknown as DeploymentRow[];
+    return cloudRows<DeploymentRow>(res.data);
 }
 
 /**

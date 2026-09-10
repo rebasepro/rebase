@@ -25,7 +25,9 @@ import {
     note,
     noteBlank,
     confirmDestructive,
-    type CloudClient
+    type CloudClient,
+    cloudRows,
+    requireCloudRow
 } from "./context";
 import { buildDialPatch } from "./resources";
 import { attachDatabaseRow } from "./databases";
@@ -66,7 +68,7 @@ maxPositionals: 0 });
                 where: org ? { organization: ["==", org] } : undefined,
                 orderBy: ["name", "asc"],
                 limit: 100
-            }).then((res) => res.data as unknown as ProjectRow[]),
+            }).then((res) => cloudRows<ProjectRow>(res.data)),
             fetchTenantBaseDomain(client, url)
         ]);
 
@@ -278,7 +280,7 @@ export async function createProject(rawArgs: string[]): Promise<void> {
     // Prompt only for the essentials, and only when attached to a terminal —
     // a headless `projects create --name X --subdomain Y` must never block.
     // repo/branch/provider are optional and default sensibly.
-    const prompts: Array<Record<string, unknown>> = [];
+    const prompts: Array<{ type: "input"; name: string; message: string }> = [];
     if (!args["--name"]) prompts.push({ type: "input",
 name: "name",
 message: "Project name:" });
@@ -286,7 +288,7 @@ message: "Project name:" });
 name: "subdomain",
 message: "Subdomain:" });
     const answers = prompts.length && process.stdin.isTTY
-        ? await inquirer.prompt(prompts as unknown as Parameters<typeof inquirer.prompt>[0])
+        ? await inquirer.prompt(prompts)
         : {};
     const a = answers as Record<string, string>;
 
@@ -360,7 +362,7 @@ message: "Subdomain:" });
         if (!user) {
             fail("Session is no longer valid.", "Run `rebase cloud login` again.", "session_invalid");
         }
-        const created = (await client.data.collection("projects").create({
+        const created = requireCloudRow<ProjectRow>(await client.data.collection("projects").create({
             name,
             subdomain,
             gitRepoUrl,
@@ -371,7 +373,7 @@ message: "Subdomain:" });
             organization: org,
             createdById: user.uid,
             status: "provisioning"
-        })) as unknown as ProjectRow;
+        }), "project");
 
         const host = projectHost(created, await fetchTenantBaseDomain(client, url));
         const linked = Boolean(args["--link"]);

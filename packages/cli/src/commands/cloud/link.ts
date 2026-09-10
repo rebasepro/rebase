@@ -25,7 +25,8 @@ import {
     note,
     noteBlank,
     warn,
-    requireInteractive
+    requireInteractive,
+    cloudRows
 } from "./context";
 
 interface ProjectRow {
@@ -151,10 +152,10 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
             // run by an agent parked on a select prompt forever.
             requireInteractive("a project to link", "--project <slug>");
             const org = getContextOrg(url);
-            const projects = (await client.data.collection("projects").find({
+            const projects = cloudRows<ProjectRow>((await client.data.collection("projects").find({
                 where: org ? { organization: ["==", org] } : undefined,
                 limit: 100
-            })).data as unknown as ProjectRow[];
+            })).data);
 
             if (projects.length === 0) {
                 fail(
