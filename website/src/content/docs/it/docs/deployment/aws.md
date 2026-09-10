@@ -35,7 +35,7 @@ rebase build
 Per App Runner, che scarica da un registry, inserisci il bundle in un'immagine derivata. Si tratta di tre righe e definisce esattamente cosa viene eseguito:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

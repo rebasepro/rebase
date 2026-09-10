@@ -35,7 +35,7 @@ rebase build
 O Container Apps faz pull de um registry, portanto embute o bundle em uma imagem derivada. Três linhas e ele fixa exatamente o que é executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-10
+
 ### Added
 
 - **Soft delete.** One condition, applied from every read path rather than

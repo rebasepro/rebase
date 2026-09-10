@@ -34,7 +34,7 @@ rebase build
 Serverless Containers descarga desde un registro, así que integra el bundle en una imagen derivada. Tres líneas, y fija con exactitud lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

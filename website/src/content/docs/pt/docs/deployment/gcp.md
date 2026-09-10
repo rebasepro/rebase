@@ -34,7 +34,7 @@ rebase build
 O Cloud Run faz o pull a partir de um registro, portanto, incorpore o bundle em uma imagem derivada. Três linhas, e isso fixa exatamente o que é executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

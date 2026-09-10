@@ -83,7 +83,7 @@ Dato che le dipendenze sono già presenti, puoi montare il bundle in sola lettur
 Per un deployment di produzione reale, è preferibile incorporare entrambi gli elementi in un'immagine, bloccando con precisione ciò che viene eseguito:
 
 ```dockerfile
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 
@@ -148,7 +148,7 @@ Il runtime è un container standard in ascolto su `$PORT`, quindi qualsiasi serv
 
 ```toml
 [build]
-  image = "rebasepro/server:0.19.1"
+  image = "rebasepro/server:0.20.0"
 
 [http_service]
   internal_port = 8080
@@ -251,7 +251,7 @@ La configurazione descritta finora impiega un singolo container per l'intero pro
 ## Aggiornamento
 
 ```yaml
-image: rebasepro/server:0.19.1
+image: rebasepro/server:0.20.0
 ```
 
 Riavvia il servizio. Il bundle rimane invariato. All'interno della stessa major version del contratto di runtime, un bundle validato continua a funzionare regolarmente — consulta [Compatibilità](/docs/architecture/runtime-and-bundles/#compatibility).

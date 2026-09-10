@@ -160,7 +160,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.19.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.20.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Seul le tag vaut généralement la peine d'être figé : le dépôt est hérité, il s'agit donc d'un seul projet et d'une seule image dont une seule unité a été modifiée. `bundleUrl` remplit la même fonction lorsque `bundle.mode: url`.

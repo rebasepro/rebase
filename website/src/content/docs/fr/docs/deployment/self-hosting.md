@@ -82,7 +82,7 @@ Puisqu'elles sont déjà présentes, vous pouvez monter le bundle en lecture seu
 Pour un véritable déploiement, préférez intégrer les deux dans une image, ce qui fige également exactement ce qui s'exécute :
 
 ```dockerfile
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 
@@ -147,7 +147,7 @@ Le runtime est un conteneur standard qui écoute sur `$PORT`, de sorte que tout 
 
 ```toml
 [build]
-  image = "rebasepro/server:0.19.1"
+  image = "rebasepro/server:0.20.0"
 
 [http_service]
   internal_port = 8080
@@ -250,7 +250,7 @@ Tout ce qui précède correspond à un conteneur unique desservant l'ensemble du
 ## Mise à niveau
 
 ```yaml
-image: rebasepro/server:0.19.1
+image: rebasepro/server:0.20.0
 ```
 
 Redémarrez. Votre bundle reste inchangé. Au sein d'une même version majeure du contrat de runtime, un bundle qui a été validé continue de fonctionner — voir [Compatibilité](/docs/architecture/runtime-and-bundles/#compatibility).
