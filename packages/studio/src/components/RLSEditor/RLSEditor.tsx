@@ -42,13 +42,27 @@ function classifyTableClient(
     junctionTableNames: Set<string>,
     isMappedToCollection: boolean
 ): TableCategory {
+    // A table the project's own schema maps is the CUSTOMER'S, whatever schema
+    // Postgres put it in. This test used to come second, behind a rule that
+    // claims the whole `rebase` schema as platform plumbing — and Rebase
+    // creates a tenant's collection tables in exactly that schema. So every
+    // table a customer owns was filed under a dimmed, collapsed "Rebase
+    // Internal" section beside `refresh_tokens` and `mfa_factors`, the
+    // "Schema Collections" section rendered empty and disappeared, and the
+    // console's answer to "what am I securing" was four unmapped tables the
+    // project barely uses.
+    //
+    // The schema can never decide this on its own: `users` and `branches` are
+    // both platform tables AND, on a project that defines them, collections
+    // the customer writes policies for. The mapping is the only thing that
+    // knows, so it is asked first.
+    if (isMappedToCollection) return "collection";
     if (
         REBASE_INTERNAL_SCHEMAS.includes(schemaName) ||
         REBASE_INTERNAL_PREFIXES.some((prefix) => tableName.startsWith(prefix))
     ) {
         return "internal";
     }
-    if (isMappedToCollection) return "collection";
     if (junctionTableNames.has(tableName)) return "junction";
     return "other";
 }
