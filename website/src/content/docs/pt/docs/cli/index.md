@@ -1,15 +1,15 @@
 ---
-sourceHash: 595031b868350f1c
+sourceHash: 97dd0e836d51f599
 title: Referência da CLI
 sidebar_label: CLI
-description: Comandos da CLI do Rebase para inicializar projetos, gerar schemas, migrar bancos de dados e gerar o SDK.
+description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
 ---
 
-## Visão Geral
+## Visão geral
 
-A CLI do Rebase (`rebase`) gerencia seu projeto do scaffolding até a implantação.
+A CLI do Rebase (`rebase`) gerencia seu projeto desde o scaffolding até o deploy.
 
-## Installation
+## Instalação
 
 ```bash
 pnpm add -g @rebasepro/cli
@@ -23,45 +23,35 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Saída legível por máquina
 
-`--json` é a chave, e fora da família `cloud` é a única: `rebase status`,
-`rebase resources` e `rebase apps list` passam então a colocar um único valor
-JSON no stdout — o resultado, ou um envelope
-`{"error": {"message", "code", "hint", "issues"}}` com saída diferente de zero —
-em **toda** saída do comando, de modo que quem chama pode fazer o parsing do
-stdout incondicionalmente. Sem ela, escrevem texto para pessoas e as falhas vão
-para o stderr. `rebase cloud` usa o mesmo envelope e é a única exceção à chave:
-ele também liga o JSON por conta própria quando o stdout não é um TTY, ou quando
-`REBASE_JSON=1` está definido. Então `rebase cloud status | cat` é JSON enquanto
-`rebase status | cat` não é — em um script, passe `--json` explicitamente em vez
-de confiar em qualquer uma das duas regras.
+`--json` é a flag de controle e, fora da família `cloud`, é a única: `rebase status`, `rebase resources` e `rebase apps list` colocam um único valor JSON no stdout — o resultado, ou um envelope `{"error": {"message", "code", "hint", "issues"}}` com saída diferente de zero — em **todas** as saídas do comando, para que o chamador possa analisar o stdout incondicionalmente. Sem ela, eles exibem texto legível por humanos e falhas vão para o stderr. `rebase cloud` usa o mesmo envelope e é a única exceção à flag: ele também ativa o JSON automaticamente quando o stdout não é um TTY, ou quando `REBASE_JSON=1` está definido. Portanto, `rebase cloud status | cat` produz JSON enquanto `rebase status | cat` não — em scripts, passe `--json` explicitamente em vez de depender de qualquer uma das regras.
 
 ## Comandos
 
 ### `rebase init`
 
-Inicialize um novo projeto Rebase:
+Inicializa um novo projeto Rebase:
 
 ```bash
 rebase init [directory]
 ```
 
-Monta a estrutura do projeto com os pacotes de frontend, backend e compartilhados.
+Configura a estrutura do projeto com frontend, backend e pacotes compartilhados.
 
 | Flag | O que faz |
 |---|---|
 | `-t, --template <preset>` | `blog`, `ecommerce` ou `blank`. Padrão `blog` |
-| `--headless` | Somente backend — sem painel de administração e sem arquivos de coleções. `--template` não tem efeito, porque não há coleções a semear |
-| `-y, --yes` | Nunca pergunta. **Obrigatório onde não há terminal para responder**, como em CI. Pula o `git init` e a instalação de dependências — os padrões interativos dizem sim a ambos, então passe `--git` / `--install` se os quiser |
-| `-i, --install` | Instalar as dependências após o scaffolding |
-| `-g, --git` | Inicializar um repositório e fazer o primeiro commit |
-| `--database-url <url>` | Usar um banco de dados existente em vez do gerenciado |
-| `--introspect` | Gerar coleções a partir desse banco. Implica `--template blank` e exige `--install` |
-| `--project <slug>` | Vincular o scaffold a um projeto do Rebase Cloud |
+| `--headless` | Apenas backend — sem painel de administração e sem arquivos de coleções. `--template` não tem efeito, pois não há coleções para popular |
+| `-y, --yes` | Nunca solicita confirmação. **Obrigatório onde quer que não haja terminal para responder**, como em ambientes de CI. Pula o git init e a instalação de dependências — os padrões interativos dizem sim para ambos, portanto passe `--git` / `--install` se desejar executá-los |
+| `-i, --install` | Instala dependências após o scaffolding |
+| `-g, --git` | Inicializa um repositório e cria o primeiro commit |
+| `--database-url <url>` | Usa um banco de dados existente em vez do gerenciado |
+| `--introspect` | Gera coleções a partir desse banco de dados. Implica `--template blank` e requer `--install` |
+| `--project <slug>` | Vincula o scaffold a um projeto do Rebase Cloud |
 | `--setup-key <key>` | A chave de uso único que autentica esse vínculo |
 
 ### `rebase dev`
 
-Inicie o servidor de desenvolvimento:
+Inicia o servidor de desenvolvimento:
 
 ```bash
 rebase dev
@@ -69,174 +59,170 @@ rebase dev
 
 Inicia tanto o frontend quanto o backend com hot reloading.
 
-As duas portas são derivadas do caminho do projeto, de modo que vários projetos
-Rebase podem rodar lado a lado. Use as URLs que o `rebase dev` imprime. Fixe uma
-com `rebase dev --port 3001`.
+Ambas as portas são derivadas do caminho do projeto, permitindo que vários projetos Rebase sejam executados
+lado a lado. Use as URLs exibidas por `rebase dev`. Fixe uma porta com `rebase dev --port 3001`.
 
 ### `rebase build`
 
-Compile o projeto em um bundle implantável em `dist-bundle/`:
+Compila o projeto em um bundle pronto para deploy em `dist-bundle/`:
 
 ```bash
 rebase build
 ```
 
-O bundle é o artefato que você implanta — a imagem do runtime o carrega, então não
-há nenhuma imagem de aplicação para você construir. Flags úteis:
+O bundle é o artefato que você implanta — a imagem de runtime o carrega, portanto não há
+imagem de aplicação para você construir por conta própria. Flags úteis:
 
 | Flag | Efeito |
 |------|--------|
-| `--out <dir>` | Gravar o bundle em outro lugar que não `dist-bundle/` |
-| `--vendor` | Sempre instalar e enviar as dependências do bundle |
-| `--no-vendor` | Nunca embutir; o pod instala no primeiro início |
-| `--skip-type-check` | Pular a checagem de tipos (mais rápido, menos seguro) |
-| `--no-static` | Pular a construção do frontend |
+| `--out <dir>` | Grava o bundle em outro local além de `dist-bundle/` |
+| `--vendor` | Sempre instala e inclui as dependências do bundle |
+| `--no-vendor` | Nunca faz o vendoring; o pod instala na primeira inicialização |
+| `--skip-type-check` | Pula a verificação de tipos (mais rápido, menos seguro) |
+| `--no-static` | Pula a compilação do frontend |
 
-As dependências são embutidas por padrão para que um reinício do pod não pague de
-35 a 55 segundos de instalação. Uma árvore que passa de 200 MB em disco é
-descartada, porque o limite de upload é de 100 MB comprimidos — o raciocínio está
-no changelog.
+As dependências são incluídas (vendored) por padrão para que a reinicialização de um pod não pague o custo de
+35–55 segundos de instalação. Uma árvore de diretórios que ultrapasse 200 MB em disco é descartada, pois o
+limite de upload é de 100 MB compactado — consulte o changelog para ver a justificativa.
 
 ### `rebase start`
 
-Execute o bundle compilado como servidor de produção:
+Executa o bundle compilado como um servidor de produção:
 
 ```bash
 rebase start
 ```
 
-Lê `PORT` e o resto do `.env`, ao contrário do `rebase dev`. Aponte-o para um
-bundle em outro lugar com `rebase start --bundle ./dist-bundle`.
+Lê `PORT` e o restante do `.env`, diferentemente de `rebase dev`. Aponte para um bundle
+em outro local com `rebase start --bundle ./dist-bundle`.
 
 ### `rebase apps list`
 
-Mostre os apps que este repositório declara:
+Exibe as aplicações declaradas por este repositório:
 
 ```bash
 rebase apps list
 ```
 
-Um repositório pode declarar mais de um app implantável — um backend e um site de
-marketing, por exemplo. É assim que você vê sobre o que o `rebase build` e a
-implantação vão agir.
+Um repositório pode declarar mais de uma aplicação implantável — um backend e um site
+de marketing, por exemplo. É assim que você visualiza em quais aplicações `rebase build` e o deploy atuarão.
 
 ### `rebase eject`
 
-Assuma o processo do servidor e a imagem dele:
+Assume o controle do processo do servidor e de sua imagem:
 
 ```bash
 rebase eject
 ```
 
-Escreve o ponto de entrada do backend e um `Dockerfile` no projeto e vira o
-backend dele, de modo que o repositório passe a construir a própria imagem em vez
-de rodar o runtime publicado. A partir daí **as atualizações do runtime da
-plataforma deixam de alcançá-lo**, e CORS, a ligação da autenticação, o
-armazenamento e o desligamento passam a ser seus para configurar.
+Grava o ponto de entrada do backend e um `Dockerfile` no projeto e altera a configuração do seu
+backend, fazendo com que o repositório construa sua própria imagem em vez de executar o
+runtime publicado. A partir desse momento, **as atualizações do runtime da plataforma não o alcançarão mais**,
+e o CORS, a integração de autenticação, o armazenamento e o encerramento passam a ser de sua responsabilidade de configuração.
 
-Pré-visualize com `rebase eject --dry-run`, que lista o que mudaria e não muda
-nada. `--force` substitui um `backend/src/index.ts` ou `env.ts` existente,
-mantendo o arquivo atual como `<name>.bak`.
+Visualize as alterações previamente com `rebase eject --dry-run`, que lista o que mudaria sem
+alterar nada. `--force` substitui um arquivo `backend/src/index.ts` ou
+`env.ts` existente, mantendo o arquivo atual como `<name>.bak`.
 
 ### `rebase schema generate`
 
-Gere o schema do Drizzle ORM a partir das suas coleções em TypeScript:
+Gera o schema do Drizzle ORM a partir das suas coleções TypeScript:
 
 ```bash
 rebase schema generate
 ```
 
-Isso lê suas coleções de `config/collections/` e gera `backend/src/schema.generated.ts` com as definições de tabelas, enums e relações do Drizzle.
+Isso lê suas coleções em `config/collections/` e gera `backend/src/schema.generated.ts` com definições de tabelas, enums e relações do Drizzle.
 
 ### `rebase db push`
 
-Envie as mudanças de schema diretamente para o banco (somente desenvolvimento):
+Aplica alterações de schema diretamente ao banco de dados (apenas para desenvolvimento):
 
 ```bash
 rebase db push
 ```
 
 :::caution
-`db push` modifica o banco diretamente, sem arquivos de migração. Use `db generate` + `db migrate` em produção.
+`db push` modifica o banco de dados diretamente sem arquivos de migração. Use `db generate` + `db migrate` para produção.
 :::
 
 ### `rebase db generate`
 
-Gere arquivos de migração SQL a partir das mudanças de schema:
+Gera arquivos de migração SQL a partir das alterações de schema:
 
 ```bash
 rebase db generate
 ```
 
-Cria arquivos de migração com data e hora em `drizzle/`, que podem ser revisados e commitados.
+Cria arquivos de migração com timestamp em `drizzle/` que podem ser revisados e comitados.
 
 ### `rebase db migrate`
 
-Execute as migrações pendentes do banco:
+Executa migrações pendentes do banco de dados:
 
 ```bash
 rebase db migrate
 ```
 
-Aplica ao banco todas as migrações ainda não aplicadas.
+Aplica todas as migrações não aplicadas ao banco de dados.
 
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
-rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
-rebase db backups                       # list what is stored
+rebase db backup --out ./backups        # ou s3://bucket/prefix, gs://bucket/prefix
+rebase db backups                       # lista o que está armazenado
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` roda `pg_dump`; `restore` roda `pg_restore` e é destrutivo, então exige
-`--yes`. `--out` aceita um caminho local ou uma URL de object storage, e assume
-`$BACKUP_DESTINATION` ou `./backups` por padrão.
+`backup` executa `pg_dump`; `restore` executa `pg_restore` e é destrutivo, portanto
+exige `--yes`. `--out` aceita um caminho local ou uma URL de object storage, e o
+padrão é `$BACKUP_DESTINATION` ou `./backups`.
 
 ### `rebase db pull`
 
-Copie outro banco de dados para o de desenvolvimento local:
+Copia outro banco de dados para o banco de desenvolvimento local:
 
 ```bash
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
-`--anonymize` substitui os campos pessoais no caminho de entrada, de modo que uma
-cópia de produção possa ser trabalhada localmente sem levar dados reais de
-clientes para um notebook.
+`--anonymize` substitui campos com dados pessoais durante a importação, permitindo que uma cópia de produção seja
+utilizada localmente sem transferir dados reais de clientes para um notebook.
 
-O `pg_dump` remove os privilégios, então a cópia chegaria com as políticas RLS da
-origem e sem nenhum dos grants por trás delas — cada leitura como `rebase_user`
-falhando com `permission denied`. O pull reprovisiona o papel da aplicação depois,
-usando a mesma rotina que o boot e o `rebase db push` usam, de modo que as tabelas
-internas do Rebase continuem revogadas como devem.
+O `pg_dump` remove privilégios, portanto a cópia chegaria com as políticas de RLS da
+origem e nenhuma das concessões (grants) por trás delas — fazendo com que qualquer leitura como `rebase_user` falhasse
+com `permission denied`. O comando pull provisiona novamente a role da aplicação em seguida, usando
+a mesma rotina que a inicialização e o `rebase db push` usam, para que as tabelas internas do Rebase continuem
+revogadas como deveriam.
 
 O destino é sempre o banco de desenvolvimento local deste projeto e não pode ser
-escolhido: `--database-url` é recusado em vez de aceito, então não há como
-escrever «puxar para a produção». `--from` é a única direção.
+escolhido: `--database-url` é recusado em vez de aceito, logo não há como
+instruir um "pull para produção". `--from` é a única direção.
 
 ### `rebase db url`
 
-Imprime a string de conexão que este projeto está usando, e nada mais, para que
-ela possa ser encadeada:
+Exibe a string de conexão que este projeto está usando, e nada mais, para que ela
+possa ser usada em pipes:
 
 ```bash
 rebase db url
 psql "$(rebase db url)"
 ```
 
-O banco de desenvolvimento gerenciado é o caso que precisa disto: o `.env` deixa
-`DATABASE_URL` comentada de propósito, e a porta é derivada do caminho do
-projeto, então nada em disco a nomeia. Quando você definiu uma `DATABASE_URL`
-sua, é ela que é impressa — a ordem de resolução é a mesma que todo outro comando
-segue. Ele inicia o banco gerenciado se ainda não estiver rodando.
+O banco de dados de desenvolvimento gerenciado é o caso que necessita disso: o `.env` deixa
+`DATABASE_URL` comentada de propósito, e a porta é derivada do
+caminho do projeto, portanto nada em disco a nomeia. Quando você define uma `DATABASE_URL`
+própria, é isso que o comando imprime — a ordem de resolução é a mesma que
+todos os outros comandos seguem. Ele inicia o banco gerenciado se ele ainda não estiver
+em execução.
 
 ### `rebase db stop` / `rebase db reset`
 
-Somente para o banco de desenvolvimento gerenciado:
+Apenas para o banco de dados de desenvolvimento gerenciado:
 
 ```bash
-rebase db stop     # stop it; the data is kept
-rebase db reset    # delete it and start over
+rebase db stop     # para o banco; os dados são mantidos
+rebase db reset    # apaga o banco e começa do zero
 ```
 
 ### `rebase db branch`
@@ -245,61 +231,57 @@ rebase db reset    # delete it and start over
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
-rebase db branch switch <name>     # work on it; every later command follows
-rebase db branch switch            # say which branch you are on
-rebase db branch switch --off      # back to the main database
+rebase db branch switch <name>     # trabalha nele; todos os comandos posteriores o seguem
+rebase db branch switch            # informa em qual branch você está
+rebase db branch switch --off      # volta para o banco de dados principal
 rebase db branch delete <name>
 rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
 
-O PostgreSQL não copia nem descarta um banco ao qual outra coisa esteja conectada,
-e essa «outra coisa» costuma ser o seu próprio `rebase dev`. `create` e `delete`
-nomeiam o que está mantendo o banco aberto; `--force` desconecta essas sessões
-primeiro.
+O PostgreSQL não copia nem remove um banco de dados ao qual qualquer outro processo esteja conectado, e
+o habitual "qualquer outro processo" é o seu próprio `rebase dev`. `create` e `delete` informam
+o que está mantendo o banco aberto; `--force` desconecta essas sessões primeiro.
 
- Cada branch é uma cópia completa em disco, então é preciso limpá-los. `prune`
-remove três coisas: uma entrada cujo banco foi descartado fora do Rebase, um banco
-de branch cuja entrada nunca foi escrita e — apenas com `--older-than` — branches
-mais antigos do que a idade que você indicar. Ele pergunta antes de remover
-qualquer coisa, a não ser que você passe `--yes`.
+Cada branch é uma cópia completa em disco, portanto elas precisam ser limpas. `prune` remove
+três coisas: uma entrada cujo banco foi excluído fora do Rebase, um banco de
+branch cuja entrada nunca foi gravada e — somente com `--older-than` — branches
+com idade superior à especificada. Ele solicita confirmação antes de remover qualquer item, a menos que você passe `--yes`.
 
- `switch` registra o branch em `.rebase/branch.json` e nunca edita o `.env`. Ele
-tem precedência sobre `DATABASE_URL` no `.env` e perde para `--database-url` ou
-para uma `DATABASE_URL` no shell, de modo que uma flag na linha de comando sempre
-supera um switch feito antes. Excluir o branch em que você está devolve você ao
-banco principal, em vez de deixar o checkout apontando para um banco que não
-existe mais.
+`switch` registra a branch em `.rebase/branch.json` e nunca edita o `.env`. Ele
+tem precedência sobre `DATABASE_URL` no `.env` e perde para `--database-url` ou uma
+`DATABASE_URL` no shell, portanto uma flag na linha de comando sempre tem prioridade sobre uma
+alternância feita anteriormente. Deletar a branch em que você está retorna você ao banco de dados
+principal, em vez de deixar o ambiente apontando para um banco que não existe mais.
 
-:::note[Não no banco de desenvolvimento gerenciado]
-`push`, `generate` e `migrate` planejam o trabalho com o Atlas, que precisa de um
-segundo banco vazio para comparar — e o PGlite gerenciado serve exatamente um.
-Executá-los ali para com uma mensagem dizendo isso. Aponte `DATABASE_URL` para um
-PostgreSQL de verdade para o fluxo de migrações; o `rebase dev` já cria as tabelas
-faltantes de forma aditiva no gerenciado.
+:::note[Não aplicável ao banco de desenvolvimento gerenciado]
+`push`, `generate` e `migrate` planejam seu trabalho com o Atlas, que precisa de um segundo
+banco vazio para comparação — e o PGlite gerenciado serve exatamente um.
+Executá-los lá é interrompido com uma mensagem informando isso. Aponte `DATABASE_URL` para um
+PostgreSQL real para o fluxo de trabalho de migrações; o `rebase dev` já cria tabelas ausentes
+de forma incremental no banco gerenciado.
 
-`branch` é recusado ali por um motivo aparentado.
-`CREATE DATABASE ... TEMPLATE` contra o PGlite escreve uma entrada de catálogo e
-não copia nada, então o branch resolveria para o banco do qual foi clonado — cada
-escrita que você pretendia isolar cairia no seu banco de desenvolvimento. O
-`rebase dev --docker` lhe dá um servidor de verdade contra o qual os branches
-funcionam.
+`branch` é recusado lá por um motivo relacionado. `CREATE DATABASE ... TEMPLATE`
+no PGlite grava uma entrada de catálogo e não copia nada, de modo que a branch
+apontaria para o banco do qual foi clonada — qualquer gravação que você pretendia isolar
+iria parar no seu banco de desenvolvimento. O `rebase dev --docker` fornece um servidor
+real contra o qual branches funcionam.
 :::
 
 ### `rebase apps init` / `rebase apps config`
 
 ```bash
-rebase apps list             # the apps this project declares
-rebase apps init <name>      # register a new app in rebase.json
-rebase apps config <app>     # what one app resolves to
+rebase apps list             # as aplicações que este projeto declara
+rebase apps init <name>      # registra uma nova aplicação em rebase.json
+rebase apps config <app>     # a configuração resolvida de uma aplicação
 ```
 
 ### `rebase status`
 
-Tudo o que este projeto declara, e se o ambiente realmente o vincula:
+Tudo o que este projeto declara e se o ambiente realmente faz o vínculo:
 
 ```bash
-rebase status               # every resource, and the variables it reads
-rebase status --json        # machine-readable
+rebase status               # cada recurso e as variáveis que ele lê
+rebase status --json        # legível por máquina
 ```
 
 ```
@@ -316,81 +298,81 @@ rebase status --json        # machine-readable
       └ declared, not configured — uploads here answer 501 STORAGE_SOURCE_NOT_CONFIGURED
 ```
 
-Três arquivos decidem o que um backend pode alcançar, e isto imprime os três
-juntos: o `rebase.json` diz onde está o seu código e quem executa o servidor, o
-`config/resources.ts` diz do que o projeto precisa, e o ambiente diz como alcançar
-cada coisa. Todo o resto — `rebase.resources.json`, o manifesto do bundle — é
-gerado a partir do do meio para leitores que não podem executar o seu código, e
-você nunca o escreve.
+Três arquivos decidem o que um backend pode acessar, e este comando imprime todos os três juntos:
+`rebase.json` informa onde está o seu código e quem executa o servidor,
+`config/resources.ts` diz o que o projeto precisa e o ambiente define como
+alcançar cada item. Todo o restante — `rebase.resources.json`, o manifesto do
+bundle — é gerado a partir do segundo arquivo para leitores que não conseguem executar o seu
+código, e você nunca o edita manualmente.
 
-Um `○` é o estado que vale conhecer antes de uma implantação, e não depois:
-declarado, não configurado. Um `✗` significa que o ambiente define algo de forma
-*errada*, o que recusa o boot em vez de degradar.
+Um `○` é o estado que vale a pena conhecer antes de um deploy em vez de depois:
+declarado, mas não configurado. Um `✗` significa que o ambiente define algo *incorretamente*,
+o que impede a inicialização em vez de apenas degradar o serviço.
 
 ### `rebase resources`
 
-O que este projeto declara precisar — os bancos, buckets, tópicos e filas que o
-código de configuração pede, e os crons e funções que os seus arquivos definem:
+O que este projeto declara que precisa — os bancos de dados, buckets, tópicos e
+filas solicitados pelo seu código de configuração, e os crons e funções definidos por seus arquivos:
 
 ```bash
-rebase resources            # list them
-rebase resources --write    # regenerate rebase.resources.json
-rebase resources --check    # fail if the committed graph is stale
-rebase resources --json     # machine-readable
+rebase resources            # lista-os
+rebase resources --write    # regenera rebase.resources.json
+rebase resources --check    # falha se o grafo comitado estiver desatualizado
+rebase resources --json     # legível por máquina
 ```
 
-`rebase resources --check` é novo — a flag que um job de CI usa para falhar em um `rebase.resources.json` que não
-corresponde mais ao código de configuração.
+`rebase resources --check` é novo — a flag usada por jobs de CI para falhar
+em caso de um `rebase.resources.json` que não corresponda mais ao código de configuração.
 
 Um recurso é declarado no código de configuração — `database("analytics")`,
-`bucket("media")`, `topic("signups")`, `queue("thumbnails")` — ou é um arquivo sob
-`backend/crons` ou `backend/functions`, e nunca é escrito à mão em
-`rebase.resources.json`, que é gerado a partir dessas declarações para que um host
-possa ler do que um projeto precisa sem compilá-lo. Cada entrada registra quem o
-usa (`collection:events`, `property:posts.cover`, `function:report`).
+`bucket("media")`, `topic("signups")`, `queue("thumbnails")` — ou é um arquivo
+em `backend/crons` ou `backend/functions`, e nunca deve ser escrito manualmente em
+`rebase.resources.json`, que é gerado a partir dessas declarações para que um host possa
+ler o que um projeto precisa sem precisar compilá-lo. Cada entrada registra quem a utiliza
+(`collection:events`, `property:posts.cover`, `function:report`).
 
-Um backend também tem um banco de dados padrão e uma fonte de armazenamento padrão
-que ninguém declara. Ambos são listados aqui, marcados como `implicit`, e nenhum
-dos dois é escrito em `rebase.resources.json` — o host os fornece, então registrá-
-los seria pedir o provisionamento de algo que ninguém pediu.
+Um backend também possui um banco de dados padrão e uma fonte de armazenamento padrão que ninguém
+declara. Ambos são listados aqui, marcados como `implicit`, e nenhum deles é gravado em
+`rebase.resources.json` — o host os fornece, portanto registrá-los solicitaria
+o provisionamento de algo que ninguém pediu.
 
-Para ver o que a plataforma guarda para um projeto em face do que o seu código
-declara, e para remover um banco provisionado que o código não nomeia mais, veja
+Para ver o que a plataforma mantém para um projeto em relação ao que seu código declara,
+e para remover um banco provisionado que o código não menciona mais, consulte
 `rebase cloud resources` abaixo.
 
 ### `rebase cloud`
 
-Tudo o que diz respeito ao Rebase Cloud, que está em beta privado. Veja o
-[guia do Rebase Cloud](/docs/deployment/cloud/) para saber o que é e o que o beta
+Tudo relacionado ao Rebase Cloud, que está em beta privado. Consulte o
+[guia do Rebase Cloud](/docs/deployment/cloud/) para saber o que ele é e o que o beta
 não inclui.
 
-Todo grupo responde a `--help`, e `--help` nunca executa o comando. A maioria dos
-comandos age sobre o projeto vinculado em `.rebase/cloud.json`; `--project <id>`
-opera sobre um sem vinculá-lo.
+Todos os grupos respondem a `--help`, e `--help` nunca executa o comando. A maioria dos comandos
+atua no projeto vinculado em `.rebase/cloud.json`; `--project <id>` opera em
+um projeto sem vinculação.
 
-Três opções valem em todo lugar: `--json` para saída legível por máquina (também o
-padrão quando encadeado, ou com `REBASE_JSON=1`), `--url <origin>` para mirar um
-control plane específico (ou `REBASE_CLOUD_URL`), e `--project, -p <id>`.
+Três opções se aplicam a todos os lugares: `--json` para saída legível por máquina (também o
+padrão quando usado em pipes, ou com `REBASE_JSON=1`), `--url <origin>` para direcionar a um
+painel de controle (control plane) específico (ou `REBASE_CLOUD_URL`), e `--project, -p <id>`.
 
-#### Autenticação
-
-```bash
-rebase cloud login      # sign in to the control plane
-rebase cloud logout     # sign out
-rebase cloud whoami     # show the current session
-```
-
-#### Vínculo do projeto
+#### Auth
 
 ```bash
-rebase cloud link         # link this directory to a cloud project
-rebase cloud link [url]   # or straight at a backend: no control plane, no login, and the rest of the family refuses until you unlink
-rebase cloud unlink       # remove the link
-rebase cloud use [org]    # select the active organization
-rebase cloud open         # open the dashboard in a browser
+rebase cloud login      # faz login no control plane
+rebase cloud logout     # faz logout
+rebase cloud whoami     # exibe a sessão atual
 ```
 
-#### Projetos
+#### Project link
+
+```bash
+rebase cloud link         # vincula este diretório a um projeto na nuvem
+rebase cloud link [url]   # ou diretamente a um backend: sem control plane, sem login, e o restante da família recusa operações até desvincular
+rebase cloud unlink       # remove o vínculo
+rebase cloud use [org]    # seleciona a organização ativa
+rebase cloud open         # abre o dashboard no navegador
+```
+
+#### Projects
 
 ```bash
 rebase cloud projects list
@@ -399,38 +381,38 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-#### Implantar e observar
+#### Deploy and observe
 
 ```bash
-rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
-rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
+rebase cloud deploy [app] [--source .]   # faz o deploy de um app e transmite os logs de build
+rebase cloud logs [--runtime] [-f]       # logs de build ou do processo em execução
 rebase cloud deployments list [--limit N|--all]
-rebase cloud rollback [id] [-y]          # back to a successful deploy
-rebase cloud cancel [-y]                 # cancel the in-flight build
-rebase cloud start | stop | restart [-y] # stop and restart need -y
-rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
-rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
+rebase cloud rollback [id] [-y]          # reverte para um deploy bem-sucedido
+rebase cloud cancel [-y]                 # cancela o build em andamento
+rebase cloud start | stop | restart [-y] # stop e restart exigem -y
+rebase cloud status                      # status do projeto em visão geral
+rebase cloud metrics                     # CPU / memória / disco em tempo real
+rebase cloud debug [health|logs|…]       # diagnostica uma implantação, somente leitura
 ```
 
-`deploy` sem nome de app implanta o backend.
+`deploy` sem o nome de uma aplicação faz o deploy do backend.
 
-#### Configuração
+#### Config
 
 ```bash
 rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add | verify | remove
 rebase cloud extensions list | enable | disable
-rebase cloud settings show | set        # name, branch, repo, subdomain
+rebase cloud settings show | set        # nome, branch, repositório, subdomínio
 ```
 
-#### Organizações
+#### Organizations
 
 ```bash
 rebase cloud orgs list | create | members
 ```
 
-#### Bancos de dados
+#### Databases
 
 ```bash
 rebase cloud db list | create | info | test
@@ -438,56 +420,56 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-#### Recursos
+#### Resources
 
-O que a plataforma guarda para o projeto, em face do que o seu código declara.
+O que a plataforma mantém para o projeto, em relação ao que seu código declara.
 
 ```bash
-rebase cloud resources                       # each database and bucket: declared? provisioned?
-rebase cloud resources prune database <key>  # remove one the code no longer declares
+rebase cloud resources                       # cada banco de dados e bucket: declarado? provisionado?
+rebase cloud resources prune database <key>  # remove um que o código não declara mais
 ```
 
-Uma implantação nunca remove um banco provisionado quando a declaração dele some —
-isso seriam dados apagados por um push. Ela o mantém, o vincula e o cobra até que
-alguém o remova pelo nome.
+Um deploy nunca remove um banco de dados provisionado quando sua declaração é removida — isso
+seria apagar dados através de um push. Ele mantém, vincula e cobra por ele até que alguém
+faça a limpeza (prune) informando seu nome.
 
 #### Compute
 
-O que o projeto reserva, e quanto isso custa.
+O que o projeto reserva e quanto isso custa.
 
 ```bash
-rebase cloud compute            # the current reservation and its monthly cost
-rebase cloud compute set        # change it
+rebase cloud compute            # a reserva atual e seu custo mensal
+rebase cloud compute set        # altera a reserva
 ```
 
 `compute set` aceita `--cpu`, `--memory`, `--replicas`, `--spot`,
 `--scale-to-zero`, `--db-mode`, `--db-instances`, `--db-cpu`, `--db-memory`,
-`--storage`, `--autoscale-max`, `--autoscale-cpu-target` e `--no-autoscale`. Não
-há faixas de plano: tudo é cobrado por recurso. Veja
+`--storage`, `--autoscale-max`, `--autoscale-cpu-target` e `--no-autoscale`.
+Não há níveis de planos: tudo é cobrado por recurso. Consulte
 [Rebase Cloud](/docs/deployment/cloud/).
 
-#### Armazenamento, webhooks, clusters e cobrança
+#### Storage, webhooks, clusters and billing
 
 ```bash
-rebase cloud storage             # list storage buckets
-rebase cloud storage create      # provision platform-managed storage
-rebase cloud storage attach      # attach your own S3-compatible bucket
+rebase cloud storage             # lista os buckets de armazenamento
+rebase cloud storage create      # provisiona armazenamento gerenciado pela plataforma
+rebase cloud storage attach      # anexa seu próprio bucket compatível com S3
 rebase cloud webhooks list | create | delete
-rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
-rebase cloud billing             # the billing account and card on file
-rebase cloud billing setup       # attach a card, one-time, opens a browser
-rebase cloud billing checkout    # a Stripe session for one project
+rebase cloud clusters list | add | verify   # os clusters onde os tenants rodam; `add` registra um a partir de um kubeconfig
+rebase cloud billing             # a conta de faturamento e o cartão cadastrado
+rebase cloud billing setup       # vincula um cartão, ação única, abre o navegador
+rebase cloud billing checkout    # uma sessão do Stripe para um projeto
 ```
 
 ### `rebase generate-sdk`
 
-Gere um SDK de cliente tipado a partir das suas definições de coleções:
+Gera um SDK de cliente tipado a partir das definições de suas coleções:
 
 ```bash
 rebase generate-sdk
 ```
 
-Cria tipos TypeScript e um cliente com segurança de tipos para todas as suas coleções.
+Cria tipos TypeScript e um cliente type-safe para todas as suas coleções.
 
 ### `rebase doctor`
 
@@ -495,45 +477,44 @@ Cria tipos TypeScript e um cliente com segurança de tipos para todas as suas co
 rebase doctor
 ```
 
-O comando para rodar quando algo está errado e você ainda não sabe o quê. Ele
-relata e nunca muda nada, então é seguro contra qualquer banco que você consiga
-alcançar.
+O comando para executar quando algo estiver errado e você ainda não souber o quê. Ele
+apenas reporta e nunca altera nada, portanto é seguro executá-lo contra qualquer banco de dados que
+você consiga acessar.
 
-**Sem banco de dados.** Estes rodam primeiro, porque tudo o que impede um projeto
-de funcionar acontece antes de qualquer tabela poder ser comparada:
+**Sem um banco de dados.** Estas verificações são executadas primeiro, pois tudo o que impede um projeto
+de funcionar por completo acontece antes que uma tabela possa ser comparada:
 
-| Verificação | Por quê |
+| Verificação | Motivo |
 | --- | --- |
-| Versão do Node | Em face da faixa que a CLI declara. Antiga demais não é relatado como «Node não suportado» — é um erro de sintaxe dentro de uma dependência. |
-| Gerenciadores de pacotes | Dois lockfiles em um só projeto. `npm install` em um workspace pnpm reescreve `node_modules` em um layout com o qual o pnpm discorda, e o sintoma é um `Cannot find module` horas depois. |
-| Slugs duplicados | O registro fica com a última coleção registrada, então a outra não é relatada como ausente — ela é servida como vencedora, sob o próprio nome. |
-| Sanidade do `.env` | Um `JWT_SECRET` com menos de 32 caracteres (com o qual a produção se recusa a subir), e `NODE_ENV=production` sem `CORS_ORIGINS` nem `FRONTEND_URL`. Os valores nunca são impressos. |
-| Divergência de versões de `@rebasepro/*` | O mesmo pacote fixado em versões diferentes entre os `package.json` do projeto. Duas cópias quebram o `instanceof` entre elas, o que falha como um type guard rejeitando o próprio tipo. |
-| Strings de conexão | Um `=` não codificado em um parâmetro de URL, que as próprias ferramentas do PostgreSQL se recusam a interpretar — então backups e `psql` quebram enquanto a aplicação continua funcionando. |
-| Funções personalizadas | O que cada função precisa do seu host, e quais delas não rodariam em um runtime de edge. |
+| Versão do Node | Comparada com a faixa declarada pela CLI. Uma versão muito antiga não é reportada como "Node incompatível" — ela se manifesta como um erro de sintaxe dentro de uma dependência. |
+| Gerenciadores de pacotes | Dois arquivos de lock em um único projeto. Executar `npm install` em um workspace pnpm reestrutura o `node_modules` em um formato incompatível com o pnpm, e o sintoma é `Cannot find module` horas depois. |
+| Slugs duplicados | O registro mantém a última coleção registrada, de modo que a outra não é dada como ausente — ela é servida como a vencedora, sob seu próprio nome. |
+| Sanidade do `.env` | Um `JWT_SECRET` com menos de 32 caracteres (o que impede a inicialização em produção) e `NODE_ENV=production` sem `CORS_ORIGINS` nem `FRONTEND_URL`. Os valores nunca são exibidos. |
+| Divergência de versão de `@rebasepro/*` | O mesmo pacote fixado em versões diferentes nos arquivos `package.json` do projeto. Duas cópias quebram o `instanceof` entre elas, falhando como um type guard que rejeita seu próprio tipo. |
+| Strings de conexão | Um `=` não codificado em um parâmetro de URL, que as próprias ferramentas do PostgreSQL recusam analisar — quebrando backups e o `psql` enquanto a aplicação continua funcionando. |
+| Funções customizadas | O que cada função exige de seu host e quais delas não rodariam em um runtime edge. |
 
-**Contra o banco de dados**, quando `DATABASE_URL` está definida:
+**Contra o banco de dados**, quando `DATABASE_URL` estiver definida:
 
-| Verificação | Por quê |
+| Verificação | Motivo |
 | --- | --- |
-| Coleções → schema gerado | Se o `schema.generated.ts` está desatualizado. |
-| Coleções → banco de dados | Tabelas, colunas, enums, chaves estrangeiras e tabelas de junção faltando. |
-| Extensões necessárias | Uma propriedade `{ type: "vector" }` precisa do pgvector, que o Rebase instala só onde um projeto o declarou. |
-| Carimbo do schema | Se este banco foi provisionado a partir destas coleções. É um hash, então pode dizer que os dois discordam e nunca qual está à frente. |
+| Coleções → schema gerado | Se `schema.generated.ts` está desatualizado. |
+| Coleções → banco de dados | Tabelas, colunas, enums, chaves estrangeiras e junções ausentes. |
+| Extensões necessárias | Uma propriedade `{ type: "vector" }` precisa do pgvector, que o Rebase instala apenas onde o projeto declarou. |
+| Schema stamp | Se este banco de dados foi provisionado a partir destas coleções. Trata-se de um hash, indicando se os dois divergem, mas sem especificar qual está à frente. |
 | Coleções → tipos do SDK | Se o SDK tipado gerado está desatualizado. |
-| Políticas RLS | Se as políticas do banco correspondem às `securityRules` que você declarou, e se alguma política nomeia um papel que este servidor não pode usar. |
+| Políticas de RLS | Se as políticas do banco correspondem às `securityRules` declaradas e se alguma política referencia uma role que este servidor não pode usar. |
 
-Se o banco estiver inacessível, as fases dele são relatadas como puladas com o
-motivo e o resto ainda roda — veja
-[Solução de problemas](/docs/troubleshooting/).
+Se o banco de dados estiver inacessível, suas etapas são reportadas como ignoradas juntamente com o
+motivo, e o restante continua sendo executado — consulte [Solução de problemas](/docs/troubleshooting/).
 
-Sai com código diferente de zero quando uma verificação encontra um erro, ou
-quando uma fase não pôde rodar porque o banco que lhe foi dado recusa conexões.
-Uma fase pulada porque você não definiu `DATABASE_URL` não é uma falha.
+Encerra com código diferente de zero quando uma verificação encontra um erro ou quando uma etapa não pôde ser executada
+porque o banco de dados informado recusa conexões. Uma etapa ignorada por
+não haver `DATABASE_URL` definida não é considerada uma falha.
 
-`rebase doctor --policies` roda apenas as verificações de RLS — sem diff de
-schema, sem tipos do SDK — e falha de forma fechada, o que o torna a forma a usar
-como gate de CI contra um banco implantado.
+`rebase doctor --policies` executa apenas as verificações de RLS — sem diff de schema, sem
+tipos de SDK — e falha de forma segura (fail-closed), tornando-o ideal para uso como barreira (gate) de CI contra um
+banco de dados em produção.
 
 ### `rebase auth`
 
@@ -545,8 +526,8 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-Gerencie chaves de API de serviço com escopo — a credencial que um agente, um
-script ou outro serviço usa, em oposição à sessão de um usuário final:
+Gerencia chaves de API com escopo para serviços — a credencial utilizada por um agente, script ou outro
+serviço, em oposição à sessão de um usuário final:
 
 ```bash
 rebase api-keys list
@@ -555,20 +536,18 @@ rebase api-keys create --name "Full Access" --full-access --expires 90d
 rebase api-keys revoke abc123-def456
 ```
 
-`--permissions` recebe um array JSON de objetos `{ collection, operations }`, ou
-use `--full-access` para leitura/escrita/exclusão em todas as coleções e funções.
-`--expires` aceita `7d`, `30d`, `90d`, `1y` ou uma data ISO, e `--rate-limit`
-define as requisições por janela de 15 minutos. Uma chave é exibida uma única vez,
-na criação.
+`--permissions` aceita um array JSON de objetos `{ collection, operations }`, ou use
+`--full-access` para permissões de leitura/gravação/exclusão em todas as coleções e funções. `--expires`
+aceita `7d`, `30d`, `90d`, `1y` ou uma data ISO, e `--rate-limit` define requisições
+por janela de 15 minutos. A chave é exibida apenas uma vez, no momento da criação.
 
-As chaves passam por dois portões: valem tanto as permissões da própria chave
-quanto a row-level security da identidade sob a qual ela age, de modo que uma
-chave nunca pode ler mais do que aquela identidade pode.
+As chaves contam com dupla verificação: aplicam-se tanto as permissões da própria chave quanto o row-level security
+da identidade sob a qual ela opera, garantindo que uma chave nunca possa ler mais do que essa identidade tem permissão.
 
 ### `rebase skills install`
 
-Instale as skills de referência do Rebase para o seu assistente de programação com
-IA. Suporta Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity:
+Instala as skills de referência do Rebase para o seu assistente de programação com IA. Suporta
+Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity:
 
 ```bash
 rebase skills install
@@ -576,11 +555,12 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Veja [Agent Skills](/docs/ai/skills) para a lista completa e para onde os arquivos são escritos.
+Consulte [Agent Skills](/docs/ai/skills) para obter a lista completa e saber onde os arquivos são gravados.
 
 ### `rebase telemetry`
 
-Compartilhamento anônimo de uso. **É opt-in, e fica desligado a menos que você o ligue:**
+Compartilhamento anônimo de dados de uso. **`rebase init` pergunta uma vez por projeto, e a confirmação
+tem padrão positivo (yes) — nada é enviado a menos que você responda:**
 
 ```bash
 rebase telemetry status
@@ -589,29 +569,31 @@ rebase telemetry enable
 rebase telemetry disable
 ```
 
-`status` imprime a configuração atual, `show` imprime exatamente o que seria
-enviado, e os outros dois a alteram. O `rebase init` pergunta uma vez; se você
-nunca rodou o `init`, nada jamais foi coletado.
+`status` imprime a configuração atual, `show` exibe exatamente o que seria enviado —
+esteja o compartilhamento ativo ou não, para que você possa ler o payload antes de decidir — e
+os outros dois comandos alteram a configuração. Se você nunca executou `init`, nada foi coletado.
 
-## Fluxo de trabalho de migração
+## Fluxo de trabalho de migrações
 
-O fluxo de trabalho típico para mudanças de schema:
+O fluxo de trabalho típico para alterações de schema:
 
 ```bash
-# 1. Edit your collection in config/collections/
-# 2. Generate the Drizzle schema
+# 1. Edite sua coleção em config/collections/
+# 2. Gere o schema do Drizzle
 rebase schema generate
 
-# 3. Generate SQL migration
+# 3. Gere a migração SQL
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/
+# 4. Revise o SQL gerado em drizzle/
 
-# 5. Apply the migration
+# 5. Aplique a migração
 rebase db migrate
 ```
 
-## Próximos Passos
+## Próximos passos
 
-- **[Schema como código](/docs/architecture/schema-as-code)** — Como funciona a geração de schema
-- **[Início rápido](/docs/getting-started/quickstart)** — Comece por aqui
+- **[Schema as Code](/docs/architecture/schema-as-code)** — Como funciona a geração de schemas
+- **[Início rápido](/docs/getting-started/quickstart)** — Comece a usar
+
+---
