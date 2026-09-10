@@ -26,7 +26,17 @@ export type EntityCardBindingProps<M extends Record<string, unknown> = Record<st
     searchString?: string;
     entity: Entity<M>;
     collection: AdminCollection<M>;
-    onClick?: (entity: Entity<M>) => void;
+    /**
+     * The card was clicked.
+     *
+     * Carries the originating event as well as the entity, because the grid's
+     * own handler needs it: `CardView` hands `renderCard` an
+     * `(e: React.MouseEvent) => void` that reads `e.metaKey` / `e.ctrlKey` and
+     * calls `e.preventDefault()`. That handler used to be passed here through
+     * `onClick as any` and then invoked with the *entity*, so its modifier
+     * branch read `entity.metaKey` — always undefined — and never ran.
+     */
+    onClick?: (entity: Entity<M>, event?: React.MouseEvent) => void;
     selected?: boolean;
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
@@ -77,6 +87,9 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
         searchString
     );
 
+    // The event is optional because `Card` activates by keyboard too, calling
+    // `onClick?.()` with nothing on Enter/Space. That path is real, and it is
+    // why this cannot simply require one.
     const handleClick = (e?: React.MouseEvent) => {
         // Cmd+click (Mac) or Ctrl+click (Windows) toggles selection
         if (e && (e.metaKey || e.ctrlKey) && selectionEnabled) {
@@ -89,7 +102,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                 path: entity.path,
                 entityId: entity.id
             });
-            onClick(entity);
+            onClick(entity, e);
         }
     };
 

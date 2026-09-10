@@ -10,7 +10,8 @@ import {
     CalendarIcon,
     AlertTriangleIcon,
     ListTodoIcon,
-    CheckCircle2Icon
+    CheckCircle2Icon,
+    type ChipColorKey
 } from "@rebasepro/ui";
 
 /* ── Types ──────────────────────────────────────────────────── */
@@ -56,9 +57,15 @@ export interface TaskTableProps {
     onLoadMoreCompleted: () => void;
 }
 
-export const resolutionDisplay: Record<string, { label: string; colorScheme: string }> = {
+// `ChipColorKey`, not `string`. Declared as `string`, every value below was
+// unchecked and the `Chip` rendering one needed `as any` to accept it. Four of
+// them said `"amber"`, which is not a hue this palette has — `getColorSchemeForKey`
+// falls back to hashing the name, so those four chips took a deterministic but
+// arbitrary colour rather than the one they asked for. They are `"yellow"` now,
+// whose solid (#fcb400) is the amber that was meant.
+export const resolutionDisplay: Record<string, { label: string; colorScheme: ChipColorKey }> = {
     verified: { label: "Verified", colorScheme: "green" },
-    needs_followup: { label: "Needs Follow-up", colorScheme: "amber" },
+    needs_followup: { label: "Needs Follow-up", colorScheme: "yellow" },
     suitable: { label: "Suitable", colorScheme: "green" },
     not_a_fit: { label: "Not a Fit", colorScheme: "red" },
     response_received: { label: "Response Received", colorScheme: "green" },
@@ -69,13 +76,13 @@ export const resolutionDisplay: Record<string, { label: string; colorScheme: str
     signed: { label: "Signed", colorScheme: "green" },
     reminder_sent: { label: "Reminder Sent", colorScheme: "blue" },
     payment_confirmed: { label: "Payment Confirmed", colorScheme: "green" },
-    not_yet_received: { label: "Not Yet Received", colorScheme: "amber" },
+    not_yet_received: { label: "Not Yet Received", colorScheme: "yellow" },
     sent: { label: "Sent", colorScheme: "green" },
     confirmed: { label: "Confirmed", colorScheme: "green" },
-    not_yet: { label: "Not Yet", colorScheme: "amber" },
+    not_yet: { label: "Not Yet", colorScheme: "yellow" },
     scheduled: { label: "Scheduled", colorScheme: "green" },
     feedback_received: { label: "Feedback Received", colorScheme: "green" },
-    awaiting_response: { label: "Awaiting Response", colorScheme: "amber" },
+    awaiting_response: { label: "Awaiting Response", colorScheme: "yellow" },
     archived: { label: "Archived", colorScheme: "green" },
     done: { label: "Done", colorScheme: "green" },
 };
@@ -255,7 +262,7 @@ export function TaskTable({
                         {isCompleted && task.values?.resolution && resolutionDisplay[task.values.resolution] && (
                             <Chip
                                 size="smallest"
-                                colorScheme={resolutionDisplay[task.values.resolution].colorScheme as any}
+                                colorScheme={resolutionDisplay[task.values.resolution].colorScheme}
                             >
                                 {resolutionDisplay[task.values.resolution].label}
                             </Chip>

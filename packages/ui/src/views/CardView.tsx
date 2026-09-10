@@ -37,7 +37,12 @@ export type CardViewProps<T> = {
             selected: boolean;
             highlighted: boolean;
             onSelectionChange: (selected: boolean) => void;
-            onClick: (e: React.MouseEvent) => void;
+            /**
+             * Absent on a keyboard activation — a card is a `role="button"` and
+             * Enter/Space reach this with no event. Only the modifier branch
+             * needs one; the click itself does not.
+             */
+            onClick: (e?: React.MouseEvent) => void;
         }
     ) => React.ReactNode;
     emptyComponent?: React.ReactNode;
@@ -238,8 +243,8 @@ export function CardView<T>({
                             const selected = selectedIds?.has(id) ?? false;
                             const highlighted = highlightedIds?.has(id) ?? false;
 
-                            const handleClick = (e: React.MouseEvent) => {
-                                if ((e.metaKey || e.ctrlKey) && selectionEnabled) {
+                            const handleClick = (e?: React.MouseEvent) => {
+                                if (e && (e.metaKey || e.ctrlKey) && selectionEnabled) {
                                     e.preventDefault();
                                     onSelectionChange?.(item, !selected);
                                     return;

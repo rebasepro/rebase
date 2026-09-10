@@ -146,7 +146,7 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
                     entity={entity}
                     collection={collection}
                     searchString={tableController.searchString}
-                    onClick={onClick as any}
+                    onClick={(_entity, event) => onClick(event)}
                     selected={selected}
                     highlighted={highlighted}
                     onSelectionChange={handleRowSelectionChange}
