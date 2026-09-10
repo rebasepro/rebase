@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  ChevronDown, User,
-  Folder, ShoppingCart,
-  LayoutList,
+  User, Folder, ShoppingCart,
+  LayoutList, CircleDot, Hash, Type,
   CircleCheck, Truck, Banknote, X, Maximize2, Code
 } from "lucide-react";
 
@@ -298,15 +297,60 @@ function OrderRow({ order, isHovered, isActive, columns, onHover, onLeave }: {
   );
 }
 
-/* ─── Order Detail Panel (split view) ─── */
+/* ─── The record, as the panel reads it ───────────────────────────────────
+   `EntityViewBinding` + `FieldBlock`, which is where the form's grammar
+   actually lives now:
+
+     - The label sits ABOVE the control, 13px medium in the PRIMARY ink, with
+       the property's type icon before it at 14px in the disabled tier and the
+       required marker after it. There is no floating label and no box: the
+       outlined field with a shrunk label inside its border is the form this
+       one replaced.
+     - Fields lay out on a four-column grid (`@2xl:grid-cols-4`) with per-field
+       spans, `gap-x-8 gap-y-7` in read mode — wider gutters than edit mode,
+       because a read row has no control edges to separate it.
+     - A read value is `min-h-8 … text-sm` in the primary ink: one control's
+       height, so a row of short values lines up with the taller ones beside it.
+
+   The panel renders the label identically in read and edit, deliberately — a
+   record whose labels restyle themselves under Edit reads as two screens. */
+function RecordField({ label, icon, span, required, highlighted, children }: {
+  label: string;
+  icon: React.ReactNode;
+  /** Columns on the four-column grid. */
+  span: 1 | 2 | 3 | 4;
+  required?: boolean;
+  highlighted?: boolean;
+  children: React.ReactNode;
+}) {
+  const spanClass = span === 1 ? "@2xl/col:col-span-1"
+    : span === 2 ? "@2xl/col:col-span-2"
+      : span === 3 ? "@2xl/col:col-span-3"
+        : "@2xl/col:col-span-4";
+  return (
+    <div className={`relative flex flex-col min-w-0 ${spanClass}`}>
+      <div className="flex items-center gap-1.5 font-medium leading-tight mb-1.5 text-[13px] text-text-primary dark:text-text-primary-dark">
+        <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark [&>svg]:size-3.5">{icon}</span>
+        <span className="truncate">{label}</span>
+        {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
+      </div>
+      {/* The demo's own affordance, not the panel's: the loop walks the record
+          and something has to say which field it is reading. A ring would need
+          a box to sit on, and the box is exactly what this pass removed. */}
+      <div className={`min-w-0 rounded-md -mx-1.5 px-1.5 transition-colors duration-300 ${
+        highlighted ? "bg-primary/12" : "bg-transparent"
+      }`}>
+        <div className="min-h-8 flex flex-col justify-center min-w-0 text-sm text-text-primary dark:text-text-primary-dark">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderDetailPanel({ order, highlightedField }: {
   order: Order; highlightedField: string | null;
 }) {
-  const fieldClass = (name: string) =>
-    `field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${
-      highlightedField === name ? "ring-2 ring-primary" : ""
-    }`;
-
   return (
     <div className="flex flex-col h-full">
       {/* Panel top bar */}
@@ -318,72 +362,56 @@ function OrderDetailPanel({ order, highlightedField }: {
         <button className="px-3 py-2 text-xs text-surface-900 dark:text-white font-medium border-b-2 border-primary">Order</button>
       </div>
 
-      {/* Panel body. EditViewBinding / DetailViewBinding both centre the form
-          in a max-width column rather than letting the fields run the width of
-          whatever pane they were given — a field is a line to read, and the
-          record pane is the half of the split that grows. */}
-      <div className="flex-1 overflow-y-auto flex flex-row w-full justify-center">
-        <div className="flex flex-col w-full max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl pt-6 pb-16 px-4 sm:px-8 md:px-10">
+      {/* The record column: the same widths and padding the panel gives it in a
+          split pane, so toggling between read and edit cannot move it. */}
+      <div className="flex-1 overflow-y-auto flex flex-row w-full justify-center items-start">
+        <div className="@container/col w-full max-w-3xl flex flex-col pt-6 pb-12 px-5 sm:px-8">
           {/* Saved badge */}
           <div className="flex justify-end mb-2" style={{ minHeight: 22 }}>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-500 dark:text-surface-300 text-[10px] font-semibold border border-transparent" style={{ minWidth: 72 }}>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-500 dark:text-surface-300 text-[10px] font-semibold" style={{ minWidth: 72 }}>
               ✓ Saved
             </span>
           </div>
 
-          {/* Title */}
-          <div className="typography-h4 text-surface-900 dark:text-white mb-2">{order.id}</div>
-
-          {/* Path */}
-          <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-6">
+          {/* The record's name, lifted out of the grid and into a header. */}
+          <div className="typography-h4 text-text-primary dark:text-text-primary-dark mb-2">{order.id}</div>
+          <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-8">
             <code className="text-[11px] text-surface-500">orders/{order.id}</code>
           </div>
 
-          {/* Form fields */}
-          <div className="flex flex-col gap-3">
-            {/* Customer */}
-            <div className={fieldClass("customer")}>
-              <span className="field-label text-primary">Customer <span className="text-red-500">*</span></span>
-              <div className="px-3 pt-6 pb-2 flex items-center gap-2">
-                <span className="text-sm font-semibold text-surface-900 dark:text-white">{order.customer}</span>
-                <span className="text-xs text-surface-500 dark:text-surface-400">({order.email})</span>
-              </div>
-            </div>
+          <div className="grid min-w-0 gap-x-8 gap-y-7 grid-cols-1 @2xl/col:grid-cols-4">
+            <RecordField label="Customer" icon={<User/>} span={2} required
+              highlighted={highlightedField === "customer"}>
+              <span className="truncate">
+                <span className="font-medium">{order.customer}</span>
+                <span className="text-text-secondary dark:text-text-secondary-dark"> ({order.email})</span>
+              </span>
+            </RecordField>
 
-            {/* Status */}
-            <div className={fieldClass("status")}>
-              <span className="field-label">Status</span>
-              <div className="px-3 pt-6 pb-2 flex items-center justify-between">
-                <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
-                <ChevronDown size={16} className="text-surface-400" />
-              </div>
-            </div>
+            <RecordField label="Status" icon={<CircleDot/>} span={1}
+              highlighted={highlightedField === "status"}>
+              <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
+            </RecordField>
 
-            {/* Payment */}
-            <div className={fieldClass("payment")}>
-              <span className="field-label">Payment</span>
-              <div className="px-3 pt-6 pb-2">
-                <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
-              </div>
-            </div>
+            <RecordField label="Payment" icon={<CircleDot/>} span={1}
+              highlighted={highlightedField === "payment"}>
+              <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
+            </RecordField>
 
-            {/* Total */}
-            <div className={fieldClass("total")}>
-              <span className="field-label">Total</span>
-              <div className="px-3 pt-6 pb-2 text-sm font-semibold text-surface-900 dark:text-surface-200">{order.total}</div>
-            </div>
+            <RecordField label="Total" icon={<Hash/>} span={1}
+              highlighted={highlightedField === "total"}>
+              <span className="font-medium tabular-nums">{order.total}</span>
+            </RecordField>
 
-            {/* Items */}
-            <div className={fieldClass("items")}>
-              <span className="field-label">Items</span>
-              <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200">{order.items} item{order.items > 1 ? "s" : ""}</div>
-            </div>
+            <RecordField label="Items" icon={<Hash/>} span={1}
+              highlighted={highlightedField === "items"}>
+              <span className="tabular-nums">{order.items} item{order.items > 1 ? "s" : ""}</span>
+            </RecordField>
 
-            {/* Address */}
-            <div className={fieldClass("address")}>
-              <span className="field-label">Shipping Address</span>
-              <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200">{order.address}</div>
-            </div>
+            <RecordField label="Shipping Address" icon={<Type/>} span={2}
+              highlighted={highlightedField === "address"}>
+              <span className="truncate">{order.address}</span>
+            </RecordField>
           </div>
         </div>
       </div>
@@ -540,13 +568,12 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
                     reading column. Opening a record collapses the title and the
                     scorecards — one gesture, driven by the same state.
 
-                    The panel also drops the centring when a record opens, so
-                    the list can go edge to edge in the master pane. This keeps
-                    it: the frame bleeds past the shell, and a list running flat
-                    into the pane edge beside a form that is a centred column
-                    reads as two different documents. Both halves stay measured
-                    columns here, which is what balances them. */}
-                <div className="flex flex-col w-full max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4">
+                    Opening a record also drops the centring and the padding, so
+                    the list goes edge to edge in the master pane. At 32% of the
+                    split there is no measure left to protect, and the inset the
+                    reading column needs reads as a stray gutter once the pane
+                    is that narrow. */}
+                <div className={`flex flex-col w-full ${panelOpen ? "" : "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"}`}>
                   {/* Collapsible title — grid-rows for a smooth height. */}
                   <div className={`grid transition-[grid-template-rows,transform,margin] duration-150 ease-out ${
                     panelOpen ? "grid-rows-[0fr] -translate-y-2 mt-0 mb-0" : "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
@@ -583,10 +610,9 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
                     </div>
                   </div>
 
-                  {/* ListView: the outline is the object, and it stays on in
-                      both states for the same reason the centring does — an
-                      outlined list beside an outlined form is one document. */}
-                  <div ref={listRef} className="w-full rounded-lg overflow-hidden border border-hairline">
+                  {/* ListView: the outline is the object. It drops when a record
+                      is open, because the list is then a pane, not a card. */}
+                  <div ref={listRef} className={`w-full ${panelOpen ? "" : "rounded-lg overflow-hidden border border-hairline"}`}>
                     <ListHeader columns={columns}/>
                     <div className="my-1.5">
                       {MOCK_ORDERS.map((order) => (
