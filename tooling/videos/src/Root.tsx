@@ -4,6 +4,7 @@ import { Composition, Series } from "remotion";
 import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { RebaseDesk, RebaseDeskVO } from "./desk/DeskFilm";
+import { DeskPlane } from "./desk/DeskPlane";
 import { DESK_DURATION } from "./desk/beats";
 import { INTRO_DURATION, SCENES } from "./film";
 import { OVERLAP } from "./transitions";
@@ -65,6 +66,16 @@ export const RemotionRoot: React.FC = () => (
         <Composition
             id="RebaseDesk-VO"
             component={RebaseDeskVO}
+            durationInFrames={DESK_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+        {/* The ribbon alone, for measuring how much of the frame it covers at
+            a beat and where — see DeskPlane.tsx. Not a deliverable. */}
+        <Composition
+            id="RebaseDesk-Plane"
+            component={DeskPlane}
             durationInFrames={DESK_DURATION}
             fps={FPS}
             width={WIDTH}

@@ -54,6 +54,11 @@ export interface Beat {
     /** The ribbon's rotation for this beat — see film.ts on why roll is the
      *  one lever that changes the view without changing coverage. */
     roll: number;
+    /** Sideways camera offset for the ribbon, world units, default 0. A
+     *  beat whose roll lands the cluster top-left — over its own eyebrow —
+     *  pushes it right with this; measured, x 20 moves the cluster from the
+     *  left quarter of the frame to the right half at a lower coverage. */
+    x?: number;
     ground: Ground;
     reveal: number;
 }
@@ -123,8 +128,8 @@ export const BEATS: Beat[] = [
     { id: "init", start: tempo(530), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.8 },
     { id: "rule", start: tempo(800), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.65 },
     { id: "push", start: tempo(1180), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.8 },
-    { id: "users", start: tempo(1396), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.8 },
-    { id: "agent", start: tempo(1630), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.65 },
+    { id: "users", start: tempo(1396), view: cell(1, 1), roll: 0.22, x: 20, ground: "base", reveal: 0.8 },
+    { id: "agent", start: tempo(1630), view: cell(2, 0), roll: 0.34, x: 20, ground: "deep", reveal: 0.65 },
     { id: "panel", start: tempo(1900), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.8 },
     { id: "views", start: tempo(2172), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.8 },
     { id: "schema", start: tempo(2352), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.8 },

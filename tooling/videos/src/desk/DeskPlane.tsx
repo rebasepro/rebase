@@ -1,9 +1,8 @@
 import React from "react";
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Easing, getInputProps, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { NeatCanvas, NeatTravel } from "../gradient/NeatCanvas";
 import { BEATS, DESK_DURATION, MOVE_LEAD, moveFrames, OPENING } from "./beats";
 import { HERO_TONES } from "../data/neat-config";
-import { FLY_TO_CORNER } from "./Presenter";
 import { GROUND } from "../theme";
 
 /**
@@ -16,12 +15,22 @@ import { GROUND } from "../theme";
  * the ribbon itself changes here, only what drives it.
  */
 
-const STATION = { x: 0, y: -12, zoom: 2.05 };
+/** Measured (RebaseDesk-Plane, scripts in the session's scratchpad): at
+ *  y -12 the ribbon covered 10-12% of the frame as a band across the whole
+ *  top, its fringe down to half the frame and across every headline. At
+ *  y -16 it covers 3-5%, a cluster in the top strip — the mass in the top
+ *  15% of the frame — and that is where it stays on a held slide. The camera
+ *  never travels; the ribbon turns with each beat's roll, as it always did. */
+const DEFAULT_STATION = { x: 0, y: -16, zoom: 2.05 };
+/** Overridable through input props, so a measurement sweep can render the
+ *  plane alone at candidate stations without editing this file. */
+const STATION = { ...DEFAULT_STATION, ...((getInputProps() as { station?: Partial<typeof DEFAULT_STATION> }).station ?? {}) };
 
 /* Keyframes: [hold-end, move-end] per beat, so odd indices close a hold and
    even ones close a move — the alternation the time warp is built on. */
 const AT: number[] = [0];
 const ROLL: number[] = [0.1];
+const SIDE: number[] = [0];
 const GROUND_KEY: string[] = [GROUND.base];
 const REVEAL: number[] = [0];
 
@@ -31,6 +40,7 @@ BEATS.forEach((b) => {
     const z = a + moveFrames(prev, b.view);
     AT.push(a, z);
     ROLL.push(ROLL[ROLL.length - 1], b.roll);
+    SIDE.push(SIDE[SIDE.length - 1], b.x ?? 0);
     GROUND_KEY.push(GROUND_KEY[GROUND_KEY.length - 1], GROUND[b.ground]);
     REVEAL.push(REVEAL[REVEAL.length - 1], b.reveal);
     prev = b.view;
@@ -40,6 +50,7 @@ BEATS.forEach((b) => {
 const OUTRO_FADE = 70;
 AT.push(DESK_DURATION - OUTRO_FADE, DESK_DURATION);
 ROLL.push(ROLL[ROLL.length - 1], ROLL[ROLL.length - 1]);
+SIDE.push(SIDE[SIDE.length - 1], SIDE[SIDE.length - 1]);
 GROUND_KEY.push(GROUND_KEY[GROUND_KEY.length - 1], GROUND_KEY[GROUND_KEY.length - 1]);
 REVEAL.push(REVEAL[REVEAL.length - 1], 0);
 
@@ -67,7 +78,7 @@ const LINEAR = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 export function ribbonAt(frame: number): NeatTravel {
     return {
-        cameraX: STATION.x,
+        cameraX: STATION.x + interpolate(frame, AT, SIDE, OPTS),
         cameraY: STATION.y,
         cameraZoom: STATION.zoom,
         cameraRotationZ: interpolate(frame, AT, ROLL, OPTS),
@@ -75,65 +86,19 @@ export function ribbonAt(frame: number): NeatTravel {
 }
 
 /**
- * THE LOUD REGISTER, ON A LEASH. The site's home hero went loud on
- * 2026-09-10 — colour at 0.85, saturation past 1 — and the film draws the
- * same register. But a slide is type and windows on a ground, and the art
- * at that strength would compete with them; so on a held shot the ribbon is
- * shown at a beat's own `reveal` (low), and across a camera move it comes up
- * to MOVE_REVEAL on a sine bump and goes back down as the next shot lands.
- * The gradient is loudest exactly when nothing has to be read.
+ * THE LOUD REGISTER. The site's home hero went loud on 2026-09-10 — colour
+ * at 0.85, saturation past 1 — and the film draws the same register at a
+ * steady exposure. What keeps it off the type is not a mask and not a dim:
+ * it is where the camera stands (DEFAULT_STATION above), which leaves the
+ * ribbon a cluster in the top strip of every held slide. Nothing about the
+ * light animates across a move; a first version pumped the exposure and an
+ * animated mask on every transition, and that was worse than the problem.
  */
-const MOVE_REVEAL = 1;
-
-function moveBump(frame: number): number {
-    /* Odd indices close a hold, even ones close a move — so [AT[i], AT[i+1]]
-       with i odd is a move window. The last pair is the outro fade, not a
-       move, and gets no bump. */
-    for (let i = 1; i < AT.length - 2; i += 2) {
-        if (frame >= AT[i] && frame <= AT[i + 1]) {
-            const t = (frame - AT[i]) / Math.max(1, AT[i + 1] - AT[i]);
-            return Math.sin(Math.PI * t);
-        }
-    }
-    return 0;
-}
-
-/**
- * THE LEASH IS AREA, NOT EXPOSURE. A first pass held the slides at 0.12 and
- * that was a wash — the loud register faded straight back into the subtle
- * one. A second pass drew it at full strength and the ribbon crossed the
- * headline: "I can't read that text". So the strength stays (0.8 on the
- * dark grounds, 0.65 on the chroma fields, full across a move) and the AREA
- * is what a held slide gives up: the art is masked to a soft-edged disc of
- * HELD_RADIUS around the frame's top-right corner — away from the
- * left-aligned headlines, above the windows, clear of the presenter. Across
- * a move the disc opens to the whole frame on the same sine bump the
- * exposure rides, and closes as the next shot lands.
- *
- * The open is the exception: the presenter stands centred on the art before
- * the first headline exists, so the disc is wide until they fly to the
- * corner, and closes as they go.
- */
-const HELD_RADIUS = 620;
-const OPEN_RADIUS = 1500;
-const FULL_RADIUS = 3400;
-const FEATHER = 340;
-
-export function maskRadiusAt(frame: number): number {
-    const held =
-        frame < FLY_TO_CORNER
-            ? OPEN_RADIUS
-            : interpolate(frame, [FLY_TO_CORNER, FLY_TO_CORNER + 36], [OPEN_RADIUS, HELD_RADIUS], OPTS);
-    return held + (FULL_RADIUS - held) * moveBump(frame);
-}
-
 export function groundAt(frame: number) {
     const r = Math.round(interpolate(frame, AT, R, OPTS));
     const g = Math.round(interpolate(frame, AT, G, OPTS));
     const b = Math.round(interpolate(frame, AT, B, OPTS));
-    const held = interpolate(frame, AT, REVEAL, OPTS);
-    const reveal = held + (MOVE_REVEAL - held) * moveBump(frame);
-    return { color: `rgb(${r}, ${g}, ${b})`, reveal };
+    return { color: `rgb(${r}, ${g}, ${b})`, reveal: interpolate(frame, AT, REVEAL, OPTS) };
 }
 
 export function timeAt(frame: number, fps: number) {
@@ -144,8 +109,6 @@ export const DeskPlane: React.FC = () => {
     const { fps } = useVideoConfig();
     const frame = useCurrentFrame();
     const ground = groundAt(frame);
-    const radius = Math.round(maskRadiusAt(frame));
-    const mask = `radial-gradient(circle at 100% 0%, #000 ${radius}px, transparent ${radius + FEATHER}px)`;
     return (
         <>
             <AbsoluteFill style={{ background: ground.color }} />
@@ -155,7 +118,7 @@ export const DeskPlane: React.FC = () => {
                 opacity={ground.reveal}
                 camera={ribbonAt(frame)}
                 time={timeAt(frame, fps)}
-                style={{ mixBlendMode: "screen", WebkitMaskImage: mask, maskImage: mask }}
+                style={{ mixBlendMode: "screen" }}
             />
         </>
     );
