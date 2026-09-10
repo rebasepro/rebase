@@ -5,9 +5,9 @@
 
 import { EXPERIMENTS, trackConversion } from "./ab-testing";
 
-function gtag(...args: any[]) {
-    if (typeof (window as any).gtag === "function") {
-        (window as any).gtag(...args);
+function gtag(...args: unknown[]) {
+    if (typeof window.gtag === "function") {
+        window.gtag(...args);
     }
 }
 
@@ -161,6 +161,6 @@ class Analytics {
 }
 
 // Initialize singleton
-if (!(window as any).__rb_analytics) {
-    (window as any).__rb_analytics = new Analytics();
+if (!window.__rb_analytics) {
+    window.__rb_analytics = new Analytics();
 }

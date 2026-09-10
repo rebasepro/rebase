@@ -27,8 +27,8 @@ function initPageEffects() {
   });
 
   // Intersection Observer for scroll animations
-  if ((window as any).pageObserver) {
-    (window as any).pageObserver.disconnect();
+  if (window.pageObserver) {
+    window.pageObserver.disconnect();
   }
 
   const observerOptions = {
@@ -45,7 +45,7 @@ function initPageEffects() {
       }
     });
   }, observerOptions);
-  (window as any).pageObserver = observer;
+  window.pageObserver = observer;
 
   // Observe all elements with animate-on-scroll class
   const animatedElements = document.querySelectorAll(".animate-on-scroll");

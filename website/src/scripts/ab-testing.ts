@@ -107,15 +107,15 @@ export function trackConversion(experimentId: string, action: string): void {
         conversion_action: action,
     };
 
-    if (typeof (window as any).gtag === "function") {
-        (window as any).gtag("event", "experiment_conversion", payload);
+    if (typeof window.gtag === "function") {
+        window.gtag("event", "experiment_conversion", payload);
     }
 }
 
 // Bind to window for inline scripts accessibility
 if (typeof window !== "undefined") {
-    (window as any).getVariant = getVariant;
-    (window as any).trackConversion = trackConversion;
+    window.getVariant = getVariant;
+    window.trackConversion = trackConversion;
 }
 
 // ─── Impression Tracking (auto-called on page load) ──────────
@@ -132,8 +132,8 @@ function trackImpressions(): void {
             variant_id: variant,
         };
 
-        if (typeof (window as any).gtag === "function") {
-            (window as any).gtag("event", "experiment_impression", payload);
+        if (typeof window.gtag === "function") {
+            window.gtag("event", "experiment_impression", payload);
         }
     }
 }

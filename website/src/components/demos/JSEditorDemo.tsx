@@ -316,10 +316,10 @@ code: "// New script\n" }]);
                                 <>
                                     <div className="flex-grow"/>
                                     <div className="flex rounded bg-surface-raised p-0.5 mr-2">
-                                        {["json", "console"].map(v => (
+                                        {(["json", "console"] as const).map(v => (
                                             <button
                                                 key={v}
-                                                onClick={() => setResultView(v as any)}
+                                                onClick={() => setResultView(v)}
                                                 className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
                                                     resultView === v ? "bg-surface-raised-hover text-white" : "text-surface-500 hover:text-surface-300"
                                                 }`}
