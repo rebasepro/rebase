@@ -7,9 +7,30 @@ import {
 
 describe("table-classification", () => {
     describe("classifyTable", () => {
-        it("should classify tables in internal schemas as rebase-internal", () => {
-            expect(classifyTable("any_table", "rebase")).toBe("rebase-internal");
+        it("classifies the whole `auth` schema as rebase-internal", () => {
             expect(classifyTable("any_table", "auth")).toBe("rebase-internal");
+        });
+
+        it("decides the `rebase` schema by NAME, because the tenant lives there too", () => {
+            // Rebase creates a tenant's collection tables in `rebase`, beside
+            // its own plumbing. Claiming the schema wholesale — which this used
+            // to do — filed every customer table as a platform internal, and
+            // the Policies screen showed a customer everything except their own
+            // data, dimmed under a lock icon next to `refresh_tokens`.
+            expect(classifyTable("refresh_tokens", "rebase")).toBe("rebase-internal");
+            expect(classifyTable("mfa_factors", "rebase")).toBe("rebase-internal");
+            expect(classifyTable("schema_meta", "rebase")).toBe("rebase-internal");
+
+            expect(classifyTable("documents", "rebase")).toBe("user");
+            expect(classifyTable("teams", "rebase")).toBe("user");
+            expect(classifyTable("budget_files", "rebase")).toBe("user");
+        });
+
+        it("treats `users` in the rebase schema as the customer's", () => {
+            // It is Rebase's auth table AND the customer's users collection —
+            // the same rows they write policies against. Listing it as internal
+            // would hide the one table almost every policy references.
+            expect(classifyTable("users", "rebase")).toBe("user");
         });
 
         it("should classify tables with internal prefixes as rebase-internal", () => {

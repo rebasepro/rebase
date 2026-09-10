@@ -5,6 +5,8 @@
  * Used by both the server-side PostgresBackendDriver and the Studio RLS editor.
  */
 
+import { REBASE_INTERNAL_TABLES } from "./util/internal-tables";
+
 /** Possible categories a database table can belong to. */
 export type TableCategory = "rebase-internal" | "junction" | "user";
 
@@ -31,14 +33,42 @@ export const REBASE_INTERNAL_PREFIXES: readonly string[] = [
  * **not** handled by this function. Use {@link detectJunctionTables} to obtain
  * the set of junction tables, then reclassify as needed.
  */
+/** The schema Rebase puts both its own tables and the tenant's collections in. */
+const REBASE_SCHEMA = "rebase";
+
+/**
+ * Rebase's own tables, by unqualified name.
+ *
+ * Reused from `util/internal-tables`, which maintains it for the privilege
+ * revoke — rather than a second list here, which would be a second thing to
+ * keep true. It already excludes `users` for the reason that matters to this
+ * function too: the auth user table is also a collection, with RLS and
+ * policies, and hiding it would hide the one table almost every policy
+ * references.
+ *
+ * That list is deliberately willing to claim common nouns — `jobs`, `branches`,
+ * `api_keys` — because its own caller re-checks each against `relrowsecurity`.
+ * This function has no such signal, so the layer above supplies it: a table the
+ * project MAPS to a collection is classified as the customer's before this is
+ * consulted at all.
+ */
+const INTERNAL_TABLE_NAMES: ReadonlySet<string> = new Set(REBASE_INTERNAL_TABLES);
+
 export function classifyTable(
   tableName: string,
   schemaName: string,
 ): TableCategory {
-  if (
-    REBASE_INTERNAL_SCHEMAS.includes(schemaName) ||
-    REBASE_INTERNAL_PREFIXES.some((prefix) => tableName.startsWith(prefix))
-  ) {
+  if (REBASE_INTERNAL_PREFIXES.some((prefix) => tableName.startsWith(prefix))) {
+    return "rebase-internal";
+  }
+
+  // Shared ground: Rebase's plumbing and the customer's collections both live
+  // here, so the NAME decides, not the schema.
+  if (schemaName === REBASE_SCHEMA) {
+    return INTERNAL_TABLE_NAMES.has(tableName) ? "rebase-internal" : "user";
+  }
+
+  if (REBASE_INTERNAL_SCHEMAS.includes(schemaName)) {
     return "rebase-internal";
   }
 
