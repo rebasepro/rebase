@@ -220,25 +220,60 @@ function mergeJunctionPayload(
  * payload column anywhere is a second description that can disagree.
  */
 export function getJunctionCollectionConfig(spec: JunctionSpec): CollectionConfig {
+    return buildJunctionCollectionConfig({
+        table: spec.table,
+        schema: spec.schema,
+        keyColumns: spec.endpoints.map(endpoint => endpoint.junctionColumn),
+        properties: spec.properties
+    });
+}
+
+/**
+ * The same synthetic collection, reached from a resolved relation rather than
+ * from a spec.
+ *
+ * The spec is built by walking every collection, which the schema planner does
+ * once at boot and no request path can afford. A read or a write already holds
+ * the relation, and a relation's `through` carries the table, both key columns
+ * and the payload — everything the config is made of. One builder underneath
+ * both, so the shape the planner emitted columns from is the shape the write
+ * path validates a `_pivot` against and the read path strips it with.
+ */
+export function getJunctionConfigForRelation(
+    through: { table: string; sourceColumn: string; targetColumn: string; properties: Properties }
+): CollectionConfig {
+    return buildJunctionCollectionConfig({
+        // Junctions live in `public`; the CREATE TABLE path strips any schema
+        // prefix from the name, so mirror that here rather than carrying it.
+        table: through.table.includes(".") ? through.table.split(".").pop()! : through.table,
+        schema: "public",
+        keyColumns: [through.sourceColumn, through.targetColumn],
+        properties: through.properties
+    });
+}
+
+function buildJunctionCollectionConfig(args: {
+    table: string;
+    schema: string;
+    keyColumns: string[];
+    properties: Properties;
+}): CollectionConfig {
     const properties: Record<string, unknown> = {};
-    for (const endpoint of spec.endpoints) {
-        properties[endpoint.junctionColumn] = {
-            type: "string",
-            columnName: endpoint.junctionColumn
-        };
+    for (const column of args.keyColumns) {
+        properties[column] = { type: "string", columnName: column };
     }
     // After the keys, so a payload property that collides with a key column
     // cannot quietly replace it — `checkJunctionPayload` refuses that config at
     // boot, and this ordering means the key column survives if one gets past.
-    for (const [key, property] of Object.entries(spec.properties)) {
+    for (const [key, property] of Object.entries(args.properties)) {
         if (key === JUNCTION_PIVOT_KEY || key in properties) continue;
         properties[key] = property;
     }
     return {
-        slug: spec.table,
-        name: spec.table,
-        table: spec.table,
-        schema: spec.schema,
+        slug: args.table,
+        name: args.table,
+        table: args.table,
+        schema: args.schema,
         properties
     } as unknown as CollectionConfig;
 }

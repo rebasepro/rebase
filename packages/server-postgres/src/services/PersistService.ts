@@ -1,7 +1,7 @@
 import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, Properties, Property, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -45,6 +45,43 @@ export class PersistService {
         this.relationService = new RelationService(db, registry);
         this.relationWrites = new RelationWriteService(db, registry);
         this.fetchService = new FetchService(db, registry);
+    }
+
+
+    /**
+     * Set the columns of one many-to-many link, without touching the membership.
+     *
+     * `collectionPath` is the nested address — `posts/1/tags` — and `targetId`
+     * the row on the far side, so this is `PATCH posts/1/tags/5` with a
+     * `_pivot` body. Separate from {@link save} because the two mean different
+     * things at the same URL: a body of the target's own columns edits the tag,
+     * a body of `_pivot` edits the *link* to it, and conflating them would let
+     * a caller who meant one silently perform the other.
+     */
+    async updateRelationPivot(
+        collectionPath: string,
+        targetId: string | number,
+        pivot: Record<string, unknown>
+    ): Promise<void> {
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        if (!hop) {
+            throw ApiError.badRequest(
+                `"${collectionPath}" is not a relation on a row, so there is no link to update. ` +
+                `A \`${JUNCTION_PIVOT_KEY}\` write addresses \`<collection>/<id>/<relation>/<targetId>\`.`,
+                "VALIDATION_UNKNOWN_FIELDS",
+                { path: collectionPath }
+            );
+        }
+        assertWritableThrough(hop, collectionPath);
+
+        // Membership first, for the same reason `delete` establishes it: the
+        // update below matches on both keys, so "no such link" and "a policy
+        // refused the write" would otherwise be the same zero rows.
+        if (!await this.relationService.isRelated(hop, targetId)) {
+            throw ApiError.notFound(`No row "${targetId}" in "${collectionPath}" to update the link of.`);
+        }
+
+        await this.relationWrites.updateRelationPivot(this.db, hop, targetId, pivot);
     }
 
 

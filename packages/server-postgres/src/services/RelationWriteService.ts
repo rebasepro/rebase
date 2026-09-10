@@ -1,6 +1,6 @@
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
-import { CollectionConfig, ResolvedManyToMany, ResolvedRelation, ResolvedVia } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedManyToMany, ResolvedRelation, ResolvedVia } from "@rebasepro/types";
 import { hasForeignKeyOnTarget, isManyToMany } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
@@ -20,8 +20,11 @@ import {
     applyJunctionMembership,
     bindJoinPathJunction,
     bindThroughJunction,
-    removeJunctionLink
+    removeJunctionLink,
+    updateJunctionPivot,
+    type JunctionLinkWrite
 } from "./junction-writes";
+import { serializePropertyToServer } from "../data-transformer";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -40,13 +43,44 @@ import {
  * would silently write a shorter membership list than the caller asked for.
  */
 function relationTargetIds(value: unknown, relationName: string, collectionSlug: string): (string | number)[] {
+    return relationLinkElements(value, relationName, collectionSlug).map(element => element.id);
+}
+
+/** One element of a membership write, as the caller sent it. */
+interface RelationLinkElement {
+    id: string | number;
+    /** The `_pivot` the element carried, unvalidated and unserialized. */
+    pivot?: Record<string, unknown>;
+}
+
+/**
+ * The same reading, keeping the link's own values.
+ *
+ * An element may be `{ id, _pivot: { role: "owner" } }` where the relation is a
+ * `manyToMany` whose `through` declares `properties`. The `_pivot` is taken off
+ * here and nowhere else: it is not a column of the target, so leaving it on the
+ * element would make it look like one to every later step.
+ */
+function relationLinkElements(
+    value: unknown,
+    relationName: string,
+    collectionSlug: string
+): RelationLinkElement[] {
     if (!Array.isArray(value)) return [];
 
     return value.map((element, index) => {
-        if (typeof element === "string" || typeof element === "number") return element;
+        if (typeof element === "string" || typeof element === "number") return { id: element };
         if (element && typeof element === "object") {
             const id = (element as { id?: unknown }).id;
-            if (typeof id === "string" || typeof id === "number") return id;
+            const pivot = (element as Record<string, unknown>)[JUNCTION_PIVOT_KEY];
+            if (typeof id === "string" || typeof id === "number") {
+                return {
+                    id,
+                    pivot: pivot && typeof pivot === "object" && !Array.isArray(pivot)
+                        ? pivot as Record<string, unknown>
+                        : undefined
+                };
+            }
         }
         throw new Error(
             `Cannot write relation "${relationName}" on "${collectionSlug}": element ${index} carries no id. ` +
@@ -54,6 +88,49 @@ function relationTargetIds(value: unknown, relationName: string, collectionSlug:
             `${element === null ? "null" : typeof element}.`
         );
     });
+}
+
+/**
+ * A `_pivot` as the junction table's columns.
+ *
+ * Exported because the payload route needs the identical reading — one function
+ * so a value written through `PATCH posts/1 { tags: [{ id, _pivot }] }` and the
+ * same value written through `PATCH posts/1/tags/5 { _pivot }` cannot be
+ * serialized two ways.
+ */
+export function serializePivot(
+    pivot: Record<string, unknown>,
+    payload: Properties,
+    label: string
+): Record<string, unknown> {
+    const declared = Object.keys(payload);
+    if (declared.length === 0) {
+        throw ApiError.badRequest(
+            `Relation '${label}' carries no junction columns, so there is nothing to write under ` +
+            `\`${JUNCTION_PIVOT_KEY}\`. Declare them in \`through.properties\`.`,
+            "VALIDATION_UNKNOWN_FIELDS",
+            { relation: label }
+        );
+    }
+
+    const values: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(pivot)) {
+        const property = payload[key as keyof Properties] as Property | undefined;
+        if (!property) {
+            throw ApiError.badRequest(
+                `The junction behind relation '${label}' has no column '${key}'. ` +
+                `Its \`through.properties\` are: ${declared.sort().map(k => `'${k}'`).join(", ")}.`,
+                "VALIDATION_UNKNOWN_FIELDS",
+                { relation: label, field: key, validFields: declared.sort() }
+            );
+        }
+        // `undefined` means "I have no value for this", not "set it to NULL" —
+        // the same reading `serializeDataToServer` gives a row's own columns.
+        if (value === undefined) continue;
+        const serialized = serializePropertyToServer(value, property, key);
+        if (serialized !== undefined) values[key] = serialized;
+    }
+    return values;
 }
 
 /**
@@ -112,6 +189,53 @@ export class RelationWriteService {
     }
 
 
+    /**
+     * Set the columns of one existing link, leaving the membership alone.
+     *
+     * `PATCH /api/data/:slug/:id/:relation/:targetId` with a `_pivot` body. The
+     * membership array cannot say this: one element would unlink everything
+     * else, and re-sending the whole set to change one `role` reintroduces the
+     * lost update the membership diff exists to avoid.
+     */
+    async updateRelationPivot(
+        tx: DrizzleClient,
+        hop: NestedPathHop,
+        targetId: string | number,
+        pivot: Record<string, unknown>
+    ): Promise<void> {
+        if (!isManyToMany(hop.relation)) {
+            throw ApiError.badRequest(
+                `Relation '${hop.relationKey}' on '${hop.parentCollection.slug}' is a ` +
+                `${hop.relation.kind}, which has no junction row to carry \`${JUNCTION_PIVOT_KEY}\`. ` +
+                "Only a `manyToMany` with `through.properties` does.",
+                "VALIDATION_UNKNOWN_FIELDS",
+                { relation: hop.relationKey, collection: hop.parentCollection.slug }
+            );
+        }
+
+        const label = `${hop.parentCollection.slug}.${hop.relationKey}`;
+        const binding = bindThroughJunction(this.registry, hop.relation.through, label);
+        const values = serializePivot(pivot, hop.relation.through.properties, label);
+
+        if (Object.keys(values).length === 0) {
+            throw ApiError.badRequest(
+                `\`${JUNCTION_PIVOT_KEY}\` named no junction column to set on '${label}'.`,
+                "VALIDATION_CONSTRAINT",
+                { relation: hop.relationKey, collection: hop.parentCollection.slug }
+            );
+        }
+
+        await updateJunctionPivot(
+            tx,
+            binding,
+            this.parsedId(hop.parentCollection, hop.parentId),
+            this.parsedId(hop.targetCollection, targetId),
+            values,
+            { parent: hop.parentCollection.slug, relation: hop.relationKey }
+        );
+    }
+
+
     /** A collection's id, parsed to the type its primary key column holds. */
     private parsedId(collection: CollectionConfig, id: string | number): unknown {
         const pks = requirePrimaryKeys(collection, this.registry);
@@ -124,6 +248,32 @@ export class RelationWriteService {
         if (ids.length === 0) return [];
         const pks = requirePrimaryKeys(collection, this.registry);
         return ids.map(id => parseIdValues(id, pks)[pks[0].fieldName]);
+    }
+
+    /**
+     * A membership list as links: the target ids parsed, and each element's
+     * `_pivot` turned into the columns the junction table holds.
+     *
+     * The values go through `serializePropertyToServer` — the same function
+     * every collection column's value goes through on a save — so a `date`
+     * arrives as a Date and a `map` as JSON, keyed by the property key, which is
+     * what the drizzle junction table is keyed by. A key the junction does not
+     * declare is **refused**, not dropped: drizzle leaves an unknown key out of
+     * the statement, so dropping it is a write that reports success having
+     * stored nothing.
+     */
+    private parsedLinks(
+        collection: CollectionConfig,
+        elements: RelationLinkElement[],
+        payload: Properties,
+        label: string
+    ): JunctionLinkWrite[] {
+        if (elements.length === 0) return [];
+        const pks = requirePrimaryKeys(collection, this.registry);
+        return elements.map(element => ({
+            id: parseIdValues(element.id, pks)[pks[0].fieldName],
+            pivot: element.pivot ? serializePivot(element.pivot, payload, label) : undefined
+        }));
     }
 
 
@@ -142,7 +292,8 @@ export class RelationWriteService {
             const relation = findRelation(resolvedRelations, key);
             if (!relation || relation.cardinality !== "many") continue;
 
-            const targetEntityIds = relationTargetIds(value, key, collection.slug);
+            const elements = relationLinkElements(value, key, collection.slug);
+            const targetEntityIds = elements.map(element => element.id);
             const targetCollection = relation.target();
 
             const label = `${collection.slug}.${key}`;
@@ -158,14 +309,16 @@ export class RelationWriteService {
                         label
                     ),
                     this.parsedId(collection, id),
-                    this.parsedIds(targetCollection, targetEntityIds)
+                    // A `via` declares no payload, so `{}` refuses a `_pivot`
+                    // sent through one rather than storing it nowhere.
+                    this.parsedLinks(targetCollection, elements, {}, label)
                 );
             } else if (relation.kind === "manyToMany") {
                 await applyJunctionMembership(
                     tx,
                     bindThroughJunction(this.registry, relation.through, label),
                     this.parsedId(collection, id),
-                    this.parsedIds(targetCollection, targetEntityIds)
+                    this.parsedLinks(targetCollection, elements, relation.through.properties, label)
                 );
             } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
@@ -294,7 +447,8 @@ export class RelationWriteService {
                         {
                             table: relation.through.table,
                             sourceColumn: relation.through.sourceColumn,
-                            targetColumn: relation.through.targetColumn
+                            targetColumn: relation.through.targetColumn,
+                            properties: relation.through.properties
                         }
                     );
                     continue;
@@ -406,17 +560,17 @@ export class RelationWriteService {
 
             // The membership this write asks for. A single value is the
             // one-to-one case and reads as a set of one.
-            const targetIds = Array.isArray(newValue)
-                ? relationTargetIds(newValue, relation.relationName, sourceCollection.slug)
+            const elements = Array.isArray(newValue)
+                ? relationLinkElements(newValue, relation.relationName, sourceCollection.slug)
                 : newValue === null || newValue === undefined
                     ? []
-                    : relationTargetIds([newValue], relation.relationName, sourceCollection.slug);
+                    : relationLinkElements([newValue], relation.relationName, sourceCollection.slug);
 
             await applyJunctionMembership(
                 tx,
                 binding,
                 this.parsedId(sourceCollection, sourceEntityId),
-                this.parsedIds(targetCollection, targetIds)
+                this.parsedLinks(targetCollection, elements, {}, `${sourceCollection.slug}.${relation.relationName}`)
             );
         } catch (error) {
             logger.error(`Failed to update inverse joinPath relation '${relation.relationName}'`, { error: error });
@@ -435,22 +589,19 @@ export class RelationWriteService {
         targetCollection: CollectionConfig,
         relation: ResolvedRelation,
         newValue: unknown,
-        junctionInfo: { table: string; sourceColumn: string; targetColumn: string }
+        junctionInfo: { table: string; sourceColumn: string; targetColumn: string; properties: Properties }
     ) {
+        const label = `${sourceCollection.slug}.${relation.relationName}`;
         try {
-            const targetIds = Array.isArray(newValue)
-                ? relationTargetIds(newValue, relation.relationName, sourceCollection.slug)
+            const elements = Array.isArray(newValue)
+                ? relationLinkElements(newValue, relation.relationName, sourceCollection.slug)
                 : [];
 
             await applyJunctionMembership(
                 tx,
-                bindThroughJunction(
-                    this.registry,
-                    junctionInfo,
-                    `${sourceCollection.slug}.${relation.relationName}`
-                ),
+                bindThroughJunction(this.registry, junctionInfo, label),
                 this.parsedId(sourceCollection, sourceEntityId),
-                this.parsedIds(targetCollection, targetIds)
+                this.parsedLinks(targetCollection, elements, junctionInfo.properties, label)
             );
         } catch (error) {
             logger.error(`Failed to update many-to-many inverse relation '${relation.relationName}'`, { error: error });

@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
-import type { ResolvedVia } from "@rebasepro/types";
+import type { Properties, ResolvedVia } from "@rebasepro/types";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { relationMisconfigured } from "./collection-helpers";
@@ -33,6 +33,27 @@ export interface JunctionBinding {
     targetColumn: AnyPgColumn;
     /** `<collection>.<relation>`, for error messages. */
     label: string;
+    /**
+     * The link's own columns — `through.properties` — as authored. Empty for a
+     * junction that carries nothing but its two keys, and for every `via`
+     * relation (a join chain has no declared payload).
+     */
+    payload: Properties;
+}
+
+/**
+ * One element of a membership write: a target id, and optionally what the link
+ * to it should hold.
+ *
+ * The pivot is kept apart from the id rather than merged into a row shape,
+ * because the two are answered by different collections: the id is parsed
+ * against the *target's* primary key, the payload validated against the
+ * junction's own properties.
+ */
+export interface JunctionLinkWrite {
+    id: unknown;
+    /** Payload values keyed by property key, already serialized for the driver. */
+    pivot?: Record<string, unknown>;
 }
 
 /** A junction that cannot be resolved is a broken relation, not a no-op. */
@@ -50,7 +71,7 @@ function column(table: PgTable, name: string | undefined, label: string, role: s
 /** The junction a `manyToMany` names outright. */
 export function bindThroughJunction(
     registry: PostgresCollectionRegistry,
-    through: { table: string; sourceColumn: string; targetColumn: string },
+    through: { table: string; sourceColumn: string; targetColumn: string; properties?: Properties },
     label: string
 ): JunctionBinding {
     const table = registry.getTable(through.table);
@@ -61,7 +82,8 @@ export function bindThroughJunction(
         table,
         parentColumn: column(table, through.sourceColumn, label, "source"),
         targetColumn: column(table, through.targetColumn, label, "target"),
-        label
+        label,
+        payload: through.properties ?? {}
     };
 }
 
@@ -139,7 +161,10 @@ export function bindJoinPathJunction(
         table,
         parentColumn: column(table, parentColumnName, label, "source"),
         targetColumn: column(table, targetColumnName, label, "target"),
-        label
+        label,
+        // A `via` reaches through a table it did not declare, so there is no
+        // `through.properties` to read and nothing to write beyond the keys.
+        payload: {}
     };
 }
 
@@ -204,12 +229,27 @@ export async function removeJunctionLink(
  *
  * The insert is `ON CONFLICT DO NOTHING`, so two sessions adding the same link
  * concurrently is a no-op rather than a unique violation.
+ *
+ * ## The payload
+ *
+ * An element may carry `pivot` — the link's own columns, from a `_pivot` on the
+ * wire. The array still *sets membership*: what is not in it is unlinked, and
+ * what is in it is linked. The payload is what the link should hold once it
+ * exists, so a new link is inserted with it (columns the caller left out take
+ * their DEFAULT) and an existing link named with a payload is updated to match.
+ *
+ * The alternative — ignoring the payload on a link that already exists — makes
+ * `PATCH { members: [{ id: 7, _pivot: { role: "admin" } }] }` a no-op that
+ * answers 200, which is the one outcome a caller cannot tell from success. An
+ * element with no `pivot` at all leaves the existing link exactly as it was;
+ * that is what keeps a plain `[1, 2, 3]` membership write from wiping the
+ * `role`s off the links it did not mention.
  */
 export async function applyJunctionMembership(
     tx: DrizzleClient,
     binding: JunctionBinding,
     parentId: unknown,
-    targetIds: unknown[]
+    links: JunctionLinkWrite[]
 ): Promise<void> {
     const existingRows = await tx
         .select({ targetId: binding.targetColumn })
@@ -225,10 +265,10 @@ export async function applyJunctionMembership(
         existingById.set(String(row.targetId), row.targetId);
     }
 
-    const wantedById = new Map<string, unknown>();
-    for (const targetId of targetIds) {
-        if (targetId === null || targetId === undefined) continue;
-        wantedById.set(String(targetId), targetId);
+    const wantedById = new Map<string, JunctionLinkWrite>();
+    for (const link of links) {
+        if (link.id === null || link.id === undefined) continue;
+        wantedById.set(String(link.id), link);
     }
 
     const removed = [...existingById.entries()]
@@ -236,7 +276,12 @@ export async function applyJunctionMembership(
         .map(([, value]) => value);
     const added = [...wantedById.entries()]
         .filter(([key]) => !existingById.has(key))
-        .map(([, value]) => value);
+        .map(([, link]) => link);
+    // Already linked AND named with a payload: the caller is stating what the
+    // link holds, not re-stating that it exists.
+    const repayloaded = [...wantedById.entries()]
+        .filter(([key, link]) => existingById.has(key) && link.pivot && Object.keys(link.pivot).length > 0)
+        .map(([, link]) => link);
 
     if (removed.length > 0) {
         await removeLinks(tx, binding, parentId, removed);
@@ -244,12 +289,67 @@ export async function applyJunctionMembership(
 
     if (added.length > 0) {
         await tx.insert(binding.table)
-            .values(added.map(targetId => ({
+            .values(added.map(link => ({
                 [binding.parentColumn.name]: parentId,
-                [binding.targetColumn.name]: targetId
+                [binding.targetColumn.name]: link.id,
+                ...(link.pivot ?? {})
             })))
             .onConflictDoNothing();
     }
+
+    for (const link of repayloaded) {
+        await tx.update(binding.table)
+            .set(link.pivot!)
+            .where(and(
+                eq(binding.parentColumn, parentId),
+                eq(binding.targetColumn, link.id)
+            ));
+    }
+}
+
+/**
+ * Set the columns of ONE existing link, without touching the membership.
+ *
+ * The membership array cannot express this on its own: sending one element
+ * would unlink everything else, and sending the whole set to change one link's
+ * `role` is the lost-update race {@link applyJunctionMembership}'s diff exists
+ * to avoid, reintroduced by the caller. So there is a route for it —
+ * `PATCH /api/data/:slug/:id/:relation/:targetId` with a `_pivot` body.
+ *
+ * A link that is not there is a **404**, not a silent insert: "update the role
+ * on this membership" and "create this membership" are different requests, and
+ * a caller who mistyped an id should hear about it rather than get a new link
+ * with a partial payload. Zero rows is also how a policy refusal arrives on
+ * Postgres, which is why the distinction is drawn by
+ * {@link explainZeroRowWrite} rather than by this function guessing.
+ */
+export async function updateJunctionPivot(
+    tx: DrizzleClient,
+    binding: JunctionBinding,
+    parentId: unknown,
+    targetId: unknown,
+    values: Record<string, unknown>,
+    subject: { parent: string; relation: string }
+): Promise<void> {
+    const conditions = [
+        eq(binding.parentColumn, parentId),
+        eq(binding.targetColumn, targetId)
+    ];
+    const result = await tx.update(binding.table).set(values).where(and(...conditions));
+
+    if ((result.rowCount ?? 0) === 0) {
+        throw await explainZeroRowWrite(
+            tx,
+            binding.table,
+            conditions,
+            `Not allowed to update the link between "${subject.parent}" "${parentId}" and ` +
+            `"${targetId}": a row-level security policy rejected the write.`,
+            `No "${subject.relation}" link between "${subject.parent}" "${parentId}" ` +
+            `and "${targetId}" to update.`
+        );
+    }
+
+    logger.info(`Updated '${subject.relation}' link ${targetId} on ${subject.parent} ${parentId}`);
 }
 
 /**

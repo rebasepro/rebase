@@ -1,4 +1,4 @@
-import { CollectionConfig, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData } from "@rebasepro/common";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
@@ -48,10 +48,22 @@ export function isJunctionRelation(relation: ResolvedRelation): boolean {
  * the foreign keys, and the target nested under one of them. The target is the
  * only object among them, so that is how it is found. A junction row that has
  * not been nested (no `with` on the join) has no object and is returned as-is.
+ *
+ * "The only object" stopped being true when a junction gained
+ * `through.properties`: a payload `map` is an object too, and it sits in the
+ * row beside the target with no guaranteed order between them — so this would
+ * have unwrapped to the payload and served it as the tag. The payload keys are
+ * known from the relation, so they are skipped by name rather than by shape.
  */
-function unwrapJunctionRow(item: Record<string, unknown>): Record<string, unknown> {
+function unwrapJunctionRow(
+    item: Record<string, unknown>,
+    relation: ResolvedRelation
+): Record<string, unknown> {
+    const payload = isManyToMany(relation) ? relation.through.properties : undefined;
     const nestedKey = Object.keys(item).find(
-        key => typeof item[key] === "object" && item[key] !== null && !Array.isArray(item[key])
+        key => key !== JUNCTION_PIVOT_KEY
+            && !(payload && key in payload)
+            && typeof item[key] === "object" && item[key] !== null && !Array.isArray(item[key])
     );
     return nestedKey ? item[nestedKey] as Record<string, unknown> : item;
 }
@@ -221,7 +233,7 @@ export function toFlatRow(
             const targetCollection = relation.target();
             normalized[key] = relData.map((item: Record<string, unknown>) =>
                 renderTarget(
-                    isJunctionRelation(relation) ? unwrapJunctionRow(item) : item,
+                    isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
                     targetCollection,
                     "ref",
                     registry
@@ -262,7 +274,7 @@ export function toRestRow(
         if (relation && Array.isArray(value)) {
             flat[key] = value.map((item: Record<string, unknown>) =>
                 renderTarget(
-                    isJunctionRelation(relation) ? unwrapJunctionRow(item) : item,
+                    isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
                     relation.target(),
                     "inline",
                     registry

@@ -233,6 +233,15 @@ export class DataService implements DataRepository {
     /**
      * Delete all rows from a collection
      */
+    /** See {@link PersistService.updateRelationPivot}. */
+    async updateRelationPivot(
+        collectionPath: string,
+        targetId: string | number,
+        pivot: Record<string, unknown>
+    ): Promise<void> {
+        return this.persistService.updateRelationPivot(collectionPath, targetId, pivot);
+    }
+
     async deleteAll(collectionPath: string, databaseId?: string): Promise<void> {
         return this.persistService.deleteAll(collectionPath, databaseId);
     }

@@ -22,6 +22,7 @@ import {
     SaveProps,
     StorageSource,
     UpdateManyProps,
+    UpdateRelationPivotProps,
     DeleteManyProps,
     EntityValues,
     EntityStatus,
@@ -1570,6 +1571,14 @@ export class PostgresBackendDriver implements DataDriver {
         await this.realtimeService.notifyUpdate(path, "*", null);
     }
 
+    async updateRelationPivot({ path, targetId, pivot }: UpdateRelationPivotProps): Promise<void> {
+        await this.dataService.updateRelationPivot(path, targetId, pivot);
+        // The junction row itself is what changed, and CDC on that table already
+        // reaches the subscribers of `<parent>/<id>/<relation>` — the same route
+        // a link or an unlink takes. Nothing extra to emit here; a second notify
+        // would only duplicate the frame CDC is about to deliver.
+    }
+
     async checkUniqueField(
         path: string,
         name: string,
@@ -2201,6 +2210,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
 
     async deleteAll(path: string): Promise<void> {
         return this.withTransaction((delegate) => delegate.deleteAll(path));
+    }
+
+    async updateRelationPivot(props: UpdateRelationPivotProps): Promise<void> {
+        return this.withTransaction((delegate) => delegate.updateRelationPivot(props));
     }
 
     async checkUniqueField(
