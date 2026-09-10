@@ -8,6 +8,8 @@ interface NeatGradientConfig {
 
 interface NeatGradientInstance {
     yOffset: number;
+    colorBrightness: number;
+    colorSaturation: number;
     cameraX: number;
     cameraY: number;
     cameraRotationX: number;
@@ -148,19 +150,37 @@ function frustumHalfWidth(aspect: number, zoom: number) {
     return (aspect >= 1 ? RIBBON_HALF_SIZE * aspect : RIBBON_HALF_SIZE * 1.05) / zoom;
 }
 
+// The two registers the site's gradient is drawn in.
+//
+// `subtle` is the wash every page hero has carried since the site was built:
+// the colour dimmed to a quarter and the canvas held at 0.55 over the ground,
+// so it lights the type without competing with it. `loud` is the blog's
+// register — there the art *is* the picture — and the home hero's: full
+// brightness, the saturation pushed past 1 because brightness alone washes the
+// palette toward pastel orange, and the canvas at full opacity. In that
+// register legibility is the page's job, not the gradient's: a scrim under the
+// reading copy and a shadow under the headline, the way the blog does it.
+//
+// `resolution` is the same in both. It is mesh subdivision, and the base 0.05
+// is what keeps the facets hard-edged and angular rather than smoothing the
+// ribbon into curves; a register changes the light, never the shape.
+const HERO_TONES = {
+    subtle: { colorBrightness: 0.25, colorSaturation: 1, opacity: 0.55 },
+    loud: { colorBrightness: 0.85, colorSaturation: 1.2, opacity: 1 },
+} as const;
+export type HeroTone = keyof typeof HERO_TONES;
+
+function toneColour(tone: HeroTone) {
+    const { colorBrightness, colorSaturation } = HERO_TONES[tone];
+    return { colorBrightness, colorSaturation };
+}
+
 const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     hero: {},
     // Blog artwork. Rides the same orbit as a hero — see `usesPose` below — but
-    // it is the picture rather than something behind text, so the two
-    // concessions the hero makes to legibility come back off: the canvas is not
-    // held at `opacity: 0.55` over the page, and the colour is not dimmed to
-    // stay out of the headline's way. `resolution` stays at the base 0.05, which
-    // is what keeps the facets hard-edged and angular rather than smoothing the
-    // ribbon into curves.
-    card: {
-        colorBrightness: 0.85,
-        colorSaturation: 1.2,
-    },
+    // it is always in the loud register, and does not persist across pages, so
+    // the colour is baked in here rather than driven by the `tone` prop.
+    card: toneColour("loud"),
     a: {
         yOffset: 0,
         planeBend: 0.2,
@@ -235,11 +255,16 @@ interface HeroPose {
 }
 
 // The home page is not on the orbit. It keeps the composition the site was
-// designed around exactly as it was, and only takes a fixed clock start in place
-// of the wall-clock one, so it too looks like itself on every load.
+// designed around, and only takes a fixed clock start in place of the
+// wall-clock one, so it too looks like itself on every load. The one departure
+// from the base seat is `cameraY`: lowering it lifts the ribbon in the frame
+// (about 46px per unit on a 1000px-tall viewport — the frustum's vertical
+// half-extent is 25 / zoom units over half the canvas), and since the hero
+// went loud (2026-09-10) the art is meant to mass in the band above the
+// headline, with the scrim's ground under the copy, rather than run behind it.
 const HOME_POSE: Omit<HeroPose, "phase"> = {
     cameraX: 0,
-    cameraY: -9.5,
+    cameraY: -12,
     cameraRotationX: 0.8310000000000001,
     cameraRotationY: 0.483,
     cameraZoom: 2.3,
@@ -374,13 +399,28 @@ function releaseCompileSlot() {
 
 export function NeatBackground({
     variant = "hero",
-    poseKey
+    poseKey,
+    tone = "subtle"
 }: {
     variant?: "hero" | "a" | "b" | "card";
     /** Overrides the pathname as the seat's identity. See {@link poseForKey}. */
     poseKey?: string;
+    /**
+     * Hero only. Which register the art is drawn in — see {@link HERO_TONES}.
+     * The hero canvas persists across client-side navigations and Astro hands
+     * it the next page's props, so a page can ask for `loud` and the one after
+     * it for `subtle`: the colour tweens between the two on the live instance,
+     * alongside the camera.
+     */
+    tone?: HeroTone;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // The instance outlives any one render: the tone effect below writes to
+    // it, and the compile inside the main effect reads the tone that is
+    // current *then*, not the one captured when the page first mounted.
+    const neatRef = useRef<NeatGradientInstance | undefined>(undefined);
+    const toneRef = useRef<HeroTone>(tone);
+    toneRef.current = tone;
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -500,8 +540,9 @@ export function NeatBackground({
             if (usesPose) {
                 // Read the pose at compile time, not at mount: a reader can navigate
                 // away before the gradient is eligible, and the seat that matters is
-                // the one for the page they are on now.
+                // the one for the page they are on now. The tone likewise.
                 measureFraming();
+                if (isHero) Object.assign(config, toneColour(toneRef.current));
                 Object.assign(config, {
                     cameraX: pose.cameraX * framing,
                     cameraY: pose.cameraY,
@@ -522,6 +563,7 @@ export function NeatBackground({
                 ref: canvas,
                 ...config,
             });
+            neatRef.current = neat;
             scrollHandler?.();
         };
 
@@ -642,6 +684,7 @@ export function NeatBackground({
             document.removeEventListener("astro:after-swap", onAfterSwap);
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
+            neatRef.current = undefined;
         };
 
         // Scroll parallax is motion too, so reduced-motion viewers keep the still
@@ -680,6 +723,36 @@ export function NeatBackground({
         return teardown;
     }, [variant]);
 
+    // The tone travels the way the camera does. On the first render there is
+    // no instance yet and this is a no-op — the compile above reads `toneRef`
+    // — so this only ever fires for a persisted hero landing on a page that
+    // wants the other register. Both values are live uniforms on the instance
+    // (`colorBrightness` and `colorSaturation` are accessors that mark the
+    // uniform block dirty), so they tween per frame on the same clock as the
+    // pose; the canvas opacity rides a CSS transition of the same length.
+    useEffect(() => {
+        const neat = neatRef.current;
+        if (variant !== "hero" || !neat) return;
+        const target = toneColour(tone);
+        if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+            neat.colorBrightness = target.colorBrightness;
+            neat.colorSaturation = target.colorSaturation;
+            return;
+        }
+        const from = { colorBrightness: neat.colorBrightness, colorSaturation: neat.colorSaturation };
+        let raf = 0;
+        let startedAt = 0;
+        const step = () => {
+            if (startedAt === 0) startedAt = performance.now();
+            const k = easeInOutCubic(Math.min(1, (performance.now() - startedAt) / POSE_TWEEN_MS));
+            neat.colorBrightness = from.colorBrightness + (target.colorBrightness - from.colorBrightness) * k;
+            neat.colorSaturation = from.colorSaturation + (target.colorSaturation - from.colorSaturation) * k;
+            if (k < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(raf);
+    }, [variant, tone]);
+
     if (variant === "hero") {
         return (
             <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
@@ -712,7 +785,10 @@ export function NeatBackground({
                         // the section's own `overflow: hidden` clips the rest.
                         height: "100vh",
                         minHeight: "100%",
-                        opacity: 0.55,
+                        opacity: HERO_TONES[tone].opacity,
+                        // Same length and curve as the pose tween, so a navigation
+                        // between the two registers reads as one move.
+                        transition: `opacity ${POSE_TWEEN_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`,
                         isolation: "isolate",
                     }}
                     aria-hidden="true"

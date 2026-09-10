@@ -50,21 +50,24 @@ const SELFHOST_COMMAND = "docker compose up -d";
         ============================================================ */}
 
         <!-- ============================================================
-             HERO — Neat is the composition, not the wallpaper.
-             The canvas holds the right of the frame at full opacity and the
-             type sits in the dark half, so nothing is ever laid over the art.
+             HERO — Neat is the picture, not the wallpaper.
+             The canvas runs in the loud register the blog uses (full
+             brightness, full opacity) and the band is split the way a blog
+             hero is: art behind the nav and the headline, a scrim under the
+             reading copy and the terminal so they sit on page ground. The
+             headline is the only type laid over the art, and it carries a
+             shadow for that.
              ============================================================ -->
-        {/* Bottom padding trimmed from pb-40. The hero is ~310px taller than it
-            was, and 160px of air under a headline this size reads as the page
-            having stopped rather than as breathing room. */}
-        {/* Top padding is bounded by the fold on a 1440x900 window — the
-            smallest laptop size that still matters here. It was pinned at
-            pt-20 when the headline lived in one half of the grid and wrapped
-            to six lines; full width it sets in three, and the measurement that
-            justified the tighter scale ("at pt-28 the CTAs landed 42px under")
-            has not been true since. Re-measured 2026-09-04 at pt-28: the CTA
-            row bottoms out at 651px and the terminal at 688px, both clear of
-            the fold with room to spare. */}
+        {/* The vertical budget moved up when the art went loud (2026-09-10).
+            The band above the headline is the picture now — the one place on
+            the page the gradient is seen unobstructed — so it gets 96px more
+            than it had; the strip under the terminal is page ground under the
+            scrim and reads as the page having stopped, so it gives 48px back.
+
+            Top padding is still bounded by the fold on a 1440x900 window — the
+            smallest laptop size that still matters here. Re-measured at pt-52:
+            the CTA row bottoms out at ~775px and the terminal at ~812px, both
+            clear of the fold. */}
         {/* `hero-under-nav` starts the section behind the transparent bar so the
             Neat canvas fills that band too (global.css). The top scale it comes
             with is the site's — this hero keeps its own tighter one, measured
@@ -72,16 +75,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
             The header's height is added back here for the same reason the shared
             class adds it: the negative margin has to be paid for, or every line
             below rides 60px too high. */}
-        <section class="relative isolate overflow-hidden flex items-center hero-under-nav pt-[calc(--spacing(28)+var(--header-h))] pb-24 sm:pb-28">
+        <section class="relative isolate overflow-hidden flex items-center hero-under-nav pt-[calc(--spacing(52)+var(--header-h))] pb-12 sm:pb-16">
             <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
-                <NeatBackground client:idle transition:persist="neat-hero" />
+                <NeatBackground client:idle transition:persist="neat-hero" tone="loud" />
             </div>
-            <!-- A second pass of the same shape, over the type, multiplying at low
-                 opacity: the ribbon darkens the letterforms where it crosses them
-                 and leaves them alone everywhere else. -->
-            <div class="neat-over absolute inset-0 pointer-events-none" aria-hidden="true">
-                <NeatBackground client:idle transition:persist="neat-hero-over" />
-            </div>
+            <!-- Same z-index as the canvas, later in the DOM, so it paints over
+                 the art and under everything else. The stops live in global.css
+                 next to the register they serve. -->
+            <div class="hero-scrim absolute inset-0 -z-10 pointer-events-none" aria-hidden="true"></div>
 
             {/* The headline is full width and the row beneath it is the split,
                 rather than the headline living in one half. At display-1 a
@@ -104,7 +105,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             which differs per locale. `leading-[1.02]` is gone:
                             `text-display-1` carries its own 0.94, and the two
                             were fighting. */}
-                        <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 text-balance">
+                        <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 text-balance [text-shadow:0_2px_30px_rgba(0,0,0,.55)]">
                             <span class="hero-line">{t("hero.title.part1")}</span>
                             <span class="hero-line">{t("hero.title.part2")}</span>
                         </h1>

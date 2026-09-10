@@ -782,11 +782,48 @@
     .terminal-caret { animation: none; }
 }
 
-/* A second pass of the Neat canvas over the type. Stacking two copies of the
-   TEXT cannot work: the upper copy's backdrop is the solid copy beneath it. */
-@utility neat-over {
-    mix-blend-mode: multiply;
-    opacity: 0.42;
+/* The ground under the type when a hero's canvas runs in the loud register
+   (`tone="loud"` on NeatBackground — full brightness, full opacity). Nothing
+   at the top, so the art is the picture behind the nav and the badge; page
+   ground at the bottom, so the paragraph, the CTAs and the terminal sit on the
+   same surface as the section after them and the seam is invisible.
+
+   The stops are placed against the home hero, measured from the bottom of the
+   band, and they differ by layout because the layout moves the copy. Above
+   `lg` the reading copy sits beside the terminal, so it starts ~39% up a
+   band of ~830px; below `lg` everything stacks, the band is ~1070px tall and
+   the same paragraph starts ~56% up. In both the rule is the same: the
+   paragraph on a near-solid scrim, the headline on a half scrim — over the art,
+   but darkened, which is the blog hero's own ratio (its title sits on a 75%
+   scrim) — and the art unobstructed above the badge. A single set of stops
+   put the phone's paragraph on a cyan slab.
+
+   `components`, like `.hero-under-nav`, so the positioning utilities beside
+   it at the call site still win. */
+@layer components {
+    .hero-scrim {
+        background: linear-gradient(
+            to top,
+            var(--color-page-ground) 0%,
+            rgb(8 9 10 / 0.92) 50%,
+            rgb(8 9 10 / 0.62) 61%,
+            rgb(8 9 10 / 0.22) 76%,
+            transparent 100%
+        );
+    }
+
+    @media (min-width: 64rem) {
+        .hero-scrim {
+            background: linear-gradient(
+                to top,
+                var(--color-page-ground) 0%,
+                rgb(8 9 10 / 0.92) 36%,
+                rgb(8 9 10 / 0.62) 52%,
+                rgb(8 9 10 / 0.22) 70%,
+                transparent 100%
+            );
+        }
+    }
 }
 
 @plugin "@tailwindcss/typography";
