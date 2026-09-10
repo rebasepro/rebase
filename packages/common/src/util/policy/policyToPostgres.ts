@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ResolvedRelation, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
 
@@ -266,7 +266,7 @@ function propertyClaimCastType(
             );
         case "relation":
             return primaryKeyClaimCastType(
-                relationTarget(name, prop, collection),
+                relationTarget(name, prop, collection, resolveCollection),
                 resolveCollection,
                 depth
             );
@@ -402,17 +402,63 @@ function belongsToColumn(
     prop: Property | undefined,
     collection?: CollectionConfig
 ): string | undefined {
-    if (!collection || prop?.type !== "relation") return undefined;
+    if (prop?.type !== "relation") return undefined;
+    const relation = resolvePropertyRelation(propName, collection);
+    return relation?.kind === "belongsTo" ? relation.localKey : undefined;
+}
+
+/**
+ * The resolved relation a `relation` property stands for, by the only name
+ * both declarations share: the property's own key.
+ *
+ * A property may carry the link inline (`relation: { kind, target }`) or name
+ * an entry in the collection's `relations` array — and the second form is
+ * matched by the property key, so there is nothing on the property to read.
+ * `resolveCollectionRelations` normalises both under that key, which is why
+ * this asks it rather than reading the property.
+ */
+function resolvePropertyRelation(
+    propName: string,
+    collection: CollectionConfig | undefined
+): ResolvedRelation | undefined {
+    if (!collection) return undefined;
     try {
-        const relations = resolveCollectionRelations(collection);
-        const declaredName = (prop as { relation?: { relationName?: string } }).relation?.relationName;
-        const relation = findRelation(relations, declaredName ?? propName);
-        return relation?.kind === "belongsTo" ? relation.localKey : undefined;
+        return findRelation(resolveCollectionRelations(collection), propName);
     } catch {
         // A relation whose target is not in this bundle. The old spelling is
         // no worse than failing to compile at all.
         return undefined;
     }
+}
+
+/**
+ * The collection a `relation` property points at.
+ *
+ * Preferred over the property's raw `target` because only the resolved
+ * relation covers both declarations, and because a resolved `target()` hands
+ * back the collection itself — no registry needed. The slug path stays as the
+ * fallback for a `target` written as a plain string, which cannot become a
+ * collection without one.
+ */
+function relationTarget(
+    propName: string,
+    prop: Property,
+    collection: CollectionConfig | undefined,
+    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined
+): CollectionConfig | undefined {
+    const relation = resolvePropertyRelation(propName, collection);
+    if (relation) {
+        try {
+            const target = relation.target();
+            if (target) return target;
+        } catch {
+            // A thunk needing a registry this compilation does not have.
+        }
+    }
+    return resolveTargetCollection(
+        relationTargetSlug((prop as { relation?: { target?: unknown } }).relation),
+        resolveCollection
+    );
 }
 
 /**

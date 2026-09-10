@@ -24,7 +24,8 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { CollectionConfig, Relation } from "@rebasepro/types";
+import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
+import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
@@ -206,6 +207,19 @@ function generateJunctionRows(
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
+/**
+ * The relation as `FetchService` hands it over: resolved.
+ *
+ * These fixtures are *authored* collections, and an authored `through` may
+ * leave `properties` out — the resolver is what fills it with `{}` so every
+ * consumer reads one shape. Casting an authored relation into a
+ * `ResolvedRelation` parameter skipped that step, and the parameter's type
+ * then promised a field nothing had filled in.
+ */
+function resolved(collection: CollectionConfig, relationName: string): ResolvedRelation {
+    return findRelation(resolveCollectionRelations(collection), relationName)!;
+}
+
 describe("batchFetchRelatedEntitiesMany: M2M through junction table regression", () => {
     let registry: PostgresCollectionRegistry;
 
@@ -318,7 +332,7 @@ name: "TypeScript" } }
 
             const { db } = createMockDb(() => junctionRows);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "posts", [1, 2, 3], "tags", relation
@@ -351,7 +365,7 @@ name: "GraphQL" } }
 
             const { db } = createMockDb(() => junctionRows);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "posts", [1], "tags", relation
@@ -373,7 +387,7 @@ name: "TypeScript" } }
 
             const { db, recorder } = createMockDb(() => junctionRows);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             await service.batchFetchRelatedEntitiesMany(
                 "posts", [1, 2, 3], "tags", relation
@@ -387,7 +401,7 @@ name: "TypeScript" } }
         it("should return empty map when no junction rows exist", async () => {
             const { db } = createMockDb(() => []);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "posts", [1, 2, 3], "tags", relation
@@ -399,7 +413,7 @@ name: "TypeScript" } }
         it("should return empty map for empty parent IDs", async () => {
             const { db, recorder } = createMockDb(() => []);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "posts", [], "tags", relation
@@ -425,7 +439,7 @@ name: "React" } }
 
             const { db } = createMockDb(() => junctionRows);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "posts", [1, 2, 3], "tags", relation
@@ -461,7 +475,7 @@ title: "Post C" } }
 
             const { db } = createMockDb(() => joinedRows);
             const service = new RelationService(db, registry);
-            const relation = tagsWithInversePosts.relations![0] as Relation;
+            const relation = resolved(tagsWithInversePosts, "posts");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "tags_inv", [1, 2], "posts", relation
@@ -481,7 +495,7 @@ title: "Post C" } }
         it("should return empty map when no junction rows exist for inverse", async () => {
             const { db } = createMockDb(() => []);
             const service = new RelationService(db, registry);
-            const relation = tagsWithInversePosts.relations![0] as Relation;
+            const relation = resolved(tagsWithInversePosts, "posts");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "tags_inv", [1, 2], "posts", relation
@@ -513,7 +527,7 @@ title: "Post Z" } }
 
             const { db } = createMockDb(() => joinedRows);
             const service = new RelationService(db, registry);
-            const relation = authorsWithJoinPath.relations![0] as Relation;
+            const relation = resolved(authorsWithJoinPath, "posts");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "authors_jp", [1, 2], "posts", relation
@@ -549,7 +563,7 @@ title: "Post Z" } }
 
             const { db } = createMockDb(() => []);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             await expect(service.batchFetchRelatedEntitiesMany(
                 "posts", [1], "tags", relation
@@ -579,7 +593,7 @@ name: "Rust" } }
 
             const { db } = createMockDb(() => junctionRows);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             // Pass numeric parent IDs (parseIdValues will return numbers for numeric PKs)
             const results = await service.batchFetchRelatedEntitiesMany(
@@ -607,7 +621,7 @@ title: "Post B" } }
 
             const { db } = createMockDb(() => joinedRows);
             const service = new RelationService(db, registry);
-            const relation = tagsWithInversePosts.relations![0] as Relation;
+            const relation = resolved(tagsWithInversePosts, "posts");
 
             // Pass numeric parent IDs
             const results = await service.batchFetchRelatedEntitiesMany(
@@ -636,7 +650,7 @@ name: "React" } }
 
             const { db } = createMockDb(() => junctionRows);
             const service = new RelationService(db, registry);
-            const relation = postsCollection.relations![0] as Relation;
+            const relation = resolved(postsCollection, "tags");
 
             const results = await service.batchFetchRelatedEntitiesMany(
                 "posts", [1, 2], "tags", relation

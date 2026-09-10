@@ -400,8 +400,10 @@ export const searched = C({
 // declaration's schema effects (NOT NULL, an index) land on a column *another*
 // declaration produced, which is exactly where a per-emitter reading of it
 // would fork.
-export const orgs = C({
-    slug: "orgs", table: "orgs", name: "Organizations",
+// Named apart from the junction-payload `orgs` above: one module, one binding,
+// and `groups.junctionPayload` points at whichever declaration came last.
+export const tenantOrgs = C({
+    slug: "tenant_orgs", table: "tenant_orgs", name: "Tenant organizations",
     properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
 });
 /** Claim form over a plain, nullable-looking string column. */
@@ -423,7 +425,7 @@ export const memberships = C({
         org: { type: "relation", relationName: "org" }
     },
     relations: [
-        { kind: "belongsTo", relationName: "org", target: () => orgs, localKey: "org_id" }
+        { kind: "belongsTo", relationName: "org", target: () => tenantOrgs, localKey: "org_id" }
     ],
     securityRules: [{ name: "memberships_self_read", operations: ["select"], ownerField: "userId" }]
 });
@@ -435,7 +437,7 @@ export const membershipTenanted = C({
         body: { type: "string" }
     },
     relations: [
-        { kind: "belongsTo", relationName: "org", target: () => orgs, localKey: "org_id" }
+        { kind: "belongsTo", relationName: "org", target: () => tenantOrgs, localKey: "org_id" }
     ],
     tenant: {
         field: "org",
@@ -460,7 +462,7 @@ export const groups: Record<string, CollectionConfig[]> = {
     appSchema: [appSchema, uuidTarget],
     indexed: [indexed],
     searched: [searched],
-    tenanted: [orgs, claimTenanted, memberships, membershipTenanted]
+    tenanted: [tenantOrgs, claimTenanted, memberships, membershipTenanted]
 };
 
 /**
