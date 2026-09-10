@@ -3,6 +3,7 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } fr
 import { NeatCanvas, NeatTravel } from "../gradient/NeatCanvas";
 import { BEATS, DESK_DURATION, MOVE_LEAD, moveFrames, OPENING } from "./beats";
 import { HERO_TONES } from "../data/neat-config";
+import { FLY_TO_CORNER } from "./Presenter";
 import { GROUND } from "../theme";
 
 /**
@@ -82,7 +83,7 @@ export function ribbonAt(frame: number): NeatTravel {
  * to MOVE_REVEAL on a sine bump and goes back down as the next shot lands.
  * The gradient is loudest exactly when nothing has to be read.
  */
-const MOVE_REVEAL = 0.5;
+const MOVE_REVEAL = 1;
 
 function moveBump(frame: number): number {
     /* Odd indices close a hold, even ones close a move — so [AT[i], AT[i+1]]
@@ -95,6 +96,35 @@ function moveBump(frame: number): number {
         }
     }
     return 0;
+}
+
+/**
+ * THE LEASH IS AREA, NOT EXPOSURE. A first pass held the slides at 0.12 and
+ * that was a wash — the loud register faded straight back into the subtle
+ * one. A second pass drew it at full strength and the ribbon crossed the
+ * headline: "I can't read that text". So the strength stays (0.8 on the
+ * dark grounds, 0.65 on the chroma fields, full across a move) and the AREA
+ * is what a held slide gives up: the art is masked to a soft-edged disc of
+ * HELD_RADIUS around the frame's top-right corner — away from the
+ * left-aligned headlines, above the windows, clear of the presenter. Across
+ * a move the disc opens to the whole frame on the same sine bump the
+ * exposure rides, and closes as the next shot lands.
+ *
+ * The open is the exception: the presenter stands centred on the art before
+ * the first headline exists, so the disc is wide until they fly to the
+ * corner, and closes as they go.
+ */
+const HELD_RADIUS = 620;
+const OPEN_RADIUS = 1500;
+const FULL_RADIUS = 3400;
+const FEATHER = 340;
+
+export function maskRadiusAt(frame: number): number {
+    const held =
+        frame < FLY_TO_CORNER
+            ? OPEN_RADIUS
+            : interpolate(frame, [FLY_TO_CORNER, FLY_TO_CORNER + 36], [OPEN_RADIUS, HELD_RADIUS], OPTS);
+    return held + (FULL_RADIUS - held) * moveBump(frame);
 }
 
 export function groundAt(frame: number) {
@@ -114,6 +144,8 @@ export const DeskPlane: React.FC = () => {
     const { fps } = useVideoConfig();
     const frame = useCurrentFrame();
     const ground = groundAt(frame);
+    const radius = Math.round(maskRadiusAt(frame));
+    const mask = `radial-gradient(circle at 100% 0%, #000 ${radius}px, transparent ${radius + FEATHER}px)`;
     return (
         <>
             <AbsoluteFill style={{ background: ground.color }} />
@@ -123,7 +155,7 @@ export const DeskPlane: React.FC = () => {
                 opacity={ground.reveal}
                 camera={ribbonAt(frame)}
                 time={timeAt(frame, fps)}
-                style={{ mixBlendMode: "screen" }}
+                style={{ mixBlendMode: "screen", WebkitMaskImage: mask, maskImage: mask }}
             />
         </>
     );
