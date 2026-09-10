@@ -83,6 +83,39 @@ function compareForSort(a: unknown, b: unknown, nullsLast: boolean): number {
  * Service for handling all row read operations.
  * Handles fetching, searching, counting, and filtering rows.
  */
+/**
+ * Which aggregate aliases hold a number that Postgres handed back as a string.
+ *
+ * `count`, `sum` and `avg` always do: bigint and numeric are returned as text
+ * because they do not fit a JS number in general. `min` and `max` are uncast,
+ * so they do it too — but only over a numeric column, and those are the two
+ * functions that also apply to text and dates.
+ *
+ * Decided by the column's DECLARED type, not by trying `Number()` on the value.
+ * `?select=avg(price),max(price)` used to answer `{avg_price: 5,
+ * max_price: "8.5"}` — one column, two functions, two JSON types, and
+ * arithmetic on the second one silently concatenates. Parsing whatever looks
+ * numeric would fix that and break something worse: a `min(sku)` of `"00123"`
+ * would come back as `123`, a different value, and no NaN check would catch it.
+ *
+ * Exported to be tested: the parsing itself needs a database, this decision
+ * does not.
+ */
+export function numericAggregateAliases(
+    aggregates: { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string }[],
+    properties: Record<string, { type?: string }>
+): Set<string> {
+    const isNumberField = (field?: string): boolean =>
+        Boolean(field) && properties[field as string]?.type === "number";
+    return new Set(
+        aggregates
+            .filter(a =>
+                a.fn === "count" || a.fn === "sum" || a.fn === "avg"
+                || ((a.fn === "min" || a.fn === "max") && isNumberField(a.field)))
+            .map(a => a.alias)
+    );
+}
+
 export class FetchService {
     private relationService: RelationService;
 
@@ -1669,8 +1702,21 @@ relatedTo: hop });
         // They do fit for every aggregate anyone puts on a dashboard, and a
         // caller handed `"12"` where they expected `12` has to find that out
         // for themselves. Parsed once, here.
-        const numericAliases = new Set(
-            options.aggregates.filter(a => a.fn === "count" || a.fn === "sum" || a.fn === "avg").map(a => a.alias)
+        //
+        // `min` and `max` over a NUMBER column too, which they were not. Those
+        // are uncast, so a `numeric` column returns them as strings — and
+        // `?select=avg(price),max(price)` answered `{avg_price: 5,
+        // max_price: "8.5"}`: two functions, one column, two JSON types, and
+        // arithmetic on the second one silently concatenates.
+        //
+        // Decided by the column's declared type rather than by trying
+        // `Number()` on the value, because `min`/`max` are the two that also
+        // apply to text and dates. Parsing whatever happens to look numeric
+        // would turn a `min(sku)` of `"00123"` into `123`, which is a different
+        // value, and the `Number.isNaN` guard below would not catch it.
+        const numericAliases = numericAggregateAliases(
+            options.aggregates,
+            (collection?.properties ?? {}) as Record<string, { type?: string }>
         );
         return rows.map(row => {
             const out: Record<string, unknown> = { ...row };
