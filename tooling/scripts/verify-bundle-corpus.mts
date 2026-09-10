@@ -512,7 +512,19 @@ async function verifyBundle(entry: CorpusEntry, bundleDir: string): Promise<void
             // is wrong and SDK drift detection has quietly stopped meaning
             // anything.
             const declared = String(manifest.schemaVersion ?? "");
-            const collectionsDir = path.join(bundleDir, String((manifest.entry as any)?.collections));
+            // `manifest` is parsed JSON, so `entry` is `unknown`, and `any` on it
+            // switched off the check on everything read through it —
+            // `String((manifest.entry as any)?.collections)` turned a missing
+            // entry into the *directory name* `"undefined"`, which then failed
+            // as "0 collections" and read like a broken bundle rather than a
+            // manifest that never said where they were.
+            const entry = manifest.entry;
+            const collectionsEntry = entry && typeof entry === "object"
+                ? (entry as { collections?: unknown }).collections
+                : undefined;
+            check("manifest names its collections directory", typeof collectionsEntry === "string",
+                typeof collectionsEntry === "string" ? collectionsEntry : "entry.collections missing");
+            const collectionsDir = path.join(bundleDir, typeof collectionsEntry === "string" ? collectionsEntry : "__no_collections_entry__");
             const loaded = await loadCollectionsFromDirectory(collectionsDir);
             const recomputed = computeSchemaVersion(loaded);
             check("collections load from the bundle", loaded.length > 0, `${loaded.length} collection(s)`);
