@@ -132,6 +132,12 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Serve index.html for unmatched paths under `path` (client-side routing)."
+                },
+                "cms": {
+                    "type": "string",
+                    "pattern": "^/(?!.*\\.\\.)(?!.*/$).*$|^/$",
+                    "description": "Where this app mounts the Rebase CMS, as a URL path — the address you would type, not a path relative to `path`. The CMS is a component inside your own app, so its address is a client-side route that nothing on the server can observe: declaring it here is what lets Rebase Cloud and `rebase apps list` link straight to it. Must be `path` or something beneath it. Omit it if this app does not mount the CMS.",
+                    "examples": ["/", "/admin"]
                 }
             }
         }

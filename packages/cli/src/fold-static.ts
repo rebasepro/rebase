@@ -32,6 +32,7 @@ export interface FoldableManifest {
         output?: string;
         path?: string;
         spa?: boolean;
+        cms?: string;
     }>;
 }
 
@@ -61,6 +62,8 @@ export interface FoldableApp {
     path: string;
     /** SPA fallback, defaulted to `true`. */
     spa: boolean;
+    /** Where this app mounts the Rebase CMS, if it does. */
+    cms?: string;
 }
 
 /**
@@ -90,7 +93,8 @@ reason: `"${name}" declares no output directory — not folded in.` });
             build: app.build,
             output: app.output,
             path: app.path ?? "/",
-            spa: app.spa ?? true
+            spa: app.spa ?? true,
+            cms: app.cms
         });
     }
 
@@ -242,7 +246,8 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
             assetsDir,
             appName: app.name,
             path: app.path,
-            spa: app.spa
+            spa: app.spa,
+            cms: app.cms
         });
         outcomes.push({ appName: app.name,
 fileCount,

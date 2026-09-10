@@ -23,7 +23,8 @@ import {
     type ManagedCompatibility,
     type RebaseAppConfig,
     type RebaseBackendAppConfig,
-    type RebaseProjectManifest
+    type RebaseProjectManifest,
+    type RebaseStaticAppConfig
 } from "@rebasepro/types";
 import { MANIFEST_FILENAME } from "./utils/project";
 
@@ -122,6 +123,47 @@ function checkAppPath(
     return value;
 }
 
+/**
+ * Is `candidate` the path `parent`, or something beneath it?
+ *
+ * Segment-aware for the same reason `isForbiddenStaticPath` is: a plain
+ * `startsWith` reads `/admin` as living under `/adm`.
+ */
+function isUnderPath(candidate: string, parent: string): boolean {
+    if (parent === "/") return true;
+    return candidate === parent || candidate.startsWith(`${parent}/`);
+}
+
+/**
+ * Validate where an app says it mounts the Rebase CMS.
+ *
+ * The same shape as {@link checkAppPath} — it is a URL path and ends up in the
+ * same places — plus one rule of its own: it has to be inside the app declaring
+ * it. The app's SPA fallback is what answers that URL, so a `cms` outside its
+ * `path` names an address this app will never serve. That is a link the console
+ * would then offer to a 404, which is worse than the missing link it replaces.
+ */
+function checkCmsPath(
+    value: unknown,
+    appPath: string,
+    fieldPath: string,
+    issues: ManifestValidationIssue[]
+): string | undefined {
+    if (value === undefined) return undefined;
+    const cms = checkAppPath(value, fieldPath, issues);
+    if (cms === undefined) return undefined;
+    if (!isUnderPath(cms, appPath)) {
+        issues.push({
+            path: fieldPath,
+            message: `must be inside this app's path — it is at "${appPath}", so it cannot serve "${cms}". ` +
+                "The CMS is a route of this app, not a separate deployment; if it really lives elsewhere, " +
+                "declare that app and put `cms` on it instead"
+        });
+        return undefined;
+    }
+    return cms;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -167,7 +209,7 @@ message: "must stay inside the project directory" });
 const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
     backend: ["type", "runtime", "config", "functions", "crons", "schema",
         "usersCollection", "dockerfile", "context", "port"],
-    static: ["type", "root", "build", "output", "path", "spa"]
+    static: ["type", "root", "build", "output", "path", "spa", "cms"]
 };
 
 /**
@@ -309,7 +351,8 @@ message: "must be a string command" });
                 issues.push({ path: `${base}.spa`,
 message: "must be a boolean" });
             }
-            checkAppPath(raw.path, `${base}.path`, issues);
+            const appPath = checkAppPath(raw.path, `${base}.path`, issues);
+            checkCmsPath(raw.cms, appPath ?? "/", `${base}.cms`, issues);
             return raw as unknown as RebaseAppConfig;
         }
         default:
@@ -396,6 +439,23 @@ message: "name is reserved" });
             continue;
         }
         byPath.set(at, name);
+    }
+
+    // One CMS per project. Not a taste ruling: everything downstream — the
+    // console's button, `rebase apps list`, the app row that records it — talks
+    // about "the project's CMS", and two of them would make every one of those
+    // pick arbitrarily. A repository that genuinely wants a second admin surface
+    // has two apps and can say so by name.
+    const withCms = Object.entries(apps).filter(
+        ([, app]) => app.type === "static" && typeof app.cms === "string"
+    );
+    if (withCms.length > 1) {
+        for (const [name] of withCms.slice(1)) {
+            issues.push({
+                path: `apps.${name}.cms`,
+                message: `a project has one CMS — "${withCms[0][0]}" already declares one`
+            });
+        }
     }
 
     refuseStorageBlock(raw.storage, issues);
@@ -635,6 +695,30 @@ export function findBackendApp(
     for (const [name, app] of Object.entries(manifest.apps)) {
         if (app.type === "backend") return { name,
 app: app as RebaseBackendAppConfig };
+    }
+    return undefined;
+}
+
+/**
+ * Where this project mounts the Rebase CMS, if it says.
+ *
+ * The CMS is a component inside a developer's own app, so its address is a
+ * client-side route: no build artifact, no running server and no control plane
+ * can observe it. {@link RebaseStaticAppConfig.cms} is the only place that fact
+ * is ever written down, and this is the one reader of it — so that "the
+ * project's CMS" means the same thing to `rebase dev`, `rebase apps list`, the
+ * bundle it builds and the console that shows it.
+ *
+ * Returns the *serving* app alongside the path, because a caller with a base URL
+ * needs to know which app answers there — and because the path alone cannot say
+ * whether the CMS is the whole of an app or one route of it.
+ */
+export function cmsMountOf(
+    manifest: RebaseProjectManifest
+): { appName: string; app: RebaseStaticAppConfig; path: string } | undefined {
+    for (const [name, app] of Object.entries(manifest.apps)) {
+        if (app.type !== "static" || typeof app.cms !== "string") continue;
+        return { appName: name, app: app as RebaseStaticAppConfig, path: app.cms };
     }
     return undefined;
 }

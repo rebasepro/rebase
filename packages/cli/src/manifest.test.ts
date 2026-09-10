@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     assessManagedCompatibility,
     buildableApps,
+    cmsMountOf,
     CURRENT_RUNTIME_RANGE,
     loadManifest,
     ManifestError,
@@ -346,6 +347,121 @@ path: "/admin" }
                 }
             });
             expect(issues).toEqual([]);
+        });
+    });
+
+    /**
+     * Where the CMS is, which nothing else in the system can observe.
+     *
+     * It is a React component inside the developer's own app, so its address is
+     * a client-side route: not a server route, not a file in the bundle, not
+     * anything a probe can distinguish from the SPA fallback. This declaration
+     * is the only place it is ever written down, which is why the rules on it
+     * are worth enforcing rather than trusting.
+     */
+    describe("static.cms", () => {
+        it("accepts a route inside the app that serves it", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { web: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/",
+cms: "/admin" } }
+            });
+            expect(issues).toEqual([]);
+        });
+
+        it("accepts an app that is entirely the CMS", () => {
+            // What `rebase init` scaffolds: one frontend, at the root, and the
+            // whole of it is the panel.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/",
+cms: "/" } }
+            });
+            expect(issues).toEqual([]);
+        });
+
+        it("accepts a CMS nested under a non-root app", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { app: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/app",
+cms: "/app/admin" } }
+            });
+            expect(issues).toEqual([]);
+        });
+
+        it("rejects a CMS outside the app that declares it", () => {
+            // Nothing serves that URL: the app's SPA fallback only answers
+            // beneath its own path. The console would offer a confident link to
+            // a 404, which is worse than the missing link it replaces.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { app: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/app",
+cms: "/admin" } }
+            });
+            expect(issues.find(i => i.path === "apps.app.cms")?.message)
+                .toMatch(/must be inside this app's path/);
+        });
+
+        it("does not read a sibling path as containment", () => {
+            // `/adm` is not a prefix of `/admin` in any sense that matters — a
+            // `startsWith` check would say it is.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { app: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/adm",
+cms: "/admin" } }
+            });
+            expect(issues.find(i => i.path === "apps.app.cms")?.message)
+                .toMatch(/must be inside this app's path/);
+        });
+
+        it("rejects a relative path with the same message `path` gets", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { web: { type: "static",
+root: "a",
+output: "a/dist",
+cms: "admin" } }
+            });
+            expect(issues.find(i => i.path === "apps.web.cms")?.message)
+                .toMatch(/absolute path/);
+        });
+
+        it("refuses a second CMS, naming the app that already has one", () => {
+            // Everything downstream says "the project's CMS" — the console
+            // button, the app row, `rebase apps list`. Two would make each of
+            // them pick one arbitrarily.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    site: { type: "static",
+root: "s",
+output: "s/dist",
+path: "/",
+cms: "/admin" },
+                    staff: { type: "static",
+root: "t",
+output: "t/dist",
+path: "/staff",
+cms: "/staff/admin" }
+                }
+            });
+            expect(issues.find(i => i.path === "apps.staff.cms")?.message)
+                .toMatch(/one CMS.*"site"/);
         });
     });
 });
@@ -709,6 +825,28 @@ admin: STATIC("/admin") });
     it("says so when there is nothing to deploy at all", () => {
         expect(() => selectDeployApp({ rebase: "^1",
 apps: {} })).toThrow(/no apps/);
+    });
+});
+
+describe("cmsMountOf", () => {
+    it("finds the app that mounts the CMS and where", () => {
+        const mount = cmsMountOf({
+            rebase: "^1",
+            apps: {
+                backend: { type: "backend", runtime: "managed" },
+                web: { type: "static", root: "f", output: "f/dist", path: "/", cms: "/admin" }
+            }
+        });
+        expect(mount).toMatchObject({ appName: "web", path: "/admin" });
+    });
+
+    it("is undefined when no app declares one", () => {
+        // Not "the CMS is at /" — the project has not said, and every caller
+        // renders not-knowing as nothing rather than as a guess.
+        expect(cmsMountOf({
+            rebase: "^1",
+            apps: { web: { type: "static", root: "f", output: "f/dist", path: "/" } }
+        })).toBeUndefined();
     });
 });
 

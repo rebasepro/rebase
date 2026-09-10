@@ -57,7 +57,8 @@ and functions stay in TypeScript where a type system can check them.
       "root": "admin",
       "build": "npm run build --workspace admin",
       "output": "admin/dist",
-      "path": "/admin"
+      "path": "/admin",
+      "cms": "/admin"
     }
   }
 }
@@ -66,6 +67,44 @@ and functions stay in TypeScript where a type system can check them.
 One process serves all of it: the API at `/api`, the site at `/`, the admin at
 `/admin`. That is the self-hosting story, and a perfectly good small tier on
 Rebase Cloud.
+
+## Saying where the CMS is
+
+`cms` is the URL path where an app mounts `<RebaseCMS>`. It is optional, it is
+the one field here that describes what is *inside* an app rather than where the
+app lives, and it exists because nothing else can find that out.
+
+The CMS is a React component in your own frontend, so its address is a
+client-side route. It is not a server route, not a file in the build, and not
+distinguishable from any other unmatched path under a SPA — a request to
+`/admin` gets the same `index.html` as a request to `/anything-else`. So no
+deploy, no running server and no amount of probing can tell where your admin
+panel is. If you do not write it down, nothing knows.
+
+What knows it, does something with it:
+
+- **Rebase Cloud** puts an *Open CMS* link in the project header and lists the
+  address on the project's overview. Without `cms`, the console can offer only
+  the project host — which reaches the CMS only if the CMS happens to sit at the
+  root of it.
+- **`rebase dev`** prints the CMS URL in its startup banner when it is not
+  simply the frontend's home page.
+- **`rebase apps list`** shows it beside the app that serves it.
+
+Two shapes, and both are ordinary:
+
+```jsonc
+// The whole app is the CMS — what `rebase init` scaffolds.
+"admin": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/" }
+
+// The CMS is one route of a bigger app, sharing its session and its client.
+"web": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/admin" }
+```
+
+The value is the address you would type, not a path relative to `path`, and it
+has to be inside the app declaring it — that app's SPA fallback is what answers
+there. A project has one CMS; declaring a second is an error rather than a
+coin toss over which one the console links to.
 
 `path` is a **build-time** input as well as a serving one. An app mounted at
 `/admin` has to be *built* for `/admin`, or `index.html` loads and every asset

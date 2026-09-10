@@ -91,7 +91,8 @@ function describeApp(app: RebaseAppConfig): string {
                 ? `custom runtime — ${app.dockerfile ?? "Dockerfile"}`
                 : `managed runtime, config: ${app.config ?? "config"}`;
         case "static":
-            return `${app.root} → ${app.output} @ ${app.path ?? "/"}`;
+            return `${app.root} → ${app.output} @ ${app.path ?? "/"}`
+                + (app.cms ? `  ${chalk.magenta(`CMS at ${app.cms}`)}` : "");
         default:
             return "";
     }

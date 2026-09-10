@@ -55,6 +55,22 @@ path: "/docs/api" }
         expect(apps.map(a => a.path)).toEqual(["/docs/api", "/admin", "/"]);
     });
 
+    it("carries where the app mounts the CMS", () => {
+        // The one fact about a frontend that nothing downstream can observe.
+        // If folding drops it, the bundle cannot state it, the deploy cannot
+        // record it, and the console has no CMS link — which is the whole
+        // failure this field exists to fix.
+        const { apps } = foldableApps({
+            apps: {
+                web: { type: "static",
+output: "frontend/dist",
+path: "/",
+cms: "/admin" }
+            }
+        });
+        expect(apps[0].cms).toBe("/admin");
+    });
+
     it("says nothing at all for a backend-only project", () => {
         // The common case. It is not a problem and must not be reported as one.
         const { apps, skipped } = foldableApps({ apps: { backend: { type: "backend" } } });

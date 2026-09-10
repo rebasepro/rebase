@@ -11,7 +11,8 @@
             "root": "frontend",
             "build": "npm run build --workspace frontend",
             "output": "frontend/dist",
-            "path": "/"
+            "path": "/",
+            "cms": "/"
         }
     }
 }

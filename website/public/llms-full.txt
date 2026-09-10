@@ -32,7 +32,7 @@ came for:
 | I want… | Start here | What you get |
 |---|---|---|
 | **A backend and an admin panel** | [Quickstart](/docs/getting-started/quickstart/) | Collections in TypeScript, a generated CRUD UI, a REST API, auth, storage and realtime |
-| **Just the API, over my own database** | [Backend only](/docs/getting-started/headless/) | A headless REST API and SDK over your existing PostgreSQL — no admin panel, no collection files, no React |
+| **Just the API, over my own database** | [Backend only](/docs/getting-started/headless/) | A headless REST API and SDK over your existing PostgreSQL — no admin panel, no collection files |
 
 Neither is a one-way door: a headless project grows an admin panel by adding
 collection files, and a full project can serve tables it has no collection for.
@@ -2624,6 +2624,26 @@ backfilled after the fact.
 
 ### [Unreleased]
 
+#### Added
+
+- **`cms` — say where your admin panel is, and Rebase Cloud will link to it.**
+  A static app in `rebase.json` can now declare the URL path where it mounts
+  `<RebaseCMS>`. The CMS is a component inside your own frontend, so its address
+  is a client-side route that nothing on the server, in the bundle or in the
+  control plane can observe — and a project whose CMS is not at the root of its
+  host therefore had no link to it anywhere in the Cloud console. Declaring it
+  gives the console an *Open CMS* button and an address on the project overview,
+  puts the URL in `rebase dev`'s banner and in `rebase apps list`.
+
+  Alongside it, a project's apps are now linked at their real addresses
+  everywhere the console lists them. They never were: the link was rendered from
+  `apps.publicUrl`, a column no deploy path has ever written, so the Apps page
+  showed a project's apps with no way to open any of them. The address is
+  derived from the project's live host and the app's path now, which also means
+  it follows a custom domain the moment one verifies. Frontends folded into a
+  managed backend bundle get their address recorded on deploy too — those rows
+  previously stayed at "registered, never deployed" for the life of the project.
+
 ### [0.20.0] - 2026-09-10
 
 #### Added
@@ -2711,6 +2731,43 @@ backfilled after the fact.
   answer every other unknown name gets.
 
 #### Fixed
+
+- **A collection created from the panel's editor no longer stops the project
+  from booting.** The schema editor moved a *collection's* presentation keys
+  into its `admin` block when it wrote a file, and left a *property's* —
+  `markdown`, `multiline`, `previewAsTag` — exactly where the panel put them,
+  at the top level of the property. The boot validator treats a key that moved
+  in 0.11 as fatal, and the loader imports every collection in the directory,
+  so one file written this way stopped `rebase dev` from starting at all:
+  "Could not regenerate the database schema", then a backend that never came
+  up. `saveProperty` had been fixed for this; `saveCollection` had not, and
+  creating a collection is a `saveCollection`.
+
+  Two things made it certain rather than likely. The walk that nests a
+  property's keys did not know about `oneOf` — the container the block-based
+  templates are built out of — so it skipped every block inside them. And all
+  four of the editor's starter templates were written in the pre-0.11 flat
+  shape behind an `as unknown as AdminCollection` cast, which is the only check
+  they had. The cast is gone: they are `satisfies AdminCollection` now, so a key
+  in the wrong place is a compile error. The templates also had `url: "image"`
+  on a boolean flag — the renderer is `admin.urlPreview`.
+
+  What the schema editor writes is now asserted against the boot validator
+  itself, for both entry points, rather than against a copy of its rules.
+
+- **The Markdown field's "Paste behavior" panel is gone.** Its two switches
+  wrote `markdown.html` and `markdown.transformPastedText` at the top level of
+  the property — the fatal shape above — clobbering the `admin.markdown` flag
+  that makes the field a markdown field at all. Nothing ever read either one:
+  the editor's `markdownConfig` prop was destructured and never used, and no
+  caller passed it. Removed rather than wired, so the panel stops promising
+  behaviour that was never implemented.
+
+- **The agent skills are inside the example gate now.** `check:doc-examples`
+  read the docs and not `tooling/rebase-agent-skills`, which is the surface an
+  agent copies from verbatim. Two of its examples wrote a property key at the
+  top level — one of them directly beside a correct `admin: { readOnly: true }`
+  in the same literal. The gate now validates 123 collections instead of 87.
 
 - **A generated column no longer wedges every push behind it.** PostgreSQL
   refuses `ALTER COLUMN … TYPE` on a column a `GENERATED ALWAYS AS … STORED`
@@ -7655,7 +7712,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 Rebase has two shapes, and this page is the one that never opens a browser: a
 REST API, auth, storage, realtime and backups over a PostgreSQL database you
-already have. No admin panel, no React, no collection files. If you were
+already have. No admin panel, no collection files. If you were
 reaching for Supabase or PostgREST, this is the comparable thing.
 
 Everything on this page also works in the full project — it is the same server.
@@ -9519,7 +9576,7 @@ propertiesOrder: ["title", "score" as AdditionalFieldKey]
 
 Import it from `@rebasepro/cms-types` in a project that has an admin panel — that is
 the copy that also typechecks the `admin` block. A headless BaaS project, which has no
-admin block and no React, imports the same function from `@rebasepro/common` instead.
+admin block, imports the same function from `@rebasepro/common` instead.
 
 Annotating the type directly still works and is still checked:
 
@@ -9575,8 +9632,8 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
 
 - A **BaaS or headless** project never writes an `admin` block. Its collections — or no
   collections at all, since BaaS mode introspects the database — describe data and
-  authorization, nothing else. `@rebasepro/types` contains no React, so there is no
-  React anywhere in the dependency tree.
+  authorization, nothing else. `@rebasepro/types` carries no UI code, so a headless
+  project's dependency tree stays server-only.
 - The **backend never reads inside the block**. It is dropped before a collection is
   serialized to the contract endpoint or into a build bundle, and it is excluded from
   the schema version — so changing an icon does not report every generated SDK as
@@ -32929,7 +32986,8 @@ See [Agent Skills](/docs/ai/skills) for the full list and where files are writte
 
 #### `rebase telemetry`
 
-Anonymous usage sharing. **Opt-in, and off unless you turned it on:**
+Anonymous usage sharing. **`rebase init` asks once per project, and the prompt
+defaults to yes — nothing is sent unless you answer it:**
 
 ```bash
 rebase telemetry status
@@ -32938,9 +32996,9 @@ rebase telemetry enable
 rebase telemetry disable
 ```
 
-`status` prints the current setting, `show` prints exactly what would be sent, and
-the other two change it. `rebase init` asks once; if you never ran `init`, nothing
-was ever collected.
+`status` prints the current setting, `show` prints exactly what would be sent —
+whether or not sharing is on, so you can read the payload before deciding — and
+the other two change it. If you never ran `init`, nothing was ever collected.
 
 ### Migration Workflow
 
@@ -34250,7 +34308,8 @@ and functions stay in TypeScript where a type system can check them.
       "root": "admin",
       "build": "npm run build --workspace admin",
       "output": "admin/dist",
-      "path": "/admin"
+      "path": "/admin",
+      "cms": "/admin"
     }
   }
 }
@@ -34259,6 +34318,44 @@ and functions stay in TypeScript where a type system can check them.
 One process serves all of it: the API at `/api`, the site at `/`, the admin at
 `/admin`. That is the self-hosting story, and a perfectly good small tier on
 Rebase Cloud.
+
+### Saying where the CMS is
+
+`cms` is the URL path where an app mounts `<RebaseCMS>`. It is optional, it is
+the one field here that describes what is *inside* an app rather than where the
+app lives, and it exists because nothing else can find that out.
+
+The CMS is a React component in your own frontend, so its address is a
+client-side route. It is not a server route, not a file in the build, and not
+distinguishable from any other unmatched path under a SPA — a request to
+`/admin` gets the same `index.html` as a request to `/anything-else`. So no
+deploy, no running server and no amount of probing can tell where your admin
+panel is. If you do not write it down, nothing knows.
+
+What knows it, does something with it:
+
+- **Rebase Cloud** puts an *Open CMS* link in the project header and lists the
+  address on the project's overview. Without `cms`, the console can offer only
+  the project host — which reaches the CMS only if the CMS happens to sit at the
+  root of it.
+- **`rebase dev`** prints the CMS URL in its startup banner when it is not
+  simply the frontend's home page.
+- **`rebase apps list`** shows it beside the app that serves it.
+
+Two shapes, and both are ordinary:
+
+```jsonc
+// The whole app is the CMS — what `rebase init` scaffolds.
+"admin": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/" }
+
+// The CMS is one route of a bigger app, sharing its session and its client.
+"web": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/admin" }
+```
+
+The value is the address you would type, not a path relative to `path`, and it
+has to be inside the app declaring it — that app's SPA fallback is what answers
+there. A project has one CMS; declaring a second is an error rather than a
+coin toss over which one the console links to.
 
 `path` is a **build-time** input as well as a serving one. An app mounted at
 `/admin` has to be *built* for `/admin`, or `index.html` loads and every asset

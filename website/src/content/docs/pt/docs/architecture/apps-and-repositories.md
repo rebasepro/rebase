@@ -1,39 +1,39 @@
 ---
-sourceHash: ee6fa328c0acbd31
+sourceHash: f90b94eda083f704
 title: Apps e Repositórios
-sidebar_label: Apps e Repositórios
-description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver em seu próprio repositório.
+sidebar_label: Apps & Repositórios
+description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.
 ---
 
 ## Projetos e apps
 
 Um **projeto** é o backend: o banco de dados, auth, storage, realtime e
-functions. Um **app** é algo que se comunica com ele.
+funções. Um **app** é algo que se comunica com ele.
 
 | Tipo | O que é |
 | --- | --- |
-| `backend` | As coleções, hooks e funções que definem a API. Exatamente um por projeto. |
-| `static` | Um bundle de cliente construído — uma SPA ou site estático, servido em seu próprio caminho. |
+| `backend` | As collections, hooks e funções que definem a API. Exatamente um por projeto. |
+| `static` | Um bundle de cliente compilado — uma SPA ou site estático, servido em seu próprio caminho. |
 
-Essa é a lista completa. O painel de administração é um app `static` como qualquer outro: ele
-é construído no seu repositório, contra as suas coleções, e é por isso que campos
-personalizados e visualizações personalizadas funcionam nele desde o primeiro dia.
+Essa é a lista completa. O painel de administração é um app `static` como qualquer outro: ele é
+compilado no seu repositório, com base nas suas collections, e é por isso que campos personalizados
+e visualizações personalizadas funcionam nele desde o primeiro dia.
 
-Quem possui o processo do servidor é uma propriedade do backend, não um tipo de app
+Quem detém o processo do servidor é uma propriedade do backend, não um tipo de app
 separado:
 
 | `runtime` | O que significa |
 | --- | --- |
-| `managed` | A imagem de runtime da plataforma executa o seu bundle. Você fornece coleções, funções, crons e schema. |
+| `managed` | A imagem de runtime da plataforma executa o seu bundle. Você fornece collections, funções, crons e schema. |
 | `custom` | Você fornece o servidor: seu próprio Dockerfile e entrypoint. O `rebase eject` configura isso. |
 
-Isso é independente de *onde* ele roda. Ambos rodam no Rebase Cloud e ambos
-são auto-hospedados (self-host) — o destino fica em `.rebase/cloud.json`, não no manifesto.
+Isso independe de *onde* ele é executado. Ambos rodam no Rebase Cloud e ambos permitem
+auto-hospedagem (self-host) — o destino fica em `.rebase/cloud.json`, não no manifesto.
 
-A parte importante é quem *possui* a lista. Um repositório declara apenas os apps
-que contém; o projeto possui o conjunto de apps existentes. Dois repositórios nunca
+A parte importante é o que *gerencia* a lista. Um repositório declara apenas os apps
+que contém; o projeto é o dono do conjunto de apps existentes. Dois repositórios nunca
 precisam saber um do outro — eles só precisam conhecer o projeto. É isso que
-torna um repositório de frontend separado, ou um aplicativo móvel sem nenhuma relação
+torna um repositório de frontend separado, ou um app mobile sem nenhuma relação
 de repositório, algo comum em vez de um caso especial.
 
 ## `rebase.json`
@@ -58,20 +58,59 @@ e funções permanecem no TypeScript, onde um sistema de tipos pode verificá-lo
       "root": "admin",
       "build": "npm run build --workspace admin",
       "output": "admin/dist",
-      "path": "/admin"
+      "path": "/admin",
+      "cms": "/admin"
     }
   }
 }
 ```
 
-Um único processo serve tudo: a API em `/api`, o site em `/`, o admin em
-`/admin`. Essa é a história da auto-hospedagem, e um plano pequeno perfeitamente
-adequado no Rebase Cloud.
+Um único processo serve tudo: a API em `/api`, o site em `/`, a administração em
+`/admin`. Esse é o modelo de auto-hospedagem (self-hosting), e uma excelente camada inicial
+no Rebase Cloud.
 
-`path` é uma entrada de **tempo de compilação** (build-time), bem como de serviço. Um app montado
-em `/admin` precisa ser *construído* para `/admin`, caso contrário o `index.html` carrega e
-todos os assets retornam 404 — uma página em branco sem nenhum erro em lugar nenhum. O `rebase build` passa o valor como
-`REBASE_APP_BASE`, que seu bundler lê como seu caminho base:
+## Informando onde está o CMS
+
+`cms` é o caminho da URL onde um app monta o `<RebaseCMS>`. Ele é opcional, é o
+único campo aqui que descreve o que está *dentro* de um app em vez de onde o
+app se localiza, e existe porque nada mais conseguiria descobrir isso.
+
+O CMS é um componente React no seu próprio frontend, portanto seu endereço é uma
+rota do lado do cliente (client-side route). Não é uma rota de servidor, não é um arquivo no build e não é
+distinguível de qualquer outro caminho não correspondido em uma SPA — uma requisição para
+`/admin` recebe o mesmo `index.html` que uma requisição para `/anything-else`. Portanto, nenhum
+deploy, nenhum servidor em execução e nenhuma quantidade de varredura pode dizer onde seu painel
+de administração está. Se você não registrar isso, nada saberá.
+
+O que sabe disso, faz algo a respeito:
+
+- O **Rebase Cloud** adiciona um link *Open CMS* no cabeçalho do projeto e lista o
+  endereço na visão geral do projeto. Sem o `cms`, o console só consegue oferecer
+  o host do projeto — que só alcança o CMS se ele estiver na
+  raiz dele.
+- O **`rebase dev`** exibe a URL do CMS no seu banner de inicialização quando ela não for
+  simplesmente a página inicial do frontend.
+- O **`rebase apps list`** o exibe ao lado do app que o serve.
+
+Dois formatos, e ambos são comuns:
+
+```jsonc
+// The whole app is the CMS — what `rebase init` scaffolds.
+"admin": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/" }
+
+// The CMS is one route of a bigger app, sharing its session and its client.
+"web": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/admin" }
+```
+
+O valor é o endereço que você digitaria, não um caminho relativo a `path`, e
+deve estar dentro do app que o declara — o fallback de SPA desse app é o que
+responde ali. Um projeto tem um CMS; declarar um segundo é um erro, em vez de
+um cara ou coroa sobre para qual deles o console apontará o link.
+
+`path` é uma entrada tanto de **tempo de compilação (build-time)** quanto de serviço. Um app montado em
+`/admin` precisa ser *compilado* para `/admin`, caso contrário o `index.html` carrega e todos os assets
+retornam 404 — uma página em branco sem nenhum erro em lugar nenhum. O `rebase build` passa o valor como
+`REBASE_APP_BASE`, que o seu bundler lê como seu caminho base:
 
 ```ts
 // vite.config.ts
@@ -81,18 +120,18 @@ export default defineConfig({
 });
 ```
 
-e se recusa a entregar uma build que o ignorou.
+e se recusa a enviar uma compilação que o tenha ignorado.
 
-Um projeto existente não precisa de um. A CLI infere a mesma estrutura a partir da
-estrutura de diretórios, e o `rebase apps init` a registra quando você deseja
-torná-la explícita:
+Um projeto existente não precisa disso. A CLI deduz a mesma estrutura a partir da
+estrutura de diretórios, e o `rebase apps init` o registra quando você desejar
+torná-lo explícito:
 
 ```bash
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
 
-## Construindo e fazendo deploy de apps
+## Compilando e fazendo deploy de apps
 
 ```bash
 rebase build              # every app in this repository
@@ -100,17 +139,17 @@ rebase build backend      # just the bundle
 rebase build admin        # just that app's static assets
 ```
 
-O backend é construído primeiro, porque a build de um app cliente pode consumir um SDK
-gerado a partir de suas coleções.
+O backend é compilado primeiro, pois a compilação de um app cliente pode consumir um SDK
+gerado a partir de suas collections.
 
 ## Múltiplos repositórios
 
 O monorepo continua sendo o padrão: um repositório com um backend e um painel de administração
-é a coisa mais simples que funciona, e o `rebase init` cria sua estrutura base. Dividir
-é um passo de evolução, não um requisito.
+é a opção mais simples que funciona, e o `rebase init` cria essa estrutura inicial. A separação é
+um passo de evolução, não um requisito.
 
 Em um repositório de frontend separado, você precisa de duas coisas — um manifesto declarando
-o que este repositório contribui e um link para o projeto:
+com o que este repositório contribui e um link para o projeto:
 
 ```jsonc
 // rebase.json
@@ -132,53 +171,53 @@ rebase cloud link https://api.example.com   # a self-hosted project
 rebase cloud link                           # or pick a Rebase Cloud project
 ```
 
-O link é gravado em `.rebase/cloud.json` e **não é commitado** — ele é por
-checkout, como um remote do git. O manifesto é commitado; o link não.
+O link é gravado em `.rebase/cloud.json` e **não é commitado** — ele é
+por checkout, como um git remote. O manifesto é commitado; o link não.
 
-## Clientes tipados sem as coleções
+## Clientes tipados sem as collections
 
-Este é o mecanismo que faz o multi-repo funcionar. Um repositório que não contém
-coleções gera seu SDK tipado a partir do próprio projeto:
+Este é o mecanismo que faz o multi-repo funcionar. Um repositório que não
+contém collections gera seu SDK tipado a partir do próprio projeto:
 
 ```bash
 rebase generate-sdk --from link
 rebase generate-sdk --from https://api.example.com --token $REBASE_SERVICE_KEY
 ```
 
-A CLI busca `/api/meta/contract`, reconstrói as definições de coleção —
-incluindo alvos de relação, dos quais o gerador de tipos precisa para decidir se
-uma chave estrangeira é uma string ou um número — e emite exatamente a mesma saída
-que teria produzido a partir da fonte local.
+A CLI busca `/api/meta/contract`, reconstrói as definições de collections —
+incluindo alvos de relacionamentos, que o gerador de tipos precisa para decidir se uma
+chave estrangeira é uma string ou um número — e emite exatamente a mesma saída que
+produziria a partir do código-fonte local.
 
-O endpoint do contrato é restrito para administradores (admin-only). As definições de coleção descrevem cada tabela,
+O endpoint de contrato é exclusivo para administradores. As definições de collections descrevem cada tabela,
 coluna e relação no projeto, incluindo aquelas que nenhuma regra de segurança jamais
-exporia; isso é um mapa do banco de dados, não uma documentação pública de API.
+exporia; trata-se de um mapa do banco de dados, não de uma documentação pública da API.
 
-## Detectando divergências
+## Detectando drift
 
 Dividir repositórios custa uma coisa que vale a pena mencionar: uma alteração de schema e o
-frontend que a utiliza deixam de ser enviados no mesmo commit. O backend pode implantar uma
-alteração que deixe desamparado um cliente construído com base na estrutura antiga.
+frontend que a utiliza não entram mais no mesmo commit. O backend pode implantar uma
+alteração que deixe desamparado um cliente compilado com o formato antigo.
 
-Cada SDK gerado registra o schema de onde veio:
+Cada SDK gerado registra o schema do qual se originou:
 
 ```ts
 // src/rebase/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
-E cada projeto publica a sua versão atual, sem autenticação, porque um registro
-de versão não revela nada sobre o schema que ele representa:
+E cada projeto publica a sua versão atual, sem autenticação, porque um
+identificador de versão não revela nada sobre o schema que ele representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
 # {"schemaVersion":"v1:c5d97d0f96b7f87a"}
 ```
 
-Comparar os dois na CI transforma uma incompatibilidade silenciosa em uma verificação com falha. O registro
-muda quando os tipos gerados podem mudar — uma nova propriedade, uma relação alterada —
-e deliberadamente *não* quando um hook, uma regra de segurança ou um ícone
-muda, para não dar alarme falso.
+Comparar os dois no CI transforma uma incompatibilidade silenciosa em uma verificação com falha. O
+identificador muda quando os tipos gerados podem mudar — uma nova propriedade, uma relação
+alterada — e deliberadamente *não* quando um hook, uma regra de segurança ou um ícone
+muda, evitando alarmes falsos.
 
 ## Configuração do cliente
 
@@ -187,8 +226,14 @@ rebase apps config web
 ```
 
 Exibe o que um cliente precisa para alcançar o projeto. Ele nunca exibe um segredo: a
-URL da API e a identidade publicável de um app devem ser enviadas dentro de um
-bundle de cliente, e qualquer coisa que não seja segura ali não pertence a uma saída
+URL da API e a identidade publicável de um app foram feitas para serem distribuídas dentro de um
+bundle de cliente, e qualquer coisa que não seja segura ali não deve constar em uma saída
 que terminará em um `.env` commitado.
+
+## Relacionado
+
+- [Runtime e Bundles](/docs/architecture/runtime-and-bundles/) — o que o `rebase build` produz e o que o inicializa
+- [Processos Divididos](/docs/deployment/split-processes/) — executando um único bundle como vários processos
+- [Comandos da CLI](/docs/cli/) — `rebase apps` e o restante
 
 ---

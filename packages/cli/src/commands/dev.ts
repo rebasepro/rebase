@@ -28,7 +28,7 @@ import {
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { findBackendApp, loadManifest, resolveBackendPaths } from "../manifest";
+import { cmsMountOf, findBackendApp, loadManifest, resolveBackendPaths } from "../manifest";
 import {
     requireProjectRoot,
     findBackendDir,
@@ -787,17 +787,26 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * a shape that has no such directory reads as a broken scaffold on the
      * very first run of the very command the headless quickstart names.
      */
-    const declaresStaticApp = (() => {
+    const staticShape = (() => {
         try {
             const { manifest } = loadManifest(projectRoot);
-            return Object.values(manifest.apps ?? {}).some(app => app.type === "static");
+            return {
+                declaresStaticApp: Object.values(manifest.apps ?? {}).some(app => app.type === "static"),
+                // Where the banner's "Admin" link actually reaches the CMS. For
+                // the scaffolded project that is the frontend's root and the two
+                // are the same URL; for a project that mounts the CMS as one
+                // route of a larger app they are not, and the banner was sending
+                // the reader to the product's home page.
+                cmsPath: cmsMountOf(manifest)?.path
+            };
         } catch {
             // A manifest that will not load is a different problem, reported
             // elsewhere. Fall back to the directory, which is what this check
             // used to be.
-            return Boolean(frontendDir);
+            return { declaresStaticApp: Boolean(frontendDir), cmsPath: undefined };
         }
     })();
+    const declaresStaticApp = staticShape.declaresStaticApp;
 
     // --- State for printing the banner ---
     let frontendUrl = "";
@@ -851,6 +860,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     ["➜ API:   ", api]
                 ]
                 : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
+
+            // The CMS, when it is not simply the frontend's home page. Printed
+            // rather than assumed: a project that mounts `<RebaseCMS>` at
+            // `/admin` inside its product app has an admin URL that appears
+            // nowhere — not in the build, not in the running server, not here —
+            // and finding it meant reading the frontend's source.
+            if (declaresStaticApp && staticShape.cmsPath && staticShape.cmsPath !== "/") {
+                lines.push(["➜ CMS:   ", `${stripAnsi(frontendUrl).replace(/\/$/, "")}${staticShape.cmsPath}`]);
+            }
 
             if (!declaresStaticApp) {
                 // Only when it is actually mounted. A project with no tables

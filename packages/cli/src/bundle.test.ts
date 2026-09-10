@@ -479,9 +479,13 @@ entry: { config: "config" } });
         expect(fs.existsSync(path.join(bundleDir, "static", "web", "index.html"))).toBe(true);
         expect(fs.existsSync(path.join(bundleDir, "static", "web", "assets", "app.js"))).toBe(true);
         const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        // `name` rides along so a control plane reconciling app ROWS against
+        // this list can match them by name rather than re-deriving one from the
+        // directory.
         expect(manifest.entry.static).toEqual([{ path: "/",
 dir: "static/web",
-spa: true }]);
+spa: true,
+name: "web" }]);
         // And it does not lose what was already there.
         expect(manifest.entry.config).toBe("config");
     });
@@ -505,10 +509,12 @@ path: "/admin" });
         expect(manifest.entry.static).toEqual([
             { path: "/",
 dir: "static/site",
-spa: true },
+spa: true,
+name: "site" },
             { path: "/admin",
 dir: "static/admin",
-spa: true }
+spa: true,
+name: "admin" }
         ]);
     });
 

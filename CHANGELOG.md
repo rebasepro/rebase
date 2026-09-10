@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`cms` — say where your admin panel is, and Rebase Cloud will link to it.**
+  A static app in `rebase.json` can now declare the URL path where it mounts
+  `<RebaseCMS>`. The CMS is a component inside your own frontend, so its address
+  is a client-side route that nothing on the server, in the bundle or in the
+  control plane can observe — and a project whose CMS is not at the root of its
+  host therefore had no link to it anywhere in the Cloud console. Declaring it
+  gives the console an *Open CMS* button and an address on the project overview,
+  puts the URL in `rebase dev`'s banner and in `rebase apps list`.
+
+  Alongside it, a project's apps are now linked at their real addresses
+  everywhere the console lists them. They never were: the link was rendered from
+  `apps.publicUrl`, a column no deploy path has ever written, so the Apps page
+  showed a project's apps with no way to open any of them. The address is
+  derived from the project's live host and the app's path now, which also means
+  it follows a custom domain the moment one verifies. Frontends folded into a
+  managed backend bundle get their address recorded on deploy too — those rows
+  previously stayed at "registered, never deployed" for the life of the project.
+
 ## [0.20.0] - 2026-09-10
 
 ### Added

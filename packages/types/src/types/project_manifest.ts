@@ -129,6 +129,30 @@ export interface RebaseStaticAppConfig {
      * static *site* generator emits real files for its routes anyway.
      */
     spa?: boolean;
+    /**
+     * Where this app mounts the Rebase CMS, as a URL path — the address you
+     * would type to reach it, not a path relative to `path`.
+     *
+     * The CMS is an ordinary React component in the developer's own app
+     * (`<RebaseCMS basePath="/admin">`), so its address is a *client-side
+     * route*: nothing on the server, in the bundle, or in the control plane can
+     * observe it. A project whose CMS sits at `/admin` inside a frontend that
+     * also serves a product at `/` is indistinguishable, from the outside, from
+     * one that has no CMS at all — which is exactly how a Rebase Cloud project
+     * came to have no discoverable admin URL anywhere in its console.
+     *
+     * Declaring it is the only way that fact travels. It is carried into the
+     * bundle manifest, recorded on the project's app row at deploy, and is what
+     * lets the console (and `rebase apps list`) offer a link straight to it.
+     *
+     * Must be `path` itself or something beneath it, since the app serving that
+     * URL is the one that has to answer for it. Absent means this app does not
+     * mount the CMS — the common case for a marketing site or a product app.
+     *
+     * @example "/" — the whole app is the CMS, as `rebase init` scaffolds it
+     * @example "/admin" — the CMS is one route of a larger app
+     */
+    cms?: string;
 }
 
 export type RebaseAppConfig = RebaseBackendAppConfig | RebaseStaticAppConfig;
@@ -366,6 +390,27 @@ export interface RebaseBundleStatic {
     dir: string;
     /** Serve `index.html` for unmatched paths under `path`. */
     spa: boolean;
+    /**
+     * The app's name in `rebase.json`.
+     *
+     * `dir` is `static/<name>` and has been since folding was written, so this
+     * is recoverable by string surgery — which is precisely why it is stated
+     * instead. A control plane reconciling app rows against this list has to
+     * match them by name, and a consumer that has to re-derive an identifier
+     * from a path is one refactor away from matching nothing and registering a
+     * duplicate app on every deploy.
+     *
+     * Optional because bundles built before this field exists do not carry it;
+     * a reader that needs a name falls back to the last segment of `dir`.
+     */
+    name?: string;
+    /**
+     * Where this app mounts the Rebase CMS, as a URL path.
+     *
+     * Copied from the app's declaration — see {@link RebaseStaticAppConfig.cms}
+     * for why a client-side route has to be declared to be knowable at all.
+     */
+    cms?: string;
 }
 
 /**

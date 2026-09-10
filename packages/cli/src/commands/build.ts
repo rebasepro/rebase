@@ -408,7 +408,8 @@ export async function buildAssetApp(
         outDir,
         runtimeRange,
         path: basePath,
-        spa: asset.spa ?? true
+        spa: asset.spa ?? true,
+        cms: asset.cms
     });
     const rel = path.relative(projectRoot, result.outDir);
     console.log(

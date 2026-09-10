@@ -1794,8 +1794,10 @@ export function foldStaticIntoBundle(options: {
     path: string;
     /** Serve `index.html` for unmatched paths under `path`. */
     spa: boolean;
+    /** Where this app mounts the Rebase CMS, if it does. */
+    cms?: string;
 }): { fileCount: number; dir: string } {
-    const { bundleDir, assetsDir, appName, path: basePath, spa } = options;
+    const { bundleDir, assetsDir, appName, path: basePath, spa, cms } = options;
     const manifestPath = path.join(bundleDir, "manifest.json");
     if (!fs.existsSync(manifestPath)) {
         throw new Error(`No manifest at ${manifestPath} — build the backend bundle first.`);
@@ -1832,7 +1834,9 @@ force: true });
         ...manifest.entry,
         static: [...existing, { path: basePath,
 dir,
-spa }]
+spa,
+name: appName,
+...(cms ? { cms } : {}) }]
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
@@ -1850,6 +1854,8 @@ export function buildStaticBundle(options: {
     path?: string;
     /** Serve `index.html` for unmatched paths. Default `true`. */
     spa?: boolean;
+    /** Where this app mounts the Rebase CMS, if it does. */
+    cms?: string;
 }): { outDir: string; manifest: RebaseBundleManifest; fileCount: number } {
     const { projectRoot, appName, assetsDir, outDir, runtimeRange } = options;
     const basePath = options.path ?? "/";
@@ -1886,7 +1892,9 @@ export function buildStaticBundle(options: {
         // `/admin`-built app at `/` is the blank-page failure in reverse.
         entry: { static: [{ path: basePath,
 dir: "static",
-spa: options.spa ?? true }] },
+spa: options.spa ?? true,
+name: appName,
+...(options.cms ? { cms: options.cms } : {}) }] },
         hooks: { native: false },
         // Nothing to install beside a static bundle — it is just files.
         deps: { declared: {} },

@@ -11,6 +11,26 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Added
+
+- **`cms` — say where your admin panel is, and Rebase Cloud will link to it.**
+  A static app in `rebase.json` can now declare the URL path where it mounts
+  `<RebaseCMS>`. The CMS is a component inside your own frontend, so its address
+  is a client-side route that nothing on the server, in the bundle or in the
+  control plane can observe — and a project whose CMS is not at the root of its
+  host therefore had no link to it anywhere in the Cloud console. Declaring it
+  gives the console an *Open CMS* button and an address on the project overview,
+  puts the URL in `rebase dev`'s banner and in `rebase apps list`.
+
+  Alongside it, a project's apps are now linked at their real addresses
+  everywhere the console lists them. They never were: the link was rendered from
+  `apps.publicUrl`, a column no deploy path has ever written, so the Apps page
+  showed a project's apps with no way to open any of them. The address is
+  derived from the project's live host and the app's path now, which also means
+  it follows a custom domain the moment one verifies. Frontends folded into a
+  managed backend bundle get their address recorded on deploy too — those rows
+  previously stayed at "registered, never deployed" for the life of the project.
+
 ## [0.20.0] - 2026-09-10
 
 ### Added
@@ -98,6 +118,43 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   answer every other unknown name gets.
 
 ### Fixed
+
+- **A collection created from the panel's editor no longer stops the project
+  from booting.** The schema editor moved a *collection's* presentation keys
+  into its `admin` block when it wrote a file, and left a *property's* —
+  `markdown`, `multiline`, `previewAsTag` — exactly where the panel put them,
+  at the top level of the property. The boot validator treats a key that moved
+  in 0.11 as fatal, and the loader imports every collection in the directory,
+  so one file written this way stopped `rebase dev` from starting at all:
+  "Could not regenerate the database schema", then a backend that never came
+  up. `saveProperty` had been fixed for this; `saveCollection` had not, and
+  creating a collection is a `saveCollection`.
+
+  Two things made it certain rather than likely. The walk that nests a
+  property's keys did not know about `oneOf` — the container the block-based
+  templates are built out of — so it skipped every block inside them. And all
+  four of the editor's starter templates were written in the pre-0.11 flat
+  shape behind an `as unknown as AdminCollection` cast, which is the only check
+  they had. The cast is gone: they are `satisfies AdminCollection` now, so a key
+  in the wrong place is a compile error. The templates also had `url: "image"`
+  on a boolean flag — the renderer is `admin.urlPreview`.
+
+  What the schema editor writes is now asserted against the boot validator
+  itself, for both entry points, rather than against a copy of its rules.
+
+- **The Markdown field's "Paste behavior" panel is gone.** Its two switches
+  wrote `markdown.html` and `markdown.transformPastedText` at the top level of
+  the property — the fatal shape above — clobbering the `admin.markdown` flag
+  that makes the field a markdown field at all. Nothing ever read either one:
+  the editor's `markdownConfig` prop was destructured and never used, and no
+  caller passed it. Removed rather than wired, so the panel stops promising
+  behaviour that was never implemented.
+
+- **The agent skills are inside the example gate now.** `check:doc-examples`
+  read the docs and not `tooling/rebase-agent-skills`, which is the surface an
+  agent copies from verbatim. Two of its examples wrote a property key at the
+  top level — one of them directly beside a correct `admin: { readOnly: true }`
+  in the same literal. The gate now validates 123 collections instead of 87.
 
 - **A generated column no longer wedges every push behind it.** PostgreSQL
   refuses `ALTER COLUMN … TYPE` on a column a `GENERATED ALWAYS AS … STORED`
