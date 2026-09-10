@@ -6,7 +6,12 @@ import tailwindcss from "@tailwindcss/vite";
 import { rebaseCollectionsPlugin } from "@rebasepro/app/vitePlugin";
 
 export default defineConfig({
-    envDir: path.resolve(__dirname, ".."),
+    // `import.meta.dirname`, not `__dirname`: vite 8 warns that the latter is
+    // unsupported by `configLoader: "native"`, which becomes the default in a
+    // future major — so every new project printed a warning telling its author
+    // to fix a file they had not written yet. Available since Node 20.11, and
+    // this scaffold requires 22.22.
+    envDir: path.resolve(import.meta.dirname, ".."),
     // The public path this app is served under, from its `path` in rebase.json.
     // `rebase build` sets REBASE_APP_BASE; without this line an app declared at
     // "/admin" would emit assets rooted at "/" and render a blank page. The
