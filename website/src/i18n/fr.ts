@@ -5,7 +5,6 @@ export const fr = {
   "hero.subtitle":
     "Un fichier TypeScript par collection vous donne le schéma, l'API REST, le SDK typé et le panneau. Les règles d'accès de ce même fichier sont compilées en row-level security Postgres, si bien que toutes les routes, toutes les tâches, tous les scripts et tous les agents se heurtent au même mur.",
   "hero.cta.demo": "Tester la démo",
-  "hero.cta.audit": "Auditer votre base de données",
 
   "rlscheck.title": "Ne nous croyez pas sur parole.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lit le catalogue de votre base de données et rapporte ce qui est réellement exposé — des tables servies avec la sécurité au niveau des lignes désactivée, des politiques vraies pour tout le monde, des vues qui contournent la RLS de leurs tables de base. Quinze contrôles. N'importe quel Postgres : Supabase, Neon, RDS, votre propre serveur. Il est en lecture seule, ne demande aucun compte, et se moque de savoir si vous utilisez Rebase.",

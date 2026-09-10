@@ -36,6 +36,26 @@ const NeatGradient = neatModuleTyped.NeatGradient ||
                      neatModuleTyped.default?.default?.NeatGradient;
 
 const NEAT_BASE_CONFIG = {
+    // A WebGL context flag, read once when the instance is built — Neat warns
+    // and ignores it if set later. Off, every facet edge of the ribbon is a
+    // staircase, which the subtle register hid under 0.55 opacity and the
+    // loud one puts in plain view (Francesco, 2026-09-10: "some shapes are
+    // visibly pixelated"). Multisampling on the default framebuffer; the cost
+    // is fill rate on the four canvases the home page mounts, and the frames
+    // still come in well under budget on a throttled phone.
+    antialias: true,
+    // Multisampling only covers the facet edges. The stripes and bars ACROSS
+    // a facet are Neat's procedural texture, which `bitmap` (the default)
+    // draws through Canvas2D into a fixed 1024px square and then magnifies
+    // across a full-viewport ribbon — so every band edge is a coarse grid no
+    // amount of MSAA touches. `baked` rasterises the same shapes analytically
+    // on the GPU at a resolution derived from the canvas: exact edge
+    // coverage, the same mipmapped texture afterwards, the same per-frame
+    // cost. Needs WebGL2 and falls back to `bitmap` (with a console warning)
+    // without it; does not do squiggles, and this config draws none. Landed in
+    // @firecms/neat 1.0.3-canary.20260731173236, which is why the site is on
+    // that build rather than 1.0.2.
+    textureMode: "baked" as const,
     licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
     colors: [
         { color: "#FB5066", enabled: true },
@@ -256,29 +276,32 @@ interface HeroPose {
 
 // The home page is not on the orbit. It keeps the composition the site was
 // designed around, and only takes a fixed clock start in place of the
-// wall-clock one, so it too looks like itself on every load. The one departure
-// from the base seat is `cameraY`: lowering it lifts the ribbon in the frame
-// (about 46px per unit on a 1000px-tall viewport — the frustum's vertical
-// half-extent is 25 / zoom units over half the canvas), and since the hero
-// went loud (2026-09-10) the art is meant to mass in the band above the
-// headline, with the scrim's ground under the copy, rather than run behind it.
-const HOME_POSE: Omit<HeroPose, "phase"> = {
-    cameraX: 0,
-    cameraY: -12,
-    cameraRotationX: 0.8310000000000001,
-    cameraRotationY: 0.483,
-    cameraZoom: 2.3,
-    planeBend: -0.7,
-    planeTwist: 1,
-    yOffset: 0,
-};
+// wall-clock one, so it too looks like itself on every load. The one thing
+// that moves with the register is `cameraY`: lowering it lifts the ribbon in
+// the frame (about 46px per unit on a 1000px-tall viewport — the frustum's
+// vertical half-extent is 25 / zoom units over half the canvas). In the loud
+// register the art is meant to mass in the band above the headline, with the
+// scrim's ground under the copy; in the subtle one it keeps the seat the site
+// was designed around and runs behind the type.
+function homePose(tone: HeroTone): Omit<HeroPose, "phase"> {
+    return {
+        cameraX: 0,
+        cameraY: tone === "loud" ? -12 : -9.5,
+        cameraRotationX: 0.8310000000000001,
+        cameraRotationY: 0.483,
+        cameraZoom: 2.3,
+        planeBend: -0.7,
+        planeTwist: 1,
+        yOffset: 0,
+    };
+}
 
 // Each term rides the orbit at its own frequency and phase offset rather than all
 // of them moving in lockstep with `t`: two pages that land near each other on the
 // camera still separate on the twist, the bend or the scroll base.
-function heroPose(t: number, isHome: boolean): HeroPose {
+function heroPose(t: number, isHome: boolean, tone: HeroTone): HeroPose {
     const phase = 3600 * t;
-    if (isHome) return { ...HOME_POSE, phase };
+    if (isHome) return { ...homePose(tone), phase };
     return {
         // Deliberately the smallest term of the lot. Translating the camera
         // sideways slides the whole composition across the frame, which reads as
@@ -297,9 +320,9 @@ function heroPose(t: number, isHome: boolean): HeroPose {
     };
 }
 
-function poseForPath(pathname: string): HeroPose {
+function poseForPath(pathname: string, tone: HeroTone): HeroPose {
     const key = pageKey(pathname);
-    return heroPose(poseParamFor(key), key === "/");
+    return heroPose(poseParamFor(key), key === "/", tone);
 }
 
 /**
@@ -312,7 +335,7 @@ function poseForPath(pathname: string): HeroPose {
  * pathname derivation lands on the slug anyway.
  */
 function poseForKey(key: string): HeroPose {
-    return heroPose(poseParamFor(key), false);
+    return heroPose(poseParamFor(key), false, "subtle");
 }
 
 // The language is not part of a page's identity: /es/product and /product are
@@ -397,30 +420,41 @@ function releaseCompileSlot() {
     setTimeout(() => { compiling = false; }, 0);
 }
 
+/**
+ * Which register a hero is drawn in — see {@link HERO_TONES} — is declared on
+ * the element that WRAPS the island, not as a prop:
+ *
+ *   <div data-neat-tone="loud">                      the page's own register
+ *   <div data-neat-tone-experiment="hero-register">  an A/B assignment on <html>
+ *                                                    outranks it, when one exists
+ *
+ * Because the hero canvas persists across client-side navigations, the page
+ * it lands on is the one that has to say which register it wants, and the
+ * wrapper is that page's element while the island is the previous page's.
+ * Reading the wrapper on `astro:after-swap` needs no prop to be handed over
+ * and nothing to re-render; the colour then tweens on the live instance,
+ * alongside the camera. Absent both, the register is `subtle`.
+ */
+function declaredTone(canvas: HTMLCanvasElement): HeroTone {
+    const declared = canvas.closest<HTMLElement>("[data-neat-tone], [data-neat-tone-experiment]");
+    const experiment = declared?.dataset.neatToneExperiment;
+    if (experiment) {
+        const assigned = document.documentElement.getAttribute("data-ab-" + experiment);
+        if (assigned && assigned in HERO_TONES) return assigned as HeroTone;
+    }
+    const tone = declared?.dataset.neatTone;
+    return tone && tone in HERO_TONES ? (tone as HeroTone) : "subtle";
+}
+
 export function NeatBackground({
     variant = "hero",
-    poseKey,
-    tone = "subtle"
+    poseKey
 }: {
     variant?: "hero" | "a" | "b" | "card";
     /** Overrides the pathname as the seat's identity. See {@link poseForKey}. */
     poseKey?: string;
-    /**
-     * Hero only. Which register the art is drawn in — see {@link HERO_TONES}.
-     * The hero canvas persists across client-side navigations and Astro hands
-     * it the next page's props, so a page can ask for `loud` and the one after
-     * it for `subtle`: the colour tweens between the two on the live instance,
-     * alongside the camera.
-     */
-    tone?: HeroTone;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    // The instance outlives any one render: the tone effect below writes to
-    // it, and the compile inside the main effect reads the tone that is
-    // current *then*, not the one captured when the page first mounted.
-    const neatRef = useRef<NeatGradientInstance | undefined>(undefined);
-    const toneRef = useRef<HeroTone>(tone);
-    toneRef.current = tone;
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -449,10 +483,45 @@ export function NeatBackground({
         const dividerBaseOffset = config.yOffset ?? 0;
         const canvas = canvasRef.current;
 
+        // Neat sizes its drawing buffer from the canvas's CSS box, in CSS
+        // pixels, and its ResizeObserver pins it there: there is no
+        // pixel-ratio option, and a buffer set larger by hand is put back at
+        // the first resize. So on a 2x display every facet edge is drawn at
+        // half resolution and upscaled — which the subtle register hid under
+        // 0.55 opacity and the loud one shows plainly (Francesco, 2026-09-10:
+        // "some shapes are visibly pixelated"). The way round it that survives
+        // Neat's own resize is to give the canvas a CSS box `s` times larger
+        // and scale it back down with a transform: the buffer follows the box,
+        // the box follows the pixel ratio. The aspect is unchanged, so the
+        // camera frames exactly as before and `measureFraming` reads the same
+        // ratio. Capped at 2 — a 3x phone gets 4x the fragments rather than
+        // 9x, and cannot show the difference anyway. Hero and card only: the
+        // dividers stay in the subtle register, where 1x is invisible and
+        // fill rate is better spent.
+        const applyRenderScale = () => {
+            if (!usesPose) return;
+            const s = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+            const box = `${100 * s}%`;
+            canvas.style.width = box;
+            if (isHero) {
+                canvas.style.height = `${100 * s}vh`;
+                canvas.style.minHeight = box;
+            } else {
+                canvas.style.height = box;
+            }
+            canvas.style.transform = s === 1 ? "" : `scale(${1 / s})`;
+            canvas.style.transformOrigin = "0 0";
+        };
+        applyRenderScale();
+
         // The hero is the only variant that persists across a client-side
         // navigation (`transition:persist` at the call sites), so it is the only
         // one whose pose can change while the instance is alive.
-        let pose = poseKey ? poseForKey(poseKey) : poseForPath(window.location.pathname);
+        // The register is read at the same three moments as the pose: compile,
+        // swap, and — for the A/B dev panel, which flips the assignment on
+        // <html> in place — whenever that attribute changes.
+        let tone: HeroTone = isHero ? declaredTone(canvas) : "subtle";
+        let pose = poseKey ? poseForKey(poseKey) : poseForPath(window.location.pathname, tone);
 
         // The camera offsets above are composed for a wide canvas. On a phone the
         // frustum is less than half as wide, so the same offset lands the camera
@@ -528,6 +597,38 @@ export function NeatBackground({
             poseRaf = requestAnimationFrame(step);
         };
 
+        // The register, applied the way the pose is. Opacity is written on the
+        // canvas and rides the CSS transition declared on it; brightness and
+        // saturation are live uniforms on the instance (accessors that mark the
+        // uniform block dirty) and tween per frame on the pose's clock. The
+        // canvas is the single writer of its own opacity — the JSX below sets
+        // the subtle value once and never changes it, so a re-render cannot
+        // fight this.
+        let toneRaf = 0;
+        const applyTone = (next: HeroTone, animate: boolean) => {
+            cancelAnimationFrame(toneRaf);
+            tone = next;
+            canvas.style.opacity = String(HERO_TONES[next].opacity);
+            if (!neat) return;
+            const target = toneColour(next);
+            if (!animate) {
+                neat.colorBrightness = target.colorBrightness;
+                neat.colorSaturation = target.colorSaturation;
+                return;
+            }
+            const from = { colorBrightness: neat.colorBrightness, colorSaturation: neat.colorSaturation };
+            let startedAt = 0;
+            const step = () => {
+                if (!neat) return;
+                if (startedAt === 0) startedAt = performance.now();
+                const k = easeInOutCubic(Math.min(1, (performance.now() - startedAt) / POSE_TWEEN_MS));
+                neat.colorBrightness = from.colorBrightness + (target.colorBrightness - from.colorBrightness) * k;
+                neat.colorSaturation = from.colorSaturation + (target.colorSaturation - from.colorSaturation) * k;
+                if (k < 1) toneRaf = requestAnimationFrame(step);
+            };
+            toneRaf = requestAnimationFrame(step);
+        };
+
         // Compiling the shaders costs 600-1000ms of main thread on a throttled
         // phone. Astro's `client:idle` schedules this for the first idle moment,
         // which is precisely the gap where the hero headline is trying to paint —
@@ -540,9 +641,14 @@ export function NeatBackground({
             if (usesPose) {
                 // Read the pose at compile time, not at mount: a reader can navigate
                 // away before the gradient is eligible, and the seat that matters is
-                // the one for the page they are on now. The tone likewise.
+                // the one for the page they are on now. The register likewise.
                 measureFraming();
-                if (isHero) Object.assign(config, toneColour(toneRef.current));
+                if (isHero) {
+                    tone = declaredTone(canvas);
+                    pose = poseKey ? poseForKey(poseKey) : poseForPath(window.location.pathname, tone);
+                    Object.assign(config, toneColour(tone));
+                    canvas.style.opacity = String(HERO_TONES[tone].opacity);
+                }
                 Object.assign(config, {
                     cameraX: pose.cameraX * framing,
                     cameraY: pose.cameraY,
@@ -563,7 +669,6 @@ export function NeatBackground({
                 ref: canvas,
                 ...config,
             });
-            neatRef.current = neat;
             scrollHandler?.();
         };
 
@@ -589,6 +694,12 @@ export function NeatBackground({
         const NEAR_VIEWPORT_PX = 600;
         const nearViewport = () => {
             const r = canvas.getBoundingClientRect();
+            // A canvas inside a `display: none` variant container measures 0x0
+            // at the origin, which the test below would call "in view". It is
+            // not; it is the losing arm of an experiment, and compiling it would
+            // spend a second of main thread on a picture nobody can see. Keep
+            // polling instead — the dev panel can flip it visible at any time.
+            if (r.width === 0 || r.height === 0) return false;
             return r.bottom > -NEAR_VIEWPORT_PX && r.top < window.innerHeight + NEAR_VIEWPORT_PX;
         };
 
@@ -644,6 +755,10 @@ export function NeatBackground({
         const onResize = () => {
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
+                // A window dragged to a monitor with a different pixel ratio
+                // fires resize; Neat's observer then re-sizes the buffer to
+                // the new box.
+                applyRenderScale();
                 if (!neat) return;
                 if (usesPose) {
                     measureFraming();
@@ -667,24 +782,43 @@ export function NeatBackground({
         // while the content swaps underneath it.
         const onAfterSwap = () => {
             if (!isHero || cancelled) return;
-            goToPose(poseForPath(window.location.pathname), !prefersReducedMotion);
+            const next = declaredTone(canvas);
+            goToPose(poseForPath(window.location.pathname, next), !prefersReducedMotion);
+            applyTone(next, !prefersReducedMotion);
             // The new page starts at the top, so the parallax offset the old page
             // left behind is stale by exactly its scroll depth.
             scrollHandler?.();
         };
         if (isHero) document.addEventListener("astro:after-swap", onAfterSwap);
 
+        // The A/B dev panel writes the assignment straight onto <html> without
+        // a navigation. A visitor never triggers this — their assignment is
+        // made before first paint and only re-applied after a swap, where the
+        // handler above already reads it.
+        let assignmentObserver: MutationObserver | undefined;
+        if (isHero && "MutationObserver" in window) {
+            assignmentObserver = new MutationObserver(() => {
+                if (cancelled) return;
+                const next = declaredTone(canvas);
+                if (next === tone) return;
+                goToPose(poseForPath(window.location.pathname, next), !prefersReducedMotion);
+                applyTone(next, !prefersReducedMotion);
+            });
+            assignmentObserver.observe(document.documentElement, { attributes: true });
+        }
+
         const teardown = () => {
             cancelled = true;
             clearTimeout(settleTimer);
             clearTimeout(resizeTimer);
             cancelAnimationFrame(poseRaf);
+            cancelAnimationFrame(toneRaf);
+            assignmentObserver?.disconnect();
             removeEventListener("load", scheduleGradient);
             window.removeEventListener("resize", onResize);
             document.removeEventListener("astro:after-swap", onAfterSwap);
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
-            neatRef.current = undefined;
         };
 
         // Scroll parallax is motion too, so reduced-motion viewers keep the still
@@ -723,36 +857,6 @@ export function NeatBackground({
         return teardown;
     }, [variant]);
 
-    // The tone travels the way the camera does. On the first render there is
-    // no instance yet and this is a no-op — the compile above reads `toneRef`
-    // — so this only ever fires for a persisted hero landing on a page that
-    // wants the other register. Both values are live uniforms on the instance
-    // (`colorBrightness` and `colorSaturation` are accessors that mark the
-    // uniform block dirty), so they tween per frame on the same clock as the
-    // pose; the canvas opacity rides a CSS transition of the same length.
-    useEffect(() => {
-        const neat = neatRef.current;
-        if (variant !== "hero" || !neat) return;
-        const target = toneColour(tone);
-        if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-            neat.colorBrightness = target.colorBrightness;
-            neat.colorSaturation = target.colorSaturation;
-            return;
-        }
-        const from = { colorBrightness: neat.colorBrightness, colorSaturation: neat.colorSaturation };
-        let raf = 0;
-        let startedAt = 0;
-        const step = () => {
-            if (startedAt === 0) startedAt = performance.now();
-            const k = easeInOutCubic(Math.min(1, (performance.now() - startedAt) / POSE_TWEEN_MS));
-            neat.colorBrightness = from.colorBrightness + (target.colorBrightness - from.colorBrightness) * k;
-            neat.colorSaturation = from.colorSaturation + (target.colorSaturation - from.colorSaturation) * k;
-            if (k < 1) raf = requestAnimationFrame(step);
-        };
-        raf = requestAnimationFrame(step);
-        return () => cancelAnimationFrame(raf);
-    }, [variant, tone]);
-
     if (variant === "hero") {
         return (
             <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
@@ -785,9 +889,12 @@ export function NeatBackground({
                         // the section's own `overflow: hidden` clips the rest.
                         height: "100vh",
                         minHeight: "100%",
-                        opacity: HERO_TONES[tone].opacity,
-                        // Same length and curve as the pose tween, so a navigation
-                        // between the two registers reads as one move.
+                        // The subtle register's value, and the only one React ever
+                        // writes; the effect owns this property from here on (see
+                        // `applyTone`). The transition is the pose tween's length
+                        // and curve, so a navigation between registers reads as one
+                        // move.
+                        opacity: HERO_TONES.subtle.opacity,
                         transition: `opacity ${POSE_TWEEN_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`,
                         isolation: "isolate",
                     }}

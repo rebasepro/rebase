@@ -53,6 +53,15 @@ class Analytics {
                 this.trackAllExperimentConversions("command_copied");
             }
 
+            // Declared conversions: an element names the action a click on it
+            // counts as, and every live experiment records it. The hero's demo
+            // CTA is a site link (`/demo`), which the demo.rebase.pro matcher
+            // below never sees.
+            const declared = target.closest("[data-ab-conversion]") as HTMLElement | null;
+            if (declared) {
+                this.trackAllExperimentConversions(declared.getAttribute("data-ab-conversion") || "conversion");
+            }
+
             // Demo CTA tracking — every link to demo.rebase.pro
             const demoLink = target.closest('a[href*="demo.rebase.pro"]') as HTMLAnchorElement | null;
             if (demoLink) {

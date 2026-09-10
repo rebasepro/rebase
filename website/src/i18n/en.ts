@@ -5,7 +5,6 @@ export const en = {
   "hero.subtitle":
     "One TypeScript file per collection gives you the schema, the REST API, the typed SDK and the panel. The access rules in that same file compile to Postgres row-level security, so every route, job, script and agent hits the same wall.",
   "hero.cta.demo": "Try the demo",
-  "hero.cta.audit": "Audit your database",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.

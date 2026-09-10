@@ -451,19 +451,23 @@ there once. Do not re-implement any of them inline on a page.
   (`height: 600px` with `-my-72`, `z-index: -1`, `.neat-divider`) so the canvas
   passes behind the neighbouring sections and leaves no seam. Every instance
   shares one palette and `textureSeed`; only the camera differs.
-- **Two registers, and the home hero is in the loud one.** The gradient is
-  drawn either *subtle* (a quarter brightness, the canvas at 0.55 — every deep
-  page's hero and every divider) or *loud* (full brightness, saturation past 1,
-  full opacity — the blog's artwork and, since 2026-09-10, the home hero).
-  `tone="loud"` on `NeatBackground` selects it, and because the hero canvas
-  persists across navigations the colour tweens between the two on the way to
-  the next page, alongside the camera. In the loud register the art is the
-  picture and legibility is the page's job: the band above the badge is
-  unobstructed, the headline sits on a half scrim with a shadow, the reading
-  copy and the terminal sit on page ground (`.hero-scrim`, whose stops differ
-  above and below `lg` because the stacked layout moves the copy up the band).
-  The multiply pass the hero used to run over the type is gone with it — at
-  full brightness it tinted the letterforms rather than modulating them.
+- **Two registers, and the home hero is under test between them.** The
+  gradient is drawn either *subtle* (a quarter brightness, the canvas at 0.55
+  — every deep page's hero and every divider) or *loud* (full brightness,
+  saturation past 1, full opacity — the blog's artwork). Since 2026-09-10 the
+  home hero runs the `hero-register` experiment (scripts/ab-testing.ts):
+  `control` is the subtle hero as it was, with the multiply pass over the
+  type; `loud` is the blog's register on
+  the home page — the art is the picture and legibility is the page's job: the
+  band above the badge is unobstructed and taller, the headline sits on a half
+  scrim with a shadow, the reading copy and the terminal sit on page ground
+  (`.hero-scrim`, whose stops differ above and below `lg` because the stacked
+  layout moves the copy up the band). Neither arm has a divider under the
+  logo wall any more: it read as a weaker copy of the hero's art.
+  The register is declared on the canvas's wrapper (`data-neat-tone`, or the
+  experiment via `data-neat-tone-experiment`) and, because the hero canvas
+  persists across navigations, the colour tweens between the two on the way
+  to the next page, alongside the camera.
 - **Four grounds, and the ground says what kind of thing you are reading.** Every
   section sits on one of them; nothing is left to look picked.
 
@@ -474,7 +478,7 @@ there once. Do not re-implement any of them inline on a page.
   | **LIT** Neat | transition | the hero and the dividers, where the page changes subject. The only register with the full palette. |
   | **CHROMA** flat hue | remember this | twice, and only twice. |
 
-  Which gives the page a shape: `LIT · BASE · RAISED RAISED [BLUE] BASE · LIT ·
+  Which gives the page a shape: `LIT · BASE RAISED RAISED [BLUE] BASE · LIT ·
   BASE RAISED BASE · [CORAL]`.
 
 - **The two chroma sections are the claim and the close, and they are not

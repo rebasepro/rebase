@@ -1,5 +1,6 @@
 ---
 import { NeatBackground } from "../NeatBackground";
+import ABVariant from "../ABVariant.astro";
 import CollectionPowerSection from "../CollectionPowerSection.astro";
 import ClientLogos from "../ClientLogos.astro";
 import PolicyPathsFigure from "../PolicyPathsFigure.astro";
@@ -50,39 +51,43 @@ const SELFHOST_COMMAND = "docker compose up -d";
         ============================================================ */}
 
         <!-- ============================================================
-             HERO — Neat is the picture, not the wallpaper.
-             The canvas runs in the loud register the blog uses (full
-             brightness, full opacity) and the band is split the way a blog
-             hero is: art behind the nav and the headline, a scrim under the
-             reading copy and the terminal so they sit on page ground. The
-             headline is the only type laid over the art, and it carries a
-             shadow for that.
+             HERO — under test as `hero-register` (scripts/ab-testing.ts).
+             control: Neat is composition, not wallpaper — the art dimmed to a
+             quarter and held at 0.55 behind the type, a second pass of the
+             same canvas multiplying over the letterforms.
+             loud: Neat is the picture — the blog's register (full brightness,
+             full opacity), the band split the way a blog hero is: art behind
+             the nav and a taller band above the headline, a scrim under the
+             reading copy and the terminal, a shadow under the headline.
+             One section, one hero canvas. The canvas reads its register from
+             the wrapper (`data-neat-tone-experiment`); the padding is
+             `.hero-home` in global.css; the rest is <ABVariant>.
              ============================================================ -->
-        {/* The vertical budget moved up when the art went loud (2026-09-10).
-            The band above the headline is the picture now — the one place on
-            the page the gradient is seen unobstructed — so it gets 96px more
-            than it had; the strip under the terminal is page ground under the
-            scrim and reads as the page having stopped, so it gives 48px back.
-
-            Top padding is still bounded by the fold on a 1440x900 window — the
-            smallest laptop size that still matters here. Re-measured at pt-52:
-            the CTA row bottoms out at ~775px and the terminal at ~812px, both
-            clear of the fold. */}
         {/* `hero-under-nav` starts the section behind the transparent bar so the
             Neat canvas fills that band too (global.css). The top scale it comes
-            with is the site's — this hero keeps its own tighter one, measured
-            above, so it overrides `padding-top` and inherits only the pull-up.
-            The header's height is added back here for the same reason the shared
-            class adds it: the negative margin has to be paid for, or every line
-            below rides 60px too high. */}
-        <section class="relative isolate overflow-hidden flex items-center hero-under-nav pt-[calc(--spacing(52)+var(--header-h))] pb-12 sm:pb-16">
-            <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
-                <NeatBackground client:idle transition:persist="neat-hero" tone="loud" />
+            with is the site's — this hero keeps its own, per register, in
+            `.hero-home`, which sits after it in the components layer and so
+            wins. Both scales add the header's height back for the same reason
+            the shared class does: the negative margin has to be paid for, or
+            every line below rides 60px too high. Both are bounded by the fold
+            on a 1440x900 window, the smallest laptop size that still matters:
+            in the loud register the terminal bottoms out at ~812px. */}
+        <section class="hero-home relative isolate overflow-hidden flex items-center hero-under-nav">
+            {/* The wrapper is the page's element and declares the register;
+                the island inside it persists across pages and reads it. */}
+            <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true"
+                 data-neat-tone="subtle" data-neat-tone-experiment="hero-register">
+                <NeatBackground client:idle transition:persist="neat-hero" />
             </div>
-            <!-- Same z-index as the canvas, later in the DOM, so it paints over
-                 the art and under everything else. The stops live in global.css
-                 next to the register they serve. -->
-            <div class="hero-scrim absolute inset-0 -z-10 pointer-events-none" aria-hidden="true"></div>
+            <!-- control: the multiply pass over the type. Hidden in the loud arm,
+                 where NeatBackground sees a 0x0 canvas and never compiles it. -->
+            <ABVariant experiment="hero-register" variant="control" class="neat-over absolute inset-0 pointer-events-none">
+                <NeatBackground client:idle transition:persist="neat-hero-over" />
+            </ABVariant>
+            <!-- loud: the scrim. Same z-index as the canvas, later in the DOM, so
+                 it paints over the art and under everything else. The stops
+                 live in global.css next to the register they serve. -->
+            <ABVariant experiment="hero-register" variant="loud" class="hero-scrim absolute inset-0 -z-10 pointer-events-none" />
 
             {/* The headline is full width and the row beneath it is the split,
                 rather than the headline living in one half. At display-1 a
@@ -105,7 +110,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             which differs per locale. `leading-[1.02]` is gone:
                             `text-display-1` carries its own 0.94, and the two
                             were fighting. */}
-                        <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 text-balance [text-shadow:0_2px_30px_rgba(0,0,0,.55)]">
+                        <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 text-balance">
                             <span class="hero-line">{t("hero.title.part1")}</span>
                             <span class="hero-line">{t("hero.title.part2")}</span>
                         </h1>
@@ -118,22 +123,15 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         <p class="max-w-[34rem] text-base sm:text-lg leading-relaxed text-[#b4b8bd]">
                             {t("hero.subtitle")}
                         </p>
-                        {/* The second CTA is the audit, not the docs. It is the
-                            one thing on the page a stranger can run against
-                            their own database in a minute without an account,
-                            and the close already carries a docs button. */}
                         <div class="mt-8 flex flex-wrap items-center gap-3">
+                            {/* The click every arm of an experiment counts as a
+                                conversion (analytics.ts reads the attribute). */}
                             <a
                                 href={translatePath("/demo")}
+                                data-ab-conversion="hero_cta_click"
                                 class="inline-flex items-center justify-start gap-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             >
                                 {t("hero.cta.demo")}
-                            </a>
-                            <a
-                                href={translatePath("/rls-check")}
-                                class="inline-flex items-center justify-start gap-2 rounded-lg border border-white/15 px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:border-white/35"
-                            >
-                                {t("hero.cta.audit")}
                             </a>
                         </div>
                     </div>
@@ -196,8 +194,8 @@ const SELFHOST_COMMAND = "docker compose up -d";
 
         <!-- Logo wall — the short beat, straight after the tallest one.
              `border-t` only: chapter 01 below opens with its own border-t at
-             white/8, and now that the divider between them occupies no flow the
-             two rules touch and paint as one 2px line. -->
+             white/8, and nothing sits between them, so the two rules would
+             touch and paint as one 2px line. -->
         <div class="border-t border-white/5 py-strip">
             {/* The caption is the qualifier PRODUCT.md mandates — and, since
                 2026-09-02, the heritage argument: FireCMS's 10,000+ projects are
@@ -207,17 +205,12 @@ const SELFHOST_COMMAND = "docker compose up -d";
             <ClientLogos />
         </div>
 
-        <!-- ============================================================
-             NEAT DIVIDER → chapter 01. The strip is the real canvas; the
-             chapter below inherits its cyan on rules, eyebrow and link.
-             ============================================================ -->
-        <!-- Neat gradient divider, bled behind the sections either side.
-             `--divider-h` is the only number here: .neat-divider derives the box
-             and the margins that cancel it out of the flow. -->
-        <div class="neat-divider relative pointer-events-none overflow-hidden"
-             style="z-index: -1; --divider-h: 600px;">
-            <NeatBackground variant="b" client:visible />
-        </div>
+        <!-- No divider between the wall and chapter 01, in either arm of the
+             hero experiment. There was one — the faded register, bled behind
+             both — and it read as a second, weaker copy of the hero's art
+             peeking out from under the logos (Francesco, 2026-09-10: "remove
+             the gradient behind the logos"). The wall sits on bare ground; the
+             next divider is chapter 03's. -->
 
         <!-- CHAPTER 01 — MECHANISM. The collection file in the middle and the
              five artifacts it fans out to. -->
@@ -435,10 +428,16 @@ const SELFHOST_COMMAND = "docker compose up -d";
                          without it. -->
                     <h3 class="mt-block font-headers text-2xl sm:text-3xl text-balance">{t("panel.title")}</h3>
                     <p class="mt-lead max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
-                    {/* No `.frame`: the carousel draws its own browser chrome, and
+                    {/* No `.frame`: the carousel draws the panel's own edge, and
                         §6 allows a demo one frame, not two. The view toggle is page
-                        furniture and sits outside the product's edge. */}
-                    <div class="mt-block animate-on-scroll fade-in-up">
+                        furniture and sits outside the product's edge.
+
+                        `lg:bleed-x`: the panel is the two-pane view the bleed
+                        doctrine's second test is written for — a list beside a
+                        record, where every extra pixel is another field on the
+                        form. A capped step past both gutters, so the frame reads
+                        as the product and not as a figure in the column. */}
+                    <div class="mt-block lg:bleed-x animate-on-scroll fade-in-up">
                         <AdminDemoCarousel client:visible height={620} />
                     </div>
                     <div class="mt-block grid grid-cols-1 md:grid-cols-3 border-t border-white/8">

@@ -287,10 +287,14 @@
 
    WHICH DEMOS. Two tests, both about the content, and a demo has to pass both:
 
-     1. The layout NARROWED it. A demo already spanning the full shell must not
-        bleed — it would move its LEFT edge off the shell too, and that edge has
-        to agree with the copy above it. Only side-column demos qualify: the
-        bleed gives back width the grid took, it does not grant new width.
+     1. The layout NARROWED it, or the frame is the product itself. A demo that
+        gave up width to a grid cell takes it back with `bleed-right`, which
+        never moves its left edge. A demo already spanning the shell — the panel
+        carousel — takes `bleed-x` instead: a SMALL, capped step past both
+        gutters, so the frame reads as wider than the reading column while
+        still sitting under its own heading. The cap is what keeps that true;
+        an uncapped symmetric bleed would put the left edge halfway across the
+        gutter from the heading, and the two would stop looking related.
 
      2. The content WANTS the width. 03's policy editor and 07's agent console
         are two-pane views whose right pane is the payload — every extra pixel
@@ -312,6 +316,14 @@
    frame is; a control or a line of text would not be. */
 @utility bleed-right {
     margin-right: calc(-1 * max(0px, (100vw - 72rem) / 2 - 1.5rem));
+}
+
+/* The capped symmetric step. `min(…, 4rem)` is the cap from test 1: the frame
+   moves far enough past the shell to read as the product rather than as a
+   figure in the column, and not so far that it loses its heading. Below 72rem
+   the gutter is negative, `max(0px, …)` returns 0 and this is a no-op. */
+@utility bleed-x {
+    margin-inline: calc(-1 * min(4rem, max(0px, (100vw - 72rem) / 2 - 1.5rem)));
 }
 
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with
@@ -782,8 +794,52 @@
     .terminal-caret { animation: none; }
 }
 
+/* A second pass of the Neat canvas over the type, multiplying at low opacity:
+   the ribbon darkens the letterforms where it crosses them and leaves them
+   alone everywhere else. The subtle register's device; at full brightness it
+   would tint the type rather than modulate it, so the loud register drops it.
+   Stacking two copies of the TEXT cannot work: the upper copy's backdrop is
+   the solid copy beneath it. */
+@utility neat-over {
+    mix-blend-mode: multiply;
+    opacity: 0.42;
+}
+
+/* ── The home hero's two registers ──────────────────────────────────────────
+   Under test as `hero-register` (scripts/ab-testing.ts). `control` is the
+   hero as it was; `loud` is the blog's register on the home page. What
+   differs in CSS is the vertical budget and the headline's shadow: in the
+   loud register the band above the headline is the picture, so it takes 96px
+   more, and the strip under the terminal — page ground under the scrim, which
+   reads as the page having stopped — gives 48px back. The scrim and the
+   multiply pass are <ABVariant> containers in the markup; the canvas's own
+   register is read by NeatBackground.
+
+   `components`, after `.hero-under-nav`, so this scale wins over the shared
+   one at equal specificity. */
+@layer components {
+    .hero-home {
+        padding-top: calc(--spacing(28) + var(--header-h));
+        padding-bottom: --spacing(24);
+    }
+    @media (min-width: 40rem) {
+        .hero-home { padding-bottom: --spacing(28); }
+    }
+    html[data-ab-hero-register="loud"] .hero-home {
+        padding-top: calc(--spacing(52) + var(--header-h));
+        padding-bottom: --spacing(12);
+    }
+    @media (min-width: 40rem) {
+        html[data-ab-hero-register="loud"] .hero-home { padding-bottom: --spacing(16); }
+    }
+    html[data-ab-hero-register="loud"] .hero-home h1 {
+        text-shadow: 0 2px 30px rgb(0 0 0 / 0.55);
+    }
+}
+
 /* The ground under the type when a hero's canvas runs in the loud register
-   (`tone="loud"` on NeatBackground — full brightness, full opacity). Nothing
+   (`data-neat-tone="loud"` on the canvas wrapper, or the loud arm of an
+   experiment — full brightness, full opacity). Nothing
    at the top, so the art is the picture behind the nav and the badge; page
    ground at the bottom, so the paragraph, the CTAs and the terminal sit on the
    same surface as the section after them and the seam is invisible.
