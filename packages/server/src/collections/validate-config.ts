@@ -1,7 +1,8 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
-import type { CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
+import type { AnyCollectionConfig, CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
 
 import { getEffectiveSecurityRules, getTableName, isRelationalCollection, securityRuleToConditions } from "@rebasepro/common";
+import type { DataSourceResolvable } from "@rebasepro/common";
 import { suggestNearMiss } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
@@ -1127,6 +1128,50 @@ const TENANT_FIELD_TYPES = new Set(["string", "number", "reference", "relation"]
  *   claims hook cannot assert them. A tenancy rule reading `uid` as a tenant
  *   would compile and would mean something nobody intended.
  */
+/**
+ * The collection object read as a config, for the two helpers that want a whole
+ * one.
+ *
+ * This module runs *before* anything has turned the user's config into a
+ * `CollectionConfig` — that is what it is for — so what it holds is an open
+ * record, and `getTableName` and `getEffectiveSecurityRules` are both typed on
+ * the finished type. Nothing structural bridges the two, so the conversion is
+ * irreducible here; what it should not be is scattered, which is how two call
+ * sites came to spell it `as unknown as CollectionConfig` independently.
+ *
+ * Both helpers read fields this module has already checked by the time they are
+ * called, and both are total on a record that is missing them — `getTableName`
+ * falls back through `slug` to `name` to `""`, and an absent `securityRules` is
+ * an empty rule list. Prefer {@link dataSourceOf} where only the routing fields
+ * are wanted: it checks them instead of claiming them.
+ */
+function asCollectionConfig(collection: Record<string, unknown>): AnyCollectionConfig {
+    return collection as unknown as AnyCollectionConfig;
+}
+
+/**
+ * The three fields {@link isRelationalCollection} reads, taken off a collection
+ * object this module has not finished validating.
+ *
+ * `isRelationalCollection` wants a `DataSourceResolvable` —
+ * `{ dataSource?: string; engine?: string; databaseId?: string }` — and what
+ * this file holds is a `Record<string, unknown>` straight out of the user's
+ * config, whose values are `unknown`. The call sites answered that mismatch
+ * with `collection as unknown as CollectionConfig`, which names a type nothing
+ * here asks for and asserts far more than the question needs: a config
+ * declaring `engine: 42` was read as an engine and routed on.
+ *
+ * Checking the three is what this module is for.
+ */
+function dataSourceOf(collection: Record<string, unknown>): DataSourceResolvable {
+    const text = (value: unknown): string | undefined => typeof value === "string" ? value : undefined;
+    return {
+        dataSource: text(collection.dataSource),
+        engine: text(collection.engine),
+        databaseId: text(collection.databaseId)
+    };
+}
+
 function checkTenant(
     collection: Record<string, unknown>,
     at: string,
@@ -1140,7 +1185,7 @@ function checkTenant(
         return;
     }
 
-    if (!isRelationalCollection(collection as unknown as CollectionConfig)) {
+    if (!isRelationalCollection(dataSourceOf(collection))) {
         collect.error(
             `${at}.tenant`,
             "`tenant` is Postgres-only: row-level security is what enforces the boundary, and an " +
@@ -1291,7 +1336,7 @@ function checkPrimaryKeyStrategy(
     collect: ProblemCollector
 ): void {
     if (!isPlainObject(collection.properties)) return;
-    if (!isRelationalCollection(collection as unknown as CollectionConfig)) return;
+    if (!isRelationalCollection(dataSourceOf(collection))) return;
 
     const ids = Object.entries(collection.properties)
         .filter(([, property]) => isPlainObject(property) && Boolean(property.isId))
@@ -1555,7 +1600,7 @@ function checkCollectionsTogether(
             if (seen) seen.push(index); else bySlug.set(slug, [index]);
         }
 
-        const table = getTableName(collection as unknown as CollectionConfig);
+        const table = getTableName(asCollectionConfig(collection));
         if (!table) return;
         const schema = typeof collection.schema === "string" && collection.schema ? collection.schema : "public";
         const qualified = `${schema}.${table}`;
@@ -1720,7 +1765,7 @@ function checkTenantMemberships(
             continue;
         }
 
-        if (!isRelationalCollection(target as unknown as CollectionConfig)) {
+        if (!isRelationalCollection(dataSourceOf(target))) {
             collect.error(
                 `${path}.collection`,
                 `'${slug}' is not stored in Postgres, so there is no table for the tenancy policy's ` +
@@ -1740,7 +1785,7 @@ function checkTenantMemberships(
             );
         }
 
-        if (!grantsSelfRead(target as unknown as CollectionConfig, userField)) {
+        if (!grantsSelfRead(asCollectionConfig(target), userField)) {
             collect.error(
                 `${path}.collection`,
                 `'${slug}' does not let a signed-in caller read their own membership rows, and the ` +

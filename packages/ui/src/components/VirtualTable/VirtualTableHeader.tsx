@@ -31,7 +31,7 @@ export type FilterFormFieldProps<CustomProps> = {
     setHidden: (hidden: boolean) => void;
 };
 
-type VirtualTableHeaderProps<M extends Record<string, unknown>> = {
+type VirtualTableHeaderProps<M extends object> = {
     resizeHandleRef: React.Ref<HTMLDivElement>;
     columnIndex: number;
     isResizingIndex: number;
@@ -67,7 +67,7 @@ function sortActionTitle(sort: VirtualTableSort, sortPosition?: number): string 
 }
 
 export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<string, unknown>>>(
-    function VirtualTableHeader<M extends Record<string, unknown>>({
+    function VirtualTableHeader<M extends object>({
         resizeHandleRef,
         columnIndex,
         isResizingIndex,

@@ -19,6 +19,23 @@ import { ErrorBoundary } from "@rebasepro/ui";
  *
  * @group Hooks
  */
+/**
+ * Are these two prop objects the same, one level down?
+ *
+ * Its own function so the comparison can be typed on `object` rather than on
+ * the slot's props. `SlotRegistry[K]` is a union of interfaces, and an
+ * interface has no implicit index signature, so reading it as
+ * `Record<string, unknown>` — which the loop this replaces did, to both
+ * arguments — is a conversion tsc refuses and `as unknown as` was suppressing.
+ * `Object.keys` needs no such claim.
+ */
+function shallowEqual(a: object, b: object): boolean {
+    if (a === b) return true;
+    const keys = Object.keys(a);
+    if (keys.length !== Object.keys(b).length) return false;
+    return keys.every((key) => a[key as keyof typeof a] === b[key as keyof typeof b]);
+}
+
 export function useSlot<K extends SlotName>(
     slot: K,
     props: SlotRegistry[K]
@@ -26,26 +43,7 @@ export function useSlot<K extends SlotName>(
     const { resolvedSlots } = useCustomizationController();
 
     const propsRef = React.useRef(props);
-    const currentProps = props as unknown as Record<string, unknown>;
-    const prevProps = propsRef.current as unknown as Record<string, unknown>;
-
-    let changed = false;
-    if (currentProps !== prevProps) {
-        const keys = Object.keys(currentProps);
-        const prevKeys = Object.keys(prevProps);
-        if (keys.length !== prevKeys.length) {
-            changed = true;
-        } else {
-            for (let i = 0; i < keys.length; i++) {
-                if (currentProps[keys[i]] !== prevProps[keys[i]]) {
-                    changed = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (changed) {
+    if (!shallowEqual(props, propsRef.current)) {
         propsRef.current = props;
     }
 
@@ -66,10 +64,10 @@ export function useSlot<K extends SlotName>(
                 // `ComponentType<any>` — which is what turns a component
                 // written against the wrong slot's props into an error where
                 // it is registered, rather than `undefined` at render.
-                const Component = s.Component as unknown as React.ComponentType<Record<string, unknown>>;
+                const Component = s.Component as React.ComponentType<SlotRegistry[K]>;
                 return (
                     <ErrorBoundary key={`${slot}_${i}`}>
-                        <Component {...(stableProps as unknown as Record<string, unknown>)} {...(s.props ?? {})}/>
+                        <Component {...stableProps} {...(s.props ?? {})}/>
                     </ErrorBoundary>
                 );
             });

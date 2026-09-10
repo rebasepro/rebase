@@ -15,7 +15,7 @@ import type { FilterFormFieldProps } from "./VirtualTableHeader";
  */
 export type VirtualTableSortKey = [string, "asc" | "desc", ("first" | "last")?];
 
-export type OnRowClickParams<T extends Record<string, unknown>> = {
+export type OnRowClickParams<T extends object> = {
     rowData: T;
     rowIndex: number;
     event: React.SyntheticEvent
@@ -25,7 +25,7 @@ export type OnRowClickParams<T extends Record<string, unknown>> = {
  * @see Table
  * @group Components
  */
-export interface VirtualTableProps<T extends Record<string, unknown>> {
+export interface VirtualTableProps<T extends object> {
 
     /**
      * Array of arbitrary data

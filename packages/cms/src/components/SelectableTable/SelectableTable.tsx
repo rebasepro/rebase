@@ -180,10 +180,10 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         setItemCount?.(pageSize);
     }, [pageSize]);
 
-    const onRowClick = useCallback(({ rowData }: OnRowClickParams<Record<string, unknown>>) => {
+    const onRowClick = useCallback(({ rowData }: OnRowClickParams<Entity<M>>) => {
         if (inlineEditing)
             return;
-        return onEntityClick && onEntityClick(rowData as unknown as Entity<M>);
+        return onEntityClick && onEntityClick(rowData);
     }, [onEntityClick, inlineEditing]);
 
     const select = useCallback((cell?: SelectedCellProps<M>) => {
@@ -271,9 +271,9 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                 ref={ref}>
 
                  <VirtualTable
-                    data={data as unknown as Record<string, unknown>[]}
+                    data={data}
                     columns={columns}
-                    cellRenderer={(props) => cellRenderer(props as unknown as CellRendererParams<Entity<M>>)}
+                    cellRenderer={cellRenderer}
                     onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}
                     onEndReached={loadNextPage}
                     onResetPagination={resetPagination}
@@ -281,7 +281,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     onColumnResize={onColumnResize}
                     rowHeight={getRowHeight(size)}
                     loading={dataLoading}
-                    filter={filterValues as any}
+                    filter={filterValues}
                     onFilterUpdate={setFilterValues ? onFilterUpdate : undefined}
                     sortBy={sortBy}
                     onSortByUpdate={setSortBy as ((sortBy?: VirtualTableSortKey[]) => void)}
@@ -290,8 +290,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     onScroll={onScroll}
                     checkFilterCombination={checkFilterCombination}
                     createFilterField={filterable ? createFilterField : undefined}
-                    rowClassName={useCallback((entity: Record<string, unknown>) => {
-                        return highlightedRow?.(entity as unknown as Entity<M>) ? "!bg-surface-raised" : "";
+                    rowClassName={useCallback((entity: Entity<M>) => {
+                        return highlightedRow?.(entity) ? "!bg-surface-raised" : "";
                     }, [highlightedRow])}
                     className="grow"
                     emptyComponent={emptyComponent}

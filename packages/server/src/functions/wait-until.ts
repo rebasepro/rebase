@@ -29,7 +29,6 @@
  */
 import type { Context } from "hono";
 import { logger } from "../utils/logger";
-import { unref } from "@rebasepro/utils";
 
 /**
  * Pending background work, on a process-global slot for the reason given in
@@ -149,7 +148,19 @@ export async function drainBackgroundWork(timeoutMs = 5_000): Promise<number> {
     const expired = new Promise<"timeout">(resolve => {
         timer = setTimeout(() => resolve("timeout"), timeoutMs);
         // Do not hold the event loop open just to observe a deadline.
-        unref(timer);
+        //
+        // Written out rather than calling `unref` from `@rebasepro/utils`,
+        // which is what every other caller in the repository does. This file is
+        // in the portable graph — `functions/index.ts` re-exports `waitUntil`
+        // from it — and that graph may import `hono` and nothing else, a
+        // runtime contract rather than a dependency list (see
+        // `functions/portability.test.ts`). `unref` is Node's; the browser and
+        // workerd timer handles are numbers and have none, which is why the
+        // check is `typeof === "object"` rather than a cast.
+        if (timer !== undefined && typeof timer === "object") {
+            const release = (timer as { unref?: unknown }).unref;
+            if (typeof release === "function") (release as () => void).call(timer);
+        }
     });
 
     try {

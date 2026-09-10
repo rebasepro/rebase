@@ -110,7 +110,7 @@ zIndex: 20 }}>
  * @group Components
  */
 const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>(
-    function VirtualTable<T extends Record<string, unknown>>({
+    function VirtualTable<T extends object>({
         data,
         onResetPagination,
         onEndReached,
@@ -472,7 +472,7 @@ position });
  * implementation always had. Runtime behaviour is unchanged — this is the same
  * memoized component under a type that describes it.
  */
-export const VirtualTable = VirtualTableInner as <T extends Record<string, unknown>>(
+export const VirtualTable = VirtualTableInner as <T extends object>(
     props: VirtualTableProps<T>
 ) => React.ReactElement | null;
 // Wrapper that applies sortable transforms to cells
@@ -584,7 +584,7 @@ function MemoizedList({
                     </div>;
                 }
 
-                const rowData = (data ? data[index] : undefined) as Record<string, unknown>;
+                const rowData = data ? data[index] : undefined;
                 return (
                     <VirtualTableRow
                         key={`row_${index}`}
@@ -601,7 +601,18 @@ function MemoizedList({
                         rowHeight={rowHeight}>
 
                         {columns.map((column: VirtualTableColumn, columnIndex: number) => {
-                            const cellData = rowData && rowData[column.key];
+                            // The one place the row is read by key, and the one
+                            // cast for it. `T` is constrained to `object`
+                            // rather than `Record<string, unknown>` because an
+                            // `interface` — `Entity`, every consumer's row type
+                            // — has no implicit index signature and so does not
+                            // satisfy the latter. Constraining it there did not
+                            // make this read safe; it pushed an
+                            // `as unknown as Record<string, unknown>` onto every
+                            // caller, on the data going in AND on each callback
+                            // coming back out, which is four of them in
+                            // `SelectableTable` alone.
+                            const cellData = rowData && (rowData as Record<string, unknown>)[column.key];
                             const isDragging = draggingColumnId === column.key;
                             const isDraggable = !column.frozen && !!onColumnsOrderChange;
 
