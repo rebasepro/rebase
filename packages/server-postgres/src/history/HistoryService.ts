@@ -9,6 +9,7 @@ export type {
     HistoryRetentionConfig
 } from "@rebasepro/types";
 import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
+import { firstSqlRow, sqlRows } from "@rebasepro/common";
 
 /**
  * A Postgres history row is already the wire shape — `updated_at` comes back
@@ -157,7 +158,7 @@ export class HistoryService {
         );
 
         return {
-            data: dataResult.rows as unknown as HistoryEntry[],
+            data: sqlRows<HistoryEntry>(dataResult),
             total
         };
     }
@@ -173,8 +174,7 @@ export class HistoryService {
             WHERE id = ${historyId}
         `);
 
-        if (result.rows.length === 0) return null;
-        return result.rows[0] as unknown as HistoryEntry;
+        return firstSqlRow<HistoryEntry>(result) ?? null;
     }
 
     // ───────── Retention / Pruning ─────────

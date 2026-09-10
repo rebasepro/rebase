@@ -1,6 +1,6 @@
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { revokeInternalTableSql } from "@rebasepro/common";
+import { revokeInternalTableSql, sqlRows, firstSqlRow } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper, hasInCauseChain, type SqlExec } from "../boot/ddl-bootstrap.js";
 import type { JobRecord } from "./types.js";
@@ -230,7 +230,7 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                  RETURNING *`,
                 [limit, workerId]
             );
-            return (rows as unknown as JobRow[]).map(toRecord);
+            return sqlRows<JobRow>(rows).map(toRecord);
         },
 
         async complete(id: string): Promise<void> {
@@ -300,7 +300,7 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
 
         async fetch(id: string): Promise<JobRecord | null> {
             const rows = await exec(`SELECT * FROM ${TABLE} WHERE id = $1`, [id]);
-            const row = (rows as unknown as JobRow[])[0];
+            const row = firstSqlRow<JobRow>(rows);
             return row ? toRecord(row) : null;
         }
     };

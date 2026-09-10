@@ -205,6 +205,29 @@ function generateOfflineNumericId(): number {
 type AnyRow = Record<string, unknown>;
 type InnerFactory = (slug: string) => SDKCollectionClient<AnyRow>;
 
+/**
+ * The row an optimistic write puts in the cache before the server has seen it.
+ *
+ * It is NOT an `M`, and saying so is the point of collecting this in one place.
+ * `M` is the row as the database has it — every server default, every generated
+ * column, every `afterRead` transform. What an optimistic write has is the
+ * fields the caller supplied (plus, on an update, whatever was already cached)
+ * and an id, which may itself be a locally-minted placeholder.
+ *
+ * The two are reconciled when the queued write drains and the server's row
+ * replaces this one. Until then the SDK hands the caller this, under `M`,
+ * because that is what the offline API's return type promises — and there is
+ * nothing in this file that can make that promise true.
+ *
+ * So: one deliberate assertion, named, rather than five spread across the
+ * create / createMany / update / upsert paths, each free to assemble the fields
+ * differently. Fixing it properly means the offline surface saying what it
+ * actually returns, which is a change to its public types.
+ */
+function optimisticRow<M>(fields: AnyRow, id: string | number): M {
+    return { ...fields, id } as unknown as M;
+}
+
 /** What the server said about one query, as ids into the local row database. */
 interface QuerySnapshot {
     ids: (string | number)[];
@@ -563,7 +586,7 @@ export class OfflineManager {
                 }
                 const providedId = id ?? (data as AnyRow).id as string | number | undefined;
                 const rowId = providedId ?? this.mintOfflineId(slug);
-                const row = { ...(data as AnyRow), id: rowId } as unknown as M;
+                const row = optimisticRow<M>(data as AnyRow, rowId);
                 await this.enqueue({
                     collection: slug,
                     type: "create",
@@ -599,10 +622,8 @@ export class OfflineManager {
                         this.connectivity.markFailure();
                     }
                 }
-                const rows = data.map((r) => ({
-                    ...(r as AnyRow),
-                    id: (r as AnyRow).id ?? this.mintOfflineId(slug)
-                })) as unknown as M[];
+                const rows = data.map((r) =>
+                    optimisticRow<M>(r as AnyRow, ((r as AnyRow).id as string | number) ?? this.mintOfflineId(slug)));
                 const rollback: Record<string, AnyRow | null> = {};
                 for (const row of rows) {
                     const key = String(row.id);
@@ -655,7 +676,7 @@ export class OfflineManager {
                         { code: "OFFLINE_UPSERT_UNSUPPORTED" }
                     );
                 }
-                const row = { ...(data as AnyRow), id: rowId } as unknown as M;
+                const row = optimisticRow<M>(data as AnyRow, rowId);
                 await this.enqueue({
                     collection: slug,
                     type: "createMany",
@@ -700,7 +721,7 @@ export class OfflineManager {
                 for (const { id, data } of updates) {
                     const base = this.rawLocalRow(slug, id);
                     rollback[String(id)] = base ?? null;
-                    optimistic.push({ ...(base ?? {}), ...(data as AnyRow), id } as unknown as M);
+                    optimistic.push(optimisticRow<M>({ ...(base ?? {}), ...(data as AnyRow) }, id));
                 }
                 await this.enqueue({
                     collection: slug,
@@ -794,7 +815,7 @@ data: u.data as AnyRow })),
                     data: data as AnyRow,
                     rollback: { rows: { [String(id)]: base ?? null } }
                 });
-                const optimistic = { ...(base ?? {}), ...(data as AnyRow), id } as unknown as M;
+                const optimistic = optimisticRow<M>({ ...(base ?? {}), ...(data as AnyRow) }, id);
                 this.setLocalRow(slug, id, optimistic);
                 this.notifyCollection(slug);
                 return optimistic;

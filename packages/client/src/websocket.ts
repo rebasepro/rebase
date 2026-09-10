@@ -84,6 +84,17 @@ const CHANNEL_MESSAGE_TYPES = new Set([
  * `@rebasepro/client-postgres` was removed; its surface may change without a
  * major bump.
  */
+/**
+ * Narrow a frame to the collection-update shape. See its use below.
+ *
+ * `WebSocketMessage.type` is `string`, so the message types that extend it do
+ * not form a discriminated union and `type === "collection_update"` narrows
+ * nothing on its own.
+ */
+function isCollectionUpdate(message: WebSocketMessage): message is CollectionUpdateMessage {
+    return message.type === "collection_update";
+}
+
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;
@@ -673,6 +684,21 @@ export class RebaseWebSocketClient {
             if (handlers) {
                 for (const handler of [...handlers]) {
                     try {
+                        // A channel frame carries fields no type here declares
+                        // — `presences`, `joins`, `leaves`, `seq`, `event`,
+                        // `messages`, `retained`, `latestSeq`, depending on the
+                        // frame — so the handler takes an open record and reads
+                        // them by name. `WebSocketMessage` has no index
+                        // signature (deliberately: a catch-all on a wire type
+                        // switches off excess-property checking at every
+                        // construction site), so handing one over is a real
+                        // conversion at a real boundary rather than an
+                        // assertion about a shape.
+                        //
+                        // The fix is to declare those frames in
+                        // `@rebasepro/types/websockets.ts` beside
+                        // `CollectionUpdateMessage`, and narrow to them the way
+                        // `isCollectionUpdate` does above.
                         handler(message as unknown as Record<string, unknown>);
                     } catch (error) {
                         console.error("Error in channel handler:", error);
@@ -683,7 +709,15 @@ export class RebaseWebSocketClient {
         }
 
         // Handle subscription updates for collection subscriptions
-        if (subscriptionId && type === "collection_update") {
+        if (subscriptionId && isCollectionUpdate(message)) {
+            // Narrowed, not asserted. `pks` and `meta` are declared on
+            // `CollectionUpdateMessage` — they always were — but
+            // `WebSocketMessage.type` is a `string` rather than a literal, so
+            // the union does not discriminate on its own and both reads went
+            // through `message as unknown as { … }`: a second, local
+            // declaration of two wire fields, free to drift from the one in
+            // `@rebasepro/types` that describes them.
+            const collectionUpdate = message;
             const subscriptionKey = this.backendToCollectionKey.get(subscriptionId);
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
@@ -695,7 +729,7 @@ export class RebaseWebSocketClient {
                     // first merge — a CDC-driven change never sends a patch, and
                     // learning them from patches alone would leave every
                     // externally-written collection unable to match a thing.
-                    const updatePks = (message as unknown as { pks?: PrimaryKeyInfo[] }).pks;
+                    const updatePks = collectionUpdate.pks;
                     if (updatePks) collectionSub.pks = updatePks;
 
                     // The page metadata, beside the rows it describes.
@@ -706,7 +740,7 @@ export class RebaseWebSocketClient {
                     // had just been handed — one extra round trip per write, per
                     // subscriber, and a window in which the count and the rows
                     // described different states of the collection.
-                    const updateMeta = (message as unknown as { meta?: CollectionUpdateMeta }).meta;
+                    const updateMeta = collectionUpdate.meta;
                     if (updateMeta) collectionSub.latestMeta = updateMeta;
 
                     // Structural merge: preserve cached row references for rows

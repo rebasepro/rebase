@@ -1,4 +1,5 @@
 import { LEGACY_RLS_SCHEMA, REBASE_SCHEMA } from "@rebasepro/types";
+import { sqlRows } from "@rebasepro/common";
 
 /**
  * Canonical SQL bootstrap for the RLS helper functions.
@@ -256,7 +257,7 @@ export async function dropLegacyAuthSchema(
 ): Promise<void> {
     let blockers: LegacyRlsDependent[];
     try {
-        blockers = (await run(LEGACY_RLS_DEPENDENTS_SQL)) as unknown as LegacyRlsDependent[];
+        blockers = sqlRows<LegacyRlsDependent>(await run(LEGACY_RLS_DEPENDENTS_SQL));
     } catch {
         return; // No catalogue access; nothing here is worth failing a boot for.
     }
@@ -280,7 +281,7 @@ export async function dropLegacyAuthSchema(
     // a query runs.
     let borrowers: LegacyRlsFunctionDependent[];
     try {
-        borrowers = (await run(LEGACY_RLS_FUNCTION_DEPENDENTS_SQL)) as unknown as LegacyRlsFunctionDependent[];
+        borrowers = sqlRows<LegacyRlsFunctionDependent>(await run(LEGACY_RLS_FUNCTION_DEPENDENTS_SQL));
     } catch {
         return;
     }
