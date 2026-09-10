@@ -28,16 +28,69 @@ function owning(over: Partial<RoleEnv> = {}): { cronScheduler: boolean; jobWorke
 }
 
 describe("resolveRole — what each role is", () => {
+    /**
+     * Surfaces no role turns on by itself.
+     *
+     * `mcp` is opt-in whatever the role: it mounts an OAuth authorization
+     * server that issues credentials to third-party software, and a role is a
+     * statement about process shape — "this container answers HTTP" — not a
+     * decision to start doing that. See `DEFAULT_OFF` in `init/surfaces.ts`.
+     */
+    const OPT_IN = ["mcp"];
+    const byDefault = [...ALL_RUNTIME_SURFACES].filter(s => !OPT_IN.includes(s));
+
     it("defaults to `all`, which is exactly today's process", () => {
         expect(resolveRole(env()).role).toBe("all");
-        expect(serving()).toEqual([...ALL_RUNTIME_SURFACES].sort());
+        expect(serving()).toEqual(byDefault.sort());
         expect(owning()).toEqual({ cronScheduler: true, jobWorkers: true, rlsAudit: true });
         expect(resolveRole(env()).provisionSchema).toBe(true);
     });
 
+    it("`all` does not switch on an opt-in surface", () => {
+        // Named separately from the assertion above so that adding a surface to
+        // `OPT_IN` cannot quietly make that assertion weaker: this one fails if
+        // the list stops being honest.
+        expect(serving()).not.toContain("mcp");
+    });
+
+    it("no role turns MCP on — not even `all`", () => {
+        // The containerized boot path takes its surfaces from the role and
+        // passes none of the project's own config through, so if a role granted
+        // this, every deployment with that role would start serving an OAuth
+        // authorization server on upgrade.
+        for (const role of ["all", "api", "functions", "worker"] as const) {
+            expect(serving({ REBASE_ROLE: role, REBASE_MIGRATE_ON_BOOT: "none" })).not.toContain("mcp");
+        }
+    });
+
+    it("REBASE_MCP_ENABLED is what turns it on", () => {
+        // And it is the ONLY thing, which makes it the one line to grep for
+        // when asking whether a given deployment serves agents.
+        expect(serving({ REBASE_MCP_ENABLED: true })).toContain("mcp");
+    });
+
+    it("REBASE_MCP_ENABLED=false is still off", () => {
+        expect(serving({ REBASE_MCP_ENABLED: false })).not.toContain("mcp");
+    });
+
+    it("enabling MCP changes nothing else about the process", () => {
+        // A surface toggle must not be a back door to a different role.
+        const without = serving({ REBASE_ROLE: "api" });
+        const with_ = serving({ REBASE_ROLE: "api", REBASE_MCP_ENABLED: true });
+        expect(with_.filter(s => s !== "mcp")).toEqual(without);
+    });
+
+    it("MCP is available to a worker too, if someone asks for it", () => {
+        // `worker` serves no HTTP by default. Nothing about that should make an
+        // explicit request impossible — the refusal, if any, belongs where the
+        // surface decides it can run, not in a role table.
+        expect(serving({ REBASE_ROLE: "worker", REBASE_MIGRATE_ON_BOOT: "none", REBASE_MCP_ENABLED: true }))
+            .toEqual(["mcp"]);
+    });
+
     it("`api` serves everything except functions", () => {
         expect(serving({ REBASE_ROLE: "api" })).toEqual(
-            [...ALL_RUNTIME_SURFACES].filter(s => s !== "functions").sort()
+            byDefault.filter(s => s !== "functions").sort()
         );
     });
 

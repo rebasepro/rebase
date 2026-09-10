@@ -33,8 +33,19 @@ const encoder = new TextEncoder();
  * is one keyword.
  */
 export async function sha256Hex(input: string): Promise<string> {
+    return hex(await sha256Bytes(input));
+}
+
+/**
+ * SHA-256 of a string, as raw bytes.
+ *
+ * The primitive {@link sha256Hex} is built on, exported because PKCE wants the
+ * digest base64url-encoded rather than hex (RFC 7636 §4.2), and routing that
+ * through hex means decoding a string we had just encoded.
+ */
+export async function sha256Bytes(input: string): Promise<Uint8Array> {
     const digest = await crypto.subtle.digest("SHA-256", encoder.encode(input));
-    return hex(new Uint8Array(digest));
+    return new Uint8Array(digest);
 }
 
 /**

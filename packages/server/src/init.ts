@@ -106,6 +106,11 @@ import {
 import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured, requireAdmin } from "./auth";
 import { createJwksRoutes } from "./auth/jwks-routes";
+import { readRuntimeVersion } from "./boot/version-skew";
+import { supportsRlsScoping } from "./auth/rls-scope";
+import { createOAuthStore } from "./mcp/oauth-store";
+import { createOAuthRoutes } from "./mcp/oauth-routes";
+import { createMcpRoutes, createMcpWellKnownRoutes } from "./mcp/mcp-routes";
 import type { JwtSigningKeyConfig } from "./auth/jwt-keys";
 import type { JobQueueOptions } from "./jobs/types";
 import {
@@ -1867,6 +1872,104 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         config.app.route("/.well-known", createJwksRoutes());
         if (hasAsymmetricSigningKey()) {
             logger.info("Access tokens are signed asymmetrically; public keys at /.well-known/jwks.json");
+        }
+    }
+
+    // ── MCP ──────────────────────────────────────────────────────────────
+    //
+    // `/mcp` lets an AI client — Claude, an IDE, an agent — read and write this
+    // project **as the person who authorized it**, with every row filtered by
+    // that person's own RLS policies. See `mcp/mcp-tools.ts`.
+    //
+    // Three preconditions, each of which declines rather than degrades:
+    //
+    //  1. `REBASE_PUBLIC_URL` must be set. Every document this surface serves
+    //     names absolute URLs, and the token audience is one of them. The
+    //     alternative — deriving the origin from the `Host` header — makes the
+    //     issuer identity a thing the caller supplies, and a resource server
+    //     whose audience check reads its expected value out of the request is
+    //     not performing an audience check. So: configured, or absent.
+    //  2. The driver must support `withAuth()`. `scopeDataDriver` returns the
+    //     driver UNSCOPED when it does not, which is correct for `/api/data`
+    //     (Mongo has no RLS and never claimed to) and catastrophic here, where
+    //     it would silently turn "acts as you" into "acts as the database
+    //     owner". Refusing to mount is the only safe reading.
+    //  3. The store must have somewhere to keep clients and codes.
+    //
+    // Nothing about this is on by default: `surfaces.mcp` is opt-in, because a
+    // project that has not thought about agent access should not be answering
+    // agents.
+    if (surfaces.mcp) {
+        const publicUrl = process.env.REBASE_PUBLIC_URL;
+        const driver = defaultDriver;
+        if (!publicUrl) {
+            logger.warn("[mcp] Surface enabled but REBASE_PUBLIC_URL is not set — not mounting. " +
+                "Set it to this deployment's externally reachable origin, e.g. https://app.example.com");
+        } else if (!isJwtConfigured()) {
+            logger.warn("[mcp] Surface enabled but no JWT secret is configured — not mounting.");
+        } else if (!driver || !supportsRlsScoping(driver)) {
+            logger.error("[mcp] Surface enabled but this data driver cannot scope by user — not mounting. " +
+                "Every MCP call must run under the caller's own row-level security; a driver without " +
+                "`withAuth()` would run them as the database owner instead.");
+        } else {
+            const store = createOAuthStore(driver);
+            if (!store) {
+                logger.error("[mcp] Surface enabled but the driver cannot persist OAuth state — not mounting.");
+            } else {
+                // `ensureTables` verifies its own work and throws when the
+                // tables are not there. Caught here rather than left to reach
+                // the boot, because this is one opt-in surface: an operator who
+                // switched on `mcp` should get a server that runs everything
+                // else and one loud line explaining what did not mount, not a
+                // process that refuses to start.
+                let ready = true;
+                try {
+                    await store.ensureTables();
+                } catch (error) {
+                    ready = false;
+                    logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
+                }
+
+                // Guarding the mount rather than returning early: everything
+                // after this block is the rest of the server's boot, and one
+                // opt-in surface failing must not take the admin gate, the
+                // schema editor and the request logger with it.
+                if (ready) {
+                    const mcpPath = "/mcp";
+                    const oauthBasePath = `${basePath}/oauth`;
+                    const mcpConfig = {
+                        publicUrl,
+                        mcpPath,
+                        oauthBasePath,
+                        getDriver: () => defaultDriver,
+                        // The RESOLVED set, not `config.collections` — a project
+                        // that declares its collections in a directory has an empty
+                        // `config.collections`, and the MCP client would be told
+                        // this project has no data at all.
+                        getCollections: () => activeCollections,
+                        serverInfo: {
+                            name: "rebase",
+                            version: readRuntimeVersion([process.cwd()]) ?? "unknown"
+                        }
+                    };
+
+                    config.app.route("/", createMcpWellKnownRoutes(mcpConfig));
+                    config.app.route(mcpPath, createMcpRoutes(mcpConfig));
+                    config.app.route(oauthBasePath, createOAuthRoutes({
+                        store,
+                        publicUrl,
+                        mcpPath,
+                        authBasePath: `${basePath}/auth`,
+                        // Open registration is what makes the Claude connector flow
+                        // work at all — there is nobody to hand a client ID to in
+                        // advance. A deployment that would rather pre-register can
+                        // switch it off and issue IDs itself.
+                        allowDynamicRegistration: process.env.REBASE_MCP_OPEN_REGISTRATION !== "false"
+                    }));
+
+                    logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
+                }
+            }
         }
     }
 
