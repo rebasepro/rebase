@@ -77,7 +77,7 @@ Each callback receives a single props object. Common fields:
 
 | Field | Type | Present in |
 |-------|------|------------|
-| `collection` | `ResolvedCollection` | All callbacks |
+| `collection` | `CollectionConfig` | All callbacks |
 | `path` | `string` | All callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
 | `id` | `string` | `beforeSave` (optional), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
@@ -87,6 +87,14 @@ Each callback receives a single props object. Common fields:
 | `context` | `RebaseCallContext` | All callbacks |
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.), or is `undefined` for public requests.
+
+`collection` is always there. A global callback fires for every collection, so
+it is the one tier that is registered independently of any of them — but it is
+still never handed a missing collection. A request naming a path the collection
+registry cannot resolve is refused with `404 NOT_FOUND` before any tier runs,
+which is the same answer the read and write paths give such a path anyway. The
+alternative — skipping the tier for those paths — would make `afterRead` a
+redaction step with a silent exception, so it is not on offer.
 
 ---
 

@@ -7,7 +7,6 @@ import {
     DatabaseAdmin,
     DataDriver,
     DeleteProps,
-    AnyCollectionConfig,
     CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
@@ -36,7 +35,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
@@ -399,21 +398,24 @@ export class PostgresBackendDriver implements DataDriver {
     ): Promise<Record<string, unknown>> {
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = resolved;
         let out = row;
+        if (!PostgresBackendDriver.hasAfterRead(resolved)) return out;
+        // Resolved once for all three tiers — see `requireCallbackCollection`.
+        const callbackCollection = requireCallbackCollection(resolvedCollection, path);
         if (globalCallbacks?.afterRead) {
             out = await globalCallbacks.afterRead({
-                collection: resolvedCollection as AnyCollectionConfig,
+                collection: callbackCollection,
                 path, row: out, context: contextForCallback
             }) ?? out;
         }
         if (callbacks?.afterRead) {
             out = await callbacks.afterRead({
-                collection: resolvedCollection as CollectionConfig,
+                collection: callbackCollection,
                 path, row: out, context: contextForCallback
             }) ?? out;
         }
         if (propertyCallbacks?.afterRead) {
             out = await propertyCallbacks.afterRead({
-                collection: resolvedCollection as AnyCollectionConfig,
+                collection: callbackCollection,
                 path, row: out, context: contextForCallback
             }) ?? out;
         }
@@ -459,7 +461,12 @@ export class PostgresBackendDriver implements DataDriver {
                         : undefined;
                     const targetPath = target?.slug;
                     if (!targetPath) continue;
-                    const targetResolved = this.resolveCollectionCallbacks(undefined, targetPath);
+                    // The relation's own target, not just its slug: the target
+                    // config is in hand here, so a relation pointing at a
+                    // collection the registry cannot resolve by slug still
+                    // masks through the config it declared, instead of handing
+                    // the tiers a collection that is not there.
+                    const targetResolved = this.resolveCollectionCallbacks(target, targetPath);
                     if (PostgresBackendDriver.hasAfterRead(targetResolved)) {
                         relationTargets[key] = { path: targetPath, resolved: targetResolved };
                     }
@@ -531,6 +538,7 @@ export class PostgresBackendDriver implements DataDriver {
 
         if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = this.buildCallContext();
+            const callbackCollection = requireCallbackCollection(resolvedCollection, path);
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
                 // `?? fetched` on every tier. An `afterRead` that mutates the row
@@ -543,7 +551,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -552,7 +560,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as CollectionConfig<M>,
+                        collection: callbackCollection,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -561,7 +569,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -661,11 +669,12 @@ export class PostgresBackendDriver implements DataDriver {
 
         if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = this.buildCallContext();
+            const callbackCollection = requireCallbackCollection(resolvedCollection, path);
             // `?? row` on every tier — see the note in `fetchCollection`.
             // 1. Global callbacks first
             if (globalCallbacks?.afterRead) {
                 row = await globalCallbacks.afterRead({
-                    collection: resolvedCollection as AnyCollectionConfig,
+                    collection: callbackCollection,
                     path,
                     row,
                     context: contextForCallback
@@ -674,7 +683,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.afterRead) {
                 row = await callbacks.afterRead({
-                    collection: resolvedCollection as CollectionConfig<M>,
+                    collection: callbackCollection,
                     path,
                     row,
                     context: contextForCallback
@@ -683,7 +692,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.afterRead) {
                 row = await propertyCallbacks.afterRead({
-                    collection: resolvedCollection as AnyCollectionConfig,
+                    collection: callbackCollection,
                     path,
                     row,
                     context: contextForCallback
@@ -924,10 +933,11 @@ export class PostgresBackendDriver implements DataDriver {
         // answers 400 with the author's message rather than a masked 500.
         try {
             if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+                const callbackCollection = requireCallbackCollection(resolvedCollection, path);
                 // 1. Global callbacks first
                 if (globalCallbacks?.beforeSave) {
                     const result = await globalCallbacks.beforeSave({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path,
                         id,
                         values: updatedValues,
@@ -941,7 +951,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.beforeSave) {
                     const result = await callbacks.beforeSave({
-                        collection: resolvedCollection as CollectionConfig<M>,
+                        collection: callbackCollection,
                         path,
                         id,
                         values: updatedValues,
@@ -955,7 +965,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.beforeSave) {
                     const result = await propertyCallbacks.beforeSave({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path,
                         id,
                         values: updatedValues,
@@ -1023,12 +1033,13 @@ export class PostgresBackendDriver implements DataDriver {
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+                const callbackCollection = requireCallbackCollection(resolvedCollection, path);
                 // `?? savedRow` on every tier — see the note in `fetchCollection`.
                 // Here it decided what the write's own response body contained.
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     savedRow = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -1037,7 +1048,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     savedRow = await callbacks.afterRead({
-                        collection: resolvedCollection as CollectionConfig<M>,
+                        collection: callbackCollection,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -1046,7 +1057,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     savedRow = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -1079,10 +1090,11 @@ export class PostgresBackendDriver implements DataDriver {
             // enqueued in a transaction that rolls back was never enqueued.
             try {
                 if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
+                    const callbackCollection = requireCallbackCollection(resolvedCollection, path);
                     // 1. Global callbacks first
                     if (globalCallbacks?.afterSave) {
                         await globalCallbacks.afterSave({
-                            collection: resolvedCollection as AnyCollectionConfig,
+                            collection: callbackCollection,
                             path,
                             id: savedId,
                             values: savedValues,
@@ -1094,7 +1106,7 @@ export class PostgresBackendDriver implements DataDriver {
                     // 2. Collection callbacks second
                     if (callbacks?.afterSave) {
                         await callbacks.afterSave({
-                            collection: resolvedCollection as CollectionConfig<M>,
+                            collection: callbackCollection,
                             path,
                             id: savedId,
                             values: savedValues as Partial<M>,
@@ -1106,7 +1118,7 @@ export class PostgresBackendDriver implements DataDriver {
                     // 3. Property callbacks third
                     if (propertyCallbacks?.afterSave) {
                         await propertyCallbacks.afterSave({
-                            collection: resolvedCollection as AnyCollectionConfig,
+                            collection: callbackCollection,
                             path,
                             id: savedId,
                             values: savedValues,
@@ -1156,6 +1168,7 @@ export class PostgresBackendDriver implements DataDriver {
             return savedRow;
         } catch (error) {
             if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+                const callbackCollection = requireCallbackCollection(resolvedCollection, path);
                 // What the hook exists to see. It was documented from the start
                 // and never passed, so `props.error` was `undefined` in every
                 // handler ever written against the guide. `id` is the caller's
@@ -1175,21 +1188,21 @@ export class PostgresBackendDriver implements DataDriver {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSaveError) {
                     await globalCallbacks.afterSaveError({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         ...errorProps
                     });
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
-                        collection: resolvedCollection as CollectionConfig<M>,
+                        collection: callbackCollection,
                         ...errorProps
                     });
                 }
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         ...errorProps
                     });
                 }
@@ -1563,11 +1576,12 @@ export class PostgresBackendDriver implements DataDriver {
         // answers 400 with the author's message rather than a masked 500.
         try {
             if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
+                const callbackCollection = requireCallbackCollection(resolvedCollection, targetPath);
                 let preventDefault = false;
                 // 1. Global callbacks first
                 if (globalCallbacks?.beforeDelete) {
                     const result = await globalCallbacks.beforeDelete({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path: targetPath,
                         id: row.id,
                         row: targetRow,
@@ -1580,7 +1594,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.beforeDelete) {
                     const result = await callbacks.beforeDelete({
-                        collection: resolvedCollection as CollectionConfig<M>,
+                        collection: callbackCollection,
                         path: targetPath,
                         id: row.id,
                         row: targetRow,
@@ -1593,7 +1607,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.beforeDelete) {
                     const result = await propertyCallbacks.beforeDelete({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path: targetPath,
                         id: row.id,
                         row: targetRow,
@@ -1643,10 +1657,11 @@ export class PostgresBackendDriver implements DataDriver {
         // cleanup half-done. See the comment on the `afterSave` block.
         try {
             if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+                const callbackCollection = requireCallbackCollection(resolvedCollection, targetPath);
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterDelete) {
                     await globalCallbacks.afterDelete({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path: targetPath,
                         id: row.id,
                         row: targetRow,
@@ -1656,7 +1671,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterDelete) {
                     await callbacks.afterDelete({
-                        collection: resolvedCollection as CollectionConfig<M>,
+                        collection: callbackCollection,
                         path: targetPath,
                         id: row.id,
                         row: targetRow,
@@ -1666,7 +1681,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterDelete) {
                     await propertyCallbacks.afterDelete({
-                        collection: resolvedCollection as AnyCollectionConfig,
+                        collection: callbackCollection,
                         path: targetPath,
                         id: row.id,
                         row: targetRow,

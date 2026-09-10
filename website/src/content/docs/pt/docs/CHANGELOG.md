@@ -31,6 +31,30 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   managed backend bundle get their address recorded on deploy too — those rows
   previously stayed at "registered, never deployed" for the life of the project.
 
+### Fixed
+
+- **A global callback is never handed a collection that is not there.** Every
+  callback props type declares `collection: CollectionConfig` — non-optional,
+  and the documented global hooks dereference it (`if (collection.slug ===
+  "audit_log") return;`). The Postgres driver resolves that value from the
+  registry, which answers nothing for a path it does not know. The collection
+  and property tiers are derived from the resolved collection, so they cannot
+  run without one; the *global* tier is registered independently of it, and
+  received the absence through a cast that quietly dropped the `| undefined`. A
+  global `beforeSave` reading `collection.slug` therefore threw a `TypeError`
+  which the callback error path then answered as `400 CALLBACK_REJECTED` —
+  blaming the author's own rule for a value the framework had failed to supply.
+
+  Skipping the tier instead was not available: `afterRead` is documented as the
+  place for security-critical redaction, "no read path bypasses it", and a tier
+  that silently does not run on the paths the registry cannot resolve is
+  precisely such a bypass. So a path with no collection is now refused before
+  any tier runs, with `404 NOT_FOUND` — which is what the read and write paths
+  already did with such a path a few lines further on, and is the honest answer
+  to a request naming a collection that does not exist. A relation embedded in
+  a REST read is masked through the target config the relation itself declares,
+  rather than a second lookup that could miss.
+
 ## [0.20.0] - 2026-09-10
 
 ### Added

@@ -242,3 +242,121 @@ describe("an afterRead that returns nothing", () => {
         expect(saved.id).toBe("c1");
     });
 });
+
+/**
+ * A callback tier is never handed a collection that is not there.
+ *
+ * `AfterReadProps.collection` and its siblings are declared
+ * `collection: CollectionConfig` — non-optional — and the documented global
+ * callbacks dereference it (`if (collection.slug === "audit_log") return;`).
+ * The driver resolves that value from the registry, which answers `undefined`
+ * for a path it does not know. The collection and property tiers are derived
+ * from the resolved collection, so they cannot run without one; the GLOBAL tier
+ * is registered independently of it, and used to receive the absence through a
+ * cast — so a global `beforeSave` reading `collection.slug` threw a `TypeError`
+ * that `toCallbackError` then answered as a 400 `CALLBACK_REJECTED`, blaming
+ * the author's rule for a value the framework failed to supply.
+ *
+ * Silently skipping the tier is not the alternative: `afterRead` is documented
+ * as the place for "security-critical redaction (PII masking, row filtering) —
+ * no read path bypasses it". So the request is refused instead, which is what
+ * the data services already do with such a path a few lines later — see
+ * `getCollectionByPath` in `services/collection-helpers.ts`.
+ */
+describe("a path the registry does not resolve, with a global callback registered", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    /** A registry that knows nothing, so `getCollectionByPath` answers undefined. */
+    const buildUnknownPathDriver = (globalCallbacks: CollectionCallbacks<Record<string, unknown>>) =>
+        buildDriver(undefined as unknown as CollectionConfig, [RAW_CUSTOMER], globalCallbacks);
+
+    type ApiError = { message: string; status?: number; statusCode?: number; code?: string };
+    const rejection = (p: Promise<unknown>) => p.then(() => undefined, (e: ApiError) => e);
+
+    it("refuses the read rather than running afterRead without a collection", async () => {
+        const seen: unknown[] = [];
+        const driver = buildUnknownPathDriver({
+            afterRead: ({ collection, row }) => {
+                seen.push(collection);
+                return row;
+            }
+        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+
+        const error = await rejection(driver.fetchCollection({ path: "ghost" } as never));
+
+        expect(error).toBeDefined();
+        expect(error!.status ?? error!.statusCode).toBe(404);
+        expect(error!.code).toBe("NOT_FOUND");
+        expect(error!.message).toContain("ghost");
+        // Not "ran with undefined", and not "quietly skipped" either.
+        expect(seen).toEqual([]);
+    });
+
+    it("refuses fetchOne on the same terms", async () => {
+        const driver = buildUnknownPathDriver({
+            afterRead: ({ row }) => row
+        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+
+        const error = await rejection(driver.fetchOne({ path: "ghost", id: "c1" } as never));
+
+        expect(error!.status ?? error!.statusCode).toBe(404);
+        expect(error!.code).toBe("NOT_FOUND");
+    });
+
+    it("does not hand the row back unredacted", async () => {
+        // The failure mode the refusal exists to prevent: a global redactor
+        // registered, a path it cannot be applied to, and the raw row returned
+        // anyway because the tier was skipped.
+        const driver = buildUnknownPathDriver({
+            afterRead: ({ row }) => ({ ...row, email: "***" })
+        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+
+        await expect(driver.fetchCollection({ path: "ghost" } as never)).rejects.toBeDefined();
+    });
+
+    it("blames the request, not the author's beforeSave", async () => {
+        // This is what a global hook written against the guide looks like, and
+        // what it used to produce: `TypeError: Cannot read properties of
+        // undefined (reading 'slug')`, answered as 400 CALLBACK_REJECTED — a
+        // rule the author never wrote, refusing a write for a reason that was
+        // not theirs.
+        const driver = buildUnknownPathDriver({
+            beforeSave: ({ collection, values }) => {
+                if (collection.slug === "orders") return values;
+                return values;
+            }
+        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+        const saveSpy = jest.spyOn((driver as any).dataService, "save")
+            .mockResolvedValue({ ...RAW_CUSTOMER } as never);
+
+        const error = await rejection(driver.save({
+            path: "ghost",
+            id: "c1",
+            values: { first_name: "Jane" },
+            status: "new"
+        } as never));
+
+        expect(error!.status ?? error!.statusCode).toBe(404);
+        expect(error!.code).toBe("NOT_FOUND");
+        expect(error!.code).not.toBe("CALLBACK_REJECTED");
+        expect(saveSpy).not.toHaveBeenCalled();
+    });
+
+    it("still runs the tier, with a real collection, on a path that does resolve", async () => {
+        // The other direction: the refusal must come from the missing
+        // collection, not from the driver having stopped calling global hooks.
+        const slugs: unknown[] = [];
+        const driver = buildDriver(customersCollection, [RAW_CUSTOMER], {
+            afterRead: ({ collection, row }) => {
+                slugs.push(collection.slug);
+                return row;
+            }
+        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+
+        await driver.fetchCollection({ path: "customers" } as never);
+
+        expect(slugs).toEqual(["customers"]);
+    });
+});

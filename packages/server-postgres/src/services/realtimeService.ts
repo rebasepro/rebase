@@ -9,7 +9,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
+import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
@@ -1052,8 +1052,12 @@ roles: ["anon"] };
                     // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
                     // between the initial driver fetch and this RLS-bound refetch.
                     const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    const resolvedCollection = collection ? { ...collection,
-    ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
+                    // `| undefined`, and now it says so: the registry answers
+                    // nothing for a path it does not know. The cast used to
+                    // erase that one line above the `?.` that admits it.
+                    const resolvedCollection: CollectionConfig | undefined = collection
+                        ? { ...collection, ...registryCollection } as CollectionConfig
+                        : registryCollection;
 
                     const callbacks = resolvedCollection?.callbacks;
                     const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -1067,12 +1071,13 @@ roles: ["anon"] };
                             data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                         } as RebaseCallContext;
 
+                        const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
                         return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
                             let processedEntity = fetchedRow;
                             // 1. Global callbacks first
                             if (globalCallbacks?.afterRead) {
                                 processedEntity = await globalCallbacks.afterRead({
-                                    collection: resolvedCollection,
+                                    collection: callbackCollection,
                                     path: notifyPath,
                                     row: processedEntity,
                                     context: contextForCallback
@@ -1081,7 +1086,7 @@ roles: ["anon"] };
                             // 2. Collection callbacks second
                             if (callbacks?.afterRead) {
                                 processedEntity = await callbacks.afterRead({
-                                    collection: resolvedCollection,
+                                    collection: callbackCollection,
                                     path: notifyPath,
                                     row: processedEntity,
                                     context: contextForCallback
@@ -1090,7 +1095,7 @@ roles: ["anon"] };
                             // 3. Property callbacks third
                             if (propertyCallbacks?.afterRead) {
                                 processedEntity = await propertyCallbacks.afterRead({
-                                    collection: resolvedCollection,
+                                    collection: callbackCollection,
                                     path: notifyPath,
                                     row: processedEntity,
                                     context: contextForCallback
@@ -1304,8 +1309,10 @@ roles: ["anon"] };
 
                     if (processedEntity) {
                         const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                        const resolvedCollection = collection ? { ...collection,
-    ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
+                        // See the note on the collection refetch above.
+                        const resolvedCollection: CollectionConfig | undefined = collection
+                            ? { ...collection, ...registryCollection } as CollectionConfig
+                            : registryCollection;
 
                         const callbacks = resolvedCollection?.callbacks;
                         const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -1318,11 +1325,12 @@ roles: ["anon"] };
                                 driver: this.driver,
                                 data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                             } as RebaseCallContext;
+                            const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
 
                             // 1. Global callbacks first
                             if (globalCallbacks?.afterRead) {
                                 processedEntity = await globalCallbacks.afterRead({
-                                    collection: resolvedCollection,
+                                    collection: callbackCollection,
                                     path: notifyPath,
                                     row: processedEntity,
                                     context: contextForCallback
@@ -1331,7 +1339,7 @@ roles: ["anon"] };
                             // 2. Collection callbacks second
                             if (callbacks?.afterRead) {
                                 processedEntity = await callbacks.afterRead({
-                                    collection: resolvedCollection,
+                                    collection: callbackCollection,
                                     path: notifyPath,
                                     row: processedEntity,
                                     context: contextForCallback
@@ -1340,7 +1348,7 @@ roles: ["anon"] };
                             // 3. Property callbacks third
                             if (propertyCallbacks?.afterRead) {
                                 processedEntity = await propertyCallbacks.afterRead({
-                                    collection: resolvedCollection,
+                                    collection: callbackCollection,
                                     path: notifyPath,
                                     row: processedEntity,
                                     context: contextForCallback

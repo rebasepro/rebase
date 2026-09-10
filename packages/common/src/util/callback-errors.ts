@@ -103,3 +103,42 @@ export function callbackRefusal(stage: string, path: string): RebaseApiError {
         details: { stage, path }
     });
 }
+
+/**
+ * The collection a callback tier is about to be handed — or a refusal.
+ *
+ * Every callback props type declares `collection: CollectionConfig`,
+ * non-optional, and the documented global-callback examples dereference it
+ * (`if (collection.slug === "audit_log") return;`). The driver resolves that
+ * value from the registry, which answers `undefined` for a path it does not
+ * know, so the tiers used to receive it through a cast that quietly dropped the
+ * `| undefined`. A global `beforeSave` reading `collection.slug` then threw a
+ * `TypeError` that `toCallbackError` reported as a 400 `CALLBACK_REJECTED` —
+ * the author's own rule blamed for a value the framework failed to supply.
+ *
+ * Skipping the tier instead is not available. `afterRead` is documented as the
+ * place for "security-critical redaction (PII masking, row filtering) — no read
+ * path bypasses it", and a tier that silently does not run on the paths the
+ * registry cannot resolve is precisely such a bypass.
+ *
+ * So the contract is the third option: **a callback tier never runs without a
+ * collection**, because a path that has none is refused before one can. That
+ * costs nothing, because it is already true — every read and every write
+ * reaches the database through `getCollectionByPath` in the driver's collection
+ * helpers, which raises this same "not found" for the same paths. Asking here
+ * only asks earlier, while the answer is still a 404 about the request instead
+ * of a `TypeError` attributed to the application's hook.
+ *
+ * @param collection The collection the driver resolved, if it resolved one.
+ * @param path       The collection path, for the message and `details`.
+ */
+export function requireCallbackCollection<C>(collection: C | undefined, path: string): C {
+    if (!collection) {
+        throw new RebaseApiError(`Collection not found: ${path}`, {
+            status: 404,
+            code: "NOT_FOUND",
+            details: { path }
+        });
+    }
+    return collection;
+}
