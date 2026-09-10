@@ -13,6 +13,7 @@ import {
     paperMixin
 } from "@rebasepro/ui";
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
+import { useRebaseContext } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 
 import { FieldBlock, LABEL_ICON_SIZE, spanClass } from "../form/components/FieldBlock";
@@ -178,6 +179,11 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
         });
     }, []);
 
+    // See the same line in `EntityForm`: the context an `additionalFields`
+    // Builder is documented to receive, in place of a `FormContext` asserted
+    // into its shape.
+    const rebaseContext = useRebaseContext();
+
     const renderField = useCallback((field: ResolvedFormField): React.ReactNode => {
 
         if (field.additional) {
@@ -185,14 +191,13 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
             if (!additionalField || !formContext) return null;
 
             const AdditionalFieldBuilder = additionalField.Builder;
-            const additionalFieldContext = formContext as unknown as AdditionalFieldDelegateProps["context"];
             const child = AdditionalFieldBuilder
-                ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
+                ? <AdditionalFieldBuilder entity={entity} context={rebaseContext}/>
                 : <div className={"w-full"}>
                     <AdditionalFieldValue
                         field={additionalField}
                         entity={entity}
-                        context={additionalFieldContext}/>
+                        context={rebaseContext}/>
                 </div>;
 
             return (

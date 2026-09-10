@@ -46,6 +46,22 @@ import { useBuildEffectiveRoleController } from "../hooks/useBuildEffectiveRoleC
  *
  * @group Core
  */
+/**
+ * Does this socket carry the admin surface?
+ *
+ * `RebaseWebSocket` declares none of `DatabaseAdmin`'s methods — the SQL console
+ * is served over the same socket only when the backend enables it — so the
+ * question is genuinely a runtime one. It used to be asked as
+ * `typeof (ws as unknown as Record<string, unknown>).executeSql === "function"`
+ * and then answered a second time, one line down, by asserting the whole socket
+ * to `DatabaseAdmin`: a check and a claim, with nothing connecting them. A
+ * predicate makes the check *be* the narrowing, so the five method reads below
+ * are checked against the interface they came from.
+ */
+function canExecuteSql(ws: object): ws is import("@rebasepro/types").DatabaseAdmin {
+    return typeof (ws as { executeSql?: unknown }).executeSql === "function";
+}
+
 export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER, DB>) {
 
     const {
@@ -310,8 +326,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
 
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
         const ws = client?.ws;
-        if (ws && typeof (ws as unknown as Record<string, unknown>).executeSql === "function") {
-            const wsAdmin = ws as import("@rebasepro/types").DatabaseAdmin;
+        if (ws && canExecuteSql(ws)) {
+            const wsAdmin = ws;
             return {
                 executeSql: wsAdmin.executeSql!.bind(wsAdmin),
                 fetchAvailableDatabases: wsAdmin.fetchAvailableDatabases?.bind(wsAdmin),

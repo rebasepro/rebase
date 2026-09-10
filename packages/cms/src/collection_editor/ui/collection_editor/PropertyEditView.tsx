@@ -638,9 +638,9 @@ propertyConfig: widgetId };
                 {renderExtraPropertyFields && collectionValues && (
                     <div className="col-span-12 mt-4 px-2">
                         {renderExtraPropertyFields({
-                            metadata: ((values as unknown as Record<string, unknown>).metadata as Record<string, unknown>) ?? {},
+                            metadata: (values.metadata ?? {}),
                             onMetadataChange: (key: string, value: unknown) => {
-                                const currentMetadata = ((values as unknown as Record<string, unknown>).metadata as Record<string, unknown>) ?? {};
+                                const currentMetadata = (values.metadata ?? {});
                                 setValues({
                                     ...values,
                                     metadata: { ...currentMetadata,

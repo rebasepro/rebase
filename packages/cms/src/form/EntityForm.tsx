@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
+import { useRebaseContext } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
@@ -307,6 +308,14 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const disabled = formex.isSubmitting || Boolean(disabledProp);
 
+    // The context an `additionalFields` Builder is documented to receive, and
+    // the one `CollectionTableBinding` already hands it. This form used to pass
+    // its own `FormContext` instead, laundered through
+    // `formContext as unknown as AdditionalFieldDelegateProps["context"]` —
+    // two unrelated types, so a Builder reading anything off `RebaseContext`
+    // worked in the table view and read `undefined` in the form.
+    const rebaseContext = useRebaseContext();
+
     const formContext: FormContext<M> = {
         setFieldValue: useCallback((key: string, value: unknown) => formex.setFieldValue(key, value), []),
         values: formex.values,
@@ -456,14 +465,13 @@ export function EntityForm<M extends Record<string, unknown>>({
             if (!AdditionalFieldBuilder && !additionalField.value) {
                 throw new Error("When using additional fields you need to provide a Builder or a value");
             }
-            const additionalFieldContext = formContext as unknown as AdditionalFieldDelegateProps["context"];
             const child = AdditionalFieldBuilder
-                ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
+                ? <AdditionalFieldBuilder entity={entity} context={rebaseContext}/>
                 : <div className={"w-full"}>
                     <AdditionalFieldValue
                         field={additionalField}
                         entity={entity}
-                        context={additionalFieldContext}/>
+                        context={rebaseContext}/>
                 </div>;
 
             return (

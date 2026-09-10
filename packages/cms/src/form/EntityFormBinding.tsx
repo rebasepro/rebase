@@ -1,6 +1,5 @@
 
 import type { PluginFormActionProps, AdminCollection } from "@rebasepro/cms-types";
-import type { FormContext } from "../types/fields";
 import React, { useCallback, useMemo, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { AnalyticsEvent } from "@rebasepro/cms-types";
@@ -295,7 +294,11 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         status,
         collection: collection as AdminCollection,
         context,
-        formContext: undefined as unknown as FormContext<Record<string, unknown>>,
+        // Genuinely absent here, and `PluginFormActionProps` declares it
+        // optional — so this needed no conversion at all. Asserting a
+        // `FormContext` onto `undefined` told every plugin slot the opposite of
+        // the comment three lines up.
+        formContext: undefined,
         openEntityMode,
         disabled: false
     }), [entityId, parentCollectionSlugs, parentEntityIds, path, status, collection, context, openEntityMode]);

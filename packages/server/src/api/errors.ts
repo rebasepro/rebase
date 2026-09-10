@@ -369,7 +369,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             : undefined;
 
     if (isBrowserSafeError && error.statusCode === undefined) {
-        const status = (error as unknown as { status?: unknown }).status;
+        const status = (error as { status?: unknown }).status;
         if (typeof status === "number") error.statusCode = status;
     }
 
