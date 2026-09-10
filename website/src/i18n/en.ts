@@ -5,6 +5,21 @@ export const en = {
   "hero.subtitle":
     "One TypeScript file per collection gives you the schema, the REST API, the typed SDK and the panel. The access rules in that same file compile to Postgres row-level security, so every route, job, script and agent hits the same wall.",
   "hero.cta.demo": "Try the demo",
+  // `hero-message` arms (scripts/ab-testing.ts). `hero.title.*` and
+  // `hero.subtitle` above are the control. Each arm is one claim; badge, CTA
+  // and terminal do not change with it.
+  "hero.agent.title.part1": "Let the agent write the backend.",
+  "hero.agent.title.part2": "The database keeps it honest.",
+  "hero.agent.subtitle":
+    "One TypeScript file per collection is all an agent has to produce. The schema, the REST API, the typed SDK and the panel are generated from it, and its access rules compile to Postgres row-level security. Whatever the model forgets, the database doesn't.",
+  "hero.onefile.title.part1": "Write the collection.",
+  "hero.onefile.title.part2": "Rebase writes the rest.",
+  "hero.onefile.subtitle":
+    "Schema, REST API, typed SDK, panel and access rules all come out of one TypeScript file, and change with it. The rules compile to Postgres row-level security, so the backend you generated is also the one that gets enforced.",
+  "hero.panel.title.part1": "Your app gets the API.",
+  "hero.panel.title.part2": "Your team gets the panel.",
+  "hero.panel.subtitle":
+    "One TypeScript file per collection produces both: the REST API and typed SDK your code calls, and the CMS your team edits in, reading through the same policies. Nothing is built twice, and there is no back door around the rules.",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.

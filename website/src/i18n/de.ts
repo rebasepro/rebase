@@ -5,6 +5,19 @@ export const de = {
   "hero.subtitle":
     "Eine TypeScript-Datei pro Collection liefert dir das Schema, die REST-API, das typisierte SDK und das Panel. Die Zugriffsregeln in derselben Datei werden zu Postgres Row-Level Security kompiliert, sodass jede Route, jeder Job, jedes Skript und jeder Agent gegen dieselbe Wand läuft.",
   "hero.cta.demo": "Demo testen",
+  // `hero-message`-Arme (scripts/ab-testing.ts); hero.title.* und hero.subtitle oben sind die Kontrolle.
+  "hero.agent.title.part1": "Lass den Agenten das Backend schreiben.",
+  "hero.agent.title.part2": "Die Datenbank hält es ehrlich.",
+  "hero.agent.subtitle":
+    "Eine TypeScript-Datei pro Collection ist alles, was ein Agent liefern muss. Schema, REST-API, typisiertes SDK und Panel werden daraus generiert, und die Zugriffsregeln darin werden zu Postgres Row-Level Security kompiliert. Was das Modell vergisst, vergisst die Datenbank nicht.",
+  "hero.onefile.title.part1": "Schreib die Collection.",
+  "hero.onefile.title.part2": "Rebase schreibt den Rest.",
+  "hero.onefile.subtitle":
+    "Schema, REST-API, typisiertes SDK, Panel und Zugriffsregeln kommen aus einer einzigen TypeScript-Datei und ändern sich mit ihr. Die Regeln werden zu Postgres Row-Level Security kompiliert, sodass das Backend, das du generiert hast, auch das ist, das durchgesetzt wird.",
+  "hero.panel.title.part1": "Deine App bekommt die API.",
+  "hero.panel.title.part2": "Dein Team bekommt das Panel.",
+  "hero.panel.subtitle":
+    "Eine TypeScript-Datei pro Collection erzeugt beides: die REST-API und das typisierte SDK, die dein Code aufruft, und das CMS, in dem dein Team arbeitet, mit denselben Policies. Nichts wird zweimal gebaut, und es gibt keine Hintertür an den Regeln vorbei.",
 
   "rlscheck.title": "Glaub uns das nicht einfach.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> liest den Katalog deiner eigenen Datenbank und meldet, was tatsächlich offen liegt — Tabellen, die mit abgeschalteter Row-Level Security ausgeliefert werden, Policies, die für jeden wahr sind, Views, die an der RLS ihrer Basistabellen vorbeilesen. Fünfzehn Checks. Jedes Postgres: Supabase, Neon, RDS, dein eigener Server. Es liest nur, braucht keinen Account, und es ist ihm egal, ob du Rebase benutzt.",
@@ -17,7 +30,7 @@ export const de = {
   "demo.rls": "✔ Zugriffsregeln zu Postgres-Policies kompiliert.",
   "demo.dev": "✔ API, Realtime und Panel laufen.",
   "demo.ports": "API- und Panel-URLs werden beim Start ausgegeben <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> wählt freie Ports pro Projekt",
-  "social.title": "Von den Machern von FireCMS, dem Open-Source-CMS in über 10.000 Projekten.",
+  "social.title": "Von den Machern von FireCMS, dem Open-Source-CMS in über 10.000 Firebase-Projekten.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Wo die Regel heute lebt",

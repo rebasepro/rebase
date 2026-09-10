@@ -5,6 +5,19 @@ export const es = {
   "hero.subtitle":
     "Un archivo TypeScript por colección te da el esquema, la API REST, el SDK tipado y el panel. Las reglas de acceso de ese mismo archivo se compilan en row-level security de Postgres, así que todas las rutas, los trabajos, los scripts y los agentes se topan con el mismo muro.",
   "hero.cta.demo": "Probar la demo",
+  // Brazos de `hero-message` (scripts/ab-testing.ts); hero.title.* y hero.subtitle de arriba son el control.
+  "hero.agent.title.part1": "Deja que el agente escriba el backend.",
+  "hero.agent.title.part2": "La base de datos lo mantiene a raya.",
+  "hero.agent.subtitle":
+    "Un archivo TypeScript por colección es todo lo que un agente tiene que producir. El esquema, la API REST, el SDK tipado y el panel se generan a partir de él, y sus reglas de acceso se compilan en row-level security de Postgres. Lo que el modelo olvide, la base de datos no lo olvida.",
+  "hero.onefile.title.part1": "Escribe la colección.",
+  "hero.onefile.title.part2": "Rebase escribe el resto.",
+  "hero.onefile.subtitle":
+    "Esquema, API REST, SDK tipado, panel y reglas de acceso salen de un solo archivo TypeScript y cambian con él. Las reglas se compilan en row-level security de Postgres, así que el backend que generaste es también el que se aplica.",
+  "hero.panel.title.part1": "Tu app recibe la API.",
+  "hero.panel.title.part2": "Tu equipo recibe el panel.",
+  "hero.panel.subtitle":
+    "Un archivo TypeScript por colección produce las dos cosas: la API REST y el SDK tipado que llama tu código, y el CMS en el que edita tu equipo, leyendo con las mismas políticas. Nada se construye dos veces y no hay puerta trasera para saltarse las reglas.",
 
   "rlscheck.title": "No te fíes de nuestra palabra.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lee el propio catálogo de tu base de datos y reporta lo que está realmente expuesto — tablas servidas con la seguridad a nivel de fila desactivada, políticas que evalúan a verdadero para todo el mundo, vistas que leen esquivando la RLS de sus tablas base. Quince comprobaciones. Cualquier Postgres: Supabase, Neon, RDS, tu propio servidor. Es de solo lectura, no necesita cuenta y le da igual si usas Rebase.",
@@ -17,7 +30,7 @@ export const es = {
   "demo.rls": "✔ Reglas de acceso compiladas en políticas de Postgres.",
   "demo.dev": "✔ API, realtime y panel en marcha.",
   "demo.ports": "Las URLs de la API y del panel se imprimen al arrancar <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> elige puertos libres por proyecto",
-  "social.title": "De los creadores de FireCMS, el CMS open source de más de 10.000 proyectos.",
+  "social.title": "De los creadores de FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Dónde vive la regla hoy",

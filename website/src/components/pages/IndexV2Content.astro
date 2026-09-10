@@ -111,8 +111,30 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             `text-display-1` carries its own 0.94, and the two
                             were fighting. */}
                         <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 text-balance">
-                            <span class="hero-line">{t("hero.title.part1")}</span>
-                            <span class="hero-line">{t("hero.title.part2")}</span>
+                            {/* `hero-message`: one arm's two lines show, the others
+                                are hidden by the CSS Layout.astro generates from
+                                EXPERIMENTS. Spans carrying `data-ab-show` rather
+                                than <ABVariant> divs, because a div cannot sit
+                                inside a heading and check:site counts <h1>s;
+                                `contents` lets each arm's block lines lay out as
+                                the h1's own, and the wipe delays still count
+                                them as first and second child. */}
+                            <span data-ab-show="hero-message:control" class="contents">
+                                <span class="hero-line">{t("hero.title.part1")}</span>
+                                <span class="hero-line">{t("hero.title.part2")}</span>
+                            </span>
+                            <span data-ab-show="hero-message:agent" class="contents">
+                                <span class="hero-line">{t("hero.agent.title.part1")}</span>
+                                <span class="hero-line">{t("hero.agent.title.part2")}</span>
+                            </span>
+                            <span data-ab-show="hero-message:onefile" class="contents">
+                                <span class="hero-line">{t("hero.onefile.title.part1")}</span>
+                                <span class="hero-line">{t("hero.onefile.title.part2")}</span>
+                            </span>
+                            <span data-ab-show="hero-message:panel" class="contents">
+                                <span class="hero-line">{t("hero.panel.title.part1")}</span>
+                                <span class="hero-line">{t("hero.panel.title.part2")}</span>
+                            </span>
                         </h1>
                     </div>
 
@@ -120,9 +142,12 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         right. The sub keeps its 34rem measure from §6 — the
                         headline got wider, the reading line did not. */}
                     <div class="lg:col-span-5">
-                        <p class="max-w-[34rem] text-base sm:text-lg leading-relaxed text-[#b4b8bd]">
-                            {t("hero.subtitle")}
-                        </p>
+                        <div class="max-w-[34rem] text-base sm:text-lg leading-relaxed text-[#b4b8bd]">
+                            <p data-ab-show="hero-message:control">{t("hero.subtitle")}</p>
+                            <p data-ab-show="hero-message:agent">{t("hero.agent.subtitle")}</p>
+                            <p data-ab-show="hero-message:onefile">{t("hero.onefile.subtitle")}</p>
+                            <p data-ab-show="hero-message:panel">{t("hero.panel.subtitle")}</p>
+                        </div>
                         <div class="mt-8 flex flex-wrap items-center gap-3">
                             {/* The click every arm of an experiment counts as a
                                 conversion (analytics.ts reads the attribute). */}

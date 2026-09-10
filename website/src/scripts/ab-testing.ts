@@ -59,6 +59,23 @@ export const EXPERIMENTS: Experiment[] = [
         weights: [50, 50],
         expires: "2026-12-31",
     },
+    {
+        // The home hero's message. Four spines for the same product, each a
+        // claim someone could disagree with. Badge, CTA and terminal are held
+        // constant, so the headline and its subtitle are the only thing under
+        // test. `control` is security by construction; `agent` is the same
+        // guarantee in the agent era's terms; `onefile` leads with the
+        // mechanism; `panel` leads with the two audiences one definition
+        // serves. Copy is `hero.<arm>.*` in the four marketing locales. The
+        // markup is spans carrying `data-ab-show` inside the one <h1>, because
+        // a div cannot sit in a heading and check:site counts <h1>s. It runs
+        // alongside `hero-register`, so read results per cell (2×4), not per
+        // arm, until one of the two is retired.
+        id: "hero-message",
+        variants: ["control", "agent", "onefile", "panel"],
+        weights: [25, 25, 25, 25],
+        expires: "2026-12-31",
+    },
 ];
 
 // ─── Client-side Helpers ─────────────────────────────────────
