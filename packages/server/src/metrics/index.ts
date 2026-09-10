@@ -19,7 +19,43 @@ import { extractBearerToken } from "../auth/bearer-token";
  */
 
 /** Which part of the API served a request. */
-export type MetricSurface = "data" | "auth" | "storage" | "functions" | "admin" | "meta" | "other";
+export type MetricSurface =
+    | "data" | "auth" | "storage" | "functions" | "admin" | "meta"
+    /**
+     * Served by this process but outside the API base path: the app's own
+     * pages, its assets, an SSR route. Real traffic, and for a project that
+     * serves a site from the same container it is usually MOST of the traffic.
+     *
+     * It used to be folded into `other` along with unrecognised API paths and
+     * the platform's own scrapes, which is how a console table came to read
+     * `other 23.0k / functions 11 / auth 4` — a breakdown whose largest row
+     * meant nothing at all.
+     */
+    | "app"
+    /** Under the API base path, and not a surface this version serves. */
+    | "other";
+
+/**
+ * Paths that are the platform OBSERVING this process, not traffic to it.
+ *
+ * `/metrics` is scraped by the control plane for the console's live view and
+ * for the rollout gate, and the middleware is installed on `/*` before the
+ * route is mounted — so every scrape counted itself. At a scrape every few
+ * seconds that is ~20/min forever, which on a real tenant added up to 23,000
+ * requests a day of pure self-observation, dwarfing its actual traffic by
+ * three orders of magnitude and putting a 0.0% error rate and a flat 9ms
+ * latency over the top of whatever the app was really doing.
+ *
+ * Excluded rather than relabelled: a request the platform makes to look at the
+ * tenant is not the tenant's traffic under any label, and leaving it in a row
+ * of its own would still have it dominating every total on the page.
+ */
+const UNCOUNTED_PATHS = new Set(["/metrics", "/health", "/livez", "/readyz"]);
+
+/** Whether a path is the platform looking in, rather than a request served. */
+export function isUncountedPath(pathname: string): boolean {
+    return UNCOUNTED_PATHS.has(pathname);
+}
 
 const LATENCY_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
 
@@ -236,8 +272,11 @@ export function classifySurface(pathname: string, basePath = "/api"): {
     collection?: string;
 } {
     const prefix = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+    // Outside the API entirely — the app's own routes. Distinct from `other`,
+    // which now means "under the API, and not a surface we serve": the two
+    // answer different questions and only one of them is a bug.
     if (!pathname.startsWith(prefix)) {
-        return { surface: "other" };
+        return { surface: "app" };
     }
 
     const rest = pathname.slice(prefix.length).replace(/^\/+/, "");
@@ -290,7 +329,11 @@ export function createMetricsMiddleware(basePath = "/api"): MetricsHandle {
 
     const middleware: MiddlewareHandler<HonoEnv> = async (c, next) => {
         const started = performance.now();
-        const { surface, collection } = classifySurface(new URL(c.req.url).pathname, basePath);
+        const pathname = new URL(c.req.url).pathname;
+        // Checked before anything is recorded, and it still calls `next()`:
+        // this decides whether the request COUNTS, never whether it is served.
+        if (isUncountedPath(pathname)) return next();
+        const { surface, collection } = classifySurface(pathname, basePath);
 
         try {
             await next();
