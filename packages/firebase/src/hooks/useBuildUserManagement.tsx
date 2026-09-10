@@ -417,6 +417,12 @@ const rowsToUsers = (rows: Record<string, unknown>[]): (UserWithRoleIds)[] => {
             created_on: data.created_on as Date | undefined,
             updated_on: data.updated_on as Date | undefined
         };
+        // A row out of the users collection, read as the shape this hook
+        // serves. `USER` is the app's own user type — anything a project
+        // declares — so nothing here can check that the row carries its fields:
+        // the row is whatever is in the database, and `USER` is whatever the
+        // project said. The two fields this hook does know about (`uid` from
+        // the row id, and the two timestamps) are set above.
         return newVar as unknown as UserWithRoleIds;
     });
 }

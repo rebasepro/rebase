@@ -436,11 +436,25 @@ export function removePropsIfExisting(source: Record<string, unknown> | unknown[
     const res = isArray(source) ? [...source] : { ...source };
 
     if (isArray(res)) {
+        // Both shapes `comparison` can have, read explicitly. The guard above
+        // establishes only that it is an object, so it may be a plain one — and
+        // `comparison[i]` with a numeric `i` then reads the key `"0"`, `"1"`,
+        // which is a real thing a caller can pass and what this did before.
+        // `(comparison as unknown as unknown[])[i]` said "it is an array" while
+        // relying on it not being one.
+        const at = (index: number): unknown =>
+            isArray(comparison) ? comparison[index] : comparison[String(index)];
         for (let i = res.length - 1; i >= 0; i--) {
-            if (res[i] === comparison[i]) {
+            // Read into consts so the `isObject` guards below narrow them.
+            // Element access through a `let` index narrows nothing, which is
+            // why the recursive call had to assert both arguments back into the
+            // shape the line above had just checked for.
+            const mine = res[i];
+            const theirs = at(i);
+            if (mine === theirs) {
                 res.splice(i, 1);
-            } else if (isObject(res[i]) && isObject(comparison[i])) {
-                res[i] = removePropsIfExisting(res[i] as unknown as Record<string, unknown>, (comparison as unknown as unknown[])[i] as Record<string, unknown>);
+            } else if (isObject(mine) && isObject(theirs)) {
+                res[i] = removePropsIfExisting(mine, theirs);
             }
         }
     } else {

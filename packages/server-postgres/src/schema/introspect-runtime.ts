@@ -314,6 +314,11 @@ export function buildCollectionsFromSchema(
                 ...buildProperties(meta, enumMap),
                 ...buildRelations(meta, slugByTable, collectionBySlug)
             }
+            // A collection synthesised from a catalogue read, not authored.
+            // `PostgresCollectionConfig` is generic over the row type `M`, and
+            // there is no `M` here — the columns were discovered a moment ago —
+            // so the object is built from the fields introspection can supply
+            // and asserted into the config the rest of the server consumes.
         } as unknown as PostgresCollectionConfig;
 
         collections.push(collection);

@@ -594,6 +594,11 @@ type: "date" };
                 }
                 result.validation = convertedValidation;
             }
+            // `result` is assembled as an open record because `validation` is
+            // rebuilt key by key — the ISO strings this deserializes come back
+            // as `Date`s, and a partially-converted validation object is not a
+            // `DateValidation` at any point in the loop above. The claim is
+            // that it is one by the time we get here.
             return result as unknown as DateProperty;
         }
 

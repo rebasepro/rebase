@@ -155,6 +155,11 @@ function getParentName(element: HTMLElement | null): string | undefined {
             );
         });
         if (key) {
+            // React's internal fibre, reached by the `__reactFiber$<hash>` key
+            // found on the element above. It is not part of any public API and
+            // no type describes it, so this cannot be checked by anything —
+            // which is the standing cost of reading it, and the reason the read
+            // is confined to this one function.
             const domFiber = (element as unknown as Record<string, ReactFiber>)[key];
             const getComponentFiber = (fiber: ReactFiber): ReactFiber => {
                 let parentFiber = fiber.return;

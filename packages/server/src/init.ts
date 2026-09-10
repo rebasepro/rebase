@@ -1715,9 +1715,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
             // Resolve configured OAuth providers via data-driven registration.
             // Each entry maps a config key to its factory function name and required fields.
+            // `factory` is a key of the auth module, not a `string`.
+            //
+            // Twelve names were listed here as bare strings and looked up with
+            // `authModule as unknown as Record<string, …>`, which tied them to
+            // nothing: rename or misspell one and `createFn` is `undefined` and
+            // the boot dies on "createFn is not a function", naming neither the
+            // provider nor the export. The template literal keeps the union to
+            // the provider factories rather than every export of the module.
+            type ProviderFactory = Extract<keyof typeof import("./auth"), `create${string}Provider`>;
             const OAUTH_PROVIDERS: Array<{
                 key: keyof RebaseAuthConfig;
-                factory: string;
+                factory: ProviderFactory;
                 requiredFields: string[];
             }> = [
                 { key: "google", factory: "createGoogleProvider", requiredFields: ["clientId"] },
@@ -1738,7 +1747,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 const providerConfig = safeAuthConfig[key] as Record<string, unknown> | undefined;
                 if (providerConfig && requiredFields.every(f => Boolean(providerConfig[f]))) {
                     const authModule = await import("./auth");
-                    const createFn = (authModule as unknown as Record<string, (cfg: unknown) => OAuthProvider<unknown>>)[factory];
+                    // The *name* is checked (see `ProviderFactory` above); the
+                    // call is not. Each factory declares its own config shape,
+                    // so indexing by a runtime name gives a union of twelve
+                    // signatures, and calling a union intersects its parameters
+                    // into something no single provider's config satisfies. The
+                    // shapes are validated by `requiredFields` a line above.
+                    const createFn = authModule[factory] as (cfg: Record<string, unknown>) => OAuthProvider<unknown>;
                     oauthProviders.push(createFn(providerConfig));
                 }
             }
