@@ -39,7 +39,7 @@ export const es = {
   "modes.subtitle": "Lee tus datos a través de la misma API y las mismas políticas que tu aplicación. Tu app habla con el backend, tu equipo trabaja en el panel y ambos ven el mismo conjunto de reglas.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
-    "El servidor al que llama tu app. Sin UI, sin React en ningún lugar del árbol de dependencias.",
+    "El servidor al que llama tu app: REST, un SDK tipado, tiempo real, auth y almacenamiento sobre tu propio Postgres.",
   "modes.baas.tag": "Con lo que habla tu app",
   "modes.cms.title": "Rebase CMS",
   "modes.cms.desc":
@@ -710,7 +710,7 @@ export const es = {
   "cmspage.14": "Móntalo dentro de una aplicación React existente, o dale su propio repositorio — <code class=\"font-mono text-surface-300\">generate-sdk --from &lt;url&gt;</code> lo tipa contra el backend en marcha, así que se despliega a su propio ritmo. Paquetes de npm, no un framework al que te mudas.",
   "cmspage.15": "Dónde encaja",
   "cmspage.16": "Tres capas, adoptadas en ese orden",
-  "cmspage.17": "REST, un SDK tipado, auth, almacenamiento, realtime y RLS sobre tu Postgres. Headless y sin React. El panel se renderiza encima.",
+  "cmspage.17": "REST, un SDK tipado, auth, almacenamiento, realtime y RLS sobre tu Postgres. Headless por sí solo. El panel se renderiza encima.",
   "cmspage.18": "capa 02 · estás aquí",
   "cmspage.19": "El back office generado para las personas de tu equipo, gobernado por el bloque <code class=\"font-mono text-surface-300\">admin</code> de tus colecciones.",
   "cmspage.20": "Editor SQL, visualizador de esquema, editor de políticas RLS, ramas y explorador de API. Studio es el espacio de trabajo del desarrollador. Se registra dentro del mismo panel que CMS.",
@@ -1899,8 +1899,8 @@ export const es = {
   "cmspage.persona.dev.body": "Construye vistas de entidad, paneles de vista previa y widgets de campo propios — todo en React y TypeScript estándar.",
   "cmspage.code.customComponent": "una property con tus componentes",
   "backendpage.hero.title": "El backend,<br/>por sí solo.",
-  "backendpage.hero.sub": "REST, un SDK tipado, tiempo real sobre WebSocket, auth, almacenamiento y una especificación OpenAPI — con cada regla de acceso aplicada por la propia base de datos. Apúntalo a tu Postgres, o ejecuta <code class=\"font-mono text-surface-200\">rebase dev</code> y consigue uno sin instalar nada. No hace falta panel de administración. Nada de React en el árbol de dependencias.",
-  "backendpage.badge": "Hono · Drizzle · PostgreSQL · sin React",
+  "backendpage.hero.sub": "REST, un SDK tipado, tiempo real sobre WebSocket, auth, almacenamiento y una especificación OpenAPI — con cada regla de acceso aplicada por la propia base de datos. Apúntalo a tu Postgres, o ejecuta <code class=\"font-mono text-surface-200\">rebase dev</code> y consigue uno sin instalar nada. No hace falta panel de administración.",
+  "backendpage.badge": "Hono · Drizzle · PostgreSQL · OpenAPI",
   "backendpage.label.generated": "la superficie generada",
   "backendpage.rest.title": "REST, sin escribirlo",
   "backendpage.rest.sub": "Cada tabla que expones se convierte en un endpoint",

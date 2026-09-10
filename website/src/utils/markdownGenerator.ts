@@ -76,7 +76,7 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 Rebase is adopted in layers, and each one is additive:
 
-- **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres. No React in the dependency tree.
+- **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres, with or without the panel.
 - **Rebase CMS** — the above, plus a schema-driven back office generated from the same collection definitions.
 - **Rebase Studio** — the above, plus the developer workspace: SQL editor, schema visualizer, RLS editor, logs and an API explorer, registered inside the same panel as CMS.
 

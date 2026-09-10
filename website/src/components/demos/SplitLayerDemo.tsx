@@ -53,7 +53,7 @@ export function SplitLayerDemo() {
                 <p className="text-xs text-surface-500">
                     {full
                         ? "One dependency and one nested block added. The API below is untouched."
-                        : "A headless project: no React, no admin block, no panel."}
+                        : "A headless project: no admin block, no panel — just the API."}
                 </p>
             </div>
 

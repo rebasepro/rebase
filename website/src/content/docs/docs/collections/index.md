@@ -70,7 +70,7 @@ propertiesOrder: ["title", "score" as AdditionalFieldKey]
 
 Import it from `@rebasepro/cms-types` in a project that has an admin panel — that is
 the copy that also typechecks the `admin` block. A headless BaaS project, which has no
-admin block and no React, imports the same function from `@rebasepro/common` instead.
+admin block, imports the same function from `@rebasepro/common` instead.
 
 Annotating the type directly still works and is still checked:
 
@@ -127,8 +127,8 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
 
 - A **BaaS or headless** project never writes an `admin` block. Its collections — or no
   collections at all, since BaaS mode introspects the database — describe data and
-  authorization, nothing else. `@rebasepro/types` contains no React, so there is no
-  React anywhere in the dependency tree.
+  authorization, nothing else. `@rebasepro/types` carries no UI code, so a headless
+  project's dependency tree stays server-only.
 - The **backend never reads inside the block**. It is dropped before a collection is
   serialized to the contract endpoint or into a build bundle, and it is excluded from
   the schema version — so changing an icon does not report every generated SDK as

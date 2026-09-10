@@ -6,7 +6,7 @@ description: Run Rebase as a headless Backend-as-a-Service over your own Postgre
 
 Rebase has two shapes, and this page is the one that never opens a browser: a
 REST API, auth, storage, realtime and backups over a PostgreSQL database you
-already have. No admin panel, no React, no collection files. If you were
+already have. No admin panel, no collection files. If you were
 reaching for Supabase or PostgREST, this is the comparable thing.
 
 Everything on this page also works in the full project — it is the same server.
