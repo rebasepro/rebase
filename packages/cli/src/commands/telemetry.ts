@@ -1,6 +1,6 @@
 import chalk from "chalk";
 
-import { describeState } from "../telemetry/consent";
+import { describeState, renderPreview } from "../telemetry/consent";
 import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setConsent } from "../telemetry";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
@@ -102,11 +102,19 @@ function printStatus(): void {
 function printPayload(): void {
     const config = readConfig();
     if (config.enabled !== true) {
+        // Deliberately still prints one. The consent prompt points here so the
+        // question can stay short, and someone deciding whether to say yes is
+        // exactly the person who most needs to see the payload — telling them
+        // to enable sharing first, in order to find out what sharing sends,
+        // is the wrong way round.
         console.log("");
         console.log(`  ${describeState()}`);
         console.log("");
-        console.log(chalk.gray("  Nothing is being sent, so there is no payload to show."));
-        console.log(chalk.gray(`  Run ${chalk.cyan("rebase telemetry enable")} first if you want to inspect one.`));
+        console.log(chalk.gray("  Nothing is being sent. This is what WOULD be sent if you said yes:"));
+        console.log("");
+        console.log(renderPreview("cli.dev", { first_run: false }).split("\n").map((l) => "  " + l).join("\n"));
+        console.log("");
+        console.log(chalk.gray(`  Start sharing with ${chalk.cyan("rebase telemetry enable")}.`));
         console.log("");
         return;
     }
@@ -126,7 +134,7 @@ function printPayload(): void {
 
 function printHelp(): void {
     console.log(`
-${chalk.bold("rebase telemetry")} — anonymous usage sharing (opt-in, off by default)
+${chalk.bold("rebase telemetry")} — anonymous usage sharing (asked once per project)
 
 ${chalk.bold("Commands")}
   ${chalk.blue("status")}     Whether anything is being shared, and why ${chalk.gray("(default)")}

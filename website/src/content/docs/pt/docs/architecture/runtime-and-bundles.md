@@ -46,7 +46,7 @@ Vale a pena entender o manifesto, pois é ele que um runtime valida antes de ace
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.19.1", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.20.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -81,7 +81,7 @@ Dois números de versão controlam se um bundle e um runtime podem trabalhar jun
 É por isso que atualizar o Rebase em um deployment auto-hospedado se resume a alterar uma tag:
 
 ```yaml
-image: rebasepro/server:0.19.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.20.0   # a newer tag — your bundle is untouched
 ```
 
 ## O desenvolvimento usa o mesmo caminho

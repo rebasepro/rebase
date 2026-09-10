@@ -35,7 +35,7 @@ rebase build
 Para App Runner, que descarga imágenes desde un registro, incorpora el bundle en una imagen derivada. Son solo tres líneas y fija con exactitud lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

@@ -85,7 +85,7 @@ O comando `rebase build --no-vendor` desativa essa opção e gera um bundle que 
 Para um deploy em produção real, dê preferência a empacotar ambos em uma imagem, o que também fixa com exatidão o que é executado:
 
 ```dockerfile
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 
@@ -150,7 +150,7 @@ O runtime é um contêiner comum escutando na porta `$PORT`, portanto qualquer p
 
 ```toml
 [build]
-  image = "rebasepro/server:0.19.1"
+  image = "rebasepro/server:0.20.0"
 
 [http_service]
   internal_port = 8080
@@ -253,7 +253,7 @@ Tudo o que foi descrito acima consiste em um único contêiner servindo todo o p
 ## Atualizando
 
 ```yaml
-image: rebasepro/server:0.19.1
+image: rebasepro/server:0.20.0
 ```
 
 Reinicie. Seu bundle permanece inalterado. Dentro de uma mesma versão major do contrato de runtime, um bundle validado continuará funcionando — consulte [Compatibilidade](/docs/architecture/runtime-and-bundles/#compatibility).

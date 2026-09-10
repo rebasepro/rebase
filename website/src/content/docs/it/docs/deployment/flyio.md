@@ -38,7 +38,7 @@ rebase build
 Esegui il commit di un `Dockerfile` di tre righe nella root del progetto:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

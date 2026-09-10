@@ -35,7 +35,7 @@ rebase build
 Container Apps effettua il pull da un registro, quindi incorpora il bundle in un'immagine derivata. Tre righe, e definisce esattamente cosa viene eseguito:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

@@ -34,7 +34,7 @@ rebase build
 Serverless Containers récupère les images depuis un registre, intégrez donc le bundle dans une image dérivée. Trois lignes suffisent pour verrouiller exactement ce qui s'exécute :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.1
+FROM rebasepro/server:0.20.0
 COPY dist-bundle /bundle
 ```
 

@@ -160,7 +160,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.19.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.20.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 In der Regel lohnt es sich nur, das Tag festzulegen: Das Repository wird übernommen, es handelt sich also um ein Projekt und ein Image, bei dem eine Einheit verschoben wurde. `bundleUrl` übernimmt dieselbe Aufgabe, wenn `bundle.mode: url` gesetzt ist.

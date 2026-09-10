@@ -83,11 +83,7 @@ export function renderPreview(event: TelemetryEventName, properties: Record<stri
  * CI must behave exactly as it does today, which means not asking and not
  * sending.
  */
-export async function promptForConsent(
-    event: TelemetryEventName,
-    properties: Record<string, unknown>,
-    options: PromptOptions = {}
-): Promise<boolean> {
+export async function promptForConsent(options: PromptOptions = {}): Promise<boolean> {
     if (!shouldPrompt(process.env, options)) return false;
 
     // Only true when this is a second (or later) asking, which the closing line
@@ -98,24 +94,16 @@ export async function promptForConsent(
         console.log("");
         console.log(chalk.bold("Help improve Rebase?"));
         console.log("");
-        console.log(chalk.gray("  Rebase is self-hosted, so we have no idea what works and what does not"));
-        console.log(chalk.gray("  unless you tell us. Sharing is entirely optional and off by default."));
+        console.log(chalk.gray("  Rebase is self-hosted, so we only learn what works if you tell us."));
+        console.log(chalk.gray("  Anonymous: random ids, the CLI version, your OS, and which template and"));
+        console.log(chalk.gray("  package manager you used. Never project names, paths, schemas, URLs or"));
+        console.log(chalk.gray("  error messages."));
         console.log("");
-        console.log(chalk.gray("  This is exactly what would be sent — nothing more, ever:"));
-        console.log("");
-        console.log(
-            renderPreview(event, properties)
-                .split("\n")
-                .map((line) => chalk.gray("    " + line))
-                .join("\n")
-        );
-        console.log("");
-        console.log(chalk.gray("  No project names, paths, schemas, URLs or error messages. Change your"));
-        console.log(chalk.gray(`  mind any time with ${chalk.cyan("rebase telemetry disable")}.`));
+        console.log(chalk.gray(`  Print the exact payload with ${chalk.cyan("rebase telemetry show")}; change your mind`));
+        console.log(chalk.gray(`  any time with ${chalk.cyan("rebase telemetry disable")}.`));
         if (askedBefore) {
             console.log("");
-            console.log(chalk.gray("  You declined before, and that is still the answer unless you change it"));
-            console.log(chalk.gray("  here. Asked once per new project; never during ordinary work."));
+            console.log(chalk.gray("  You declined before; that stands unless you change it here."));
         }
         console.log("");
 
@@ -124,7 +112,14 @@ export async function promptForConsent(
                 type: "confirm",
                 name: "accepted",
                 message: "Share anonymous usage data?",
-                default: false
+                // Defaults to yes: this is the question the project most needs
+                // answered, and a bare Enter is the commonest answer to any
+                // prompt. It is still a question — nothing is sent until it is
+                // answered, `n` is one keystroke, and the decision is
+                // reversible with the command named two lines above. What it
+                // is NOT is "off by default" any more; anything that used to
+                // say so had to change with it.
+                default: true
             }
         ] as unknown as Parameters<typeof inquirer.prompt>[0]) as { accepted: boolean };
 

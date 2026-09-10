@@ -221,7 +221,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.19.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.20.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Geralmente, apenas a tag vale a pena fixar: o repositório é herdado, portanto trata-se de

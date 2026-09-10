@@ -821,7 +821,7 @@ async function createProject(options: InitOptions) {
     };
     // `reAskDeclined`: scaffolding is the one moment where asking again is an
     // offer rather than nagging. See PromptOptions.
-    if (await promptForConsent("cli.init", initProperties, { reAskDeclined: true })) {
+    if (await promptForConsent({ reAskDeclined: true })) {
         await recordEvent("cli.init", initProperties, { projectRoot: options.targetDirectory });
     }
 }

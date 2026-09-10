@@ -558,7 +558,8 @@ See [Agent Skills](/docs/ai/skills) for the full list and where files are writte
 
 ### `rebase telemetry`
 
-Anonymous usage sharing. **Opt-in, and off unless you turned it on:**
+Anonymous usage sharing. **`rebase init` asks once per project, and the prompt
+defaults to yes — nothing is sent unless you answer it:**
 
 ```bash
 rebase telemetry status
@@ -567,9 +568,9 @@ rebase telemetry enable
 rebase telemetry disable
 ```
 
-`status` prints the current setting, `show` prints exactly what would be sent, and
-the other two change it. `rebase init` asks once; if you never ran `init`, nothing
-was ever collected.
+`status` prints the current setting, `show` prints exactly what would be sent —
+whether or not sharing is on, so you can read the payload before deciding — and
+the other two change it. If you never ran `init`, nothing was ever collected.
 
 ## Migration Workflow
 

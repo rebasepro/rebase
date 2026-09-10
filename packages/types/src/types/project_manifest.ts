@@ -230,7 +230,7 @@ export interface RebaseProjectManifest {
      * Repository-wide opt-out from anonymous CLI usage sharing.
      *
      * **Only `false` does anything.** It suppresses sharing for everyone who
-     * clones this repository, overriding each developer's own opt-in — an
+     * clones this repository, overriding each developer's own answer — an
      * organisation setting policy for work done on its behalf, the same shape
      * as a committed `.npmrc`.
      *
@@ -238,7 +238,7 @@ export interface RebaseProjectManifest {
      * quietly. This file is committed, so a `true` here would be one developer
      * answering a privacy question for every colleague who later clones the
      * repo — consent by proxy, which is the exact thing opt-in exists to
-     * prevent. Individuals opt in with `rebase telemetry enable`.
+     * prevent. Individuals answer at `rebase init`, or with `rebase telemetry enable` / `disable`.
      */
     telemetry?: boolean;
 }

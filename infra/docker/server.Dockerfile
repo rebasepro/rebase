@@ -11,7 +11,25 @@
 #   docker build -f infra/docker/server.Dockerfile -t rebasepro/server:0.17.3 .
 
 # ── Stage 1: build the workspace packages ────────────────────────────────────
-FROM node:22-slim AS build
+#
+# `--platform=$BUILDPLATFORM` pins this stage to the architecture of the machine
+# doing the building, so it runs ONCE natively instead of once per target under
+# qemu. It is the difference between a 3-minute release and an 11-minute one:
+# the multi-arch build spent 746s on linux/arm64 against 117s on linux/amd64,
+# and 608s of that gap was this stage — 451s to compile TypeScript, 92s to
+# install, 65s to assemble /runtime — all of it emulated, and none of it
+# producing anything architecture-specific.
+#
+# Safe because everything this stage hands to the runtime is portable: JavaScript
+# `dist/` output, and a node_modules tree of pure-JS packages. Checked rather
+# than assumed — /app in the published 0.20.0 image is bit-identical across
+# linux/amd64 and linux/arm64 (9796 files, one md5, zero `.node` binaries).
+#
+# What would break it is a NATIVE dependency: a `.node` addon resolves to the
+# builder's architecture and would be copied, silently, into an image for a
+# different one — a crash on a self-hoster's Apple silicon and nowhere in CI.
+# The runtime stage refuses to build if one appears, so this cannot rot quietly.
+FROM --platform=$BUILDPLATFORM node:22-slim AS build
 
 RUN corepack enable
 
@@ -145,6 +163,28 @@ COPY --from=build /src/packages/server/package.json ./node_modules/@rebasepro/se
 COPY --from=build /src/packages/server-postgres/dist ./node_modules/@rebasepro/server-postgres/dist
 COPY --from=build /src/packages/server-postgres/src ./node_modules/@rebasepro/server-postgres/src
 COPY --from=build /src/packages/server-postgres/package.json ./node_modules/@rebasepro/server-postgres/package.json
+
+# The guard for the `--platform=$BUILDPLATFORM` above.
+#
+# That flag builds the stage this tree came from on the BUILDER's architecture,
+# which is only sound while the tree stays pure JavaScript. A native addon added
+# to the /runtime install list — or pulled in as a transitive optional
+# dependency, which needs no edit here at all — would be compiled for the
+# builder and copied into an image for a different architecture. It would pass
+# every test in CI, where the two are the same, and fail on a self-hoster's
+# machine with an ELF header error from inside node.
+#
+# So the build refuses, here, naming the file. `--omit=dev` does not exclude
+# optional dependencies, which is exactly how this arrives unannounced.
+RUN found="$(find /app/node_modules -name '*.node' -type f | head -n 5)"; \
+    if [ -n "$found" ]; then \
+      echo "ERROR: native binaries in a stage built for the BUILD platform:"; \
+      echo "$found"; \
+      echo "The build stage is pinned to \$BUILDPLATFORM, so these were compiled"; \
+      echo "for the builder and would ship broken on every other architecture."; \
+      echo "Either drop the dependency or unpin stage 1 (and accept qemu)."; \
+      exit 1; \
+    fi
 
 COPY infra/docker/entrypoint.mjs ./entrypoint.mjs
 
