@@ -17,7 +17,7 @@ export const es = {
   "demo.rls": "✔ Reglas de acceso compiladas en políticas de Postgres.",
   "demo.dev": "✔ API, realtime y panel en marcha.",
   "demo.ports": "Las URLs de la API y del panel se imprimen al arrancar <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> elige puertos libres por proyecto",
-  "social.title": "De los creadores de FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
+  "social.title": "De los creadores de FireCMS, el CMS open source de más de 10.000 proyectos.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Dónde vive la regla hoy",
