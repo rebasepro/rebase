@@ -841,7 +841,7 @@ description: "List databases attached to the project" },
                 action: "info",
                 section: "Database",
                 description: "Connection details",
-                flags: [["--reveal", "Include the password. Without it, the value is masked"]]
+                flags: [["--reveal", "Include the password (owner or admin). Without it, the value is masked"]]
             },
             {
                 action: "connect",

@@ -419,8 +419,8 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-`db connect` opens a local port that *is* the managed database — which has no
-public endpoint — and holds it until Ctrl-C. `--reveal` includes the password.
+`db connect` opens a local port that *is* the managed database (no public
+endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 #### Resources
 
