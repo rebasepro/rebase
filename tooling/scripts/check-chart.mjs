@@ -598,6 +598,10 @@ const REFUSAL_CASES = [
     ]],
     ["rate limit store nonsense", ["--set", "sharedState.rateLimitStore=redis"]],
     ["migration mode the image refuses", ["--set", "migrationJob.mode=push"]],
+    // The surface mounts or it does not, and the runtime decides that silently:
+    // without an origin it logs and declines, leaving a release that is healthy
+    // on every probe and has no /mcp.
+    ["mcp enabled with no public url", ["--set", "mcp.enabled=true"]],
     ["migration mode nonsense", ["--set", "migrationJob.mode=sync"]],
     // A release with sign-up closed and no seeded admin is a release nobody can
     // sign in to, which is a values mistake worth catching at `helm install`

@@ -85,6 +85,20 @@ failed `helm install` and has one screen to work from.
   {{- fail "bundle.mode=image means the bundle is baked into image.repository, but that is still the stock runtime image (rebasepro/server), which contains no project. Build one FROM rebasepro/server with `COPY dist-bundle /bundle` and set image.repository to it — or use bundle.mode=url." }}
 {{- end }}
 
+{{/* ── The MCP surface needs an origin ──────────────────────────────────── */}}
+{{/*
+`REBASE_PUBLIC_URL` is not optional once the surface is on. Every document it
+serves names absolute URLs and the token audience is one of them, so the runtime
+declines to mount without it — and says so in a boot log nobody reads, on a
+release that otherwise comes up healthy and simply has no /mcp. Refusing at
+render time puts the failure where the mistake was made.
+*/}}
+{{- if .Values.mcp.enabled }}
+  {{- if not .Values.mcp.publicUrl }}
+    {{- fail "mcp.enabled is true but mcp.publicUrl is empty. The MCP surface serves absolute URLs — the OAuth issuer identity and the audience its own tokens are checked against — and cannot take them from the Host header without letting the caller choose them. The runtime declines to mount the surface without it, so the release would come up healthy with no /mcp. Set mcp.publicUrl to this release's externally reachable origin, e.g. https://app.example.com" }}
+  {{- end }}
+{{- end }}
+
 {{/* ── Topology variables in config.env ─────────────────────────────────── */}}
 {{/*
 Who decides the topology.
@@ -106,7 +120,7 @@ Kept in step with `TOPOLOGY_ENV_VARS` in
 `packages/server/src/deploy/pod-contract.ts` by `scripts/check-chart.mjs`,
 which cannot import TypeScript and so compares the two lists as text.
 */}}
-{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_RLS_AUDIT" "REBASE_MIGRATE_ON_BOOT" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
+{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_RLS_AUDIT" "REBASE_MCP_ENABLED" "REBASE_MIGRATE_ON_BOOT" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
 {{- range $name, $value := .Values.config.env }}
   {{- if has $name $topologyEnv }}
     {{- fail (printf "config.env sets %s, which decides this release's topology and is the chart's to own. Set here it either does nothing (under split, the chart's value is written last and wins) or takes effect unsupervised (unsplit, where nothing overrides it) — and a wrong topology passes every probe, because /livez and /health answer on every role. Use `split` and the api/functions/worker blocks instead." $name) }}

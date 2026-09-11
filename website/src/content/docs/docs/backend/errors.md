@@ -174,9 +174,11 @@ the ID you got. Read the response header.
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
+| `RELATION_HAS_NO_PIVOT` | 400 | The write carried a link payload, but the path does not reach its target through a `manyToMany` that declares `through.properties` — so there is no junction row to put it on. | Declare `through.properties` on the relation, or drop the payload from the write. See [Relations](/docs/collections/relations/). |
 | `RELATION_MISCONFIGURED` | 500 | A relation does not resolve against the registered schema. The operation is refused rather than skipped: dropping it would report success for a write that never happened, or emptiness for rows that exist. | Run `rebase schema generate` if the generated schema is older than the database. |
 | `RELATION_NOT_UNLINKABLE` | 400 | The relation cannot be unlinked from this side. | Write from the owning side. |
 | `RELATION_NOT_WRITABLE` | 400 | The nested path is not a writable relation. | See [Relations](/docs/collections/relations/). |
+| `RELATION_PIVOT_UNSUPPORTED` | 400 | The relation declares junction columns, but this data source cannot write them. | The link itself still works; only the payload on it does not. Check the driver's capabilities. |
 | `RELATION_SOURCE_KEY_EMPTY` | 400 | A relation write had no source key to hang the link on. | Save the parent row first. |
 | `SCHEMA_DRIFT` | 500 | A table or column the code expects does not exist in the database. | `rebase db push` in development; redeploy on a managed tenant. |
 | `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` was combined with `orderBy: "_score"`. Relevance is computed per query rather than stored, so it cannot key a cursor. | Page relevance with `limit`/`offset`, or order by a column. |

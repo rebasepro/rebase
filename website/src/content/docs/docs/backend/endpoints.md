@@ -187,6 +187,33 @@ deployment's custom endpoints is not public.
 WebSocket connections arrive as an HTTP upgrade on the same server rather than at
 a path of their own — see [Realtime](/docs/backend/realtime/).
 
+## MCP surface
+
+Mounted only when `REBASE_MCP_ENABLED=true`, which also requires
+`REBASE_PUBLIC_URL` — see
+[Configuration](/docs/getting-started/configuration/#mcp-surface). Off by
+default: no `REBASE_ROLE` turns this on, because it hands project access to
+third-party software and that is a decision for a person to make.
+
+The `.well-known` documents sit at the **origin**, not under `basePath`: RFC 8414
+and RFC 9728 define those paths relative to the origin, and a client fetches them
+before it holds any token.
+
+| Method | Path | Gate | More |
+|---|---|---|---|
+| `GET` | `/.well-known/oauth-protected-resource` | none | RFC 9728 metadata naming this resource and its authorization server. Served at the path-suffixed form as well |
+| `GET` | `/.well-known/oauth-authorization-server` | none | RFC 8414 metadata: the endpoints, grant types and PKCE methods this deployment supports |
+| `POST` | `/mcp` | OAuth bearer | The MCP protocol endpoint. Acts **as the signed-in user**, so every read and write is subject to the same RLS |
+| `GET` | `/mcp` | OAuth bearer | The server-sent-events stream for a session |
+| `DELETE` | `/mcp` | OAuth bearer | Ends a session |
+| `POST` | `/api/oauth/register` | rate-limited | RFC 7591 dynamic client registration. Refused when `REBASE_MCP_OPEN_REGISTRATION=false` |
+| `GET` | `/api/oauth/authorize` | session | The consent screen a client is redirected to |
+| `POST` | `/api/oauth/authorize/decision` | session | The person's answer to it — approve or deny |
+| `POST` | `/api/oauth/token` | client credentials + PKCE | Exchanges an authorization code, or refreshes |
+| `POST` | `/api/oauth/revoke` | client credentials | RFC 7009 token revocation |
+| `GET` | `/api/oauth/grants` | session | Which clients this user has approved |
+| `DELETE` | `/api/oauth/grants/:clientId` | session | Withdraws one, so a person can undo a consent without an admin |
+
 ## Related
 
 - [REST API](/docs/backend/api/) — the data routes in full: filters, sorting, pagination, errors

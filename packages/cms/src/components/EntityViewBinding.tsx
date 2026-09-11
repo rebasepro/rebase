@@ -246,7 +246,14 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
                 </FieldBlock>
             </div>
         );
-    }, [collection, entity, formContext]);
+        // `rebaseContext` is read twice above and was not declared, so every
+        // `additionalFields` Builder kept receiving the context captured on the
+        // first render — the stale closure this dependency array exists to
+        // prevent. It is handed straight to customer code, which is the worst
+        // place to be one version behind: a Builder that resolves a reference or
+        // checks a permission would do it against a context that has since
+        // changed user, auth or data source.
+    }, [collection, entity, formContext, rebaseContext]);
 
     /**
      * One field of a `readVariant: "summary"` section: a label/value row rather

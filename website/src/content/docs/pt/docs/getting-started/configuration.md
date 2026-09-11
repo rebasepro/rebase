@@ -1,87 +1,84 @@
 ---
-sourceHash: 19ae5aa65ad4194e
-title: Ambiente e Configuração
+sourceHash: a6ecab532bd0be01
+title: Ambiente & Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
 ---
 
 ## Variáveis de Ambiente
 
-Toda a configuração é feita através de variáveis de ambiente no seu arquivo `.env` na raiz do projeto.
+Toda a configuração é feita por meio de variáveis de ambiente no seu arquivo `.env` na raiz do projeto.
 
-> **Importante**: O Rebase valida as variáveis de ambiente com **Zod** no arranque.
-> Se faltar algo obrigatório ou estiver malformado (um URL que não é um URL, uma
-> porta que não é um número), o servidor recusa arrancar e nomeia a variável.
+> **Importante**: O Rebase valida variáveis de ambiente com **Zod** na inicialização. Se
+> algo obrigatório estiver ausente ou malformado (uma URL que não é uma URL, uma porta que
+> não é um número), o servidor recusa a inicialização e informa o nome da variável.
 >
-> Onde vive o esquema depende de como executa o backend. Um projeto arrancado pelo
-> runtime — `rebase dev`, `rebase start`, a imagem publicada — usa o esquema do
-> próprio runtime (`loadBootEnv` em `@rebasepro/server`), que é a união de todas as
-> tabelas abaixo. Um projeto que executou [`rebase eject`](/docs/cli) possui o seu
-> próprio `backend/src/env.ts` com `loadEnv({ extend })`, e pode acrescentar aí as
-> suas variáveis tipadas.
+> O local onde o esquema reside depende de como você executa o backend. Um projeto inicializado
+> pelo runtime — `rebase dev`, `rebase start`, a imagem publicada — usa o esquema de
+> propriedade do runtime (`loadBootEnv` em `@rebasepro/server`), que é a união de todas as tabelas
+> abaixo. Um projeto que executou [`rebase eject`](/docs/cli) possui um `backend/src/env.ts`
+> chamando `loadEnv({ extend })` e pode adicionar suas próprias variáveis tipadas lá.
 
 ### Obrigatórias
 
 | Variável | Descrição | Exemplo |
-|----------|-------------|---------|
-| `DATABASE_URL` | String de conexão PostgreSQL. **Opcional em desenvolvimento** — sem ela, o `rebase dev` executa um PostgreSQL gerenciado para o projeto, com os dados em `.rebase/`. Obrigatória em todo o resto. | `postgresql://user:pass@localhost:5432/mydb` |
-| `JWT_SECRET` | Chave secreta para assinar tokens JWT. Use uma string aleatória forte (mínimo 32 caracteres). **Obrigatória em produção** (gerada automaticamente em desenvolvimento). | `a1b2c3d4e5...` |
+|----------|-----------|---------|
+| `DATABASE_URL` | String de conexão do PostgreSQL. **Opcional em desenvolvimento** — se não definida, `rebase dev` executa um PostgreSQL gerenciado para o projeto, com seus dados em `.rebase/`. Obrigatória em todos os outros lugares. | `postgresql://user:pass@localhost:5432/mydb` |
+| `JWT_SECRET` | Chave secreta para assinar tokens JWT. Use uma string aleatória forte (mín. 32 caracteres). **Obrigatória em produção** (gerada automaticamente em desenvolvimento). | `a1b2c3d4e5...` |
 
 > **`sslmode=no-verify` é uma grafia do node-postgres, não do libpq.**
 >
-> O Rebase e o driver do Node a aceitam — cifrar, mas não verificar o
-> certificado. `psql`, `pg_dump`, `pg_restore` e Atlas não, e não degradam: eles
-> se recusam a iniciar com `invalid sslmode value: "no-verify"`.
+> O Rebase e o driver do Node a aceitam — criptografam, mas não verificam o
+> certificado. O `psql`, `pg_dump`, `pg_restore` e Atlas não aceitam, e não
+> degradam graciosamente: eles recusam iniciar com `invalid sslmode value: "no-verify"`.
 >
-> Os comandos do próprio Rebase (`rebase db push`, `rebase db backup`, `rebase db
-> restore`) a reescrevem para o equivalente `sslmode=require` antes de chamar o
-> binário, então funcionam com a URL tal como está configurada. Usar `psql` à mão
-> não — troque ali por `sslmode=require`, que cifra sem verificar exatamente do
-> mesmo jeito.
+> Os próprios comandos do Rebase (`rebase db push`, `rebase db backup`, `rebase db
+> restore`) reescrevem isso para o equivalente `sslmode=require` antes de executar os comandos shell,
+> funcionando assim com a URL configurada. Executar o `psql` manualmente não faz isso
+> — substitua por `sslmode=require` lá, o que criptografa sem verificar exatamente da
+> mesma forma.
 
 ### Frontend
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `VITE_API_URL` | URL da API de backend para o SDK do cliente. **Defina-o apenas em desenvolvimento** — veja abaixo. | origem da página |
-| `VITE_GOOGLE_CLIENT_ID` | ID do cliente Google OAuth. Habilita "Fazer login com o Google". | — |
+|----------|-----------|--------|
+| `VITE_API_URL` | URL da API do backend para o SDK do cliente. **Defina isso apenas em desenvolvimento** — veja abaixo. | origem da página |
+| `VITE_GOOGLE_CLIENT_ID` | ID do cliente OAuth do Google. Habilita o "Entrar com Google". | — |
 
-
-> **Deixe `VITE_API_URL` sem definir nas builds de produção.**
+> **Deixe `VITE_API_URL` não configurado em builds de produção.**
 >
-> Em desenvolvimento o frontend e o backend são origens separadas, então o
-> servidor de desenvolvimento a injeta. Em produção o backend do Rebase serve a
-> SPA, então a API é a própria origem da página e o cliente a resolve assim
-> sozinho.
+> Em desenvolvimento, o frontend e o backend são origens separadas, portanto, o servidor
+> de desenvolvimento injeta isso. Em produção, o backend do Rebase serve a SPA, de modo que a
+> API é a própria origem da página e o cliente a resolve dessa forma por conta própria.
 >
-> Assar uma URL absoluta num bundle de produção funciona até o momento em que um
-> segundo hostname aponta para a mesma app: um domínio próprio carrega então a
-> página a partir de `example.com` e chama a API em `example.rebase.website`, o
-> que é cross-origin, então toda requisição falha no preflight. Permitir a origem
-> no CORS também **não** resolve: o cookie de refresh é `SameSite=Lax` e não é
-> enviado entre sites, então você teria limpado os erros do console e continuaria
-> com a autenticação quebrada. Sem definir, qualquer domínio que aponte para a
-> app funciona sem nenhuma configuração de CORS.
+> Fixar uma URL absoluta em um bundle de produção funciona até o momento em que um segundo
+> hostname aponta para a mesma aplicação: um domínio customizado então carrega a página de
+> `example.com` e chama a API em `example.rebase.website`, o que é cross-origin, fazendo com
+> que cada requisição falhe no preflight. Permitir a origem no CORS **não** resolve isso
+> também — o cookie de atualização (refresh cookie) é `SameSite=Lax` e não é enviado cross-site,
+> portanto você limparia os erros do console e ainda continuaria com a autenticação quebrada.
+> Não definida, todo domínio que aponta para a aplicação funciona sem nenhuma configuração
+> de CORS.
 
 ### Backend
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `PORT` | Porta para o servidor HTTP de backend. Lida por `rebase start`. O `rebase dev` lê-a **apenas do ambiente da shell** — uma `PORT` no `.env` não é lida aí, porque a porta é resolvida antes de esse ficheiro ser carregado — e caso contrário usa uma porta derivada do caminho do projeto, para que vários projetos possam correr ao mesmo tempo. `rebase dev --port` prevalece sobre ambas, e o banner de arranque indica que nível usou. | `3001` |
-| `LOG_LEVEL` | Nível de verbosidade de log: `error`, `warn`, `info`, `debug` | `info` |
-| `REBASE_LOG_RAW_QUERIES` | Mostra o SQL por trás de uma linha `Failed query: [redacted]`. Toda instrução que falha é ocultada por omissão, porque uma consulta falhada leva consigo os seus parâmetros ligados — um email, um hash de palavra-passe. Define-o como `true` enquanto diagnosticas uma falha de DDL, RLS ou captura de alterações. Ignorado quando `NODE_ENV=production`. | `false` |
+|----------|-----------|--------|
+| `PORT` | Porta para o servidor HTTP do backend. Lida por `rebase start`. O `rebase dev` a lê **apenas do ambiente do shell** — uma `PORT` no `.env` não é lida lá, porque a porta é resolvida antes que esse arquivo seja carregado — e, caso contrário, vincula uma porta derivada do caminho do projeto, para que vários projetos possam rodar ao mesmo tempo. `rebase dev --port` tem precedência sobre ambos, e o banner inicial indica qual foi utilizado. | `3001` |
+| `LOG_LEVEL` | Nível de detalhe dos logs: `error`, `warn`, `info`, `debug` | `info` |
+| `REBASE_LOG_RAW_QUERIES` | Mostra o SQL por trás de uma linha `Failed query: [redacted]`. Toda instrução que falha é ocultada por padrão, porque uma consulta com falha carrega seus parâmetros vinculados — um e-mail, um hash de senha. Defina como `true` ao diagnosticar uma falha de DDL, RLS ou captura de alterações. Ignorado quando `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Ambiente: `development`, `production` ou `test` | `development` |
-| `CORS_ORIGINS` | Lista de origens permitidas separadas por vírgulas. **Obrigatória em produção** se diferir do domínio do backend. Em desenvolvimento ela é *adicionada a* localhost — veja abaixo. | — |
-| `FRONTEND_URL` | URL da app frontend. Usada como alternativa a `CORS_ORIGINS`, nos dois ambientes. | — |
-| `ADMIN_CONNECTION_STRING` | String de conexão ao banco de dados em nível administrativo (usada para introspecção de esquema e operações administrativas). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Desativa a troca de papel do PostgreSQL no Editor SQL (útil com autenticação própria em que os papéis do banco não estão mapeados). | `false` |
+| `CORS_ORIGINS` | Lista separada por vírgulas de origens permitidas. **Obrigatório em produção** se for diferente do domínio do backend. Em desenvolvimento, é *adicionado ao* localhost — veja abaixo. | — |
+| `FRONTEND_URL` | URL do aplicativo frontend. Usado como alternativa ao CORS_ORIGINS, em ambos os ambientes. | — |
+| `ADMIN_CONNECTION_STRING` | String de conexão do banco de dados com nível de administrador (usada para introspecção de esquema e operações administrativas). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Desativa a alternância de roles do PostgreSQL no SQL Editor (útil para autenticação personalizada onde as roles do banco não são mapeadas). | `false` |
 
 #### CORS em desenvolvimento
 
-Desenvolvimento permite **localhost, mais o que `CORS_ORIGINS` (ou
-`FRONTEND_URL`) nomear** — a mesma lista que a produção usa, com localhost
-acrescentado em vez de substituído. Assim a variável funciona igual nos dois
-ambientes, e os casos que precisam dela em desenvolvimento são os comuns:
+O desenvolvimento permite o **localhost, além do que `CORS_ORIGINS` (ou `FRONTEND_URL`)
+indicar** — a mesma lista que a produção usa, com o localhost adicionado em vez de
+substituído. Portanto, a variável funciona da mesma forma em ambos os ambientes, e os
+casos que precisam dela em desenvolvimento são os comuns:
 
 ```bash
 # A phone on the LAN, a colleague's machine, an ngrok tunnel,
@@ -89,270 +86,280 @@ ambientes, e os casos que precisam dela em desenvolvimento são os comuns:
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
-Uma origem que não é localhost nem está listada é recusada, e a recusa é
-registrada **uma vez por origem** com a linha exata que a permitiria. Recusar não
-é cautela por si só: a API envia credenciais, então refletir um `Origin`
-arbitrário deixaria qualquer site que a desenvolvedora visite fazer requisições
-autenticadas contra o servidor de desenvolvimento com a sessão dela e ler as
+Uma origem que não seja o localhost nem esteja listada é recusada, e a recusa é
+registrada em log **uma vez por origem** com a linha exata que a permitiria. A recusa
+não é cautela por capricho: a API envia credenciais, portanto refletir um
+`Origin` arbitrário permitiria que qualquer site que o desenvolvedor visitasse fizesse
+requisições autenticadas contra o servidor de desenvolvimento com sua sessão e lesse as
 respostas.
 
 ### Autenticação
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `JWT_SECRET` | Segredo para assinatura JWT (obrigatório em produção, gerado automaticamente em desenvolvimento) | — |
-| `JWT_PRIVATE_KEY` | Chave privada PEM para assinar tokens de acesso de forma assimétrica (RS256), para que qualquer coisa que tenha o JWKS possa verificar uma sessão sem conseguir emitir uma. Aceita um PEM com quebras de linha reais, um PEM com escapes `\n`, ou o base64 do PEM inteiro. Sem ela os tokens continuam HS256. | — |
-| `JWT_KEY_ID` | Nomeia `JWT_PRIVATE_KEY` no cabeçalho do token e no JWKS. Mude-o sempre que a chave mudar — a rotação depende de a antiga e a nova serem distinguíveis. | `default` |
+|----------|-----------|--------|
+| `JWT_SECRET` | Segredo para assinatura de JWT (obrigatório em produção, gerado automaticamente em desenvolvimento) | — |
+| `JWT_PRIVATE_KEY` | Chave privada PEM para assinar tokens de acesso assimetricamente (RS256), para que qualquer serviço que possua o JWKS possa verificar uma sessão sem conseguir forjar uma. Aceita um PEM com quebras de linha reais, um PEM com escapes `\n` ou base64 de todo o PEM. Sem isso, os tokens permanecem em HS256. | — |
+| `JWT_KEY_ID` | Identifica a `JWT_PRIVATE_KEY` no cabeçalho do token e no JWKS. Altere-o sempre que a chave mudar — a rotação depende de o antigo e o novo serem distinguíveis. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Tempo de vida do token de acesso | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Tempo de vida do token de atualização. Deslizante — cada rotação o renova, então ele governa quanto tempo uma sessão sobrevive à **inatividade**. | `400d` |
-| `ALLOW_REGISTRATION` | Permitir que novos usuários se registrem (`true`/`false`). Fora de produção o **primeiro** usuário sempre pode se registrar, diga o que disser isto — uma tabela de usuários vazia tem de admitir alguém, e esse alguém vira o administrador. Em produção (`NODE_ENV=production`) essa janela está fechada: uma tabela vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma primeira conta criada por registro aberto é uma conta comum, e o administrador é nomeado com `REBASE_ADMIN_EMAIL` abaixo ou atribuído com a chave de serviço. O `.env.example` do scaffold a define como `true`; o padrão do framework é desligado. | `false` |
-| `DISABLE_SELF_REGISTRATION` | Interruptor de emergência. Fecha a janela de bootstrap do primeiro usuário que `ALLOW_REGISTRATION=false` deixa deliberadamente aberta fora de produção, de modo que o registro fica fechado mesmo contra um banco vazio. Combine-a com `REBASE_ADMIN_EMAIL` abaixo, ou a implantação não terá como produzir o seu primeiro chamador autenticado. Todo artefato de implantação publicado a define. | — |
-| `REBASE_ADMIN_EMAIL` | E-mail da primeira conta de administrador, criada no arranque **enquanto a tabela de usuários ainda está vazia** e nunca depois. É assim que uma implantação de produção ganha o seu administrador: o operador nomeia a primeira conta em vez de disputá-la com a internet. O arranque avisa quando a tabela está vazia em produção e isto fica sem definir. | — |
-| `REBASE_ADMIN_PASSWORD` | Senha dessa conta. Pelo menos 12 caracteres, ou é recusada e a conta não é criada. Troque-a após o primeiro login. | — |
-| `MFA_ENCRYPTION_KEY` | Cifra todos os segredos TOTP armazenados. Sem definir, os segredos são cifrados com `JWT_SECRET` e o arranque avisa uma vez — então rotacionar `JWT_SECRET` desconecta todo mundo *e* deixa indecifrável cada autenticador cadastrado. Defina uma chave dedicada (32+ caracteres aleatórios) antes que alguém se cadastre. | — |
-| `MFA_ENCRYPTION_KEY_PREVIOUS` | A chave da qual se está rotacionando *para longe*. Defina as duas durante uma rotação: os segredos novos são escritos com `MFA_ENCRYPTION_KEY` e os existentes continuam legíveis, então ninguém fica trancado para fora da própria conta no meio da rotação. Remova-a assim que todos os segredos forem recifrados. | — |
-| `ALLOW_ANONYMOUS` | Habilita o login anônimo (`POST /api/auth/anonymous`). É opt-in, e deliberadamente não condicionado a `ALLOW_REGISTRATION`. | `false` |
-| `AUTH_REQUIRE` | Exige autenticação para a API de dados. Defina `false` para uma superfície de leitura totalmente pública — a RLS continua valendo. | `true` |
-| `AUTH_DEFAULT_ROLE` | Papel atribuído a um usuário recém-registrado quando nenhum é informado. | — |
-| `AUTH_ALLOW_USER_LOOKUP` | Monta `POST /api/auth/find-user`, que resolve um e-mail para um perfil público mínimo (`uid`, `displayName`, `photoURL`) em fluxos de convite por e-mail. Apenas para chamadores autenticados, e nunca devolve o e-mail, os papéis ou os metadados do usuário encontrado. Desligado por padrão: é uma superfície de enumeração. | `false` |
-| `AUTH_COOKIE_SAME_SITE` | `SameSite` no cookie de refresh: `Strict`, `Lax` ou `None`. `None` exige HTTPS e é só para um frontend genuinamente cross-site. | `Lax` |
-| `AUTH_COOKIE_SECURE` | `Secure` no cookie de refresh. Ligado por padrão; `AUTH_COOKIE_SECURE=false` para http sem TLS — uma implantação em um endereço de rede local, onde o navegador descartaria o cookie e a sessão morreria na expiração do token de acesso, sem erro algum. A inicialização avisa. `http://localhost` não precisa disso. | `true` |
-| `GOOGLE_CLIENT_ID` | ID do cliente Google OAuth (validação de backend) | — |
-| `GOOGLE_CLIENT_SECRET` | Segredo do cliente Google OAuth | — |
-| `GITHUB_CLIENT_ID` | ID do cliente GitHub OAuth | — |
-| `GITHUB_CLIENT_SECRET` | Segredo do cliente GitHub OAuth | — |
-| `MICROSOFT_CLIENT_ID` | ID do cliente Microsoft OAuth | — |
-| `MICROSOFT_CLIENT_SECRET` | Segredo do cliente Microsoft OAuth | — |
-| `LINKEDIN_CLIENT_ID` | ID do cliente LinkedIn OAuth | — |
-| `LINKEDIN_CLIENT_SECRET` | Segredo do cliente LinkedIn OAuth | — |
-| `FACEBOOK_CLIENT_ID` | ID do cliente Facebook OAuth | — |
-| `FACEBOOK_CLIENT_SECRET` | Segredo do cliente Facebook OAuth | — |
-| `TWITTER_CLIENT_ID` | ID do cliente X/Twitter OAuth | — |
-| `TWITTER_CLIENT_SECRET` | Segredo do cliente X/Twitter OAuth | — |
-| `DISCORD_CLIENT_ID` | ID do cliente Discord OAuth | — |
-| `DISCORD_CLIENT_SECRET` | Segredo do cliente Discord OAuth | — |
-| `GITLAB_CLIENT_ID` | ID do cliente GitLab OAuth. A `baseUrl` de uma instância auto-hospedada não tem grafia como variável de ambiente — configure o GitLab no bloco `auth` para isso. | — |
-| `GITLAB_CLIENT_SECRET` | Segredo do cliente GitLab OAuth | — |
-| `BITBUCKET_CLIENT_ID` | ID do cliente Bitbucket OAuth | — |
-| `BITBUCKET_CLIENT_SECRET` | Segredo do cliente Bitbucket OAuth | — |
-| `SLACK_CLIENT_ID` | ID do cliente Slack OAuth | — |
-| `SLACK_CLIENT_SECRET` | Segredo do cliente Slack OAuth | — |
-| `SPOTIFY_CLIENT_ID` | ID do cliente Spotify OAuth | — |
-| `SPOTIFY_CLIENT_SECRET` | Segredo do cliente Spotify OAuth | — |
-| `APPLE_CLIENT_ID` | Services ID da Apple. A Apple não tem segredo de cliente estático — o Rebase assina um JWT ES256 de vida curta a cada troca de token — então ela precisa dos quatro valores `APPLE_*`, e sem eles não configura nada. | — |
-| `APPLE_TEAM_ID` | Team ID do Apple Developer, o emissor do JWT. | — |
+| `JWT_REFRESH_EXPIRES_IN` | Tempo de vida do token de atualização (refresh token). Deslizante — cada rotação o renova, portanto isso governa quanto tempo uma sessão sobrevive à **inatividade**. | `400d` |
+| `ALLOW_REGISTRATION` | Permite que novos usuários se registrem (`true`/`false`). Fora de produção, o **primeiro** usuário sempre pode se registrar, independentemente do que estiver definido aqui — uma tabela de usuários vazia precisa admitir alguém, e esse alguém se torna o administrador. Em produção (`NODE_ENV=production`), essa janela é fechada: uma tabela vazia recusa o registro de inicialização com `SETUP_REQUIRED`, uma primeira conta criada por registro aberto é uma conta comum, e o administrador é definido com `REBASE_ADMIN_EMAIL` abaixo ou atribuído com a service key. O `.env.example` do scaffold define como `true`; o padrão do framework é desativado. | `false` |
+| `DISABLE_SELF_REGISTRATION` | Botão de desligamento de emergência (kill switch). Fecha a janela de inicialização do primeiro usuário que `ALLOW_REGISTRATION=false` deliberadamente deixa aberta fora de produção, para que o registro seja bloqueado mesmo em um banco de dados vazio. Combine com `REBASE_ADMIN_EMAIL` abaixo, ou a implantação não terá como produzir seu primeiro chamador autenticado. Todo artefato de implantação distribuído define isso. | — |
+| `REBASE_ADMIN_EMAIL` | E-mail da primeira conta de administrador, criada na inicialização **enquanto a tabela de usuários ainda estiver vazia** e nunca depois disso. É assim que uma implantação de produção obtém seu administrador: o operador define a primeira conta em vez de disputá-la com a internet. A inicialização emite um aviso quando a tabela está vazia em produção e isso não está configurado. | — |
+| `REBASE_ADMIN_PASSWORD` | Senha para essa conta. Pelo menos 12 caracteres, caso contrário é recusada e a conta não é criada. Altere-a após o primeiro login. | — |
+| `MFA_ENCRYPTION_KEY` | Criptografa cada segredo TOTP armazenado. Se não configurado, os segredos são criptografados com `JWT_SECRET` e a inicialização avisa uma vez — portanto, rotacionar o `JWT_SECRET` desconecta todos *e* torna indecriptável qualquer autenticador registrado. Defina uma chave dedicada (32+ caracteres aleatórios) antes que alguém se registre. | — |
+| `MFA_ENCRYPTION_KEY_PREVIOUS` | A chave antiga da qual se está fazendo a rotação. Defina ambas durante uma rotação: novos segredos são gravados com `MFA_ENCRYPTION_KEY` e os existentes ainda podem ser lidos, para que ninguém fique bloqueado fora de sua própria conta no meio da rotação. Remova-a quando todos os segredos tiverem sido recriptografados. | — |
+| `ALLOW_ANONYMOUS` | Habilita o login anônimo (`POST /api/auth/anonymous`). Opcional (opt-in) e deliberadamente não bloqueado por `ALLOW_REGISTRATION`. | `false` |
+| `AUTH_REQUIRE` | Exige autenticação para a API de dados. Defina como `false` para uma superfície de leitura totalmente pública — o RLS ainda se aplica. | `true` |
+| `AUTH_DEFAULT_ROLE` | Role atribuída a um usuário recém-registrado quando nenhuma for informada. | — |
+| `AUTH_ALLOW_USER_LOOKUP` | Monta a rota `POST /api/auth/find-user`, que resolve um e-mail para um perfil público mínimo (`uid`, `displayName`, `photoURL`) para fluxos de convite por e-mail. Apenas chamadores autenticados, e nunca retorna o e-mail, roles ou metadados do usuário encontrado. Desativado por padrão: é uma superfície de enumeração. | `false` |
+| `AUTH_COOKIE_SAME_SITE` | `SameSite` no cookie de atualização: `Strict`, `Lax` ou `None`. `None` requer HTTPS e serve apenas para um frontend genuinamente cross-site. | `Lax` |
+| `AUTH_COOKIE_SECURE` | `Secure` no cookie de atualização. Seguro por padrão; `AUTH_COOKIE_SECURE=false` para http simples — uma implantação em um endereço de LAN onde o navegador descartaria o cookie e a sessão morreria no vencimento do token de acesso sem erro. Um aviso é exibido na inicialização. `http://localhost` não precisa disso. | `true` |
+| `GOOGLE_CLIENT_ID` | ID do cliente OAuth do Google (validação no backend) | — |
+| `GOOGLE_CLIENT_SECRET` | Segredo do cliente OAuth do Google | — |
+| `GITHUB_CLIENT_ID` | ID do cliente OAuth do GitHub | — |
+| `GITHUB_CLIENT_SECRET` | Segredo do cliente OAuth do GitHub | — |
+| `MICROSOFT_CLIENT_ID` | ID do cliente OAuth da Microsoft | — |
+| `MICROSOFT_CLIENT_SECRET` | Segredo do cliente OAuth da Microsoft | — |
+| `LINKEDIN_CLIENT_ID` | ID do cliente OAuth do LinkedIn | — |
+| `LINKEDIN_CLIENT_SECRET` | Segredo do cliente OAuth do LinkedIn | — |
+| `FACEBOOK_CLIENT_ID` | ID do cliente OAuth do Facebook | — |
+| `FACEBOOK_CLIENT_SECRET` | Segredo do cliente OAuth do Facebook | — |
+| `TWITTER_CLIENT_ID` | ID do cliente OAuth do X/Twitter | — |
+| `TWITTER_CLIENT_SECRET` | Segredo do cliente OAuth do X/Twitter | — |
+| `DISCORD_CLIENT_ID` | ID do cliente OAuth do Discord | — |
+| `DISCORD_CLIENT_SECRET` | Segredo do cliente OAuth do Discord | — |
+| `GITLAB_CLIENT_ID` | ID do cliente OAuth do GitLab. A `baseUrl` de uma instância auto-hospedada não possui configuração por variável de ambiente — configure o GitLab no bloco `auth` para isso. | — |
+| `GITLAB_CLIENT_SECRET` | Segredo do cliente OAuth do GitLab | — |
+| `BITBUCKET_CLIENT_ID` | ID do cliente OAuth do Bitbucket | — |
+| `BITBUCKET_CLIENT_SECRET` | Segredo do cliente OAuth do Bitbucket | — |
+| `SLACK_CLIENT_ID` | ID do cliente OAuth do Slack | — |
+| `SLACK_CLIENT_SECRET` | Segredo do cliente OAuth do Slack | — |
+| `SPOTIFY_CLIENT_ID` | ID do cliente OAuth do Spotify | — |
+| `SPOTIFY_CLIENT_SECRET` | Segredo do cliente OAuth do Spotify | — |
+| `APPLE_CLIENT_ID` | ID de Serviços da Apple (Apple Services ID). A Apple não possui um segredo de cliente estático — o Rebase assina um JWT ES256 de curta duração por troca de token — portanto, precisa de todos os quatro valores `APPLE_*` e não configura nada sem eles. | — |
+| `APPLE_TEAM_ID` | ID da equipe de desenvolvedor da Apple (Apple Developer Team ID), o emissor do JWT. | — |
 | `APPLE_KEY_ID` | Key ID da chave privada registrada na Apple. | — |
 | `APPLE_PRIVATE_KEY` | Conteúdo do arquivo de chave privada `.p8`, com quebras de linha e tudo (escapes `\n` são aceitos). | — |
-| `REBASE_SERVICE_KEY` | Chave de API de administrador estática. Contorna a autenticação JWT normal para chamadas servidor a servidor quando passada como `Authorization: Bearer <key>`. (Gerada automaticamente em desenvolvimento). | — |
-| `REBASE_RATE_LIMIT_STORE` | Onde vivem os contadores do rate limit de auth: `memory` (por processo) ou `sql` (compartilhados entre réplicas). Um processo não consegue ver a própria contagem de réplicas, então uma implantação com pares tem de dizer isso — três réplicas no padrão aplicam três vezes o limite. Qualquer outro valor **recusa iniciar** em vez de recorrer a outro, `postgres` incluído. | `memory` |
-| `AUTH_MAGIC_LINK` | Monta o fluxo de login sem senha por link. Precisa de um serviço de e-mail configurado, ou o link não tem para onde ir. | `false` |
-| `AUTH_EMAIL_OTP` | Monta o login sem senha com um código de seis dígitos enviado por e-mail. O mesmo requisito de e-mail acima. | `false` |
-| `CAPTCHA_PROVIDER` | Liga a verificação de captcha nas rotas de auth: `turnstile` ou `hcaptcha`. Sem definir significa sem captcha. | — |
-| `CAPTCHA_SECRET` | O segredo do provedor, usado no servidor para verificar o token que o navegador envia. Obrigatório assim que `CAPTCHA_PROVIDER` estiver definido. | — |
-| `CAPTCHA_ROUTES` | Rotas de auth a proteger, separadas por vírgulas (por exemplo `register,login`). Sem definir protege o conjunto padrão do provedor. | — |
+| `REBASE_SERVICE_KEY` | Chave estática da API de administração. Ignora a autenticação JWT normal para chamadas servidor-para-servidor quando passada como `Authorization: Bearer <key>`. (Gerada automaticamente em desenvolvimento). | — |
+| `REBASE_RATE_LIMIT_STORE` | Onde os contadores de rate limit de autenticação residem: `memory` (por processo) ou `sql` (compartilhado entre réplicas). Um processo não pode ver sua própria contagem de réplicas, portanto uma implantação com instâncias paralelas precisa especificar — três réplicas no padrão aplicam três vezes o limite. Qualquer outro valor **recusa a inicialização** em vez de adotar um fallback, incluindo `postgres`. | `memory` |
+| `AUTH_MAGIC_LINK` | Monta o fluxo de link de login sem senha (magic link). Requer um serviço de e-mail configurado, caso contrário o link não tem para onde ir. | `false` |
+| `AUTH_EMAIL_OTP` | Monta o login sem senha com um código de seis dígitos enviado por e-mail. Mesmo requisito de e-mail acima. | `false` |
+| `CAPTCHA_PROVIDER` | Ativa a verificação de captcha nas rotas de autenticação: `turnstile` ou `hcaptcha`. Não configurado significa sem captcha. | — |
+| `CAPTCHA_SECRET` | O segredo do provedor, usado no servidor para verificar o token enviado pelo navegador. Obrigatório uma vez que `CAPTCHA_PROVIDER` esteja definido. | — |
+| `CAPTCHA_ROUTES` | Rotas de autenticação separadas por vírgula para proteger (por exemplo, `register,login`). Não configurado protege o conjunto padrão do provedor. | — |
 
 ### Armazenamento
 
-:::caution[O armazenamento não tem segurança em nível de linha, então precisa de um modelo de acesso]
-As coleções são protegidas pela RLS do Postgres. O armazenamento de objetos não
-tem equivalente — as chaves compartilham um único namespace plano — então, com um
-bucket configurado e nenhum modelo de acesso, o servidor **recusa iniciar em
-produção**. Satisfaça isso com exatamente um destes: um hook `storageAuthorize`
-exportado de `config/index.ts` (o que o scaffold traz), `STORAGE_PUBLIC_READ` ou
+:::caution[O armazenamento não possui segurança em nível de linha, portanto precisa de um modelo de acesso]
+As coleções são protegidas pelo RLS do Postgres. O armazenamento de objetos não tem
+equivalente — as chaves compartilham um namespace único e plano —, portanto, com um
+bucket configurado e nenhum modelo de acesso, o servidor **recusa a inicialização em produção**.
+Satisfaça isso com exatamente um dos seguintes: um hook `storageAuthorize` exportado de
+`config/index.ts` (o que o scaffold inclui por padrão), `STORAGE_PUBLIC_READ` ou
 `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 :::
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
+|----------|-----------|--------|
 | `STORAGE_TYPE` | Backend de armazenamento: `local`, `s3` ou `gcs`. Em produção, `local` desativa o armazenamento a menos que `FORCE_LOCAL_STORAGE=true` | `local` |
-| `STORAGE_PATH` | Caminho base para armazenamento local | `./uploads` |
-| `FORCE_LOCAL_STORAGE` | Permite armazenamento local em produção — apenas com um volume durável montado em `STORAGE_PATH` | `false` |
+| `STORAGE_PATH` | Caminho base para o armazenamento local | `./uploads` |
+| `FORCE_LOCAL_STORAGE` | Permite armazenamento local em produção — apenas com um volume persistente montado em `STORAGE_PATH` | `false` |
 | `S3_BUCKET` | Nome do bucket S3 (quando `STORAGE_TYPE=s3`) | — |
-| `S3_REGION` | Região AWS | — |
-| `S3_ACCESS_KEY_ID` | Chave de acesso AWS | — |
-| `S3_SECRET_ACCESS_KEY` | Chave secreta AWS | — |
+| `S3_REGION` | Região da AWS | — |
+| `S3_ACCESS_KEY_ID` | Chave de acesso da AWS | — |
+| `S3_SECRET_ACCESS_KEY` | Chave secreta de acesso da AWS | — |
 | `S3_ENDPOINT` | Endpoint S3 personalizado (para MinIO, Cloudflare R2, etc.) | — |
 | `S3_FORCE_PATH_STYLE` | Força URLs em estilo de caminho para o bucket S3 (`true`/`false`) | `false` |
 | `GCS_BUCKET` | Nome do bucket GCS (quando `STORAGE_TYPE=gcs`) | — |
-| `GCS_PROJECT_ID` | Projeto do GCP. Normalmente inferido das credenciais. | — |
-| `GCS_KEY_FILENAME` | Caminho para um arquivo de chave de conta de serviço. Omita no GCP, onde a Workload Identity fornece as credenciais. | — |
-| `STORAGE_PUBLIC_READ` | Serve todo objeto a qualquer um, sem token. Apenas para um bucket que realmente é uma CDN pública. Uma das três formas de satisfazer a verificação de arranque acima. | `false` |
-| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Deixa qualquer chamador autenticado ler, escrever, listar e apagar todo objeto. Chamado de `INSECURE` no objeto de configuração por um motivo: só é defensável numa app single-tenant onde toda conta é confiável com todo arquivo. | `false` |
-| `STORAGE_RENDITION_CACHE` | Guarda em cache as versões de imagem geradas (redimensionamentos, conversões de formato) em vez de produzi-las a cada requisição. | `false` |
+| `GCS_PROJECT_ID` | Projeto do GCP. Geralmente inferido das credenciais. | — |
+| `GCS_KEY_FILENAME` | Caminho para o arquivo de chave da conta de serviço. Omita no GCP, onde o Workload Identity fornece credenciais. | — |
+| `STORAGE_PUBLIC_READ` | Serve qualquer objeto para qualquer pessoa, sem token. Apenas para um bucket que seja genuinamente uma CDN pública. Uma das três maneiras de satisfazer a verificação de inicialização abaixo. | `false` |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Permite que qualquer chamador autenticado leia, grave, liste e exclua todos os objetos. Chamado de `INSECURE` no objeto de configuração por um motivo: é defensável apenas em um aplicativo single-tenant onde toda conta é confiável para acessar todos os arquivos. | `false` |
+| `STORAGE_RENDITION_CACHE` | Armazena em cache rendições de imagens geradas (redimensionamentos, conversões de formato) em vez de produzi-las a cada requisição. | `false` |
 
-### Email (Opcional)
+### E-mail (Opcional)
 
 | Variável | Descrição |
-|----------|-------------|
+|----------|-----------|
 | `SMTP_HOST` | Host do servidor SMTP |
 | `SMTP_PORT` | Porta do servidor SMTP |
-| `SMTP_SECURE` | Habilitar conexão segura (`true`/`false`) |
-| `SMTP_USER` | Nome de usuário SMTP |
+| `SMTP_SECURE` | Ativa conexão segura (`true`/`false`) |
+| `SMTP_USER` | Usuário SMTP |
 | `SMTP_PASS` | Senha SMTP |
 | `SMTP_FROM` | Endereço do remetente para e-mails do sistema |
-| `SMTP_NAME` | Nome exibido no endereço do remetente |
-| `APP_NAME` | Nome do produto usado nos assuntos e corpos dos e-mails (padrão: `Rebase`) |
-| `EMAIL_LOGO_URL` | Logo exibido no topo dos modelos de e-mail padrão. PNG ou JPG `http(s)` absoluto — os clientes removem SVG e bloqueiam URIs `data:`. Sem definir, uma app ainda chamada `Rebase` recebe a marca do Rebase e uma renomeada não recebe nenhuma |
+| `SMTP_NAME` | Nome de exibição no endereço do remetente |
+| `APP_NAME` | Nome do produto usado nos assuntos e corpos de e-mail (padrão: `Rebase`) |
+| `EMAIL_LOGO_URL` | Logo exibido no topo dos modelos de e-mail padrão. PNG ou JPG absoluto em `http(s)` — os clientes de e-mail removem SVG e bloqueiam URIs `data:`. Se não configurado, um app ainda chamado `Rebase` recebe a marca do Rebase e um renomeado não recebe nenhum |
 
 ### Pool de conexões do banco de dados
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
+|----------|-----------|--------|
 | `DB_POOL_MAX` | Máximo de conexões no pool | `20` |
-| `DB_POOL_IDLE_TIMEOUT` | Milissegundos que uma conexão ociosa é mantida | `30000` |
-| `DB_POOL_CONNECT_TIMEOUT` | Milissegundos de espera por uma conexão | `10000` |
-| `DATABASE_DIRECT_URL` | Conexão direta (sem pool). O [Realtime](/docs/backend/realtime) precisa de uma: `LISTEN`/`NOTIFY` não sobrevive a um pooler de transações como o PgBouncer, e sem ela as notificações de mudança são desativadas com um aviso em vez de se perderem em silêncio. | — |
-| `DATABASE_READ_URL` | Réplica de leitura. As leituras vão para lá quando está definida e difere de `DATABASE_URL`; se a conexão falhar, tudo recorre à primária com um aviso. | — |
-| `REBASE_DB_POOL_MAX` | Um teto sobre todos os pools do processo, aplicado independentemente do que cada um pediu. Só dígitos: um valor malformado é ignorado em vez de serializar o servidor em silêncio. | — |
+| `DB_POOL_IDLE_TIMEOUT` | Milissegundos que uma conexão inativa é mantida | `30000` |
+| `DB_POOL_CONNECT_TIMEOUT` | Milissegundos para aguardar por uma conexão | `10000` |
+| `DATABASE_DIRECT_URL` | Conexão direta (sem pool). O [Realtime](/docs/backend/realtime) precisa de uma: o `LISTEN`/`NOTIFY` não sobrevive a um pooler de transações como o PgBouncer e, sem isso, as notificações de alteração são desativadas com um aviso em vez de serem perdidas silenciosamente. | — |
+| `DATABASE_READ_URL` | Réplica de leitura. As leituras vão para lá quando estiver definido e for diferente de `DATABASE_URL`; se a conexão falhar, tudo volta para o primário com um aviso. | — |
+| `REBASE_DB_POOL_MAX` | Um limite máximo para todos os pools no processo, aplicado independentemente do que cada um solicitou. Apenas dígitos numéricos: um valor malformado é ignorado em vez de serializar silenciosamente o servidor. | — |
 
 ### Comportamento do runtime
 
 Lido pelo runtime — `rebase dev`, `rebase start` e a imagem de servidor
-publicada. Um projeto que fez eject é dono dessas decisões no próprio código.
+publicada. Um projeto que foi ejetado é responsável por essas decisões em seu próprio código.
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `REBASE_RLS_AUDIT` | Executa a auditoria de segurança em nível de linha no arranque e monta o seu endpoint, que reporta tabelas servidas sem políticas. | — |
-| `REBASE_BASE_PATH` | Caminho base de toda rota da API. É preciso dizer o mesmo ao cliente — veja [Alterar `basePath`](#alterar-basepath). | `/api` |
-| `REBASE_SERVE_STATIC` | Serve os assets estáticos/de administração do bundle a partir deste processo. Desligue quando houver uma CDN na frente. | `true` |
-| `REBASE_HISTORY` | Registra o [histórico de mudanças de entidades](/docs/backend/history). | `true` |
-| `REBASE_COMPRESSION` | Respostas com gzip/brotli. | `true` |
-| `REBASE_MAX_BODY_SIZE` | Corpo máximo da requisição, **em bytes** (`10485760`, não `10MB` — um valor que não é um número recusa iniciar em vez de remover o limite em silêncio). | — |
-| `REBASE_ENABLE_SWAGGER` | A superfície OpenAPI. Três estados: sem definir significa ligada em desenvolvimento e desligada em produção; `false` desliga as duas em qualquer lugar. Note que `true` em produção serve a **especificação** em `/api/docs` mas não a **UI** do Swagger em `/api/swagger` — a UI depende de `NODE_ENV` separadamente. | — |
+|----------|-----------|--------|
+| `REBASE_RLS_AUDIT` | Executa a auditoria de segurança em nível de linha (RLS) na inicialização e monta seu endpoint, que relata tabelas expostas sem políticas. | — |
+| `REBASE_BASE_PATH` | Caminho base para todas as rotas da API. O cliente deve ser configurado com o mesmo valor — veja [Alterando `basePath`](#changing-basepath). | `/api` |
+| `REBASE_SERVE_STATIC` | Serve os arquivos estáticos/admin do bundle a partir deste processo. Desative quando houver uma CDN à frente. | `true` |
+| `REBASE_HISTORY` | Registra o [histórico de alterações de entidades](/docs/backend/history). | `true` |
+| `REBASE_COMPRESSION` | Respostas com compressão gzip/brotli. | `true` |
+| `REBASE_MAX_BODY_SIZE` | Tamanho máximo do corpo da requisição, **em bytes** (`10485760`, não `10MB` — um valor que não seja numérico recusa a inicialização em vez de remover silenciosamente o limite). | — |
+| `REBASE_ENABLE_SWAGGER` | A interface OpenAPI. Três estados: não definido significa ativado em desenvolvimento, desativado em produção; `false` desativa ambos em qualquer lugar. Observe que `true` em produção serve a **especificação** em `/api/docs`, mas não a **UI** do Swagger em `/api/swagger` — a UI é restrita por `NODE_ENV` separadamente. | — |
 | `REBASE_METRICS` | Expõe métricas do Prometheus em `/metrics`. | `false` |
-| `REBASE_METRICS_TOKEN` | Token bearer que protege `/metrics`. Sem definir, deixa o endpoint aberto a qualquer coisa que alcance a porta — tudo bem numa rede privada, não numa pública, e os logs de arranque dizem isso. | — |
-| `REBASE_MIGRATE_ON_BOOT` | O que o runtime pode fazer ao esquema no arranque. `ensure` (o padrão, em toda parte — produção incluída) roda a passagem **aditiva**: criar tabelas, colunas e tipos enum que faltam, nunca descartar nem reescrever um. `none` não toca em nada. A imagem publicada aceita apenas esses dois e **recusa iniciar com `push`**. Numa [implantação dividida](/docs/deployment/split-processes) exatamente um processo pode aprovisionar, então todo outro papel precisa definir `none` ou recusar iniciar. | `ensure` |
-| `REBASE_REQUIRE_SCHEMA_MATCH` | Recusa iniciar quando o banco foi aprovisionado pela última vez a partir de um conjunto de coleções diferente daquele com que este processo foi construído. Sem definir (ou com qualquer coisa diferente de `true`/`1`) avisa em vez disso. | avisa |
-| `REALTIME_CDC` | Captura de mudanças em nível de banco: `auto` (ligar onde a conexão suportar, recorrer em silêncio caso contrário), `trigger` (forçar, avisar se for impossível), `wal` (hoje degrada para `trigger`), `off`. Veja [Realtime](/docs/backend/realtime#database-level-change-capture-cdc). | `auto` |
-| `REALTIME_CHANNEL_BUS` | Transporte entre instâncias para canais de broadcast e presença: `memory` ou `postgres`. Ignorado quando a `realtime.bus` foi dado um transporte já construído. | `memory` |
-| `ALLOW_LOCALHOST_IN_PRODUCTION` | Permite valores `localhost`/loopback sob `NODE_ENV=production`. Desligado, para que um arranque de produção falhe alto em vez de conectar a um banco que não está lá. | `false` |
-| `REBASE_STRICT_COLLECTION_CONFIG` | O que o arranque faz com uma chave nas suas coleções que esta versão não lê: `warn`, `error` (recusar iniciar — vale a pena ligar em CI) ou `off`. Só governa as chaves que ele não *reconhece*, que costumam ser um erro de digitação e ocasionalmente metadados deliberados; uma chave que ele sabe que mudou de lugar é sempre fatal, porque senão o recurso que ela configurava some em silêncio. | `warn` |
-| `REBASE_PROVISION_ONLY` | `1`/`true` roda a passagem de esquema e sai sem abrir um socket — o formato que um Job de migração quer, a partir da mesma imagem e do mesmo bundle do servidor que vem depois. Um valor vazio conta como *não definido*, então um `${SOMETHING}` não substituído num arquivo de compose não pode transformar uma implantação comum numa que migra e recusa servir. | — |
-| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` deixa uma máquina — um agente, um job de CI — *aplicar* uma mudança de esquema através de `/api/admin/schema`, não apenas planejá-la. Desligado a menos que seja pedido: a credencial que faria essa mudança é a que mais provavelmente está numa variável de CI. | `false` |
-| `REBASE_FUNCTIONS_TIMEOUT_MS` | Por quanto tempo uma função personalizada pode rodar antes de a sua requisição ser abortada. O mesmo botão que a opção `functionsTimeoutMs`. | — |
-| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` faz uma rejeição de promise não tratada terminar o processo em vez de registrá-la. Ligado sob um orquestrador que vai reiniciá-lo; desligado onde um reinício é pior que um vazamento. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Mantém o agendador de cron rodando numa plataforma que o runtime detectaria como scale-to-zero, onde um timer que dispara numa instância ociosa não dispara em instância nenhuma. | — |
-| `TRUSTED_PROXY_HOPS` | Quantos proxies ficam na frente deste servidor, para que o limitador de taxa possa ler o endereço real do cliente em `X-Forwarded-For`. Padrão seguro `0`: sem proxy, confiar no cabeçalho deixaria qualquer chamador forjar uma identidade. | `0` |
+| `REBASE_METRICS_TOKEN` | Token Bearer protegendo `/metrics`. Não definido deixa o endpoint aberto para qualquer um que consiga acessar a porta — aceitável em uma rede privada, não em uma pública, e os logs de inicialização alertam sobre isso. | — |
+| `REBASE_MIGRATE_ON_BOOT` | O que o runtime pode fazer com o esquema na inicialização. `ensure` (o padrão em todo lugar — inclusive produção) executa a etapa **aditiva**: cria tabelas, colunas e tipos enum ausentes, nunca remove ou reescreve um. `none` não altera nada. A imagem publicada aceita apenas esses dois e **recusa a inicialização com `push`**. Em uma [implantação dividida](/docs/deployment/split-processes), exatamente um processo pode provisionar, portanto, todos os outros papéis devem definir `none` ou recusarão a inicialização. | `ensure` |
+| `REBASE_REQUIRE_SCHEMA_MATCH` | Recusa a inicialização quando o banco de dados foi provisionado pela última vez a partir de um conjunto de coleções diferente do que este processo foi construído. Não definido (ou qualquer coisa diferente de `true`/`1`) emite um aviso. | warn |
+| `REALTIME_CDC` | Captura de alterações no nível do banco de dados: `auto` (habilita onde a conexão suportar, faz fallback silencioso caso contrário), `trigger` (força o uso, avisa se impossível), `wal` (atualmente se degrada para `trigger`), `off`. Veja [Realtime](/docs/backend/realtime#database-level-change-capture-cdc). | `auto` |
+| `REALTIME_CHANNEL_BUS` | Transporte entre instâncias para canais de broadcast e presença: `memory` ou `postgres`. Ignorado quando um transporte construído foi fornecido a `realtime.bus`. | `memory` |
+| `ALLOW_LOCALHOST_IN_PRODUCTION` | Permite valores `localhost`/loopback sob `NODE_ENV=production`. Desativado por padrão, para que uma inicialização em produção falhe explicitamente em vez de conectar a um banco de dados que não existe. | `false` |
+| `REBASE_STRICT_COLLECTION_CONFIG` | O que a inicialização faz com uma chave nas suas coleções que esta versão não lê: `warn`, `error` (recusa inicializar — vale a pena ativar no CI) ou `off`. Controla apenas chaves que não são *reconhecidas*, que geralmente são erros de digitação e ocasionalmente metadados deliberados; uma chave que o sistema sabe que mudou de lugar é sempre fatal, pois o recurso configurado estaria silenciosamente ausente de outra forma. | `warn` |
+| `REBASE_PROVISION_ONLY` | `1`/`true` executa a etapa de esquema e encerra sem abrir um socket — o formato que um Job de migração precisa, a partir da mesma imagem e do mesmo bundle que o servidor subsequente. Um valor vazio é considerado *não definido*, portanto um `${SOMETHING}` não substituído em um compose file não transformará uma implantação comum em uma que apenas migra e recusa atender requisições. | — |
+| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` permite que uma máquina — um agente, um job de CI — *aplique* uma alteração de esquema por meio de `/api/admin/schema`, não apenas a planeje. Desativado a menos que solicitado: a credencial que faria tal alteração é a mais propensa a estar armazenada em uma variável de CI. | `false` |
+| `REBASE_FUNCTIONS_TIMEOUT_MS` | Quanto tempo uma função customizada pode executar antes que sua requisição seja abortada. O mesmo controle que a opção `functionsTimeoutMs`. | — |
+| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` faz com que uma rejeição de promise não tratada encerre o processo em vez de registrá-la em log. Ativado sob um orquestrador que reiniciará o processo; desativado onde uma reinicialização for pior do que um vazamento de memória. | `false` |
+| `REBASE_CRON_ALWAYS_ON` | Mantém o agendador do cron em execução em uma plataforma que o runtime detectaria como scale-to-zero (escala até zero), onde um timer disparado em uma instância inativa dispararia em nenhuma instância. | — |
+| `TRUSTED_PROXY_HOPS` | Quantos proxies existem à frente deste servidor, para que o rate limiter possa ler o endereço real do cliente a partir de `X-Forwarded-For`. Padrão seguro contra falhas `0`: sem proxy, confiar no cabeçalho permitiria que qualquer chamador forjasse uma identidade. | `0` |
 
-:::note[O aprovisionamento no arranque é aditivo, e não é uma ferramenta de migração]
-A passagem de arranque roda sem supervisão, sem ninguém lendo um diff, então ela
-nunca vai descartar uma coluna, estreitar um tipo ou reescrever uma tabela. É
-também por isso que a imagem recusa `REBASE_MIGRATE_ON_BOOT=push`: um push
-completo calcula um diff e fará um `DROP COLUMN` sem hesitar, e o reinício de um
-contêiner nunca pode ser capaz de destruir uma coluna de produção como efeito
-colateral de um reagendamento.
+:::note[O provisionamento na inicialização é aditivo e não é uma ferramenta de migração]
+A etapa de inicialização executa de forma autônoma sem ninguém avaliando um diff,
+portanto nunca removerá uma coluna, restringirá um tipo ou reescreverá uma tabela.
+É também por isso que a imagem recusa `REBASE_MIGRATE_ON_BOOT=push`: um push completo
+calcula um diff e executará alegremente `DROP COLUMN`, e o reinício de um contêiner
+nunca deve ser capaz de destruir uma coluna de produção como efeito colateral de um
+reagendamento.
 
-Mudanças destrutivas ou que remodelam ficam onde podem ser revisadas: `rebase db
-generate` + `rebase db migrate`, ou `rebase db push` a partir de um checkout ou
-da CI, que ensaia a mudança, recusa as destrutivas sem confirmação e pode fazer
-um backup antes.
+Alterações destrutivas ou de remodelação permanecem onde podem ser revisadas: `rebase db
+generate` + `rebase db migrate`, ou `rebase db push` a partir de um checkout ou CI,
+que executa em modo dry-run, recusa alterações destrutivas sem confirmação e
+pode criar um backup primeiro.
 :::
 
 ### Implantações divididas
 
-Uma imagem e um bundle podem ser iniciados várias vezes, cada uma servindo uma
-parte diferente do projeto. Uma linha para cada aqui, porque esta página afirma
-listar todas as variáveis; o que cada combinação *monta e possui* — e quais
-combinações recusam iniciar — está em
-**[Processos divididos](/docs/deployment/split-processes)**.
+Uma imagem e um bundle podem ser inicializados várias vezes, cada um servindo uma
+parte diferente do projeto. Uma linha para cada aqui, pois esta página lista todas
+as variáveis; o que cada combinação *monta e gerencia* — e quais combinações
+recusam inicializar — está em
+**[Processos Divididos](/docs/deployment/split-processes)**.
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `REBASE_ROLE` | Que parte este processo serve: `all`, `api`, `functions` ou `worker`. | `all` |
-| `REBASE_CRON_SCHEDULER` | Sobrepõe se *este* processo roda os timers de cron. Sem definir, segue o papel. | — |
-| `REBASE_JOB_WORKERS` | Sobrepõe se este processo roda workers da fila de jobs. Sem definir, segue o papel. | — |
-| `REBASE_FUNCTIONS_ONLY` | Serve neste processo apenas as funções personalizadas nomeadas. | — |
-| `REBASE_FUNCTIONS_EXCLUDE` | Serve todas as funções personalizadas exceto as nomeadas. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | Para onde o processo de API encaminha uma requisição de função que ele mesmo não serve. | — |
+|----------|-----------|--------|
+| `REBASE_ROLE` | Qual parte este processo atende: `all`, `api`, `functions` ou `worker`. | `all` |
+| `REBASE_CRON_SCHEDULER` | Sobrescreve se *este* processo executa os timers do cron. Não definido segue a role. | — |
+| `REBASE_JOB_WORKERS` | Sobrescreve se este processo executa workers da fila de jobs. Não definido segue a role. | — |
+| `REBASE_FUNCTIONS_ONLY` | Atende apenas as funções customizadas especificadas neste processo. | — |
+| `REBASE_FUNCTIONS_EXCLUDE` | Atende todas as funções customizadas, exceto as especificadas. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Para onde o processo da API encaminha uma requisição de função que ele próprio não atende. | — |
+
+### Superfície MCP
+
+Um endpoint opcional (opt-in) do Model Context Protocol em `/mcp`, para que um cliente de IA possa ler
+e gravar neste projeto **como o usuário autenticado**. Desativado a menos que configurado e — ao contrário de
+qualquer outra superfície — nenhum `REBASE_ROLE` o ativa: os outros descrevem o formato de
+um processo, enquanto este é uma decisão de conceder credenciais a software de terceiros,
+devendo ser tomada por uma pessoa em vez de herdada da função de um contêiner.
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `REBASE_MCP_ENABLED` | Monta a superfície MCP. Requer `REBASE_PUBLIC_URL`; sem ela, a superfície se recusa a montar e registra isso no log de inicialização. | `false` |
+| `REBASE_PUBLIC_URL` | A origem acessível externamente desta implantação, por exemplo `https://app.example.com`. A superfície MCP não pode derivá-la — obter a origem do cabeçalho `Host` tornaria a identidade do emissor, e o público-alvo (audience) contra o qual seus próprios tokens são validados, um valor fornecido pelo chamador. | — |
+| `REBASE_MCP_OPEN_REGISTRATION` | Permite o registro dinâmico de clientes OAuth (RFC 7591), para que um cliente possa se cadastrar automaticamente. Defina como `false` para exigir que os clientes sejam registrados com antecedência. | `true` |
 
 ### Backups
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `BACKUP_SCHEDULE` | Expressão cron para backups agendados. Sem definir significa que os backups agendados estão desligados. | — |
-| `BACKUP_DESTINATION` | Caminho local, ou uma URL `s3://bucket/prefix` / `gs://bucket/prefix`. | `./backups` |
-| `BACKUP_RETENTION_DAYS` | Apaga backups com mais de N dias. Sem definir ou `0` mantém tudo. | — |
-| `BACKUP_KEEP_MINIMUM` | Mantém sempre pelo menos N dos backups mais recentes, diga o que disser a retenção. | — |
-| `PG_DUMP_PATH` | Substitui o binário `pg_dump` — ele precisa corresponder à versão maior do servidor. | — |
-| `PG_RESTORE_PATH` | Substitui o binário `pg_restore`. | — |
+|----------|-----------|--------|
+| `BACKUP_SCHEDULE` | Expressão cron para backups agendados. Não definido significa que os backups agendados estão desativados. | — |
+| `BACKUP_DESTINATION` | Caminho local ou uma URL `s3://bucket/prefix` / `gs://bucket/prefix`. | `./backups` |
+| `BACKUP_RETENTION_DAYS` | Exclui backups anteriores a N dias. Não definido ou `0` mantém tudo. | — |
+| `BACKUP_KEEP_MINIMUM` | Sempre retém pelo menos N dos backups mais recentes, independentemente do que a retenção definir. | — |
+| `PG_DUMP_PATH` | Sobrescreve o binário `pg_dump` — ele deve corresponder à versão principal do servidor. | — |
+| `PG_RESTORE_PATH` | Sobrescreve o binário `pg_restore`. | — |
 
-Backups contêm segredos e dados pessoais. Use um destino privado com criptografia
-em repouso.
-| `PG_DUMPALL_PATH` | Onde vive o `pg_dumpall`, quando não está no `PATH`. Sem ele — e sem as ferramentas cliente do PostgreSQL instaladas — um backup dos globals falha com um erro que nomeia esta variável. | — |
+Os backups contêm segredos e dados de identificação pessoal (PII). Use um destino privado com
+criptografia em repouso.
+| `PG_DUMPALL_PATH` | Onde o `pg_dumpall` reside, quando não estiver no `PATH`. Sem ele — e sem as ferramentas de cliente do PostgreSQL instaladas —, o backup de variáveis globais falha com um erro indicando esta variável. | — |
 
-### Entrega do bundle
+### Entrega de bundles
 
-Uma implantação gerenciada não carrega o seu código na imagem: o runtime busca um
-bundle no arranque. Estas variáveis decidem qual e como.
+Uma implantação gerenciada não armazena seu código na imagem: o runtime busca um
+bundle na inicialização. Estas variáveis definem qual deles e como.
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
+|----------|-----------|--------|
 | `REBASE_BUNDLE` | Caminho para um diretório de bundle já extraído. O que o `rebase start` define localmente. | — |
-| `REBASE_BUNDLE_URL` | De onde buscar o arquivo do bundle, quando não há um local. | — |
-| `REBASE_BUNDLE_TOKEN` | A credencial bearer dessa busca. Trate-a como um segredo: é o que autoriza um tenant a baixar o próprio código. | — |
-| `REBASE_BUNDLE_FETCH_DIR` | Onde um bundle baixado é extraído. Precisa ser gravável e sobreviver entre a busca e o arranque. | — |
-| `REBASE_RUNTIME_MODULES` | Módulos extras que a imagem do runtime fornece ao bundle, além dos que ela mesma declara. | — |
+| `REBASE_BUNDLE_URL` | De onde buscar o arquivo do bundle, quando não houver um local. | — |
+| `REBASE_BUNDLE_TOKEN` | A credencial Bearer para essa busca. Trate-a como um segredo: é o que autoriza um tenant a baixar seu próprio código. | — |
+| `REBASE_BUNDLE_FETCH_DIR` | Onde um bundle baixado é extraído. Deve ter permissão de escrita e persistir entre o download e a inicialização. | — |
+| `REBASE_RUNTIME_MODULES` | Módulos extras que a imagem de runtime fornece ao bundle, além daqueles que ele próprio declara. | — |
 
-### Vínculos de recursos
+### Vinculação de recursos
 
-Cada banco de dados, bucket e tópico que um projeto declara em
-`config/resources.ts` é vinculado por variáveis de ambiente nomeadas a partir
-dele. Os nomes base estão abaixo; um recurso que não é o padrão acrescenta `__` e
-a sua chave em maiúsculas, então um bucket chamado `media` lê
-`S3_BUCKET__MEDIA`. O `rebase status`
- imprime, por
-recurso, a variável exata que está lendo e se ela está definida.
-
-| Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `REBASE_DRIVER` | O pacote npm que implementa o driver de uma fonte de dados, quando não é o do Postgres padrão. Com sufixo por fonte: `REBASE_DRIVER__ANALYTICS`. | — |
-| `REBASE_TOPIC_URL` | A string de conexão de um tópico declarado. Com sufixo por tópico. | — |
-
-### O ambiente da própria CLI
-
-Lido pelo `rebase`, não pelo servidor. Nada daqui afeta uma implantação.
+Cada banco de dados, bucket e tópico que um projeto declara em `config/resources.ts` é
+vinculado por variáveis de ambiente nomeadas a partir dele. Os nomes base estão abaixo; um
+recurso não padrão anexa `__` e sua chave em maiúsculas, portanto, um bucket chamado
+`media` lê `S3_BUCKET__MEDIA`. O `rebase status`
+exibe, por recurso,
+a variável exata que está sendo lida e se ela está definida.
 
 | Variável | Descrição | Padrão |
-|----------|-------------|---------|
-| `REBASE_BASE_URL` | O backend com que o `rebase auth` e o `rebase api-keys` conversam, em vez de derivá-lo do projeto. | — |
+|----------|-----------|--------|
+| `REBASE_DRIVER` | O pacote npm que implementa o driver de uma fonte de dados, quando não for o padrão do Postgres. Com sufixo por fonte: `REBASE_DRIVER__ANALYTICS`. | — |
+| `REBASE_TOPIC_URL` | A string de conexão para um tópico declarado. Com sufixo por tópico. | — |
+
+### Ambiente próprio da CLI
+
+Lido pelo `rebase`, não pelo servidor. Nada aqui afeta uma implantação.
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `REBASE_BASE_URL` | O backend com o qual `rebase auth` e `rebase api-keys` se comunicam, em vez de derivá-lo do projeto. | — |
 | `REBASE_PORT` | A porta que esses comandos assumem ao derivar essa URL. | — |
-| `SERVICE_KEY` | A chave de serviço com que eles se autenticam, em vez de perguntar. | — |
-| `REBASE_ENV_FILE_PATH` | Qual `.env` a CLI lê e escreve, quando não é o do projeto. | — |
-| `REBASE_CLOUD_URL` | O control plane com que o `rebase cloud` conversa. | — |
-| `REBASE_CLOUD_EMAIL` | A conta com que o `rebase cloud login` entra, em vez de perguntar. | — |
-| `REBASE_CLOUD_PASSWORD` | A senha dela, para que um cofre de segredos possa entregá-la sem que ela chegue ao histórico do shell. | — |
-| `REBASE_DEBUG` | `1` imprime o erro subjacente e o detalhe da requisição em vez da mensagem curta. A primeira coisa a definir quando um comando `rebase cloud` falha de forma pouco útil. | — |
-| `REBASE_DEV_NO_DB` | O `rebase dev` não sobe banco nenhum e não aprovisiona nada — você traz o seu. O mesmo que `--no-db`. | — |
-| `REBASE_FRONTEND_PORT` | Fixa a porta do servidor de desenvolvimento do frontend, que o `rebase dev` de outro modo deriva do caminho do projeto. | — |
-| `REBASE_DEV_READY_TIMEOUT_MS` | Quanto tempo o `rebase dev` espera o backend se anunciar antes de dizer que ele não subiu. `0` desliga o relatório. | `30000` |
-| `DATABASE_PASSWORD` | A senha que o `rebase dev --docker` coloca na string de conexão que deriva do `docker-compose.yml`. | — |
-| `DO_NOT_TRACK` | A convenção comum entre ferramentas. Definida como qualquer coisa diferente de `0` e a CLI não envia telemetria. | — |
-| `REBASE_TELEMETRY_DISABLED` | O mesmo, específico para o Rebase. Não precisa de arquivo nenhum, e é por isso que é a indicada em CI e numa imagem. | — |
-| `REBASE_TELEMETRY_ENDPOINT` | Para onde a telemetria é enviada, para um coletor auto-hospedado. | — |
+| `SERVICE_KEY` | A chave de serviço com a qual eles se autenticam, em vez de solicitar interativamente. | — |
+| `REBASE_ENV_FILE_PATH` | Qual `.env` a CLI lê e grava, quando não for o do projeto. | — |
+| `REBASE_CLOUD_URL` | O control plane com o qual o `rebase cloud` se comunica. | — |
+| `REBASE_CLOUD_EMAIL` | A conta com a qual o `rebase cloud login` faz login, em vez de solicitar interativamente. | — |
+| `REBASE_CLOUD_PASSWORD` | Sua senha, para que um gerenciador de segredos possa fornecê-la sem que ela fique no histórico do shell. | — |
+| `REBASE_DEBUG` | `1` imprime o erro subjacente e os detalhes da requisição em vez da mensagem curta. A primeira coisa a configurar quando um comando `rebase cloud` falhar sem fornecer detalhes úteis. | — |
+| `REBASE_DEV_NO_DB` | `rebase dev` não inicializa nenhum banco de dados e não provisiona nada — você fornece o seu próprio. O mesmo que `--no-db`. | — |
+| `REBASE_FRONTEND_PORT` | Fixa a porta do servidor de desenvolvimento do frontend, que o `rebase dev` caso contrário deriva do caminho do projeto. | — |
+| `REBASE_DEV_READY_TIMEOUT_MS` | Quanto tempo o `rebase dev` aguarda o backend se anunciar antes de informar que ele não iniciou. `0` desativa o relatório. | `30000` |
+| `DATABASE_PASSWORD` | A senha que `rebase dev --docker` insere na string de conexão derivada do `docker-compose.yml`. | — |
+| `DO_NOT_TRACK` | Convenção entre ferramentas. Defina com qualquer valor diferente de `0` e a CLI não enviará telemetria. | — |
+| `REBASE_TELEMETRY_DISABLED` | O mesmo, especificamente para o Rebase. Não precisa de arquivo, por isso é a opção a ser usada no CI e em imagens. | — |
+| `REBASE_TELEMETRY_ENDPOINT` | Para onde a telemetria é enviada, no caso de um coletor auto-hospedado. | — |
 
 ## Segredos em desenvolvimento
 
-`JWT_SECRET` e `REBASE_SERVICE_KEY` são obrigatórios em produção e gerados para
-você fora dela, então dá para começar sem configurar nada.
+`JWT_SECRET` e `REBASE_SERVICE_KEY` são obrigatórios em produção e gerados
+para você fora dela, para que você possa começar sem precisar configurar nada.
 
-Esses valores gerados ficam em cache em `.rebase-dev-secrets.json`, ao lado de
-`.rebase-dev-port` e `.rebase-dev-url` e gitignorados junto com eles. Antes eles
-eram regerados a cada arranque — então reiniciar o servidor de desenvolvimento
-deslogava você da sua própria app e invalidava qualquer chave de API que você
-tivesse acabado de criar.
+Esses valores gerados são armazenados em cache em `.rebase-dev-secrets.json`, junto a
+`.rebase-dev-port` e `.rebase-dev-url`, e ignorados pelo Git com eles. Anteriormente, eles
+eram regenerados a cada inicialização — portanto, reiniciar o servidor de desenvolvimento desconectava você do
+seu próprio aplicativo e invalidava qualquer chave de API recém-criada.
 
-- Defina qualquer uma das duas variáveis explicitamente e a sua é usada; nada é
-  posto em cache nem lido.
+- Defina qualquer uma das variáveis explicitamente e a sua será usada; nada é armazenado em cache ou lido.
 - Aponte o cache para outro lugar com `REBASE_DEV_SECRETS_FILE` — um caminho, e a
-  única variável desta seção que você definiria de propósito.
-- Apague o arquivo para rotacionar os dois segredos. O arranque seguinte escreve
-  um novo.
-- Se o arquivo não puder ser escrito — um contêiner somente leitura, digamos — o
-  servidor sobe mesmo assim com um segredo efêmero, exatamente como antes.
+  única variável nesta seção que você configuraria deliberadamente.
+- Exclua o arquivo para renovar ambos os segredos. A próxima inicialização grava um novo.
+- Se o arquivo não puder ser gravado — como em um contêiner somente leitura —, o servidor inicia
+  de qualquer maneira com um segredo efêmero, exatamente como fazia antes.
 
-Nada é posto em cache em produção, nem sob um executor de testes. Em produção um
-arranque que teve de gerar qualquer um dos dois segredos continua falhando,
-nomeando a variável, e isso não mudou:
+Nada é armazenado em cache em produção ou sob um executor de testes. Em produção, uma inicialização
+que precise gerar qualquer um dos segredos ainda falhará, informando o nome da variável, e isso permanece
+inalterado:
 
 ```
 JWT_SECRET must be explicitly set in production.
@@ -430,10 +437,10 @@ await initializeRebaseBackend({
 });
 ```
 
-### Alterar `basePath`
+### Alterando `basePath`
 
-`basePath` move toda rota da API, então é preciso dizer o mesmo ao cliente — caso
-contrário ele continua pedindo `/api/...` e recebe um 404 para tudo:
+`basePath` move todas as rotas da API, portanto o cliente deve ser configurado com o mesmo valor —
+caso contrário, continuará solicitando `/api/...` e receberá 404 para tudo:
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -444,9 +451,9 @@ export const rebase = createRebaseClient({
 });
 ```
 
-O painel de administração pega isso do cliente que recebe; nada mais precisa ser
-configurado. Se você montar uma URL de requisição à mão, componha-a a partir do
-cliente em vez de escrever `/api` você mesmo:
+O painel de administração obtém isso do cliente fornecido a ele; nada mais precisa de
+configuração. Se você construir uma URL de requisição manualmente, una-a a partir do cliente em vez
+de escrever `/api` você mesmo:
 
 ```typescript
 import { useApiBase } from "@rebasepro/app";
@@ -457,19 +464,19 @@ function Widget() {
 }
 ```
 
-## Solução de problemas
+## Solução de Problemas
 
-### Permissão negada no Editor SQL (`permission denied for table <name>`)
+### Permissão Negada no SQL Editor (`permission denied for table <name>`)
 
-* **Sintomas:** Consultas personalizadas executadas no Editor SQL do Rebase Studio falham com `cause: error: permission denied for table <name>`, mesmo que a visão de planilha do CMS carregue os dados sem problema.
-* **Causa:** Por padrão, o Rebase tenta executar as consultas do Editor SQL trocando temporariamente de papel de banco de dados para corresponder ao papel de aplicação do usuário ativo (por exemplo, `SET LOCAL ROLE "admin"`). Se você usa autenticação própria em que os papéis existem apenas em tabelas do banco em vez de papéis reais do PostgreSQL, a troca de papel falha ou faltam privilégios. A visão de planilha do CMS roda sob o usuário dono da conexão e contorna isso.
-* **Solução:** Adicione `DISABLE_DB_ROLE_SWITCHING=true` à configuração `.env` do seu backend. Isso força o Rebase a rodar as consultas do Editor SQL com os privilégios do dono da conexão (tipicamente um superusuário/dono).
+* **Sintomas:** Consultas personalizadas executadas no SQL Editor do Rebase Studio falham com `cause: error: permission denied for table <name>`, mesmo que a visualização de planilha do CMS carregue os dados com sucesso.
+* **Causa:** Por padrão, o Rebase tenta executar consultas do SQL Editor alternando temporariamente as roles do banco de dados para corresponder à role de aplicação do usuário ativo (por exemplo, `SET LOCAL ROLE "admin"`). Se você estiver usando autenticação personalizada em que as roles existem apenas nas tabelas do banco de dados em vez de roles reais do PostgreSQL, a alternância de role falha ou faltam privilégios no banco. A visualização de planilha do CMS é executada com o usuário proprietário da conexão padrão e ignora isso.
+* **Solução:** Adicione `DISABLE_DB_ROLE_SWITCHING=true` à configuração do `.env` do seu backend. Isso força o Rebase a executar as consultas do SQL Editor usando os privilégios do proprietário da conexão (geralmente um superusuário/owner).
 
-### Falha ao buscar o esquema no Editor SQL (`Cross-database execution requires adminConnectionString`)
+### Falha na Busca de Esquema no SQL Editor (`Cross-database execution requires adminConnectionString`)
 
-* **Sintomas:** O Studio não carrega a árvore de esquema, ou o Editor SQL lança `Failed to fetch schema: Cross-database execution requires adminConnectionString to be configured in the backend.`
-* **Causa:** O Rebase precisa de privilégios administrativos para consultar os catálogos de sistema do banco e rodar comandos administrativos. Se `adminConnectionString` não for fornecido ao bootstrapper, ou `getAdmin()` for sobrescrito para devolver `undefined`, essas operações falham.
-* **Solução:** Garanta que `adminConnectionString` esteja configurado na inicialização do bootstrapper do backend:
+* **Sintomas:** O Studio falha ao carregar a árvore de esquema, ou o SQL Editor exibe `Failed to fetch schema: Cross-database execution requires adminConnectionString to be configured in the backend.`
+* **Causa:** O Rebase requer privilégios administrativos para consultar os catálogos do sistema do banco de dados e executar comandos administrativos. Se `adminConnectionString` não for fornecida ao bootstrapper, ou se `getAdmin()` for sobrescrito para retornar `undefined`, essas operações falham.
+* **Solução:** Certifique-se de que `adminConnectionString` esteja configurada durante a inicialização do bootstrapper do backend:
   ```typescript
   createPostgresBootstrapper({
       connection: db,
@@ -482,4 +489,5 @@ function Widget() {
 
 - **[Implantação](/docs/getting-started/deployment)** — Guia de implantação em produção
 - **[Visão Geral do Backend](/docs/backend)** — Referência completa de configuração do backend
+
 ---

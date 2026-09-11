@@ -107,6 +107,30 @@ config:
 
 existingSecret: ""
 
+# ─── MCP surface ───────────────────────────────────────────────────────────
+#
+# An opt-in Model Context Protocol endpoint at `/mcp`, so an AI client can read
+# and write this project **as the signed-in user** over OAuth.
+#
+# It lives here rather than in `config.env` because `REBASE_MCP_ENABLED` is a
+# topology variable — the deployer's to own, not the project's — and
+# `_validate.tpl` refuses it there. That is not bookkeeping: this surface issues
+# credentials to third-party software, and a release should say so in its values
+# file, where a reviewer sees it, rather than in a map of loose environment
+# strings.
+#
+# `publicUrl` is required when enabled, exactly as the runtime requires it: every
+# document the surface serves names absolute URLs, and the token audience is one
+# of them. It cannot be taken from the `Host` header without letting the caller
+# choose the issuer identity its own tokens are checked against.
+mcp:
+  enabled: false
+  # This release's externally reachable origin, e.g. https://app.example.com
+  publicUrl: ""
+  # RFC 7591 dynamic client registration, so a client can enrol itself. Set
+  # false to require clients be registered ahead of time.
+  openRegistration: true
+
 # ─── Topology ──────────────────────────────────────────────────────────────
 #
 # `split: false` runs one Deployment serving everything — REBASE_ROLE unset,

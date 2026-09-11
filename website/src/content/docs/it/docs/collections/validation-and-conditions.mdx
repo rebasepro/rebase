@@ -1,0 +1,172 @@
+---
+sourceHash: 5f1468eda58b7564
+title: Validazione e condizioni
+sidebar_label: Validazione e condizioni
+description: "Valori enum, regole di validazione per proprietà e campi condizionali che rendono una proprietà obbligatoria, disabilitata o nascosta in base ai valori dell'entità stessa."
+---
+
+## Valori Enum
+
+Utilizzato con proprietà di tipo stringa o numero per renderizzare menu a tendina (select):
+
+```typescript no-verify
+// Simple array
+enum: ["draft", "published", "archived"]
+
+// With labels
+enum: [
+    { id: "draft", label: "Draft" },
+    { id: "published", label: "Published" },
+    { id: "archived", label: "Archived" }
+]
+
+// With colors (for Kanban columns and chips)
+enum: [
+    { id: "draft", label: "Draft", color: "grayDark" },
+    { id: "published", label: "Published", color: "greenDark" },
+    { id: "archived", label: "Archived", color: "orangeDark" }
+]
+```
+
+## Validazione
+
+Ogni regola risiede nel blocco `validation` della proprietà, e le regole accettate da una proprietà dipendono dal suo tipo: `min` conta i caratteri in una stringa, confronta grandezze in un numero e conta gli elementi in un array.
+
+```typescript
+properties: {
+    title: {
+        type: "string",
+        name: "Title",
+        validation: { required: true, min: 2, max: 200 }
+    },
+    slug: {
+        type: "string",
+        name: "Slug",
+        validation: {
+            unique: true,
+            matches: /^[a-z0-9-]+$/,
+            matchesMessage: "Lowercase letters, digits and hyphens only",
+            trim: true,
+            lowercase: true
+        }
+    },
+    readingMinutes: {
+        type: "number",
+        name: "Reading time",
+        validation: { integer: true, moreThan: 0, max: 120 }
+    }
+}
+```
+
+### Tutti i tipi
+
+| Regola | Tipo | Descrizione |
+|------|------|-------------|
+| `required` | `boolean` | Il valore deve essere presente |
+| `requiredMessage` | `string` | Cosa mostra il modulo quando non è presente. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+| `unique` | `boolean` | Solo una riga nella tabella può contenere questo valore |
+| `uniqueInArray` | `boolean` | Solo una voce *per array* può contenerlo. Si applica a un figlio diretto di una proprietà `array`, o a un figlio di primo livello di una `map` al suo interno. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+
+### Stringhe
+
+| Regola | Tipo | Descrizione |
+|------|------|-------------|
+| `min` / `max` | `number` | Numero minimo / massimo di caratteri, inclusi. Un `max` definisce anche la dimensione della colonna: trasforma `TEXT` in `VARCHAR(max)`, quindi ridurlo su una tabella che contiene già righe più lunghe è una migrazione che il database rifiuterà |
+| `length` | `number` | Esattamente questo numero di caratteri — un codice paese, un riferimento a lunghezza fissa |
+| `matches` | `string \| RegExp` | Un pattern che l'intero valore deve rispettare. Una stringa viene compilata per richiesta, quindi una che non si compila viene rifiutata all'avvio anziché trasformarsi silenziosamente in nessuna regola |
+| `matchesMessage` | `string` | Cosa mostra il modulo quando `matches` fallisce |
+| `trim` | `boolean` | Rimuove gli spazi vuoti iniziali e finali **prima** del salvataggio. Una trasformazione, non un controllo — modifica ciò che viene scritto, il che lo rende la soluzione per "lo stesso tag due volte, uno con uno spazio finale". **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+| `lowercase` / `uppercase` | `boolean` | Converte il valore in minuscolo/maiuscolo prima del salvataggio, come `trim`. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+
+I formati email e URL **non** sono regole di validazione. `email` e `url` sono flag sulla proprietà stessa, accanto a `type` — dichiarazioni sui dati a partire dalle quali viene generato il contratto OpenAPI, piuttosto che comportamenti del modulo:
+
+```typescript
+properties: {
+    email: { type: "string", name: "Email", email: true },
+    website: { type: "string", name: "Website", url: true }
+}
+```
+
+Vedi [Proprietà stringa](/docs/collections/properties/#string-options).
+
+### Numeri
+
+| Regola | Tipo | Descrizione |
+|------|------|-------------|
+| `min` / `max` | `number` | Valore minimo / massimo accettato, **incluso** |
+| `moreThan` / `lessThan` | `number` | I corrispettivi esclusivi di `min` e `max` |
+| `positive` / `negative` | `boolean` | Rigorosamente superiore / inferiore a zero. `0` viene rifiutato da entrambi — usa `min: 0` per consentirlo |
+| `integer` | `boolean` | Nessuna parte frazionaria. Non modifica il tipo di colonna; lo fa `columnType` |
+
+### Date
+
+| Regola | Tipo | Descrizione |
+|------|------|-------------|
+| `min` / `max` | `Date` | Data minima / massima accettata, inclusa. Un istante fisso, non "oggi" |
+
+### Array
+
+| Regola | Tipo | Descrizione |
+|------|------|-------------|
+| `min` / `max` | `number` | Numero minimo / massimo di elementi, inclusi. Elementi, non caratteri |
+
+## Campi condizionali
+
+È possibile rendere i campi dinamici in modo che reagiscano ai valori dell'entità. Esistono due modi per farlo:
+
+### 1. Condizioni JSON Logic (Dichiarative)
+
+Puoi utilizzare la proprietà `conditions` per definire regole dichiarative in JSON Logic che possono essere serializzate e modificate visivamente nell'editor delle collezioni.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    conditions: {
+        disabled: { "==": [{ "var": "values.is_free" }, true] },
+        required: { "!=": [{ "var": "values.is_free" }, true] },
+        min: 0,
+        clearOnDisabled: true // Set to null if field gets disabled
+    }
+}
+```
+
+L'oggetto conditions ti dà accesso a:
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
+- `required`, `requiredMessage`, `min`, `max`
+- `defaultValue`
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
+- `referencePath`, `referenceFilter`
+- `canAddElements`, `sortable` (per gli array)
+- `acceptedFiles`, `maxFileSize` (per i caricamenti)
+
+`disabledMessage` è la frase che l'utente vede al posto del controllo. Senza di essa, un campo disattivato non spiega nulla, e questa è la differenza tra un modulo che guida l'utente e uno che lo blocca senza spiegazioni.
+
+:::caution[Le condizioni sono un comportamento del modulo]
+**Solo modulo di amministrazione — non applicato dall'API o dal database.** Vengono eseguite nel browser, sull'entità in corso di modifica, e definiscono ciò che il pannello propone. Una regola che deve valere per ogni chiamante appartiene a `validation`, che il server controlla, oppure a una [regola di sicurezza](/docs/collections/security-rules/), che il database impone a chiunque — pannello, SDK o `curl`.
+:::
+
+### 2. Property Builder (Programmatici)
+
+Per comportamenti complessi che non possono essere espressi tramite JSON Logic, puoi utilizzare `dynamicProps`, che valuta una funzione Javascript.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    dynamicProps: ({ values, user }) => ({
+        disabled: values.is_free === true || !user.roles.includes("admin"),
+        validation: values.is_free ? {} : { required: true, min: 0 }
+    })
+}
+```
+
+Si applica la stessa avvertenza, e in modo ancora più netto: la funzione viene inclusa nel bundle del pannello ed eseguita a ogni render del modulo. **Solo modulo di amministrazione — non applicato dall'API o dal database.**
+
+## Passaggi successivi
+
+- [Proprietà](/docs/collections/properties/) — i tipi di proprietà a cui si applicano queste regole
+- [Definizione delle collezioni](/docs/collections/) — dove vengono dichiarate le proprietà
+- [Regole di sicurezza (RLS)](/docs/collections/security-rules/) — le regole imposte dal database, che la validazione non sostituisce
+
+---

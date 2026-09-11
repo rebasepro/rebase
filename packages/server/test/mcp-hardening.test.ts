@@ -296,7 +296,7 @@ describe("tool inputs", () => {
     it.each([
         "candidates; DROP TABLE users",
         "../../etc/passwd",
-        "candidates ",
+        "candidates\u0000",
         "CANDIDATES",
         ""
     ])("refuses %j as a collection name", async (name) => {

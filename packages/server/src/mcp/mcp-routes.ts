@@ -77,7 +77,12 @@ export interface McpRoutesConfig {
  * uncredentialed by design.
  */
 export function createMcpWellKnownRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
-    const router = new Hono<HonoEnv>();
+    // `wellKnown`, not `router`: this file builds two, and the endpoint index
+    // keys a mount on `<file>#<receiver>`. Two receivers sharing a name collapse
+    // to one key, and these two mount at DIFFERENT prefixes — `/` for the
+    // metadata an MCP client fetches before it can authenticate, `/mcp` for the
+    // protocol itself — so one of them could not be expressed at all.
+    const wellKnown = new Hono<HonoEnv>();
     const resourcePath = protectedResourceMetadataPath(config.mcpPath);
 
     const serveResourceMetadata = (c: Context<HonoEnv>) =>
@@ -86,13 +91,13 @@ export function createMcpWellKnownRoutes(config: McpRoutesConfig): Hono<HonoEnv>
     // The path-suffixed form is the one RFC 9728 §3.1 specifies for a resource
     // with a path. The bare form is served too, because clients in the wild ask
     // for it and answering costs nothing.
-    router.get(resourcePath, serveResourceMetadata);
-    router.get("/.well-known/oauth-protected-resource", serveResourceMetadata);
+    wellKnown.get(resourcePath, serveResourceMetadata);
+    wellKnown.get("/.well-known/oauth-protected-resource", serveResourceMetadata);
 
-    router.get("/.well-known/oauth-authorization-server", (c) =>
+    wellKnown.get("/.well-known/oauth-authorization-server", (c) =>
         c.json(authorizationServerMetadata(config.publicUrl, config.oauthBasePath)));
 
-    return router;
+    return wellKnown;
 }
 
 /** The MCP endpoint itself. */

@@ -178,6 +178,20 @@ is what lets one Deployment carry a different build than its siblings.
 {{- end }}
 - name: REBASE_RATE_LIMIT_STORE
   value: {{ include "rebase.rateLimitStore" . | quote }}
+{{- if .Values.mcp.enabled }}
+{{/* Written by the chart, not by the project: REBASE_MCP_ENABLED is a topology
+     variable and `_validate.tpl` refuses it in `config.env`. Without this block
+     the refusal would leave a Helm operator no supported way to turn the surface
+     on at all. */}}
+- name: REBASE_MCP_ENABLED
+  value: "true"
+- name: REBASE_PUBLIC_URL
+  value: {{ .Values.mcp.publicUrl | quote }}
+{{- if not .Values.mcp.openRegistration }}
+- name: REBASE_MCP_OPEN_REGISTRATION
+  value: "false"
+{{- end }}
+{{- end }}
 {{- if .Values.sharedState.requireSchemaMatch }}
 - name: REBASE_REQUIRE_SCHEMA_MATCH
   value: "true"

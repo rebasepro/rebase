@@ -261,6 +261,21 @@ combinations refuse to boot — is on
 | `REBASE_FUNCTIONS_EXCLUDE` | Serve every custom function except the named ones. | — |
 | `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. | — |
 
+### MCP surface
+
+An opt-in Model Context Protocol endpoint at `/mcp`, so an AI client can read
+and write this project **as the signed-in user**. Off unless set, and — unlike
+every other surface — no `REBASE_ROLE` turns it on: the others describe a
+process shape, while this one is a decision to hand credentials to third-party
+software, and it should be made by a person rather than inherited from a
+container's job title.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_MCP_ENABLED` | Mount the MCP surface. Requires `REBASE_PUBLIC_URL`; without it the surface declines to mount and says so in the boot log. | `false` |
+| `REBASE_PUBLIC_URL` | This deployment's externally reachable origin, e.g. `https://app.example.com`. The MCP surface cannot derive it — taking the origin from the `Host` header would make the issuer identity, and the audience its own tokens are checked against, a value the caller supplies. | — |
+| `REBASE_MCP_OPEN_REGISTRATION` | Allow OAuth dynamic client registration (RFC 7591), so a client can enrol itself. Set to `false` to require clients be registered ahead of time. | `true` |
+
 ### Backups
 
 | Variable | Description | Default |

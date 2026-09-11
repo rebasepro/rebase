@@ -42,6 +42,19 @@ module.exports = {
         "json",
         "node"
     ],
+    /**
+     * Nine suites in this package boot PGlite — a real Postgres compiled to
+     * WASM — and some boot two at once to compare what two code paths built.
+     * Jest runs them in parallel workers, so the boots contend, and the 5000 ms
+     * default is not a timeout on the test's logic: it is a bet on how many
+     * other WASM instances happen to be starting beside it.
+     *
+     * `ensure-matches-db-push.test.ts` lost that bet on 2026-09-11 and passed on
+     * its own three seconds later, which is the shape of every flake this kind
+     * of default produces — a red CI run that reproduces nowhere, and a suite
+     * people learn to re-run rather than read.
+     */
+    testTimeout: 30_000,
     moduleNameMapper: {
         "^chalk$": "<rootDir>/test/mocks/chalk.cjs",
         "^\\.{1,2}/module-dir$": "<rootDir>/test/mocks/module-dir.cjs",

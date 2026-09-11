@@ -131,6 +131,15 @@ const MOUNTS = new Map([
     ["packages/server/src/boot/boot.ts#app", ""],
     ["packages/server/src/metrics/index.ts#router", "/metrics"],
 
+    // ── The MCP surface (opt-in, REBASE_MCP_ENABLED) ──────────────────────
+    // Three routers, two prefixes. The well-known metadata mounts at the ROOT
+    // rather than under `basePath` because RFC 8414 and RFC 9728 define those
+    // paths relative to the origin — the same reason `jwks.json` sits there —
+    // and a client fetches them before it holds any token.
+    ["packages/server/src/mcp/mcp-routes.ts#wellKnown", ""],
+    ["packages/server/src/mcp/mcp-routes.ts#router", "/mcp"],
+    ["packages/server/src/mcp/oauth-routes.ts#router", "/api/oauth"],
+
     // ── init.ts, one line per router ──────────────────────────────────────
     ["packages/server/src/init.ts#schemaEditorRouter", "/api/admin/schema-editor"],
     ["packages/server/src/init.ts#liveSchemaRouter", "/api/admin/schema"],

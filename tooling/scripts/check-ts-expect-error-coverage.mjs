@@ -66,6 +66,17 @@ function filesWithDirectives() {
             if (SKIP_DIRECTORIES.has(entry.name)) continue;
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) {
+                // A nested repository is a separate checkout with tsconfigs of
+                // its own, exactly like the `.claude/worktrees` case above: the
+                // control plane lives at `saas/`, is gitignored here, and is
+                // typechecked by `saas/backend/tsconfig.json` — which no program
+                // in THIS repo reads, so every directive in it reported as
+                // unvalidated while its own `tsc` was validating it all along.
+                //
+                // It is also absent from a fresh CI clone, so this was a red
+                // gate only the developer with the checkout could see — the one
+                // failure mode the skip list was written to prevent.
+                if (fs.existsSync(path.join(full, ".git"))) continue;
                 walk(full);
                 continue;
             }
