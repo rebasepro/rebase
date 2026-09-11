@@ -152,13 +152,20 @@ export interface AdminStringOptions extends AdminPropertyOptions {
      */
     clearable?: boolean;
     /**
-     * How to render a string that holds a URL: a link, or one of the supported
-     * media types for an inline preview.
+     * How to render a string that holds a URL: one of the supported media types
+     * for an inline preview, or `true` for a plain link.
      *
      * Only presentation. Whether the string *is* a URL is `url` on the property
-     * itself, which is what the OpenAPI contract is generated from.
+     * itself, which is what the OpenAPI contract is generated from — and a
+     * property that declares `url: true` renders as a link with no help from
+     * here. Set this only to upgrade that link to an inline rendering of what it
+     * points at.
+     *
+     * `true` was always honoured at runtime (both the preview and the skeleton
+     * branch on `typeof … === "boolean"`) and was missing from this type, so the
+     * one value that means "just a link" was the one value that did not compile.
      */
-    urlPreview?: PreviewType;
+    urlPreview?: PreviewType | boolean;
 }
 
 /**

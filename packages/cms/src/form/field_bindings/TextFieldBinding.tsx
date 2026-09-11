@@ -44,7 +44,10 @@ export function TextFieldBinding<T extends string | number>({
     let url: boolean | PreviewType | undefined;
     if (property.type === "string") {
         multiline = property.admin?.multiline;
-        url = property.admin?.urlPreview;
+        // `url: true` alone earns the preview. A form field holding a URL that
+        // renders as plain text is one you have to select and copy to follow,
+        // and the property has already said what it is.
+        url = property.admin?.urlPreview ?? property.url;
     }
 
     useClearRestoreValue({
@@ -83,7 +86,7 @@ export function TextFieldBinding<T extends string | number>({
         inputType = "number";
     } else if (property.type === "string") {
         if (property.email) inputType = "email";
-        else if (property.admin?.urlPreview) inputType = "url";
+        else if (property.admin?.urlPreview || property.url) inputType = "url";
     }
 
     // `undefined` rather than an empty element: TextField and the multiline box

@@ -39,7 +39,16 @@ export function StringPropertyPreview({
                     {strValue}
                 </Chip>
             </ErrorBoundary>);
-    } else if (property.admin?.urlPreview) {
+    } else if (property.admin?.urlPreview || property.url) {
+        // `url: true` is the DATA statement — this string is a URI — and on its
+        // own that is enough to render a link. It used to take a second,
+        // presentational flag as well, so a property that had correctly declared
+        // itself a URL still rendered as plain text you had to select and copy.
+        //
+        // `urlPreview` keeps its own job: upgrading that link to an inline
+        // rendering of the thing it points at (an image, a video, a file card).
+        // Absent, `UrlComponentPreview` draws an external-link icon and the URL,
+        // which is what a link is.
         return (
             <UrlComponentPreview size={size}
                 url={strValue}
