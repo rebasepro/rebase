@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readBundleManifest, bundleDeployBody, packBundle, declaredAppsFrom } from "./bundle-deploy";
+import { readBundleManifest, bundleDeployBody, bundleCommit, packBundle, declaredAppsFrom } from "./bundle-deploy";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 
 let scratch: string;
@@ -157,5 +157,58 @@ type: "static" }
         expect(declaredAppsFrom({})).toEqual([]);
         expect(declaredAppsFrom(null)).toEqual([]);
         expect(declaredAppsFrom(undefined)).toEqual([]);
+    });
+});
+
+/**
+ * The commit a bundle was built from.
+ *
+ * Nothing near the control plane has a repository on this path — the CLI uploads
+ * a tarball — so every bundle deployment recorded an empty hash: 291 of 305
+ * production rows, a Deployments list on which almost nothing said what it
+ * shipped. The CLI is the one party standing in the repo.
+ */
+describe("bundleCommit", () => {
+    const git = (answers: Record<string, string>) => (args: string[]) => {
+        const key = args[0];
+        if (!(key in answers)) throw new Error(`unexpected git ${args.join(" ")}`);
+        return answers[key];
+    };
+
+    it("reports the short hash and the subject", () => {
+        expect(bundleCommit(".", git({ "rev-parse": "0a1b2c3\n", log: "fix: the thing\n" })))
+            .toEqual({ hash: "0a1b2c3", message: "fix: the thing" });
+    });
+
+    it("reports nothing outside a repository, rather than a guess", () => {
+        // No git, not a repo, no commits yet — all the same answer, and the
+        // server records what it is given and nothing more.
+        expect(bundleCommit(".", () => { throw new Error("not a git repository"); })).toBeNull();
+    });
+
+    it("refuses an answer that is not a hash", () => {
+        expect(bundleCommit(".", git({ "rev-parse": "HEAD\n", log: "m\n" }))).toBeNull();
+    });
+});
+
+describe("bundleDeployBody carries the commit only when there is one", () => {
+    const manifest = { app: "backend" } as unknown as RebaseBundleManifest;
+
+    it("sends both fields when the repo answered", () => {
+        const body = bundleDeployBody({
+            projectId: "p1", bundleId: "b1", manifest,
+            commit: { hash: "0a1b2c3", message: "fix: the thing" }
+        });
+        expect(body.gitCommitHash).toBe("0a1b2c3");
+        expect(body.gitCommitMessage).toBe("fix: the thing");
+    });
+
+    it("omits them entirely when it did not", () => {
+        // Not `""`. An absent field and an empty one are the same to the server,
+        // and sending the empty string would make "we did not look"
+        // indistinguishable from "we looked and there was nothing".
+        const body = bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest, commit: null });
+        expect("gitCommitHash" in body).toBe(false);
+        expect("gitCommitMessage" in body).toBe(false);
     });
 });

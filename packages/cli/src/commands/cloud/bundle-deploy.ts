@@ -14,7 +14,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, execFileSync } from "child_process";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 
 /** Read and shallow-validate a built bundle's manifest. */
@@ -70,6 +70,53 @@ COPYFILE_DISABLE: "1" } }
  * without unpacking the uploaded archive first — a rejection (native deps, no
  * matching runtime) is then a fast, cheap answer.
  */
+/** The commit a bundle was built from, as far as the working directory knows. */
+export interface BundleCommit {
+    hash: string;
+    message: string;
+}
+
+/**
+ * The commit HEAD is on, read here because here is the only place it exists.
+ *
+ * A bundle deploy has no repository anywhere near the control plane: the CLI
+ * builds a tarball and uploads it, so the three paths `deploy.ts` documents for
+ * learning a commit — clone, `ls-remote`, or "there is no repo at all" — all
+ * resolve to the third. Every bundle deployment therefore recorded an empty
+ * hash, which is 291 of the 305 rows in production: a Deployments list where
+ * almost nothing says what it shipped.
+ *
+ * But the CLI is standing IN the repository. `git -C <dir> log -1` answers
+ * exactly, message included — the one thing even the git-build path cannot get
+ * from `ls-remote`.
+ *
+ * Returns null rather than guessing, for every reason it can fail: no git, not a
+ * repository, no commits yet. The server records what it is given and nothing
+ * more, so null here stays `UNKNOWN_COMMIT_HASH` there.
+ *
+ * A dirty tree is NOT reported as a different commit. The bundle may contain
+ * uncommitted work, and the honest statement about that is "built from a tree at
+ * <hash>", not a fabricated identifier — the same rule the rest of this file
+ * follows about inventing values.
+ */
+export function bundleCommit(cwd: string, run: (args: string[]) => string = gitIn(cwd)): BundleCommit | null {
+    try {
+        const hash = run(["rev-parse", "--short=7", "HEAD"]).trim();
+        if (!/^[0-9a-f]{7,40}$/.test(hash)) return null;
+        // `%s` is the subject alone. A full body would put newlines into a
+        // single-line column that the console renders in a table row.
+        const message = run(["log", "-1", "--pretty=%s"]).trim();
+        return { hash, message };
+    } catch {
+        return null;
+    }
+}
+
+/** `git -C <cwd> …`, as a function, so `bundleCommit` is testable without a repo. */
+function gitIn(cwd: string): (args: string[]) => string {
+    return (args) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+}
+
 export function bundleDeployBody(input: {
     projectId: string;
     bundleId: string;
@@ -81,6 +128,14 @@ export function bundleDeployBody(input: {
      * register the whole set rather than only the one being deployed.
      */
     declaredApps?: DeclaredApp[];
+    /**
+     * What HEAD said when this bundle was built, or null outside a repository.
+     *
+     * Omitted from the body entirely when null — an absent field and an empty
+     * one are the same to the server, and sending `""` would make "we did not
+     * look" indistinguishable from "we looked and there was nothing".
+     */
+    commit?: BundleCommit | null;
 }): Record<string, unknown> {
     return {
         projectId: input.projectId,
@@ -90,7 +145,10 @@ export function bundleDeployBody(input: {
         client: "cli",
         frameworkVersion: input.manifest.runtime?.builtAgainst,
         ...(input.declaredApps?.length ? { declaredApps: input.declaredApps } : {}),
-        ...(input.message ? { message: input.message } : {})
+        ...(input.message ? { message: input.message } : {}),
+        ...(input.commit
+            ? { gitCommitHash: input.commit.hash, gitCommitMessage: input.commit.message }
+            : {})
     };
 }
 

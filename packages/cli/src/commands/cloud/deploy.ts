@@ -35,7 +35,7 @@ import {
     type CloudClient
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
-import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declaredAppsFrom } from "./bundle-deploy";
+import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, bundleCommit, declaredAppsFrom } from "./bundle-deploy";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
@@ -397,12 +397,18 @@ async function uploadAndTrigger(opts: {
         // describe its other apps.
     }
 
-    const body = bundleDeployBody({ projectId,
-bundleId,
-manifest,
-app: opts.appName,
-message: opts.message,
-declaredApps });
+    const body = bundleDeployBody({
+        projectId,
+        bundleId,
+        manifest,
+        app: opts.appName,
+        message: opts.message,
+        declaredApps,
+        // Read here because here is the only place it exists: a bundle deploy
+        // uploads a tarball, so nothing near the control plane has a repository
+        // to ask. See `bundleCommit`.
+        commit: bundleCommit(process.cwd())
+    });
 
     let deploymentId: string;
     let managed: boolean;
