@@ -289,7 +289,37 @@ export function extractSurface({ pkg, dts, mustHaveMembers = [] }) {
     return lines.sort().join("\n") + "\n";
 }
 
-/** Newest mtime under a directory, or 0 if it does not exist. */
+/** Extensions `tsc --emitDeclarationOnly` can turn into a line of `index.d.ts`. */
+const DECLARING_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+
+/** Directories whose contents are never emitted, by near-universal convention. */
+const NON_EMITTING_DIRS = new Set(["__tests__", "__mocks__", "__fixtures__", "__snapshots__"]);
+
+/**
+ * Whether editing this file could move `dist/index.d.ts`.
+ *
+ * The freshness check exists to stop the gate answering from an old build. It
+ * must not start refusing for edits that cannot possibly change the answer —
+ * `packages/server/src` holds 28 `*.test.ts` and `packages/client/src` 31, so a
+ * whole-tree mtime walk would make the most-edited files in the repo block a
+ * gate they have no bearing on. That is the same lesson the stale `dist` taught,
+ * in a new costume: the gate stops answering for reasons that are not about your
+ * change, and people route around it.
+ *
+ * An allowlist rather than a blocklist, because the failure directions are not
+ * symmetric. Missing an extension makes the gate slightly too eager to answer —
+ * the pre-existing behaviour. Admitting a file that cannot be emitted makes it
+ * refuse for no reason, which is the thing being fixed.
+ */
+export function affectsDeclarations(relPath) {
+    const segments = relPath.split(path.sep);
+    if (segments.some(s => NON_EMITTING_DIRS.has(s))) return false;
+    const name = segments[segments.length - 1];
+    if (/\.(test|spec)\.[cm]?tsx?$/.test(name)) return false;
+    return DECLARING_EXTENSIONS.has(path.extname(name));
+}
+
+/** Newest mtime among the files under `dir` that can reach the declarations. */
 function newestMtime(dir) {
     let newest = 0;
     const walk = (d) => {
@@ -301,8 +331,9 @@ function newestMtime(dir) {
         }
         for (const entry of entries) {
             const full = path.join(d, entry.name);
-            if (entry.isDirectory()) walk(full);
-            else {
+            if (entry.isDirectory()) {
+                if (!NON_EMITTING_DIRS.has(entry.name)) walk(full);
+            } else if (affectsDeclarations(path.relative(dir, full))) {
                 const { mtimeMs } = fs.statSync(full);
                 if (mtimeMs > newest) newest = mtimeMs;
             }

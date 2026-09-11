@@ -23,7 +23,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { extractSurface, renderAll, staleTargets } from "../api-surface.mjs";
+import { affectsDeclarations, extractSurface, renderAll, staleTargets } from "../api-surface.mjs";
 import { checkApiSurface } from "../check-api-surface.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -167,4 +167,49 @@ test("a dist older than its src is refused, not diffed", () => {
     const fresh = Date.now() / 1000 + 60;
     fs.utimesSync(dts, fresh, fresh);
     assert.deepEqual(staleTargets(target, dir), []);
+});
+
+test("a test file is not a stale dist — it cannot reach the declarations", () => {
+    // The freshness guard walked the whole `src` tree at first, and
+    // `packages/server/src` holds 28 `*.test.ts` while `packages/client/src`
+    // holds 31. Editing one would have made the gate refuse to answer until the
+    // package was rebuilt — a refusal with no relationship to the surface, on
+    // the most-edited files in the repo. That is the stale-dist lesson in a new
+    // costume: the gate stops answering for reasons that are not about your
+    // change, so people route around it.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-surface-tests-"));
+    fs.mkdirSync(path.join(dir, "packages/fixture/src"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "packages/fixture/dist"), { recursive: true });
+
+    const dts = path.join(dir, "packages/fixture/dist/index.d.ts");
+    fs.writeFileSync(dts, "export declare const a: string;\n");
+    fs.writeFileSync(path.join(dir, "packages/fixture/src/index.ts"), "export const a = '';\n");
+
+    const old = Date.now() / 1000 - 3600;
+    fs.utimesSync(dts, old, old);
+    fs.utimesSync(path.join(dir, "packages/fixture/src/index.ts"), old - 60, old - 60);
+
+    const target = [{ pkg: "@fixture/x", dts: "packages/fixture/dist/index.d.ts" }];
+    assert.deepEqual(staleTargets(target, dir), [], "the build is newer than the only real source");
+
+    // Touch a test file far in the future. It still must not flag.
+    const spec = path.join(dir, "packages/fixture/src/index.test.ts");
+    fs.writeFileSync(spec, "// a test\n");
+    assert.deepEqual(staleTargets(target, dir), [], "a *.test.ts cannot change index.d.ts");
+
+    // Same for a conventional non-emitting directory.
+    fs.mkdirSync(path.join(dir, "packages/fixture/src/__tests__"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "packages/fixture/src/__tests__/helper.ts"), "export const h = 1;\n");
+    assert.deepEqual(staleTargets(target, dir), [], "__tests__/ is not emitted");
+
+    // …but a real source edit still does, or the guard would be decorative.
+    fs.writeFileSync(path.join(dir, "packages/fixture/src/index.ts"), "export const a = 'b';\n");
+    assert.deepEqual(staleTargets(target, dir), ["packages/fixture"]);
+});
+
+test("affectsDeclarations admits what tsc emits and nothing else", () => {
+    for (const yes of ["index.ts", "a/b.tsx", "x.mts", "types.d.ts"])
+        assert.equal(affectsDeclarations(yes.split("/").join(path.sep)), true, yes);
+    for (const no of ["index.test.ts", "a.spec.tsx", "__tests__/h.ts", "README.md", "logo.svg", "data.json"])
+        assert.equal(affectsDeclarations(no.split("/").join(path.sep)), false, no);
 });
