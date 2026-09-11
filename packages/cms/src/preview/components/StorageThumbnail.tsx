@@ -2,11 +2,12 @@ import React, { useEffect } from "react";
 
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
-import { ErrorView, useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
+import { useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { Skeleton } from "@rebasepro/ui";
+import { cls, ImageOffIcon, iconSize, Skeleton, Tooltip, Typography } from "@rebasepro/ui";
+import { getThumbnailMeasure } from "../util";
 type StorageThumbnailProps = {
     storagePathOrDownloadUrl: string;
     storeUrl: boolean;
@@ -122,7 +123,9 @@ export function StorageThumbnailInternal({
     if (downloadConfig?.fileNotFound)
         // `file_not_found` is translated into seven locales and this rendered
         // the English literal, so a German panel said "File not found".
-        return <ErrorView error={t("file_not_found")}></ErrorView>
+        return <FileNotFoundThumbnail message={t("file_not_found")}
+            size={size}
+            fill={fill}/>;
 
     return downloadConfig?.url
         ? <UrlComponentPreview previewType={previewType}
@@ -134,6 +137,54 @@ export function StorageThumbnailInternal({
         : fill
             ? <Skeleton className="w-full h-full"/>
             : renderSkeletonImageThumbnail(size);
+}
+
+/**
+ * The placeholder for a path the storage source answered 404 for.
+ *
+ * It occupies the box the image would have — the card's whole 4:3 thumbnail
+ * when `fill`, otherwise the same measure as the skeleton it replaces — and
+ * centres its contents in it. This was `ErrorView`, which is a
+ * left-aligned block with a red triangle and `m-2` around it: laid over a card
+ * thumbnail it sat in the top-left corner with the icon colliding with the
+ * text, and a grid of them read as a page of errors rather than as missing
+ * pictures. A file that is not there is the same absence `ImagePreview`
+ * already draws for an image that fails to load, so it is drawn the same way.
+ *
+ * At `small` the box is 40px and no label fits, so the message becomes the
+ * tooltip instead of being clipped.
+ */
+function FileNotFoundThumbnail({
+    message,
+    size,
+    fill
+}: { message: string, size: PreviewSize, fill?: boolean }) {
+
+    const measure = fill ? undefined : getThumbnailMeasure(size);
+    const labelled = fill || size !== "small";
+
+    const body = (
+        <div
+            className={cls(
+                "flex flex-col items-center justify-center gap-1 text-center overflow-hidden",
+                "bg-surface-raised rounded-md p-2",
+                fill ? "w-full h-full" : ""
+            )}
+            style={measure === undefined ? undefined : { width: measure, height: measure, maxHeight: "100%" }}>
+            <ImageOffIcon
+                size={labelled ? iconSize.small : iconSize.smallest}
+                className="shrink-0 text-surface-400 dark:text-surface-500"/>
+            {labelled && (
+                <Typography variant="caption"
+                    color="secondary"
+                    className="max-w-full line-clamp-2 leading-tight">
+                    {message}
+                </Typography>
+            )}
+        </div>
+    );
+
+    return labelled ? body : <Tooltip title={message}>{body}</Tooltip>;
 }
 
 function getFiletype(input: string): FileType {

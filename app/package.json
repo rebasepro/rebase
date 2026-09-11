@@ -10,7 +10,7 @@
         "config"
     ],
     "scripts": {
-        "dev": "rebase dev",
+        "dev": "node ../tooling/scripts/mirror-seed-assets.mjs && rebase dev",
         "build": "pnpm --filter \"./frontend\" --filter \"./backend\" --filter \"./config\" -r run build",
         "start": "pnpm --filter \"*-backend\" start",
         "db:generate": "rebase db generate --collections ../config/collections",
