@@ -43,6 +43,13 @@ firebase-debug.log*
 
 report.**.json
 
+# Git worktrees checked out inside the repo. `.claude/worktrees/` was the first
+# location; `.worktrees/` appeared later and was not ignored, so `git add -A`
+# staged it as an embedded repository — which clones of this repo cannot fetch
+# and which no gate should walk into either (see `hasOwnCheckout` in
+# tooling/scripts/check-config-paths.mjs).
+.worktrees/
+
 # The saas control plane is its own git repository living inside this one, and
 # its worktrees get checked out beside it as `saas-<topic>`. They are foreign
 # checkouts, so `git add` on one writes a gitlink to a commit this repo has
