@@ -488,6 +488,9 @@ export const fr: RebaseTranslations = {
     confirm_delete_selection_unknown: "Supprimer toutes les lignes correspondant au filtre actuel ?",
     confirm_delete_selection_body: "Cette action est irréversible. Chaque ligne est supprimée séparément, l’opération peut donc prendre du temps.",
 
+    export_selection_count: "Télécharger les {{total}} lignes sélectionnées au format {{format}}",
+    export_selection_all_matching: "Télécharger tous les {{collection}} correspondant au filtre actuel",
+
     select_reference: "Sélectionner une référence",
     select_references: "Sélectionner des références",
     account_settings: "Paramètres du compte",

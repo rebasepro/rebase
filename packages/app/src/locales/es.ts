@@ -496,6 +496,9 @@ export const es: RebaseTranslations = {
     confirm_delete_selection_unknown: "¿Eliminar todas las filas que coinciden con el filtro actual?",
     confirm_delete_selection_body: "Esta acción no se puede deshacer. Cada fila se elimina por separado, así que puede tardar un rato.",
 
+    export_selection_count: "Descargar las {{total}} filas seleccionadas en {{format}}",
+    export_selection_all_matching: "Descargar todos los {{collection}} que coinciden con el filtro actual",
+
     select_reference: "Seleccionar referencia",
     select_references: "Seleccionar referencias",
     account_settings: "Configuración de la cuenta",

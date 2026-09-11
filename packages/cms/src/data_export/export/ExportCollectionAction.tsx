@@ -255,9 +255,21 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
             <DialogContent className={"flex flex-col gap-4 my-4"}>
 
-                <div>{t("download_table_csv")}</div>
+                {/* What is about to be downloaded, in as many words. The export
+                    now follows the selection, or the view's filter and search —
+                    so "the content of this table" would be describing something
+                    it no longer does. */}
+                <div>{exportSelection
+                    ? (rowsToExport === undefined
+                        ? (t("export_selection_all_matching", { collection: collection.name })
+                            ?? `Download every ${collection.name} matching the current filter as a ${exportType.toUpperCase()}`)
+                        : (t("export_selection_count", {
+                            total: rowsToExport.toLocaleString(),
+                            format: exportType.toUpperCase()
+                        }) ?? `Download the ${rowsToExport.toLocaleString()} selected rows as a ${exportType.toUpperCase()}`))
+                    : t("download_table_csv")}</div>
 
-                {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT && !tooManyToExport &&
+                {!exportSelection && collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT && !tooManyToExport &&
                     <Alert color={"warning"}>
                         <div>
                             {t("large_number_of_documents", { count: collectionEntitiesCount.toString() })}

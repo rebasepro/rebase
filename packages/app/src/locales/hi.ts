@@ -488,6 +488,9 @@ export const hi: RebaseTranslations = {
     confirm_delete_selection_unknown: "क्या वर्तमान फ़िल्टर से मेल खाने वाली सभी पंक्तियाँ हटाएँ?",
     confirm_delete_selection_body: "इसे पूर्ववत नहीं किया जा सकता। हर पंक्ति अलग-अलग हटाई जाती है, इसलिए इसमें कुछ समय लग सकता है।",
 
+    export_selection_count: "{{total}} चयनित पंक्तियाँ {{format}} रूप में डाउनलोड करें",
+    export_selection_all_matching: "वर्तमान फ़िल्टर से मेल खाने वाले सभी {{collection}} डाउनलोड करें",
+
     select_reference: "संदर्भ चुनें",
     select_references: "संदर्भ चुनें (एकाधिक)",
     account_settings: "खाता सेटिंग्स",

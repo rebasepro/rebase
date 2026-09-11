@@ -567,6 +567,9 @@ export interface RebaseTranslations {
     confirm_delete_selection: string;
     confirm_delete_selection_unknown: string;
     confirm_delete_selection_body: string;
+    /** What an export is about to download, once a selection narrows it. */
+    export_selection_count: string;
+    export_selection_all_matching: string;
 
     select_reference: string;
     select_references: string;

@@ -496,6 +496,9 @@ export const en: RebaseTranslations = {
     confirm_delete_selection_unknown: "Delete every row matching the current filter?",
     confirm_delete_selection_body: "This cannot be undone. Each row is deleted individually, so this may take a while.",
 
+    export_selection_count: "Download the {{total}} selected rows as a {{format}}",
+    export_selection_all_matching: "Download every {{collection}} matching the current filter",
+
     select_reference: "Select reference",
     select_references: "Select references",
     account_settings: "Account Settings",

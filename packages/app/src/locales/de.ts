@@ -488,6 +488,9 @@ export const de: RebaseTranslations = {
     confirm_delete_selection_unknown: "Alle Zeilen löschen, die dem aktuellen Filter entsprechen?",
     confirm_delete_selection_body: "Dies kann nicht rückgängig gemacht werden. Jede Zeile wird einzeln gelöscht, das kann eine Weile dauern.",
 
+    export_selection_count: "Die {{total}} ausgewählten Zeilen als {{format}} herunterladen",
+    export_selection_all_matching: "Alle {{collection}}, die dem aktuellen Filter entsprechen, herunterladen",
+
     select_reference: "Referenz auswählen",
     select_references: "Referenzen auswählen",
     account_settings: "Kontoeinstellungen",

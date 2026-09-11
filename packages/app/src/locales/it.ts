@@ -488,6 +488,9 @@ export const it: RebaseTranslations = {
     confirm_delete_selection_unknown: "Eliminare tutte le righe che corrispondono al filtro attuale?",
     confirm_delete_selection_body: "L’operazione non può essere annullata. Ogni riga viene eliminata singolarmente, quindi potrebbe richiedere del tempo.",
 
+    export_selection_count: "Scarica le {{total}} righe selezionate in formato {{format}}",
+    export_selection_all_matching: "Scarica tutti i {{collection}} che corrispondono al filtro attuale",
+
     select_reference: "Seleziona riferimento",
     select_references: "Seleziona riferimenti",
     account_settings: "Impostazioni account",

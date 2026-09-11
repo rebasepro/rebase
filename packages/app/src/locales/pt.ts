@@ -493,6 +493,9 @@ export const pt: RebaseTranslations = {
     confirm_delete_selection_unknown: "Eliminar todas as linhas que correspondem ao filtro atual?",
     confirm_delete_selection_body: "Esta ação não pode ser anulada. Cada linha é eliminada individualmente, pelo que pode demorar algum tempo.",
 
+    export_selection_count: "Descarregar as {{total}} linhas selecionadas em {{format}}",
+    export_selection_all_matching: "Descarregar todos os {{collection}} que correspondem ao filtro atual",
+
     select_reference: "Selecionar referência",
     select_references: "Selecionar referências",
     account_settings: "Definições da conta",
