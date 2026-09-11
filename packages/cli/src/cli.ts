@@ -16,7 +16,7 @@ import { normalizeImportsCommand } from "./commands/normalize-imports";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { telemetryCommand } from "./commands/telemetry";
-import { isEnabled, recordEvent } from "./telemetry";
+import { errorClass, isEnabled, recordEvent } from "./telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
@@ -121,12 +121,22 @@ export async function entry(args: string[]) {
         await dispatch(command, effectiveSubcommand, args, parsedArgs, namespacedCommands);
     } catch (error) {
         // What failed, never why. `cli.error` records the command that threw and
-        // the error's constructor name — never its message, and never anything
+        // a classification of the error — never its message, and never anything
         // derived from one. The consent screen promises "no project names,
         // paths, schemas, URLs or error messages", and a failure is exactly
         // where those leak: a message is usually a path, a connection string or
         // a column name. Which command fails, and how often, is the signal
         // worth having and costs none of that.
+        //
+        // The classification is `errorClass`, not `error.constructor.name`.
+        // Both are safe, but the constructor name is almost always the useless
+        // half of the answer: Node reports a refused connection, a missing file
+        // and a permission denial all as plain `Error` carrying a `code`, so
+        // every ECONNREFUSED, ENOENT and EACCES arrived here as the word
+        // "Error" and the one question this event exists to answer — what is
+        // actually going wrong out there — had no answer in the data.
+        // `errorClass` prefers the `code` and falls back to the name, and it
+        // is already the classifier the payload contract is written around.
         //
         // `recordEvent` is fire-and-forget and swallows its own failures, but it
         // is awaited so a short-lived CLI does not exit before the request is
@@ -135,7 +145,7 @@ export async function entry(args: string[]) {
         await recordEvent("cli.error", {
             command: command ?? "none",
             subcommand: effectiveSubcommand ?? "none",
-            error_type: error instanceof Error ? error.constructor.name : "unknown",
+            error_type: errorClass(error),
             usage: Boolean(error && typeof error === "object" && (error as { isUsageError?: unknown }).isUsageError)
         }, { projectRoot: process.cwd() });
         throw error;
