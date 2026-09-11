@@ -524,7 +524,8 @@ jobs:
       # in no pipeline — AUDIT-2026-07-28 finding A left it open because nobody
       # had watched an unattended run. It has now been run repeatedly, in CI mode
       # with a cold server boot, against both a fresh database and a populated
-      # one: 10 tests, ~33s, green each time.
+      # one: green each time. It has grown since — 36 tests, ~1.4m — as the
+      # BaaS REST surface and the panel's own write path were added to it.
       #
       # The reason it could not simply be switched on is the database. CI's is
       # always empty, so `/auth/config` reports `needsSetup` and LoginView shows
