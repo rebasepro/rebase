@@ -162,6 +162,7 @@ function isNodeRuntime
 function isOperationAllowed
 function isTopologyEnvVar
 function isTransformableImage
+function isUncountedPath
 function lazyResource
 function listBackupObjects
 function listenWithPortRetry
@@ -604,7 +605,7 @@ interface CronJobLogEntry { durationMs, error, finishedAt, jobId, logs, manual, 
 interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
 interface CronResourceOptions { catchUpWindowSeconds, description, enabled, engine, label, schedule, timeoutSeconds, timezone, transport }
 interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface DataDriver { admin, batchWrite, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany }
+interface DataDriver { admin, batchWrite, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany, updateRelationPivot }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
@@ -779,6 +780,7 @@ interface TruePolicyExpression { kind }
 interface UnorderedIndexKey { prop }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface UpdateManyProps { collection, path, updates }
+interface UpdateRelationPivotProps { path, pivot, targetId }
 interface UploadFileProps { bucket, context, file, key, metadata, public }
 interface UploadFileResult { bucket, key, storageUrl }
 interface UploadPropertyContext { collection, property }
@@ -1090,6 +1092,7 @@ function getEnumVarName
 function getGeneratedPolicyNames
 function getInjectedSecurityRules
 function getJunctionCollectionConfig
+function getJunctionConfigForRelation
 function getJunctionSecurityRules
 function getLabelOrConfigFrom
 function getPrimaryKeys
@@ -1125,6 +1128,7 @@ function reconcileCursorOrder
 function registerConditionOperations
 function relationDeclaringProperty
 function relationalCollections
+function requireCallbackCollection
 function resolveArrayProperties
 function resolveCollectionRelations
 function resolveDataSource

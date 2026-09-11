@@ -289,6 +289,77 @@ export function extractSurface({ pkg, dts, mustHaveMembers = [] }) {
     return lines.sort().join("\n") + "\n";
 }
 
+/** Newest mtime under a directory, or 0 if it does not exist. */
+function newestMtime(dir) {
+    let newest = 0;
+    const walk = (d) => {
+        let entries;
+        try {
+            entries = fs.readdirSync(d, { withFileTypes: true });
+        } catch {
+            return;
+        }
+        for (const entry of entries) {
+            const full = path.join(d, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else {
+                const { mtimeMs } = fs.statSync(full);
+                if (mtimeMs > newest) newest = mtimeMs;
+            }
+        }
+    };
+    walk(dir);
+    return newest;
+}
+
+/**
+ * Which tracked packages have sources newer than the `dist` they were built to.
+ *
+ * This surface is read from `dist/index.d.ts` on purpose — that file IS what a
+ * deployed bundle resolves against. The cost is that the answer is only as
+ * current as the last build, and nothing rebuilds on the way in here.
+ *
+ * A stale `dist` does not degrade gracefully. It reports the baseline's newer
+ * symbols as **deletions** — the one classification this gate exists to scream
+ * about. On 2026-09-11 that is exactly what it did: five realtime channel types
+ * declared and baselined in a917727b0 came back as "5 export(s) REMOVED … a
+ * deployed bundle importing this symbol throws at boot", when the build was
+ * simply hours older than the commit. Four of the five tracked packages were
+ * stale at once, so the gate had been answering with noise for about a day.
+ *
+ * A gate that cries contract-break on an old build is a gate people learn to
+ * skip, and three separate commits then landed additions without regenerating
+ * the baseline. So it refuses to answer instead.
+ *
+ * It matters more for `--write` than for the check: rendering a baseline from a
+ * stale `dist` writes real exports OUT of the contract, and the next run reports
+ * that as a removal by whoever touched it next.
+ */
+export function staleTargets(targets = TRACKED, root = ROOT) {
+    const stale = new Map();
+    for (const target of targets) {
+        const match = target.dts.match(/^(packages\/[^/]+)\//);
+        if (!match) continue;
+        const pkgDir = path.join(root, match[1]);
+        const dts = path.join(root, target.dts);
+        if (!fs.existsSync(dts)) continue;
+        const built = fs.statSync(dts).mtimeMs;
+        const edited = newestMtime(path.join(pkgDir, "src"));
+        if (edited > built) stale.set(match[1], { built, edited });
+    }
+    return [...stale.keys()].sort();
+}
+
+/** The message both entry points print, so they cannot drift apart. */
+export function staleDistMessage(stale) {
+    return `✗ ${stale.length} package(s) have sources newer than the dist this reads:\n\n` +
+        stale.map(p => `    ${p}`).join("\n") +
+        "\n\nThe surface is read from dist/index.d.ts, so an old build reports the\n" +
+        "baseline's newer exports as REMOVALS — a contract break that is not real.\n" +
+        "Refusing to answer. Build them first:\n\n" +
+        `    pnpm ${stale.map(p => `--filter @rebasepro/${p.replace("packages/", "")}`).join(" ")} build\n`;
+}
+
 /** `targets` is a parameter so the gate's own tests can render a fixture surface. */
 export function renderAll(targets = TRACKED) {
     let out =
@@ -304,6 +375,13 @@ export function renderAll(targets = TRACKED) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    // Hard refusal on `--write`: a baseline rendered from a stale dist silently
+    // drops real exports, and the next run blames whoever touched the file next.
+    const stale = staleTargets();
+    if (stale.length && process.argv.includes("--write")) {
+        console.error(staleDistMessage(stale));
+        process.exit(1);
+    }
     const surface = renderAll();
     if (process.argv.includes("--write")) {
         fs.mkdirSync(path.dirname(BASELINE), { recursive: true });

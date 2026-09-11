@@ -23,7 +23,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { extractSurface, renderAll } from "../api-surface.mjs";
+import { extractSurface, renderAll, staleTargets } from "../api-surface.mjs";
 import { checkApiSurface } from "../check-api-surface.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -135,4 +135,36 @@ test("mustHaveMembers refuses a render that went blind again", () => {
         /rendered with no members/,
         "the floor is what stops this gate from silently returning to bare names"
     );
+});
+
+test("a dist older than its src is refused, not diffed", () => {
+    // The failure this guard exists for. `renderAll` reads `dist/index.d.ts`, so
+    // a build older than the source reports the baseline's newer exports as
+    // REMOVED — the one verdict here that reads as a fleet emergency. On
+    // 2026-09-11 five realtime channel types, declared AND baselined in the same
+    // commit, came back as "5 export(s) REMOVED"; four of the five tracked
+    // packages were stale at once. Three commits had by then landed additions
+    // without regenerating the baseline, which is what a gate that cries wolf
+    // buys you.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-surface-stale-"));
+    fs.mkdirSync(path.join(dir, "packages/fixture/src"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "packages/fixture/dist"), { recursive: true });
+
+    const dts = path.join(dir, "packages/fixture/dist/index.d.ts");
+    fs.writeFileSync(dts, "export declare const a: string;\n");
+    const src = path.join(dir, "packages/fixture/src/index.ts");
+    fs.writeFileSync(src, "export const a = '';\n");
+
+    // The dist predates the edit, which is the whole condition.
+    const old = Date.now() / 1000 - 3600;
+    fs.utimesSync(dts, old, old);
+
+    const target = [{ pkg: "@fixture/x", dts: "packages/fixture/dist/index.d.ts" }];
+    assert.deepEqual(staleTargets(target, dir), ["packages/fixture"]);
+
+    // …and a dist built after the edit is not flagged, or the guard would refuse
+    // to ever answer and the gate would be off rather than strict.
+    const fresh = Date.now() / 1000 + 60;
+    fs.utimesSync(dts, fresh, fresh);
+    assert.deepEqual(staleTargets(target, dir), []);
 });

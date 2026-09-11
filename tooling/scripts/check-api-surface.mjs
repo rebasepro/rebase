@@ -30,7 +30,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderAll, BASELINE, TRACKED } from "./api-surface.mjs";
+import { renderAll, BASELINE, TRACKED, staleTargets, staleDistMessage } from "./api-surface.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const rel = p => path.relative(ROOT, p);
@@ -104,6 +104,18 @@ export function checkApiSurface({ baseline = BASELINE, targets } = {}) {
             "Create it with: pnpm write:api-surface"
         );
         return 1;
+    }
+
+    // Before diffing anything: this reads `dist`, and an old `dist` reports the
+    // baseline's newer exports as REMOVED — the one verdict here that reads as
+    // an emergency. See `staleTargets` for the day it did exactly that.
+    // Skipped when `targets` is supplied, which is the tests' fixture surface.
+    if (!targets) {
+        const stale = staleTargets();
+        if (stale.length) {
+            console.error(staleDistMessage(stale));
+            return 1;
+        }
     }
 
     let current;
