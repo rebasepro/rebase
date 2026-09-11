@@ -144,6 +144,37 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    "db connect": {
+        command: "cloud db connect",
+        usage: "cloud db connect [--port <n>] [--reveal]",
+        summary:
+            "Open a local port that is the project's managed database, and hold it open until Ctrl-C. "
+            + "A managed database lives inside the platform's cluster, so the host `db info` reports is "
+            + "your backend's address for it and resolves to nothing on your machine; this is what makes "
+            + "it reachable from here. Point psql, TablePlus, Drizzle Studio or pg_dump at the URL it "
+            + "prints. The database still asks for its password — the tunnel is a network path, not a "
+            + "credential.",
+        flags: [
+            ["--port <n>", "Local port to listen on. Default: 5432"],
+            ["--reveal", "Print the password inside the connection URL"]
+        ],
+        examples: [
+            "rebase cloud db connect",
+            "rebase cloud db connect --port 6543",
+            "rebase cloud db connect --reveal --project shop"
+        ],
+        notes: [
+            "Requires the organization's owner or admin role — the same gate as the console's SQL "
+            + "console, because it is the same capability.",
+            "Piped or with --json it prints one object — host, port, database, username, "
+            + "connectionString — and keeps serving, so a script can read the URL and connect.",
+            "Connections go through the control plane, so they count against the project's own "
+            + "database connection limit like any other client.",
+            "Bring-your-own databases are refused: that host is already yours to reach, and there is "
+            + "nothing for the platform to tunnel."
+        ]
+    },
+
     deploy: {
         command: "cloud deploy",
         usage: "cloud deploy [app] [options]",

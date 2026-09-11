@@ -31,6 +31,29 @@ function captureStdout(): { output: () => string; restore: () => void } {
 restore: () => { process.stdout.write = orig; } };
 }
 
+/**
+ * Human-mode output, which does NOT arrive on `process.stdout`.
+ *
+ * `printJson` writes to the stream directly, so {@link captureStdout} sees it;
+ * the human renderers go through `console.log`, which the test runner has
+ * already replaced. Spying on the console is therefore the only way to read
+ * them, and the spy is handed back so it can be taken off again — this file's
+ * `afterEach` clears mocks rather than restoring them, so a spy left installed
+ * would silently swallow every later test's output.
+ */
+function captureHumanOutput(): { text: () => string; restore: () => void } {
+    const chunks: string[] = [];
+    // eslint-disable-next-line no-control-regex
+    const ANSI = /\u001b\[[0-9;]*m/g;
+    const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+        chunks.push(args.map(String).join(" "));
+    });
+    return {
+        text: () => chunks.join("\n").replace(ANSI, ""),
+        restore: () => spy.mockRestore()
+    };
+}
+
 /* ── fake SDK client ────────────────────────────────────────────── */
 
 interface FakeClientSpec {
@@ -360,7 +383,7 @@ describe("db info --json", () => {
         database: "app",
         username: "u",
         passwordAvailable: true,
-        portForward: null,
+        directAccess: { via: "tunnel" },
         unavailableReason: null
     };
 
@@ -392,6 +415,54 @@ connectionString: "postgres://u:s3cr3t@h/app" };
 
         const parsed = JSON.parse(cap.output().trim());
         expect(parsed.password).toBe("s3cr3t");
+    });
+
+    /**
+     * The host `db info` reports is a Service inside the platform's cluster, so
+     * the page has to say what to do about that. It used to print `kubectl -n
+     * rebase-tenant-… port-forward`, which needs a kubeconfig for OUR cluster —
+     * something no customer has and nothing issues. The remedy must be a
+     * command the reader can actually run.
+     */
+    it("points a platform-hosted database at the tunnel, never at kubectl", async () => {
+        setJsonModeForTest(false);
+        useClient(fakeClient({ invoke: async () => infoBody }));
+        const cap = captureHumanOutput();
+        await dbCommand("info", ["node", "rebase", "cloud", "db", "info"]);
+        cap.restore();
+        setJsonModeForTest(true);
+
+        expect(cap.text()).toContain("rebase cloud db connect");
+        expect(cap.text()).not.toContain("kubectl");
+    });
+
+    it("offers kubectl only for a cluster the customer owns", async () => {
+        setJsonModeForTest(false);
+        useClient(
+            fakeClient({
+                invoke: async () => ({
+                    ...infoBody,
+                    directAccess: {
+                        via: "tunnel",
+                        kubectl: {
+                            namespace: "rebase-tenant-1",
+                            service: "postgres-rw",
+                            localPort: 5432,
+                            remotePort: 5432
+                        }
+                    }
+                })
+            })
+        );
+        const cap = captureHumanOutput();
+        await dbCommand("info", ["node", "rebase", "cloud", "db", "info"]);
+        cap.restore();
+        setJsonModeForTest(true);
+
+        // Their cluster, their credentials — and the tunnel still works there,
+        // so it is offered first rather than replaced.
+        expect(cap.text()).toContain("rebase cloud db connect");
+        expect(cap.text()).toContain("kubectl -n rebase-tenant-1 port-forward svc/postgres-rw 5432:5432");
     });
 });
 

@@ -184,7 +184,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
 | `domains` | Custom domains, the DNS records to add, and verification |
-| `db` | Attach or create a database, backups, restore, and point-in-time recovery |
+| `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
@@ -224,6 +224,12 @@ Stated plainly, because finding out later is worse:
   and says so before it signs you in.
 - **Point-in-time recovery is CLI-only.** The console shows backups; the staged
   PITR workflow is `rebase cloud db pitr`.
+- **No public database endpoint.** A managed database is not exposed to the
+  internet, so the host the console shows is your backend's address for it and
+  resolves to nothing on your machine. `rebase cloud db connect` opens a local
+  port that is that database, tunnelled through the control plane, for as long
+  as you leave it running — but there is no permanent hostname a third-party
+  service can connect to.
 
 ## Self-hosting instead
 

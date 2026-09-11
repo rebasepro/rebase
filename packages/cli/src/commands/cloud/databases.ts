@@ -3,6 +3,8 @@
  *
  *   db list                List databases attached to the project
  *   db create              Attach a managed or bring-your-own database
+ *   db info                Where the database is, and what it is called
+ *   db connect             A local port that IS the project's database
  *   db test                Test connectivity to the project's database
  *   db backup list|create|restore
  */
@@ -31,6 +33,7 @@ import {
     cloudRows,
     requireCloudRow
 } from "./context";
+import { dbConnect } from "./db-connect";
 
 interface DatabaseRow {
     id: string | number;
@@ -58,6 +61,9 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
             break;
         case "info":
             await dbInfo(rawArgs);
+            break;
+        case "connect":
+            await dbConnect(rawArgs);
             break;
         case "test":
             await testDatabase(rawArgs);
@@ -395,7 +401,19 @@ interface DbInfoResponse {
     database: string | null;
     username: string | null;
     passwordAvailable: boolean;
-    portForward: { namespace: string; service: string; localPort: number; remotePort: number } | null;
+    /**
+     * How the customer reaches this database from their own machine.
+     *
+     * This replaced a `portForward` field that was rendered as a `kubectl
+     * port-forward -n rebase-tenant-…` line — a command whose prerequisite is a
+     * kubeconfig for the platform's cluster, which no customer has and which
+     * nothing here has ever issued. `kubectl` is present now only when the
+     * cluster is the customer's own.
+     */
+    directAccess: {
+        via: "tunnel";
+        kubectl?: { namespace: string; service: string; localPort: number; remotePort: number };
+    } | null;
     unavailableReason: string | null;
 }
 
@@ -457,10 +475,21 @@ path: projectId });
                 if (info.unavailableReason) {
                     console.log(chalk.gray(`  ${info.unavailableReason}`));
                 }
-                if (info.portForward) {
-                    const pf = info.portForward;
+                if (info.directAccess) {
                     console.log("");
-                    console.log(chalk.gray(`  Port-forward:  kubectl -n ${pf.namespace} port-forward svc/${pf.service} ${pf.localPort}:${pf.remotePort}`));
+                    console.log(chalk.gray("  The host above is inside the platform's cluster: it is the address your"));
+                    console.log(chalk.gray("  deployed backend uses, and it resolves to nothing from here. To reach this"));
+                    console.log(chalk.gray("  database from this machine, open a tunnel:"));
+                    console.log("");
+                    console.log(`    ${chalk.cyan("rebase cloud db connect")}`);
+                    const pf = info.directAccess.kubectl;
+                    if (pf) {
+                        // Only ever present for a cluster the customer owns,
+                        // where they hold the credentials this needs.
+                        console.log("");
+                        console.log(chalk.gray("  Or, on your own cluster:"));
+                        console.log(chalk.gray(`    kubectl -n ${pf.namespace} port-forward svc/${pf.service} ${pf.localPort}:${pf.remotePort}`));
+                    }
                 }
                 console.log("");
             },
@@ -472,7 +501,7 @@ path: projectId });
                 database: info.database,
                 username: info.username,
                 passwordAvailable: info.passwordAvailable,
-                portForward: info.portForward,
+                directAccess: info.directAccess,
                 unavailableReason: info.unavailableReason,
                 // Only present when explicitly revealed.
                 ...(args["--reveal"] ? { password,
@@ -814,6 +843,15 @@ description: "List databases attached to the project" },
                 description: "Connection details",
                 flags: [["--reveal", "Include the password. Without it, the value is masked"]]
             },
+            {
+                action: "connect",
+                section: "Database",
+                description: "Open a local port that IS the project's database",
+                flags: [
+                    ["--port <n>", "Local port to listen on. Default: 5432"],
+                    ["--reveal", "Print the password in the connection URL"]
+                ]
+            },
             { action: "test",
 section: "Database",
 description: "Test database connectivity" },
@@ -856,7 +894,9 @@ description: "Delete a staged recovery" }
             "A project has exactly one database: `create` refuses rather than attaching a second, because",
             "which of two rows a deploy uses is undefined.",
             "A managed database is provisioned at the project's FIRST DEPLOY, so `test` failing before then",
-            "is not a fault."
+            "is not a fault.",
+            "The host `info` reports is inside the platform's cluster — your backend's address for it, not",
+            "one your laptop can resolve. `connect` is what makes it reachable from here."
         ]
     });
 }

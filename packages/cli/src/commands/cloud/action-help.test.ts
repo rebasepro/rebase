@@ -20,6 +20,7 @@ import { ACTION_HELP, printActionHelp } from "./action-help";
 import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
+import { DB_CONNECT_FLAGS } from "./db-connect";
 import { DEPLOY_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
 import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
@@ -40,6 +41,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "projects delete": {},
     "resources prune": {},
     "db create": CREATE_DATABASE_FLAGS,
+    "db connect": DB_CONNECT_FLAGS,
     "db backup": {},
     "db pitr": { "--target": String },
     deploy: DEPLOY_FLAGS,

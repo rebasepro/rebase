@@ -1,5 +1,5 @@
 ---
-sourceHash: 97dd0e836d51f599
+sourceHash: 27723fe81b7fd939
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -21,9 +21,9 @@ Oppure usa tramite `pnpm dlx`:
 pnpm dlx @rebasepro/cli <command>
 ```
 
-## Output leggibile da macchina
+## Output interpretabile da macchina
 
-`--json` è il flag dedicato e, al di fuori della famiglia `cloud`, è l'unico: `rebase status`, `rebase resources` e `rebase apps list` inviano quindi un singolo valore JSON su stdout — il risultato, oppure un envelope `{"error": {"message", "code", "hint", "issues"}}` con un codice di uscita diverso da zero — a **ogni** uscita del comando, in modo che il chiamante possa analizzare stdout incondizionatamente. Senza di esso, scrivono testo leggibile per gli umani e gli errori vanno su stderr. `rebase cloud` usa lo stesso envelope ed è l'unica eccezione al flag: attiva il JSON automaticamente anche quando stdout non è una TTY, o quando è impostato `REBASE_JSON=1`. Quindi `rebase cloud status | cat` produce JSON mentre `rebase status | cat` no — in uno script, passa `--json` esplicitamente anziché fare affidamento su una delle due regole.
+`--json` è il selettore, e al di fuori della famiglia `cloud` è l'unico: `rebase status`, `rebase resources` e `rebase apps list` inseriscono quindi un singolo valore JSON su stdout — il risultato, oppure un envelope `{"error": {"message", "code", "hint", "issues"}}` con un codice di uscita diverso da zero — a **ogni** uscita del comando, consentendo al chiamante di analizzare stdout incondizionatamente. Senza di esso, producono testo leggibile dall'uomo e gli errori vanno su stderr. `rebase cloud` utilizza lo stesso envelope ed è l'unica eccezione al selettore: attiva automaticamente il JSON anche quando stdout non è un TTY, o quando è impostato `REBASE_JSON=1`. Quindi `rebase cloud status | cat` restituisce JSON mentre `rebase status | cat` no — in uno script, passa esplicitamente `--json` anziché fare affidamento su una delle due regole.
 
 ## Comandi
 
@@ -40,14 +40,14 @@ Configura la struttura del progetto con frontend, backend e pacchetti condivisi.
 | Flag | Descrizione |
 |---|---|
 | `-t, --template <preset>` | `blog`, `ecommerce` o `blank`. Predefinito `blog` |
-| `--headless` | Solo backend — nessun pannello di amministrazione e nessun file di collection. `--template` non ha effetto, poiché non ci sono collection da inizializzare |
-| `-y, --yes` | Non chiede mai conferme. **Richiesto ovunque non ci sia un terminale interattivo**, come nella CI. Salta git init e l'installazione delle dipendenze — le impostazioni interattive predefinite rispondono affermativamente a entrambi, quindi passa `--git` / `--install` se li desideri |
+| `--headless` | Solo backend — nessun pannello di amministrazione e nessun file di collection. `--template` non ha effetto, poiché non ci sono collection di cui eseguire il seed |
+| `-y, --yes` | Non richiedere mai conferme. **Obbligatorio ovunque non ci sia un terminale per rispondere**, come nella CI. Salta git init e l'installazione delle dipendenze — i valori predefiniti interattivi rispondono sì a entrambi, quindi passa `--git` / `--install` se desideri eseguirli |
 | `-i, --install` | Installa le dipendenze dopo lo scaffolding |
 | `-g, --git` | Inizializza un repository ed esegue il primo commit |
 | `--database-url <url>` | Usa un database esistente invece di quello gestito |
-| `--introspect` | Genera le collection a partire da quel database. Implica `--template blank` e richiede `--install` |
+| `--introspect` | Genera collection da quel database. Implica `--template blank` e richiede `--install` |
 | `--project <slug>` | Collega lo scaffold a un progetto Rebase Cloud |
-| `--setup-key <key>` | La chiave monouso per autenticare quel collegamento |
+| `--setup-key <key>` | La chiave monouso per autenticare tale collegamento |
 
 ### `rebase dev`
 
@@ -69,17 +69,17 @@ Compila il progetto in un bundle distribuibile in `dist-bundle/`:
 rebase build
 ```
 
-Il bundle è l'artefatto che distribuisci — l'immagine di runtime lo carica, quindi non c'è un'immagine dell'applicazione da compilare autonomamente. Flag utili:
+Il bundle è l'artefatto da distribuire — l'immagine runtime lo carica, quindi non c'è alcuna immagine applicativa da creare manualmente. Flag utili:
 
 | Flag | Effetto |
-|------|---------|
+|------|--------|
 | `--out <dir>` | Scrive il bundle in una posizione diversa da `dist-bundle/` |
-| `--vendor` | Installa e include sempre le dipendenze nel bundle |
-| `--no-vendor` | Non include mai le dipendenze; il pod le installerà al primo avvio |
+| `--vendor` | Installa e include sempre le dipendenze del bundle |
+| `--no-vendor` | Non include mai le dipendenze; il pod le installa al primo avvio |
 | `--skip-type-check` | Salta il controllo dei tipi (più veloce, meno sicuro) |
 | `--no-static` | Salta la compilazione del frontend |
 
-Le dipendenze vengono incluse nel bundle (vendored) per impostazione predefinita, in modo che un riavvio del pod non richieda un'installazione da 35–55 secondi. Un albero che supera i 200 MB su disco viene invece escluso, poiché il limite di caricamento è di 100 MB compressi — consulta il changelog per la motivazione completa.
+Le dipendenze vengono incluse tramite vendoring per impostazione predefinita, in modo che il riavvio di un pod non richieda un'installazione di 35–55 secondi. Un albero che supera i 200 MB su disco viene invece scartato, poiché il limite di caricamento è di 100 MB compressi — consulta il changelog per i dettagli.
 
 ### `rebase start`
 
@@ -89,7 +89,7 @@ Esegue il bundle compilato come server di produzione:
 rebase start
 ```
 
-Legge `PORT` e il resto di `.env`, a differenza di `rebase dev`. Indirizzalo verso un bundle situato altrove con `rebase start --bundle ./dist-bundle`.
+Legge `PORT` e il resto di `.env`, a differenza di `rebase dev`. Indirizzalo a un bundle altrove con `rebase start --bundle ./dist-bundle`.
 
 ### `rebase apps list`
 
@@ -99,29 +99,29 @@ Mostra le app dichiarate da questo repository:
 rebase apps list
 ```
 
-Un repository può dichiarare più di un'app distribuibile — ad esempio un backend e un sito di marketing. In questo modo puoi verificare su cosa agiranno `rebase build` e il deployment.
+Un repository può dichiarare più di un'app distribuibile — ad esempio un backend e un sito di marketing. Questo comando consente di vedere su cosa agiranno `rebase build` e il deployment.
 
 ### `rebase eject`
 
-Prendi il controllo del processo server e della sua immagine:
+Prendi il controllo del processo del server e della sua immagine:
 
 ```bash
 rebase eject
 ```
 
-Scrive l'entrypoint del backend e un `Dockerfile` all'interno del progetto e converte il backend, in modo che il repository compili la propria immagine invece di eseguire il runtime pubblicato. Da quel momento in poi **gli aggiornamenti del runtime della piattaforma non lo raggiungeranno più**, e CORS, configurazione dell'autenticazione, archiviazione e arresto saranno a tuo carico.
+Scrive l'entrypoint del backend e un `Dockerfile` nel progetto e converte il backend, in modo che il repository compili la propria immagine invece di eseguire il runtime pubblicato. Da quel momento in poi **gli aggiornamenti del runtime della piattaforma non lo raggiungeranno più**, e la configurazione di CORS, autenticazione, storage e arresto diventa interamente a tuo carico.
 
-Visualizza un'anteprima con `rebase eject --dry-run`, che mostra cosa cambierebbe senza modificare nulla. `--force` sostituisce un file `backend/src/index.ts` o `env.ts` esistente, salvando il file corrente come `<name>.bak`.
+Visualizza un'anteprima con `rebase eject --dry-run`, che elenca le modifiche senza applicarle. `--force` sostituisce un eventuale `backend/src/index.ts` o `env.ts` esistente, conservando il file corrente come `<name>.bak`.
 
 ### `rebase schema generate`
 
-Genera lo schema Drizzle ORM a partire dalle tue collection TypeScript:
+Genera lo schema Drizzle ORM dalle tue collection TypeScript:
 
 ```bash
 rebase schema generate
 ```
 
-Questo comando legge le tue collection da `config/collections/` e genera `backend/src/schema.generated.ts` con le definizioni delle tabelle Drizzle, gli enum e le relazioni.
+Legge le collection da `config/collections/` e genera `backend/src/schema.generated.ts` contenente definizioni di tabelle Drizzle, enum e relazioni.
 
 ### `rebase db push`
 
@@ -132,12 +132,12 @@ rebase db push
 ```
 
 :::caution
-`db push` modifica il database direttamente senza file di migrazione. Usa `db generate` + `db migrate` per la produzione.
+`db push` modifica direttamente il database senza file di migrazione. Usa `db generate` + `db migrate` per la produzione.
 :::
 
 ### `rebase db generate`
 
-Genera i file di migrazione SQL a partire dalle modifiche allo schema:
+Genera i file di migrazione SQL dalle modifiche dello schema:
 
 ```bash
 rebase db generate
@@ -153,7 +153,7 @@ Esegue le migrazioni del database in sospeso:
 rebase db migrate
 ```
 
-Applica al database tutte le migrazioni non ancora eseguite.
+Applica tutte le migrazioni non ancora eseguite al database.
 
 ### `rebase db backup` / `backups` / `restore`
 
@@ -163,7 +163,7 @@ rebase db backups                       # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` esegue `pg_dump`; `restore` esegue `pg_restore` ed è distruttivo, quindi richiede `--yes`. `--out` accetta un percorso locale o un URL di object storage e assume come valore predefinito `$BACKUP_DESTINATION` o `./backups`.
+`backup` esegue `pg_dump`; `restore` esegue `pg_restore` ed è distruttivo, quindi richiede `--yes`. `--out` accetta un percorso locale o un URL di object storage, con valore predefinito pari a `$BACKUP_DESTINATION` o `./backups`.
 
 ### `rebase db pull`
 
@@ -173,22 +173,22 @@ Copia un altro database in quello di sviluppo locale:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
-`--anonymize` sostituisce i dati personali durante l'importazione, in modo da poter lavorare localmente su una copia di produzione senza trasferire dati reali dei clienti sul proprio computer.
+`--anonymize` sostituisce i dati personali durante l'importazione, consentendo di lavorare localmente su una copia di produzione senza trasferire dati reali dei clienti sul computer.
 
-`pg_dump` rimuove i privilegi, quindi la copia arriverebbe con le policy RLS di origine senza alcuna delle concessioni sottostanti — con ogni lettura come `rebase_user` che fallirebbe con `permission denied`. L'operazione di pull ripristina successivamente i ruoli dell'app, impiegando la stessa routine usata all'avvio e da `rebase db push`, garantendo che le tabelle interne di Rebase rimangano revocate come previsto.
+`pg_dump` rimuove i privilegi, quindi la copia arriverebbe con i criteri RLS di origine ma senza i relativi grant — causando il fallimento di ogni lettura come `rebase_user` con `permission denied`. Il pull ripristina successivamente il ruolo dell'applicazione, usando la stessa procedura impiegata all'avvio e da `rebase db push`, assicurando che l'accesso alle tabelle interne di Rebase rimanga revocato come previsto.
 
-La destinazione è sempre il database di sviluppo locale di questo progetto e non può essere modificata: `--database-url` viene rifiutato anziché accettato, quindi non c'è modo di eseguire un "pull in produzione". `--from` è l'unica direzione consentita.
+La destinazione è sempre il database di sviluppo locale di questo progetto e non può essere modificata: `--database-url` viene rifiutato, rendendo impossibile eseguire un "pull in produzione". `--from` è l'unica direzione supportata.
 
 ### `rebase db url`
 
-Stampa la stringa di connessione utilizzata da questo progetto, e nient'altro, consentendone l'uso in pipe:
+Stampa la stringa di connessione utilizzata da questo progetto, e nient'altro, facilitando l'uso in pipe:
 
 ```bash
 rebase db url
 psql "$(rebase db url)"
 ```
 
-Il database di sviluppo gestito è il caso principale in cui serve questo comando: `.env` lascia intenzionalmente commentato `DATABASE_URL`, e la porta viene ricavata dal percorso del progetto, quindi nulla su disco la specifica esplicitamente. Se hai impostato un tuo `DATABASE_URL`, verrà stampato quest'ultimo — l'ordine di risoluzione è lo stesso seguito da tutti gli altri comandi. Se non è già in esecuzione, avvia automaticamente il database gestito.
+Il database di sviluppo gestito è il caso tipico in cui questo comando serve: `.env` lascia intenzionalmente `DATABASE_URL` commentato e la porta viene derivata dal percorso del progetto, quindi nessun file su disco la specifica. Quando imposti un tuo `DATABASE_URL`, è quello che verrà stampato — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Se non è già in esecuzione, il comando avvia il database gestito.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -212,16 +212,16 @@ rebase db branch delete <name>
 rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
 
-PostgreSQL non copia né elimina un database a cui è connesso qualsiasi altro processo, e di solito quel processo è la tua stessa istanza di `rebase dev`. `create` e `delete` indicano cosa sta tenendo occupato il database; `--force` termina prima quelle sessioni.
+PostgreSQL non consente di copiare o eliminare un database se vi sono connessioni attive, e solitamente l'altra connessione è la tua istanza di `rebase dev`. `create` e `delete` indicano cosa sta tenendo aperto il database; `--force` disconnette prima queste sessioni.
 
-Ogni branch è una copia completa su disco, pertanto richiede una pulizia periodica. `prune` rimuove tre elementi: una voce il cui database è stato eliminato all'esterno di Rebase, un database di branch la cui voce non è mai stata registrata e — solo specificando `--older-than` — i branch che superano l'età indicata. Chiede conferma prima di eliminare qualsiasi elemento, a meno che non venga passato `--yes`.
+Ogni branch è una copia completa su disco, quindi richiede una pulizia periodica. `prune` rimuove tre elementi: una voce il cui database è stato eliminato al di fuori di Rebase, un database di branch la cui voce non è mai stata registrata e — solo con `--older-than` — i branch che superano l'anzianità specificata. Richiede conferma prima di rimuovere qualsiasi elemento, a meno che non si passi `--yes`.
 
-`switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`. Ha la precedenza su `DATABASE_URL` in `.env`, ma è subordinato a `--database-url` o a un `DATABASE_URL` impostato nella shell, quindi un flag sulla riga di comando ha sempre priorità rispetto a uno switch precedente. L'eliminazione del branch su cui ci si trova riporta al database principale anziché lasciare l'ambiente puntato su un database inesistente.
+`switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`. Ha la precedenza rispetto a `DATABASE_URL` in `.env`, ma cede il passo a `--database-url` o a un `DATABASE_URL` nella shell, garantendo che un flag sulla riga di comando prevalga sempre su uno switch precedente. L'eliminazione del branch su cui ti trovi ti riporta al database principale anziché lasciare il puntamento a un database rimosso.
 
-:::note[Non disponibile sul database di sviluppo gestito]
-`push`, `generate` e `migrate` pianificano le operazioni tramite Atlas, che necessita di un secondo database vuoto per il confronto — e l'istanza gestita di PGlite ne gestisce esattamente uno solo. Eseguire questi comandi lì si interrompe mostrando un messaggio esplicativo. Punta `DATABASE_URL` su un vero PostgreSQL per il flusso di lavoro delle migrazioni; `rebase dev` crea già in modalità additiva le tabelle mancanti sul database gestito.
+:::note[Non supportato sul database di sviluppo gestito]
+`push`, `generate` e `migrate` pianificano le operazioni con Atlas, che richiede un secondo database vuoto per il confronto — e il PGlite gestito ne fornisce esattamente uno. L'esecuzione di questi comandi lì si interrompe con un messaggio esplicativo. Per il flusso di lavoro delle migrazioni, fai puntare `DATABASE_URL` a un'istanza PostgreSQL reale; `rebase dev` crea già le tabelle mancanti in modo incrementale su quello gestito.
 
-Anche `branch` viene rifiutato per una ragione analoga. `CREATE DATABASE ... TEMPLATE` su PGlite registra una voce di catalogo senza copiare nulla, quindi il branch farebbe riferimento al database da cui è stato clonato — ogni scrittura destinata a rimanere isolata finirebbe nel tuo database di sviluppo. `rebase dev --docker` mette a disposizione un vero server su cui i branch possono operare regolarmente.
+`branch` viene rifiutato lì per un motivo simile. L'istruzione `CREATE DATABASE ... TEMPLATE` su PGlite scrive una voce di catalogo senza copiare nulla, quindi il branch farebbe riferimento al database da cui è stato clonato — e ogni scrittura che intendevi isolare finirebbe nel database di sviluppo. `rebase dev --docker` fornisce un server reale compatibile con i branch.
 :::
 
 ### `rebase apps init` / `rebase apps config`
@@ -234,7 +234,7 @@ rebase apps config <app>     # what one app resolves to
 
 ### `rebase status`
 
-Tutto ciò che questo progetto dichiara e se l'ambiente lo associa effettivamente:
+Tutto ciò che questo progetto dichiara, e se l'ambiente lo associa effettivamente:
 
 ```bash
 rebase status               # every resource, and the variables it reads
@@ -255,21 +255,13 @@ rebase status --json        # machine-readable
       └ declared, not configured — uploads here answer 501 STORAGE_SOURCE_NOT_CONFIGURED
 ```
 
-Tre file determinano le risorse accessibili da un backend, e questo comando li illustra tutti insieme:
-`rebase.json` specifica la posizione del codice e chi esegue il server,
-`config/resources.ts` descrive le esigenze del progetto e l'ambiente definisce
-come raggiungere ogni risorsa. Tutto il resto — `rebase.resources.json`, il manifest
-del bundle — viene generato a partire da quest'ultimo a beneficio dei processi che non possono
-eseguire il tuo codice, e non deve mai essere modificato a mano.
+Tre file determinano ciò a cui un backend può accedere, e questo comando li stampa tutti insieme: `rebase.json` indica dove si trova il codice e chi esegue il server, `config/resources.ts` specifica ciò di cui il progetto ha bisogno, e l'ambiente indica come raggiungere ogni risorsa. Tutto il resto — `rebase.resources.json`, il manifest del bundle — viene generato a partire dal secondo file per i processi che non possono eseguire il tuo codice, e non va mai modificato a mano.
 
-Un cerchio `○` rappresenta lo stato più utile da rilevare prima di un deploy anziché dopo:
-dichiarato, ma non configurato. Una `✗` indica che l'ambiente imposta qualcosa in modo *errato*,
-provocando il blocco dell'avvio anziché un funzionamento degradato.
+Un simbolo `○` indica lo stato utile da conoscere prima di un deploy anziché dopo: dichiarato, non configurato. Una `✗` indica che l'ambiente imposta qualcosa in modo *errato*, bloccando l'avvio anziché funzionare in modalità degradata.
 
 ### `rebase resources`
 
-Tutto ciò di cui il progetto dichiara di aver bisogno — i database, i bucket, i topic e
-le code richiesti dal codice di configurazione, oltre ai cron e alle funzioni definiti nei file:
+Ciò di cui questo progetto dichiara di aver bisogno — database, bucket, topic e code richiesti dal codice di configurazione, nonché cron e funzioni definiti dai suoi file:
 
 ```bash
 rebase resources            # list them
@@ -278,38 +270,21 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` è un'opzione recente — il flag che un job di CI utilizza per fallire
-qualora il file `rebase.resources.json` non corrisponda più al codice di configurazione.
+`rebase resources --check` è una novità — è il flag utilizzato dai job di CI per segnalare un errore nel caso in cui `rebase.resources.json` non corrisponda più al codice di configurazione.
 
-Una risorsa viene dichiarata nel codice di configurazione — `database("analytics")`,
-`bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oppure corrisponde a un file
-sotto `backend/crons` o `backend/functions`, e non viene mai scritta a mano in
-`rebase.resources.json`, che è generato da queste dichiarazioni in modo che un host possa
-leggere i requisiti del progetto senza doverlo compilare. Ciascuna voce tiene traccia di chi la impiega
-(`collection:events`, `property:posts.cover`, `function:report`).
+Una risorsa viene dichiarata nel codice di configurazione — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oppure è un file in `backend/crons` o `backend/functions`, e non va mai scritta manualmente in `rebase.resources.json`, che viene generato da tali dichiarazioni affinché l'host possa verificare i requisiti del progetto senza doverlo compilare. Ogni voce indica chi la utilizza (`collection:events`, `property:posts.cover`, `function:report`).
 
-Un backend dispone inoltre di un database e di una sorgente di archiviazione predefiniti che nessuno
-dichiara esplicitamente. Entrambi vengono elencati qui, contrassegnati come `implicit`, e nessuno dei due
-è scritto in `rebase.resources.json` — l'host li fornisce in automatico, perciò registrarli
-richiederebbe il provisioning di risorse non richieste.
+Un backend include anche un database predefinito e un'origine di storage predefinita che nessuno dichiara. Entrambi sono elencati qui, contrassegnati come `implicit`, e nessuno dei due viene scritto in `rebase.resources.json` — poiché vengono forniti dall'host, registrarli richiederebbe il provisioning di elementi non esplicitamente richiesti.
 
-Per confrontare le risorse mantenute dalla piattaforma con quelle dichiarate nel codice,
-e per eliminare un database di cui è stato effettuato il provisioning ma che non è più presente nel codice,
-consulta `rebase cloud resources` di seguito.
+Per verificare le risorse allocate sulla piattaforma rispetto a quelle dichiarate dal codice, e per rimuovere un database fornito non più menzionato dal codice, vedi `rebase cloud resources` di seguito.
 
 ### `rebase cloud`
 
-Tutto ciò che riguarda Rebase Cloud, attualmente in beta privata. Consulta la
-[guida a Rebase Cloud](/docs/deployment/cloud/) per scoprire in cosa consiste e cosa
-non include la beta.
+Tutto ciò che riguarda Rebase Cloud, attualmente in beta privata. Consulta la [guida a Rebase Cloud](/docs/deployment/cloud/) per scoprire di cosa si tratta e cosa non è incluso nella beta.
 
-Ogni gruppo accetta `--help`, e `--help` non esegue mai il comando. La maggior parte dei comandi
-agisce sul progetto collegato in `.rebase/cloud.json`; `--project <id>` opera su uno
-specifico progetto senza effettuare il collegamento.
+Ogni gruppo risponde a `--help`, e `--help` non esegue mai il comando. La maggior parte dei comandi agisce sul progetto collegato in `.rebase/cloud.json`; `--project <id>` opera su uno specifico progetto senza collegarlo.
 
-Tre opzioni sono valide ovunque: `--json` per l'output leggibile da macchina (impostazione
-predefinita anche tramite pipe o con `REBASE_JSON=1`), `--url <origin>` per puntare a un
-control plane specifico (oppure `REBASE_CLOUD_URL`), e `--project, -p <id>`.
+Tre opzioni si applicano ovunque: `--json` per l'output interpretabile da macchina (predefinito anche in pipe o con `REBASE_JSON=1`), `--url <origin>` per indirizzare un control plane specifico (oppure `REBASE_CLOUD_URL`), e `--project, -p <id>`.
 
 #### Autenticazione
 
@@ -338,7 +313,7 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-#### Deploy e osservabilità
+#### Distribuzione e osservabilità
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
@@ -352,7 +327,7 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` eseguito senza il nome di un'app distribuisce il backend.
+`deploy` senza il nome di un'app distribuisce il backend.
 
 #### Configurazione
 
@@ -372,38 +347,34 @@ rebase cloud orgs list | create | members
 #### Database
 
 ```bash
-rebase cloud db list | create | info | test
+rebase cloud db list | create | info | connect | test
 rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
+`db connect` apre una porta locale che *è* il database gestito — che non ha endpoint pubblici — e la mantiene attiva fino a Ctrl-C. `--reveal` include la password.
+
 #### Risorse
 
-Ciò che la piattaforma riserva per il progetto, a fronte di quanto dichiarato dal codice.
+Ciò che la piattaforma gestisce per il progetto, a confronto con quanto dichiarato dal codice.
 
 ```bash
 rebase cloud resources                       # each database and bucket: declared? provisioned?
 rebase cloud resources prune database <key>  # remove one the code no longer declares
 ```
 
-Un deploy non elimina mai un database sottoposto a provisioning quando la relativa dichiarazione viene rimossa — questo
-comporterebbe la perdita di dati causata da un push. Il database viene mantenuto, associato e fatturato finché
-qualcuno non lo rimuove esplicitamente indicandone il nome con prune.
+Un deploy non rimuove mai un database allocato quando la sua dichiarazione viene eliminata — ciò comporterebbe la perdita di dati a causa di un push. Lo mantiene, lo collega e lo fattura finché qualcuno non lo rimuove esplicitamente per nome.
 
 #### Compute
 
-Cosa riserva il progetto e quali sono i relativi costi.
+Ciò che il progetto riserva e il relativo costo.
 
 ```bash
 rebase cloud compute            # the current reservation and its monthly cost
 rebase cloud compute set        # change it
 ```
 
-`compute set` accetta i parametri `--cpu`, `--memory`, `--replicas`, `--spot`,
-`--scale-to-zero`, `--db-mode`, `--db-instances`, `--db-cpu`, `--db-memory`,
-`--storage`, `--autoscale-max`, `--autoscale-cpu-target` e `--no-autoscale`.
-Non esistono livelli di abbonamento: i prezzi sono calcolati in base alla singola risorsa. Consulta
-[Rebase Cloud](/docs/deployment/cloud/).
+`compute set` accetta `--cpu`, `--memory`, `--replicas`, `--spot`, `--scale-to-zero`, `--db-mode`, `--db-instances`, `--db-cpu`, `--db-memory`, `--storage`, `--autoscale-max`, `--autoscale-cpu-target` e `--no-autoscale`. Non ci sono livelli di piano tariffario: ogni risorsa è prezzata singolarmente. Consulta [Rebase Cloud](/docs/deployment/cloud/).
 
 #### Storage, webhook, cluster e fatturazione
 
@@ -420,13 +391,13 @@ rebase cloud billing checkout    # a Stripe session for one project
 
 ### `rebase generate-sdk`
 
-Genera un client SDK tipizzato a partire dalle definizioni delle collection:
+Genera un SDK client tipizzato a partire dalle definizioni delle collection:
 
 ```bash
 rebase generate-sdk
 ```
 
-Crea i tipi TypeScript e un client type-safe per tutte le tue collection.
+Crea tipi TypeScript e un client type-safe per tutte le tue collection.
 
 ### `rebase doctor`
 
@@ -434,40 +405,36 @@ Crea i tipi TypeScript e un client type-safe per tutte le tue collection.
 rebase doctor
 ```
 
-Il comando da eseguire quando qualcosa non funziona e non se ne conosce ancora il motivo. Si limita a
-rilevare e segnalare senza apportare modifiche, pertanto è sicuro da eseguire su qualsiasi database raggiungibile.
+Il comando da eseguire quando qualcosa non funziona e non sai ancora cosa sia. Si limita a generare un report senza modificare nulla, quindi è sicuro su qualsiasi database raggiungibile.
 
-**Senza database.** Questi controlli vengono eseguiti per primi, poiché tutto ciò che impedisce a un progetto
-di avviarsi si verifica prima ancora che sia possibile esaminare una tabella:
+**Senza un database.** Questi controlli vengono eseguiti per primi, poiché tutto ciò che impedisce del tutto il funzionamento di un progetto si verifica prima ancora che sia possibile confrontare una tabella:
 
 | Controllo | Motivo |
 | --- | --- |
-| Versione di Node | Verifica rispetto all'intervallo dichiarato dalla CLI. Una versione obsoleta non viene segnalata come "Node non supportato", bensì come errore di sintassi all'interno di una dipendenza. |
-| Gestori di pacchetti | Rileva due file di lock all'interno dello stesso progetto. L'esecuzione di `npm install` in un workspace pnpm riscrive `node_modules` secondo una struttura incompatibile con pnpm, causando errori di tipo `Cannot find module` ore dopo. |
-| Slug duplicati | Il registro mantiene l'ultima collection registrata, quindi l'altra non viene segnalata come mancante: viene invece servita come prevalente, con il proprio nome. |
-| Integrità di `.env` | Verifica che `JWT_SECRET` non sia inferiore a 32 caratteri (condizione che impedisce l'avvio in produzione) e che `NODE_ENV=production` non sia privo di `CORS_ORIGINS` e `FRONTEND_URL`. I valori non vengono mai stampati a video. |
-| Discrepanza di versione `@rebasepro/*` | Verifica se lo stesso pacchetto è bloccato su versioni differenti nei vari file `package.json` del progetto. La presenza di due copie compromette l'uso di `instanceof` tra di esse, provocando il fallimento di un type guard che rigetta il proprio stesso tipo. |
-| Stringhe di connessione | Verifica la presenza di caratteri `=` non codificati nei parametri dell'URL, che gli strumenti nativi di PostgreSQL non riescono ad analizzare — causando il malfunzionamento di backup e `psql` mentre l'applicazione continua a funzionare. |
-| Funzioni personalizzate | Verifica ciò di cui ogni funzione ha bisogno dall'host e quali di esse non potrebbero essere eseguite su un runtime edge. |
+| Node version | Rispetto all'intervallo dichiarato dalla CLI. Una versione obsoleta non viene segnalata come "Node non supportato", ma come errore di sintassi all'interno di una dipendenza. |
+| Package managers | Due file di lock in un singolo progetto. L'esecuzione di `npm install` in un workspace pnpm riscrive `node_modules` con una struttura non compatibile con pnpm, e il sintomo è un errore `Cannot find module` riscontrato ore dopo. |
+| Duplicate slugs | Il registry conserva l'ultima collection registrata, quindi l'altra non viene segnalata come mancante: viene servita come vincente, con il proprio nome. |
+| `.env` sanity | Un `JWT_SECRET` più corto di 32 caratteri (con cui la produzione rifiuta l'avvio), e `NODE_ENV=production` senza `CORS_ORIGINS` né `FRONTEND_URL`. I valori non vengono mai stampati. |
+| `@rebasepro/*` version skew | Lo stesso pacchetto bloccato su versioni diverse nei vari file `package.json` del progetto. Due copie distinte compromettono il funzionamento di `instanceof` tra loro, causando il fallimento di un type guard che rifiuta il proprio stesso tipo. |
+| Connection strings | Un carattere `=` non codificato in un parametro URL, che gli strumenti nativi di PostgreSQL si rifiutano di analizzare — provocando il blocco di backup e `psql` mentre l'applicazione continua a funzionare. |
+| Custom functions | Cosa richiede ciascuna funzione dal proprio host e quali di esse non funzionerebbero su un edge runtime. |
 
-**Sul database**, quando è impostato `DATABASE_URL`:
+**Connesso al database**, quando `DATABASE_URL` è impostato:
 
 | Controllo | Motivo |
 | --- | --- |
-| Collection → schema generato | Verifica se `schema.generated.ts` non è aggiornato. |
-| Collection → database | Controlla la presenza di tabelle, colonne, enum, chiavi esterne e tabelle di giunzione mancanti. |
-| Estensioni richieste | Una proprietà `{ type: "vector" }` necessita di pgvector, che Rebase installa unicamente se dichiarato nel progetto. |
-| Schema stamp | Verifica se il database è stato predisposto a partire da queste collection. Trattandosi di un hash, indica se le due parti non concordano, senza specificare quale sia più recente. |
-| Collection → tipi SDK | Verifica se l'SDK tipizzato generato non è aggiornato. |
-| Policy RLS | Controlla se le policy del database corrispondono alle `securityRules` dichiarate e se qualche policy fa riferimento a un ruolo non utilizzabile dal server. |
+| Collections → generated schema | Verifica se `schema.generated.ts` non è aggiornato. |
+| Collections → database | Tabelle, colonne, enum, chiavi esterne e tabelle di giunzione mancanti. |
+| Required extensions | Una proprietà `{ type: "vector" }` richiede pgvector, che Rebase installa solo se dichiarato nel progetto. |
+| Schema stamp | Verifica se il database è stato creato da queste collection. È un hash, quindi può indicare che i due differiscono ma non chi sia più avanti. |
+| Collections → SDK types | Verifica se l'SDK tipizzato generato non è aggiornato. |
+| RLS policies | Verifica se i criteri del database corrispondono alle `securityRules` dichiarate e se qualche criterio indica un ruolo che questo server non può utilizzare. |
 
-Se il database non è raggiungibile, le relative fasi vengono contrassegnate come saltate indicandone il motivo e
-i controlli rimanenti vengono comunque portati a termine — consulta la [Risoluzione dei problemi](/docs/troubleshooting/).
+Se il database non è raggiungibile, le relative fasi vengono contrassegnate come ignorate con la motivazione indicata e il resto viene comunque eseguito — vedi [Risoluzione dei problemi](/docs/troubleshooting/).
 
-Il comando termina con un codice diverso da zero se un controllo rileva un errore o se una fase non può essere completata
-a causa del database che rifiuta le connessioni. Una fase saltata per via della mancata impostazione di `DATABASE_URL` non costituisce un errore.
+Termina con codice diverso da zero se un controllo rileva un errore o se una fase non può essere eseguita a causa del rifiuto delle connessioni da parte del database configurato. Una fase saltata perché non è stato impostato alcun `DATABASE_URL` non viene considerata un errore.
 
-`rebase doctor --policies` esegue solo i controlli relativi a RLS — senza calcolare le differenze di schema né verificare i tipi dell'SDK — e si arresta in modalità "fail closed", rappresentando la variante consigliata da utilizzare come controllo (gate) di CI su un database già distribuito.
+`rebase doctor --policies` esegue solo i controlli RLS — nessun diff dello schema, nessun tipo SDK — e fallisce in modo restrittivo (fail-closed), rendendolo ideale come gate di CI su un database distribuito.
 
 ### `rebase auth`
 
@@ -479,8 +446,7 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-Gestisce le chiavi API con privilegi limitati per i servizi — la credenziale utilizzata da un agente, uno script o un
-servizio esterno, a differenza della sessione di un utente finale:
+Gestisce le chiavi API di servizio con ambito (scoped) — le credenziali utilizzate da un agente, uno script o un altro servizio, a differenza della sessione di un utente finale:
 
 ```bash
 rebase api-keys list
@@ -489,18 +455,13 @@ rebase api-keys create --name "Full Access" --full-access --expires 90d
 rebase api-keys revoke abc123-def456
 ```
 
-`--permissions` accetta un array JSON di oggetti `{ collection, operations }`, oppure è possibile utilizzare
-`--full-access` per concedere permessi di lettura/scrittura/cancellazione su qualsiasi collection e funzione. `--expires`
-accetta `7d`, `30d`, `90d`, `1y` o una data in formato ISO, mentre `--rate-limit` definisce le richieste massime
-per ogni intervallo di 15 minuti. La chiave viene mostrata una sola volta, al momento della creazione.
+`--permissions` accetta un array JSON di oggetti `{ collection, operations }`, oppure usa `--full-access` per permessi di lettura/scrittura/cancellazione su ogni collection e funzione. `--expires` accetta `7d`, `30d`, `90d`, `1y` o una data ISO, mentre `--rate-limit` imposta il numero di richieste per finestra di 15 minuti. La chiave viene mostrata una sola volta, al momento della creazione.
 
-Le chiavi prevedono una doppia verifica: si applicano sia i permessi propri della chiave sia la row-level security
-dell'identità per conto della quale agisce, impedendo alla chiave di accedere a più dati rispetto a quanti ne siano consentiti all'identità.
+Le chiavi sono soggette a una doppia convalida: si applicano sia i permessi della chiave stessa, sia la sicurezza a livello di riga (row-level security) dell'identità per conto della quale opera; di conseguenza, una chiave non potrà mai leggere più di quanto consentito a tale identità.
 
 ### `rebase skills install`
 
-Installa le skill di riferimento di Rebase per il tuo assistente di sviluppo AI. Supporta
-Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity:
+Installa le skill di riferimento di Rebase per il tuo assistente di sviluppo AI. Supporta Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity:
 
 ```bash
 rebase skills install
@@ -508,11 +469,11 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Consulta [Agent Skills](/docs/ai/skills) per visualizzare l'elenco completo e le directory di destinazione dei file.
+Consulta [Skill degli agenti](/docs/ai/skills) per l'elenco completo e i percorsi di destinazione dei file.
 
 ### `rebase telemetry`
 
-Condivisione anonima dei dati di utilizzo. **`rebase init` lo richiede una sola volta per progetto, e la risposta predefinita è affermativa — nessun dato viene trasmesso prima di aver risposto:**
+Condivisione anonima dei dati di utilizzo. **`rebase init` chiede conferma una sola volta per progetto, e il prompt è impostato su sì per impostazione predefinita — non viene inviato nulla a meno che tu non risponda:**
 
 ```bash
 rebase telemetry status
@@ -521,13 +482,11 @@ rebase telemetry enable
 rebase telemetry disable
 ```
 
-`status` visualizza l'impostazione corrente, `show` stampa nel dettaglio il payload che verrebbe inviato —
-a prescindere dal fatto che la condivisione sia abilitata, permettendo di verificarne i dati prima di scegliere — mentre
-gli altri due comandi ne modificano lo stato. Se non hai mai eseguito `init`, nessun dato è mai stato raccolto.
+`status` stampa l'impostazione corrente, `show` mostra esattamente cosa verrebbe inviato — a prescindere che la condivisione sia attiva o meno, consentendoti di esaminare il payload prima di decidere — e gli altri due comandi ne modificano lo stato. Se non hai mai eseguito `init`, non è mai stato raccolto alcun dato.
 
-## Flusso di lavoro per le migrazioni
+## Flusso di lavoro delle migrazioni
 
-Il tipico flusso di lavoro per applicare modifiche allo schema:
+Il flusso di lavoro tipico per le modifiche allo schema:
 
 ```bash
 # 1. Edit your collection in config/collections/
@@ -546,6 +505,6 @@ rebase db migrate
 ## Passaggi successivi
 
 - **[Schema as Code](/docs/architecture/schema-as-code)** — Come funziona la generazione dello schema
-- **[Quickstart](/docs/getting-started/quickstart)** — Inizia subito
+- **[Quickstart](/docs/getting-started/quickstart)** — Per iniziare
 
 ---

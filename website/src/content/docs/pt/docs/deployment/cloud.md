@@ -1,46 +1,40 @@
 ---
-sourceHash: f52b1c720e31b72e
+sourceHash: 535999d55c2b1a7c
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
-description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto é vinculado e implantado, e o que a beta privada ainda não inclui.
+description: O Rebase Cloud é o mesmo Rebase, operado para você. O que ele é, como um projeto é vinculado e implantado, e o que o beta privado ainda não inclui.
 ---
 
-:::note[Esta página está disponível apenas em inglês]
-A tradução está pendente. O conteúdo abaixo está em inglês.
+O Rebase Cloud executa o mesmo Rebase de código aberto que você hospedaria por conta própria — a mesma imagem publicada `rebasepro/server`, o mesmo bundle, o mesmo Postgres. A diferença é quem o opera.
+
+:::note[Beta privado]
+O Rebase Cloud está em **beta privado**. Ele executa tenants reais hoje e é liberado em
+lotes. [Solicitar acesso](https://rebase.pro/pricing).
+
+Não é self-service, portanto, os comandos abaixo precisam de uma conta que tenha sido aprovada.
+Tudo o mais neste site funciona sem uma.
 :::
 
-Rebase Cloud runs the same open-source Rebase you would self-host — the same
-published `rebasepro/server` image, the same bundle, the same Postgres. The
-difference is who operates it.
+## O que é
 
-:::note[Private beta]
-Rebase Cloud is in **private beta**. It runs real tenants today and opens in
-batches. [Request access](https://rebase.pro/pricing).
+Um **projeto** Cloud são três coisas que a plataforma opera para você:
 
-It is not self-serve, so the commands below need an account that has been let in.
-Everything else on this site works without one.
-:::
-
-## What it is
-
-A Cloud **project** is three things the platform operates for you:
-
-| | What you get |
+| | O que você recebe |
 |---|---|
-| **App** | Your bundle, running on the published runtime image. Deploys are a bundle upload, not a container build |
-| **Database** | A managed PostgreSQL, with automated backups and point-in-time recovery |
-| **Storage** | A bucket of your own, if your project uses file storage |
+| **App** | Seu bundle, executando na imagem de runtime publicada. Deploys são o upload de um bundle, não a compilação de um contêiner |
+| **Database** | Um PostgreSQL gerenciado, com backups automatizados e point-in-time recovery |
+| **Storage** | Um bucket próprio, se o seu projeto usar armazenamento de arquivos |
 
-Each is provisioned when you first deploy, and each is billed for what it
-reserves rather than per seat.
+Cada um é provisionado quando você faz o deploy pela primeira vez, e cada um é cobrado pelo que
+reserva, em vez de por usuário.
 
-**Nothing about your project changes to run there.** The same repository
-self-hosts with `docker compose`, and the escape hatch is real: `rebase build`
-produces a bundle that boots anywhere the runtime image runs.
+**Nada no seu projeto muda para rodar lá.** O mesmo repositório
+pode ser auto-hospedado com `docker compose`, e a rota de saída é real: `rebase build`
+produz um bundle que inicializa em qualquer lugar onde a imagem de runtime seja executada.
 
-## Link a project
+## Vincular um projeto
 
-From a project directory:
+A partir do diretório de um projeto:
 
 ```bash
 rebase cloud login
@@ -48,22 +42,22 @@ rebase cloud billing setup
 rebase cloud projects create --name "My app" --subdomain my-app --link
 ```
 
-`projects create` takes no positional argument. The name and the subdomain are
-flags, and both are required — on a terminal they are prompted for, and a
-headless run that omits either exits with `input_required` rather than inventing
-one. **The subdomain is not editable afterwards:** it is the
-`<slug>.rebase.website` host the project answers on, so pick it deliberately.
+O comando `projects create` não recebe argumentos posicionais. O nome e o subdomínio são
+flags e ambos são obrigatórios — em um terminal, eles são solicitados e uma
+execução headless que omita qualquer um deles é encerrada com `input_required` em vez de inventar
+um. **O subdomínio não pode ser editado posteriormente:** ele é o host
+`<slug>.rebase.website` no qual o projeto responde, portanto, escolha-o com cuidado.
 
-`--link` binds this directory to the project in the same call, so there is no
-separate `link` step. It writes `.rebase/cloud.json`, which records the project id
-and slug. That file is not a secret and it is not your credentials — those live
-in `~/.rebase/credentials.json`, written by `login`.
+`--link` vincula este diretório ao projeto na mesma chamada, portanto não há uma
+etapa de `link` separada. Ele grava o arquivo `.rebase/cloud.json`, que registra o ID do projeto
+e o slug. Esse arquivo não é um segredo e não contém suas credenciais — estas ficam
+em `~/.rebase/credentials.json`, gravadas pelo `login`.
 
-`billing setup` attaches a card to the organization, once. It is first in the
-sequence on purpose: the first deploy of a project is refused without one, and
-finding that out after a bundle has finished uploading is the worse order.
+`billing setup` anexa um cartão à organização, uma única vez. Ele está em primeiro lugar na
+sequência de propósito: o primeiro deploy de um projeto é recusado sem isso, e
+descobrir isso após o término do upload do bundle é a pior ordem possível.
 
-An existing project links without creating one:
+Um projeto existente se vincula sem criar um novo:
 
 ```bash
 rebase cloud projects list
@@ -76,29 +70,29 @@ rebase cloud link --project my-app
 rebase cloud deploy
 ```
 
-One command, and no flag to remember. A scaffold's `rebase.json` declares
-`runtime: "managed"` for its backend, and `deploy` reads that declaration — it
-says so on the way past (`rebase.json declares runtime: managed — deploying a
-bundle`), builds the app into `dist-bundle`, uploads the bundle, runs it on the
-published runtime image, and follows the deployment to a terminal state. The exit
-code is the verdict, so the same line works unattended in CI.
+Um comando e nenhuma flag para lembrar. O `rebase.json` de um scaffold declara
+`runtime: "managed"` para seu backend, e o `deploy` lê essa declaração — ele
+informa isso durante o processo (`rebase.json declares runtime: managed — deploying a
+bundle`), compila o aplicativo em `dist-bundle`, faz o upload do bundle, executa-o na
+imagem de runtime publicada e acompanha o deployment até um estado terminal. O código de
+saída é o veredito, portanto a mesma linha funciona sem intervenção no CI.
 
-To ship an artefact that was built earlier — a CI job that builds once and
-deploys twice, say — point at the directory instead of rebuilding:
+Para enviar um artefato que foi compilado anteriormente — por exemplo, um job de CI que compila uma vez e
+faz deploy duas vezes —, aponte para o diretório em vez de recompilar:
 
 ```bash
 rebase build
 rebase cloud deploy --bundle-dir dist-bundle
 ```
 
-Leaving the managed runtime is its own flag, `--eject`, and nothing else asks
-for it: a build that would move a managed project onto a container image it then
-owns is refused until you say so. `--force` used to mean this, which put the
-least reversible thing the CLI can do under the same word as "overwrite this
-file"; it is an unknown option now rather than an alias, so a script carrying it
-stops instead.
+Sair do runtime gerenciado tem sua própria flag, `--eject`, e nada mais solicita
+isso: um build que moveria um projeto gerenciado para uma imagem de contêiner sob seu
+próprio controle é recusado até que você confirme explicitamente. `--force` costumava significar isso, o que colocava
+a ação menos reversível que a CLI pode fazer sob a mesma palavra que "sobrescrever este
+arquivo"; agora é uma opção desconhecida em vez de um alias, portanto, um script que a utilize
+será interrompido.
 
-Watch it:
+Acompanhe os logs e o status:
 
 ```bash
 rebase cloud logs            # the build log
@@ -106,133 +100,140 @@ rebase cloud logs --runtime  # what the running container is printing
 rebase cloud status          # what the platform thinks the project is doing
 ```
 
-`status` reports `blockedOn` and `nextAction`. When `blockedOn` is `null` the
-platform is genuinely working and polling is the right thing to do; when it names
-something, that something is waiting for you.
+`status` relata `blockedOn` e `nextAction`. Quando `blockedOn` for `null`, a
+plataforma está genuinamente trabalhando e fazer polling é a coisa certa a fazer; quando ele apontar
+algo, esse algo está esperando por você.
 
-## Roll back
+## Rollback
 
 ```bash
 rebase cloud deployments
 rebase cloud rollback
 ```
 
-A rollback re-points the project at what a previous successful deployment
-shipped, and never rebuilds — the value of a rollback is that it ships an
-artefact that has already run.
+Um rollback reaponta o projeto para o que um deployment bem-sucedido anterior
+enviou e nunca recompila — o valor de um rollback é que ele entrega um
+artefato que já foi executado.
 
-Which deployments qualify depends on how the project deploys, and both kinds
-work:
+Quais deployments se qualificam depende de como o projeto faz o deploy, e ambos os tipos
+funcionam:
 
-| How it deployed | What is restored |
+| Como foi feito o deploy | O que é restaurado |
 |---|---|
-| `rebase cloud deploy` (a source build) | The image that build published |
-| `rebase cloud deploy --bundle` (the platform runtime) | The bundle that deploy shipped, on the runtime version the project is running now |
+| `rebase cloud deploy` (um build a partir do código-fonte) | A imagem que aquele build publicou |
+| `rebase cloud deploy --bundle` (o runtime da plataforma) | O bundle que aquele deploy enviou, na versão de runtime que o projeto está executando agora |
 
-So a rollback needs a deployment that recorded one of the two, which means a
-project that has deployed successfully at least twice. `rebase cloud deployments`
-marks the ones that qualify, and `--json` reports `rollbackable` per row along
-with the `image` or `bundle` it would restore.
+Portanto, um rollback precisa de um deployment que tenha registrado um dos dois, o que significa um
+projeto que tenha feito deploy com sucesso pelo menos duas vezes. `rebase cloud deployments`
+marca os que se qualificam, e `--json` relata `rollbackable` por linha junto
+com a `image` ou `bundle` que seria restaurado.
 
-Two deployments are refused, and the CLI says which: one that did not succeed,
-and one from before the platform recorded its artefact. There is nothing to guess
-at in either case — guessing would ship whatever was built or uploaded most
-recently while claiming to restore this one — so deploy the version you want
-instead.
+Dois tipos de deployments são recusados, e a CLI informa quais: um que não foi bem-sucedido
+e outro de antes da plataforma registrar seu artefato. Não há o que adivinhar
+em nenhum dos casos — adivinhar enviaria o que foi compilado ou carregado mais
+recentemente alegando restaurar este —, portanto, faça o deploy da versão desejada.
 
-A rollback appends a new deployment rather than rewinding history, and waits for
-the restored version to serve before reporting success. Follow it with
+Um rollback acrescenta um novo deployment em vez de voltar no histórico, e aguarda a
+versão restaurada começar a responder antes de relatar sucesso. Acompanhe com
 `rebase cloud logs -f`.
 
-## Compute, and what it costs
+## Computação e custos
 
-A project is priced from what it reserves, not from a tier. `compute` prints
-every dial and the control plane's own itemised quote for them. (`rebase cloud
-resources` is a different thing: the databases and buckets the code declares,
-and whether each is provisioned — see the [CLI reference](/docs/cli/#rebase-cloud).)
+O preço de um projeto é baseado no que ele reserva, e não em um plano. `compute` exibe
+cada parâmetro e a cotação detalhada do próprio plano de controle para eles. (`rebase cloud
+resources` é uma coisa diferente: os bancos de dados e buckets que o código declara,
+e se cada um está provisionado — consulte a [referência da CLI](/docs/cli/#rebase-cloud).)
 
 ```bash
 rebase cloud compute
 rebase cloud compute set --cpu 500m --memory 2Gi
 ```
 
-| Dial | Unit, and what it means |
+| Parâmetro | Unidade e significado |
 |---|---|
-| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `250m` and `512Mi` |
-| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for at rest |
-| `--autoscale-max` | 1–16. The ceiling it may reach, and the worst case it may be billed. `--no-autoscale` turns it off |
-| `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
-| `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
-| `--scale-to-zero` | `true` or `false`. Request-billed compute that stops when idle, at the cost of a cold start |
-| `--db-mode` | `shared` (the pooled cluster) or `dedicated` (one of this project's own) |
-| `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
-| `--db-cpu`, `--db-memory`, `--storage` | Per database instance. Empty means `500m`, `2Gi` and the default volume |
+| `--cpu`, `--memory` | Request do app por instância, ex.: `500m` e `2Gi`. Vazio significa o padrão da plataforma — `250m` e `512Mi` |
+| `--replicas` | Instâncias que sempre existem: o piso do autoscaler e pelo que o projeto é cobrado em repouso |
+| `--autoscale-max` | 1–16. O teto que pode atingir e o pior cenário de cobrança. `--no-autoscale` desativa |
+| `--autoscale-cpu-target` | 10–95. A utilização de CPU que o autoscaler mantém, em relação ao request e não ao limite. Vazio significa 70 |
+| `--spot` | `true` ou `false`. Capacidade preemptível: mais barata e reiniciada sem aviso prévio |
+| `--scale-to-zero` | `true` ou `false`. Computação cobrada por requisição que para quando ociosa, ao custo de um cold start |
+| `--db-mode` | `shared` (cluster compartilhado) ou `dedicated` (dedicado exclusivamente a este projeto) |
+| `--db-instances` | 1–3. `1` é uma instância única sem failover; `2` adiciona um standby automático |
+| `--db-cpu`, `--db-memory`, `--storage` | Por instância de banco de dados. Vazio significa `500m`, `2Gi` e o volume padrão |
 
-An empty dial is not the same as one pinned to the same number: an empty dial
-follows the platform default and moves when it moves.
+Um parâmetro vazio não é o mesmo que um fixado no mesmo número: um parâmetro vazio
+segue o padrão da plataforma e muda quando este mudar.
 
-Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
-project runs on, and they differ between providers. The control plane refuses a
-value it cannot honour and names the field. Run `rebase cloud compute` to see
-the €/month before and after; a change applies immediately, prorated from today,
-except one that restarts the database, which waits for a maintenance window.
+Nada é validado pela CLI, intencionalmente — os limites pertencem ao cluster no qual o
+projeto é executado e variam entre provedores. O plano de controle recusa um
+valor que não pode atender e indica o campo. Execute `rebase cloud compute` para ver
+o valor em €/mês antes e depois; uma alteração é aplicada imediatamente, proporcionalmente a partir de hoje,
+exceto uma que reinicie o banco de dados, que aguardará uma janela de manutenção.
 
-## The rest of the surface
+## O restante da superfície
 
-| Command group | What it covers |
+| Grupo de comandos | O que cobre |
 |---|---|
-| `login`, `logout`, `whoami` | Your session |
-| `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
-| `projects` | Create, list, inspect, delete |
-| `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
-| `start`, `stop`, `restart` | Pausing a project and bringing it back |
-| `status`, `metrics`, `debug` | What it is doing, and why it is not |
-| `env` | Environment variables. `list` never prints values; `--secret` is write-only |
-| `domains` | Custom domains, the DNS records to add, and verification |
-| `db` | Attach or create a database, backups, restore, and point-in-time recovery |
-| `extensions` | The Postgres extension allowlist |
-| `storage` | The project's bucket |
-| `resources` | Which databases and buckets the platform holds, against what the code declares |
-| `compute` | What this project reserves, what it costs, and how to change it |
-| `clusters` | The clusters tenants run on. Platform-admin only |
-| `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
+| `login`, `logout`, `whoami` | Sua sessão |
+| `link`, `unlink`, `use`, `open` | Vincular este diretório a um projeto, selecionar uma organização, abrir o console |
+| `projects` | Criar, listar, inspecionar, excluir |
+| `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Envio e monitoramento |
+| `start`, `stop`, `restart` | Pausar um projeto e reativá-lo |
+| `status`, `metrics`, `debug` | O que está fazendo e por que não está |
+| `env` | Variáveis de ambiente. `list` nunca exibe valores; `--secret` é somente escrita |
+| `domains` | Domínios personalizados, registros DNS a adicionar e verificação |
+| `db` | Anexar ou criar um banco de dados, conectar-se a ele a partir de sua máquina, backups, restauração e point-in-time recovery |
+| `extensions` | A allowlist de extensões do Postgres |
+| `storage` | O bucket do projeto |
+| `resources` | Quais bancos de dados e buckets a plataforma mantém, em comparação com o que o código declara |
+| `compute` | O que este projeto reserva, quanto custa e como alterar |
+| `clusters` | Os clusters onde os tenants são executados. Apenas para administradores da plataforma |
+| `settings`, `orgs`, `webhooks`, `billing` | Configurações do projeto, organizações, deploy hooks, faturamento |
 
-Every group in that table answers `--help` with a page of its own — a usage line,
-its flags, and examples — and `--help` never runs the command. A test holds the
-index to the pages, so a group added without one fails the build rather than
-answering with the table of contents. `verify:docs` holds the table itself to
-that index: every group the CLI dispatches appears here exactly once, so a group
-added without a row fails the build too.
+Cada grupo nessa tabela responde ao `--help` com uma página própria — uma linha de uso,
+suas flags e exemplos —, e o `--help` nunca executa o comando. Um teste mantém o
+índice para as páginas, de modo que um grupo adicionado sem uma página falha a compilação em vez
+de responder com o índice. O `verify:docs` compara a própria tabela
+com esse índice: cada grupo despachado pela CLI aparece aqui exatamente uma vez, portanto, um grupo
+adicionado sem uma linha correspondente também falha a compilação.
 
-Piped, `--help` answers in JSON instead: the same usage line, flags and examples
-as a structure to read rather than sixty lines of terminal escapes.
+Ao usar pipes, o `--help` responde em JSON: a mesma linha de uso, flags e exemplos
+como uma estrutura legível em vez de sessenta linhas de sequências de escape do terminal.
 
-## What the beta does not include
+## O que o beta não inclui
 
-Stated plainly, because finding out later is worse:
+Explicado de forma direta, porque descobrir mais tarde é pior:
 
-- **No region choice.** Everything runs in one region today. The placement model
-  exists in the platform, but a project cannot pick a region.
-  `projects create --provider` and `--region` are not the exception they look
-  like: they record which of the control plane's registered deploy targets a
-  project belongs to, and there is one, so both default to it and neither moves a
-  project anywhere else. `rebase cloud projects create --help` says the same.
-- **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
-- **No published SLA**, and no SOC 2. If you need either, say so when you request
-  access rather than assuming.
-- **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
-  secret URLs you point a repository webhook at — are the supported automation.
-- **CI needs a human's credentials.** There is no machine token yet;
-  `rebase cloud login` takes an email and a password. Pass them as
-  `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD` from a secret store —
-  `--password` puts the password in your shell history and in the process table,
-  and says so before it signs you in.
-- **Point-in-time recovery is CLI-only.** The console shows backups; the staged
-  PITR workflow is `rebase cloud db pitr`.
+- **Sem escolha de região.** Hoje tudo roda em uma única região. O modelo de posicionamento
+  existe na plataforma, mas um projeto não pode escolher uma região.
+  `projects create --provider` e `--region` não são a exceção que parecem
+  ser: eles registram a qual dos destinos de deploy registrados no plano de controle o
+  projeto pertence, e há apenas um, portanto ambos adotam esse padrão e nenhum deles move o
+  projeto para outro lugar. `rebase cloud projects create --help` confirma isso.
+- **Não é self-service.** O acesso é liberado em lotes; não há cadastro com pagamento imediato.
+- **Sem SLA publicado** e sem SOC 2. Se você precisar de algum dos dois, informe ao solicitar
+  acesso em vez de presumir.
+- **Sem deploys de preview ou de branches** e sem GitHub App oficial. Deploy hooks —
+  URLs secretas para as quais você aponta o webhook de um repositório — são a automação suportada.
+- **O CI precisa de credenciais humanas.** Ainda não existe token de máquina;
+  o `rebase cloud login` recebe um e-mail e uma senha. Passe-os como
+  `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` a partir de um gerenciador de segredos —
+  `--password` coloca a senha no histórico do seu shell e na tabela de processos,
+  alertando sobre isso antes de autenticar.
+- **Point-in-time recovery é apenas via CLI.** O console exibe os backups; o fluxo
+  em etapas de PITR é `rebase cloud db pitr`.
+- **Sem endpoint público para o banco de dados.** Um banco de dados gerenciado não fica exposto à
+  internet; portanto, o host exibido no console é o endereço interno usado pelo seu backend e
+  não resolve para nada na sua máquina. `rebase cloud db connect` abre uma porta local
+  que se conecta a esse banco, encapsulada pelo plano de controle enquanto você mantiver o
+  comando em execução — mas não existe um hostname permanente ao qual um serviço
+  externo possa se conectar.
 
-## Self-hosting instead
+## Auto-hospedagem como alternativa
 
-Nothing here is a lock-in. The [self-hosting guide](/docs/deployment/self-hosting/)
-runs the identical image and bundle with `docker compose`, and the
-[Kubernetes guide](/docs/deployment/kubernetes/) renders the same topology from
-the Helm chart.
+Nada aqui gera lock-in. O [guia de auto-hospedagem](/docs/deployment/self-hosting/)
+executa a imagem e o bundle idênticos com `docker compose`, e o
+[guia de Kubernetes](/docs/deployment/kubernetes/) renderiza a mesma topologia a partir
+do Helm chart.
+
+---

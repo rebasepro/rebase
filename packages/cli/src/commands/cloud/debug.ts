@@ -920,7 +920,10 @@ maxPositionals: 0 });
         username?: string | null;
         passwordAvailable?: boolean;
         unavailableReason?: string | null;
-        portForward?: { namespace: string; service: string; localPort: number; remotePort: number } | null;
+        directAccess?: {
+            via: "tunnel";
+            kubectl?: { namespace: string; service: string; localPort: number; remotePort: number };
+        } | null;
     }
 
     let info: DbInfo;
@@ -931,14 +934,23 @@ path: projectId });
         reportError(e, "Failed to read database connection info");
     }
 
-    const pf = info.portForward;
-    const forwardCmd = pf
-        ? `kubectl port-forward -n ${pf.namespace} svc/${pf.service} ${pf.localPort}:${pf.remotePort}`
-        : null;
+    // The host above is a Service inside the platform's cluster, so `debug db`
+    // has to say what to do about that. It used to print `kubectl port-forward
+    // -n rebase-tenant-…`, which needs a kubeconfig for OUR cluster: a customer
+    // has none, and nothing in the platform issues one. The tunnel is the
+    // remedy a reader can actually run.
+    const access = info.directAccess;
+    const connectCmd = access ? "rebase cloud db connect" : null;
+    const LOCAL_PORT = 5432;
     const psqlCmd =
-        pf && info.username && info.database
-            ? `psql -h 127.0.0.1 -p ${pf.localPort} -U ${info.username} -d ${info.database}`
+        access && info.username && info.database
+            ? `psql -h 127.0.0.1 -p ${LOCAL_PORT} -U ${info.username} -d ${info.database}`
             : null;
+    // Only for a cluster the customer owns, where the credentials are theirs.
+    const kubectlCmd = access?.kubectl
+        ? `kubectl port-forward -n ${access.kubectl.namespace} svc/${access.kubectl.service} `
+          + `${access.kubectl.localPort}:${access.kubectl.remotePort}`
+        : null;
 
     emit(
         () => {
@@ -959,14 +971,20 @@ path: projectId });
                 ["Password", info.passwordAvailable ? chalk.gray("stored — not shown here") : chalk.yellow("none stored")]
             ]);
             console.log("");
-            if (forwardCmd) {
-                // Printed rather than run. Opening a tunnel and a superuser shell
+            if (connectCmd) {
+                // Printed rather than run. Opening a tunnel and a database shell
                 // is not something a command called `debug` should do implicitly.
-                console.log(chalk.gray("  A managed database is only reachable inside its cluster. To connect:"));
+                console.log(chalk.gray("  That host is inside the platform's cluster and does not resolve here."));
+                console.log(chalk.gray("  To reach the database from this machine:"));
                 console.log("");
-                console.log(`    ${forwardCmd}`);
+                console.log(`    ${connectCmd}`);
                 if (psqlCmd) console.log(`    ${psqlCmd}`);
                 console.log("");
+                if (kubectlCmd) {
+                    console.log(chalk.gray("  Or, on your own cluster:"));
+                    console.log(`    ${kubectlCmd}`);
+                    console.log("");
+                }
                 if (info.passwordAvailable) {
                     console.log(
                         chalk.gray("  Get the password with:  ") + chalk.bold("rebase cloud db info --reveal")
@@ -982,7 +1000,8 @@ path: projectId });
             database: info.database ?? null,
             username: info.username ?? null,
             passwordAvailable: Boolean(info.passwordAvailable),
-            portForwardCommand: forwardCmd,
+            connectCommand: connectCmd,
+            kubectlCommand: kubectlCmd,
             psqlCommand: psqlCmd
         }
     );

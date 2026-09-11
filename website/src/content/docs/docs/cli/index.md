@@ -414,10 +414,13 @@ rebase cloud orgs list | create | members
 #### Databases
 
 ```bash
-rebase cloud db list | create | info | test
+rebase cloud db list | create | info | connect | test
 rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
+
+`db connect` opens a local port that *is* the managed database — which has no
+public endpoint — and holds it until Ctrl-C. `--reveal` includes the password.
 
 #### Resources
 

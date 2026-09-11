@@ -603,10 +603,7 @@ describe("debug is read-only", () => {
                 database: "rebase",
                 username: "app",
                 passwordAvailable: true,
-                portForward: { namespace: "rebase-tenant-proj_1",
-service: "postgres-rw",
-localPort: 5432,
-remotePort: 5432 },
+                directAccess: { via: "tunnel" },
                 unavailableReason: null
             };
         });
@@ -620,7 +617,11 @@ remotePort: 5432 },
         const parsed = JSON.parse(text.trim());
         expect(parsed).not.toHaveProperty("password");
         expect(parsed.passwordAvailable).toBe(true);
-        expect(parsed.portForwardCommand).toContain("kubectl port-forward -n rebase-tenant-proj_1");
+        // The remedy has to be runnable: a customer holds no kubeconfig for
+        // the platform's cluster, so `kubectl` is offered only when the cluster
+        // is their own — which this project's is not.
+        expect(parsed.connectCommand).toBe("rebase cloud db connect");
+        expect(parsed.kubectlCommand).toBe(null);
         expect(parsed.psqlCommand).toContain("psql -h 127.0.0.1 -p 5432 -U app -d rebase");
         expect(invoke.mock.calls.filter((c) => c[2]?.path === "reveal")).toHaveLength(0);
     });
