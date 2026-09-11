@@ -56,6 +56,14 @@ const green = (s) => `\x1b[32m${s}\x1b[0m`;
  * `.claude/worktrees` is here for the reason it is in every other sweep: it
  * holds full checkouts of other branches, so a gate that reads it reports on
  * code nobody is about to ship and misses nothing when it does not.
+ *
+ * The NAME list is not the rule, though, and relying on it went wrong: a second
+ * worktree location appeared at `.worktrees/`, and this gate walked straight
+ * into it and reported five configs that fail to load because that checkout has
+ * no `node_modules`. A fresh CI clone has neither directory, so the failure was
+ * one only a developer with worktrees could see — the exact shape the skip list
+ * exists to prevent. `hasOwnCheckout` below is the rule the list was
+ * approximating: a directory with its own `.git` is somebody else's tree.
  */
 const SKIP = new Set(["node_modules", "dist", "build", ".git", ".claude", ".astro", "coverage"]);
 
@@ -74,11 +82,22 @@ const UNLOADABLE = [
     "website/astro.config"
 ];
 
+/**
+ * Whether this directory is a checkout of its own — a git worktree, a submodule,
+ * or a nested repository. Its contents belong to another tree's tooling and are
+ * built, typechecked and shipped by that tree, not this one.
+ */
+function hasOwnCheckout(dir) {
+    return fs.existsSync(path.join(dir, ".git"));
+}
+
 function findConfigs(dir, out = []) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
             if (SKIP.has(entry.name)) continue;
-            findConfigs(path.join(dir, entry.name), out);
+            const full = path.join(dir, entry.name);
+            if (hasOwnCheckout(full)) continue;
+            findConfigs(full, out);
         } else if (/^vite\.config\.[cm]?[jt]s$/.test(entry.name)) {
             const rel = path.relative(ROOT, path.join(dir, entry.name));
             if (!UNLOADABLE.some((prefix) => rel.startsWith(prefix))) out.push(path.join(dir, entry.name));
