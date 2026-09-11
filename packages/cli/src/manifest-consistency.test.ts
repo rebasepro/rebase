@@ -243,16 +243,16 @@ describe("rebase.json — the schema and the type agree", () => {
     const typePath = path.join(repoRoot, "packages/types/src/types/project_manifest.ts");
 
     /**
-     * Top-level property names declared on `RebaseProjectManifest`.
+     * Property names declared on one interface in `project_manifest.ts`.
      *
      * Read from source rather than imported: the interface is erased at runtime,
      * so there is nothing to reflect over. Scoped to that one interface's body —
      * the file declares a dozen others — and matches only single-indented
      * members, so nested object literals cannot leak in.
      */
-    function typeKeys(): string[] {
+    function typeKeys(interfaceName: string): string[] {
         const source = fs.readFileSync(typePath, "utf8");
-        const start = source.indexOf("export interface RebaseProjectManifest {");
+        const start = source.indexOf(`export interface ${interfaceName} {`);
         expect(start).toBeGreaterThan(-1);
         const body = source.slice(start, source.indexOf("\n}", start));
         // `[\w$]` rather than `\w`: the first member is `$schema`, and a `\w`
@@ -260,13 +260,90 @@ describe("rebase.json — the schema and the type agree", () => {
         return [...body.matchAll(/^ {4}([\w$]+)\??:/gm)].map(m => m[1]).sort();
     }
 
-    function schemaKeys(): string[] {
+    /** Property names on the root schema, or on one of its `$defs`. */
+    function schemaKeys(def?: string): string[] {
         const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
-        return Object.keys(schema.properties).sort();
+        const node = def ? schema.$defs?.[def] : schema;
+        expect(node?.properties).toBeDefined();
+        return Object.keys(node.properties).sort();
     }
 
     it("declares the same top-level keys on both sides", () => {
-        expect(schemaKeys()).toEqual(typeKeys());
+        expect(schemaKeys()).toEqual(typeKeys("RebaseProjectManifest"));
+    });
+
+    /**
+     * The app definitions, which is where the keys people actually write live.
+     *
+     * Only the top level was compared here, and every field of a `rebase.json`
+     * that is not `rebase`, `apps` or `telemetry` sits one level down — so the
+     * parity claim covered three keys and left the other sixteen unguarded. A
+     * field added to `RebaseStaticAppConfig` and to the CLI validator but not to
+     * the schema is invisible to the check above, ships green, and turns every
+     * editor red on a file the CLI accepts. `$defs` is closed for the same
+     * reason the root is, so an omission there is a rejection, not a gap.
+     */
+    it.each([
+        ["backendApp", "RebaseBackendAppConfig"],
+        ["staticApp", "RebaseStaticAppConfig"]
+    ])("declares the same keys on %s as on %s", (def, interfaceName) => {
+        expect(schemaKeys(def)).toEqual(typeKeys(interfaceName));
+    });
+
+    it.each(["backendApp", "staticApp"])("keeps %s closed", (def) => {
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        expect(schema.$defs?.[def]?.additionalProperties).toBe(false);
+    });
+
+    /**
+     * An app entry is chosen by its `type`, not by trying both shapes.
+     *
+     * `apps.*` was `oneOf: [backendApp, staticApp]`. JSON Schema's `oneOf` has
+     * no discriminator, so when neither branch matched — which is what ANY
+     * mistake in a static app looks like, the branches being closed — an editor
+     * had seven errors to choose from and picked the backend branch's:
+     *
+     *     Value should be one of: "backend"
+     *
+     * on a `"type": "static"` app, naming a key the file does not contain. One
+     * typo'd property produced it. Dispatching on `type` through `if`/`then`
+     * reduces the same typo to `Property pth is not allowed`, on the property.
+     *
+     * Asserted rather than left to review because the failure is not visible
+     * from this repository at all: every gate here reads the schema with a
+     * parser that does not care, and the only place the difference shows up is
+     * somebody else's editor.
+     */
+    it("picks an app's shape by its `type` rather than trying both", () => {
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        const entry = schema.properties?.apps?.additionalProperties;
+        expect(entry?.oneOf).toBeUndefined();
+        expect(entry?.required).toEqual(["type"]);
+        const dispatched = (entry?.allOf ?? []).map((branch: {
+            if?: { properties?: { type?: { const?: string } } };
+            then?: { $ref?: string };
+        }) => [branch.if?.properties?.type?.const, branch.then?.$ref]);
+        expect(dispatched).toEqual([
+            ["backend", "#/$defs/backendApp"],
+            ["static", "#/$defs/staticApp"]
+        ]);
+    });
+
+    /**
+     * And the set it dispatches over is the type's, not a copy that drifted.
+     *
+     * `RebaseAppType` has been edited twice — `admin` and `custom` were removed
+     * — and a schema still offering a departed type completes it in an editor,
+     * then rejects the file it just helped write.
+     */
+    it("offers exactly the app types the union declares", () => {
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        const source = fs.readFileSync(typePath, "utf8");
+        const union = source.match(/export type RebaseAppType =([^;]+);/)?.[1] ?? "";
+        const declared = [...union.matchAll(/"([^"]+)"/g)].map(m => m[1]).sort();
+        expect(declared.length).toBeGreaterThan(0);
+        expect([...(schema.properties?.apps?.additionalProperties?.properties?.type?.enum ?? [])].sort())
+            .toEqual(declared);
     });
 
     it("still refuses unknown keys", () => {

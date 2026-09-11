@@ -25,9 +25,23 @@
                 "description": "Lowercase alphanumeric with dashes — the name appears in URLs."
             },
             "additionalProperties": {
-                "oneOf": [
-                    { "$ref": "#/$defs/backendApp" },
-                    { "$ref": "#/$defs/staticApp" }
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                    "type": {
+                        "enum": ["backend", "static"],
+                        "description": "Which kind of app this is. Everything else an entry may declare follows from it."
+                    }
+                },
+                "allOf": [
+                    {
+                        "if": { "properties": { "type": { "const": "backend" } }, "required": ["type"] },
+                        "then": { "$ref": "#/$defs/backendApp" }
+                    },
+                    {
+                        "if": { "properties": { "type": { "const": "static" } }, "required": ["type"] },
+                        "then": { "$ref": "#/$defs/staticApp" }
+                    }
                 ]
             }
         },

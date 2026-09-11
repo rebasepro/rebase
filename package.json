@@ -65,6 +65,8 @@
     "check:runtime-deps": "node tooling/scripts/check-runtime-provided-deps.mjs",
     "check:runtime-image:boots": "node tooling/scripts/check-runtime-image-boots.mjs",
     "check:runtime-image:live": "node tooling/scripts/check-runtime-image.mjs --live",
+    "check:published-schema": "node tooling/scripts/check-published-schema.mjs",
+    "check:published-schema:live": "node tooling/scripts/check-published-schema.mjs --live",
     "check:bundle": "node tooling/scripts/check-bundle-budget.mjs",
     "check:hooks": "node tooling/scripts/check-hooks-baseline.mjs",
     "check:unused": "node tooling/scripts/check-unused-locals.mjs",

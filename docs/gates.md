@@ -74,6 +74,7 @@ this list, in this order.
 | `check:baas-types` | A real BaaS project typechecked with `react` mapped to a stub: a React type reached through an alias. | — |
 | `check:ts-expect-error-coverage` | Every file carrying a `@ts-expect-error` is in a tsc program. A directive in a file no program reads is a comment, and the file usually claims the opposite. | Add the file to `tsconfig.tests.json` |
 | `check:runtime-image` | Every container image the shipped files name has a workflow that publishes it. | — |
+| `check:published-schema` | Every shipped `rebase.json` names a `$schema` this repo actually publishes. A moved or renamed schema file 404s, and an editor given a 404 validates nothing and looks fine. | — |
 | `check:runtime-deps` | The packages the runtime image promises to supply are installed there, at a compatible version, with their own dependencies and peers. | — |
 | `check:chart` | The Helm chart lints, renders its three documented topologies, and every refusal in `_validate.tpl` is still reachable. Needs Helm. | — |
 | `check:runtime-image:boots` | The image actually starts, both ways a bundle can arrive, and still refuses when given neither. Needs Docker. | — |
@@ -154,4 +155,5 @@ Run by `publish.yml` and `release.sh`, not on a pull request.
 | `check:template-pins` | Both halves of the above, standalone: every `@rebasepro` symbol the templates import, and every `${VAR:?}` the scaffold's compose file requires, exists in the version `rebase init` pins. `check:templates` runs the import half on every PR. | Fix the template, or bump the version |
 | `check:version-pins` | Version numbers written into the docs match the release. Also runs inside `verify:docs`. | `pnpm fix:version-pins` |
 | `check:runtime-image:live` | The published image tag actually answers, which the hermetic check deliberately does not ask. | — |
+| `check:published-schema:live` | rebase.pro is serving the schema this repo has. Until the website deploys, every editor validates `rebase.json` against the older one — which reports a field the CLI accepts as an error. | `website/scripts/scheduled-publish.sh` |
 | `verify:docs` | The non-strict form, for working locally before `verify:docs:strict` gates the PR. | — |

@@ -162,5 +162,21 @@ log "deploying to firebase hosting (rebase-578f2)"
 "$FIREBASE" deploy --only hosting --project rebase-578f2 --non-interactive \
 	|| fail "firebase deploy failed — check that 'firebase login:list' still shows an account"
 
+# A deploy that does not check its own output is how the JSON Schema went stale.
+#
+# `website/public/schemas/rebase.json` is not marketing copy: every rebase.json
+# in the world names it in `$schema`, so it is the contract a developer's editor
+# validates against. It reached the live site only as a side effect of this job,
+# and nothing ever asked whether it arrived. `cms` shipped on 2026-09-10 and the
+# published schema kept rejecting it — the demo manifest, of all files, was red
+# in VS Code with an error naming a key it does not contain, and every gate in
+# the repository was green.
+#
+# --wait: Hosting can still answer from an edge that has not caught up, and a
+# false alarm on a Tuesday morning is how a check earns its way to /dev/null.
+log "verifying the published JSON Schema matches $COMMIT"
+/usr/bin/env node "$WT/tooling/scripts/check-published-schema.mjs" --live --wait 90 \
+	|| fail "deployed, but rebase.pro is not serving this commit's rebase.json schema — every editor is validating against the old one"
+
 rm -f "$MARKER" 2>/dev/null || true
 log "──────── deployed $COMMIT ────────"

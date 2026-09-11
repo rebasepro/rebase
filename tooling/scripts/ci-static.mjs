@@ -126,6 +126,19 @@ automatically-triggered workflow publishes the image, not that the registry
 currently answers. The live probe belongs to the release, and runs there.`
     },
     {
+        run: "check:published-schema",
+        why: `Every rebase.json we ship opens with a $schema pointing at rebase.pro, and
+that file reaches the live site only when the WEBSITE is deployed. So a new
+manifest field can pass every gate here and still be a red squiggle in VS
+Code — which is what \`cms\` did: against the older published schema the
+demo's \`"cms": "/"\` knocked out the static branch of what was then a bare
+oneOf, and editors reported \`Value should be one of: "backend"\`, naming a
+key the file does not have. Hermetic: it asserts the URL maps to a file this
+repo publishes,
+because a 404 makes an editor validate NOTHING and look fine. Whether the
+site is currently serving it is \`--live\`, and belongs to the release.`
+    },
+    {
         run: "check:runtime-deps",
         why: `The image promises to supply @rebasepro/common, /utils and friends so a
 bundle does not vendor them. Nothing checked those copies could actually
