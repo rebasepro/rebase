@@ -32,6 +32,13 @@ export const repoRoot = path.resolve(cliRoot, "../..");
  * REBASE_E2E short-circuits the registry lookup in init: the versions in the
  * working tree are usually unpublished, and without this the scaffold refuses
  * to pin them.
+ *
+ * REBASE_TELEMETRY_DISABLED is set here as well as in vitest.e2e.config.ts,
+ * because this helper's whole job is to curate what a spawned CLI sees and
+ * this suite spawns `rebase init` for real. Inheriting it from the runner
+ * would work today and stop working the moment anyone runs one of these files
+ * some other way — and the failure is silent, landing rows in the production
+ * telemetry table rather than breaking a test.
  */
 export function getCleanEnv(): Record<string, string> {
     const cleanEnv = { ...process.env } as Record<string, string>;
@@ -46,6 +53,7 @@ export function getCleanEnv(): Record<string, string> {
         }
     }
     cleanEnv.REBASE_E2E = "true";
+    cleanEnv.REBASE_TELEMETRY_DISABLED = "1";
     return cleanEnv;
 }
 

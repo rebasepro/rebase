@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+import { TEST_ENV } from "./vitest.config";
+
 /**
  * The DB-backed suite: tests that start a real managed database.
  *
@@ -16,6 +18,8 @@ export default defineConfig({
     test: {
         globals: true,
         environment: "node",
+        // See vitest.config.ts: no suite may reach the telemetry collector.
+        env: TEST_ENV,
         include: ["src/**/*.integration.test.ts"],
         // A first boot runs initdb: ~11s cold, ~4s warm, and slower on CI.
         testTimeout: 120_000,
