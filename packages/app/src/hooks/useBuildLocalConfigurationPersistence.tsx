@@ -78,10 +78,13 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         setFavouritePaths,
         collapsedGroups,
         setCollapsedGroups
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `configVersion`
+        // is deliberate and the rule cannot see why: it contributes nothing to
+        // the value and everything to its IDENTITY. The stored configs live in a
+        // ref, so nothing else in this array changes when they do, and this is
+        // the only thing telling the views that read them during render that
+        // they have. Removing it as "unnecessary" is what would break it.
     }), [
-        // `configVersion` contributes nothing to the value and everything to
-        // its identity: the stored configs live in a ref, and this is what
-        // tells the views that read them during render that they changed.
         configVersion,
         onCollectionModified,
         getCollectionConfig,

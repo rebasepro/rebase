@@ -799,6 +799,21 @@ combinations refuse to boot — is on
 | `REBASE_FUNCTIONS_EXCLUDE` | Serve every custom function except the named ones. | — |
 | `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. | — |
 
+#### MCP surface
+
+An opt-in Model Context Protocol endpoint at `/mcp`, so an AI client can read
+and write this project **as the signed-in user**. Off unless set, and — unlike
+every other surface — no `REBASE_ROLE` turns it on: the others describe a
+process shape, while this one is a decision to hand credentials to third-party
+software, and it should be made by a person rather than inherited from a
+container's job title.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_MCP_ENABLED` | Mount the MCP surface. Requires `REBASE_PUBLIC_URL`; without it the surface declines to mount and says so in the boot log. | `false` |
+| `REBASE_PUBLIC_URL` | This deployment's externally reachable origin, e.g. `https://app.example.com`. The MCP surface cannot derive it — taking the origin from the `Host` header would make the issuer identity, and the audience its own tokens are checked against, a value the caller supplies. | — |
+| `REBASE_MCP_OPEN_REGISTRATION` | Allow OAuth dynamic client registration (RFC 7591), so a client can enrol itself. Set to `false` to require clients be registered ahead of time. | `true` |
+
 #### Backups
 
 | Variable | Description | Default |
@@ -14221,9 +14236,11 @@ the ID you got. Read the response header.
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
+| `RELATION_HAS_NO_PIVOT` | 400 | The write carried a link payload, but the path does not reach its target through a `manyToMany` that declares `through.properties` — so there is no junction row to put it on. | Declare `through.properties` on the relation, or drop the payload from the write. See [Relations](/docs/collections/relations/). |
 | `RELATION_MISCONFIGURED` | 500 | A relation does not resolve against the registered schema. The operation is refused rather than skipped: dropping it would report success for a write that never happened, or emptiness for rows that exist. | Run `rebase schema generate` if the generated schema is older than the database. |
 | `RELATION_NOT_UNLINKABLE` | 400 | The relation cannot be unlinked from this side. | Write from the owning side. |
 | `RELATION_NOT_WRITABLE` | 400 | The nested path is not a writable relation. | See [Relations](/docs/collections/relations/). |
+| `RELATION_PIVOT_UNSUPPORTED` | 400 | The relation declares junction columns, but this data source cannot write them. | The link itself still works; only the payload on it does not. Check the driver's capabilities. |
 | `RELATION_SOURCE_KEY_EMPTY` | 400 | A relation write had no source key to hang the link on. | Save the parent row first. |
 | `SCHEMA_DRIFT` | 500 | A table or column the code expects does not exist in the database. | `rebase db push` in development; redeploy on a managed tenant. |
 | `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` was combined with `orderBy: "_score"`. Relevance is computed per query rather than stored, so it cannot key a cursor. | Page relevance with `limit`/`offset`, or order by a column. |
@@ -14534,6 +14551,33 @@ deployment's custom endpoints is not public.
 
 WebSocket connections arrive as an HTTP upgrade on the same server rather than at
 a path of their own — see [Realtime](/docs/backend/realtime/).
+
+### MCP surface
+
+Mounted only when `REBASE_MCP_ENABLED=true`, which also requires
+`REBASE_PUBLIC_URL` — see
+[Configuration](/docs/getting-started/configuration/#mcp-surface). Off by
+default: no `REBASE_ROLE` turns this on, because it hands project access to
+third-party software and that is a decision for a person to make.
+
+The `.well-known` documents sit at the **origin**, not under `basePath`: RFC 8414
+and RFC 9728 define those paths relative to the origin, and a client fetches them
+before it holds any token.
+
+| Method | Path | Gate | More |
+|---|---|---|---|
+| `GET` | `/.well-known/oauth-protected-resource` | none | RFC 9728 metadata naming this resource and its authorization server. Served at the path-suffixed form as well |
+| `GET` | `/.well-known/oauth-authorization-server` | none | RFC 8414 metadata: the endpoints, grant types and PKCE methods this deployment supports |
+| `POST` | `/mcp` | OAuth bearer | The MCP protocol endpoint. Acts **as the signed-in user**, so every read and write is subject to the same RLS |
+| `GET` | `/mcp` | OAuth bearer | The server-sent-events stream for a session |
+| `DELETE` | `/mcp` | OAuth bearer | Ends a session |
+| `POST` | `/api/oauth/register` | rate-limited | RFC 7591 dynamic client registration. Refused when `REBASE_MCP_OPEN_REGISTRATION=false` |
+| `GET` | `/api/oauth/authorize` | session | The consent screen a client is redirected to |
+| `POST` | `/api/oauth/authorize/decision` | session | The person's answer to it — approve or deny |
+| `POST` | `/api/oauth/token` | client credentials + PKCE | Exchanges an authorization code, or refreshes |
+| `POST` | `/api/oauth/revoke` | client credentials | RFC 7009 token revocation |
+| `GET` | `/api/oauth/grants` | session | Which clients this user has approved |
+| `DELETE` | `/api/oauth/grants/:clientId` | session | Withdraws one, so a person can undo a consent without an admin |
 
 ### Related
 
@@ -22314,18 +22358,24 @@ For toolbar-level actions that work on the collection or selected entities:
 
 ```tsx
 
-function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
+function PublishSelectedAction({ selectionController, path }: CollectionActionsProps) {
+    const data = useData();
     const handlePublish = async () => {
-        const selected = selectionController.selectedEntities;
+        // `selection` is either the rows that were ticked or a query standing
+        // for every row that matches — `resolveSelection` reads them, one page
+        // at a time, and refuses rather than returning a prefix.
+        const selected = await resolveSelection({
+            selection: selectionController.selection,
+            accessor: data.collection(path)
+        });
         for (const entity of selected) {
-            await context.data.collection<Record<string, unknown>>(entity.path)
-                    .update(entity.id, { status: "published" });
+            await data.collection(entity.path).update(entity.id, { status: "published" });
         }
     };
 
     return (
         <button onClick={handlePublish}>
-            Publish {selectionController.selectedEntities.length} selected
+            Publish {selectionController.selectedCount ?? "all"} selected
         </button>
     );
 }
@@ -32866,10 +32916,13 @@ rebase cloud orgs list | create | members
 ##### Databases
 
 ```bash
-rebase cloud db list | create | info | test
+rebase cloud db list | create | info | connect | test
 rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
+
+`db connect` opens a local port that *is* the managed database (no public
+endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 ##### Resources
 
@@ -35100,7 +35153,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
 | `domains` | Custom domains, the DNS records to add, and verification |
-| `db` | Attach or create a database, backups, restore, and point-in-time recovery |
+| `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
@@ -35140,6 +35193,15 @@ Stated plainly, because finding out later is worse:
   and says so before it signs you in.
 - **Point-in-time recovery is CLI-only.** The console shows backups; the staged
   PITR workflow is `rebase cloud db pitr`.
+- **No public database endpoint.** A managed database is not exposed to the
+  internet, so the host the console shows is your backend's address for it and
+  resolves to nothing on your machine. `rebase cloud db connect` opens a local
+  port that is that database, tunnelled through the control plane, for as long
+  as you leave it running — but there is no permanent hostname a third-party
+  service can connect to. That tunnel, and the password behind
+  `rebase cloud db info --reveal`, both need the organization's owner or admin
+  role: the same one Studio's SQL editor asks for, because all three end at a
+  session on your production data.
 
 ### Self-hosting instead
 

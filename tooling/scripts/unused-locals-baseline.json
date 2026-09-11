@@ -57,8 +57,6 @@
   "packages/cms/src/components/CollectionViewBinding/useBoardDataController.tsx::currentCollection": 1,
   "packages/cms/src/components/DefaultAppBar.tsx::adminModeController": 1,
   "packages/cms/src/components/DefaultDrawer.tsx::isFloating": 1,
-  "packages/cms/src/components/DeleteEntityDialog.tsx::authController": 1,
-  "packages/cms/src/components/DeleteEntityDialog.tsx::customizationController": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::collectionRegistryController": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::selectedEntityView": 1,
   "packages/cms/src/components/EditViewBinding.tsx::formViewIncludeActions": 1,

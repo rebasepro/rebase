@@ -1,18 +1,19 @@
 ---
-sourceHash: 3bf8656e3408eede
-title: Actions d'Entité
-sidebar_label: Actions d'Entité
-description: Ajoutez des boutons d'action personnalisés aux entités pour l'archivage, la publication, l'exportation, le clonage, et plus encore.
+sourceHash: 90a147a04897bd60
+title: Actions d'entité
+sidebar_label: Actions d'entité
+description: Ajoutez des boutons d'action personnalisés aux entités pour archiver, publier, exporter, cloner, et bien plus encore.
 ---
 
 ## Vue d'ensemble
 
-Les actions d'entité sont des boutons personnalisés qui apparaissent sur les entités individuelles. Utilisez-les pour des opérations telles que la publication, l'archivage, le clonage ou le déclenchement de workflows externes.
+Les actions d'entité sont des boutons personnalisés qui s'affichent sur les entités individuelles. Utilisez-les pour des opérations telles que la publication, l'archivage, le clonage ou le déclenchement de workflows externes.
 
-## Définition des Actions d'Entité
+## Définir des actions d'entité
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { resolveSelection } from "@rebasepro/cms";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -32,9 +33,10 @@ const articlesCollection = defineCollection({
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", publishedAt: new Date() });
-                    context.snackbarController.open({
+                    context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
                     });
@@ -44,6 +46,7 @@ const articlesCollection = defineCollection({
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .create({ ...values, name: values.name + " (Copy)" });
@@ -55,7 +58,7 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Actions de Collection
+## Actions de collection
 
 Pour les actions au niveau de la barre d'outils qui s'appliquent à la collection ou aux entités sélectionnées :
 
@@ -85,19 +88,23 @@ function PublishSelectedAction({ selectionController, path }: CollectionActionsP
     );
 }
 
-// Register
+// Register — `Actions` is an array, so several can be composed.
 const collection = defineCollection({
+    slug: "products",
+    name: "Products",
+    table: "products",
+    properties: { /* … */ },
     admin: {
-        Actions: PublishSelectedAction
+        Actions: [PublishSelectedAction]
     }
-    // ...
 });
 ```
 
 ![Actions de collection](/img/collection_actions.png)
 
-## Prochaines Étapes
+## Prochaines étapes
 
-- **[Colonnes Supplémentaires](/docs/frontend/additional-columns)** — Colonnes de tableau calculées
-- **[Champs Personnalisés](/docs/frontend/custom-fields)** — Champs de formulaire personnalisés
+- **[Colonnes supplémentaires](/docs/frontend/additional-columns)** — Colonnes de tableau calculées
+- **[Champs personnalisés](/docs/frontend/custom-fields)** — Champs de formulaire personnalisés
+
 ---

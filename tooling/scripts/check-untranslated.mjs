@@ -20,6 +20,9 @@
  *
  * Comment lines are skipped — a comment quoting the string it is about is not a
  * rendered string, and this file's own docblock would otherwise be a finding.
+ * `console.*` calls are skipped on the same principle: a log line goes to a
+ * developer's terminal, and translating it would both mistranslate the audience
+ * and make the message unsearchable in the source.
  *
  * ## Why a baseline
  *
@@ -90,6 +93,14 @@ for (const file of SCANNED.flatMap(sourceFiles)) {
     for (const line of fs.readFileSync(file, "utf8").split("\n")) {
         const trimmed = line.trim();
         if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
+        // Console output, for the same reason as a comment: it is not a rendered
+        // string. It goes to a developer's terminal, never to a user, and `t()`
+        // there would translate a log line into a language the person reading
+        // the stack trace did not ask for — while making the message unsearchable
+        // in the source. `console.error("Error deleting entities", e)` beside a
+        // toast that says the same thing IS the correct shape: the toast is
+        // translated, the log is not.
+        if (/\bconsole\.(?:log|info|warn|error|debug|trace)\s*\(/.test(line)) continue;
         // Already translated on this line, `?? "English"` fallback included.
         if (line.includes("t(\"")) continue;
         // `group:` and `icon:` take identifiers, not labels. A group name is

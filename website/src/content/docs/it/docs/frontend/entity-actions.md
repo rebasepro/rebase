@@ -1,18 +1,19 @@
 ---
-sourceHash: 3bf8656e3408eede
-title: Azioni Entità
-sidebar_label: Azioni Entità
-description: Aggiungi pulsanti di azione personalizzati alle entità per archiviazione, pubblicazione, esportazione, clonazione e altro.
+sourceHash: 90a147a04897bd60
+title: Azioni entità
+sidebar_label: Azioni entità
+description: Aggiungi pulsanti di azione personalizzati alle entità per archiviare, pubblicare, esportare, clonare e altro ancora.
 ---
 
 ## Panoramica
 
-Le azioni entità sono pulsanti personalizzati che appaiono sulle singole entità. Usali per operazioni come pubblicazione, archiviazione, clonazione o attivazione di flussi di lavoro esterni.
+Le azioni entità sono pulsanti personalizzati visualizzati sulle singole entità. Utilizzale per operazioni quali la pubblicazione, l'archiviazione, la clonazione o l'attivazione di flussi di lavoro esterni.
 
-## Definizione delle Azioni Entità
+## Definizione delle azioni entità
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { resolveSelection } from "@rebasepro/cms";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -32,9 +33,10 @@ const articlesCollection = defineCollection({
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", publishedAt: new Date() });
-                    context.snackbarController.open({
+                    context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
                     });
@@ -44,6 +46,7 @@ const articlesCollection = defineCollection({
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .create({ ...values, name: values.name + " (Copy)" });
@@ -55,9 +58,9 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Azioni della Collezione
+## Azioni della collection
 
-Per le azioni a livello di barra degli strumenti che operano sulla collezione o sulle entità selezionate:
+Per azioni a livello di barra degli strumenti che operano sulla collection o sulle entità selezionate:
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
@@ -85,20 +88,23 @@ function PublishSelectedAction({ selectionController, path }: CollectionActionsP
     );
 }
 
-// Register
+// Register — `Actions` is an array, so several can be composed.
 const collection = defineCollection({
+    slug: "products",
+    name: "Products",
+    table: "products",
+    properties: { /* … */ },
     admin: {
-        Actions: PublishSelectedAction
+        Actions: [PublishSelectedAction]
     }
-    // ...
 });
 ```
 
-![Azioni collezione](/img/collection_actions.png)
+![Azioni della collection](/img/collection_actions.png)
 
-## Prossimi Passi
+## Passaggi successivi
 
-- **[Colonne Aggiuntive](/docs/frontend/additional-columns)** — Colonne di tabella calcolate
-- **[Campi Personalizzati](/docs/frontend/custom-fields)** — Campi del modulo personalizzati
+- **[Colonne aggiuntive](/docs/frontend/additional-columns)** — Colonne calcolate della tabella
+- **[Campi personalizzati](/docs/frontend/custom-fields)** — Campi modulo personalizzati
 
 ---

@@ -1,6 +1,4 @@
 {
-  "packages/cms/src/collection_editor/ConfigControllerProvider.tsx::create_collection": 1,
-  "packages/cms/src/collection_editor/ConfigControllerProvider.tsx::edit_collection": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx::ai_assist": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx::ai_placeholder_modify": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx::generate_collection_with_ai": 1,
@@ -154,7 +152,6 @@
   "packages/cms/src/form/EntityForm.tsx::settings_heading": 1,
   "packages/cms/src/form/EntityFormActions.tsx::create_copy": 1,
   "packages/cms/src/form/EntityFormActions.tsx::fix_errors_before_saving": 1,
-  "packages/cms/src/form/EntityFormBinding.tsx::error_saving_entity": 1,
   "packages/cms/src/form/field_bindings/ArrayOfReferencesFieldBinding.tsx::collection_does_not_exist": 1,
   "packages/cms/src/form/field_bindings/ArrayOfReferencesFieldBinding.tsx::internal_error": 1,
   "packages/cms/src/form/field_bindings/MultipleRelationFieldBinding.tsx::collection_does_not_exist": 1,

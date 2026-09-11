@@ -238,7 +238,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             });
         }
         onClose();
-    }, [singleEntity, selection, performDelete, dataClient, path, onEntityDelete, onMultipleEntitiesDelete, onClose, snackbarController, collection.name, t]);
+    }, [singleEntity, selection, performDelete, dataClient, path, onEntityDelete, onMultipleEntitiesDelete, onClose, snackbarController, collection.name, collection.singularName, t]);
 
     const entityName = collection.singularName ?? collection.name;
 

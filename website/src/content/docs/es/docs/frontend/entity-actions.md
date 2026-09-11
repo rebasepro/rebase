@@ -1,18 +1,19 @@
 ---
-sourceHash: 3bf8656e3408eede
-title: Acciones de Entidad
-sidebar_label: Acciones de Entidad
+sourceHash: 90a147a04897bd60
+title: Acciones de entidad
+sidebar_label: Acciones de entidad
 description: Añade botones de acción personalizados a las entidades para archivar, publicar, exportar, clonar y más.
 ---
 
-## Resumen
+## Descripción general
 
-Las acciones de entidad son botones personalizados que aparecen en entidades individuales. Úsalos para operaciones como publicar, archivar, clonar o activar flujos de trabajo externos.
+Las acciones de entidad son botones personalizados que aparecen en entidades individuales. Utilízalas para operaciones como publicar, archivar, clonar o activar flujos de trabajo externos.
 
-## Definición de Acciones de Entidad
+## Definir acciones de entidad
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { resolveSelection } from "@rebasepro/cms";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -32,9 +33,10 @@ const articlesCollection = defineCollection({
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", publishedAt: new Date() });
-                    context.snackbarController.open({
+                    context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
                     });
@@ -44,6 +46,7 @@ const articlesCollection = defineCollection({
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .create({ ...values, name: values.name + " (Copy)" });
@@ -55,9 +58,9 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Acciones de Colección
+## Acciones de colección
 
-Para acciones a nivel de barra de herramientas que funcionan en la colección o en entidades seleccionadas:
+Para acciones a nivel de barra de herramientas que operan sobre la colección o las entidades seleccionadas:
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
@@ -85,20 +88,23 @@ function PublishSelectedAction({ selectionController, path }: CollectionActionsP
     );
 }
 
-// Register
+// Register — `Actions` is an array, so several can be composed.
 const collection = defineCollection({
+    slug: "products",
+    name: "Products",
+    table: "products",
+    properties: { /* … */ },
     admin: {
-        Actions: PublishSelectedAction
+        Actions: [PublishSelectedAction]
     }
-    // ...
 });
 ```
 
 ![Acciones de colección](/img/collection_actions.png)
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[Columnas Adicionales](/docs/frontend/additional-columns)** — Columnas de tabla calculadas
-- **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulario personalizados
+- **[Columnas adicionales](/docs/frontend/additional-columns)** — Columnas calculadas de la tabla
+- **[Campos personalizados](/docs/frontend/custom-fields)** — Campos de formulario personalizados
 
 ---
