@@ -97,7 +97,7 @@ import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit"
 import type { CaptchaConfig } from "./auth/captcha";
 import {
     ALL_RUNTIME_SURFACES,
-    disabledSurfaces,
+    trimmedSurfaces,
     resolveOwnership,
     resolveSurfaces,
     type RuntimeOwnershipOptions,
@@ -1044,7 +1044,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // one already-decided answer rather than re-deriving it from optionals.
     const surfaces = resolveSurfaces(config.surfaces);
     const ownership = resolveOwnership(config.ownership);
-    const offSurfaces = disabledSurfaces(surfaces);
+    // `trimmedSurfaces`, not `disabledSurfaces`: a surface that is off by
+    // default was not turned off by anyone, and counting it made every
+    // deployment in the fleet announce itself as partial. See its docblock.
+    const offSurfaces = trimmedSurfaces(surfaces);
     if (offSurfaces.length > 0) {
         // Said once, at info: a request answering 404 because this process was
         // never meant to serve it is indistinguishable, from the client side,

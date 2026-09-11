@@ -162,7 +162,33 @@ export function resolveOwnership(options?: RuntimeOwnershipOptions): ResolvedOwn
     };
 }
 
-/** The surfaces a process is not serving, for a boot log line. */
+/** The surfaces a process is not serving. Literal: off is off, however it got there. */
 export function disabledSurfaces(resolved: ResolvedSurfaces): RuntimeSurface[] {
     return ALL_RUNTIME_SURFACES.filter(surface => !resolved[surface]);
+}
+
+/**
+ * The surfaces whose absence is worth a line in the boot log.
+ *
+ * NOT the same question as {@link disabledSurfaces}, and conflating them made
+ * every deployment in the fleet announce itself as partial.
+ *
+ * The line exists to tell one thing from another: a request answering 404
+ * because this process was never meant to serve it is, from the client side,
+ * indistinguishable from a broken deployment. That is worth saying — about a
+ * surface somebody TURNED OFF.
+ *
+ * A {@link DEFAULT_OFF} surface is a different fact. Nobody turned `mcp` off;
+ * it has never been on, and a deployment without it is not partial, it is the
+ * deployment. Counting it made `offSurfaces` non-empty on every single boot —
+ * managed tenant, self-hosted container, local dev — so a line that means
+ * "somebody trimmed this process" started appearing on processes nobody had
+ * trimmed. `split-roles-e2e.test.ts` calls this "the compatibility assertion for
+ * the whole feature", and it has been failing since the MCP surface landed.
+ *
+ * An operator who explicitly disables a default-off surface still gets no line,
+ * which is right: the process serves exactly what it would have served anyway.
+ */
+export function trimmedSurfaces(resolved: ResolvedSurfaces): RuntimeSurface[] {
+    return disabledSurfaces(resolved).filter(surface => !DEFAULT_OFF.includes(surface));
 }

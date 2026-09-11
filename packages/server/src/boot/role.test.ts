@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { parseNameList, resolveRole, RoleConfigurationError, type RoleEnv } from "./role";
-import { resolveOwnership, resolveSurfaces, ALL_RUNTIME_SURFACES } from "../init/surfaces";
+import { resolveOwnership, resolveSurfaces, disabledSurfaces, trimmedSurfaces, ALL_RUNTIME_SURFACES } from "../init/surfaces";
 
 /**
  * `REBASE_ROLE`, and the combinations that refuse to boot.
@@ -233,5 +233,47 @@ describe("parseNameList", () => {
         expect(parseNameList(undefined)).toEqual([]);
         expect(parseNameList("")).toEqual([]);
         expect(parseNameList("  ")).toEqual([]);
+    });
+});
+
+/**
+ * "Off by default" and "turned off" are different facts, and the boot log only
+ * cares about the second.
+ *
+ * Conflating them made every deployment in the fleet — managed tenant,
+ * self-hosted container, local dev — log "Partial runtime surface — some routes
+ * are not served by this process" from the moment the MCP surface landed, on a
+ * process nobody had trimmed. That line exists to tell "this process was never
+ * meant to serve that" apart from "this deployment is broken", and it had
+ * started saying the first about processes serving everything they ever served.
+ *
+ * `split-roles-e2e.test.ts` — which calls itself "the compatibility assertion
+ * for the whole feature" — caught it, and had been failing in CI on main
+ * unattended, alongside five other genuinely-red gates.
+ */
+describe("trimmedSurfaces", () => {
+    it("says nothing about a default deployment", () => {
+        expect(trimmedSurfaces(resolveSurfaces())).toEqual([]);
+    });
+
+    it("still says nothing when a default-off surface is explicitly off", () => {
+        // Same process, same surfaces. An operator restating the default has
+        // not trimmed anything.
+        expect(trimmedSurfaces(resolveSurfaces({ mcp: false }))).toEqual([]);
+    });
+
+    it("reports a surface somebody actually turned off", () => {
+        expect(trimmedSurfaces(resolveSurfaces({ functions: false }))).toEqual(["functions"]);
+    });
+
+    it("reports the trimmed ones without the default-off one", () => {
+        const trimmed = trimmedSurfaces(resolveSurfaces({ functions: false, cron: false }));
+        expect(trimmed).toEqual(["functions", "cron"]);
+        expect(trimmed).not.toContain("mcp");
+    });
+
+    it("leaves disabledSurfaces literal, because it answers the other question", () => {
+        // Off is off there, however it got there — the two must not merge back.
+        expect(disabledSurfaces(resolveSurfaces())).toContain("mcp");
     });
 });
