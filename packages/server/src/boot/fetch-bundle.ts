@@ -519,7 +519,15 @@ async function downloadTo(
     if (!response.ok) {
         // The status is the diagnosis: 401/403 is a bad or missing token, 404 is
         // a bundle that was garbage-collected out from under a running service.
-        throw new Error(`${response.status} ${response.statusText}`);
+        //
+        // `Retry-After` rides along when the server sent one, because 429 is the
+        // one 4xx that is an instruction rather than a verdict — see
+        // `isTransientStatus`.
+        const retryAfter = response.headers?.get?.("retry-after") ?? undefined;
+        throw new Error(
+            `${response.status} ${response.statusText}`
+            + (retryAfter ? ` (retry-after: ${retryAfter})` : "")
+        );
     }
     if (!response.body) throw new Error("empty response body");
 
@@ -542,6 +550,40 @@ async function downloadTo(
  * refuse. Writing the whole tarball first means a truncated download is caught
  * by `tar` as a corrupt archive, which is an error.
  */
+/**
+ * The 4xx statuses that mean "not yet" rather than "no".
+ *
+ * 429 is a server asking to be asked again; 408 is it saying the attempt ran out
+ * of time. Both clear on their own, and both are indistinguishable from a bad
+ * credential to a rule that reads only the first digit.
+ */
+export function isTransientStatus(detail: string): boolean {
+    return /^(429|408) /.test(detail);
+}
+
+/**
+ * The wait a `Retry-After` asks for, in milliseconds, or undefined.
+ *
+ * Seconds or an HTTP date, per RFC 9110. Capped, because this runs during a
+ * pod's startup probe window: a server asking for five minutes gets the cap and
+ * another attempt, which is better than a container marked unhealthy while it
+ * politely waits.
+ */
+export function retryAfterMs(detail: string, now: number = Date.now()): number | undefined {
+    const raw = /\(retry-after: ([^)]+)\)/.exec(detail)?.[1]?.trim();
+    if (!raw) return undefined;
+
+    const seconds = Number(raw);
+    const ms = Number.isFinite(seconds)
+        ? seconds * 1_000
+        : Number.isFinite(Date.parse(raw)) ? Date.parse(raw) - now : NaN;
+    if (!Number.isFinite(ms)) return undefined;
+    return Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS);
+}
+
+/** Ceiling on an honoured `Retry-After`. See `retryAfterMs`. */
+export const MAX_RETRY_AFTER_MS = 30_000;
+
 export async function fetchBundle(options: FetchBundleOptions): Promise<string> {
     const fetchImpl = options.fetchImpl ?? fetch;
     const extract = options.extract ?? extractWithTar;
@@ -566,12 +608,23 @@ export async function fetchBundle(options: FetchBundleOptions): Promise<string> 
             // A 401/403/404 will not become a 200 by waiting. Retrying them
             // turns a clear failure into a slow one, and the pod spends its
             // startup budget confirming a credential is still wrong.
-            const permanent = /^4\d\d /.test(detail);
+            //
+            // 429 and 408 are the exceptions, and treating them as permanent is
+            // how a deploy fails for a reason that was going to clear on its
+            // own. The control plane caps concurrent bundle fetches (three in
+            // the fleet, two per project) precisely because the handler holds a
+            // bundle in memory and eight at once is an OOMKill of the thing
+            // every tenant depends on — so it answers 429 with `Retry-After`,
+            // meaning "come back", and expects to be come back to. Read as a
+            // verdict instead, a rollout that brought two pods up together took
+            // the whole deployment down and rolled it back.
+            const permanent = /^4\d\d /.test(detail) && !isTransientStatus(detail);
             if (permanent || attempt === attempts) break;
+            const wait = retryAfterMs(detail) ?? retryDelayMs;
             logger.warn("Bundle download failed; retrying", {
-                attempt, of: attempts, error: detail
+                attempt, of: attempts, error: detail, waitMs: wait
             });
-            await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+            await new Promise(resolve => setTimeout(resolve, wait));
         }
     }
 
