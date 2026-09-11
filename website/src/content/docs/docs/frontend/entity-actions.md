@@ -12,6 +12,7 @@ Entity actions are custom buttons that appear on individual entities. Use them f
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { resolveSelection } from "@rebasepro/cms";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -62,18 +63,26 @@ For toolbar-level actions that work on the collection or selected entities:
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
-function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
+import { useData } from "@rebasepro/app";
+import { resolveSelection } from "@rebasepro/cms";
+function PublishSelectedAction({ selectionController, path }: CollectionActionsProps) {
+    const data = useData();
     const handlePublish = async () => {
-        const selected = selectionController.selectedEntities;
+        // `selection` is either the rows that were ticked or a query standing
+        // for every row that matches — `resolveSelection` reads them, one page
+        // at a time, and refuses rather than returning a prefix.
+        const selected = await resolveSelection({
+            selection: selectionController.selection,
+            accessor: data.collection(path)
+        });
         for (const entity of selected) {
-            await context.data.collection<Record<string, unknown>>(entity.path)
-                    .update(entity.id, { status: "published" });
+            await data.collection(entity.path).update(entity.id, { status: "published" });
         }
     };
 
     return (
         <button onClick={handlePublish}>
-            Publish {selectionController.selectedEntities.length} selected
+            Publish {selectionController.selectedCount ?? "all"} selected
         </button>
     );
 }

@@ -1,5 +1,5 @@
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 
 import {
     useAuthController,
@@ -9,7 +9,7 @@ import {
 } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks";
 import { Entity, User } from "@rebasepro/types";
-import { CollectionActionsProps, ExportConfig, RebaseContext, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionActionsProps, ExportConfig, RebaseContext, AdminCollection, SelectionQuery } from "@rebasepro/cms-types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
     Alert,
@@ -30,6 +30,7 @@ import {
 } from "@rebasepro/ui";
 import { downloadEntitiesExport } from "./export";
 import { fetchAllEntitiesForExport, MAX_EXPORT_ROWS } from "./fetch_export_data";
+import { resolveSelection, selectionQueryToFindParams } from "../../selection";
 
 const DOCS_LIMIT = 500;
 
@@ -53,6 +54,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     collection,
     path,
     collectionEntitiesCount,
+    selectionController,
+    tableController,
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
@@ -76,10 +79,22 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const context = useAdminContext<USER>();
     const dataClient = useData();
 
+    // A selection narrows the export to it; with none, the export is the view
+    // — filter, search and sort included.
+    const exportSelection = selectionController?.hasSelection ? selectionController.selection : undefined;
+
+    const liveQuery: SelectionQuery<M> = useMemo(() => ({
+        path,
+        filterValues: tableController?.filterValues,
+        searchString: tableController?.searchString,
+        sortBy: tableController?.sortBy
+    }), [path, tableController?.filterValues, tableController?.searchString, tableController?.sortBy]);
+
     // Said before the download starts, not discovered halfway through it: the
     // walk refuses rather than writing a short file, so the dialog has to name
     // the ceiling it is about to hit.
-    const tooManyToExport = collectionEntitiesCount !== undefined && collectionEntitiesCount > MAX_EXPORT_ROWS;
+    const rowsToExport = exportSelection ? selectionController?.selectedCount : collectionEntitiesCount;
+    const tooManyToExport = rowsToExport !== undefined && rowsToExport > MAX_EXPORT_ROWS;
 
     const canExport = !exportAllowed || exportAllowed({
         collectionEntitiesCount: collectionEntitiesCount ?? 0,
@@ -149,14 +164,29 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setDataLoadingError(undefined);
         setProgress({ loaded: 0 });
         try {
-            // Paginated, not `find({})`: an absent limit resolves to 50 rows
-            // server-side, so the export used to be the first page of the
-            // collection under a filename that read like all of it.
-            const data = await fetchAllEntitiesForExport<M>({
-                accessor: dataClient.collection(path) as { find: (params?: any) => Promise<any> },
-                onProgress: (loaded, total) => setProgress({ loaded,
-                    total })
-            });
+            const onProgress = (loaded: number, total: number | undefined) => setProgress({ loaded, total });
+            const accessor = dataClient.collection(path) as { find: (params?: any) => Promise<any> };
+
+            // What the user is looking at, or what they picked out of it.
+            //
+            // Neither used to be true: the export read the collection with no
+            // params at all, so a filtered, searched table of 40 rows exported
+            // every row in the table — and ticking rows first changed nothing.
+            const data = exportSelection
+                ? await resolveSelection<M>({
+                    selection: exportSelection,
+                    accessor,
+                    maxRows: MAX_EXPORT_ROWS,
+                    onProgress
+                })
+                // Paginated, not `find({})`: an absent limit resolves to 50 rows
+                // server-side, so the export used to be the first page of the
+                // collection under a filename that read like all of it.
+                : await fetchAllEntitiesForExport<M>({
+                    accessor,
+                    params: selectionQueryToFindParams(liveQuery),
+                    onProgress
+                });
             const additionalData = await fetchAdditionalFields(data);
             const additionalHeaders = [
                 ...exportConfig?.additionalFields?.map(column => column.key) ?? [],
@@ -194,7 +224,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             setDataLoading(false);
         }
 
-    }, [onAnalyticsEvent, dataClient, path, fetchAdditionalFields, includeUndefinedValues, flattenArrays, exportType, dateExportType]);
+    }, [onAnalyticsEvent, dataClient, path, exportSelection, liveQuery, fetchAdditionalFields, includeUndefinedValues, flattenArrays, exportType, dateExportType]);
 
     const onOkClicked = useCallback(() => {
         // The dialog stays open until the walk finishes: it is the only place a

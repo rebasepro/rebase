@@ -548,6 +548,26 @@ export interface RebaseTranslations {
     error_deleting_entities: string;
     deleted: string;
 
+    /**
+     * Selecting rows across a paginated view: the count, the escalation from
+     * "the ones I ticked" to "every row that matches", and what the bulk
+     * actions say while they work.
+     */
+    selection_selected_count: string;
+    selection_select_all_loaded: string;
+    selection_deselect_all: string;
+    selection_select_all_matching: string;
+    selection_select_all_matching_unknown: string;
+    selection_all_matching_selected: string;
+    selection_all_matching_selected_unknown: string;
+    selection_clear: string;
+    selection_reading_rows: string;
+    selection_reading_rows_unknown: string;
+    selection_deleting_progress: string;
+    confirm_delete_selection: string;
+    confirm_delete_selection_unknown: string;
+    confirm_delete_selection_body: string;
+
     select_reference: string;
     select_references: string;
     account_settings?: string;

@@ -114,7 +114,13 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
         selectionController?.toggleEntitySelection(entity, selected);
     }, [selectionController]);
 
-    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntities.map(e => e.id)), [selectionController?.selectedEntities]);
+    // Built from the rows on screen rather than from a list of the selected:
+    // in query mode there is no such list, and this Set only ever describes
+    // which visible rows draw a ticked checkbox.
+    const selectedIds = useMemo(
+        () => new Set<string | number>(data.filter(e => selectionController?.isEntitySelected(e)).map(e => e.id)),
+        [data, selectionController]
+    );
     const highlightedIds = useMemo(() => new Set(highlightedEntities?.map(e => e.id)), [highlightedEntities]);
 
     const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {

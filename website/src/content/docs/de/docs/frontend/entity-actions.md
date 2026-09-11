@@ -61,22 +61,26 @@ Für Aktionen auf Symbolleisten-Ebene, die für die Sammlung oder ausgewählte E
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
-function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
+import { useData } from "@rebasepro/app";
+import { resolveSelection } from "@rebasepro/cms";
+function PublishSelectedAction({ selectionController, path }: CollectionActionsProps) {
+    const data = useData();
     const handlePublish = async () => {
-        const selected = selectionController.selectedEntities;
+        // `selection` is either the rows that were ticked or a query standing
+        // for every row that matches — `resolveSelection` reads them, one page
+        // at a time, and refuses rather than returning a prefix.
+        const selected = await resolveSelection({
+            selection: selectionController.selection,
+            accessor: data.collection(path)
+        });
         for (const entity of selected) {
-            await context.data.save({
-                path: entity.path,
-                entityId: entity.id,
-                values: { status: "published" },
-                collection: context.collection
-            });
+            await data.collection(entity.path).update(entity.id, { status: "published" });
         }
     };
 
     return (
         <button onClick={handlePublish}>
-            Publish {selectionController.selectedEntities.length} selected
+            Publish {selectionController.selectedCount ?? "all"} selected
         </button>
     );
 }

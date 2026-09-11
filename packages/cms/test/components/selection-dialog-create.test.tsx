@@ -46,9 +46,17 @@ setBlocked: () => undefined };
 });
 
 jest.mock("../../src/components/CollectionViewBinding/useSelectionController", () => {
-    const controller = { selectedEntities: [],
-setSelectedEntities: () => undefined,
-toggleEntitySelection: () => undefined };
+    const controller = {
+        selection: { type: "entities", entities: [] },
+        setSelection: () => undefined,
+        selectedCount: 0,
+        hasSelection: false,
+        setSelectedEntities: () => undefined,
+        selectAllMatching: () => undefined,
+        clearSelection: () => undefined,
+        isEntitySelected: () => false,
+        toggleEntitySelection: () => undefined
+    };
     return { useSelectionController: () => controller };
 });
 

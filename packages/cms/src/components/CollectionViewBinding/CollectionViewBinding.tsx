@@ -10,10 +10,13 @@ import {
 import {
     CollectionCustomViewParams,
     CollectionSize,
+    EntitySelection,
     EntityTableController,
     PartialCollectionConfig,
+    SelectionQuery,
     ViewMode
 } from "@rebasepro/cms-types";
+import { SelectAllCheckbox, SelectionBanner, serializeSelectionQuery } from "../../selection";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -230,7 +233,7 @@ const CollectionViewBindingInner = React.memo(
 
         const canCreateEntities = canCreate(collection, path);
         const [highlightedEntity, setHighlightedEntity] = useState<Entity<M> | undefined>(undefined);
-        const [deleteEntityClicked, setDeleteEntityClicked] = React.useState<Entity<M> | Entity<M>[] | undefined>(undefined);
+        const [deleteEntityClicked, setDeleteEntityClicked] = React.useState<Entity<M> | EntitySelection<M> | undefined>(undefined);
 
         const [lastDeleteTimestamp, setLastDeleteTimestamp] = React.useState<number>(0);
 
@@ -398,8 +401,9 @@ const CollectionViewBindingInner = React.memo(
         const selectionController = useSelectionController<M>();
         const usedSelectionController = collection.selectionController ?? selectionController;
         const {
-            selectedEntities,
-            setSelectedEntities
+            selection,
+            clearSelection,
+            toggleEntitySelection
         } = usedSelectionController;
 
         const tableController = useDataTableController<M>({
@@ -525,14 +529,20 @@ const CollectionViewBindingInner = React.memo(
             analyticsController.onAnalyticsEvent?.("multiple_delete_dialog_open", {
                 path: path
             });
-            setDeleteEntityClicked(selectedEntities);
+            // The selection itself, not rows: in query mode there are no rows to
+            // hand over yet. The dialog confirms against the count and reads
+            // them only once the user has said yes.
+            setDeleteEntityClicked(selection);
         };
 
         const internalOnEntityDelete = (_path: string, entity: Entity<M>) => {
             analyticsController.onAnalyticsEvent?.("single_entity_deleted", {
                 path: path
             });
-            setSelectedEntities((selectedEntities) => selectedEntities.filter((e) => e.id !== entity.id));
+            // Untick rather than filter a list: in query mode the list does not
+            // exist, and "the ones I selected, minus this one" is precisely an
+            // exclusion.
+            toggleEntitySelection(entity, false);
             setDeletedEntities(prev => [...prev, entity]);
             setLastDeleteTimestamp(Date.now());
         };
@@ -541,7 +551,7 @@ const CollectionViewBindingInner = React.memo(
             analyticsController.onAnalyticsEvent?.("multiple_entities_deleted", {
                 path: path
             });
-            setSelectedEntities([]);
+            clearSelection();
             setDeleteEntityClicked(undefined);
             setDeletedEntities(prev => [...prev, ...entities]);
             setLastDeleteTimestamp(Date.now());
@@ -865,7 +875,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             frozen?: boolean
         }) => {
 
-            const isSelected = Boolean(usedSelectionController.selectedEntities.find(e => e.id == entity.id && e.path == entity.path));
+            const isSelected = usedSelectionController.isEntitySelected(entity);
             const customEntityActions = (collection.entityActions ?? EMPTY_ARRAY)
                 .map(action => resolveEntityAction(action, customizationController.entityActions))
                 .filter(Boolean) as EntityAction<M>[];
@@ -906,6 +916,29 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             searchString={tableController.searchString}
             onCountChange={setDocsCount}
         />;
+
+        // What "select all matching" would stand for right now. `docsCount` is
+        // the count for exactly this query — the same one the toolbar shows —
+        // so the number offered and the number selected cannot disagree.
+        const liveSelectionQuery: SelectionQuery<M> = useMemo(() => ({
+            path,
+            filterValues: tableController.filterValues,
+            searchString: tableController.searchString,
+            sortBy: tableController.sortBy
+        }), [path, tableController.filterValues, tableController.searchString, tableController.sortBy]);
+
+        // A query selection is a promise about a *specific* query, and the
+        // filter bar stays live while one is held. Letting it follow the filter
+        // would mean the rows about to be deleted are not the rows that were
+        // counted and agreed to; keeping the stale query would show rows the
+        // selection does not cover as ticked. So the selection is dropped, the
+        // way a search does in Gmail, and the banner disappears with it.
+        const selectionQueryKey = selection.type === "query" ? serializeSelectionQuery(selection.query) : undefined;
+        const liveQueryKey = serializeSelectionQuery(liveSelectionQuery);
+        useEffect(() => {
+            if (selectionQueryKey !== undefined && selectionQueryKey !== liveQueryKey)
+                clearSelection();
+        }, [selectionQueryKey, liveQueryKey, clearSelection]);
 
         const { resolvedSlots } = customizationController;
 
@@ -1036,8 +1069,12 @@ parentEntityIds,
                 searchString={tableController.searchString ?? ""}
             />;
 
+        // Under the toolbar, above the view, in both layouts — the toolbar node
+        // is what `SplitListView` is handed, so putting the banner anywhere
+        // else would give the split layout no escalation at all.
         const toolbarNode = (
-            <CollectionTableToolbar
+            <>
+                <CollectionTableToolbar
                 compact={isCompact}
                 loading={tableController.dataLoading}
                 onTextSearch={tableController.setSearchString}
@@ -1053,6 +1090,7 @@ parentEntityIds,
                     collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
                     viewMode={viewMode}
+                    selectionEnabled={activeSelectionEnabled}
                     entitiesCount={docsCount}
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
@@ -1075,7 +1113,14 @@ parentEntityIds,
                         {pluginToolbarWidgets}
                     </ResolvedCollectionActions>
                 }
-            />
+                />
+                {activeSelectionEnabled && <SelectionBanner
+                    selectionController={usedSelectionController}
+                    query={liveSelectionQuery}
+                    collectionEntitiesCount={docsCount ?? undefined}
+                    loadedEntities={tableController.data}
+                    collectionName={collection.name}/>}
+            </>
         );
 
         // A custom view wins over the built-in chain, but only after the
@@ -1178,11 +1223,19 @@ parentEntityIds,
                 AdditionalHeaderWidget={buildAdditionalHeaderWidget}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}
-                additionalIDHeaderWidget={<EntityIdHeaderWidget
-                    path={path}
-                    idPath={path}
-                    collection={collection}
-                    openEntityMode={openEntityMode}/>}
+                additionalIDHeaderWidget={<div className="flex items-center gap-1">
+                    {/* The ID column is the one the row checkboxes live in, so
+                        its header is where a table's select-all belongs —
+                        directly above the column it acts on. */}
+                    {activeSelectionEnabled && <SelectAllCheckbox
+                        selectionController={usedSelectionController}
+                        loadedEntities={tableController.data}/>}
+                    <EntityIdHeaderWidget
+                        path={path}
+                        idPath={path}
+                        collection={collection}
+                        openEntityMode={openEntityMode}/>
+                </div>}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
@@ -1316,7 +1369,7 @@ parentEntityIds,
 
                 {deleteEntityClicked &&
                     <DeleteEntityDialog
-                        entityOrEntitiesToDelete={deleteEntityClicked}
+                        target={deleteEntityClicked}
                         path={path}
                         collection={collection}
                         open={Boolean(deleteEntityClicked)}

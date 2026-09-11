@@ -106,6 +106,11 @@ export {
 export { mapPropertyToConfig, mapPropertiesToConfigs } from "./util/propertyConfigMapper";
 export { useCollectionDataController, createStaticDataController } from "./util/dataControllerAdapter";
 
+// Selecting rows across a paginated view: the banner and the select-all
+// control, and `resolveSelection` — the only way to turn a query selection into
+// the rows it stands for, which a custom collection action has to call.
+export * from "./selection";
+
 // Data import/export — merged from former standalone packages
 export * from "./data_import";
 export * from "./data_export";

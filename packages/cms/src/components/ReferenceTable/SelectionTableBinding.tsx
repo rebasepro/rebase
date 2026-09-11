@@ -28,6 +28,9 @@ import { useAnalyticsController } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
 
+/** Stable identity, so the effect that propagates the picks does not re-fire. */
+const EMPTY_ENTITIES: Entity<any>[] = [];
+
 /**
  * @group Components
  */
@@ -136,6 +139,17 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     // reason to bind `M` to this component's own parameter.
     const selectionController = useSelectionController<M>();
 
+    // The rows picked in this dialog.
+    //
+    // This surface never enters query mode: it offers no "select all matching",
+    // because pointing a reference field at every row of a collection is not
+    // something anyone means to do, and `maxSelection` could not be enforced
+    // against a count nobody has read yet. Every write below goes through
+    // `setSelectedEntities`, so the query branch is unreachable here.
+    const selectedEntities = selectionController.selection.type === "entities"
+        ? selectionController.selection.entities
+        : EMPTY_ENTITIES;
+
     // Track whether the selection has been initialized to avoid
     // firing onMultipleEntitiesSelected during the initial mount/fetch.
     const selectionInitializedRef = useRef(false);
@@ -146,9 +160,9 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     useEffect(() => {
         if (!selectionInitializedRef.current) return;
         if (onMultipleEntitiesSelected) {
-            onMultipleEntitiesSelected(selectionController.selectedEntities);
+            onMultipleEntitiesSelected(selectedEntities);
         }
-    }, [selectionController.selectedEntities]);
+    }, [selectedEntities]);
 
     /**
      * Fetch initially selected ids
@@ -205,7 +219,6 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 path,
                 entityId: entity.id
             });
-            const selectedEntities = selectionController.selectedEntities;
             if (selectedEntities.map((e) => e.id).indexOf(entity.id) > -1) {
                 selectionController.setSelectedEntities(
                     selectedEntities.filter((item: Entity<any>) => item.id !== entity.id)
@@ -215,7 +228,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 selectionController.setSelectedEntities([...selectedEntities, entity]);
             }
         }
-    }, [multiselect, onSingleEntitySelected, analyticsController, path, sideDialogContext, selectionController, maxSelection]);
+    }, [multiselect, onSingleEntitySelected, analyticsController, path, sideDialogContext, selectionController, selectedEntities, maxSelection]);
 
     // create a new entity from within the reference dialog
     const onNewClick = () => {
@@ -254,8 +267,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         width: number,
         frozen?: boolean
     }) => {
-        const selectedEntities = selectionController.selectedEntities;
-        const isSelected = selectedEntities && selectedEntities.map(e => e.id).indexOf(entity.id) > -1;
+        const isSelected = selectionController.isEntitySelected(entity);
         return <CollectionRowActions
             width={width}
             frozen={frozen}

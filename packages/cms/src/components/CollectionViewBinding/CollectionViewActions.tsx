@@ -63,7 +63,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     const collectionEditorController = useCollectionEditorController();
     const hasCollectionEditor = Boolean(collectionEditorController?.editCollection);
 
-    const selectedEntities = selectionController.selectedEntities;
+    const { selectedCount, hasSelection } = selectionController;
 
     const addButton = canCreate(collection, path) &&
         onNewClick && (largeLayout && !compact
@@ -120,25 +120,29 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     // collection toolbar — and in the split view, where the toolbar is a narrow
     // strip above the list, it was a third of the visible controls doing
     // nothing. It appears the moment you tick a row, which is when you want it.
-    const hasSelection = Boolean(selectedEntities?.length);
+
+    // `undefined` is "every matching row, and nobody knows how many" — a full
+    // selection against an accessor with no `count`. Rendering it as 0 would
+    // say the opposite of what is true.
+    const countLabel = selectedCount === undefined ? "…" : selectedCount.toLocaleString();
 
     let multipleDeleteButton: React.ReactNode | undefined;
     if (hasSelection) {
         const button = largeLayout && !compact
             ? <Button
                 variant={"text"}
-                disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
+                disabled={!multipleDeleteEnabled}
                 startIcon={<Trash2Icon size={iconSize.small}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
                 className="lg:w-20"
             >
-                ({selectedEntities?.length})
+                ({countLabel})
             </Button>
             : <IconButton
                 size={"small"}
                 color={"primary"}
-                disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
+                disabled={!multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
                 <Trash2Icon size={iconSize.small}/>
             </IconButton>;

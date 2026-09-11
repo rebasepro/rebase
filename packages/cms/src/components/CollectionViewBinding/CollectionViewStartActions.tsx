@@ -15,6 +15,7 @@ import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { withViewMode } from "../../util/view_mode";
 import { useSplitView } from "./SplitViewContext";
+import { SelectAllCheckbox } from "../../selection";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -41,6 +42,8 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
      * offered — see `sortButton`.
      */
     viewMode?: ViewMode;
+    /** Whether rows can be selected at all in this mount. */
+    selectionEnabled?: boolean;
     compact?: boolean;
     openNewDocument: (defaultValues?: Record<string, unknown>) => void;
 }
@@ -56,6 +59,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     entitiesCount,
     resolvedProperties,
     viewMode,
+    selectionEnabled,
     compact,
     openNewDocument
 }: CollectionViewStartActionsProps<M>) {
@@ -203,8 +207,21 @@ parentEntityIds,
         </Tooltip>
     ) : null;
 
+    // A table puts its select-all in the ID column header, directly above the
+    // checkboxes it acts on. The card, list and board views have no header to
+    // put one in — and without it the only way to start a selection there is to
+    // tick rows one at a time, which for a "select all" is the whole problem.
+    const selectAllCheckbox = selectionEnabled && viewMode && viewMode !== "table" ? (
+        <div key={"select_all"} className={"mx-1 flex items-center"}>
+            <SelectAllCheckbox
+                selectionController={selectionController}
+                loadedEntities={tableController.data}/>
+        </div>
+    ) : null;
+
     const actions: React.ReactNode[] = [
         backButton,
+        selectAllCheckbox,
         filtersButton,
         sortButton,
         <ClearFilterSortButton

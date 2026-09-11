@@ -142,14 +142,117 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
 }
 
 /**
- * Use this controller to retrieve the selected entities or modify them in
- * an {@link AdminCollection}
+ * The query a selection stands for: the view's filter, search and sort at the
+ * moment "select all matching" was clicked.
+ *
+ * It is captured rather than read live, because the filter is editable while a
+ * selection is held. A selection that silently followed the filter bar would
+ * mean the rows you are about to delete are not the rows you counted.
+ *
+ * @group Models
+ */
+export interface SelectionQuery<M extends Record<string, unknown> = Record<string, unknown>> {
+    path: string;
+    filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
+    searchString?: string;
+    sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[];
+}
+
+/**
+ * What a selection *is*.
+ *
+ * Ticking rows gives you `"entities"` — the rows themselves, all of them
+ * loaded. Clicking "select all 12,480 matching" gives you `"query"`, which
+ * stands for rows that mostly have not been read and, past a few pages, never
+ * will be all at once.
+ *
+ * This is a union rather than an `Entity[]` with a flag beside it because the
+ * difference has to be unmissable at the point of use. The array it replaced
+ * held, in query mode, whatever the view happened to have scrolled — so
+ * `selectedEntities.length` read 50, a bulk delete deleted 50, and it reported
+ * success. There is no way to write that against a union: the `"query"` branch
+ * has no `entities` to reach for, and `resolveSelection` is the only thing that
+ * can produce them.
+ *
+ * @group Models
+ */
+export type EntitySelection<M extends Record<string, unknown> = Record<string, unknown>> =
+    | {
+        type: "entities";
+        /** The rows that were picked, in the order they were picked. */
+        entities: Entity<M>[];
+    }
+    | {
+        type: "query";
+        /** Every row matching this is selected, bar the exclusions. */
+        query: SelectionQuery<M>;
+        /**
+         * Rows ticked back off after selecting the query.
+         *
+         * Gmail drops to a plain list when you untick one; keeping the query and
+         * carrying the exclusions is both closer to what was meant ("all of them
+         * except that one") and cheaper — dropping to a list would have to read
+         * every row first.
+         */
+        excluded: Entity<M>[];
+        /**
+         * The server's count for `query` when the selection was made.
+         *
+         * `undefined` where the accessor has no `count` — a collection can be
+         * selected in full without anyone knowing how large it is, and the UI
+         * says so rather than inventing a number.
+         */
+        count?: number;
+    };
+
+/**
+ * Use this controller to retrieve the selection or modify it in an
+ * {@link AdminCollection}.
+ *
+ * Read {@link SelectionController.selection} to find out what is selected. It
+ * is a {@link EntitySelection} union, so a consumer that wants rows has to say
+ * what it does when the selection is a query — {@link resolveSelection} reads
+ * them, page by page, with a ceiling and a progress callback.
+ *
+ * {@link SelectionController.isEntitySelected} and
+ * {@link SelectionController.toggleEntitySelection} work the same in both
+ * modes and are what a per-row checkbox should use.
+ *
  * @group Models
  */
 export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
-    selectedEntities: Entity<M>[];
+
+    /** What is selected: the rows, or the query they stand for. */
+    selection: EntitySelection<M>;
+
+    setSelection(selection: EntitySelection<M>): void;
+    setSelection(action: (prev: EntitySelection<M>) => EntitySelection<M>): void;
+
+    /**
+     * How many rows are selected.
+     *
+     * `undefined` only in query mode against an accessor with no `count`:
+     * "every matching row, we do not know how many". Callers must render that
+     * case rather than defaulting it to zero.
+     */
+    selectedCount: number | undefined;
+
+    /** Whether anything at all is selected. Cheap in both modes. */
+    hasSelection: boolean;
+
+    /** Replace the selection with exactly these rows. */
     setSelectedEntities(entities: Entity<M>[]): void;
-    setSelectedEntities(action: (prev: Entity<M>[]) => Entity<M>[]): void;
+
+    /**
+     * Select every row matching `query`, minus whatever gets unticked later.
+     *
+     * `count` is what the UI reports and what {@link resolveSelection} checks
+     * its ceiling against; pass the view's own filtered count so the two agree.
+     */
+    selectAllMatching(query: SelectionQuery<M>, count?: number): void;
+
+    clearSelection(): void;
+
     isEntitySelected(entity: Entity<M>): boolean;
     toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
 }

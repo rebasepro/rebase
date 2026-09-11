@@ -191,7 +191,7 @@ function buildRemoveEntityAction({
                     if (!collection || !path)
                         throw new Error(`${key}EntityAction: Collection is undefined`);
                     return <DeleteEntityDialog
-                        entityOrEntitiesToDelete={entity}
+                        target={entity}
                         path={path}
                         collection={collection}
                         variant={variant}
@@ -200,7 +200,7 @@ function buildRemoveEntityAction({
                             context?.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
                                 path
                             });
-                            selectionController?.setSelectedEntities(selectionController.selectedEntities.filter(e => e.id !== entity.id));
+                            selectionController?.toggleEntitySelection(entity, false);
                             onCollectionChange?.();
                             // In full-screen mode, navigateBack would go to the deleted entity's
                             // detail URL, which no longer exists. Navigate to the parent collection instead.

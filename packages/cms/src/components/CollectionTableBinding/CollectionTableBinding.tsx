@@ -89,9 +89,23 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
     const ref = useRef<HTMLDivElement>(null);
 
     const largeLayout = useLargeLayout();
-    const selectedEntities = useMemo(() => {
-        return (selectionController?.selectedEntities?.length > 0 ? selectionController?.selectedEntities : highlightedEntities)?.filter(Boolean);
-    }, [selectionController?.selectedEntities, highlightedEntities]);
+    // Asked per row rather than held as a list: a query selection has no list,
+    // and the one this replaced would have answered with whatever the view had
+    // scrolled. `highlightedEntities` is the fallback the table has always had
+    // — the row you navigated to, shown lit when nothing is selected.
+    const hasSelection = Boolean(selectionController?.hasSelection);
+    const isRowHighlighted = useCallback((entity: Entity<M>) => {
+        if (hasSelection) return selectionController!.isEntitySelected(entity);
+        return Boolean(highlightedEntities?.some(e => e && e.id === entity.id && e.path === entity.path));
+    }, [hasSelection, selectionController, highlightedEntities]);
+
+    // Memo-busting key for the cell renderer: it has to change whenever what is
+    // selected changes. The selection object is exactly that in both modes, and
+    // it is compared deeply.
+    const cellExtraData = useMemo(() => ({
+        selection: selectionController?.selection,
+        highlightedEntityIds: highlightedEntities?.map(e => e?.id)
+    }), [selectionController?.selection, highlightedEntities]);
 
     const context: RebaseContext<USER> = useRebaseContext<USER>();
 
@@ -374,7 +388,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 inlineEditing={inlineEditing}
                 cellRenderer={cellRenderer}
                 onEntityClick={onEntityClick}
-                highlightedRow={useCallback((entity: Entity<M>) => Boolean(selectedEntities?.find(e => e.id === entity.id && e.path === entity.path)), [selectedEntities])}
+                highlightedRow={isRowHighlighted}
                 tableController={tableController}
                 onValueChange={onValueChange}
                 initialScroll={initialScroll}
@@ -386,7 +400,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 endAdornment={endAdornment}
                 AddColumnComponent={AddColumnComponent}
                 onColumnsOrderChange={onColumnsOrderChange}
-                extraData={useMemo(() => ({ selectedEntityIds: selectedEntities?.map(e => e.id) }), [selectedEntities])}/>
+                extraData={cellExtraData}/>
 
         </div>
     );
