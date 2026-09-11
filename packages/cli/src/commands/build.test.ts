@@ -14,7 +14,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import chalk from "chalk";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../bundle", async (importOriginal) => {
     const actual = await importOriginal<typeof import("../bundle")>();
@@ -46,10 +47,20 @@ foldFrontendIntoBundle: vi.fn(async () => undefined) };
 });
 
 import { buildBundle } from "../bundle";
-import { buildCommand } from "./build";
+import { buildCommand, dockerBuildHint } from "./build";
 
 let projectRoot: string;
 let cwd: string;
+
+// Colour off for the whole file, because several tests here assert on printed
+// text and chalk decides at import time from the environment. `FORCE_COLOR` set
+// on a developer's machine turned the two summary-line snapshots red on a clean
+// tree — a suite that fails on a terminal preference reads as a broken build.
+// Off at the source rather than stripped afterwards: a filter that removes
+// escape codes passes whether or not they were there.
+const colourLevel = chalk.level;
+beforeAll(() => { chalk.level = 0; });
+afterAll(() => { chalk.level = colourLevel; });
 
 beforeEach(() => {
     cwd = process.cwd();
@@ -141,5 +152,54 @@ describe("the build summary line", () => {
 
     it("still names the schema when there is one", async () => {
         expect(await summary("v1")).toMatchInlineSnapshot(`"    0 collection(s), schema v1"`);
+    });
+});
+
+/**
+ * The command a custom runtime is told to run has to be one that works.
+ *
+ * It was `docker build -f <dockerfile> .` for every project, with the `.` a
+ * guess and `context` validated, stored, and read by nothing. For the reference
+ * project the guess is wrong: `app/backend/Dockerfile` copies `pnpm-lock.yaml`
+ * and `pnpm-workspace.yaml`, which live at the monorepo root, so the command
+ * died on its first instruction — while `infra/cloudbuild.yaml`, the deploy
+ * that does work, had always said `-f app/backend/Dockerfile .` from the root.
+ *
+ * Asserted on the text because the text is the whole feature: nothing here runs
+ * docker, so a wrong path has no other symptom until somebody pastes it.
+ */
+describe("the docker build command printed for a custom runtime", () => {
+    it("builds in place when the context is the project", () => {
+        expect(dockerBuildHint("/repo", "backend", { dockerfile: "backend/Dockerfile" }))
+            .toEqual([
+                "    npm run build --workspace backend  then  docker build -f backend/Dockerfile ."
+            ]);
+    });
+
+    it("re-expresses the Dockerfile against a context above the project", () => {
+        // `-f` resolves against the working directory, not the context, so the
+        // path that is right from `app/` is wrong from the root. Printing the
+        // declared path unchanged is what made the old line unfixable for one
+        // of the two.
+        expect(dockerBuildHint("/repo/app", "backend", {
+            dockerfile: "backend/Dockerfile",
+            context: ".."
+        })).toEqual([
+            "    npm run build --workspace backend",
+            "    cd .. && docker build -f app/backend/Dockerfile ."
+        ]);
+    });
+
+    it("offers no command when the Dockerfile sits outside its own context", () => {
+        // Legal to docker and useless: nothing the Dockerfile COPYs is in the
+        // context. A command here would fail on a line the reader did not write.
+        expect(dockerBuildHint("/repo", "backend", {
+            dockerfile: "backend/Dockerfile",
+            context: "frontend"
+        })).toEqual([
+            "    npm run build --workspace backend",
+            "    ⚠ backend/Dockerfile is outside the build context (frontend) — nothing it COPYs is reachable.",
+            "      Widen \"context\" in rebase.json, or move the Dockerfile inside it."
+        ]);
     });
 });

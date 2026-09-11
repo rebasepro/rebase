@@ -42,6 +42,7 @@ interface Backend {
     type: string;
     runtime?: string;
     dockerfile?: string;
+    context?: string;
 }
 
 function backendOf(dir: string): Backend | undefined {
@@ -151,7 +152,68 @@ present: false });
         if (backend?.runtime !== "custom") return;
         expect(has(backend.dockerfile ?? "Dockerfile")).toBe(true);
     });
+
+    /**
+     * The build context holds everything the Dockerfile copies out of it.
+     *
+     * `context` was validated and stored and read by nothing, so it could say
+     * anything — and for the reference project the DEFAULT said something
+     * wrong. `app/backend/Dockerfile` opens with
+     *
+     *     COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+     *
+     * and `app/` has none of those three; they are at the monorepo root, which
+     * is where `infra/cloudbuild.yaml` has always built from. Nothing noticed,
+     * because the only consumer was a line of help text.
+     *
+     * Checked by resolving each `COPY` source against the context and looking,
+     * which is the same question `docker build` asks and the one no amount of
+     * reading the manifest answers. Stage copies are skipped: `--from=` names
+     * an earlier stage's filesystem, not the context.
+     */
+    it("has a build context containing everything its Dockerfile COPYs", () => {
+        if (backend?.runtime !== "custom") return;
+        const dockerfile = path.join(dir, backend.dockerfile ?? "Dockerfile");
+        const contextDir = path.resolve(dir, backend.context ?? ".");
+
+        const unreachable = copySourcesOf(dockerfile)
+            .filter(source => !fs.existsSync(path.resolve(contextDir, source)));
+
+        expect({ context: backend.context ?? ".",
+unreachable }).toEqual({ context: backend.context ?? ".",
+unreachable: [] });
+    });
 });
+
+/**
+ * Paths a Dockerfile copies out of its build context.
+ *
+ * Deliberately small: continuations joined, flags and the destination dropped,
+ * `--from=` stage copies skipped, globs skipped because only `docker build`
+ * knows what they match. Anything it cannot read confidently it leaves out —
+ * a parser that guesses would fail builds that work, which is the one outcome
+ * worse than the gap it is closing.
+ */
+function copySourcesOf(dockerfile: string): string[] {
+    const text = fs.readFileSync(dockerfile, "utf8").replace(/\\\r?\n/g, " ");
+    const sources: string[] = [];
+
+    for (const line of text.split("\n")) {
+        const instruction = line.trim();
+        if (!/^(COPY|ADD)\s/i.test(instruction)) continue;
+
+        const tokens = instruction.split(/\s+/).slice(1);
+        if (tokens.some(token => /^--from=/i.test(token))) continue;
+
+        const operands = tokens.filter(token => !token.startsWith("--"));
+        // Last operand is the destination inside the image.
+        for (const source of operands.slice(0, -1)) {
+            if (/[*?[\]]/.test(source)) continue;
+            sources.push(source);
+        }
+    }
+    return sources;
+}
 
 /**
  * A scaffolded project's own files must reference things that exist.
@@ -353,6 +415,47 @@ describe("rebase.json — the schema and the type agree", () => {
         // nothing.
         const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
         expect(schema.additionalProperties).toBe(false);
+    });
+});
+
+/**
+ * The two path rules agree on actual paths, not just in intent.
+ *
+ * `checkRelativePath` normalizes and refuses anything landing outside the
+ * project; the schema does it with a regex. They disagreed on the shortest case
+ * there is: the pattern was `^(?!/)(?!\.\./).*`, which refuses `"../"` and
+ * accepts a bare `".."` — so an editor blessed `"config": ".."` and the CLI
+ * then rejected it. Agreement asserted by running the same strings through
+ * both, because two hand-written rules for one question drift silently and the
+ * only proof is the verdicts.
+ *
+ * `context` is deliberately not on this list: it is the one field allowed to
+ * escape, and it has its own `$def`. That exception is covered above.
+ */
+describe("rebase.json — the path rules agree", () => {
+    const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
+
+    /** Paths the editor and the CLI must judge identically. */
+    const SAMPLES = ["config", "./config", "backend/functions", "..foo", "..", "../", "../..", "a/b/../c"];
+
+    function schemaAccepts(value: string): boolean {
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        return new RegExp(schema.$defs.relativePath.pattern).test(value)
+            && value.length >= (schema.$defs.relativePath.minLength ?? 0);
+    }
+
+    function cliAccepts(value: string): boolean {
+        const { issues } = validateManifest({
+            rebase: "^1",
+            apps: { backend: { type: "backend", runtime: "managed", config: value } }
+        });
+        return !issues.some(issue => issue.path === "apps.backend.config");
+    }
+
+    it.each(SAMPLES)("judges %j the same way on both sides", (value) => {
+        expect({ value,
+schema: schemaAccepts(value) }).toEqual({ value,
+schema: cliAccepts(value) });
     });
 });
 

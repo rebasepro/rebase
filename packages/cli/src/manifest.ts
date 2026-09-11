@@ -174,12 +174,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * A manifest is committed and reviewed, so this is not a security boundary so
  * much as a guard against `../../` typos that would otherwise have `rebase build`
  * writing outside the project.
+ *
+ * `mayEscape` is for `context`, and only for `context`. Every other path here
+ * names something Rebase *reads* — collections, functions, the generated
+ * schema, the built assets to serve — and those have to be inside the project
+ * or the bundle cannot carry them. A Docker build context is the one field that
+ * names something Rebase never opens: it is handed to `docker build`, and in
+ * any workspace repository the thing it has to name is the workspace root,
+ * above the app. That is not exotic. It is what pnpm, turbo and nx layouts all
+ * look like, and it is what this repository's own reference project needs — its
+ * Dockerfile's first instruction copies `pnpm-lock.yaml`, which does not exist
+ * beside `rebase.json` and never will.
+ *
+ * Refusing it did not prevent the escape; it only stopped anyone declaring it.
+ * `app/rebase.json` built from the monorepo root the whole time — via
+ * `infra/cloudbuild.yaml`, which says `-f app/backend/Dockerfile .` — while the
+ * manifest said the context was `app/` and `rebase build` printed a command
+ * that dies on its first `COPY`.
  */
 function checkRelativePath(
     value: unknown,
     fieldPath: string,
     issues: ManifestValidationIssue[],
-    { required }: { required: boolean }
+    { required, mayEscape = false }: { required: boolean; mayEscape?: boolean }
 ): string | undefined {
     if (value === undefined) {
         if (required) issues.push({ path: fieldPath,
@@ -197,7 +214,7 @@ message: "must be a relative path, not absolute" });
         return undefined;
     }
     const normalized = path.normalize(value);
-    if (normalized === ".." || normalized.startsWith(`..${path.sep}`)) {
+    if (!mayEscape && (normalized === ".." || normalized.startsWith(`..${path.sep}`))) {
         issues.push({ path: fieldPath,
 message: "must stay inside the project directory" });
         return undefined;
@@ -333,7 +350,11 @@ message: `"${type}" is no longer an app type — ${REMOVED_APP_TYPES[type]}` });
                 }
             }
             checkRelativePath(raw.dockerfile, `${base}.dockerfile`, issues, { required: false });
-            checkRelativePath(raw.context, `${base}.context`, issues, { required: false });
+            // `dockerfile` stays project-relative even when the context is
+            // above the project: it names a file in THIS repository, and moving
+            // the context should not rewrite it. `rebase build` re-expresses it
+            // against the context when it prints the command.
+            checkRelativePath(raw.context, `${base}.context`, issues, { required: false, mayEscape: true });
             if (raw.port !== undefined && (typeof raw.port !== "number" || !Number.isInteger(raw.port))) {
                 issues.push({ path: `${base}.port`,
 message: "must be an integer" });

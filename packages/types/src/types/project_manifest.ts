@@ -92,7 +92,23 @@ export interface RebaseBackendAppConfig {
      * Default `Dockerfile`.
      */
     dockerfile?: string;
-    /** `runtime: "custom"` only. Build context relative to the root. Default `.`. */
+    /**
+     * `runtime: "custom"` only. Directory handed to `docker build` as the build
+     * context, relative to the directory holding `rebase.json`. Default `.`.
+     *
+     * The one path in this file allowed to point **above** the project. Every
+     * other one names something Rebase reads, and those must be inside the
+     * project or a bundle cannot carry them; this names something Rebase never
+     * opens. In a workspace repository it normally has to be the workspace root
+     * (`".."`), because the lockfile and sibling packages a Dockerfile copies do
+     * not live beside `rebase.json`.
+     *
+     * {@link RebaseBackendAppConfig.dockerfile} stays relative to `rebase.json`
+     * whatever this is — it names a file in this repository, and moving the
+     * context should not rewrite it. `rebase build` re-expresses it against the
+     * context when it prints the command, because `docker build -f` resolves
+     * against the working directory rather than the context.
+     */
     context?: string;
     /** `runtime: "custom"` only. Port the container listens on. Default 8080. */
     port?: number;

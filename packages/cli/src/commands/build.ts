@@ -57,6 +57,57 @@ ${chalk.bold("Examples")}
 `.trim());
 }
 
+/**
+ * The two commands that turn a custom-runtime app into an image.
+ *
+ * Exported for the test, because the failure this replaced was in the printed
+ * text and nowhere else. It said:
+ *
+ *     docker build -f backend/Dockerfile .
+ *
+ * for every custom backend, and the `.` was a guess — `context` was validated,
+ * stored on the config, and read by nothing. For the reference project that
+ * guess is wrong: `app/backend/Dockerfile` opens by copying `pnpm-lock.yaml`
+ * and `pnpm-workspace.yaml`, which live at the monorepo root, so the command
+ * `rebase build` handed you died on its first instruction. The deploy that
+ * actually works, `infra/cloudbuild.yaml`, has always said
+ * `-f app/backend/Dockerfile .` from the root.
+ *
+ * `dockerfile` is relative to `rebase.json`; `context` is too, and may point
+ * above it. Docker resolves `-f` against the working directory, not the
+ * context, so the path has to be re-expressed against wherever the command
+ * runs — which is what the old line never did and is the whole reason it
+ * could not be right for both.
+ */
+export function dockerBuildHint(
+    projectRoot: string,
+    name: string,
+    app: { dockerfile?: string; context?: string }
+): string[] {
+    const dockerfile = app.dockerfile ?? "Dockerfile";
+    const context = app.context ?? ".";
+    const contextDir = path.resolve(projectRoot, context);
+    const fromContext = path.relative(contextDir, path.resolve(projectRoot, dockerfile));
+
+    const build = `${chalk.cyan(`npm run build --workspace ${name}`)}`;
+
+    // A Dockerfile outside its own context is legal to `docker build` but means
+    // nothing it copies is reachable, so there is no command to offer. Say what
+    // is wrong instead of printing one that cannot work.
+    if (fromContext.startsWith("..")) {
+        return [
+            chalk.dim(`    ${build}`),
+            chalk.yellow(`    ⚠ ${dockerfile} is outside the build context (${context}) — nothing it COPYs is reachable.`),
+            chalk.dim(`      Widen "context" in rebase.json, or move the Dockerfile inside it.`)
+        ];
+    }
+
+    const docker = chalk.cyan(`docker build -f ${fromContext} .`);
+    return context === "."
+        ? [chalk.dim(`    ${build}  then  ${docker}`)]
+        : [chalk.dim(`    ${build}`), chalk.dim(`    ${chalk.cyan(`cd ${context}`)} && ${docker}`)];
+}
+
 export async function buildCommand(rawArgs: string[] = []): Promise<void> {
     if (wantsHelp(rawArgs)) {
         printHelp();
@@ -158,7 +209,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             // ships. The workspace's own `build` script compiles this app, and
             // the Dockerfile turns it into the image.
             console.log(chalk.dim("  custom runtime — this project builds its own image, not a bundle"));
-            console.log(chalk.dim(`    ${chalk.cyan(`npm run build --workspace ${name}`)}  then  ${chalk.cyan(`docker build -f ${app.dockerfile ?? "Dockerfile"} .`)}`));
+            for (const line of dockerBuildHint(projectRoot, name, app)) console.log(line);
             console.log("");
             continue;
         }

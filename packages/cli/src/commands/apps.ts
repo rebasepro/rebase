@@ -88,7 +88,12 @@ function describeApp(app: RebaseAppConfig): string {
     switch (app.type) {
         case "backend":
             return app.runtime === "custom"
+                // The context is named only when it is not the project, which is
+                // the case where it changes what you would type. A workspace app
+                // builds from the workspace root, and a listing that showed only
+                // the Dockerfile implied a `docker build .` beside it that fails.
                 ? `custom runtime — ${app.dockerfile ?? "Dockerfile"}`
+                    + (app.context && app.context !== "." ? ` (context: ${app.context})` : "")
                 : `managed runtime, config: ${app.config ?? "config"}`;
         case "static":
             return `${app.root} → ${app.output} @ ${app.path ?? "/"}`

@@ -6,6 +6,7 @@
             "type": "backend",
             "runtime": "custom",
             "dockerfile": "backend/Dockerfile",
+            "context": "..",
             "port": 3001,
             "config": "config",
             "functions": "backend/functions",

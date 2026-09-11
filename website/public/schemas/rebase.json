@@ -54,8 +54,14 @@
         "relativePath": {
             "type": "string",
             "minLength": 1,
-            "pattern": "^(?!/)(?!\\.\\./).*",
-            "description": "A path relative to the directory holding rebase.json."
+            "pattern": "^(?!/)(?!\\.\\.(?:/|$)).+",
+            "description": "A path relative to the directory holding rebase.json, and staying inside it. The old pattern only refused a leading \"../\", so a bare \"..\" passed the editor and was then rejected by the CLI."
+        },
+        "buildContextPath": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/).+",
+            "description": "A Docker build context, relative to the directory holding rebase.json. This is the one path here allowed to point ABOVE the project (\"..\"), because it names something Rebase hands to `docker build` rather than something it reads. In a workspace repository the context is normally the workspace root — the lockfile and the sibling packages a Dockerfile copies do not live beside rebase.json."
         },
         "backendApp": {
             "type": "object",
@@ -93,8 +99,8 @@
                     "description": "Custom runtime only. Dockerfile path. Default \"Dockerfile\"."
                 },
                 "context": {
-                    "$ref": "#/$defs/relativePath",
-                    "description": "Custom runtime only. Build context. Default \".\"."
+                    "$ref": "#/$defs/buildContextPath",
+                    "description": "Custom runtime only. Directory passed to `docker build` as the build context, relative to the directory holding rebase.json. Default \".\". May point above the project — \"..\" for an app inside a workspace whose Dockerfile copies the root lockfile. `dockerfile` stays relative to rebase.json either way; it is re-expressed against this when a build command is printed."
                 },
                 "port": {
                     "type": "integer",
