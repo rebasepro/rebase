@@ -3,11 +3,10 @@
         "app/frontend/dist": {
             "chunks": {
                 "rebase-core": 1886880,
-                "form": 391335,
-                "index": 250603,
+                "form": 391029,
+                "index": 250600,
                 "rebase-ui": 184819,
                 "vendor-react-dom": 178377,
-                "vendor-prism": 85065,
                 "vendor-zod": 65982,
                 "useHistory": 58795,
                 "vendor-datefns": 19559,
@@ -21,8 +20,8 @@
                 "vendor-react-router": 281,
                 "get_import_inference_type": 258
             },
-            "totalBytes": 3148598,
-            "totalGzipBytes": 919059
+            "totalBytes": 3063224,
+            "totalGzipBytes": 892646
         }
     }
 }

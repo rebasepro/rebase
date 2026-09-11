@@ -15,9 +15,19 @@ import {
     XIcon
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
-import { JsonPreviewBinding } from "./JsonPreviewBinding";
+
 
 const EntityHistoryView = lazyChunk(() => import("./history").then(m => ({ default: m.EntityHistoryView })));
+/**
+ * The JSON tab pulls `prism-react-renderer` — 85 kB, and it was EAGER.
+ *
+ * A static import here put the syntax highlighter in the set a browser
+ * downloads before the login screen paints, for a preview that cannot appear
+ * until somebody has signed in, opened a record, and chosen this tab. Its
+ * neighbour `EntityHistoryView` is already loaded this way, behind the same
+ * `Suspense`, for the same reason.
+ */
+const JsonPreviewBinding = lazyChunk(() => import("./JsonPreviewBinding").then(m => ({ default: m.JsonPreviewBinding })));
 
 export type InspectorTab = "json" | "history";
 
@@ -137,7 +147,9 @@ export function EntityInspector({
             <div className={"flex-1 min-h-0 overflow-auto"}>
                 <ErrorBoundary>
                     {tab === "json" && (
-                        <JsonPreviewBinding values={values ?? entity?.values ?? {}}/>
+                        <Suspense fallback={<CircularProgressCenter/>}>
+                            <JsonPreviewBinding values={values ?? entity?.values ?? {}}/>
+                        </Suspense>
                     )}
                     {tab === "history" && includeHistory && formContext && (
                         <Suspense fallback={<CircularProgressCenter/>}>
