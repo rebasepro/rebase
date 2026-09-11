@@ -373,12 +373,11 @@ export function DrawerToggle({
                     aria-label={isExpanded ? t("collapse") : t("expand")}
                     onClick={() => isExpanded ? closeDrawer() : openDrawer()}
                 >
-                    {/* `w-[44px]` is the label grid and applies only while a label is
-                        shown; collapsed, the button is 40px wide and a shrink-0 44px
-                        slot pushed the chevron 2px right of the rail's centre. See
-                        the note in DrawerNavigationItem. */}
-                    <div className={cls("shrink-0 flex items-center justify-center h-[24px] text-surface-500 dark:text-surface-400",
-                        showFullContent ? "w-[44px]" : "w-full")}>
+                    {/* 44px in both states, on the same grid as the rows above and
+                        for the same reason: the rail floats open under the pointer,
+                        and a slot that changed width with it walked the chevron
+                        sideways on hover. See the note in DrawerNavigationItem. */}
+                    <div className="shrink-0 flex items-center justify-center w-[44px] h-[24px] text-surface-500 dark:text-surface-400">
                         {isExpanded
                             ? <ChevronsLeftIcon size={iconSize.small}/>
                             : <ChevronsRightIcon size={iconSize.small}/>
@@ -523,10 +522,9 @@ export function DrawerFooterActions({
                         trigger={
                             <div
                                 className={cls(
-                                    "shrink-0 flex items-center justify-center cursor-pointer",
-                                    // Same label grid, same collapsed exception — see
-                                    // the note in DrawerNavigationItem.
-                                    showFullContent ? "w-[44px]" : "w-full",
+                                    // Same 44px grid, and fixed across both states for
+                                    // the same reason — see DrawerNavigationItem.
+                                    "shrink-0 flex items-center justify-center w-[44px] cursor-pointer",
                                     "rounded-md py-1",
                                     "hover:bg-surface-hover",
                                     "transition-colors duration-150"

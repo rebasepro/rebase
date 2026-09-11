@@ -38,14 +38,20 @@ export function DrawerNavigationItem({
     // every row then reads at the weight of the category above it. The indent is
     // the same 44px the icon occupied, so labels stay on the original grid and the
     // rail width does not change.
-    // 44px is the LABEL GRID, and it only applies while there is a label. Collapsed,
-    // the row is 40px wide (a 72px rail, less the scroller's `px-2` and the group's
-    // `mx-2`), so a `shrink-0` 44px slot is 4px wider than the row containing it: it
-    // overflowed to the right and centred the icon at 38px against a row centre of
-    // 36px. Every icon, the collapse chevron and the avatar sat 2px right of the
-    // logo above them. Invisible until the focus ring was fixed and started drawing
-    // the row's real box around them.
-    const iconSlot = drawerOpen ? "w-[44px]" : "w-full";
+    // The slot is 44px in BOTH states, and must stay that way: the collapsed rail
+    // floats open under the pointer, so anything that measures the icon off the
+    // open state animates every icon as the drawer expands. A slot that was
+    // `w-full` while collapsed (40px: a 72px rail, less the scroller's `px-2` and
+    // the group's `mx-2`) and 44px once open moved every icon, the collapse
+    // chevron and the footer avatar 2px to the right the moment you hovered the
+    // rail — a whole column of chrome twitching under the cursor.
+    //
+    // The cost of the fixed slot is that on a collapsed row it is 4px wider than
+    // the 40px row containing it, so it overflows right and centres the icon 2px
+    // right of the row's own box. That shows only as a focus ring sitting 2px left
+    // of the icon it rings, on a rail nobody tabs into with the drawer shut. A
+    // standing 2px offset is cheaper than 2px of movement.
+    const iconSlot = "w-[44px]";
     const iconWrap = indented
         ? <div className={cls("shrink-0 h-[30px]", iconSlot)} aria-hidden={true}/>
         : <div
