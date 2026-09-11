@@ -17,7 +17,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
-import { deepEqual as equal } from "fast-equals"
+import { deepEqual as equal, shallowEqual } from "fast-equals"
 import { CollectionRowActions, CollectionTableBinding } from "../CollectionTableBinding";
 import { CollectionTableToolbar } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 import { getEntityChildViews } from "@rebasepro/common";
@@ -197,11 +197,31 @@ const CollectionViewBindingInner = React.memo(
 
         const scrollRestoration = useScrollRestoration();
 
+        // `collectionProp` is a rest object: a new value on every render of this
+        // component, even when nothing in it changed. Everything below derives
+        // from it — the merged collection, its properties, the table's columns —
+        // so an identity-only change rebuilt all of them each render, and
+        // `mergeDeep` handed back a fresh `propertiesOrder` array every time,
+        // which the sync effect below read as a change and set state for: a
+        // render loop, and a table that threw away the column width the user
+        // had just dragged. Hold the last rest object that actually differs.
+        //
+        // Shallow is enough, and is the comparison that fits: a re-render this
+        // component causes itself re-spreads the same props, so every value in
+        // the new object is the same reference. A render caused from above has
+        // already been through this component's own props comparator, which is
+        // where a deep difference is decided.
+        const collectionPropRef = React.useRef(collectionProp);
+        if (!shallowEqual(collectionPropRef.current, collectionProp)) {
+            collectionPropRef.current = collectionProp;
+        }
+        const stableCollectionProp = collectionPropRef.current;
+
         const collection = useMemo(() => {
-            const registryCollection = collectionRegistry.getCollection(path) || collectionProp;
+            const registryCollection = collectionRegistry.getCollection(path) || stableCollectionProp;
             const userOverride = userConfigPersistence?.getCollectionConfig<M>(path);
             return (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as AdminCollection<M>;
-        }, [collectionProp, path, userConfigPersistence, collectionRegistry]);
+        }, [stableCollectionProp, path, userConfigPersistence, collectionRegistry]);
 
         const collectionRef = React.useRef(collection);
         useEffect(() => {
@@ -223,9 +243,12 @@ const CollectionViewBindingInner = React.memo(
         // Optimistic state for column order to prevent UI flickering during persistence
         const [localPropertiesOrder, setLocalPropertiesOrder] = useState<string[] | undefined>(collection.propertiesOrder);
 
-        // Sync local state with collection's propertiesOrder when it changes from external sources
+        // Sync local state with collection's propertiesOrder when it changes from
+        // external sources. By value, not by identity: the merged collection is
+        // rebuilt whenever the user config changes, and an array with the same
+        // keys in it is not an external change to follow.
         useEffect(() => {
-            setLocalPropertiesOrder(collection.propertiesOrder);
+            setLocalPropertiesOrder(previous => equal(previous, collection.propertiesOrder) ? previous : collection.propertiesOrder);
         }, [collection.propertiesOrder]);
 
         const unselectNavigatedEntity = useCallback(() => {

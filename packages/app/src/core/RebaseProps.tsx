@@ -235,7 +235,11 @@ export type RebaseProps<USER extends User, DB = unknown> = {
 
     /**
      * Use this controller to access the configuration that is stored locally,
-     * and not defined in code
+     * and not defined in code.
+     *
+     * Optional: when omitted the panel builds a localStorage-backed store of
+     * its own, so column widths, column order and the view mode a collection
+     * was left in survive without the host app wiring anything.
      */
     userConfigPersistence?: UserConfigurationPersistence;
 

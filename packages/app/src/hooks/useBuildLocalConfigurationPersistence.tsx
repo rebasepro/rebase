@@ -21,18 +21,26 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         return getCollectionFromStorage(storageKey);
     }, [getCollectionFromStorage]);
 
+    // Bumped on every write. The collection views merge this store into their
+    // collection while rendering, so a write that is only a ref mutation is
+    // invisible to them: the new column width reaches storage, the table keeps
+    // rendering the old one, and the next re-render — a row arriving, a
+    // selection, a filter — rebuilds the columns from the stale config and
+    // snaps the column back. Making a write a state change is what lets the
+    // views re-read it.
+    const [configVersion, setConfigVersion] = useState(0);
+
     const onCollectionModified = useCallback(<M extends Record<string, any>>(path: string, data: PartialCollectionConfig<M>) => {
         const storageKey = `collection_config::${stripCollectionPath(path)}`;
-        writeStoredJson(storageKey, data);
-        const cachedConfig = configCache.current[storageKey];
-        // `getCollectionFromStorage` takes the storage key, not the path — every
-        // other caller passes one. Reading `path` looked up a key this hook
-        // never writes, so the fallback could only ever contribute `{}`. It is
-        // masked today because the one caller merges the stored config in
-        // before calling, but `onCollectionModified` accepts a partial by type
-        // and by its public interface, and a real partial would lose the rest.
-        const newConfig = mergeDeep(cachedConfig ?? getCollectionFromStorage(storageKey), data);
-        configCache.current[storageKey] = mergeDeep(configCache.current[storageKey], newConfig);
+        // Read before writing. `data` is a partial by type and by this
+        // interface's contract, so what is already stored is the other half of
+        // the result — writing `data` first and merging afterwards read back
+        // the value that had just been overwritten, and every key the caller
+        // left out was dropped.
+        const merged = mergeDeep(configCache.current[storageKey] ?? getCollectionFromStorage(storageKey), data);
+        configCache.current[storageKey] = merged;
+        writeStoredJson(storageKey, merged);
+        setConfigVersion(version => version + 1);
     }, [getCollectionFromStorage]);
 
     const [recentlyVisitedPaths, _setRecentlyVisitedPaths] = useState<string[]>([]);
@@ -71,6 +79,10 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         collapsedGroups,
         setCollapsedGroups
     }), [
+        // `configVersion` contributes nothing to the value and everything to
+        // its identity: the stored configs live in a ref, and this is what
+        // tells the views that read them during render that they changed.
+        configVersion,
         onCollectionModified,
         getCollectionConfig,
         recentlyVisitedPaths,

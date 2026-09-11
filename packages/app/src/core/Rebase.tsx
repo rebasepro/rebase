@@ -26,6 +26,7 @@ import { SchemaDriftProvider } from "../components/SchemaDriftBanner";
 import { GlobalComponentOverrideProvider } from "../contexts/ComponentOverrideContext";
 import { useBuildModeController } from "../hooks/useBuildModeController";
 import { useBuildAdminModeController } from "../hooks/useBuildAdminModeController";
+import { useBuildLocalConfigurationPersistence } from "../hooks/useBuildLocalConfigurationPersistence";
 import { RebaseClientInstanceContext } from "../contexts/RebaseClientInstanceContext";
 import { DialogsProvider } from "../contexts/DialogsProvider";
 import { buildRebaseData, wrapAsEntityData, CollectionRegistry } from "@rebasepro/common";
@@ -100,6 +101,16 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             console.error("Duplicate plugin keys detected:", keys.filter((k, i) => keys.indexOf(k) !== i));
         }
     }
+
+    // Per-user table preferences — a resized column, a reordered one, the view
+    // mode a collection was left in — are local by nature, so the panel keeps
+    // its own localStorage-backed store unless the host app supplies one.
+    // Without a default here the context was `undefined` for every app that
+    // did not pass `userConfigPersistence` (which is every app the CLI
+    // scaffolds), and each of those preferences was written nowhere and lost
+    // on the next render.
+    const localUserConfigPersistence = useBuildLocalConfigurationPersistence();
+    const resolvedUserConfigPersistence = userConfigPersistence ?? localUserConfigPersistence;
 
     // Merge direct slots with plugin slots.
     const resolvedSlots: AnySlotContribution[] = useMemo(() => [
@@ -402,7 +413,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         <AnalyticsContext.Provider value={analyticsController}>
             <CustomizationControllerContext.Provider value={customizationController}>
                 <UserConfigurationPersistenceContext.Provider
-                    value={userConfigPersistence}>
+                    value={resolvedUserConfigPersistence}>
                     <StorageSourcesContext.Provider
                         value={storageSourcesValue}>
                     <StorageSourceContext.Provider

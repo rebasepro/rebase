@@ -5,7 +5,7 @@ import {
     useAuthController,
     useCustomizationController,
     useAdminModeController,
-    useBuildLocalConfigurationPersistence,
+    useUserConfigurationPersistence,
     useRebaseClient,
     useData,
     useDataSources,
@@ -73,7 +73,10 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const registry = useRebaseRegistry();
     const context = useRebaseContext();
     const adminModeController = useAdminModeController();
-    const userConfigPersistence = useBuildLocalConfigurationPersistence();
+    // The store the rest of the panel reads. Built one level up, by
+    // `<Rebase>`, so the registry here and the collection views below merge
+    // from the same cache — a second instance built here would keep its own.
+    const userConfigPersistence = useUserConfigurationPersistence();
 
     // ── Collection Editor resolution ──────────────────────────────────
     // The collection editor is ALWAYS enabled when Studio is registered.
