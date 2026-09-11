@@ -2,7 +2,7 @@ import type { Properties } from "@rebasepro/types";
 
 import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
-import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection, ViewMode } from "@rebasepro/cms-types";
+import { CollectionActionsProps, EntityTableController, SelectionController, SelectionQuery, AdminCollection, ViewMode } from "@rebasepro/cms-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { Badge, Button, cls, FilterIcon, IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
@@ -15,7 +15,7 @@ import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { withViewMode } from "../../util/view_mode";
 import { useSplitView } from "./SplitViewContext";
-import { SelectAllCheckbox } from "../../selection";
+import { SelectionMenu } from "../../selection";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -44,6 +44,8 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
     viewMode?: ViewMode;
     /** Whether rows can be selected at all in this mount. */
     selectionEnabled?: boolean;
+    /** The view's live query — what the menu's "all matching" item stands for. */
+    selectionQuery?: SelectionQuery<M>;
     compact?: boolean;
     openNewDocument: (defaultValues?: Record<string, unknown>) => void;
 }
@@ -60,6 +62,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     resolvedProperties,
     viewMode,
     selectionEnabled,
+    selectionQuery,
     compact,
     openNewDocument
 }: CollectionViewStartActionsProps<M>) {
@@ -207,21 +210,24 @@ parentEntityIds,
         </Tooltip>
     ) : null;
 
-    // A table puts its select-all in the ID column header, directly above the
-    // checkboxes it acts on. The card, list and board views have no header to
-    // put one in — and without it the only way to start a selection there is to
-    // tick rows one at a time, which for a "select all" is the whole problem.
-    const selectAllCheckbox = selectionEnabled && viewMode && viewMode !== "table" ? (
-        <div key={"select_all"} className={"mx-1 flex items-center"}>
-            <SelectAllCheckbox
+    // One control, in one place, for every view — the leading edge of the
+    // toolbar, which in a table sits directly above the checkbox column anyway.
+    // The table used to carry its own in the ID column header, which meant two
+    // controls that did different amounts.
+    const selectionMenu = selectionEnabled && selectionQuery ? (
+        <div key={"select_all"} className={"mr-1 flex items-center"}>
+            <SelectionMenu
                 selectionController={selectionController}
-                loadedEntities={tableController.data}/>
+                loadedEntities={tableController.data}
+                query={selectionQuery}
+                collectionEntitiesCount={collectionEntitiesCount}
+                collectionName={collection.name}/>
         </div>
     ) : null;
 
     const actions: React.ReactNode[] = [
         backButton,
-        selectAllCheckbox,
+        selectionMenu,
         filtersButton,
         sortButton,
         <ClearFilterSortButton

@@ -16,7 +16,7 @@ import {
     SelectionQuery,
     ViewMode
 } from "@rebasepro/cms-types";
-import { SelectAllCheckbox, SelectionBanner, serializeSelectionQuery } from "../../selection";
+import { serializeSelectionQuery } from "../../selection";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -1069,12 +1069,8 @@ parentEntityIds,
                 searchString={tableController.searchString ?? ""}
             />;
 
-        // Under the toolbar, above the view, in both layouts — the toolbar node
-        // is what `SplitListView` is handed, so putting the banner anywhere
-        // else would give the split layout no escalation at all.
         const toolbarNode = (
-            <>
-                <CollectionTableToolbar
+            <CollectionTableToolbar
                 compact={isCompact}
                 loading={tableController.dataLoading}
                 onTextSearch={tableController.setSearchString}
@@ -1091,6 +1087,7 @@ parentEntityIds,
                     resolvedProperties={resolvedCollection.properties}
                     viewMode={viewMode}
                     selectionEnabled={activeSelectionEnabled}
+                    selectionQuery={liveSelectionQuery}
                     entitiesCount={docsCount}
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
@@ -1113,14 +1110,7 @@ parentEntityIds,
                         {pluginToolbarWidgets}
                     </ResolvedCollectionActions>
                 }
-                />
-                {activeSelectionEnabled && <SelectionBanner
-                    selectionController={usedSelectionController}
-                    query={liveSelectionQuery}
-                    collectionEntitiesCount={docsCount ?? undefined}
-                    loadedEntities={tableController.data}
-                    collectionName={collection.name}/>}
-            </>
+            />
         );
 
         // A custom view wins over the built-in chain, but only after the
@@ -1223,19 +1213,11 @@ parentEntityIds,
                 AdditionalHeaderWidget={buildAdditionalHeaderWidget}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}
-                additionalIDHeaderWidget={<div className="flex items-center gap-1">
-                    {/* The ID column is the one the row checkboxes live in, so
-                        its header is where a table's select-all belongs —
-                        directly above the column it acts on. */}
-                    {activeSelectionEnabled && <SelectAllCheckbox
-                        selectionController={usedSelectionController}
-                        loadedEntities={tableController.data}/>}
-                    <EntityIdHeaderWidget
-                        path={path}
-                        idPath={path}
-                        collection={collection}
-                        openEntityMode={openEntityMode}/>
-                </div>}
+                additionalIDHeaderWidget={<EntityIdHeaderWidget
+                    path={path}
+                    idPath={path}
+                    collection={collection}
+                    openEntityMode={openEntityMode}/>}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />

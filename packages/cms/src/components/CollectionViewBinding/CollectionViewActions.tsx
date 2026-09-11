@@ -129,13 +129,21 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     let multipleDeleteButton: React.ReactNode | undefined;
     if (hasSelection) {
         const button = largeLayout && !compact
+            // `min-w`, not `w`. A fixed 80px was enough for the one- and
+            // two-digit counts you could reach by ticking rows; "select all
+            // matching" put six digits in here, and a flex child over its width
+            // compresses — so the bin itself was what gave way, shrinking to a
+            // sliver beside the number. The width is a floor now, so the
+            // control still holds its place in the toolbar when the count is
+            // short, and `shrink-0` means the icon can never be the thing that
+            // gives.
             ? <Button
                 variant={"text"}
                 disabled={!multipleDeleteEnabled}
-                startIcon={<Trash2Icon size={iconSize.small}/>}
+                startIcon={<Trash2Icon size={iconSize.small} className={"shrink-0"}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
-                className="lg:w-20"
+                className="lg:min-w-20"
             >
                 ({countLabel})
             </Button>

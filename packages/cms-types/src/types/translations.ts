@@ -553,14 +553,12 @@ export interface RebaseTranslations {
      * "the ones I ticked" to "every row that matches", and what the bulk
      * actions say while they work.
      */
-    selection_selected_count: string;
     selection_select_all_loaded: string;
     selection_deselect_all: string;
-    selection_select_all_matching: string;
-    selection_select_all_matching_unknown: string;
-    selection_all_matching_selected: string;
-    selection_all_matching_selected_unknown: string;
-    selection_clear: string;
+    selection_options: string;
+    selection_menu_all_loaded: string;
+    selection_menu_all_matching: string;
+    selection_menu_none: string;
     selection_reading_rows: string;
     selection_reading_rows_unknown: string;
     selection_deleting_progress: string;
