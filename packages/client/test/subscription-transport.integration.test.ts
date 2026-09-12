@@ -68,10 +68,18 @@ function createClient(port: number, watchdogMs: number) {
     return client;
 }
 
-const waitFor = async (predicate: () => boolean, timeoutMs = 4000) => {
+/**
+ * @param what names the thing being waited for, and it is not decoration: this
+ *   helper used to throw "timed out waiting for condition", which is the same
+ *   sentence whether the watchdog failed to fire or the socket never connected.
+ *   Those have opposite causes and one of them cost an afternoon.
+ */
+const waitFor = async (predicate: () => boolean, timeoutMs = 4000, what = "a condition") => {
     const start = Date.now();
     while (!predicate()) {
-        if (Date.now() - start > timeoutMs) throw new Error("timed out waiting for condition");
+        if (Date.now() - start > timeoutMs) {
+            throw new Error(`timed out after ${timeoutMs}ms waiting for ${what}`);
+        }
         await new Promise(r => setTimeout(r, 10));
     }
 };
@@ -94,6 +102,29 @@ async function setup(onSubscribe: (socket: NodeWebSocket, frame: Record<string, 
     servers.push(server);
     const client = createClient(server.port, watchdogMs);
     clients.push(client);
+
+    // Open the socket, and wait for it, before handing the client over.
+    //
+    // `ensureConnected` is public, idempotent and exactly this: the client is
+    // lazy by design — it opens nothing until an operation needs a socket — so
+    // waiting without asking first waits forever.
+    //
+    // Every test built on `setup` is about what happens to a subscribe that
+    // REACHES the server, so a client that has not connected yet is not a
+    // slower version of the same scenario — it is a different one, and it used
+    // to be reported as a watchdog failure.
+    //
+    // The specific flake: when a connect fails (which localhost does under a
+    // loaded machine, roughly once in 25 full-suite runs), `onclose` runs
+    // `suspendSubscribeWatchdogs`, so the queued subscribe has no watchdog at
+    // all, and `attemptReconnect` waits 2s before the first retry and 4s before
+    // the second. A test budgeting 4s for a 300ms watchdog then failed on the
+    // watchdog, which was never armed and was never the problem.
+    //
+    // Ten seconds because that covers two failed connects (2s + 4s of backoff)
+    // and still fails fast against a server that is genuinely not there.
+    client.ensureConnected();
+    await waitFor(() => (client as any).isConnected === true, 10000, "the client to connect");
     return { server, client };
 }
 
@@ -110,7 +141,7 @@ describe("Subscription resilience over a real socket", () => {
         const onUpdate = jest.fn();
         client.listenCollection({ path: "products" }, onUpdate as any);
 
-        await waitFor(() => onUpdate.mock.calls.length > 0);
+        await waitFor(() => onUpdate.mock.calls.length > 0, 4000, "the first rows to arrive");
         expect(onUpdate.mock.calls[0][0]).toEqual([{ id: "p1" }]);
     });
 
@@ -123,7 +154,15 @@ describe("Subscription resilience over a real socket", () => {
         const onError = jest.fn();
         client.listenCollection({ path: "products" }, onUpdate as any, onError as any);
 
-        await waitFor(() => onError.mock.calls.length > 0);
+        // The premise first, and separately: this test is about a subscribe the
+        // server RECEIVED and ignored. If the frame never arrives, the watchdog
+        // is not what went wrong, and a failure here says so in those words.
+        await waitFor(
+            () => server.received.some(f => f.type === "subscribe_collection"),
+            4000,
+            "the subscribe frame to reach the server"
+        );
+        await waitFor(() => onError.mock.calls.length > 0, 4000, "the subscribe watchdog to fire");
 
         expect(server.received.some(f => f.type === "subscribe_collection")).toBe(true);
         expect(onUpdate).not.toHaveBeenCalled();
@@ -145,7 +184,7 @@ describe("Subscription resilience over a real socket", () => {
 
         const onError = jest.fn();
         client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
-        await waitFor(() => onError.mock.calls.length > 0);
+        await waitFor(() => onError.mock.calls.length > 0, 4000, "the first subscribe to give up");
 
         const framesBefore = server.received.filter(f => f.type === "subscribe_collection").length;
 
@@ -153,7 +192,7 @@ describe("Subscription resilience over a real socket", () => {
         const onUpdate2 = jest.fn();
         client.listenCollection({ path: "products" }, onUpdate2 as any);
 
-        await waitFor(() => onUpdate2.mock.calls.length > 0);
+        await waitFor(() => onUpdate2.mock.calls.length > 0, 4000, "the second listener to load");
 
         const framesAfter = server.received.filter(f => f.type === "subscribe_collection").length;
         expect(framesAfter).toBeGreaterThan(framesBefore); // it really re-subscribed
@@ -185,7 +224,7 @@ describe("Subscription resilience over a real socket", () => {
         const onError = jest.fn();
         client.listenCollection({ path: "products" }, onUpdate as any, onError as any);
 
-        await waitFor(() => onUpdate.mock.calls.length > 0);
+        await waitFor(() => onUpdate.mock.calls.length > 0, 4000, "rows for a subscribe queued while connecting");
         expect(onError).not.toHaveBeenCalled();
         expect(onUpdate.mock.calls[0][0]).toEqual([{ id: "p1" }]);
     });
@@ -208,7 +247,7 @@ describe("Subscription resilience over a real socket", () => {
         const onUpdate = jest.fn();
         client.listenCollection({ path: "products" }, onUpdate as any);
 
-        await waitFor(() => onUpdate.mock.calls.length > 0, 8000);
+        await waitFor(() => onUpdate.mock.calls.length > 0, 8000, "rows to arrive after the reconnect");
         expect(onUpdate.mock.calls[0][0]).toEqual([{ id: "p1" }]);
     }, 15000);
 
@@ -226,8 +265,38 @@ describe("Subscription resilience over a real socket", () => {
         const onError = jest.fn();
         client.listenCollection({ path: "nope" }, jest.fn() as any, onError as any);
 
-        await waitFor(() => onError.mock.calls.length > 0);
+        await waitFor(() => onError.mock.calls.length > 0, 4000, "the server's error to reach the listener");
         expect((onError.mock.calls[0][0] as any).message).toContain("Collection not found");
+    });
+
+    it("does not fire a subscribe watchdog after the caller disconnects", async () => {
+        // `disconnect()` cleared the reconnect timer and nulled the socket's
+        // handlers — including `onclose`, which is what would otherwise have run
+        // `suspendSubscribeWatchdogs`. So an armed watchdog survived an explicit
+        // disconnect and fired up to `subscriptionTimeoutMs` later.
+        //
+        // Both callers are hurt by that, differently. Sign-out
+        // (`disconnect()`, not permanent) keeps the subscriptions on purpose so
+        // a later subscribe resumes them; a watchdog firing in between tears one
+        // down, so signing back in leaves it dead. `close()`
+        // (`disconnect(true)`) is the caller saying they are done — and on Node
+        // a 30s timer that is not unref'd holds the event loop open by itself,
+        // which is the very thing `close()` exists to prevent.
+        const { server, client } = await setup(() => { /* deliberate silence */ });
+
+        const onError = jest.fn();
+        client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+        await waitFor(
+            () => server.received.some(f => f.type === "subscribe_collection"),
+            4000,
+            "the subscribe frame to reach the server"
+        );
+
+        client.disconnect();
+
+        // Comfortably past the 300ms watchdog this client was built with.
+        await new Promise(r => setTimeout(r, 900));
+        expect(onError).not.toHaveBeenCalled();
     });
 
     it("delivers a row subscription and times out one that is ignored", async () => {
@@ -243,12 +312,12 @@ describe("Subscription resilience over a real socket", () => {
 
         const onUpdate = jest.fn();
         client.listenOne({ path: "products", id: "answered" } as any, onUpdate as any);
-        await waitFor(() => onUpdate.mock.calls.length > 0);
+        await waitFor(() => onUpdate.mock.calls.length > 0, 4000, "the answered row subscription to load");
         expect(onUpdate.mock.calls[0][0]).toEqual({ id: "answered" });
 
         const onError = jest.fn();
         client.listenOne({ path: "products", id: "ignored" } as any, jest.fn() as any, onError as any);
-        await waitFor(() => onError.mock.calls.length > 0);
+        await waitFor(() => onError.mock.calls.length > 0, 4000, "the ignored row subscription to time out");
         expect((onError.mock.calls[0][0] as any).code).toBe("SUBSCRIPTION_TIMEOUT");
     });
 });

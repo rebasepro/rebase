@@ -431,6 +431,19 @@ export class RebaseWebSocketClient {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
+        // The subscribe watchdogs too, and for the same reason as the reconnect
+        // timer: nothing armed for a socket the caller just released may still
+        // go off.
+        //
+        // It has to be here rather than left to `onclose`, because the line
+        // below deliberately nulls that handler — so an explicit disconnect was
+        // the one close that did NOT suspend them. They then fired up to
+        // `subscriptionTimeoutMs` later: on sign-out, killing a subscription the
+        // non-permanent disconnect had deliberately kept so a later subscribe
+        // could resume it; on `close()`, calling a consumer's `onError` after
+        // they were done, and holding the Node event loop open with a timer that
+        // is not unref'd — which is the one thing `close()` exists to prevent.
+        this.suspendSubscribeWatchdogs();
         if (this.ws) {
             this.ws.onclose = null; // Prevent reconnect on explicit disconnect
             this.ws.onerror = null; // Prevent errors on explicit disconnect
