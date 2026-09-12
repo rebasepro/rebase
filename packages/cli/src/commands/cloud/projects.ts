@@ -231,8 +231,8 @@ export const CREATE_PROJECT_FLAGS = {
      * means the two-command sequence that every project needs is one command,
      * and `--db none` is there for the case that genuinely wants to decide later.
      *
-     * Distinct from `--db-mode`/`--db-cpu` next to it, which are resource dials
-     * on a database that exists. This is whether there is one.
+     * Distinct from `--db-cpu`/`--db-instances` next to it, which are resource
+     * dials on a database that exists. This is whether there is one.
      */
     "--db": String,
     /** For `--db byodb`. Same spelling as `rebase cloud db create` uses. */
@@ -247,7 +247,6 @@ export const CREATE_PROJECT_FLAGS = {
     "--replicas": String,
     "--spot": String,
     "--scale-to-zero": String,
-    "--db-mode": String,
     "--db-instances": String,
     "--db-cpu": String,
     "--db-memory": String,

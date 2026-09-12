@@ -37,7 +37,7 @@ rebase cloud deploy
 > **📖 Use the `rebase-cloud` skill for anything hosted.** It carries the first-deploy
 > sequence, what a managed database actually is and when it comes into
 > existence, `blockedOn`/`nextAction`, build-time vs run-time variables,
-> extensions on a shared pool, domains, logs, rollbacks, and how to tell a
+> extensions and the restart they cost, domains, logs, rollbacks, and how to tell a
 > platform failure from a project one. This section is a pointer on purpose:
 > two copies of that material would drift, and the version an agent reads
 > decides whether a deploy takes four minutes or forty.

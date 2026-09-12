@@ -231,7 +231,7 @@ traffic through.
 | **Job workers** | Yes, same | Cloud: pinned off |
 | **Admin panel** | Yes as a `static` app in OSS | Cloud: refused at intake; two competing hosting impls (O3) |
 | **User apps** | Same as admin — it is the same mechanism | Same |
-| **Database** | Yes: `byodb`, shared pool, dedicated | — |
+| **Database** | Yes: `byodb`, shared pool, dedicated *(the shared pool was retired 2026-09; `byodb` and dedicated remain)* | — |
 | **Storage** | Yes: shared prefix / dedicated bucket, multi-source | — |
 
 Worth stating plainly: the admin panel and a customer's marketing site are **the same kind

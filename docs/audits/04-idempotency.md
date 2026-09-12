@@ -410,6 +410,10 @@ is sent to an auth-collection create rather than accepting and ignoring it.
    two tenants' keys would collide in one table (and `uid` values are not
    tenant-qualified). Confirm by checking how `DATABASE_URL` is issued per tenant in
    the shared-pool tier.
+
+   > **Retired 2026-09.** There is no shared-pool tier. Every managed tenant
+   > holds its own database on a cluster of its own, which is the safe case
+   > this item asks to confirm.
 2. **Is `INSERT INTO "rebase"."idempotency_keys" … ON CONFLICT … DO UPDATE … WHERE
    "rebase"."idempotency_keys".created_at < …` accepted by Postgres?** Schema-
    qualified column references to the conflict target should resolve, but per L1 no

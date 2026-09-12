@@ -445,7 +445,7 @@ rebase cloud compute set        # change it
 ```
 
 `compute set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
-`--scale-to-zero`, `--db-mode`, `--db-instances`, `--db-cpu`, `--db-memory`,
+`--scale-to-zero`, `--db-instances`, `--db-cpu`, `--db-memory`,
 `--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
 There are no plan tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).

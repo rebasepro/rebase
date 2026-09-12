@@ -31,6 +31,30 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   managed backend bundle get their address recorded on deploy too — those rows
   previously stayed at "registered, never deployed" for the life of the project.
 
+### Removed
+
+- **The shared database tier is retired.** `--db-mode` is gone from
+  `rebase cloud compute set` and `rebase cloud projects create`, and
+  `compute show` no longer prints a "Database" row or carries `databaseMode` in
+  its `--json` output. There is nothing left to choose: every managed database
+  is a CloudNativePG cluster of the project's own, in the project's own
+  Kubernetes namespace, with its own scheduled backups and its own WAL archive.
+
+  The pooled tier existed as a cheap rung, and at the density it actually ran
+  at it was not paying for itself while being the sole source of three defects
+  — a 4:1 oversubscribed volume, an enforcement that killed connections rather
+  than degrading to read-only, and, worst, a `dedicated` dial that silently
+  abandoned a project's data on the pool and pointed its application at a new
+  empty database. The control plane now refuses that move outright.
+
+  Nothing is removed from the wire: the control plane still accepts
+  `dedicated`, and a project row that still says `shared` still reads back. A
+  client old enough to send `--db-mode shared` gets a 400 that says the tier was
+  retired, rather than writing a value nothing provisions. The database is still
+  dialable — `--db-cpu`, `--db-memory`, `--db-instances` and `--storage` —
+  and `rebase cloud db create --type byodb` still points a project at a
+  PostgreSQL the platform does not run.
+
 ### Fixed
 
 - **A global callback is never handed a collection that is not there.** Every

@@ -97,7 +97,6 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--replicas <n>", "Instance count"],
             ["--spot <true|false>", "Run on preemptible capacity"],
             ["--scale-to-zero <true|false>", "Stop the instances when idle"],
-            ["--db-mode <mode>", "Database topology dial"],
             ["--db-instances <n>", "Database instance count"],
             ["--db-cpu <n>", "vCPU per database instance"],
             ["--db-memory <size>", "Memory per database instance"],
@@ -135,9 +134,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud db create --type byodb --connection-string \"$DATABASE_URL\" --wait"
         ],
         notes: [
-            "A managed database is CloudNativePG in a shared in-cluster pool, and it is created at "
-            + "the project's first deploy. There is nothing to poll before then, so --wait says so "
-            + "and returns rather than looping.",
+            "A managed database is a CloudNativePG cluster of the project's own, in the project's "
+            + "own namespace and backed up on its own schedule. It is created at the project's first "
+            + "deploy: there is nothing to poll before then, so --wait says so and returns rather "
+            + "than looping.",
             "`rebase cloud db test` legitimately fails before the first deploy.",
             "A project has exactly one database — attaching a second is refused, because the "
             + "platform reads one row and it becomes undefined which it deploys against."
@@ -326,7 +326,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "`restore` replaces the live database. Nothing about it is undoable from here — `--yes`, the global flag listed below, is what skips that confirmation.",
-            "A managed database on the shared pool is backed up with the pool, not per project."
+            "Backups are the project's own: a base backup on a schedule, plus continuous WAL archiving for point-in-time recovery."
         ]
     },
 
@@ -604,7 +604,6 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
             ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
             ["--scale-to-zero <true|false>", "Request-billed compute that stops when idle, at the cost of a cold start"],
-            ["--db-mode <shared|dedicated>", "Pooled cluster, or one of this project's own"],
             ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
             ["--db-cpu <n>", "Database CPU request per instance. Default: 500m"],
             ["--db-memory <size>", "Database memory request per instance. Default: 2Gi"],
@@ -616,7 +615,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         examples: [
             "rebase cloud compute set --cpu 500m --memory 2Gi",
             "rebase cloud compute set --replicas 2 --autoscale-max 6",
-            "rebase cloud compute set --db-mode dedicated --db-instances 2"
+            "rebase cloud compute set --db-instances 2 --db-memory 4Gi"
         ],
         notes: [
             "Run `rebase cloud compute` first — it prints the current dials and the €/month this project is quoted.",

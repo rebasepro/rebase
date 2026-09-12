@@ -135,35 +135,30 @@ Do not debug it. Do not retry it. Deploy first; `db test` answers afterwards.
 `rebase cloud db create --wait` knows this and returns immediately for a managed
 database rather than polling something that cannot appear yet.
 
-### 2. Extensions live on a cluster shared with other tenants
+### 2. Extensions restart this project's own database
 
 ```bash
 rebase cloud extensions list
 rebase cloud extensions enable vector      # `pgvector` is accepted as an alias
 ```
 
-`extensions list` marks some with **⟳ restarts DB**. On the shared pool that
-restart affects **every tenant on that pool**, so the CLI refuses to do it
-without `--yes`. Never pass `--yes` to an extension enable on the user's behalf.
+`extensions list` marks some with **⟳ restarts DB**. That restart is this
+project's database and nothing else's — a single-instance database has no
+standby to fail over to, so it is a write outage for as long as the restart
+takes. The CLI refuses to do it without `--yes`. Never pass `--yes` to an
+extension enable on the user's behalf.
 
-An extension the shared pool will not carry is not something you can work
-around from inside the project.
-
-### 3. When the shared pool is not enough
-
-Two escape hatches, in increasing order of ownership:
+### 3. When the managed database is not the right shape
 
 ```bash
-# A CloudNativePG cluster of this project's own, still managed by the platform
-rebase cloud compute set --db-mode dedicated
-
 # Your own PostgreSQL, anywhere
 rebase cloud db create --type byodb --connection-string "$DATABASE_URL" --wait
 ```
 
-`--db-mode dedicated` costs more and is the right answer for isolation or for an
-extension the pool cannot carry. `byodb` is the right answer when the database
-has to be somewhere the platform does not run.
+`byodb` is the right answer when the database has to be somewhere the platform
+does not run. There is no longer a pooled tier to outgrow: every managed
+database is already a CloudNativePG cluster of the project's own, sized with
+`--db-cpu`, `--db-memory`, `--db-instances` and `--storage`.
 
 > **A project has exactly one database.** The platform reads its `databases`
 > rows with `limit: 1` in three places, so a second row does not add a database —
@@ -409,7 +404,7 @@ each one is a dial:
 ```bash
 rebase cloud compute                       # what this project reserves, and €/month
 rebase cloud compute set --cpu 500m --memory 1Gi
-rebase cloud compute set --db-mode dedicated --db-instances 2
+rebase cloud compute set --db-instances 2 --db-memory 4Gi
 rebase cloud compute set --autoscale-max 5 --autoscale-cpu-target 70
 ```
 

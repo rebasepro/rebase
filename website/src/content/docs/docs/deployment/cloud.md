@@ -159,7 +159,6 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
 | `--scale-to-zero` | `true` or `false`. Request-billed compute that stops when idle, at the cost of a cold start |
-| `--db-mode` | `shared` (the pooled cluster) or `dedicated` (one of this project's own) |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
 | `--db-cpu`, `--db-memory`, `--storage` | Per database instance. Empty means `500m`, `2Gi` and the default volume |
 

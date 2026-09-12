@@ -362,6 +362,15 @@ rename it to a suffix the lister and the pruner both ignore
 
 #### M6 — the shared-pool prune runs on a failed night, and has no keep-minimum
 
+> **Retired 2026-09.** The shared tier is being removed, so this finding
+> expires with the CronJob. It was also understated: on 2026-09-12 every
+> `pg-pool-1-logical-dumps` job in the cluster's history had failed, because
+> the CNPG operand image the job runs — chosen so `pg_dump` matches the pool's
+> major version — ships no `aws` CLI. So there was never a per-project dump to
+> prune, and the build log told every shared tenant that "per-project restores
+> use the nightly logical dump of this project's own database". Whole-pool
+> base backups were current throughout.
+
 `saas/backend/src/db/shared-pool-backup.ts:64-98`. The per-database loop records
 `FAILED=1` and continues (`:84-87`); the prune block runs unconditionally
 (`:92-95`); `exit 1` comes afterwards (`:97`).

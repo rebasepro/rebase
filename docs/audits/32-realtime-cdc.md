@@ -488,6 +488,10 @@ de-duplication and double-deliver. Make the narrower declaration reference the w
 2. **Does any supported deployment give an untrusted party a Postgres login?** M2's severity turns
    entirely on this. `rebase_user` is `NOLOGIN`, which closes the obvious door, but the managed
    runtime's shared-pool tenancy tiers and any customer-provisioned analytics role would reopen it.
+
+   > **Retired 2026-09.** The shared-pool tier is gone; a customer-provisioned
+   > analytics role on the project's own database is now the whole of this
+   > question.
    Someone who knows the cloud topology should settle whether `LISTEN rebase_cdc` is reachable by
    anyone who should not read every table.
 3. **Should a subscription to a row the caller cannot read be refused rather than answered with

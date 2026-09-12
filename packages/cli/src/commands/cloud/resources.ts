@@ -1514,7 +1514,10 @@ const DIAL_FLAGS = {
     "--replicas": "replicaCount",
     "--spot": "preemptible",
     "--scale-to-zero": "scaleToZero",
-    "--db-mode": "databaseMode",
+    // No `--db-mode`. The shared tier was retired, so a managed database is a
+    // CloudNativePG cluster of the project's own and there is nothing left to
+    // choose — a flag whose only legal value is the default is a flag that
+    // changes nothing. The database is still dialable, by size and instances.
     "--db-instances": "databaseInstances",
     "--db-cpu": "databaseCpu",
     "--db-memory": "databaseMemory",
@@ -1632,7 +1635,6 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                     ["App replicas", dialLine(project!.replicaCount)],
                     ["Capacity", dialLine(project!.preemptible, { true: "spot", false: "on demand" })],
                     ["When idle", dialLine(project!.scaleToZero, { true: "scale to zero", false: "stay warm" })],
-                    ["Database", dialLine(project!.databaseMode)],
                     ["Database instances", dialLine(project!.databaseInstances)],
                     ["Database CPU", dialLine(project!.databaseCpu)],
                     ["Database memory", dialLine(project!.databaseMemory)],
@@ -1662,7 +1664,6 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 replicaCount: project!.replicaCount ?? null,
                 preemptible: project!.preemptible ?? null,
                 scaleToZero: project!.scaleToZero ?? null,
-                databaseMode: project!.databaseMode ?? null,
                 databaseInstances: project!.databaseInstances ?? null,
                 databaseCpu: project!.databaseCpu ?? null,
                 databaseMemory: project!.databaseMemory ?? null,
