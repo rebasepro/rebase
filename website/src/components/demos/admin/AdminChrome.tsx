@@ -29,9 +29,14 @@ export const SHELL_ROOT =
  * The content sheet — one lightness step above the frame AND a hairline on its
  * edge, inset on large layouts. Both halves matter: the step alone is ~3 L* and
  * the two grounds read as one black without the line.
+ *
+ * The `lg:mt-2` is Scaffold's `!hasAppBar` branch: in the product the inset on
+ * top comes from the DrawerHeader spacer, and the sheet only asks for a margin
+ * of its own when there is no app bar above it. These tabs draw no app bar, so
+ * without it the sheet was inset left, right and bottom but flush with the top.
  */
 export const SHELL_SHEET =
-  "bg-surface-sheet grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-xl lg:border lg:border-hairline flex flex-col";
+  "bg-surface-sheet grow overflow-auto m-0 mt-1 lg:mx-2 lg:mb-2 lg:mt-2 lg:rounded-xl lg:border lg:border-hairline flex flex-col";
 
 export type DrawerItem = {
   icon: React.ComponentType<{ size?: number }>;
