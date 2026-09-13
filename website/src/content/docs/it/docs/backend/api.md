@@ -1,5 +1,5 @@
 ---
-sourceHash: 2499dc27f2076f94
+sourceHash: 862b9b1d6de22bdd
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -434,19 +434,16 @@ Chiavi di idempotenza, scritture condizionali (`ETag` / `If-Match`), operazioni 
 
 ## Pipeline degli hook del ciclo di vita
 
-Ogni operazione di mutazione REST (`POST`, `PATCH`, `DELETE`) attraversa una pipeline di esecuzione sequenziale e rigorosa degli hook:
+Su Postgres, ogni mutazione REST (`POST`, `PATCH`, `DELETE`) esegue in ordine i callback della sua collezione, dentro l'unica transazione che porta la scrittura:
 
 ```
-Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
+Request ──► BEGIN ──► beforeSave/beforeDelete ──► DB operation ──► afterSave/afterDelete ──► COMMIT ──► Response
 ```
 
-### Hook bloccanti e differiti (deferred)
+Ogni hook viene atteso, e un errore lanciato da uno qualsiasi di essi annulla l'intera scrittura:
 
-1. **Hook bloccanti (`beforeSave`, `beforeDelete`)**
-   Questi hook vengono eseguiti in modo sincrono nel ciclo principale della richiesta *prima* di eseguire il commit della transazione del database. Possono modificare i payload in ingresso, eseguire validazioni personalizzate o interrompere completamente la richiesta generando un errore.
-
-2. **Hook differiti (`afterSave`, `afterDelete`)**
-   Questi hook vengono eseguiti in modo asincrono dopo che la transazione del database è stata confermata con successo (commit). Utilizzano promesse differite (fire-and-forget), il che significa che vengono eseguiti in background e non bloccano la risposta HTTP inviata al client. Ideali per l'invio di webhook, l'attivazione di notifiche push o l'accodamento di task esterni.
+1. **`beforeSave`, `beforeDelete`** vengono eseguiti prima della scrittura. Possono modificare i valori in ingresso, validare o rifiutare la richiesta lanciando un errore: il chiamante riceve **400 `CALLBACK_REJECTED`** e non viene scritto nulla.
+2. **`afterSave`, `afterDelete`** vengono eseguiti dopo la scrittura ma *prima* del commit. Un errore annulla la riga e risponde con lo stesso 400, con `details.stage` che indica l'hook. Tengono aperta la transazione mentre sono in esecuzione, quindi non sono il posto per un webhook o per qualsiasi altra chiamata di rete: [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) spiega dove va quel lavoro.
 
 ## Endpoint di sistema
 

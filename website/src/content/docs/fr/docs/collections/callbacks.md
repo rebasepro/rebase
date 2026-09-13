@@ -1,5 +1,5 @@
 ---
-sourceHash: b1e4de7690e9f165
+sourceHash: f10be03939ad9c7f
 title: Rappels d'entité
 sidebar_label: Rappels
 description: Utilisez les rappels de cycle de vie pour exécuter une logique personnalisée lors de la création, la mise à jour, la lecture ou la suppression d'entités. Inclut l'API context.data pour les opérations inter-collections.
@@ -157,21 +157,18 @@ beforeSave: async ({ values }) => {
 
 ### `afterSave`
 
-Appelé après un enregistrement réussi. À utiliser pour les effets secondaires.
+Appelé après l'écriture de la ligne et avant le commit, dans la même transaction. Une exception annule l'enregistrement — voir [Sémantique des Transactions](#sémantique-des-transactions).
 
 ```typescript
 afterSave: async ({
     values,         // Saved values
-    entityId,       // Entity ID
-    previousValues, // Previous values (null for new entities)
+    id,             // Entity ID
+    previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
     context
 }) => {
-    // Send webhook
-    await fetch("https://api.slack.com/webhook", {
-        method: "POST",
-        body: JSON.stringify({ text: `New article: ${values.title}` })
-    });
+    // Same transaction as the save: the log row commits with the article or not at all
+    await context.data.audit_log.create({ action: status, article_id: id, title: values.title });
 }
 ```
 
@@ -228,7 +225,7 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Appelé après une suppression réussie.
+Appelé après la suppression de la ligne et avant le commit, dans la même transaction. Une exception annule la suppression.
 
 ```typescript
 afterDelete: async ({
@@ -382,38 +379,38 @@ Le comportement décrit ci-dessus est vérifié de bout en bout sur Postgres par
 
 ### Sémantique des Transactions
 
-:::warning
-**Les opérations `context.data` ne sont PAS automatiquement enveloppées dans la même transaction que l'enregistrement déclencheur.**
-
-L'enregistrement original de l'entité termine sa transaction de base de données en premier. Ensuite, `afterSave` s'exécute et tout appel `context.data` ouvre des **transactions distinctes**. Si une opération `context.data` échoue dans `afterSave`, l'enregistrement original n'est **pas annulé**.
+:::important
+**Ce qu'un callback écrit via `context.data` fait partie de l'écriture qui l'a déclenché.** Sur Postgres, `beforeSave`, l'enregistrement et `afterSave` — ou `beforeDelete`, la suppression et `afterDelete` — s'exécutent dans une seule transaction ; chaque callback est attendu avant le commit, et `context.data` écrit via cette même transaction.
 :::
 
-Cela signifie :
+L'écriture déclenchante et tout ce que ses callbacks ont écrit sont donc validés ensemble ou pas du tout :
 
-- ✅ L'enregistrement déclencheur réussit toujours indépendamment
-- ⚠️ Les écritures d'effets secondaires peuvent échouer sans affecter l'opération originale
-- ⚠️ Il n'y a aucune garantie d'atomicité entre l'enregistrement original et les appels `context.data` ultérieurs
+- Une exception levée dans `afterSave` ou `afterDelete` annule l'écriture déclenchante, ainsi que chaque écriture faite par les callbacks via `context.data`. L'appelant reçoit **400 `CALLBACK_REJECTED`**, avec `details.stage` nommant le hook — ou le statut propre de l'erreur quand elle en porte un : une `RebaseApiError` que vous avez levée, le 409 d'une violation d'unicité.
+- Les abonnés temps réel n'apprennent l'existence de la ligne qu'après le commit : une écriture annulée n'est jamais annoncée.
+- Un callback garde la transaction ouverte pendant qu'il s'exécute ; un callback lent, c'est donc un verrou maintenu et une connexion du pool immobilisée.
 
-Pour les opérations qui doivent être atomiques, enveloppez-les dans une gestion des erreurs :
+Laissez l'erreur remonter quand l'écriture déclenchante ne doit pas lui survivre. Capturez-la quand elle le doit : l'écriture en échec est annulée à elle seule, et le reste est validé.
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, status, context }) => {
+    // The update below saves this collection again, which runs this callback
+    // again: act on creates only, or it never stops.
+    if (status !== "new") return;
     try {
-        await context.data.jobs.create({
-            title: values.title,
-            status: "published",
-        });
+        await context.data.jobs.create({ title: values.title, status: "published" });
     } catch (error) {
-        // Log the failure — the original save already succeeded
-        console.error(`Failed to promote job from submission ${entityId}:`, error);
-        // Optionally: mark the submission as "promotion_failed"
-        await context.data["job-submissions"].update(entityId, {
+        // Only the failed create is undone. The submission and this marker commit.
+        await context.data.job_submissions.update(id, {
             promotion_status: "failed",
-            promotion_error: String(error),
+            promotion_error: String(error)
         });
     }
 }
 ```
+
+Le travail qui doit sortir de la base de données — un e-mail, un webhook, un appel à une API tierce — n'a pas sa place dans le corps du callback. Il garderait la transaction ouverte le temps d'un aller-retour réseau, et rien ne peut le reprendre quand l'écriture est annulée. Mettez un [job](/docs/backend/jobs) en file pour cela, ou faites-le une fois l'écriture terminée : publiez sur un [canal temps réel](/docs/backend/realtime) ou utilisez `waitUntil` dans une [fonction personnalisée](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) indique ce qui convient.
+
+Sur MongoDB, rien de tout cela ne s'applique. Ce pilote exécute les mêmes callbacks sans transaction : l'écriture est déjà enregistrée quand `afterSave` s'exécute, et une exception à ce stade signale l'échec sans annuler l'écriture.
 
 ## Synchroniser les Données Entre les Collections
 

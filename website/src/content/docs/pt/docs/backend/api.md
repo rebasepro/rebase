@@ -1,5 +1,5 @@
 ---
-sourceHash: 2499dc27f2076f94
+sourceHash: 862b9b1d6de22bdd
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -514,19 +514,16 @@ estão todos em sua própria página: **[Escrita via REST](/docs/backend/writes/
 
 ## Pipeline de Hooks do Ciclo de Vida
 
-Toda operação de mutação REST (`POST`, `PATCH`, `DELETE`) passa por um pipeline de execução de hooks sequencial e rigoroso:
+No Postgres, toda mutação REST (`POST`, `PATCH`, `DELETE`) roda os callbacks da sua coleção em ordem, dentro da única transação que carrega a escrita:
 
 ```
-Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
+Request ──► BEGIN ──► beforeSave/beforeDelete ──► DB operation ──► afterSave/afterDelete ──► COMMIT ──► Response
 ```
 
-### Hooks Bloqueantes vs. Adiados (Deferred)
+Todo hook é aguardado, e um erro lançado por qualquer um deles desfaz a escrita inteira:
 
-1. **Hooks Bloqueantes (`beforeSave`, `beforeDelete`)**
-   Esses hooks são executados de forma síncrona no ciclo principal da requisição *antes* de confirmar (commit) a transação no banco de dados. Eles podem modificar payloads de entrada, executar validações personalizadas ou abortar a requisição completamente lançando um erro.
-
-2. **Hooks Adiados (`afterSave`, `afterDelete`)**
-   Esses hooks são executados de forma assíncrona após a confirmação bem-sucedida da transação no banco de dados. Eles utilizam promises adiadas (fire-and-forget), o que significa que rodam em segundo plano e não bloqueiam a resposta HTTP para o cliente. São ideais para enviar webhooks, disparar notificações push ou enfileirar tarefas externas.
+1. **`beforeSave`, `beforeDelete`** rodam antes da escrita. Eles podem alterar os valores de entrada, validar ou recusar a requisição lançando um erro — quem chamou recebe **400 `CALLBACK_REJECTED`** e nada é escrito.
+2. **`afterSave`, `afterDelete`** rodam depois da escrita, mas *antes* do commit. Um erro reverte a linha e responde o mesmo 400, com `details.stage` indicando o hook. Eles mantêm a transação aberta enquanto rodam, por isso são o lugar errado para um webhook ou qualquer outra chamada de rede — [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) explica para onde vai esse trabalho.
 
 ## Endpoints do sistema
 

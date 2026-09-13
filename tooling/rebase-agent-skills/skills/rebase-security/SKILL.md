@@ -278,16 +278,26 @@ interface AfterReadProps<M extends Record<string, unknown>, USER extends User> {
 // (there is no id yet on a create).
 ```
 
-### Blocking vs Fire-and-Forget
+### What a callback can stop
+
+Every callback is awaited, and on Postgres the write callbacks run inside the
+write's transaction: `beforeSave`, the SQL and `afterSave` commit together or
+not at all. None of them is fire-and-forget.
 
 | Callback | Can Block? | How to Block |
 |---|---|---|
-| `beforeSave` | Yes | Throw an error to abort the save (returns an HTTP error) |
-| `beforeDelete` | Yes | Throw an error to prevent deletion |
+| `beforeSave` | Yes | Throw — the write never happens; 400 `CALLBACK_REJECTED` |
+| `beforeDelete` | Yes | Throw, or return `false` (403) — the row is not deleted |
 | `afterRead` | Redacts, does not block | Return a modified `row`. It returns a row, not `null` — filter rows out with RLS, not here |
-| `afterSave` | No | Post-write side effect |
+| `afterSave` | Yes — rolls back | Throw — the row it just wrote is rolled back; 400 `CALLBACK_REJECTED`, `details.stage: "afterSave"` |
 | `afterSaveError` | No | Fires when a save fails |
-| `afterDelete` | No | Post-delete side effect |
+| `afterDelete` | Yes — rolls back | Throw — the delete is rolled back; 400 `CALLBACK_REJECTED`, `details.stage: "afterDelete"` |
+
+> **IMPORTANT FOR AGENTS**: because `afterSave`/`afterDelete` hold the write's
+> transaction open, never make a network call (webhook, email, third-party API)
+> from one — it holds a lock for the round trip, and a failure rolls the user's
+> write back. On MongoDB there is no transaction: the write is already stored
+> when `afterSave` runs, and a throw does not undo it.
 
 ### Execution Order
 

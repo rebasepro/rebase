@@ -1,5 +1,5 @@
 ---
-sourceHash: b1e4de7690e9f165
+sourceHash: f10be03939ad9c7f
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Verwenden Sie Lebenszyklus-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data API für sammlungsübergreifende Operationen.
@@ -157,21 +157,18 @@ beforeSave: async ({ values }) => {
 
 ### `afterSave`
 
-Wird nach einem erfolgreichen Speichervorgang aufgerufen. Für Nebeneffekte verwenden.
+Wird nach dem Schreiben der Zeile und vor dem Commit aufgerufen, in derselben Transaktion. Ein Fehler rollt das Speichern zurück — siehe [Transaktionssemantik](#transaktionssemantik).
 
 ```typescript
 afterSave: async ({
     values,         // Saved values
-    entityId,       // Entity ID
-    previousValues, // Previous values (null for new entities)
+    id,             // Entity ID
+    previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
     context
 }) => {
-    // Send webhook
-    await fetch("https://api.slack.com/webhook", {
-        method: "POST",
-        body: JSON.stringify({ text: `New article: ${values.title}` })
-    });
+    // Same transaction as the save: the log row commits with the article or not at all
+    await context.data.audit_log.create({ action: status, article_id: id, title: values.title });
 }
 ```
 
@@ -228,7 +225,7 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Wird nach einem erfolgreichen Löschvorgang aufgerufen.
+Wird nach dem Löschen der Zeile und vor dem Commit aufgerufen, in derselben Transaktion. Ein Fehler rollt das Löschen zurück.
 
 ```typescript
 afterDelete: async ({
@@ -382,38 +379,39 @@ Das oben beschriebene Verhalten ist end-to-end gegen Postgres verifiziert, durch
 
 ### Transaktionssemantik
 
-:::warning
-**`context.data`-Operationen werden NICHT automatisch in dieselbe Transaktion eingeschlossen wie der auslösende Speichervorgang.**
-
-Der ursprüngliche Entitätsspeichervorgang schließt zuerst seine Datenbanktransaktion ab. Dann läuft `afterSave`, und alle `context.data`-Aufrufe öffnen **separate Transaktionen**. Wenn eine `context.data`-Operation in `afterSave` fehlschlägt, wird der ursprüngliche Speichervorgang **nicht rückgängig gemacht**.
+:::important
+**Was ein Callback über `context.data` schreibt, gehört zu dem Schreibvorgang, der ihn ausgelöst hat.** Auf Postgres laufen `beforeSave`, das Speichern und `afterSave` — bzw. `beforeDelete`, das Löschen und `afterDelete` — in einer Transaktion; jeder Callback wird vor dem Commit abgewartet, und `context.data` schreibt über dieselbe Transaktion.
 :::
 
-Das bedeutet:
+Der auslösende Schreibvorgang und alles, was seine Callbacks geschrieben haben, werden also gemeinsam oder gar nicht committet:
 
-- ✅ Der auslösende Speichervorgang ist immer unabhängig erfolgreich
-- ⚠️ Schreibvorgänge mit Nebeneffekten können fehlschlagen, ohne die ursprüngliche Operation zu beeinflussen
-- ⚠️ Es gibt keine Atomizitätsgarantie zwischen dem ursprünglichen Speichervorgang und nachfolgenden `context.data`-Aufrufen
+- Ein Fehler in `afterSave` oder `afterDelete` rollt den auslösenden Schreibvorgang zurück, zusammen mit jedem Schreibvorgang, den die Callbacks über `context.data` gemacht haben. Der Aufrufer erhält **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt — oder den eigenen Status des Fehlers, wenn er einen trägt: einen `RebaseApiError`, den Sie ausgelöst haben, das 409 einer Unique-Verletzung.
+- Realtime-Abonnenten erfahren von der Zeile erst nach dem Commit; ein zurückgerollter Schreibvorgang wird nie angekündigt.
+- Ein Callback hält die Transaktion offen, solange er läuft; ein langsamer Callback bedeutet also gehaltene Locks und eine belegte Pool-Verbindung.
 
-Für Operationen, die atomar sein müssen, umwickeln Sie diese mit Fehlerbehandlung:
+Lassen Sie einen Fehler durchschlagen, wenn der auslösende Schreibvorgang ihn nicht überleben soll. Fangen Sie ihn ab, wenn er es soll: Der fehlgeschlagene Schreibvorgang wird für sich allein zurückgenommen, der Rest wird committet.
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, status, context }) => {
+    // Das Update unten speichert diese Collection erneut und löst diesen
+    // Callback erneut aus: nur bei Neuanlage handeln, sonst endet es nie.
+    if (status !== "new") return;
     try {
-        await context.data.jobs.create({
-            title: values.title,
-            status: "published",
-        });
+        await context.data.jobs.create({ title: values.title, status: "published" });
     } catch (error) {
-        // Den Fehler protokollieren — der ursprüngliche Speichervorgang war bereits erfolgreich
-        console.error(`Failed to promote job from submission ${entityId}:`, error);
-        // Optional: Die Einreichung als "promotion_failed" markieren
-        await context.data["job-submissions"].update(entityId, {
+        // Nur das fehlgeschlagene Create wird zurückgenommen. Die Einreichung
+        // und diese Markierung werden committet.
+        await context.data.job_submissions.update(id, {
             promotion_status: "failed",
-            promotion_error: String(error),
+            promotion_error: String(error)
         });
     }
 }
 ```
+
+Arbeit, die die Datenbank verlassen muss — eine E-Mail, ein Webhook, ein Aufruf einer Drittanbieter-API — gehört nicht in den Rumpf des Callbacks. Sie würde die Transaktion für einen Netzwerk-Roundtrip offen halten, und nichts kann sie zurücknehmen, wenn der Schreibvorgang zurückgerollt wird. Stellen Sie dafür einen [Job](/docs/backend/jobs) ein, oder erledigen Sie sie, nachdem der Schreibvorgang zurückgekehrt ist: über einen [Realtime-Kanal](/docs/backend/realtime) veröffentlichen oder `waitUntil` in einer [Custom Function](/docs/backend/custom-functions) verwenden. [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) beschreibt, was wann passt.
+
+Auf MongoDB gilt nichts davon. Dieser Treiber führt dieselben Callbacks ohne Transaktion aus: Der Schreibvorgang ist bereits gespeichert, wenn `afterSave` läuft, und ein Fehler dort meldet das Scheitern, ohne den Schreibvorgang rückgängig zu machen.
 
 ## Daten zwischen Sammlungen synchronisieren
 
