@@ -18,11 +18,30 @@ import { finding, pass, WARN, FAIL } from "../lib/report.mjs";
 export const id = "control-plane";
 export const title = "Deploy targets the plane that actually serves prod";
 
+/**
+ * Any `kubectl` invocation whose verb is one that changes something.
+ *
+ * The flags go between `kubectl` and the verb, and almost nobody writes the
+ * verb first. This used to require them adjacent — `\bkubectl\s+(apply|…)\b` —
+ * so `kubectl -n rebase-shared delete cluster pg-pool-1` was not classified as
+ * deploy-shaped at all, and the destructive-verb rule below never ran for it.
+ *
+ * That is the form a namespaced deletion actually takes, which made the check
+ * blind to essentially every deletion that could destroy tenant data. On
+ * 2026-09-13 a CloudNativePG cluster and two 100 GiB volumes were deleted with
+ * this silent. What it did catch, minutes later, was the same operation spelled
+ * without a flag between the two words.
+ *
+ * `[^|;&]*?` stops at a pipe or separator, so `kubectl get pods | grep delete`
+ * is still not a deletion.
+ */
+const KUBECTL_VERB = /\bkubectl\b[^|;&]*?\s(apply|delete|set\s+image|rollout\s+restart)\b/;
+
 /** Commands that put code or config somewhere real. */
 const DEPLOY_SHAPED = [
     /\bgcloud\s+run\s+deploy\b/,
     /\bgcloud\s+builds\s+submit\b/,
-    /\bkubectl\s+(apply|set\s+image|rollout\s+restart|delete)\b/,
+    KUBECTL_VERB,
     /\bterraform\s+apply\b/,
     /\brebase\s+cloud\s+deploy\b/,
     /\bpnpm\s+(run\s+)?deploy(:\w+)?\b/,
@@ -62,7 +81,9 @@ export function run(_ctx, { command = "" } = {}) {
         );
     }
 
-    if (/\bkubectl\s+delete\b/.test(command)) {
+    // The same adjacency bug as KUBECTL_VERB, and the one that mattered: this
+    // is the rule that BLOCKS, and it only ever saw the two words side by side.
+    if (/\bkubectl\b[^|;&]*?\sdelete\b/.test(command)) {
         found.push(
             finding(
                 id,

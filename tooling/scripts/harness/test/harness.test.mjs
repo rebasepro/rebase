@@ -40,13 +40,43 @@ test("control-plane flags a Cloud Run deploy but not the demo", () => {
 
 test("control-plane blocks destructive kubectl", () => {
     const found = controlPlane.run(null, { command: "kubectl delete ns tenant-42" });
-    assert.ok(blocking(found), "kubectl delete must be blocking, not advisory");
+    assert.ok(blocking(found), "a destructive kubectl verb must be blocking, not advisory");
+});
+
+/**
+ * The forms the rule was blind to, which are the forms people actually type.
+ *
+ * The pattern required `kubectl` and its verb to be adjacent, and the only test
+ * above uses the one spelling where they are. Everything with a flag in between
+ * — which is every namespaced command, and so every command that can destroy
+ * one tenant's data rather than the whole namespace — was not classified as
+ * deploy-shaped at all, so the blocking rule never even ran.
+ *
+ * Found on 2026-09-13 by deleting a CloudNativePG cluster and two 100 GiB
+ * volumes with the gate silent, and then being stopped by it on the namespace
+ * removal that followed: the same operation, one flag shorter.
+ */
+test("control-plane blocks a destructive verb behind flags, not just beside kubectl", () => {
+    const forms = [
+        "kubectl -n rebase-shared delete cluster pg-pool-1",
+        "kubectl --context=gke_x -n tenant-42 delete pvc data-0",
+        "kubectl -n tenant-42 delete secret rebase-platform-env",
+        "kubectl delete ns tenant-42"
+    ];
+    for (const command of forms) {
+        assert.ok(controlPlane.isDeployShaped(command), `must be deploy-shaped: ${command}`);
+        assert.ok(blocking(controlPlane.run(null, { command })), `must block: ${command}`);
+    }
 });
 
 test("control-plane ignores non-deploy commands", () => {
     assert.equal(controlPlane.isDeployShaped("ls -la"), false);
     assert.equal(controlPlane.isDeployShaped("git status"), false);
     assert.equal(controlPlane.isDeployShaped("kubectl apply -f svc.yaml"), true);
+    assert.equal(controlPlane.isDeployShaped("kubectl -n prod apply -f svc.yaml"), true);
+    // A verb that only appears after a pipe is somebody reading, not writing.
+    assert.equal(controlPlane.isDeployShaped("kubectl get pods | grep delete"), false);
+    assert.equal(controlPlane.isDeployShaped("kubectl get deploy -o yaml | tee apply.log"), false);
 });
 
 test("lockfile check only fires inside a worktree", () => {
