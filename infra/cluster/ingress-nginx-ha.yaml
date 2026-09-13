@@ -46,6 +46,25 @@
 #   kubectl patch deploy ingress-nginx-controller -n ingress-nginx \
 #     --type=strategic -p "$(cat infra/cluster/ingress-nginx-spread.yaml)"
 #
+# Then the drain, which is also a template change, so also a roll:
+#
+#   kubectl patch deploy ingress-nginx-controller -n ingress-nginx --type=json -p '[
+#     {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--shutdown-grace-period=40"},
+#     {"op":"add","path":"/spec/minReadySeconds","value":15}]'
+#
+# ## Why the drain, when the budget already keeps one pod up
+#
+# The budget keeps a backend alive; it does not stop the load balancer sending
+# traffic to the node that just lost one. Under `externalTrafficPolicy: Local`
+# the LB drops a node only after its health check fails three times (~24s on
+# GKE), and an nginx that quits on SIGTERM refuses everything routed to it in
+# that window. Measured on production 2026-09-13: a rolling restart without the
+# grace period failed ~25% of requests for ~25s; with it, 2 of 1,336 across the
+# whole roll. `minReadySeconds` is the other half — it holds the next old pod
+# until the LB has had time to admit the new one's node. Autopilot evicts this
+# pod on every node scale-down, so deploys are not the only thing that pays for
+# a missing drain. saas/backend/manifests/ingress-nginx.yaml carries the same.
+#
 # The controller itself is applied from the upstream ingress-nginx manifests and
 # is not managed by Helm here, so nothing reconciles this file automatically. It
 # is the record of what a rebuilt cluster needs, and the thing to re-apply after
