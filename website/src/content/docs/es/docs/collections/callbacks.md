@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e38df91e7b677a9
+sourceHash: f10be03939ad9c7f
 title: Callbacks de Entidad
 sidebar_label: Callbacks
 description: Utilice los callbacks del ciclo de vida para ejecutar lógica personalizada cuando las entidades son creadas, actualizadas, leídas o eliminadas. Incluye la API `context.data` para operaciones entre colecciones.
@@ -156,21 +156,18 @@ beforeSave: async ({ values }) => {
 
 ### `afterSave`
 
-Se invoca después de una operación de guardar exitosa. Utilícelo para efectos secundarios.
+Se invoca después de escribir la fila y antes del commit, dentro de la misma transacción. Un error revierte el guardado; consulta [Semántica de Transacciones](#semántica-de-transacciones).
 
 ```typescript
 afterSave: async ({
     values,         // Saved values
-    entityId,       // Entity ID
-    previousValues, // Previous values (null for new entities)
+    id,             // Entity ID
+    previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
     context
 }) => {
-    // Send webhook
-    await fetch("https://api.slack.com/webhook", {
-        method: "POST",
-        body: JSON.stringify({ text: `New article: ${values.title}` })
-    });
+    // Same transaction as the save: the log row commits with the article or not at all
+    await context.data.audit_log.create({ action: status, article_id: id, title: values.title });
 }
 ```
 
@@ -227,7 +224,7 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Se invoca después de una eliminación exitosa.
+Se invoca después de borrar la fila y antes del commit, dentro de la misma transacción. Un error revierte el borrado.
 
 ```typescript
 afterDelete: async ({
@@ -380,38 +377,38 @@ El comportamiento descrito arriba está verificado de extremo a extremo contra P
 
 ### Semántica de Transacciones
 
-:::warning
-**Las operaciones de `context.data` NO se envuelven automáticamente en la misma transacción que el guardado que las activa.**
-
-El guardado de la entidad original completa primero su transacción de base de datos. Luego se ejecuta `afterSave` y cualquier llamada a `context.data` abre **transacciones separadas**. Si una operación de `context.data` falla en `afterSave`, el guardado original **no se revierte**.
+:::important
+**Lo que un callback escribe con `context.data` forma parte de la escritura que lo activó.** En Postgres, `beforeSave`, el guardado y `afterSave` —o `beforeDelete`, el borrado y `afterDelete`— se ejecutan dentro de una sola transacción; cada callback se espera antes del commit, y `context.data` escribe a través de esa misma transacción.
 :::
 
-Esto significa:
+Así que la escritura que lo activa y todo lo que escribieron sus callbacks se confirman juntos o no se confirman:
 
--   ✅ El guardado que activa la operación siempre se realiza con éxito de forma independiente
--   ⚠️ Las escrituras de efectos secundarios pueden fallar sin afectar la operación original
--   ⚠️ No hay garantía de atomicidad entre el guardado original y las llamadas `context.data` subsiguientes
+-   Un error lanzado en `afterSave` o `afterDelete` revierte la escritura que lo activó, junto con cada escritura que los callbacks hicieron con `context.data`. Al llamante se le responde **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook, o con el estado propio del error cuando lo trae: un `RebaseApiError` que lanzaste, el 409 de una violación de unicidad.
+-   Los suscriptores en tiempo real se enteran de la fila solo después del commit, así que una escritura revertida nunca se anuncia.
+-   Un callback mantiene la transacción abierta mientras se ejecuta, así que uno lento es un bloqueo mantenido y una conexión del pool ocupada.
 
-Para operaciones que deben ser atómicas, envuélvalas en manejo de errores:
+Deja que el error se propague cuando la escritura que lo activó no deba sobrevivirle. Captúralo cuando sí deba: la escritura fallida se deshace por sí sola y el resto se confirma.
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, status, context }) => {
+    // The update below saves this collection again, which runs this callback
+    // again: act on creates only, or it never stops.
+    if (status !== "new") return;
     try {
-        await context.data.jobs.create({
-            title: values.title,
-            status: "published",
-        });
+        await context.data.jobs.create({ title: values.title, status: "published" });
     } catch (error) {
-        // Log the failure — the original save already succeeded
-        console.error(`Failed to promote job from submission ${entityId}:`, error);
-        // Optionally: mark the submission as "promotion_failed"
-        await context.data["job-submissions"].update(entityId, {
+        // Only the failed create is undone. The submission and this marker commit.
+        await context.data.job_submissions.update(id, {
             promotion_status: "failed",
-            promotion_error: String(error),
+            promotion_error: String(error)
         });
     }
 }
 ```
+
+El trabajo que tiene que salir de la base de datos —un correo, un webhook, una llamada a una API de terceros— no va en el cuerpo del callback. Mantendría la transacción abierta durante un viaje de ida y vuelta por la red, y nada puede deshacerlo cuando la escritura se revierte. Encola un [job](/docs/backend/jobs) para ello, o hazlo después de que la escritura regrese: publica en un [canal en tiempo real](/docs/backend/realtime) o usa `waitUntil` en una [función personalizada](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) explica cuál conviene.
+
+En MongoDB nada de esto se cumple. Ese driver ejecuta los mismos callbacks sin transacción, así que la escritura ya está guardada cuando se ejecuta `afterSave`, y un error ahí informa del fallo sin deshacer la escritura.
 
 ## Sincronización de Datos entre Colecciones
 
@@ -462,18 +459,29 @@ Otros patrones entre colecciones:
 
 ## Referencia Completa del Contexto
 
+<span class="since-badge" data-since="0.21">Since 0.21</span>
+
 Cada callback recibe un objeto `context` de tipo `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
     /** The authenticated user, if any */
     user?: User;
-    /** The underlying data driver (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Unified data access — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+    /** The driver running this operation (server-side only) */
+    driver?: DataDriver;
+    /** The query accessor — context.data.<slug>.create/update/find/delete */
+    data: RebaseSdkData;
+    /** Functions, storage, email and dataAsAdmin — but no `data` */
+    client: RebaseCallbackClient;
+    /** The default storage source */
+    storageSource: StorageSource;
 }
 ```
+
+Consulta a través de `context.data`. `context.client` no tiene `data`: en el
+servidor es el singleton `rebase`, cuyo único plano de datos es `dataAsAdmin`,
+con ámbito de administrador, así que `context.client.data` es un error de
+compilación.
 
 ## Próximos Pasos
 

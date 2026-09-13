@@ -13,6 +13,11 @@
  * can look at it. The table is the queue: there is nothing to install, nothing
  * to run alongside Postgres, and a job enqueued in a transaction that rolls
  * back was never enqueued.
+ *
+ * That last clause is kept by the store, not by luck: an enqueue from inside a
+ * write goes on that write's transaction through `rebase.enqueue_job` (see
+ * `job-store.ts` and `db/ambient-transaction.ts`). For a long time it went on
+ * its own connection instead, and the promise was simply untrue.
  */
 
 /** Where a job is in its life. */

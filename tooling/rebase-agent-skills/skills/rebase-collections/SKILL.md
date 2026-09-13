@@ -1313,8 +1313,8 @@ All callbacks receive a `context` property of type `RebaseCallContext<USER>`. Th
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `context.client` | `RebaseClient` | Invoke backend functions, access APIs |
-| `context.data` | `RebaseData` | Unified data access — `context.data.products.create(...)` |
+| `context.client` | `RebaseCallbackClient` | Invoke backend functions, storage, email, `dataAsAdmin`. Has **no** `data` — `context.client.data` does not compile |
+| `context.data` | `RebaseSdkData` | The query accessor in a callback — `context.data.products.create(...)`. Runs with the privilege of whatever triggered the callback, on the write's own transaction |
 | `context.storageSource` | `StorageSource` | File storage operations |
 | `context.user` | `USER \| undefined` | Authenticated user (set by backend in server-side callbacks) |
 
@@ -1412,11 +1412,19 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
 | Callback | When It Runs | Return Value | Can Block? |
 |----------|-------------|--------------|------------|
 | `beforeSave` | Before write to DB (after validation) | Modified `values` (`Partial<EntityValues<M>>`) | Yes (throw to block) |
-| `afterSave` | After successful write | `void` | No |
+| `afterSave` | After the write, **before the commit** | `void` | Yes — a throw rolls the write back |
 | `afterSaveError` | After a failed write | `void` | No |
 | `afterRead` | After reading from DB | Modified row (`Record<string, unknown>`) | No |
-| `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw to block) |
-| `afterDelete` | After successful deletion | `void` | No |
+| `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw, or return `false`) |
+| `afterDelete` | After the delete, **before the commit** | `void` | Yes — a throw rolls the delete back |
+
+> **IMPORTANT FOR AGENTS:** on Postgres, `beforeSave`, the SQL and `afterSave` (or
+> `beforeDelete`, the delete and `afterDelete`) run inside **one transaction**, and
+> `context.data` writes through it. A throw from an after-hook rolls the write back
+> with everything the callbacks wrote, and answers 400 `CALLBACK_REJECTED` with
+> `details.stage` naming the hook. Catch a failed `context.data` write inside the
+> hook and only that write is undone — the rest commits. Never make a network call
+> from an after-hook: it holds the transaction open for the round trip.
 
 ### `callbacks` runs on the server. `admin.browserCallbacks` runs in the panel.
 
@@ -1499,7 +1507,7 @@ title: {
 - **Syncing data between collections** — Use `afterSave` to copy/move entities from one collection to another (e.g., approved submissions → published jobs)
 - **Computed fields** — Use `beforeSave` to generate slugs, timestamps, or derived values
 - **Validation** — Use `beforeSave` to enforce business rules beyond schema validation
-- **Notifications** — Use `afterSave` to send emails, Slack messages, or webhook calls
+- **Notifications** — Not from the `afterSave` body: it runs inside the write's transaction, so an email, Slack message or webhook call there holds the transaction open and cannot be taken back if the write rolls back. Enqueue a job, or send it after the write returns — see [Hooks](https://rebase.pro/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction)
 - **Cascade operations** — Use `afterDelete` to clean up related records in other collections
 - **Data enrichment** — Use `afterRead` to add computed/virtual fields for display
 

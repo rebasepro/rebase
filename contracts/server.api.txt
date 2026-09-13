@@ -230,6 +230,7 @@ function verifyPassword
 function versionProperty
 function waitUntil
 interface AccessTokenPayload { aal, amr, claims, displayName, email, iat, isAnonymous, mfa_verified, photoURL, roles, uid }
+interface AmbientTransaction { afterCommit, exec }
 interface ApiKey { admin, created_at, created_by, expires_at, id, key_hash, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyPermission { collection, operations }
@@ -888,6 +889,7 @@ type QueueHandler
 type RebaseAppConfig
 type RebaseAppType
 type RebaseCallContext { client, data, driver, storageSource, user }
+type RebaseCallbackClient
 type RebaseData
 type RebaseErrorCode
 type RebaseSdkData
@@ -1128,6 +1130,7 @@ function reconcileCursorOrder
 function registerConditionOperations
 function relationDeclaringProperty
 function relationalCollections
+function requireCallbackClient
 function requireCallbackCollection
 function resolveArrayProperties
 function resolveCollectionRelations

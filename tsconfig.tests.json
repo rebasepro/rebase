@@ -176,7 +176,14 @@
     "packages/server/test/mcp-revocation.test.ts",
     "packages/server/test/mcp-hardening.test.ts",
     "packages/server/test/mcp-boot-wiring.test.ts",
-    "packages/server/test/helpers/mcp-harness.ts"
+    "packages/server/test/helpers/mcp-harness.ts",
+    // `packages/server-postgres` carries 1037, so one file, and it is half a
+    // test without this line. It pins a callback's `context.client` to its
+    // type: the runtime half fails when the server hands a `data` the type
+    // does not declare, and the other half is a literal annotated with the
+    // type — a compile error only tsc can report, because this package's jest
+    // transpiles with `isolatedModules` and checks no types at all.
+    "packages/server-postgres/test/callback-context-client.test.ts"
   ],
   "exclude": [
     "**/node_modules",

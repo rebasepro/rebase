@@ -5,6 +5,26 @@ import type { RebaseSdkData } from "./controllers/data";
 import type { User } from "./users";
 
 /**
+ * The client a collection callback is handed as `context.client`: the Rebase
+ * client **without `data`**.
+ *
+ * A callback's queries go through {@link RebaseCallContext.data}. This client
+ * is for everything else — functions, storage, email, and `dataAsAdmin` when a
+ * callback deliberately needs an admin's reach.
+ *
+ * `data` is left off because server-side there is none. The object is the
+ * `rebase` singleton, which omits `data` so that its admin-scoped plane has
+ * exactly one name. This used to be declared as the full `RebaseClient`, so
+ * `context.client.data.collection(…)` compiled and then threw "Cannot read
+ * properties of undefined" in production. In the browser the panel's client
+ * does carry a `data`, but `context.data` is the accessor there too: one name
+ * for a callback's queries on both sides of the wire.
+ *
+ * @group Hooks and utilities
+ */
+export type RebaseCallbackClient<DB = unknown> = Omit<RebaseClient<DB>, "data">;
+
+/**
  * Context that is provided to entity callbacks (hooks).
  * It contains only the dependencies that are available in both the frontend and the backend.
  *
@@ -53,6 +73,8 @@ export type RebaseCallContext<USER extends User = User> = {
      * user-scoped operation to admin. For queries in a callback use
      * {@link data}; come here for functions, storage and email.
      *
+     * There is no `context.client.data`: see {@link RebaseCallbackClient}.
+     *
      * @example
      * // In a beforeSave callback:
      * const result = await context.client.functions.invoke('my-function', { ... });
@@ -62,7 +84,7 @@ export type RebaseCallContext<USER extends User = User> = {
      * const { client } = props.context;
      * const result = await client.functions.invoke('extract-job', { url });
      */
-    client: RebaseClient;
+    client: RebaseCallbackClient;
 
     /**
      * Unified data access — `context.data.products.create(...)`.

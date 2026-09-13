@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b4bd11fc7d22d9f
+sourceHash: 4bf1765ebe335262
 slug: pt/docs/upgrading/0-12-to-0-13
 title: Atualizando de 0.12 para 0.13
 sidebar_label: 0.12 → 0.13
@@ -442,11 +442,12 @@ erro de compilação em vez de um privilégio silencioso. A propriedade ainda ex
 em tempo de execução, como um alias de `dataAsAdmin`, de modo que um backend em
 JavaScript puro continua rodando enquanto você migra — mas não dependa disso.
 
-**Não altere estes casos.** Eles são de escopo do usuário e nunca foram depreciados:
+**Altere estes também.** Esta página os apresentava como de escopo do usuário e nunca depreciados. São o mesmo singleton do servidor, portanto eram o mesmo alias com escopo de administrador:
 
-- `context.client.data` em um callback de entidade — executa sob o RLS do chamador
-- `client.data` em um handler de cron — um `RebaseClient`
-- `rebase.data` em um SDK gerado ou aplicação no navegador — um objeto diferente
+- `context.client.data` em um callback de entidade → `context.data`, o acessor das consultas nos callbacks. Executa com o privilégio do que disparou o callback, e `context.client.data` não compila nas versões atuais.
+- `client.data` em um handler de cron → `client.dataAsAdmin` (a partir da 0.14 o contexto do handler o chama de `rebase`)
+
+**Não altere este:** `rebase.data` em um SDK gerado ou aplicação no navegador é um objeto diferente.
 
 E para consultas com escopo de usuário dentro de um manipulador de requisição, nenhum
 dos nomes é o que você procura: use `c.var.driver`, que transporta a identidade do chamador.

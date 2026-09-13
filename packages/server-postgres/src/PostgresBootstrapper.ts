@@ -1201,10 +1201,10 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
 
-            await ensureHistoryTableExists(db);
+            const inTransaction = await ensureHistoryTableExists(db);
 
             const retention = typeof config === "object" ? config.retention : undefined;
-            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined);
+            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, { inTransaction });
 
             return { historyService };
         },

@@ -1,5 +1,5 @@
 ---
-sourceHash: 713d80a42d70ff87
+sourceHash: 77aa7e43ab714fa6
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
 description: Verwenden Sie Entity-Callbacks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offen zu halten.
@@ -24,7 +24,7 @@ Also: niemals `await` auf eine ausgehende HTTP-Anfrage in einem Callback. Stelle
 ## Slack-Benachrichtigung bei neuer Bestellung
 
 `WebhookDispatcher` wird aus `@rebasepro/server` exportiert. `enqueueEntityChange` kehrt sofort
-zurück — der POST passiert, nachdem der Callback zurückgekehrt ist, außerhalb der Transaktion — und
+zurück — der POST passiert, sobald der Schreibvorgang committet ist, nie für einen zurückgerollten — und
 der Dispatcher validiert das Ziel, signiert die Nutzlast, begrenzt jeden Versuch mit einer Frist und
 wiederholt Fehlschläge.
 
@@ -75,8 +75,7 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 Die Warteschlange liegt im Prozess und im Speicher: ein Absturz oder ein Deploy zwischen dem
-Einreihen und der Zustellung verliert das Ereignis, und der Empfänger sieht die Benachrichtigung
-womöglich einige Millisekunden, bevor die Zeile committet ist. Rufen Sie beim Herunterfahren
+Commit und der Zustellung verliert das Ereignis. Rufen Sie beim Herunterfahren
 `await dispatcher.flush()` auf. Sollen Zustellungen einen Neustart überleben, schreiben Sie eine
 Outbox-Zeile in derselben Transaktion und leeren Sie sie aus einem Job.
 

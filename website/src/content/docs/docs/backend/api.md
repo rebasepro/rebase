@@ -518,19 +518,16 @@ REST](/docs/backend/writes/)**.
 
 ## Lifecycle Hook Pipeline
 
-Every REST mutation operation (`POST`, `PATCH`, `DELETE`) runs through a strict, sequential hook execution pipeline:
+On Postgres, every REST mutation (`POST`, `PATCH`, `DELETE`) runs its collection's callbacks in order, inside the one transaction that carries the write:
 
 ```
-Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
+Request ──► BEGIN ──► beforeSave/beforeDelete ──► DB operation ──► afterSave/afterDelete ──► COMMIT ──► Response
 ```
 
-### Blocking vs. Deferred Hooks
+Every hook is awaited, and a throw from any of them undoes the whole write:
 
-1. **Blocking Hooks (`beforeSave`, `beforeDelete`)**
-   These hooks are executed synchronously in the main request cycle *before* committing the database transaction. They can modify incoming payloads, run custom validations, or abort the request entirely by throwing an error.
-
-2. **Deferred Hooks (`afterSave`, `afterDelete`)**
-   These hooks execute asynchronously after the database transaction has successfully committed. They use deferred promises (fire-and-forget), meaning they run in the background and do not block the client's HTTP response. Ideal for sending webhooks, triggering push notifications, or queuing external tasks.
+1. **`beforeSave`, `beforeDelete`** run before the write. They can change the incoming values, validate, or refuse the request by throwing — the caller gets **400 `CALLBACK_REJECTED`** and nothing is written.
+2. **`afterSave`, `afterDelete`** run after the write but *before* the commit. A throw rolls the row back and answers the same 400, with `details.stage` naming the hook. They hold the transaction open while they run, which makes them the wrong place for a webhook or any other network call — [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says where that work goes.
 
 ## System endpoints
 

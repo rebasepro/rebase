@@ -409,7 +409,7 @@ A refused destination comes back as `success: false` with the reason in `respons
 
 The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations. Use `enqueueEntityChange()` here, never `await onEntityChange()`:
 
-> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts, per matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and delivers after the callback returns, which is why it is the pattern for callbacks.
+> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts, per matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
 
 ```typescript
 // config/collections/orders.ts
@@ -616,9 +616,9 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 
 ### `enqueueEntityChange(table, event, id, entity, previousEntity?): void`
 
-Same matching and same payload, queued instead of awaited. Returns `void` immediately; the deliveries run on an in-process drain loop after the caller returns, so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
+Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop, so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
 
-By default the queue is **in memory**: a crash or a deploy between the enqueue and the delivery drops the event, and the receiver may see the notification a few milliseconds before the row is committed.
+By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event.
 
 #### Durable delivery
 
@@ -687,7 +687,7 @@ If you don't want webhook delivery to block your API response — and inside a c
 
 ```typescript
 afterSave: async ({ id, values, collection }) => {
-    // Returns void. Delivery happens after this callback returns.
+    // Returns void. Delivery is queued once this write commits.
     dispatcher.enqueueEntityChange(collection.slug, "INSERT", String(id), values);
 },
 ```

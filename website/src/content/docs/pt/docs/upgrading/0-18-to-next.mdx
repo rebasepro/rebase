@@ -1,0 +1,49 @@
+---
+sourceHash: fc1823b20f5de5c5
+slug: pt/docs/upgrading/0-18-to-next
+title: Atualizar de 0.18 para a próxima versão
+sidebar_label: 0.18 → next
+description: As alterações incompatíveis que já estão em main e descritas nesta documentação, antes de existir a versão que as publica.
+---
+
+# Atualizar 0.18 → next
+
+**Nada disto está publicado.** São as entradas `### Breaking` da seção
+[`[Unreleased]`](/pt/docs/changelog/) do changelog: estão em `main`, e este site de
+documentação publica a partir de `main`, portanto aparecem aqui antes de existir
+a versão que as contém. Se você instalou a partir do npm, está na 0.20 e nada
+disto chegou até você. A 0.19 e a 0.20 não declaram nenhuma alteração
+incompatível, então este é um único salto a partir da 0.18.
+
+---
+
+## 31. `context.client.data` não compila mais em um callback de coleção
+
+`RebaseCallContext["client"]` agora é `RebaseCallbackClient`: `RebaseClient` sem
+`data`. No servidor, esse cliente é o singleton `rebase`, que não tem `data`
+desde a 0.18, então `context.client.data.collection(…)` compilava e depois
+lançava `Cannot read properties of undefined (reading 'collection')` a cada
+chamada. Agora é um erro de compilação.
+
+**O que mudar:** consulte pelo `context.data`, o acessor que as consultas de um
+callback sempre deveriam usar. Ele roda com o privilégio do que disparou o
+callback, na própria transação da escrita. O
+[guia de callbacks](/pt/docs/collections/callbacks/) descreve o que cada acessor
+do contexto alcança.
+
+```diff lang="ts"
+ afterSave: async ({ context }) => {
+-    await context.client.data.audit_logs.create({ action: "approved" });
++    await context.data.audit_logs.create({ action: "approved" });
+ }
+```
+
+```bash
+grep -rn "client\.data\b" config
+```
+
+`context.client.dataAsAdmin` continua disponível para um callback que precisa
+ver o que um administrador pode ver. `admin.browserCallbacks` também muda: lá a
+forma antiga funcionava, porque o cliente do painel tem `data`, e mesmo assim
+deixa de compilar. `useRebaseContext().client` em um componente React mantém seu
+`data`.

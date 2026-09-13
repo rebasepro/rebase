@@ -11,6 +11,41 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Breaking
+
+- **`context.client.data` no longer compiles in a collection callback.** A
+  callback's queries go through `context.data`. `RebaseCallContext["client"]`
+  is now `RebaseCallbackClient`, which is `RebaseClient` without `data`. The old
+  spelling used to compile and then, on the server, throw `Cannot read
+  properties of undefined (reading 'collection')` on every call.
+
+  A server-side callback's client is the `rebase` singleton, which has had no
+  `data` since 0.18.0: its admin-scoped plane is spelled `dataAsAdmin` and
+  nothing else. The type kept saying `RebaseClient` because the driver passed
+  the object through a cast. A hook that caught the error failed silently —
+  Rebase Cloud's own stop and start hooks flipped a project's status that way
+  and paused nothing.
+
+  ```diff ts
+   afterSave: async ({ context }) => {
+  -    await context.client.data.audit_logs.create({ action: "approved" });
+  +    await context.data.audit_logs.create({ action: "approved" });
+   }
+  ```
+
+  `context.data` runs with the privilege of whatever triggered the callback, on
+  the write's own transaction. `context.client.dataAsAdmin` is still there for a
+  callback that must see what an admin may see.
+
+  In `admin.browserCallbacks` the panel's client does carry `data`, so the old
+  spelling ran there; it stops compiling too, and `context.data`, the panel's
+  own data source, replaces it. `useRebaseContext().client` is unchanged and
+  still has `data`.
+
+  A driver that was never given the server client — one constructed outside
+  `initializeRebaseBackend`, or one it missed — now refuses a callback's read of
+  `context.client` with a 500 that says so, instead of handing it `undefined`.
+
 ### Added
 
 - **`cms` — say where your admin panel is, and Rebase Cloud will link to it.**
@@ -56,6 +91,29 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   PostgreSQL the platform does not run.
 
 ### Fixed
+
+- **A job, queue message, topic event or history entry written from a callback
+  now commits with the write, and never without it.** The jobs guide, the queue
+  and topic handles and the hooks guide all promised that "a job enqueued in a
+  transaction that rolls back was never enqueued", and the history service that
+  an entry commits with its row. Neither held. Both were written through the
+  default driver's own pool connection, in autocommit: a job enqueued from an
+  `afterSave` that then threw stayed queued for a row that was never written,
+  and a worker could claim it before the row committed; a batch that rolled
+  back after its first row kept that row's history entry.
+
+  Inside a write they now go on the write's own transaction. That transaction
+  runs as the restricted request role, which is revoked from `rebase.jobs` and
+  `rebase.entity_history` on purpose, so each goes through one narrow
+  `SECURITY DEFINER` function — `rebase.enqueue_job` and
+  `rebase.record_history`, created at boot and executable only by that role. An
+  idempotency-key clash inside a write answers `null` instead of aborting it.
+  Webhook deliveries queued from a callback wait for the commit and are dropped
+  with a rollback. Outside a write — a custom function, a cron — an enqueue
+  commits at once, as before.
+
+  A database that refuses to create the functions is reported at boot, and both
+  fall back to the old behaviour rather than failing writes.
 
 - **A global callback is never handed a collection that is not there.** Every
   callback props type declares `collection: CollectionConfig` — non-optional,
@@ -3945,7 +4003,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   `RebaseServerClient` now extends `Omit<RebaseClient, "data">`, so this is a compile error rather than a silent privilege. **The property still exists at runtime**, aliasing `dataAsAdmin`, so an untyped JavaScript caller keeps working instead of failing on `undefined` mid-upgrade — the type is the contract, and it is the type that changed.
 
-  Unaffected, because their accessor is genuinely user-scoped and was never deprecated: `context.client.data` in entity callbacks, and `client.data` in a cron handler — both are `RebaseClient`. Also unaffected: `rebase.data` in a **generated SDK** or browser app, which is a different object entirely.
+  *Corrected since release:* this paragraph listed `context.client.data` in entity callbacks and `client.data` in a cron handler as unaffected and user-scoped. Neither was. Both are this same server singleton, so both were this same admin-scoped alias, and both went with it. In a callback, query through `context.data`, which runs with the privilege of whatever triggered the callback; in a cron handler, use `rebase.dataAsAdmin` from its context. Unaffected: `rebase.data` in a **generated SDK** or browser app, which is a different object entirely.
 
   For user-scoped queries inside a request handler, neither name is right: use the request-scoped driver (`c.var.driver`), which carries the caller's identity so RLS applies.
 

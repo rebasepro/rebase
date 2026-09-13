@@ -1,6 +1,7 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK } from "../src/services/webhook-service";
 import type { JobQueueClient } from "../src/jobs";
+import { setAmbientTransactionResolver } from "../src/db/ambient-transaction";
 
 /**
  * Webhook deliveries as rows rather than as an array in one process's heap.
@@ -198,5 +199,59 @@ describe("running a queued delivery", () => {
         } finally {
             fetchSpy.mockRestore();
         }
+    });
+});
+
+/**
+ * Called from a callback, `enqueueEntityChange` is inside the write it
+ * describes. It used to queue straight away, so a receiver could hear about a
+ * row a few milliseconds before it committed — or about one that never did.
+ * The driver publishes the write's transaction (`setAmbientTransactionResolver`);
+ * deliveries wait for its commit and are dropped with its rollback.
+ */
+describe("a change reported from inside a write", () => {
+    afterEach(() => setAmbientTransactionResolver(undefined));
+
+    function insideAWrite() {
+        const onCommit: Array<() => void> = [];
+        setAmbientTransactionResolver(() => ({
+            exec: async () => [],
+            afterCommit: (fn) => { onCommit.push(fn); }
+        }));
+        return {
+            commit() {
+                setAmbientTransactionResolver(undefined);
+                for (const fn of onCommit.splice(0)) fn();
+            }
+        };
+    }
+
+    it("queues nothing until the write commits", async () => {
+        const queue = fakeQueue();
+        const dispatcher = new WebhookDispatcher({ jobQueue: queue });
+        dispatcher.setWebhooks([WEBHOOK]);
+        const write = insideAWrite();
+
+        dispatcher.enqueueEntityChange("orders", "INSERT", "1", { id: "1" });
+        await dispatcher.flush();
+        expect(queue.enqueued).toHaveLength(0);
+
+        write.commit();
+        await dispatcher.flush();
+        expect(queue.enqueued).toHaveLength(1);
+    });
+
+    it("queues nothing at all when the write rolls back", async () => {
+        const queue = fakeQueue();
+        const dispatcher = new WebhookDispatcher({ jobQueue: queue });
+        dispatcher.setWebhooks([WEBHOOK]);
+        insideAWrite();
+
+        dispatcher.enqueueEntityChange("orders", "INSERT", "1", { id: "1" });
+        // A rollback is the commit never coming: nothing runs the hooks.
+        setAmbientTransactionResolver(undefined);
+        await dispatcher.flush();
+
+        expect(queue.enqueued).toHaveLength(0);
     });
 });

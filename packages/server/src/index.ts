@@ -59,6 +59,11 @@ export {
 // DB Abstractions (for database driver implementations)
 // =============================================================================
 export * from "./db/interfaces";
+// The shape a driver publishes for the write transaction it opened; the job
+// store and the webhook dispatcher read it. A type only: the driver writes the
+// slot directly (see the file), so no version of either package can fail to
+// link against the other.
+export type { AmbientTransaction } from "./db/ambient-transaction";
 
 // =============================================================================
 // Auth — curated public surface (NOT `export *`).

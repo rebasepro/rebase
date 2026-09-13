@@ -23,7 +23,7 @@
  * on rebase.pro for weeks before the version that stamps them exists. The guide
  * reported "all 7 covered" while five `### Breaking` entries had no destination
  * at all. So `[Unreleased]` is a version here, its destination is
- * {@link NEXT_PAGE}, and that one page is held to a stricter rule than the
+ * {@link nextPage}, and that one page is held to a stricter rule than the
  * released hops: **one `## ` section per Breaking bullet**. A released page is
  * written once and then frozen; the unreleased one has bullets arriving under it
  * every week, and "names the version" is satisfied forever by the first section
@@ -43,8 +43,27 @@ const CHANGELOG = "CHANGELOG.md";
 // moved to the page for its hop.
 const GUIDE = "website/src/content/docs/docs/upgrading.mdx";
 const GUIDE_PAGES = "website/src/content/docs/docs/upgrading/*.mdx";
-/** Where an `## [Unreleased]` breaking change has to land. */
-const NEXT_PAGE = "website/src/content/docs/docs/upgrading/0-17-to-next.mdx";
+/**
+ * Where an `## [Unreleased]` breaking change has to land: `<X>-to-next.mdx`,
+ * where X is the release the newest released hop ends at.
+ *
+ * Derived, because it was a constant — `0-17-to-next.mdx` — and the 0.18.0
+ * release renamed that page to `0-17-to-0-18.mdx` without touching it. The
+ * next Breaking bullet was then sent to a page that would have been a second
+ * hop from 0.17. Read from the hop pages, the destination moves with the
+ * rename that releases it.
+ */
+function nextPage(root) {
+    let newest = null;
+    for (const file of globSync(GUIDE_PAGES, { cwd: root })) {
+        const m = path.basename(file).match(/^\d+-\d+-to-(\d+)-(\d+)\.mdx$/);
+        if (!m) continue;
+        const to = [Number(m[1]), Number(m[2]), 0];
+        if (!newest || isOlder(newest, to)) newest = to;
+    }
+    if (!newest) throw new Error(`No released hop matches ${GUIDE_PAGES} — nothing to derive the next page from.`);
+    return `website/src/content/docs/docs/upgrading/${newest[0]}-${newest[1]}-to-next.mdx`;
+}
 /** The label the changelog gives the section that has no version yet. */
 const UNRELEASED = "Unreleased";
 
@@ -105,6 +124,7 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
     const findings = [];
     for (const { version, entries, bullets } of breaking) {
         if (version === UNRELEASED) {
+            const NEXT_PAGE = nextPage(root);
             let page;
             try {
                 page = readFileSync(path.join(root, NEXT_PAGE), "utf8");

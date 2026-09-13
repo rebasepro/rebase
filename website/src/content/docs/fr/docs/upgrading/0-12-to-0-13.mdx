@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b4bd11fc7d22d9f
+sourceHash: 4bf1765ebe335262
 slug: fr/docs/upgrading/0-12-to-0-13
 title: Mise à niveau de 0.12 vers 0.13
 sidebar_label: 0.12 → 0.13
@@ -436,11 +436,12 @@ erreur de compilation plutôt que d'un privilège silencieux. La propriété est
 runtime sous forme d'alias vers `dataAsAdmin`, de sorte qu'un backend en JavaScript pur continue de fonctionner
 pendant votre migration — mais ne comptez pas là-dessus.
 
-**Ne modifiez pas ceux-là.** Ils sont restreints à l'utilisateur et n'ont jamais été dépréciés :
+**Modifiez aussi ceux-là.** Cette page les présentait comme restreints à l'utilisateur et jamais dépréciés. Il s'agit du même singleton serveur, donc du même alias limité à l'administrateur :
 
-- `context.client.data` dans un callback d'entité — s'exécute sous le RLS de l'appelant
-- `client.data` dans un gestionnaire de cron — un `RebaseClient`
-- `rebase.data` dans un SDK généré ou une application navigateur — un objet différent
+- `context.client.data` dans un callback d'entité → `context.data`, l'accesseur des requêtes dans les callbacks. Il s'exécute avec le privilège de ce qui a déclenché le callback, et `context.client.data` ne compile plus dans les versions actuelles.
+- `client.data` dans un gestionnaire de cron → `client.dataAsAdmin` (depuis la 0.14, le contexte du gestionnaire le nomme `rebase`)
+
+**Ne modifiez pas celui-ci :** `rebase.data` dans un SDK généré ou une application navigateur est un objet différent.
 
 Et pour les requêtes restreintes à l'utilisateur à l'intérieur d'un gestionnaire de requêtes, aucun de ces deux noms n'est ce que vous
 recherchez : utilisez `c.var.driver`, qui porte l'identité de l'appelant.

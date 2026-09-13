@@ -1,0 +1,49 @@
+---
+sourceHash: fc1823b20f5de5c5
+slug: es/docs/upgrading/0-18-to-next
+title: Actualizar de 0.18 a la próxima versión
+sidebar_label: 0.18 → next
+description: Los cambios incompatibles que ya están en main y descritos en esta documentación, antes de que exista la versión que los publica.
+---
+
+# Actualizar 0.18 → next
+
+**Nada de esto está publicado.** Son las entradas `### Breaking` de la sección
+[`[Unreleased]`](/es/docs/changelog/) del changelog: están en `main`, y este sitio
+de documentación se publica desde `main`, así que aparecen aquí antes de que
+exista la versión que las lleva. Si instalaste desde npm estás en 0.20 y nada de
+esto te ha llegado todavía. 0.19 y 0.20 no declaran ningún cambio incompatible,
+así que esto es un solo salto desde 0.18.
+
+---
+
+## 31. `context.client.data` ya no compila en un callback de colección
+
+`RebaseCallContext["client"]` es ahora `RebaseCallbackClient`: `RebaseClient`
+sin `data`. En el servidor ese cliente es el singleton `rebase`, que no tiene
+`data` desde 0.18, así que `context.client.data.collection(…)` compilaba y luego
+lanzaba `Cannot read properties of undefined (reading 'collection')` en cada
+llamada. Ahora es un error de compilación.
+
+**Qué cambiar:** consulta a través de `context.data`, el accesor que las
+consultas de un callback siempre debieron usar. Se ejecuta con el privilegio de
+lo que haya disparado el callback, en la propia transacción de la escritura.
+La [guía de callbacks](/es/docs/collections/callbacks/) explica a qué llega cada
+accesor del contexto.
+
+```diff lang="ts"
+ afterSave: async ({ context }) => {
+-    await context.client.data.audit_logs.create({ action: "approved" });
++    await context.data.audit_logs.create({ action: "approved" });
+ }
+```
+
+```bash
+grep -rn "client\.data\b" config
+```
+
+`context.client.dataAsAdmin` sigue ahí para un callback que deba ver lo que puede
+ver un administrador. `admin.browserCallbacks` también cambia: allí la forma
+antigua funcionaba, porque el cliente del panel tiene `data`, y aun así deja de
+compilar. `useRebaseContext().client` en un componente de React conserva su
+`data`.

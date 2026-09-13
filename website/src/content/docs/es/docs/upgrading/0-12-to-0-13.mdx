@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b4bd11fc7d22d9f
+sourceHash: 4bf1765ebe335262
 slug: es/docs/upgrading/0-12-to-0-13
 title: Actualización de 0.12 a 0.13
 sidebar_label: 0.12 → 0.13
@@ -437,11 +437,12 @@ error de compilación en lugar de un privilegio silencioso. La propiedad todaví
 tiempo de ejecución como alias de `dataAsAdmin`, por lo que un backend en JavaScript puro sigue funcionando
 mientras migras — pero no dependas de ello.
 
-**No toques estos.** Tienen ámbito de usuario y nunca fueron declarados obsoletos:
+**Cambia estos también.** Esta página los presentaba con ámbito de usuario y nunca declarados obsoletos. Son el mismo singleton del servidor, así que eran el mismo alias con ámbito de administrador:
 
-- `context.client.data` en un callback de entidad — se ejecuta bajo el RLS del invocador
-- `client.data` en un cron handler — un `RebaseClient`
-- `rebase.data` en un SDK generado o aplicación de navegador — un objeto diferente
+- `context.client.data` en un callback de entidad → `context.data`, el accesor de las consultas en los callbacks. Se ejecuta con el privilegio de lo que haya disparado el callback, y `context.client.data` no compila en las versiones actuales.
+- `client.data` en un cron handler → `client.dataAsAdmin` (desde 0.14 el contexto del handler lo llama `rebase`)
+
+**No toques este:** `rebase.data` en un SDK generado o aplicación de navegador es un objeto diferente.
 
 Y para consultas con ámbito de usuario dentro de un request handler, ninguno de los dos nombres es lo
 que buscas: usa `c.var.driver`, que transporta la identidad del invocador.

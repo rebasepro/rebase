@@ -1,5 +1,5 @@
 ---
-sourceHash: 50497f876941204d
+sourceHash: 02ee62af305e1df6
 slug: de/docs/upgrading
 title: Upgrade
 description: Was bricht, wenn Sie eine bestehende App auf das aktuelle Release umstellen, und was Sie jeweils tun müssen.
@@ -8,6 +8,8 @@ description: Was bricht, wenn Sie eine bestehende App auf das aktuelle Release u
 # Upgrade einer bestehenden App
 
 Sind Sie bereits auf 0.17? Der Sprung auf 0.18 ist veröffentlicht und hier beschrieben: [0.17 → 0.18](/de/docs/upgrading/0-17-to-0-18/).
+
+Auf 0.18 oder neuer? Was auf `main` bereits zusammengeführt, aber noch nicht veröffentlicht ist, steht hier: [0.18 → next](/de/docs/upgrading/0-18-to-next/).
 
 Dieses Release entfernt das `auth`-Schema, benennt Pakete um, ändert die Bedeutung von `id`, stellt CJS ein, verschiebt das Admin-Panel zu react-router 8 und — was am wichtigsten ist — **behebt drei Wege, über die Zugriff gewährt werden konnte, nach dem Sie nicht gefragt haben**: eine Sicherheitsregel, die stillschweigend permissiv war, und zwei Fälle beim Realtime-Socket. Lesen Sie die ersten drei Abschnitte vor allem anderen. Abschnitt 0 ändert SQL, das Sie möglicherweise manuell geschrieben haben; Abschnitte 1 und 2 ändern, wer Ihre Daten lesen kann, und keiner davon kündigt sich von selbst an.
 
@@ -301,11 +303,12 @@ grep -rn "rebase\.data\b" src config backend
 
 `RebaseServerClient` erweitert nun `Omit<RebaseClient, "data">`, sodass dies ein Kompilierungsfehler ist und kein stillegtes Privileg mehr darstellt. Die Eigenschaft ist zur Laufzeit weiterhin vorhanden und bildet einen Alias für `dataAsAdmin`, sodass ein Backend in reinem JavaScript während der Migration weiterläuft — verlassen Sie sich jedoch nicht darauf.
 
-**Lassen Sie diese unverändert.** Sie sind benutzerbezogen und waren nie veraltet:
+**Ändern Sie diese ebenfalls.** Diese Seite führte sie früher als benutzerbezogen und nie veraltet. Sie sind dasselbe Server-Singleton und waren damit derselbe admin-gebundene Alias:
 
-- `context.client.data` in einem Entity-Callback — läuft unter dem RLS des Aufrufers
-- `client.data` in einem Cron-Handler — ein `RebaseClient`
-- `rebase.data` in einem generierten SDK oder einer Browser-App — ein anderes Objekt
+- `context.client.data` in einem Entity-Callback → `context.data`, der Accessor für Abfragen in Callbacks. Er läuft mit den Rechten dessen, was den Callback ausgelöst hat, und `context.client.data` kompiliert in aktuellen Versionen nicht.
+- `client.data` in einem Cron-Handler → `client.dataAsAdmin` (ab 0.14 heißt es im Kontext des Handlers `rebase`)
+
+**Lassen Sie dies unverändert:** `rebase.data` in einem generierten SDK oder einer Browser-App ist ein anderes Objekt.
 
 Und für benutzerbezogene Abfragen innerhalb eines Request-Handlers ist keiner der beiden Namen das, was Sie wollen: Verwenden Sie `c.var.driver`, was die Identität des Aufrufers trägt.
 

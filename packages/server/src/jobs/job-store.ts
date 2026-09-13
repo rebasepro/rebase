@@ -1,8 +1,9 @@
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { revokeInternalTableSql, sqlRows, firstSqlRow } from "@rebasepro/common";
+import { REBASE_USER_ROLE, revokeInternalTableSql, sqlRows, firstSqlRow } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper, hasInCauseChain, type SqlExec } from "../boot/ddl-bootstrap.js";
+import { currentAmbientTransaction } from "../db/ambient-transaction.js";
 import type { JobRecord } from "./types.js";
 
 /**
@@ -59,6 +60,31 @@ function isUniqueViolation(err: unknown): boolean {
     return hasInCauseChain(err, (e) => e.code === "23505");
 }
 
+/**
+ * How a job gets into `rebase.jobs` from inside somebody else's transaction.
+ *
+ * An enqueue from a collection callback has to ride the write's transaction —
+ * committed with it, discarded with it, invisible to workers until then — and
+ * that transaction runs as the request's restricted role, which has no access
+ * to `rebase.jobs` at all (see the revoke in `ensureTable`). This function is
+ * the one door: `SECURITY DEFINER`, so the insert runs with the owner's rights
+ * for that one statement and the transaction's role never changes. Switching
+ * the role for the insert instead would elevate the whole connection for as
+ * long as the insert took, and a callback's un-awaited statement would run
+ * in that window as the owner.
+ *
+ * The door is narrow on purpose. It takes the five columns an enqueue sets and
+ * nothing else, so it cannot claim, complete or rewrite a job — and only the
+ * request role is granted it, not PUBLIC. That role runs statements the server
+ * writes; nobody outside gets SQL as it.
+ *
+ * `ON CONFLICT DO NOTHING` rather than a caught unique violation: an error
+ * inside a transaction aborts the whole transaction, so an idempotency clash
+ * would have failed the customer's write. A clash returns no row, hence NULL.
+ */
+const ENQUEUE_FUNCTION = "rebase.enqueue_job";
+const ENQUEUE_SIGNATURE = `${ENQUEUE_FUNCTION}(text, jsonb, timestamptz, integer, text)`;
+
 export interface JobStore {
     ensureTable(): Promise<void>;
     /** Returns the new job's id, or `null` if an idempotency key matched unfinished work. */
@@ -98,6 +124,14 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
         execRaw(sqlText, params ? { params } : undefined);
 
     const ddl = createDdlBootstrapper(execRaw, "jobs");
+
+    /**
+     * Whether {@link ENQUEUE_FUNCTION} exists, so an enqueue inside a write can
+     * ride its transaction. Decided at boot rather than assumed: a database
+     * that refused the function would otherwise fail every write whose callback
+     * enqueues, where falling back to the old behaviour only loses atomicity.
+     */
+    let enqueueInTransaction = false;
 
     return {
         async ensureTable(): Promise<void> {
@@ -168,6 +202,44 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 await ddl.step("Revoking end-user access to jobs", () =>
                     exec(revokeInternalTableSql("rebase", "jobs")));
 
+                await ddl.ensureObject(`Creating ${ENQUEUE_FUNCTION}`, `
+                    CREATE OR REPLACE FUNCTION ${ENQUEUE_FUNCTION}(
+                        p_task text, p_payload jsonb, p_run_at timestamptz,
+                        p_max_attempts integer, p_idempotency_key text
+                    ) RETURNS text
+                    LANGUAGE sql
+                    SECURITY DEFINER
+                    SET search_path = pg_catalog, pg_temp
+                    AS $fn$
+                        INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
+                        VALUES (p_task, p_payload, p_run_at, p_max_attempts, p_idempotency_key)
+                        ON CONFLICT DO NOTHING
+                        RETURNING id
+                    $fn$
+                `);
+                // Re-applied every boot: a new function is executable by PUBLIC
+                // until told otherwise, and the request role may be provisioned
+                // after the function was first made.
+                await ddl.step(`Granting ${ENQUEUE_FUNCTION} to the request role`, async () => {
+                    await exec(`REVOKE ALL ON FUNCTION ${ENQUEUE_SIGNATURE} FROM PUBLIC`);
+                    await exec(`
+                        DO $grant$ BEGIN
+                            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}') THEN
+                                GRANT EXECUTE ON FUNCTION ${ENQUEUE_SIGNATURE} TO ${REBASE_USER_ROLE};
+                            END IF;
+                        END $grant$
+                    `);
+                });
+                enqueueInTransaction = firstSqlRow<{ present: boolean }>(await exec(
+                    `SELECT to_regprocedure('${ENQUEUE_SIGNATURE}') IS NOT NULL AS present`
+                ))?.present === true;
+                if (!enqueueInTransaction) {
+                    logger.warn(
+                        `⚠️ [jobs] ${ENQUEUE_FUNCTION} could not be created, so a job enqueued inside a write ` +
+                        "commits on its own: it stays queued if the write rolls back."
+                    );
+                }
+
                 logger.info("✅ Job queue table ready");
             } else {
                 logger.error(
@@ -178,18 +250,30 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
         },
 
         async insert(job): Promise<string | null> {
+            const params = [
+                job.task,
+                JSON.stringify(job.payload ?? null),
+                job.runAt.toISOString(),
+                job.maxAttempts,
+                job.idempotencyKey ?? null
+            ];
+            // Inside a write: on its transaction, through the definer function
+            // — see `ENQUEUE_FUNCTION`. Checked and used with no `await`
+            // between, so the transaction cannot close in the gap.
+            const ambient = enqueueInTransaction ? currentAmbientTransaction() : undefined;
+            if (ambient) {
+                const rows = await ambient.exec(
+                    `SELECT ${ENQUEUE_FUNCTION}($1::text, $2::jsonb, $3::timestamptz, $4::integer, $5::text) AS id`,
+                    params
+                );
+                return (rows?.[0]?.id as string | null | undefined) ?? null;
+            }
             try {
                 const rows = await exec(
                     `INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
                      VALUES ($1, $2::jsonb, $3, $4, $5)
                      RETURNING id`,
-                    [
-                        job.task,
-                        JSON.stringify(job.payload ?? null),
-                        job.runAt.toISOString(),
-                        job.maxAttempts,
-                        job.idempotencyKey ?? null
-                    ]
+                    params
                 );
                 return (rows?.[0]?.id as string) ?? null;
             } catch (error) {

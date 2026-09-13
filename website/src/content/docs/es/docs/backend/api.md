@@ -1,5 +1,5 @@
 ---
-sourceHash: 2499dc27f2076f94
+sourceHash: 862b9b1d6de22bdd
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -434,19 +434,16 @@ Las claves de idempotencia, las escrituras condicionales (`ETag` / `If-Match`), 
 
 ## Pipeline de hooks del ciclo de vida
 
-Cada operación de mutación REST (`POST`, `PATCH`, `DELETE`) se ejecuta a través de una canalización estricta y secuencial de ejecución de hooks:
+En Postgres, cada mutación REST (`POST`, `PATCH`, `DELETE`) ejecuta los callbacks de su colección en orden, dentro de la única transacción que lleva la escritura:
 
 ```
-Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
+Request ──► BEGIN ──► beforeSave/beforeDelete ──► DB operation ──► afterSave/afterDelete ──► COMMIT ──► Response
 ```
 
-### Hooks bloqueantes vs. diferidos
+Cada hook se espera, y un error en cualquiera de ellos deshace toda la escritura:
 
-1. **Hooks bloqueantes (`beforeSave`, `beforeDelete`)**
-   Estos hooks se ejecutan sincrónicamente en el ciclo principal de la solicitud *antes* de confirmar la transacción en la base de datos. Pueden modificar las cargas útiles entrantes, ejecutar validaciones personalizadas o cancelar la solicitud por completo lanzando un error.
-
-2. **Hooks diferidos (`afterSave`, `afterDelete`)**
-   Estos hooks se ejecutan asincrónicamente después de que la transacción en la base de datos se haya confirmado con éxito. Utilizan promesas diferidas (fire-and-forget), lo que significa que se ejecutan en segundo plano y no bloquean la respuesta HTTP al cliente. Son ideales para enviar webhooks, disparar notificaciones push o poner en cola tareas externas.
+1. **`beforeSave`, `beforeDelete`** se ejecutan antes de la escritura. Pueden cambiar los valores entrantes, validar o rechazar la solicitud lanzando un error: el llamante recibe **400 `CALLBACK_REJECTED`** y no se escribe nada.
+2. **`afterSave`, `afterDelete`** se ejecutan después de la escritura pero *antes* del commit. Un error revierte la fila y responde el mismo 400, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por eso son el lugar equivocado para un webhook o cualquier otra llamada de red: [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) explica adónde va ese trabajo.
 
 ## Endpoints del sistema
 

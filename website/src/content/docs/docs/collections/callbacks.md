@@ -185,21 +185,18 @@ is the browser-safe one, and it is the same class the client SDK throws.
 
 ### `afterSave`
 
-Called after a successful save. Use for side effects.
+Called after the row is written and before the commit, inside the same transaction. A throw rolls the save back — see [Transaction Semantics](#transaction-semantics).
 
 ```typescript
 afterSave: async ({
     values,         // Saved values
     id,             // Entity ID
-    previousValues, // Previous values (null for new entities)
+    previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
     context
 }) => {
-    // Send webhook
-    await fetch("https://api.slack.com/webhook", {
-        method: "POST",
-        body: JSON.stringify({ text: `New article: ${values.title}` })
-    });
+    // Same transaction as the save: the log row commits with the article or not at all
+    await context.data.audit_log.create({ action: status, article_id: id, title: values.title });
 }
 ```
 
@@ -253,7 +250,7 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Called after a successful deletion.
+Called after the row is deleted and before the commit, inside the same transaction. A throw rolls the delete back.
 
 ```typescript
 afterDelete: async ({
@@ -405,38 +402,38 @@ The behaviour above is verified end-to-end against Postgres by the `"scopes cont
 
 ### Transaction Semantics
 
-:::warning
-**`context.data` operations are NOT automatically wrapped in the same transaction as the triggering save.**
-
-The original entity save completes its database transaction first. Then `afterSave` runs and any `context.data` calls open **separate transactions**. If a `context.data` operation fails in `afterSave`, the original save is **not rolled back**.
+:::important
+**A callback's `context.data` writes are part of the write that triggered it.** On Postgres, `beforeSave`, the save and `afterSave` — or `beforeDelete`, the delete and `afterDelete` — run inside one transaction, each callback awaited before the commit, and `context.data` writes through that same transaction.
 :::
 
-This means:
+So the triggering write and everything its callbacks wrote commit together or not at all:
 
-- ✅ The triggering save always succeeds independently
-- ⚠️ Side-effect writes may fail without affecting the original operation
-- ⚠️ There is no atomicity guarantee between the original save and subsequent `context.data` calls
+- A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
+- Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
+- A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
 
-For operations that must be atomic, wrap them in error handling:
+Let a failure throw when the triggering write should not survive it. Catch it when it should: the failed write is undone on its own, and the rest commits.
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, status, context }) => {
+    // The update below saves this collection again, which runs this callback
+    // again: act on creates only, or it never stops.
+    if (status !== "new") return;
     try {
-        await context.data.jobs.create({
-            title: values.title,
-            status: "published",
-        });
+        await context.data.jobs.create({ title: values.title, status: "published" });
     } catch (error) {
-        // Log the failure — the original save already succeeded
-        console.error(`Failed to promote job from submission ${id}:`, error);
-        // Optionally: mark the submission as "promotion_failed"
-        await context.data["job-submissions"].update(id, {
+        // Only the failed create is undone. The submission and this marker commit.
+        await context.data.job_submissions.update(id, {
             promotion_status: "failed",
-            promotion_error: String(error),
+            promotion_error: String(error)
         });
     }
 }
 ```
+
+Work that has to leave the database — an email, a webhook, a call to a third-party API — does not belong in the callback body. It would hold the transaction open for a network round trip, and nothing can take it back when the write rolls back. Enqueue a [job](/docs/backend/jobs) for it, or do it after the write returns: publish on a [realtime channel](/docs/backend/realtime), or use `waitUntil` in a [custom function](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says which fits.
+
+On MongoDB none of this holds. That driver runs the same callbacks without a transaction, so the write is already stored when `afterSave` runs, and a throw there reports the failure without undoing it.
 
 ## Syncing Data Between Collections
 
@@ -487,18 +484,28 @@ Other cross-collection patterns:
 
 ## Full Context Reference
 
+<span class="since-badge" data-since="0.21">Since 0.21</span>
+
 Every callback receives a `context` object of type `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
     /** The authenticated user, if any */
     user?: User;
-    /** The underlying data driver (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Unified data access — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+    /** The driver running this operation (server-side only) */
+    driver?: DataDriver;
+    /** The query accessor — context.data.<slug>.create/update/find/delete */
+    data: RebaseSdkData;
+    /** Functions, storage, email and dataAsAdmin — but no `data` */
+    client: RebaseCallbackClient;
+    /** The default storage source */
+    storageSource: StorageSource;
 }
 ```
+
+Query through `context.data`. `context.client` has no `data`: server-side it is
+the `rebase` singleton, whose only data plane is the admin-scoped `dataAsAdmin`,
+so `context.client.data` is a compile error.
 
 ## Next Steps
 

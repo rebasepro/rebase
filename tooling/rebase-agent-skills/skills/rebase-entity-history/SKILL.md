@@ -73,7 +73,7 @@ const productsCollection: PostgresCollectionConfig = {
 
 ## How History Recording Works
 
-History is recorded **fire-and-forget** — it never blocks or slows down the main save/delete operation. Errors during history recording are logged to the console but do not propagate.
+On Postgres, history is recorded **inside the write's transaction** and awaited: the row and its history entry commit together or neither does. A failed history insert therefore fails the write — deliberately, because a trail with silent gaps cannot tell "nothing changed" from "the entry was lost". Only the pruning pass afterwards is non-blocking. (The MongoDB driver still records history fire-and-forget: errors are logged and the write stands.)
 
 ### When History Entries Are Created
 
@@ -470,7 +470,7 @@ console.log(`Server running at http://localhost:${env.PORT}`);
 
 ### Write Performance
 
-- History recording is **fire-and-forget** — it runs asynchronously and never blocks the save/delete response.
+- On Postgres, history recording is one extra `INSERT` **inside the write's transaction**, awaited — it adds to the write's latency and holds its locks for that long. A failing insert fails the write.
 - For updates, the system fetches the **previous entity values** before saving (to compute `changed_fields` and store `previous_values`). This adds one extra `SELECT` query per update.
 - Updates with zero actual changes are skipped entirely — no history entry is created.
 
