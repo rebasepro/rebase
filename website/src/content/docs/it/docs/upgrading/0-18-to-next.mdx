@@ -1,0 +1,49 @@
+---
+sourceHash: fc1823b20f5de5c5
+slug: it/docs/upgrading/0-18-to-next
+title: Aggiornare da 0.18 alla prossima release
+sidebar_label: 0.18 → next
+description: Le modifiche incompatibili già presenti su main e descritte in questa documentazione, prima che esista la release che le contiene.
+---
+
+# Aggiornare 0.18 → next
+
+**Niente di tutto questo è pubblicato.** Sono le voci `### Breaking` della sezione
+[`[Unreleased]`](/it/docs/changelog/) del changelog: stanno su `main`, e questo
+sito di documentazione pubblica da `main`, quindi compaiono qui prima che esista
+la versione che le contiene. Se hai installato da npm sei su 0.20 e niente di
+questo ti ha ancora raggiunto. 0.19 e 0.20 non dichiarano modifiche
+incompatibili, quindi questo è un solo salto da 0.18.
+
+---
+
+## 31. `context.client.data` non compila più in un callback di collezione
+
+`RebaseCallContext["client"]` ora è `RebaseCallbackClient`: `RebaseClient` senza
+`data`. Lato server quel client è il singleton `rebase`, che non ha più `data`
+dalla 0.18, quindi `context.client.data.collection(…)` compilava e poi lanciava
+`Cannot read properties of undefined (reading 'collection')` a ogni chiamata.
+Ora è un errore di compilazione.
+
+**Cosa cambiare:** interroga i dati tramite `context.data`, l'accessor che le
+query di un callback avrebbero sempre dovuto usare. Viene eseguito con il
+privilegio di ciò che ha attivato il callback, nella transazione stessa della
+scrittura. La [guida ai callback](/it/docs/collections/callbacks/) descrive cosa
+raggiunge ogni accessor del contesto.
+
+```diff lang="ts"
+ afterSave: async ({ context }) => {
+-    await context.client.data.audit_logs.create({ action: "approved" });
++    await context.data.audit_logs.create({ action: "approved" });
+ }
+```
+
+```bash
+grep -rn "client\.data\b" config
+```
+
+`context.client.dataAsAdmin` resta disponibile per un callback che deve vedere
+ciò che può vedere un amministratore. Anche `admin.browserCallbacks` cambia: lì
+la vecchia forma funzionava, perché il client del pannello ha `data`, e smette
+comunque di compilare. `useRebaseContext().client` in un componente React
+mantiene il suo `data`.

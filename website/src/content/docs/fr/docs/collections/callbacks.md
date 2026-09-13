@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e38df91e7b677a9
+sourceHash: b1e4de7690e9f165
 title: Rappels d'entité
 sidebar_label: Rappels
 description: Utilisez les rappels de cycle de vie pour exécuter une logique personnalisée lors de la création, la mise à jour, la lecture ou la suppression d'entités. Inclut l'API context.data pour les opérations inter-collections.
@@ -464,18 +464,29 @@ Autres modèles inter-collections :
 
 ## Référence Complète du Contexte
 
+<span class="since-badge" data-since="0.21">Since 0.21</span>
+
 Chaque rappel reçoit un objet `context` de type `RebaseCallContext` :
 
 ```typescript
 interface RebaseCallContext {
     /** L'utilisateur authentifié, le cas échéant */
     user?: User;
-    /** Le pilote de données sous-jacent (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Accès unifié aux données — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+    /** Le pilote qui exécute cette opération (côté serveur uniquement) */
+    driver?: DataDriver;
+    /** L'accesseur des requêtes — context.data.<slug>.create/update/find/delete */
+    data: RebaseSdkData;
+    /** Fonctions, stockage, e-mail et dataAsAdmin — mais pas de `data` */
+    client: RebaseCallbackClient;
+    /** La source de stockage par défaut */
+    storageSource: StorageSource;
 }
 ```
+
+Interrogez les données via `context.data`. `context.client` n'a pas de `data` :
+côté serveur, c'est le singleton `rebase`, dont le seul plan de données est
+`dataAsAdmin`, limité à l'administrateur ; `context.client.data` est donc une
+erreur de compilation.
 
 ## Prochaines étapes
 

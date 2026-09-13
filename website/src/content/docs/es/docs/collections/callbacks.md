@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e38df91e7b677a9
+sourceHash: b1e4de7690e9f165
 title: Callbacks de Entidad
 sidebar_label: Callbacks
 description: Utilice los callbacks del ciclo de vida para ejecutar lógica personalizada cuando las entidades son creadas, actualizadas, leídas o eliminadas. Incluye la API `context.data` para operaciones entre colecciones.
@@ -462,18 +462,29 @@ Otros patrones entre colecciones:
 
 ## Referencia Completa del Contexto
 
+<span class="since-badge" data-since="0.21">Since 0.21</span>
+
 Cada callback recibe un objeto `context` de tipo `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
     /** The authenticated user, if any */
     user?: User;
-    /** The underlying data driver (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Unified data access — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+    /** The driver running this operation (server-side only) */
+    driver?: DataDriver;
+    /** The query accessor — context.data.<slug>.create/update/find/delete */
+    data: RebaseSdkData;
+    /** Functions, storage, email and dataAsAdmin — but no `data` */
+    client: RebaseCallbackClient;
+    /** The default storage source */
+    storageSource: StorageSource;
 }
 ```
+
+Consulta a través de `context.data`. `context.client` no tiene `data`: en el
+servidor es el singleton `rebase`, cuyo único plano de datos es `dataAsAdmin`,
+con ámbito de administrador, así que `context.client.data` es un error de
+compilación.
 
 ## Próximos Pasos
 

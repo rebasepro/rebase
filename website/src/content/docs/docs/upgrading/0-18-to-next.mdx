@@ -1,0 +1,48 @@
+---
+slug: docs/upgrading/0-18-to-next
+title: Upgrading 0.18 to the next release
+sidebar_label: 0.18 → next
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists.
+---
+
+# Upgrading 0.18 → next
+
+**Nothing here is released yet.** These are the `### Breaking` entries of the
+changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
+this documentation site publishes from `main`, so they are described here before
+the version that carries them exists on npm. If you installed from npm you are
+on 0.20 and none of this has reached you — read it to know what is coming, and
+come back when you move. 0.19 and 0.20 declare no breaking change, so this is
+one hop from 0.18.
+
+---
+
+## 31. `context.client.data` no longer compiles in a collection callback
+
+`RebaseCallContext["client"]` is `RebaseCallbackClient` now: `RebaseClient`
+without `data`. Server-side that client is the `rebase` singleton, which has had
+no `data` since 0.18, so `context.client.data.collection(…)` compiled and then
+threw `Cannot read properties of undefined (reading 'collection')` on every
+call. It is a compile error instead.
+
+**What to change:** query through `context.data`, the accessor a callback's
+queries were always meant to use. It runs with the privilege of whatever
+triggered the callback, on the write's own transaction. The
+[callbacks guide](/docs/collections/callbacks/) covers what each accessor on the
+context can reach.
+
+```diff lang="ts"
+ afterSave: async ({ context }) => {
+-    await context.client.data.audit_logs.create({ action: "approved" });
++    await context.data.audit_logs.create({ action: "approved" });
+ }
+```
+
+```bash
+grep -rn "client\.data\b" config
+```
+
+`context.client.dataAsAdmin` is still there for a callback that must see what an
+admin may see. `admin.browserCallbacks` changes too: the old spelling ran there,
+because the panel's client carries `data`, and it stops compiling all the same.
+`useRebaseContext().client` in a React component keeps its `data`.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 50497f876941204d
+sourceHash: 02ee62af305e1df6
 slug: es/docs/upgrading
 title: Actualización
 description: Qué se rompe al migrar una aplicación existente a la versión actual y qué hacer en cada caso.
@@ -8,6 +8,8 @@ description: Qué se rompe al migrar una aplicación existente a la versión act
 # Actualizar una aplicación existente
 
 ¿Ya estás en 0.17? El salto a 0.18 ya está publicado y descrito aquí: [0.17 → 0.18](/es/docs/upgrading/0-17-to-0-18/).
+
+¿En 0.18 o posterior? Lo que ya está fusionado en `main` pero aún no publicado se describe aquí: [0.18 → next](/es/docs/upgrading/0-18-to-next/).
 
 Esta versión elimina el esquema `auth`, renombra paquetes, cambia el significado de `id`, elimina CJS, mueve el panel de administración a react-router 8 y, lo más importante, **corrige tres formas en las que se podía conceder acceso sin haberlo solicitado**: una regla de seguridad que era silenciosamente permisiva y dos en el socket en tiempo real. Lee las tres primeras secciones antes de cualquier otra cosa. La Sección 0 es la que cambia el SQL que podrías haber escrito a mano; las secciones 1 y 2 alteran quién puede leer tus datos, y ninguna de ellas se anuncia por sí sola.
 
@@ -301,11 +303,12 @@ grep -rn "rebase\.data\b" src config backend
 
 `RebaseServerClient` ahora extiende `Omit<RebaseClient, "data">`, por lo que esto genera un error de compilación en lugar de un privilegio silencioso. La propiedad sigue estando presente en tiempo de ejecución como un alias de `dataAsAdmin`, por lo que un backend de JavaScript puro seguirá funcionando mientras migras, pero no confíes en ello.
 
-**No toques estos.** Tienen alcance de usuario y nunca cayeron en desuso:
+**Cambia estos también.** Esta página los presentaba con alcance de usuario y nunca en desuso. Son el mismo singleton del servidor, así que eran el mismo alias con ámbito de administrador:
 
-- `context.client.data` en un callback de entidad — se ejecuta bajo la RLS del emisor
-- `client.data` en un controlador de cron — un `RebaseClient`
-- `rebase.data` en un SDK generado o en una aplicación de navegador — un objeto diferente
+- `context.client.data` en un callback de entidad → `context.data`, el accesor de las consultas en los callbacks. Se ejecuta con el privilegio de lo que haya disparado el callback, y `context.client.data` no compila en las versiones actuales.
+- `client.data` en un controlador de cron → `client.dataAsAdmin` (desde 0.14 el contexto del controlador lo llama `rebase`)
+
+**No toques este:** `rebase.data` en un SDK generado o en una aplicación de navegador es un objeto diferente.
 
 Y para consultas delimitadas al usuario dentro de un controlador de solicitudes, ninguno de los dos nombres es el que quieres: usa `c.var.driver`, que lleva la identidad del emisor.
 

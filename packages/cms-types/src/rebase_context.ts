@@ -2,7 +2,7 @@ import type { AnalyticsController } from "./controllers/analytics_controller";
 import type { AuthController } from "./controllers/auth";
 import type { UserConfigurationPersistence } from "./controllers/local_config_persistence";
 import type { DatabaseAdmin } from "@rebasepro/types";
-import type { RebaseCallContext } from "@rebasepro/types";
+import type { RebaseCallContext, RebaseClient } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 /**
@@ -13,6 +13,14 @@ import type { User } from "@rebasepro/types";
  * @see useRebaseContext
  */
 export type RebaseContext<USER extends User = User, AuthControllerType extends AuthController<USER> = AuthController<USER>> = RebaseCallContext<USER> & {
+
+    /**
+     * The app's Rebase client, `data` included. Wider than the callback
+     * context's `client`, which leaves `data` off because a server-side
+     * callback's client has none — a collection callback's queries go through
+     * `context.data` on both sides.
+     */
+    client: RebaseClient;
 
     authController: AuthControllerType;
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e38df91e7b677a9
+sourceHash: b1e4de7690e9f165
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Verwenden Sie Lebenszyklus-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data API für sammlungsübergreifende Operationen.
@@ -464,18 +464,28 @@ Andere sammlungsübergreifende Muster:
 
 ## Vollständige Kontextreferenz
 
+<span class="since-badge" data-since="0.21">Since 0.21</span>
+
 Jeder Callback erhält ein `context`-Objekt vom Typ `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
     /** Der authentifizierte Benutzer, falls vorhanden */
     user?: User;
-    /** Der zugrunde liegende Datentreiber (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Vereinheitlichter Datenzugriff — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+    /** Der Treiber, der diese Operation ausführt (nur serverseitig) */
+    driver?: DataDriver;
+    /** Der Accessor für Abfragen — context.data.<slug>.create/update/find/delete */
+    data: RebaseSdkData;
+    /** Funktionen, Storage, E-Mail und dataAsAdmin — aber kein `data` */
+    client: RebaseCallbackClient;
+    /** Die Standard-Storage-Quelle */
+    storageSource: StorageSource;
 }
 ```
+
+Abfragen laufen über `context.data`. `context.client` hat kein `data`: Serverseitig
+ist es das `rebase`-Singleton, dessen einzige Datenebene das admin-gebundene
+`dataAsAdmin` ist, daher ist `context.client.data` ein Kompilierfehler.
 
 ## Nächste Schritte
 

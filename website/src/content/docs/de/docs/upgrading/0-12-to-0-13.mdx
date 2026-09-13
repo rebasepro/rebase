@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b4bd11fc7d22d9f
+sourceHash: 4bf1765ebe335262
 slug: de/docs/upgrading/0-12-to-0-13
 title: Upgrade von 0.12 auf 0.13
 sidebar_label: 0.12 → 0.13
@@ -433,11 +433,12 @@ Kompilierfehler führt, anstatt stillschweigend Berechtigungen zu vergeben. Die 
 zur Laufzeit weiterhin als Alias für `dataAsAdmin` vorhanden, sodass ein reines JavaScript-Backend
 während der Migration weiterläuft – verlassen Sie sich jedoch nicht darauf.
 
-**Diese bitte nicht verändern.** Sie sind benutzerspezifisch und waren nie deprecated:
+**Diese ebenfalls ändern.** Diese Seite führte sie früher als benutzerspezifisch und nie deprecated. Sie sind dasselbe Server-Singleton und waren damit derselbe admin-gebundene Alias:
 
-- `context.client.data` in einem Entity-Callback – läuft unter dem RLS des Aufrufers
-- `client.data` in einem Cron-Handler – ein `RebaseClient`
-- `rebase.data` in einem generierten SDK oder einer Browser-App – ein anderes Objekt
+- `context.client.data` in einem Entity-Callback → `context.data`, der Accessor für Abfragen in Callbacks. Er läuft mit den Rechten dessen, was den Callback ausgelöst hat, und `context.client.data` kompiliert in aktuellen Versionen nicht.
+- `client.data` in einem Cron-Handler → `client.dataAsAdmin` (ab 0.14 heißt es im Kontext des Handlers `rebase`)
+
+**Dies bitte nicht verändern:** `rebase.data` in einem generierten SDK oder einer Browser-App ist ein anderes Objekt.
 
 Und für benutzerspezifische Abfragen innerhalb eines Request-Handlers ist keiner der beiden Namen
 das Richtige: Verwenden Sie `c.var.driver`, welches die Identität des Aufrufers trägt.

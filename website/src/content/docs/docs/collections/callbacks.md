@@ -487,18 +487,28 @@ Other cross-collection patterns:
 
 ## Full Context Reference
 
+<span class="since-badge" data-since="0.21">Since 0.21</span>
+
 Every callback receives a `context` object of type `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
     /** The authenticated user, if any */
     user?: User;
-    /** The underlying data driver (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Unified data access — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+    /** The driver running this operation (server-side only) */
+    driver?: DataDriver;
+    /** The query accessor — context.data.<slug>.create/update/find/delete */
+    data: RebaseSdkData;
+    /** Functions, storage, email and dataAsAdmin — but no `data` */
+    client: RebaseCallbackClient;
+    /** The default storage source */
+    storageSource: StorageSource;
 }
 ```
+
+Query through `context.data`. `context.client` has no `data`: server-side it is
+the `rebase` singleton, whose only data plane is the admin-scoped `dataAsAdmin`,
+so `context.client.data` is a compile error.
 
 ## Next Steps
 

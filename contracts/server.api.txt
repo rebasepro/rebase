@@ -888,6 +888,7 @@ type QueueHandler
 type RebaseAppConfig
 type RebaseAppType
 type RebaseCallContext { client, data, driver, storageSource, user }
+type RebaseCallbackClient
 type RebaseData
 type RebaseErrorCode
 type RebaseSdkData
@@ -1128,6 +1129,7 @@ function reconcileCursorOrder
 function registerConditionOperations
 function relationDeclaringProperty
 function relationalCollections
+function requireCallbackClient
 function requireCallbackCollection
 function resolveArrayProperties
 function resolveCollectionRelations

@@ -436,11 +436,18 @@ compile error rather than a silent privilege. The property is still there at
 runtime, aliasing `dataAsAdmin`, so a plain-JavaScript backend keeps running
 while you migrate — but do not rely on that.
 
-**Leave these alone.** They are user-scoped and were never deprecated:
+**Change these too.** This page used to list them as user-scoped and never
+deprecated. They are the same server singleton, so they were the same
+admin-scoped alias:
 
-- `context.client.data` in an entity callback — runs under the caller's RLS
-- `client.data` in a cron handler — a `RebaseClient`
-- `rebase.data` in a generated SDK or browser app — a different object
+- `context.client.data` in an entity callback → `context.data`, the query
+  accessor in callbacks. It runs with the privilege of whatever triggered the
+  callback, and `context.client.data` does not compile in current versions.
+- `client.data` in a cron handler → `client.dataAsAdmin` (from 0.14 the
+  handler's context calls it `rebase`)
+
+**Leave this alone:** `rebase.data` in a generated SDK or browser app is a
+different object.
 
 And for user-scoped queries inside a request handler, neither name is what you
 want: use `c.var.driver`, which carries the caller's identity.

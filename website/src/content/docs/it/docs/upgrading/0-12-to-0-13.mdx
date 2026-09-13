@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b4bd11fc7d22d9f
+sourceHash: 4bf1765ebe335262
 slug: it/docs/upgrading/0-12-to-0-13
 title: Aggiornamento da 0.12 a 0.13
 sidebar_label: 0.12 → 0.13
@@ -437,11 +437,12 @@ errore di compilazione anziché un'acquisizione silenziosa di privilegi. La prop
 runtime come alias di `dataAsAdmin`, garantendo il funzionamento di un backend in JavaScript puro
 durante la migrazione — ma è consigliabile non fare affidamento su questo comportamento.
 
-**Non modificare i seguenti casi.** Mantengono l'ambito utente e non sono mai stati deprecati:
+**Modifica anche questi.** Questa pagina li presentava con ambito utente e mai deprecati. Sono lo stesso singleton del server, quindi erano lo stesso alias con ambito amministratore:
 
-- `context.client.data` in un callback di entità — eseguito sotto l'RLS del chiamante
-- `client.data` in un gestore cron — un `RebaseClient`
-- `rebase.data` in un SDK generato o in un'app browser — un oggetto differente
+- `context.client.data` in un callback di entità → `context.data`, l'accessor delle query nei callback. Viene eseguito con il privilegio di ciò che ha attivato il callback, e `context.client.data` non compila nelle versioni attuali.
+- `client.data` in un gestore cron → `client.dataAsAdmin` (dalla 0.14 il contesto del gestore lo chiama `rebase`)
+
+**Non modificare questo:** `rebase.data` in un SDK generato o in un'app browser è un oggetto differente.
 
 Per query con ambito utente all'interno di un gestore di richieste, nessuno dei due nomi
 è appropriato: usa `c.var.driver`, che contiene l'identità del chiamante.

@@ -19,21 +19,46 @@ import {
     RebaseCallContext,
     CollectionRegistryInterface,
     User,
-    RebaseClient,
+    RebaseServerClient,
     RebaseData,
     RebaseSdkData,
-    SecurityOperation
+    SecurityOperation,
+    StorageSource
 } from "@rebasepro/types";
 import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, buildSdkData, callbackRefusal, checkOperation, PolicyClauses, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, callbackRefusal, checkOperation, PolicyClauses, requireCallbackClient, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server";
 import { MongoConditionBuilder } from "../db/MongoConditionBuilder";
 import { assertSecurityRulesEnforceable, buildMongoFilterFromSecurityRules } from "../db/securityRuleFilter";
 import { logger } from "@rebasepro/server";
+
+/**
+ * The context a collection callback is handed, built once for both drivers in
+ * this file. It used to be five hand-written literals cast `as
+ * RebaseCallContext`, which let `client` claim a `data` the server singleton
+ * does not have and hid that the client may not be attached at all. Same
+ * contract as `PostgresBackendDriver.buildCallContext`.
+ */
+function callContext(
+    driver: NonNullable<RebaseCallContext["driver"]>,
+    user: User | undefined,
+    data: RebaseSdkData,
+    client: RebaseServerClient | undefined
+): RebaseCallContext {
+    return {
+        user,
+        driver,
+        data,
+        get client() {
+            return requireCallbackClient(client);
+        },
+        storageSource: client?.storage as StorageSource
+    };
+}
 
 /**
  * MongoDB DataDriver Delegate
@@ -50,7 +75,9 @@ export class MongoDriver implements DataDriver {
     public historyService: MongoHistoryService;
     public user?: User;
     public data: RebaseSdkData;
-    public client?: RebaseClient;
+
+    /** The server singleton, attached by `initializeRebaseBackend` after boot. */
+    public client?: RebaseServerClient;
 
     constructor(
         private db: Db,
@@ -127,13 +154,7 @@ propertyCallbacks: undefined };
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-            const contextForCallback = {
-                user: this.user,
-                driver: this,
-                data: this.data,
-                client: this.client,
-                storageSource: this.client?.storage
-            } as RebaseCallContext; // Backend context
+            const contextForCallback = callContext(this, this.user, this.data, this.client);
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
                 if (globalCallbacks?.afterRead) {
@@ -228,13 +249,7 @@ propertyCallbacks: undefined };
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
-            const contextForCallback = {
-                user: this.user,
-                driver: this,
-                data: this.data,
-                client: this.client,
-                storageSource: this.client?.storage
-            } as RebaseCallContext; // Backend context
+            const contextForCallback = callContext(this, this.user, this.data, this.client);
             let processedRow: Record<string, unknown> = row;
             if (globalCallbacks?.afterRead) {
                 processedRow = await globalCallbacks.afterRead({
@@ -319,13 +334,7 @@ propertyCallbacks: undefined };
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         let updatedValues = values;
-        const contextForCallback = {
-            user: this.user,
-            driver: this,
-            data: this.data,
-            client: this.client,
-            storageSource: this.client?.storage
-        } as RebaseCallContext;
+        const contextForCallback = callContext(this, this.user, this.data, this.client);
 
         // Fetch previous values for callbacks AND history recording
         let previousValuesForHistory: Partial<M> | undefined;
@@ -527,13 +536,7 @@ propertyCallbacks: undefined };
 
         const callbackRow: Record<string, unknown> = { id: row.id, ...(row.values ?? {}) };
 
-        const contextForCallback = {
-            user: this.user,
-            driver: this,
-            data: this.data,
-            client: this.client,
-            storageSource: this.client?.storage
-        } as RebaseCallContext;
+        const contextForCallback = callContext(this, this.user, this.data, this.client);
 
         // A `before*` callback is the application speaking, not the server
         // failing: a bare `throw` is the documented way to block a write, so it
@@ -759,13 +762,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
         const { callbacks, globalCallbacks, propertyCallbacks } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
         if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-            const contextForCallback = {
-                user: this.user,
-                driver: this,
-                data: this.data,
-                client: this.delegate.client,
-                storageSource: this.delegate.client?.storage
-            } as RebaseCallContext;
+            const contextForCallback = callContext(this, this.user, this.data, this.delegate.client);
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
                 if (globalCallbacks?.afterRead) {

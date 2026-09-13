@@ -13,7 +13,7 @@ import {
     ListenCollectionProps,
     ListenOneProps,
     RebaseCallContext,
-    RebaseClient,
+    RebaseServerClient,
     RebaseData,
     RebaseSdkData,
     RestFetchService,
@@ -36,7 +36,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
@@ -160,7 +160,14 @@ export class PostgresBackendDriver implements DataDriver {
     public branchService?: BranchService;
     public user?: User;
     public data: RebaseSdkData;
-    public client?: RebaseClient;
+
+    /**
+     * The server singleton, attached by `initializeRebaseBackend` after boot —
+     * a driver exists before the client does. Typed as what is attached: a
+     * `RebaseServerClient` has no `data`, and callbacks read it as
+     * `context.client`.
+     */
+    public client?: RebaseServerClient;
 
     /**
      * Auto-set to `true` once a `SET LOCAL ROLE` has failed with insufficient
@@ -346,14 +353,24 @@ export class PostgresBackendDriver implements DataDriver {
      * disabled checking for the whole object and let `driver` — documented in
      * the callbacks guide — sit on the runtime context while absent from the
      * contract. Both are declared now, so this is a plain typed return.
+     *
+     * `client` went through a narrower cast, `as RebaseCallContext["client"]`,
+     * and it lied twice. It said `RebaseClient`, `data` included, about the
+     * server singleton, which has no `data` — so `context.client.data` compiled
+     * and threw in production. And it dropped the `| undefined` of a client
+     * that is attached after construction. The type now leaves `data` off, and
+     * a driver that was never given a client refuses by name, at the read.
      */
     private buildCallContext(): RebaseCallContext {
+        const client = this.client;
         return {
             user: this.user,
             driver: this,
             data: this.data,
-            client: this.client as RebaseCallContext["client"],
-            storageSource: this.client?.storage as StorageSource
+            get client() {
+                return requireCallbackClient(client);
+            },
+            storageSource: client?.storage as StorageSource
         };
     }
 
