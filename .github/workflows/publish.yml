@@ -997,11 +997,10 @@ jobs:
             echo "| Fleet tag | \`${FLEET_TAG}\` |" >> $GITHUB_STEP_SUMMARY
             echo "| Digest | \`${{ steps.image.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "From \`saas/backend\`, with a port-forward to the control plane open" >> $GITHUB_STEP_SUMMARY
-            echo "(\`../scripts/dev-prod.sh\`):" >> $GITHUB_STEP_SUMMARY
+            echo "From \`saas/backend\` (\`--prod\` opens its own port-forward to the control plane):" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "pnpm release:runtime --image-tag=${FLEET_TAG}          # what it would do" >> $GITHUB_STEP_SUMMARY
-            echo "pnpm release:runtime --image-tag=${FLEET_TAG} --roll --apply" >> $GITHUB_STEP_SUMMARY
+            echo "pnpm release:runtime --prod --image-tag=${FLEET_TAG}          # what it would do" >> $GITHUB_STEP_SUMMARY
+            echo "pnpm release:runtime --prod --image-tag=${FLEET_TAG} --roll --apply" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
 

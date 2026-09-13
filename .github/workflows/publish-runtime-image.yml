@@ -208,6 +208,6 @@ jobs:
             echo "runtime release and roll it, from \`saas/backend\`:"
             echo ""
             echo "\`\`\`bash"
-            echo "pnpm release:runtime --image-tag=${{ steps.fleet.outputs.tag }} --roll --apply"
+            echo "pnpm release:runtime --prod --image-tag=${{ steps.fleet.outputs.tag }} --roll --apply"
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
