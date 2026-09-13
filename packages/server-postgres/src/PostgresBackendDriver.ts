@@ -1239,6 +1239,29 @@ export class PostgresBackendDriver implements DataDriver {
         return txDriver;
     }
 
+    /**
+     * The callback context for work already running inside `tx` on behalf of
+     * `user` — for a caller that opened the user-scoped transaction itself.
+     *
+     * The realtime refetch is that caller: it applies the subscriber's auth
+     * context and role switch on its own connection. Its `afterRead` hooks used
+     * to get a context assembled by hand, and it was wrong in both directions:
+     * `data` was THIS driver's — the base one, on the owner connection, outside
+     * that transaction — so a hook reading related rows through `context.data`
+     * bypassed RLS on every subscription frame while the REST read of the same
+     * rows did not; and `client` and `storageSource` were absent, though the
+     * type promises both. This builds the context the REST path builds, bound to
+     * the transaction the rows came from.
+     */
+    callContextWithin(tx: DrizzleClient, user: User): RebaseCallContext {
+        const txDriver = new PostgresBackendDriver(
+            tx, this.realtimeService, this.registry, user, this.poolManager, this.historyService
+        );
+        txDriver.dataService = new DataService(tx, this.registry);
+        txDriver.client = this.client;
+        return txDriver.buildCallContext();
+    }
+
     async saveMany<M extends Record<string, unknown>>({
                                                           path,
                                                           rows,

@@ -133,6 +133,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     let pool: pg.Pool;            // the app's connection (superuser worst case)
     let driver: PostgresBackendDriver;
     let realtime: RealtimeService;
+    let registry: PostgresCollectionRegistry;
     let runSql: RawSqlRunner;
 
     async function userDriver(uid: string) {
@@ -230,7 +231,7 @@ describe("Unified RLS enforcement (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = buildRegistry();
+        registry = buildRegistry();
         realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(db as never, realtime as never, registry);
         realtime.setDataDriver(driver);
@@ -462,6 +463,41 @@ describe("Unified RLS enforcement (E2E)", () => {
         expect(seen).toHaveLength(1);
         expect(seen[0].visible).toContain("t-b");
         expect(seen[0].visible).toContain("t-a-cb");
+    });
+
+    /**
+     * The same guarantee, on the path a subscription takes.
+     *
+     * A realtime frame's `afterRead` hooks used to get a context assembled by
+     * hand whose `data` was the realtime service's own driver — the base one,
+     * on the owner connection, outside the transaction the frame's rows were
+     * read in. So an `afterRead` that enriched rows through `context.data` saw
+     * every tenant's rows on each `.listen()` frame, while the test above — the
+     * REST path — passed. Only this path could show it.
+     */
+    it("scopes context.data to the subscriber when an afterRead runs on a realtime frame", async () => {
+        // The hook reads ANOTHER collection: one reading its own would run its
+        // own afterRead on every row it fetched, and recurse. `docs` is scoped
+        // per owner — user-a sees `d-a` only, the owner connection sees both.
+        const tasks = registry.getCollectionByPath("tasks") as unknown as { callbacks?: unknown };
+        const previous = tasks.callbacks;
+        const seen: string[][] = [];
+        tasks.callbacks = {
+            afterRead: async (props: { row: unknown; context: { data: Record<string, { findAll(): Promise<Array<{ id: string }>> }> } }) => {
+                const docs = await props.context.data.docs.findAll();
+                seen.push(docs.map(d => d.id).sort());
+                return props.row;
+            }
+        };
+        try {
+            const frame = await realtimeFetchAs("user-a") as Array<{ id: string }>;
+            expect(frame.length).toBeGreaterThan(0);
+        } finally {
+            tasks.callbacks = previous;
+        }
+
+        expect(seen.length).toBeGreaterThan(0);
+        for (const visible of seen) expect(visible).toEqual(["d-a"]);
     });
 
     it("fails closed when the user role is broken", async () => {

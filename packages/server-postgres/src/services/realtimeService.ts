@@ -7,7 +7,7 @@ import { DataService } from "./dataService";
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
-import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
+import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
@@ -20,7 +20,7 @@ import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collect
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
-import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
+import type { ChannelHistoryEntry, ChannelRetentionRule, User } from "@rebasepro/types";
 import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
@@ -50,6 +50,51 @@ export interface SubscriptionAuthContext {
      * whose first page loaded fine.
      */
     claims?: Record<string, unknown>;
+}
+
+/**
+ * A driver that can build a callback context inside a transaction it did not
+ * open. `PostgresBackendDriver.callContextWithin` is the one implementation.
+ */
+interface CallContextMinter {
+    callContextWithin(tx: DrizzleClient, user: User): RebaseCallContext;
+}
+
+function mintsCallContexts(driver: DataDriver | undefined): driver is DataDriver & CallContextMinter {
+    return driver !== undefined && "callContextWithin" in driver && typeof driver.callContextWithin === "function";
+}
+
+/**
+ * The context a subscription frame's `afterRead` hooks run with.
+ *
+ * It used to be assembled here by hand — `{ user, driver, data }` cast to
+ * `RebaseCallContext` — and the cast hid two faults. `data` was the realtime
+ * service's own driver, the base one on the owner connection, outside the
+ * transaction this frame's rows were read in: a hook enriching rows through
+ * `context.data` bypassed RLS on every frame, while the REST read of the same
+ * rows, whose hooks run on the caller's transaction, did not. And `client` and
+ * `storageSource`, which the type declares required, were missing, so a hook
+ * that signs a URL or invokes a function worked over REST and failed every
+ * `.listen()`. The driver now builds it, bound to `tx`, the way the REST path
+ * builds it.
+ *
+ * Refuses rather than falling back: the fallback IS the unscoped context.
+ */
+function callbackContextWithin(driver: DataDriver | undefined, tx: DrizzleClient, auth: SubscriptionAuthContext): RebaseCallContext {
+    if (!mintsCallContexts(driver)) {
+        throw new Error("This driver cannot run afterRead hooks inside the subscriber's transaction.");
+    }
+    return driver.callContextWithin(tx, {
+        uid: auth.uid,
+        roles: auth.roles,
+        isAnonymous: auth.isAnonymous === true,
+        // What a socket does not carry, stated rather than invented.
+        displayName: null,
+        email: null,
+        photoURL: null,
+        providerId: "realtime",
+        ...(auth.claims ? { claims: auth.claims } : {})
+    });
 }
 
 /** What a channel frame is asking to do. */
@@ -1064,12 +1109,9 @@ roles: ["anon"] };
                     const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
                     if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                        const contextForCallback = {
-                            user: { uid: activeAuth.uid,
-    roles: activeAuth.roles },
-                            driver: this.driver,
-                            data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                        } as RebaseCallContext;
+                        // Bound to THIS transaction — the subscriber's — see
+                        // callbackContextWithin below for what this used to be.
+                        const contextForCallback = callbackContextWithin(this.driver, tx, activeAuth);
 
                         const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
                         return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
@@ -1319,12 +1361,7 @@ roles: ["anon"] };
                         const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
                         if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                            const contextForCallback = {
-                                user: { uid: activeAuth.uid,
-    roles: activeAuth.roles },
-                                driver: this.driver,
-                                data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                            } as RebaseCallContext;
+                            const contextForCallback = callbackContextWithin(this.driver, tx, activeAuth);
                             const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
 
                             // 1. Global callbacks first
