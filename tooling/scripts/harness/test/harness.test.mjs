@@ -79,6 +79,58 @@ test("control-plane ignores non-deploy commands", () => {
     assert.equal(controlPlane.isDeployShaped("kubectl get deploy -o yaml | tee apply.log"), false);
 });
 
+/**
+ * Prose is not a command.
+ *
+ * A negated character class matches newlines, so widening the gap made any
+ * paragraph containing both words a match — including the commit message
+ * describing the fix that introduced it. Bounding the gap by length did not
+ * separate them either: a clause fits in 160 characters. What separates them is
+ * position — a command starts with `kubectl`, a sentence does not.
+ */
+test("control-plane does not fire on prose that merely mentions both words", () => {
+    const prose = [
+        "git commit -m 'the kubectl gate was blind to namespaced commands\\n\\n" +
+            "It watched a cluster and two volumes go, and only later did it refuse to " +
+            "delete an empty namespace. The pattern required the verb adjacent.'",
+        "echo 'we use kubectl for everything; the runbook says to check twice before " +
+            "you ever reach for a command that can delete a tenant volume'"
+    ];
+    for (const command of prose) {
+        assert.equal(controlPlane.isDeployShaped(command), false, `prose must not be deploy-shaped: ${command.slice(0, 48)}…`);
+    }
+});
+
+test("control-plane still catches a command with long flags before the verb", () => {
+    // ~100 characters of prefix: a fully qualified context plus a tenant
+    // namespace, which is the longest shape that occurs in this repo.
+    const command =
+        "kubectl --context=gke_rebase-578f2_europe-west1_rebase-saas-gke " +
+        "-n rebase-tenant-unfeigned-loyalty-staging-e4a934 delete pvc data-postgres-1";
+    assert.ok(controlPlane.isDeployShaped(command), "a real command must still be caught");
+    assert.ok(blocking(controlPlane.run(null, { command })), "and must still block");
+});
+
+/**
+ * The positions a command can legitimately start in. Requiring `kubectl` to
+ * begin a command is only safe if "begin" covers the ways a shell gets there —
+ * otherwise the rule is one `&&` away from silent.
+ */
+test("control-plane catches a destructive verb wherever a command can start", () => {
+    const starts = [
+        "kubectl -n prod delete pvc data-0",
+        "cd /repo && kubectl -n prod delete pvc data-0",
+        "echo hi; kubectl -n prod delete pvc data-0",
+        "set -e\nkubectl -n prod delete pvc data-0",
+        "bash -c \"kubectl -n prod delete pvc data-0\"",
+        "sudo kubectl -n prod delete pvc data-0",
+        "kubectl -n prod \\\n  delete pvc data-0"
+    ];
+    for (const command of starts) {
+        assert.ok(blocking(controlPlane.run(null, { command })), `must block: ${JSON.stringify(command)}`);
+    }
+});
+
 test("lockfile check only fires inside a worktree", () => {
     const inWorktree = { isWorktree: true, changed: ["pnpm-lock.yaml"], root: "/wt", primaryRoot: "/primary" };
     assert.ok(blocking(lockfileWorktree.run(inWorktree)));

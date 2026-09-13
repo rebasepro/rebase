@@ -32,10 +32,27 @@ export const title = "Deploy targets the plane that actually serves prod";
  * this silent. What it did catch, minutes later, was the same operation spelled
  * without a flag between the two words.
  *
- * `[^|;&]*?` stops at a pipe or separator, so `kubectl get pods | grep delete`
- * is still not a deletion.
+ * Two things keep prose out.
+ *
+ * **Position.** `kubectl` has to START a command — the beginning of the string,
+ * or just after a separator, newline, or opening quote. In a command it always
+ * does; in a sentence it is preceded by a word ("the kubectl gate", "we use
+ * kubectl for"). Length alone cannot tell those apart: an unbounded gap made
+ * any paragraph containing both words a match, and bounding it at 160
+ * characters did not help, because a clause fits in 160 characters easily. The
+ * commit message describing this fix was refused by the rule it describes,
+ * twice.
+ *
+ * A refusal is the safe direction to be wrong in, but a gate that cries wolf on
+ * documentation teaches people to route around it, and routing around this one
+ * is a single reordered flag.
+ *
+ * **Separators.** The gap excludes `|`, `;` and `&`, so `kubectl get pods |
+ * grep delete` is a read. It keeps newlines, so a backslash-continued command
+ * still matches.
  */
-const KUBECTL_VERB = /\bkubectl\b[^|;&]*?\s(apply|delete|set\s+image|rollout\s+restart)\b/;
+const KUBECTL_VERB =
+    /(?:^|[;&|\n('"`])\s*(?:sudo\s+)?kubectl\b[^|;&]*?\s(apply|delete|set\s+image|rollout\s+restart)\b/;
 
 /** Commands that put code or config somewhere real. */
 const DEPLOY_SHAPED = [
@@ -83,7 +100,8 @@ export function run(_ctx, { command = "" } = {}) {
 
     // The same adjacency bug as KUBECTL_VERB, and the one that mattered: this
     // is the rule that BLOCKS, and it only ever saw the two words side by side.
-    if (/\bkubectl\b[^|;&]*?\sdelete\b/.test(command)) {
+    // Same command-start requirement, for the same reason.
+    if (/(?:^|[;&|\n('"`])\s*(?:sudo\s+)?kubectl\b[^|;&]*?\sdelete\b/.test(command)) {
         found.push(
             finding(
                 id,
