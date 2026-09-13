@@ -454,6 +454,22 @@ const flatNavLinks = [
         backdrop-filter: blur(8px);
     }
 
+    /* ── The bar over a light-ink slab ──
+       The scrolled tint above is 40% of a near-black frame, which is a wash
+       tuned for the dark grounds it spends 95% of the page over. Over
+       `.ground-close` — the coral ask, the one bright slab on the site — that
+       same 40% blends INTO the coral and paints a dark maroon smudge across
+       the top of the screen the whole page exists to reach.
+
+       The bar goes opaque here rather than light: its own ink (white links,
+       the blue CTA) is tuned for a dark bar, and inverting the wash would take
+       the whole nav vocabulary with it. Opaque reads as a deliberate bar laid
+       on the colour, which is the same gesture `ground-chroma` already makes
+       with `--ground-lift` for frames on a slab. */
+    html[data-scrolled][data-over-bright] .site-header {
+        background-color: color-mix(in oklab, var(--surface-frame) 94%, transparent);
+    }
+
     /* ── The bar while a menu is open ──
        The mega-menu panel (NavigationDropdown.astro) is a 95% surface-950 plate
        hung from the bar's bottom edge. At the top of a page the bar above it was
@@ -507,6 +523,21 @@ const flatNavLinks = [
             // A few pixels of slack: iOS rubber-banding reports small positive
             // offsets at rest, and toggling on those flickers the bar.
             root.toggleAttribute('data-scrolled', window.scrollY > 8);
+
+            // Is the bar currently over a light-ink slab? Rect maths against
+            // the handful of `.ground-close` sections, inside the rAF the
+            // scroll handler already pays for — no observer, no second
+            // listener. `bar` is the bar's own height rather than a constant
+            // so the mobile and desktop bars both measure themselves.
+            var bar = document.querySelector('.site-header');
+            bar = bar ? bar.offsetHeight : 0;
+            var bright = false;
+            var slabs = document.querySelectorAll('.ground-close');
+            for (var i = 0; i < slabs.length; i++) {
+                var r = slabs[i].getBoundingClientRect();
+                if (r.top <= bar && r.bottom > 0) { bright = true; break; }
+            }
+            root.toggleAttribute('data-over-bright', bright);
         }
 
         window.addEventListener('scroll', function () {

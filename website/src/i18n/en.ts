@@ -1,25 +1,10 @@
 export const en = {
-  "hero.badge": "Open-source · MIT · Any Postgres",
-  "hero.title.part1": "The backend that can't forget",
-  "hero.title.part2": "a permission check.",
+  "hero.badge": "Open-source backend · MIT · Any Postgres",
+  "hero.title.part1": "A backend for your Postgres.",
+  "hero.title.part2": "And the panel you never write.",
   "hero.subtitle":
-    "One TypeScript file per collection gives you the schema, the REST API, the typed SDK and the panel. The access rules in that same file compile to Postgres row-level security, so every route, job, script and agent hits the same wall.",
+    "REST, a typed SDK, realtime, auth and storage for your app; spreadsheets, media, relations and roles for your team. Our own CRM is twenty-three collections and not one hand-written screen.",
   "hero.cta.demo": "Try the demo",
-  // `hero-message` arms (scripts/ab-testing.ts). `hero.title.*` and
-  // `hero.subtitle` above are the control. Each arm is one claim; badge, CTA
-  // and terminal do not change with it.
-  "hero.agent.title.part1": "Let the agent write the backend.",
-  "hero.agent.title.part2": "The database keeps it honest.",
-  "hero.agent.subtitle":
-    "One TypeScript file per collection is all an agent has to produce. The schema, the REST API, the typed SDK and the panel are generated from it, and its access rules compile to Postgres row-level security. Whatever the model forgets, the database doesn't.",
-  "hero.onefile.title.part1": "Write the collection.",
-  "hero.onefile.title.part2": "Rebase writes the rest.",
-  "hero.onefile.subtitle":
-    "Schema, REST API, typed SDK, panel and access rules all come out of one TypeScript file, and change with it. The rules compile to Postgres row-level security, so the backend you generated is also the one that gets enforced.",
-  "hero.panel.title.part1": "Your app gets the API.",
-  "hero.panel.title.part2": "Your team gets the panel.",
-  "hero.panel.subtitle":
-    "One TypeScript file per collection produces both: the REST API and typed SDK your code calls, and the CMS your team edits in, reading through the same policies. Nothing is built twice, and there is no back door around the rules.",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
@@ -45,9 +30,9 @@ export const en = {
   // sub-block of the same chapter (merged 2026-09-09; panel.badge is no longer
   // rendered on the home page).
   "panel.badge": "The panel that ships with it",
-  "panel.title": "The panel, rendered from the same definition.",
+  "panel.title": "And the surface your team opens every morning.",
   "engine.badge": "What you get",
-  "engine.title": "Everything your app calls, and the panel your team works in.",
+  "engine.title": "Working APIs against your database, from minute one.",
   "engine.subtitle":
     "A typed SDK for your collections, REST over every table and realtime on a WebSocket, running against your database from minute one.",
   "engine.link": "Explore the backend",
@@ -63,7 +48,7 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.subtitle": "It reads your data through the same API and the same policies your app does. Your app talks to the backend, your team works in the panel, and both see one set of rules.",
+  "modes.subtitle": "Spreadsheet editing, media, relations, roles and workflows \u2014 a surface you can hand a non-developer on their first day. It is a client of your API like any other, so whatever it can see, your policies said so.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "The server your app calls: REST, a typed SDK, realtime, auth and storage over your own Postgres.",
@@ -77,9 +62,9 @@ export const en = {
   "modes.full.tag": "The developer half of the panel",
   "showcase.badge": "Built for real products",
   "showcase.title.part1": "Seven products.",
-  "showcase.title.part2": "One definition.",
+  "showcase.title.part2": "All of them in production.",
   "showcase.subtitle":
-    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, <b>public data</b>, an outbound sales agent, a design tool and a CRM — very different products, the same collection file underneath.",
+    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, <b>public data</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
   "showcase.nolink": "Internal tool — no public site",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
@@ -128,7 +113,7 @@ export const en = {
   "cta.lane.cloud.link": "Request access",
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
-  "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups, all under the same policies.",
+  "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups. None of it is a separate service to sign up for and wire together.",
   "personas.badge": "Who touches it",
   "personas.title": "Three people touch this. None of them the same way.",
   "personas.dev.title": "The developer who owns the database",
@@ -151,7 +136,7 @@ export const en = {
   // which is the whole differentiator against middleware-based authorization.
   "security.title": "Written in TypeScript. Enforced by Postgres.",
   "security.desc":
-    "Row-level security written in the same TypeScript file as the collection, compiled into real Postgres policies. Granular per collection, per field, per role — and enforced by the database itself, not by middleware someone has to remember to call.",
+    "Your access rules compile into real Postgres policies \u2014 granular per collection, per field, per role. The database holds them on every path into it: your routes, your nightly job, the backfill script someone ran once, the agent holding a key. Not middleware someone has to remember to call.",
   "security.link": "How security works",
   "security.postLink": "Read: your backend's security should not depend on remembering to check",
   "opensource.badge": "Open source",
@@ -175,10 +160,10 @@ export const en = {
   "showcase.sync.tab3.desc":
     "Design your data model visually in Rebase Studio. Every change writes back to your local TypeScript files via AST — your code stays clean, your team stays in sync.",
   "power.title":
-    'One collection.<br/>Everything generated.',
+    'You write this file.<br/>You don\u2019t write the rest.',
   "power.subtitle":
-    "One TypeScript file per collection is the entire input. The database schema, the REST API, the typed SDK, the forms and every admin view come out of it — and change with it.",
-  "power.badge": "Code as Truth",
+    "Schema, REST API, typed SDK, edit forms and every panel view come out of it, and move when it moves. There is no second data model to keep in sync and no CRUD screen to go and maintain when a field changes name.",
+  "power.badge": "How it works",
   "power.appcode": "App Code",
   "power.generates": "→ generates all of the following",
   "power.mobile.generates": "→ generates DB schema · REST API · Typed SDK · entity forms · admin views",

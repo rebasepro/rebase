@@ -16,8 +16,41 @@ and beat table, §6 additions, and §7, which is new.
 > Postgres itself. When a human needs to touch the data, the same definition
 > renders a full admin panel.
 
-Two products, one definition. That is the whole story, and every page is a view
-onto it.
+**What we lead with is the consequence of that, not the sentence itself: the
+back office stops being a project.** Twenty-three collections, zero admin
+screens written — those are Edith's real numbers, and they are the shape of
+every project on the showcase.
+
+> Revised 2026-09-12. This section used to end "Two products, one definition.
+> That is the whole story, and every page is a view onto it", and the home page
+> obeyed it literally: the same claim opened the hero, chapter 01, chapter 03,
+> chapter 04 and chapter 05, with five chapter numbers each promising a new
+> idea and delivering the old one. All four arms of the `hero-message` A/B even
+> opened their subtitle on the identical sentence, so the test varied headlines
+> over one claim and could never learn whether that claim was the right one to
+> lead with. (Francesco, 2026-09-12: "we say the same thing many times and
+> completely omit the essence of the product... fine that one collection
+> generates all, but I don't think it's that relevant.")
+>
+> "One definition, every surface" is still true and still claim 2 below. It is
+> a MECHANISM, and a mechanism is what you prove in chapter 01, not what you
+> open with five times. The essence is what the reader stops having to do.
+
+### Say it once
+
+Each claim has exactly one owner on `/`. A beat may depend on another beat's
+claim, but it may not restate it — if a paragraph can be cut without losing
+information the reader does not already have, cut it.
+
+| Claim | Owned by | Off-limits everywhere else |
+|-------|----------|----------------------------|
+| The back office stops being a project | hero | — |
+| One definition fans out to every surface | 01 only | "one TypeScript file per collection", "everything generated" |
+| The rules are in the database, on every path | 02 only | "the same policies", "one set of rules" |
+| Working APIs, and a panel a non-developer can use | 03 only | "your app gets the API, your team gets the panel" |
+| A backend small enough for a model to hold | 04 only | "a handful of collection files" |
+| It holds up in serious places | 05 only | "the same collection file underneath" |
+| It is yours — MIT, your Postgres, leaving is a redeploy | close only | — |
 
 **Order matters.** The backend leads. The admin panel comes second and it comes with it — never framed as optional, an add-on, or something you opt into (Francesco, repeatedly).
 See `~/.claude/.../memory/backend-first-positioning.md` — the site used to sell

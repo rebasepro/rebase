@@ -59,23 +59,20 @@ export const EXPERIMENTS: Experiment[] = [
         weights: [50, 50],
         expires: "2026-12-31",
     },
-    {
-        // The home hero's message. Four spines for the same product, each a
-        // claim someone could disagree with. Badge, CTA and terminal are held
-        // constant, so the headline and its subtitle are the only thing under
-        // test. `control` is security by construction; `agent` is the same
-        // guarantee in the agent era's terms; `onefile` leads with the
-        // mechanism; `panel` leads with the two audiences one definition
-        // serves. Copy is `hero.<arm>.*` in the four marketing locales. The
-        // markup is spans carrying `data-ab-show` inside the one <h1>, because
-        // a div cannot sit in a heading and check:site counts <h1>s. It runs
-        // alongside `hero-register`, so read results per cell (2×4), not per
-        // arm, until one of the two is retired.
-        id: "hero-message",
-        variants: ["control", "agent", "onefile", "panel"],
-        weights: [25, 25, 25, 25],
-        expires: "2026-12-31",
-    },
+    // `hero-message` was REMOVED 2026-09-12, not parked. Its four arms were four
+    // headlines over one claim — every one of them opened its subtitle on "One
+    // TypeScript file per collection" — so it could never tell us whether that
+    // claim was the right one to lead with, which was the only question worth
+    // asking. The hero now carries one message: `hero.title.*` / `hero.subtitle`
+    // render unconditionally.
+    //
+    // It had to be REMOVED rather than re-weighted, and the reason is the note in
+    // Layout.astro's assigner: a stored assignment is only re-rolled when it is
+    // *invalid*, so `weights: [100, 0, 0, 0]` leaves everyone already bucketed on
+    // their old arm forever. Deleting the variants is what makes their stored
+    // value invalid, which is what re-rolls them. (Francesco, 2026-09-12, quoting
+    // the old `panel` arm back at me off the new build: "we have that in the
+    // header".)
 ];
 
 // ─── Client-side Helpers ─────────────────────────────────────

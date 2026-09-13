@@ -30,8 +30,8 @@ const CAPABILITIES: Capability[] = [
         label: "A small surface",
         Icon: FileCheck2,
         title: "A surface an agent can hold",
-        desc: "A whole backend is a handful of typed collection files. No controllers, no serializers, no migrations to hand-write — the whole contract fits in one context window, and the compiler checks whatever the model writes back.",
-        pills: ["1 file per collection", "fits in one context window", "compiler-checked"],
+        desc: "No controllers, no serializers, no migrations to hand-write, and nothing for a model to invent between the schema and the route. The whole contract fits in one context window, and the compiler checks whatever it writes back.",
+        pills: ["no controllers to review", "fits in one context window", "compiler-checked"],
         screen: "config/collections/orders.ts",
         body: (
             <>
