@@ -26,7 +26,8 @@ import {
     reportError,
     note,
     noteBlank,
-    requireCloudRow
+    requireCloudRow,
+    billingAccountIdOf
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
@@ -1380,10 +1381,7 @@ projectId }
     // default: show the active org's billing account.
     if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
     try {
-        const orgRow = (await client.data.collection("organizations").findById(org)) as
-            | { billing_account_id?: string | number; billingAccount?: string | number }
-            | undefined;
-        const billingId = orgRow?.billing_account_id ?? orgRow?.billingAccount;
+        const billingId = billingAccountIdOf(await client.data.collection("organizations").findById(org));
         if (!billingId) {
             // Not an error — an org simply may not have been billed yet.
             emit(

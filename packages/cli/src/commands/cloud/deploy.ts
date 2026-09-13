@@ -32,7 +32,8 @@ import {
     resolveTimeoutMs,
     fetchTenantBaseDomain,
     projectHost,
-    type CloudClient
+    type CloudClient,
+    billingAccountIdOf
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
 import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, bundleCommit, declaredAppsFrom } from "./bundle-deploy";
@@ -825,10 +826,7 @@ path: `payment-method/${encodeURIComponent(org)}` }
         // plan to read — which is not "internal", so it does not exempt anything.
         let plan: string | null = null;
         try {
-            const orgRow = (await client.data.collection("organizations").findById(org)) as
-                | { billing_account_id?: string | number; billingAccount?: string | number }
-                | undefined;
-            const billingId = orgRow?.billing_account_id ?? orgRow?.billingAccount;
+            const billingId = billingAccountIdOf(await client.data.collection("organizations").findById(org));
             if (billingId != null) {
                 const acct = (await client.data.collection("billing-accounts").findById(billingId)) as
                     | { plan?: string }

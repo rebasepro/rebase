@@ -42,6 +42,25 @@ function credentialsPath(): string {
 }
 
 /** Project-local link file: <project>/.rebase/cloud.json */
+/**
+ * The billing account an organization row points at, whichever key it arrived under.
+ *
+ * REST serves every column under its own property name, so the relation comes
+ * back as `billingAccountId`. Both readers in this CLI checked
+ * `billing_account_id` and `billingAccount` — neither is what arrives — so
+ * `rebase cloud billing` answered "no billing account" for every organization,
+ * and the deploy pre-check never saw an internal plan. The other two spellings
+ * are still accepted: older servers and fixtures send them.
+ */
+export function billingAccountIdOf(org: unknown): string | number | undefined {
+    if (typeof org !== "object" || org === null) return undefined;
+    for (const key of ["billingAccountId", "billing_account_id", "billingAccount"]) {
+        const value = (org as Record<string, unknown>)[key];
+        if (typeof value === "string" || typeof value === "number") return value;
+    }
+    return undefined;
+}
+
 export function projectLinkPath(cwd: string = process.cwd()): string {
     const root = findProjectRoot(cwd) || cwd;
     return path.join(root, ".rebase", "cloud.json");

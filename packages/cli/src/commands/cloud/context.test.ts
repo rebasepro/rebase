@@ -19,7 +19,8 @@ import {
     refuseDirectLink,
     resolveCloudUrl,
     setJsonModeForTest,
-    type CloudClient
+    type CloudClient,
+    billingAccountIdOf
 } from "./context";
 import { printEnvHelp } from "./env";
 
@@ -338,5 +339,23 @@ mode: "direct" });
 projectId: "42",
 mode: "cloud" });
         expect(() => refuseDirectLink(argv("whoami"))).not.toThrow();
+    });
+});
+
+describe("billingAccountIdOf", () => {
+    it("reads the relation under the key REST serves it with", () => {
+        // `rebase cloud billing` answered "no billing account" for every org:
+        // REST sends `billingAccountId`, and the CLI read two other spellings.
+        expect(billingAccountIdOf({ id: "org1", billingAccountId: "ba1" })).toBe("ba1");
+    });
+
+    it("still reads the older spellings", () => {
+        expect(billingAccountIdOf({ billing_account_id: "ba2" })).toBe("ba2");
+        expect(billingAccountIdOf({ billingAccount: 7 })).toBe(7);
+    });
+
+    it("has no answer for a row without one", () => {
+        expect(billingAccountIdOf({ id: "org1" })).toBeUndefined();
+        expect(billingAccountIdOf(undefined)).toBeUndefined();
     });
 });
