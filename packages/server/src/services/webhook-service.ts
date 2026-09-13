@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from "crypto";
 import { assertAllowedOutboundUrl, BlockedUrlError } from "./outbound-url-guard";
 import { logger } from "../utils/logger";
+import { currentAmbientTransaction } from "../db/ambient-transaction";
 import type { JobQueueClient } from "../jobs/types";
 
 /**
@@ -147,15 +148,17 @@ export class WebhookDispatcher {
      * for a third party. It also means a receiver that is down can no longer
      * fail the customer's write.
      *
-     * The cost, when no `jobQueue` is configured: the queue is in-process and
-     * in-memory. A crash or a deploy between the enqueue and the delivery drops
-     * the event, and a receiver may see the notification a few milliseconds
-     * before the row it describes is committed. Use {@link flush} on shutdown,
-     * and `onDelivery` to record failures.
+     * Called inside a write — from a callback — the deliveries are held until
+     * that write commits and dropped if it rolls back. They used to go out
+     * whatever happened to the row: a receiver could hear about a change a few
+     * milliseconds before it committed, or about one that never did.
      *
-     * With `jobQueue` set, only the second half of that remains: the delivery
-     * becomes a row in `rebase.jobs` and survives the crash, the deploy and the
-     * pod being rescheduled.
+     * The cost, when no `jobQueue` is configured: the queue is in-process and
+     * in-memory. A crash or a deploy between the commit and the delivery drops
+     * the event. Use {@link flush} on shutdown, and `onDelivery` to record
+     * failures. With `jobQueue` set, the delivery becomes a row in
+     * `rebase.jobs` and survives the deploy and the pod being rescheduled — the
+     * only gap left is a crash between the commit and that insert.
      */
     enqueueEntityChange(
         table: string,
@@ -167,6 +170,18 @@ export class WebhookDispatcher {
         const jobs = this.buildDeliveries(table, event, entity, previousEntity);
         if (jobs.length === 0) return;
 
+        // After the commit, not on the write's transaction: a delivery is a
+        // message about a committed row, and this call is fire-and-forget, so
+        // an insert on the transaction would race the commit it depends on.
+        const ambient = currentAmbientTransaction();
+        if (ambient) {
+            ambient.afterCommit(() => this.dispatchDeliveries(jobs));
+            return;
+        }
+        this.dispatchDeliveries(jobs);
+    }
+
+    private dispatchDeliveries(jobs: QueuedDelivery[]): void {
         // The webhook is referenced by id rather than embedded. Its `secret`
         // would otherwise be written into `rebase.jobs` in cleartext and sit
         // there for as long as retention keeps the row — and a webhook edited

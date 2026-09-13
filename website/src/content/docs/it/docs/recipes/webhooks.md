@@ -1,5 +1,5 @@
 ---
-sourceHash: 713d80a42d70ff87
+sourceHash: 77aa7e43ab714fa6
 title: "Ricetta: Integrazione Webhook"
 sidebar_label: Webhooks
 description: Utilizza i callback delle entità per inviare webhook a servizi esterni quando i dati cambiano, senza tenere aperta la transazione della scrittura.
@@ -24,7 +24,7 @@ Quindi: non usare mai `await` su una richiesta HTTP in uscita dentro un callback
 ## Notifica Slack per Nuovo Ordine
 
 `WebhookDispatcher` è esportato da `@rebasepro/server`. `enqueueEntityChange` ritorna
-immediatamente — la POST avviene dopo il ritorno del callback, fuori dalla transazione — e il
+immediatamente — la POST avviene una volta confermata la scrittura, mai per una annullata — e il
 dispatcher valida la destinazione, firma il payload, limita ogni tentativo con una scadenza e
 ritenta i fallimenti.
 
@@ -74,9 +74,8 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 };
 ```
 
-La coda è in-process e in memoria: un crash o un deploy tra l'accodamento e la consegna perde
-l'evento, e il destinatario può vedere la notifica qualche millisecondo prima che la riga sia
-committata. Chiama `await dispatcher.flush()` allo spegnimento. Se le consegne devono sopravvivere
+La coda è in-process e in memoria: un crash o un deploy tra il commit e la consegna perde
+l'evento. Chiama `await dispatcher.flush()` allo spegnimento. Se le consegne devono sopravvivere
 a un riavvio, scrivi una riga di outbox nella stessa transazione e svuotala da un job.
 
 ### Chiamare direttamente un endpoint

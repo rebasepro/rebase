@@ -1,5 +1,5 @@
 ---
-sourceHash: 713d80a42d70ff87
+sourceHash: 77aa7e43ab714fa6
 title: "Receta: Integración de Webhooks"
 sidebar_label: Webhooks
 description: Utiliza las devoluciones de llamada de la entidad para enviar webhooks a servicios externos cuando los datos cambien, sin mantener abierta la transacción de la escritura.
@@ -24,8 +24,8 @@ Así que: nunca uses `await` sobre una petición HTTP saliente en una devolució
 ## Notificación de Slack sobre un Nuevo Pedido
 
 `WebhookDispatcher` se exporta desde `@rebasepro/server`. `enqueueEntityChange` retorna
-inmediatamente — el POST ocurre después de que la devolución de llamada retorna, fuera de la
-transacción — y el dispatcher valida el destino, firma el payload, limita cada intento con un plazo
+inmediatamente — el POST ocurre cuando la escritura se confirma, nunca para una que se revierte —
+y el dispatcher valida el destino, firma el payload, limita cada intento con un plazo
 y reintenta los fallos.
 
 ```typescript
@@ -74,9 +74,8 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 };
 ```
 
-La cola es en proceso y en memoria: un fallo del proceso o un despliegue entre el encolado y la
-entrega pierde el evento, y el receptor puede ver la notificación unos milisegundos antes de que la
-fila esté confirmada. Llama a `await dispatcher.flush()` al apagar. Si las entregas deben sobrevivir
+La cola es en proceso y en memoria: un fallo del proceso o un despliegue entre la confirmación y la
+entrega pierde el evento. Llama a `await dispatcher.flush()` al apagar. Si las entregas deben sobrevivir
 a un reinicio, escribe una fila de outbox en la misma transacción y vacíala desde un job.
 
 ### Llamar directamente a un endpoint

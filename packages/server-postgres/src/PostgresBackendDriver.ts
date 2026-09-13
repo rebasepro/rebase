@@ -40,6 +40,7 @@ import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkDa
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
+import { runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
@@ -2254,6 +2255,14 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     ): Promise<T> {
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
+        // What a write's callbacks hand off — a job, a history entry, a
+        // webhook — commits with the write or not at all, and is found through
+        // this scope by code that is not handed the transaction. Writes only:
+        // a read has nothing to roll back, and inside one the scope is
+        // cleared, so a read nested in a write's callback is not taken for it.
+        // See `write-transaction-scope.ts`.
+        const writeScope = options?.accessMode === "read only" ? undefined : new WriteTransactionScope();
+
         // The same identity the transaction is about to hand Postgres, made
         // available to the row walk so per-field `access.read` is applied to
         // whatever this read serves. Established here rather than threaded
@@ -2263,7 +2272,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // `dataAsAdmin` read nested inside a user request restores the user's
         // viewer when it returns.
         const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
-            await this.delegate.db.transaction(async (tx) => {
+            await runInWriteScope(writeScope, () => this.delegate.db.transaction(async (tx) => {
                 let uid = this.user?.uid;
                 if (!uid) {
                     logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
@@ -2316,9 +2325,25 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 txDelegate._pendingNotifications = pendingNotifications;
                 txDelegate.client = this.delegate.client;
 
-                return await operation(txDelegate);
-            }, options)
+                writeScope?.bind(tx, (sqlText, params) => txEntityService.executeSql(sqlText, params));
+                let out: T;
+                try {
+                    out = await operation(txDelegate);
+                } catch (error) {
+                    // Closed before the rethrow, so before the ROLLBACK is
+                    // queued: a statement accepted after it would run on this
+                    // connection in autocommit, and commit.
+                    writeScope?.close();
+                    throw error;
+                }
+                // Last, inside the transaction: whatever the callbacks started
+                // on it finishes before the commit rather than after it.
+                await writeScope?.settle();
+                return out;
+            }, options)).finally(() => writeScope?.close())
         );
+
+        writeScope?.committed();
 
         for (const notification of pendingNotifications) {
             try {

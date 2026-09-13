@@ -21,7 +21,7 @@ So: never `await` an outbound HTTP request in a callback. Queue it.
 ## Slack Notification on New Order
 
 `WebhookDispatcher` is exported from `@rebasepro/server`. `enqueueEntityChange` returns
-immediately — the POST happens after the callback returns, outside the transaction — and the
+immediately — the POST happens once the write commits, never for one that rolls back — and the
 dispatcher validates the destination, signs the payload, bounds every attempt with a deadline and
 retries failures.
 
@@ -71,9 +71,8 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 };
 ```
 
-The queue is in-process and in-memory: a crash or a deploy between the enqueue and the delivery
-drops the event, and the receiver may see the notification a few milliseconds before the row is
-committed. Call `await dispatcher.flush()` on shutdown. If you need deliveries to survive a
+The queue is in-process and in-memory: a crash or a deploy between the commit and the delivery
+drops the event. Call `await dispatcher.flush()` on shutdown. If you need deliveries to survive a
 restart, write an outbox row in the same transaction and drain it from a job instead.
 
 ### Calling an endpoint directly

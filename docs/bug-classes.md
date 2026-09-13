@@ -3235,3 +3235,37 @@ path — a manifest's `files`, a chunking rule's `id.includes()`, a copy plugin'
 `src` — is unchecked by anything until it happens to be the entry that matters.
 Prefer one entry that does the work over two that agree, and when a package is
 deleted, grep its name across configs, not only across imports.
+
+## 62. A side effect written on its own connection while its write is still open
+
+`rebase.jobs`, `rebase.entity_history` and webhook deliveries were all written
+*while* a write's transaction was open and awaited inside it — and all of them on
+a different connection. The job store was built on the default driver and ran
+`executeSql` on its pool; `HistoryService` was constructed once, on the pool, and
+every transaction driver reused it. So a job enqueued from an `afterSave` that
+then threw stayed queued for a row that never existed, another connection (a
+worker) could claim it before the row committed, and a batch that rolled back
+after its first row kept that row's history entry. Four docblocks, two guides and
+the history service's own contract said the opposite, and every unit test agreed
+with them, because a mocked `transaction()` has one connection.
+
+The tell is a service that holds a database handle of its own and is called from
+code that runs inside a transaction it was never given. "Awaited inside the
+transaction" and "written on the transaction" read the same in review and are not.
+
+The fix is not "pass `tx` everywhere": the callers (a queue handle, a topic, the
+dispatcher) are in a package that knows no driver. The driver publishes the write
+transaction it opened (`db/ambient-transaction.ts` ← `write-transaction-scope.ts`),
+the stores write on it, and because it runs as the restricted request role — which
+is revoked from those tables — through narrow `SECURITY DEFINER` functions rather
+than a role switch that would elevate the whole connection for anything
+interleaved.
+
+**Sweep (2026-09-13):** jobs, queue messages, topic events — fixed (one store).
+History — fixed. Webhook deliveries — now held until commit. Realtime
+notifications — clean, already flushed after commit. `rebase.dataAsAdmin` inside a
+callback — a separate transaction by design, documented as such. Open: a realtime
+channel broadcast from inside a hook goes out at once; the hooks guide already
+says to publish after the write returns. Test with a real pool
+(`write-transaction-scope-e2e.test.ts`): "another connection sees it early" cannot
+be asked of PGlite or of a mock.

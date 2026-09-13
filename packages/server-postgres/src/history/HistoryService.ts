@@ -10,6 +10,8 @@ export type {
 } from "@rebasepro/types";
 import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
 import { firstSqlRow, sqlRows } from "@rebasepro/common";
+import { currentWriteScope } from "../services/write-transaction-scope";
+import { RECORD_HISTORY_FUNCTION } from "./ensure-history-table";
 
 /**
  * A Postgres history row is already the wire shape — `updated_at` comes back
@@ -30,12 +32,21 @@ const DEFAULT_RETENTION: HistoryRetentionConfig = {
 export class HistoryService {
     public retention: HistoryRetentionConfig;
 
+    /**
+     * Whether {@link RECORD_HISTORY_FUNCTION} exists, so an entry recorded
+     * inside a write goes on that write's transaction. Without it, entries go
+     * through the pool and commit on their own.
+     */
+    private readonly inTransaction: boolean;
+
     constructor(
         private db: NodePgDatabase,
-        retention?: Partial<HistoryRetentionConfig>
+        retention?: Partial<HistoryRetentionConfig>,
+        options?: { inTransaction?: boolean }
     ) {
         this.retention = { ...DEFAULT_RETENTION,
 ...retention };
+        this.inTransaction = options?.inTransaction === true;
     }
 
     /**
@@ -54,7 +65,13 @@ export class HistoryService {
      * anyway, and nobody found out.
      *
      * So it throws, and the driver awaits it inside the write's transaction.
-     * The row and its history entry commit together or neither does. That is a
+     * The row and its history entry commit together or neither does — which
+     * needs the entry written *on* that transaction, not merely while it is
+     * open. This service is built once, on the pool, and for a long time it
+     * wrote there: a batch that rolled back after its first row left that
+     * row's entry behind, describing a row that never existed. Inside a write
+     * it now goes through {@link RECORD_HISTORY_FUNCTION} on the write's own
+     * transaction (found through `currentWriteScope`). That is a
      * real trade — a broken `rebase.entity_history` now fails writes to the
      * collections that declare history, where before it failed quietly — and it
      * is the right side of it for a table that exists to answer "who changed
@@ -86,7 +103,22 @@ export class HistoryService {
         }
 
         try {
-            await this.db.execute(sql`
+            // Checked and used with no `await` between, so the transaction
+            // cannot close in the gap.
+            const scope = this.inTransaction ? currentWriteScope() : undefined;
+            if (scope?.tx) {
+                await scope.track(scope.tx.execute(sql`
+                    SELECT ${sql.raw(RECORD_HISTORY_FUNCTION)}(
+                        ${tableName},
+                        ${String(id)},
+                        ${action},
+                        ${changedFields ? sql`ARRAY[${sql.join(changedFields.map(f => sql`${f}`), sql`, `)}]::text[]` : sql`NULL::text[]`},
+                        ${values ? sql`${JSON.stringify(values)}::jsonb` : sql`NULL::jsonb`},
+                        ${previousValues ? sql`${JSON.stringify(previousValues)}::jsonb` : sql`NULL::jsonb`},
+                        ${updatedBy ?? null}::text
+                    )
+                `));
+            } else await this.db.execute(sql`
                 INSERT INTO rebase.entity_history
                     (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by)
                 VALUES (

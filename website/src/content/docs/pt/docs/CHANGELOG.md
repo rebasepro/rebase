@@ -92,6 +92,29 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Fixed
 
+- **A job, queue message, topic event or history entry written from a callback
+  now commits with the write, and never without it.** The jobs guide, the queue
+  and topic handles and the hooks guide all promised that "a job enqueued in a
+  transaction that rolls back was never enqueued", and the history service that
+  an entry commits with its row. Neither held. Both were written through the
+  default driver's own pool connection, in autocommit: a job enqueued from an
+  `afterSave` that then threw stayed queued for a row that was never written,
+  and a worker could claim it before the row committed; a batch that rolled
+  back after its first row kept that row's history entry.
+
+  Inside a write they now go on the write's own transaction. That transaction
+  runs as the restricted request role, which is revoked from `rebase.jobs` and
+  `rebase.entity_history` on purpose, so each goes through one narrow
+  `SECURITY DEFINER` function — `rebase.enqueue_job` and
+  `rebase.record_history`, created at boot and executable only by that role. An
+  idempotency-key clash inside a write answers `null` instead of aborting it.
+  Webhook deliveries queued from a callback wait for the commit and are dropped
+  with a rollback. Outside a write — a custom function, a cron — an enqueue
+  commits at once, as before.
+
+  A database that refuses to create the functions is reported at boot, and both
+  fall back to the old behaviour rather than failing writes.
+
 - **A global callback is never handed a collection that is not there.** Every
   callback props type declares `collection: CollectionConfig` — non-optional,
   and the documented global hooks dereference it (`if (collection.slug ===
