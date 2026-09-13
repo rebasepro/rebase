@@ -79,6 +79,38 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   a REST read is masked through the target config the relation itself declares,
   rather than a second lookup that could miss.
 
+- **`cms` — a collection's `formView` can edit the record it shows.**
+  `FormViewConfig` documents a Builder that "receives the same props as entity
+  view tabs" with Save beside it (`includeActions`, default true). The edit view
+  rendered the Builder *in place of* the record form, and only the form can hand
+  out a working context — so every Builder got the read-only stand-in kept for
+  tabs that are still loading: `readOnly: true`, with `formContext.setFieldValue`,
+  `save`, `submit` and `formex.setFieldValue` all throwing. Each keystroke threw
+  inside the input's own handler and was dropped; Save and Discard, which wait on
+  the same context, never appeared; and a new record, which has no id to build
+  even a stand-in from, rendered nothing at all. The collection's entity view
+  tabs were caught too: they hold the stand-in only until the form publishes its
+  context, and with no form that was for as long as the record stayed open.
+
+  The form now renders the Builder in place of its generated fields — the way
+  an entity view declared with `includeActions` already was. It gets the live
+  context, so what it writes is validated, stored by the bar's Save and covered
+  by the unsaved-changes prompt. It also gets `parentCollectionSlugs` and
+  `parentEntityIds`, a lazy Builder gets its own loading boundary, and it sits in
+  the form's column, as it already did on the read-only and detail screens.
+  `includeActions: false`, computed and never read, now takes Save, Save and
+  close and Discard out of the bar while the formView is on screen, for a
+  Builder that stores the record itself through `formContext.submit()`.
+
+  Where the record cannot be edited, the context now says so. The stand-in
+  reported `disabled: false` while throwing on every write, so a Builder that
+  honoured `disabled` offered controls that could not work; it carries
+  `disabled: true` beside `readOnly: true` now, as the detail view's always did.
+  It also no longer vanishes once the hidden form beside it mounts: for a user
+  without permission to edit, that swapped a `formView` for the default
+  rendering, and dropped `additionalFields` from the default one, a frame after
+  they appeared.
+
 ## [0.20.0] - 2026-09-10
 
 ### Added

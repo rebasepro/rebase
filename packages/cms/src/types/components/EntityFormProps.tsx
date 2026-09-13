@@ -41,7 +41,21 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
 
     navigateBack?: () => void;
 
+    /**
+     * Rendered in place of the generated fields, inside this form — so it is
+     * handed this form's live {@link FormContext}, and Save, validation and the
+     * unsaved-changes guard all see what it writes. A collection's
+     * `formView.Builder` and an entity view declared with `includeActions` both
+     * arrive here.
+     */
     Builder?: React.ComponentType<EntityCustomViewParams<M>>;
+
+    /**
+     * Passed through to {@link Builder}: the path of parents above this record,
+     * which every entity view receives. The form itself does not read them.
+     */
+    parentCollectionSlugs?: string[];
+    parentEntityIds?: string[];
 
     children?: React.ReactNode;
 

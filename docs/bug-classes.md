@@ -1120,6 +1120,27 @@ the result (`let cancelled = false` … `if (cancelled) return`). The request
 still completes and its answer is still paid for; what changes is that it is no
 longer allowed to write into a slot that has moved on.
 
+### The same shape in the entity form — 2026-09-13
+
+`EditViewBinding` chose between the record form and a collection's `formView`
+Builder. The form branch hands out a live `FormContext`; the formView branch had
+no form, so it handed the Builder the read-only stand-in the view keeps for tabs
+that are still loading — the same type, with `setFieldValue`, `save` and
+`submit` throwing. Builders compiled against it, and the app that found it had
+tests passing a writable fake. In production every keystroke was dropped and
+there was no Save. A placeholder for "not ready yet" had become permanent,
+because the branch that would have made it ready was the one not taken.
+
+The stand-in also said `disabled: false` — the one field a Builder reads to
+decide whether to offer controls — while refusing every write.
+
+**Sweep:** `createFormexStub` and hand-built `FormContext` literals across
+`packages/*/src`. Three: the detail view's (permanent by design, and
+`disabled: true` — clean), `PopupFormField`'s (built on a real formex — clean),
+and this one. The Builder now renders through the form, which already took a
+`Builder`. Guard: `packages/cms/test/components/form_view_builder_live_context.test.tsx`,
+rendered down through the real form, because a fake context is what hid it.
+
 ---
 
 ## 30. A claim on a shared input that the mechanism cannot actually make

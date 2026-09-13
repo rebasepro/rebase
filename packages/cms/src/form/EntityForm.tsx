@@ -1,7 +1,7 @@
 
 import type { AdditionalFieldDelegateProps } from "@rebasepro/cms-types";
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
@@ -14,7 +14,7 @@ import { useRebaseContext } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
-import { Alert, Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, paperMixin, Typography } from "@rebasepro/ui";
+import { Alert, Button, CircularProgressCenter, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, paperMixin, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
 import { FieldBlock, isSelfLabellingProperty, LABEL_ICON_SIZE, spanClass } from "./components/FieldBlock";
@@ -64,6 +64,8 @@ export function EntityForm<M extends Record<string, unknown>>({
     formex: formexProp,
     disabled: disabledProp,
     Builder,
+    parentCollectionSlugs,
+    parentEntityIds,
     EntityFormActionsComponent = EntityFormActions,
     showDefaultActions = true,
     navigateBack: navigateBackProp,
@@ -544,12 +546,19 @@ export function EntityForm<M extends Record<string, unknown>>({
     const formFields = () => {
 
         if (Builder) {
-            return <Builder
-                collection={collection}
-                entity={entity}
-                modifiedValues={formex.values}
-                formContext={formContext}
-            />;
+            // Its own boundary: a Builder is usually a lazy chunk, and without
+            // one, loading it suspends the nearest boundary above the record
+            // view — which takes the identity bar down with the form.
+            return <Suspense fallback={<CircularProgressCenter/>}>
+                <Builder
+                    collection={collection}
+                    parentCollectionSlugs={parentCollectionSlugs}
+                    parentEntityIds={parentEntityIds}
+                    entity={entity}
+                    modifiedValues={formex.values}
+                    formContext={formContext}
+                />
+            </Suspense>;
         }
 
         const sections = showRail || !layout.sidebar.length

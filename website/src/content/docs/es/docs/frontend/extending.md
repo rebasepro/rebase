@@ -1,5 +1,5 @@
 ---
-sourceHash: 5de2aebf9af99221
+sourceHash: 387b83637f6dc883
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: Una guía de decisión para elegir el mecanismo de extensión adecuado — plugins, slots, sustituciones de componentes, vistas de entidad, acciones y más.
@@ -121,7 +121,7 @@ const collection = {
     admin: {
         formView: {
             Builder: MyCustomProductForm,
-            includeActions: true  // show save/delete bar (default: true)
+            includeActions: true  // Save and Discard in the bar (default: true)
         }
     }
 };
@@ -129,6 +129,8 @@ const collection = {
 ```
 
 Úselo cuando necesite un layout completamente personalizado para la experiencia de edición de entidades de una colección. Para ajustes menores, prefiera `collection.components` con la sustitución `Entity.Form` en su lugar.
+
+El Builder se renderiza dentro del formulario de la entidad y recibe su `formContext` activo: escriba con `formContext.setFieldValue`, y el botón Guardar de la barra almacena la entidad. Donde la entidad no se puede editar —la vista de detalle de solo lectura, o un usuario sin permiso de edición— `formContext.disabled` es `true` y las escrituras lanzan un error. Establezca `includeActions: false` si su Builder guarda por su cuenta mediante `formContext.submit()`.
 
 ### `additionalFields`
 

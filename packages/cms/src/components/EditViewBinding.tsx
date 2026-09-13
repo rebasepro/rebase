@@ -430,14 +430,26 @@ parentEntityIds,
         mountedTabsRef.current.add(activeTab);
     }
 
-    // Memoize the read-only fallback form context to avoid recreating it every render
+    /**
+     * The record as a context with no form behind it: what a view is handed
+     * where nothing can edit the record — the read-only rendering for a user
+     * without permission, and the entity-view tabs until the form has mounted
+     * and published its own. Its writes throw, so it says `disabled`: that is
+     * the flag every control already honours, and a stand-in reporting
+     * `disabled: false` invited the very write it was about to refuse.
+     *
+     * Not dropped once the form's context arrives. The form mounts even where
+     * it is hidden — for a user who cannot edit, the read-only view is shown
+     * beside a hidden form — so its context always arrives, and the read-only
+     * view lost its context the moment it did: a `formView` flipped to the
+     * default rendering, and `additionalFields` vanished from the default one.
+     */
     const readOnlyFormContext = useMemo<FormContext<M> | undefined>(() => {
-        if (formContext) return undefined; // not needed when real formContext exists
         if (!entityId) return undefined;
         const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
         return {
             entityId,
-            disabled: false,
+            disabled: true,
             readOnly: true,
             openEntityMode: layout,
             status: status,
@@ -457,7 +469,7 @@ parentEntityIds,
             savingError: undefined,
             formex: formexStub
         };
-    }, [formContext, entityId, layout, status, usedEntity, collection, path]);
+    }, [entityId, layout, status, usedEntity, collection, path]);
 
     const nonActionCustomViews = useMemo(() =>
         resolvedEntityViews.filter(e => !e.includeActions),
@@ -677,10 +689,40 @@ parentEntityIds,
         }
     }, [status, onTabChange, path, entityId, collection]);
 
-    // Resolve formView.Builder if provided
     const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
-    const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
+    const FormViewBuilder = resolveComponentRef<EntityCustomViewParams<M>>(formViewConfig?.Builder);
     const formViewIncludeActions = formViewConfig?.includeActions !== false;
+
+    /**
+     * What the record form renders in place of its generated fields.
+     *
+     * A `formView` Builder is rendered *by the form*, never instead of it. It
+     * used to be drawn here in the form's place, and the form is the only
+     * thing that can hand it a working context — the real one arrives through
+     * `onFormContextReady`, and with no form mounted it never did. Every
+     * Builder got the read-only stand-in above: each keystroke threw inside
+     * `setFieldValue`, and Save and Discard, which wait on that same context,
+     * never appeared. A new record was worse: with no id there is not even a
+     * stand-in, and the screen stayed blank.
+     *
+     * An entity view declared with `includeActions` is a second form over the
+     * same record, and takes the place while its tab is open.
+     */
+    const FormBuilder = selectedSecondaryForm
+        ? resolveComponentRef(selectedSecondaryForm.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined)
+        : FormViewBuilder;
+
+    /**
+     * `formView.includeActions: false` leaves saving to the Builder — it holds
+     * `formContext.submit` and `save` — so the bar offers no Save or Discard of
+     * its own. Only for the collection's form: an entity view that declared
+     * `includeActions` is on screen because it asked for them. Delete is a
+     * record action, in the bar's overflow menu, and is not affected.
+     */
+    const formActionsContext = canEdit && formContext
+        && (!FormViewBuilder || formViewIncludeActions || selectedSecondaryForm)
+        ? formContext
+        : undefined;
 
     // Without edit permission the record is rendered read-only — the same
     // sections, spans and rail as the form, so losing the permission changes the
@@ -701,7 +743,7 @@ parentEntityIds,
                                 parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                                 entity={usedEntity}
                                 modifiedValues={usedEntity?.values}
-                                formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
+                                formContext={readOnlyFormContext}
                             />
                         </Suspense>
                     </ErrorBoundary>
@@ -717,25 +759,7 @@ parentEntityIds,
                 formContext={readOnlyFormContext}/>
     ) : null;
 
-    const entityView = FormViewBuilder ? (
-        // formView.Builder replaces the default form
-        <div className={cls(
-            "relative flex-1 w-full h-full overflow-auto",
-            (!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : ""
-        )}>
-            <ErrorBoundary>
-                <Suspense fallback={<CircularProgressCenter />}>
-                    {(formContext ?? readOnlyFormContext) && <FormViewBuilder
-                        collection={collection}
-                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
-                        entity={usedEntity}
-                        modifiedValues={(formContext ?? readOnlyFormContext)?.formex?.values ?? usedEntity?.values}
-                        formContext={(formContext ?? readOnlyFormContext) as FormContext<Record<string, unknown>>}
-                    />}
-                </Suspense>
-            </ErrorBoundary>
-        </div>
-    ) : (
+    const entityView = (
         <ResolvedEntityForm<M>
             collection={collection}
             path={path}
@@ -799,7 +823,9 @@ parentEntityIds,
                     setTimeout(() => onCloseRequest?.(), 0);
                 }
             }}
-            Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
+            Builder={FormBuilder}
+            parentCollectionSlugs={parentCollectionSlugs}
+            parentEntityIds={parentEntityIds}
         />
     );
 
@@ -893,12 +919,12 @@ parentEntityIds,
             onBack={layout === "full_screen" && !onShowList
                 ? () => navigate(withListState(urlController.buildUrlCollectionPath(path)))
                 : undefined}
-            onSave={canEdit && formContext ? () => {
+            onSave={formActionsContext ? () => {
                 sideDialogContext.setPendingClose?.(false);
                 pendingCloseRef.current = false;
-                formContext.submit();
+                formActionsContext.submit();
             } : undefined}
-            onSaveAndClose={canEdit && formContext && canCloseAfterSave ? () => {
+            onSaveAndClose={formActionsContext && canCloseAfterSave ? () => {
                 // Lowered again once the submit settles. A submit the form
                 // rejects never reaches `onSaved`, so nothing would consume the
                 // flag and the *next* save — a keyboard ⌘S, say — would close
@@ -906,12 +932,12 @@ parentEntityIds,
                 // save that succeeds has already closed by the time this runs.
                 if (layout === "split") {
                     pendingCloseRef.current = true;
-                    Promise.resolve(formContext.submit())
+                    Promise.resolve(formActionsContext.submit())
                         .finally(() => { pendingCloseRef.current = false; });
                     return;
                 }
                 sideDialogContext.setPendingClose?.(true);
-                Promise.resolve(formContext.submit())
+                Promise.resolve(formActionsContext.submit())
                     .finally(() => sideDialogContext.setPendingClose?.(false));
             } : undefined}
             // Welded to Save in the split, its own button in the overlays.
@@ -919,8 +945,8 @@ parentEntityIds,
             onClose={onCloseRequest}
             // Unlike the form's own Discard, this one does not stop to ask —
             // so it has to be reversible. See {@link useUndoableDiscard}.
-            onDiscard={canEdit && formContext
-                ? () => discard(formContext.formex, status)
+            onDiscard={formActionsContext
+                ? () => discard(formActionsContext.formex, status)
                 : undefined}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}

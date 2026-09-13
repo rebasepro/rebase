@@ -1,5 +1,5 @@
 ---
-sourceHash: 5de2aebf9af99221
+sourceHash: 387b83637f6dc883
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Entscheidungsleitfaden zur Wahl des richtigen Erweiterungsmechanismus — Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
@@ -121,7 +121,7 @@ const collection = {
     admin: {
         formView: {
             Builder: MyCustomProductForm,
-            includeActions: true  // show save/delete bar (default: true)
+            includeActions: true  // Save and Discard in the bar (default: true)
         }
     }
 };
@@ -129,6 +129,8 @@ const collection = {
 ```
 
 Verwenden Sie dies, wenn Sie ein vollständig benutzerdefiniertes Layout für die Entity-Bearbeitung einer Collection benötigen. Für kleinere Anpassungen bevorzugen Sie stattdessen `collection.components` mit dem `Entity.Form`-Override.
+
+Der Builder wird innerhalb des Entity-Formulars gerendert und erhält dessen aktiven `formContext`: Schreiben Sie mit `formContext.setFieldValue`, und „Speichern“ in der Leiste speichert die Entity. Wo die Entity nicht bearbeitet werden kann — in der schreibgeschützten Detailansicht oder für Benutzer ohne Bearbeitungsrecht — ist `formContext.disabled` gleich `true`, und Schreibvorgänge werfen einen Fehler. Setzen Sie `includeActions: false`, wenn Ihr Builder selbst über `formContext.submit()` speichert.
 
 ### `additionalFields`
 

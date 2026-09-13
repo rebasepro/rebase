@@ -249,7 +249,9 @@ export type AdminCollectionOptions<
      * (entity, formContext, collection, etc.) and has full control over the UI.
      *
      * Works in both edit mode and read-only mode (when `defaultEntityAction`
-     * is `"view"`). In read-only mode, `formContext.readOnly` will be `true`.
+     * is `"view"`, or for a user who may not edit the record). In edit mode
+     * `formContext` is the record form's live context; in read-only mode
+     * `formContext.disabled` and `formContext.readOnly` are both `true`.
      */
     formView?: FormViewConfig;
 

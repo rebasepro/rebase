@@ -59,7 +59,6 @@
   "packages/cms/src/components/DefaultDrawer.tsx::isFloating": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::collectionRegistryController": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::selectedEntityView": 1,
-  "packages/cms/src/components/EditViewBinding.tsx::formViewIncludeActions": 1,
   "packages/cms/src/components/EditViewBinding.tsx::largeLayout": 1,
   "packages/cms/src/components/EditViewBinding.tsx::selectedEntityView": 1,
   "packages/cms/src/components/history/EntityHistoryView.tsx::authController": 1,

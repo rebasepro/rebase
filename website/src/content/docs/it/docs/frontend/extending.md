@@ -1,5 +1,5 @@
 ---
-sourceHash: 5de2aebf9af99221
+sourceHash: 387b83637f6dc883
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida decisionale per scegliere il giusto meccanismo di estensione — plugin, slot, sovrascritture dei componenti, viste entità, azioni e altro.
@@ -121,7 +121,7 @@ const collection = {
     admin: {
         formView: {
             Builder: MyCustomProductForm,
-            includeActions: true  // show save/delete bar (default: true)
+            includeActions: true  // Save and Discard in the bar (default: true)
         }
     }
 };
@@ -129,6 +129,8 @@ const collection = {
 ```
 
 Usalo quando hai bisogno di un layout completamente personalizzato per l'esperienza di modifica delle entità di una collezione. Per modifiche più piccole, preferisci invece `collection.components` con la sovrascrittura `Entity.Form`.
+
+Il Builder viene renderizzato all'interno del modulo dell'entità e riceve il suo `formContext` attivo: scrivi con `formContext.setFieldValue`, e il pulsante Salva nella barra memorizza l'entità. Dove l'entità non può essere modificata — la vista di dettaglio in sola lettura, o un utente senza permesso di modifica — `formContext.disabled` è `true` e le scritture generano un errore. Imposta `includeActions: false` se il tuo Builder salva da sé tramite `formContext.submit()`.
 
 ### `additionalFields`
 

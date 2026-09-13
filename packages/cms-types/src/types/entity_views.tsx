@@ -75,8 +75,11 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     isSaving?: boolean;
 
     /**
-     * Whether the form context is in read-only detail view mode.
-     * Custom entity views can use this to adjust their rendering.
+     * There is no form behind this context: the record is being shown, not
+     * edited, and `setFieldValue`, `save` and `submit` throw. Always paired
+     * with `disabled: true` — the read-only detail view, a record the user may
+     * not edit, and an entity view tab in the moment before the form has
+     * mounted all get one. Where the record is being edited this is absent.
      */
     readOnly?: boolean;
 }
@@ -109,7 +112,15 @@ export type EntityCustomView<M extends Record<string, unknown> = Record<string, 
  * and has full control over the UI.
  *
  * The form tab still appears in the tab bar but renders your Builder
- * instead of the auto-generated field form.
+ * instead of the auto-generated field form. It is rendered *inside* the
+ * record's form, so on the edit screen `formContext` is that form's live
+ * context: `formContext.setFieldValue` edits the record, the identity bar's
+ * Save stores it, and closing with an edit pending asks first — the same as
+ * for a generated field.
+ *
+ * Where the record cannot be edited — the read-only detail view, or a user
+ * without permission to edit it — the Builder gets `formContext.disabled` and
+ * `formContext.readOnly` set, and writes throw.
  *
  * @group Models
  */
@@ -119,8 +130,11 @@ export type FormViewConfig<M extends Record<string, unknown> = Record<string, un
      */
     Builder: ComponentRef<EntityCustomViewParams<M>>;
     /**
-     * If true, the save/delete action bar is rendered alongside the custom view.
-     * Defaults to true.
+     * Whether the identity bar offers Save, Save and close and Discard while
+     * this view is on screen. Set it to `false` when the Builder stores the
+     * record on its own terms, through `formContext.submit` or
+     * `formContext.save`. Delete is a record action, in the bar's overflow
+     * menu, and is offered either way. Defaults to true.
      */
     includeActions?: boolean;
 };

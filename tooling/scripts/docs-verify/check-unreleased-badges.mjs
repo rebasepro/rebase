@@ -143,6 +143,7 @@ const NOT_NEW = new Map([
     // introduced. A note about an old surface is not a new feature, and badging
     // the pages that describe it would tell a reader on 0.17 that something they
     // already have is unavailable to them.
+    ["formView", "a collection's form override, released before 0.13, whose notes quote it only as `formView.Builder`; the Unreleased note is a fix"]
 ]);
 
 /**

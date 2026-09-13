@@ -187,7 +187,7 @@ const collection = {
     admin: {
         formView: {
             Builder: MyCustomProductForm,
-            includeActions: true  // show save/delete bar (default: true)
+            includeActions: true  // Save and Discard in the bar (default: true)
         }
     }
 };
@@ -195,6 +195,8 @@ const collection = {
 ```
 
 Use when you need a completely custom layout for one collection's entity editing experience. For smaller tweaks, prefer `collection.components` with `Entity.Form` override instead.
+
+The Builder is rendered inside the record's form and receives its live `formContext`: write with `formContext.setFieldValue`, and the bar's Save stores the record. Where the record cannot be edited — the read-only detail view, or a user without edit permission — `formContext.disabled` is `true` and writes throw. Set `includeActions: false` if your Builder saves on its own through `formContext.submit()`.
 
 ### `additionalFields`
 
