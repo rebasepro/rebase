@@ -5,7 +5,7 @@ is one of the three states a real deployment is in:
 
 | state      | who created the schema         | covered by                        |
 |------------|--------------------------------|-----------------------------------|
-| **empty**  | this code, zero rows           | `cli-init-e2e` `--empty` axis      |
+| **empty**  | this code, zero rows           | `cli-init-e2e`, a new scaffold on a new database |
 | **fresh**  | this code, seeded              | every other suite                  |
 | **aged**   | an *older release*, then upgraded | **only this directory**         |
 
@@ -35,12 +35,15 @@ Two kinds, both belong here.
 **Recorded** — the normal case, one per release. Run:
 
 ```bash
-node --import tsx scripts/record-schema-snapshot.mts
+node --import tsx tooling/scripts/record-schema-snapshot.mts --database-url <url>
 ```
 
-It provisions an empty database with the code at your current checkout, stamps
-the file with the auth schema version and package version it came from, and
-writes `packages/server-postgres/test/e2e/schema-snapshots/recorded-<version>.sql`.
+It provisions nothing. Point it at a database this release booted against (the
+acceptance database, an e2e container, a `pnpm dev` database; `DATABASE_URL` is
+read when `--database-url` is absent): it dumps that database's `rebase` schema,
+appends synthetic seed rows, stamps the file with the package version and auth
+schema version, and writes
+`packages/server-postgres/test/e2e/schema-snapshots/recorded-v<version>-auth<N>.sql`.
 Do this on the release commit, *before* you start the next migration — a snapshot
 recorded after the migration records the shape you were trying to test against.
 

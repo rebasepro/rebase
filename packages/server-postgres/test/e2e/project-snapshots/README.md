@@ -7,7 +7,7 @@ reason this directory exists.
 |---|---|---|
 | `schema-snapshots/` | a database, auth schema only | a migration that mangles an aged **database** |
 | `project-snapshots/` | a database **and the artifacts a project keeps beside it** | the two disagreeing after only one was migrated |
-| `fixtures/bundles/` (repo root) | built bundles | a runtime that cannot boot an old **bundle** |
+| `tests/fixtures/bundles/` (repo root) | built bundles | a runtime that cannot boot an old **bundle** |
 
 ## Why a database-only corpus was not enough
 
@@ -55,12 +55,17 @@ pnpm record:project-snapshot
 ```
 
 It starts its own Postgres, provisions it from the reference project in
-`scripts/derived-names.mts` — the same naming-stress fixture the frozen-names gate
-uses — seeds rows, points every foreign key at a real row, and writes the four
-files above. No live database of the right vintage required, which is the point:
-"record one per release" is a discipline that had already been skipped three
-releases running, so the only version worth building is the one nobody has to
-remember. `scripts/release.sh` runs it.
+`tooling/scripts/derived-names.mts` — the same naming-stress fixture the
+frozen-names gate uses — seeds rows, points every foreign key at a real row, and
+writes the four files above. No live database of the right vintage required, which
+is the point: "record one per release" is a discipline that had already been
+skipped three releases running, so the only version worth building is the one
+nobody has to remember. `tooling/scripts/release.sh` runs it.
+
+Releases cut by the `Publish` workflow (`.github/workflows/publish.yml`) do not:
+it bumps, tags and publishes without calling the recorder. Every release from
+v0.17.3 on was cut that way; v0.17.3 was recorded by hand afterwards, and
+v0.18.0 through v0.21.0 have no snapshot.
 
 It refuses to overwrite an existing snapshot. A snapshot is a record of what a
 release shipped; rewriting it un-tests every upgrade path that ran through it.
