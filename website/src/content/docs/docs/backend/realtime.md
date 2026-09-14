@@ -475,7 +475,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Past the channel frame budget above |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
-| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 With no handler attached, these are logged as a warning. They used to be
 discarded entirely: there was no promise to reject and no channel to deliver to,
