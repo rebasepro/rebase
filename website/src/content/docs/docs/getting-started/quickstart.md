@@ -52,7 +52,7 @@ creates the tables at boot — including the example `posts`, `authors` and `tag
 It starts both halves together:
 
 - **Backend** — REST API, auth, storage, WebSocket
-- **Frontend** — the Rebase admin panel
+- **Frontend** — the panel: Rebase CMS and Rebase Studio
 - **Hot reload** for both
 
 Both ports are **derived from this project's path** rather than fixed, so several

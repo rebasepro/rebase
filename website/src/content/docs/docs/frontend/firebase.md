@@ -1,10 +1,10 @@
 ---
 title: Firebase
 sidebar_label: Firebase
-description: "@rebasepro/firebase runs the Rebase admin panel against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved."
+description: "@rebasepro/firebase runs Rebase CMS against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved."
 ---
 
-`@rebasepro/firebase` points the Rebase admin panel at Firebase. Your
+`@rebasepro/firebase` points Rebase CMS at Firebase. Your
 collections describe Firestore documents, and the panel reads and writes them
 through the Firebase SDK.
 

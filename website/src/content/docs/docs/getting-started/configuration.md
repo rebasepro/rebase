@@ -470,7 +470,7 @@ function Widget() {
 
 ### SQL Editor Permission Denied (`permission denied for table <name>`)
 
-* **Symptoms:** Custom queries executed in the Rebase Studio SQL Editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
+* **Symptoms:** Custom queries executed in Rebase Studio's SQL editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
 * **Cause:** By default, Rebase attempts to execute SQL Editor queries by temporarily switching database roles to match the active user's application role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom authentication where roles exist only in database tables rather than actual PostgreSQL roles, the role switch fails or database privileges are missing. The CMS spreadsheet view executes under the default connection owner user and bypasses this.
 * **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner).
 

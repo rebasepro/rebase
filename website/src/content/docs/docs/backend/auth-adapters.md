@@ -35,7 +35,7 @@ export interface AuthAdapter {
    */
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
 
-  /** Optional user management operations (CRUD) for the Admin Dashboard panel */
+  /** Optional user management operations (CRUD) for the panel */
   userManagement?: UserManagementAdapter;
 
   /** Optional: Mount adapter-specific custom public routes (e.g. callback paths) */
@@ -44,7 +44,7 @@ export interface AuthAdapter {
   /** Optional: Mount adapter-specific admin-only routes */
   createAdminRoutes?(): Hono<any, any, any> | undefined;
 
-  /** Advertise supported capabilities (to customize Admin Dashboard UI visibility) */
+  /** Advertise supported capabilities (to customize what the panel shows) */
   getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
 
   /** Lifecycle hooks called during backend start and graceful shutdown */
@@ -198,7 +198,7 @@ const backend = await initializeRebaseBackend({
 
 ---
 
-### Mounting Auth Routes and Admin UI Actions
+### Mounting Auth Routes and Panel Actions
 
 If your custom auth provider requires mounting redirect endpoints (like OAuth callback routes or SAML login loops), implement the `createAuthRoutes` method on your adapter:
 
@@ -240,7 +240,7 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-If you wish to allow user CRUD operations directly inside the Rebase Admin Dashboard, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `createUser`, `updateUser`, and `deleteUser`.
+If you wish to allow user CRUD operations directly inside the panel, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `createUser`, `updateUser`, and `deleteUser`.
 
 ## Next Steps
 
