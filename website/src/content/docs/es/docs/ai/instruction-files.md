@@ -63,7 +63,7 @@ servidor en la raíz del proyecto, y una ruta absoluta es la única línea de es
 archivo que no se puede confirmar en el repositorio. Está ahí porque
 `~/.rebase/projects.json` es común a toda la máquina: un proyecto que no nombra
 un directorio propio acaba usando lo que persistió el último proyecto de esa
-máquina. Consulta [la prioridad](/es/docs/ai/mcp#sobre-qué-directorio-actúa).
+máquina. Consulta [la prioridad](/es/docs/ai/mcp#en-qué-directorio-actúa).
 
 ## Por qué un puntero en lugar de una copia
 

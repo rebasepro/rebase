@@ -1,42 +1,35 @@
 ---
-sourceHash: f10be03939ad9c7f
-title: Entitäts-Callbacks
+sourceHash: 13eea3897cdb7bee
+title: Entity-Callbacks
 sidebar_label: Callbacks
-description: Verwenden Sie Lebenszyklus-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data API für sammlungsübergreifende Operationen.
+description: Nutzen Sie Lebenszyklus-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für sammlungsübergreifende Operationen.
 ---
 
 ## Übersicht
 
-Callbacks ermöglichen es Ihnen, sich in den Entitätslebenszyklus einzuhängen, um:
+Mit Callbacks können Sie sich in den Lebenszyklus von Entitäten einklinken, um:
 
-- **Daten zwischen Sammlungen synchronisieren** — Entitäten bei Statusänderungen über Tabellen hinweg kopieren oder verschieben
-- **Daten transformieren** vor dem Speichern (berechnete Felder, Slug-Erstellung)
-- **Geschäftsregeln validieren** über die Schema-Validierung hinaus
-- **Nebeneffekte auslösen** nach Schreibvorgängen (E-Mails senden, APIs synchronisieren, Caches aktualisieren)
-- **Daten filtern/transformieren** nach dem Lesen
-- **Kaskadenoperationen** — verwandte Datensätze beim Löschen bereinigen
+- **Daten zwischen Sammlungen zu synchronisieren** — Entitäten bei Statusänderungen über Tabellen hinweg kopieren oder verschieben
+- **Daten vor dem Speichern zu transformieren** (berechnete Felder, Slug-Generierung)
+- Geschäftsregeln über die Schema-Validierung hinaus zu **validieren**
+- **Nebeneffekte nach Schreibvorgängen auszulösen** (E-Mails senden, APIs synchronisieren, Caches aktualisieren)
+- Daten nach dem Lesen zu **filtern/transformieren**
+- **Operationen zu kaskadieren** — zugehörige Datensätze beim Löschen bereinigen
 
-## Wo Callbacks laufen
+## Wo Callbacks ausgeführt werden
 
-Eine Collection hat zwei Callback-Blöcke, und der einzige Unterschied ist, welche Laufzeitumgebung sie ausführt.
+Eine Sammlung verfügt über zwei Callback-Blöcke, und der einzige Unterschied besteht darin, welche Laufzeitumgebung sie ausführt.
 
 | | `callbacks` | `admin.browserCallbacks` |
 |---|---|---|
-| Läuft auf | dem Server | dem Admin-Panel, im Browser |
-| Feuert für | REST, das SDK, Realtime, `dataAsAdmin` | Lese- und Schreibvorgänge des Panels |
-| Erreicht den Browser | nein — die Rümpfe werden aus dem Bundle entfernt | ja, vollständig |
-| Verwenden für | alles Folgende | Collections, mit denen das Panel direkt spricht |
+| Wird ausgeführt auf | dem Server | dem Admin-Panel, im Browser |
+| Wird ausgelöst für | REST, das SDK, Realtime, `dataAsAdmin` | Lese- und Schreibvorgänge, die das Panel durchführt |
+| Erreicht den Browser | nein — Funktionsrümpfe werden aus dem Bundle entfernt | ja, vollständig |
+| Verwendung für | alles Nachfolgende | Sammlungen, mit denen das Panel direkt kommuniziert |
 
-**`callbacks` ist der, den du willst.** Er läuft auf jedem Pfad, der den Server
-erreicht, also umgeht ihn nichts, und sein Rumpf verlässt die Maschine nie — ein
-API-Schlüssel oder ein `process.env`-Zugriff darin ist sicher. Der Rest dieser
-Seite handelt von `callbacks`.
+**`callbacks` ist der Block, den Sie verwenden möchten.** Er wird auf jedem Pfad ausgeführt, der den Server erreicht, sodass nichts an ihm vorbeigeleitet werden kann, und sein Code verlässt niemals die Maschine — ein API-Schlüssel oder das Auslesen von `process.env` ist dort sicher. Der Rest dieser Seite bezieht sich auf `callbacks`.
 
-`admin.browserCallbacks` gibt es für einen Fall: eine Collection auf einem
-`direct`- oder `custom`-Transport, die das Panel *selbst* liest und schreibt,
-ohne Rebase-Server im Anfragepfad. Serverseitig sieht nichts diese Operationen,
-`callbacks` kann für sie also nie feuern, und dieser Block ist der einzige Ort,
-an dem ihre Lebenszyklus-Logik leben kann.
+`admin.browserCallbacks` existiert für einen bestimmten Fall: eine Sammlung über ein `direct`- oder `custom`-Transportprotokoll, die das Panel *selbst* liest und schreibt, ohne dass sich ein Rebase-Server im Anfragepfad befindet. Auf Serverseite bekommt nichts diese Operationen mit, weshalb `callbacks` für sie niemals ausgelöst werden kann; dieser Block ist der einzige Ort, an dem ihre Lebenszykluslogik liegen kann.
 
 ```typescript
 import type { CollectionConfig } from "@rebasepro/types";
@@ -44,7 +37,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 const eventsCollection: CollectionConfig = {
     slug: "events",
     name: "Events",
-    dataSource: "analytics",      // deklariert mit transport: "direct"
+    dataSource: "analytics",      // declared with transport: "direct"
     properties: {
         city: { name: "City", type: "string" },
         code: { name: "Code", type: "string" }
@@ -57,27 +50,20 @@ const eventsCollection: CollectionConfig = {
 };
 ```
 
-Zwei Regeln folgen aus „geht an jeden Besucher", und keine davon ist
-Geschmackssache:
+Aus der Tatsache, dass Code „an jeden Besucher ausgeliefert wird“, folgen zwei Regeln, und keine davon ist bloße Stilfrage:
 
-1. **Keine Geheimnisse.** Keine API-Schlüssel, kein `process.env`, nichts, was
-   dich stören würde, wenn jemand es im Bundle liest. Das gehört in `callbacks`.
-2. **Es ist keine Sicherheitsgrenze.** Ein `browserCallbacks.afterRead`, das ein
-   Feld schwärzt, schwärzt es *nachdem* der Browser die Zeile bereits hat — bei
-   einem direkten Transport kam das rohe Dokument direkt aus dem Store. Das ist
-   Darstellung. Schwärzung, die halten muss, gehört in `callbacks` oder in die
-   Regeln des Stores selbst.
+1. **Keine Secrets.** Keine API-Schlüssel, kein `process.env`, nichts, von dem Sie nicht möchten, dass es jemand im Bundle einsehen kann. Das gehört in `callbacks`.
+2. **Es ist keine Sicherheitsgrenze.** Ein `browserCallbacks.afterRead`, das ein Feld unkenntlich macht (redigiert), tut dies *nachdem* der Browser die Zeile bereits erhalten hat — bei einem direkten Transport kam das rohe Dokument direkt aus dem Datenspeicher. Es dient rein der Darstellung. Zensierung bzw. Zugriffsbeschränkungen, die verbindlich sein müssen, gehören in `callbacks` oder in die eigenen Regeln des Datenspeichers.
 
-Bei einer Collection mit Server-Transport — der Standard, und mit ziemlicher
-Sicherheit deiner — hat der Server `callbacks` bereits ausgeführt, bevor die
-Zeile das Panel erreicht, ein `browserCallbacks.afterRead` läuft also
-*zusätzlich*. Schreibe es idempotent, oder schreibe es nicht.
+Bei einer Sammlung mit Server-Transport — dem Standardfall und fast sicher auch Ihrem — hat der Server `callbacks` bereits ausgeführt, bevor die Zeile das Panel erreicht, sodass ein `browserCallbacks.afterRead` *zusätzlich* dazu läuft. Schreiben Sie es idempotent, oder schreiben Sie es gar nicht.
 
 ## Callbacks definieren
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
 
+// The row shape is inferred from `properties`, so `values.title` below is a
+// `string` without anything being written twice.
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
@@ -107,19 +93,19 @@ const articlesCollection = defineCollection({
             return values;
         },
 
-        afterSave: async ({ values, entityId }) => {
+        afterSave: async ({ values, id }) => {
             // Send notification
-            console.log(`Article ${entityId} saved: ${values.title}`);
+            console.log(`Article ${id} saved: ${values.title}`);
         },
 
-        beforeDelete: async ({ entityId }) => {
+        beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
             // Throw to block the deletion
         },
 
-        afterRead: async ({ entity }) => {
+        afterRead: async ({ row }) => {
             // Transform data after loading
-            return entity;
+            return row;
         }
     }
 });
@@ -129,12 +115,12 @@ const articlesCollection = defineCollection({
 
 ### `beforeSave`
 
-Wird aufgerufen, bevor eine Entität in die Datenbank geschrieben wird. Geben Sie die geänderten Werte zurück.
+Wird aufgerufen, bevor ein Datensatz in die Datenbank geschrieben wird. Gibt die modifizierten Werte zurück.
 
 ```typescript
 beforeSave: async ({
     values,       // Entity values
-    entityId,     // Entity ID (null for new entities)
+    id,           // Entity ID (null for new entities)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context
@@ -144,7 +130,7 @@ beforeSave: async ({
 }
 ```
 
-Werfen Sie einen Fehler, um das **Speichern zu blockieren**:
+Werfen Sie einen Fehler, um **den Speichervorgang zu blockieren**. Der Schreibvorgang erreicht die Datenbank niemals, und der Aufrufer erhält den Status **400** mit Ihrer Nachricht und dem Code `CALLBACK_REJECTED`:
 
 ```typescript
 beforeSave: async ({ values }) => {
@@ -155,9 +141,31 @@ beforeSave: async ({ values }) => {
 }
 ```
 
+```json
+{ "error": { "message": "Price cannot be negative", "code": "CALLBACK_REJECTED",
+             "details": { "stage": "beforeSave", "path": "products" } } }
+```
+
+Um den Status und den Code selbst festzulegen — ein 409 bei einem Konflikt, ein 422 für etwas Wohlgeformtes, aber Unzulässiges — werfen Sie einen `RebaseApiError`:
+
+```typescript
+import { RebaseApiError } from "@rebasepro/types";
+
+beforeSave: async ({ values }) => {
+    if (await isTaken(values.slug)) {
+        throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
+    }
+    return values;
+}
+```
+
+:::note
+Importieren Sie diesen aus `@rebasepro/types`, nicht aus `@rebasepro/server`. Eine Sammlungsdatei wird mit dem Frontend geteilt — der Vite-Build des Admin-Panels liest dasselbe Verzeichnis —, daher darf sie nur Pakete importieren, die im Browser lauffähig sind. `RebaseApiError` ist die browser-sichere Variante und dieselbe Klasse, die auch das Client-SDK wirft.
+:::
+
 ### `afterSave`
 
-Wird nach dem Schreiben der Zeile und vor dem Commit aufgerufen, in derselben Transaktion. Ein Fehler rollt das Speichern zurück — siehe [Transaktionssemantik](#transaktionssemantik).
+Wird aufgerufen, nachdem die Zeile geschrieben wurde und vor dem Commit, innerhalb derselben Transaktion. Ein Fehler (Throw) rollt den Speichervorgang zurück — siehe [Transaktionssemantik](#transaktionssemantik).
 
 ```typescript
 afterSave: async ({
@@ -179,7 +187,7 @@ Wird aufgerufen, wenn ein Speichervorgang fehlschlägt.
 ```typescript
 afterSaveError: async ({
     values,
-    entityId,
+    id,
     error,
     context
 }) => {
@@ -189,35 +197,32 @@ afterSaveError: async ({
 
 ### `afterRead`
 
-Wird nach dem Lesen von Entitäten aus der Datenbank aufgerufen. Transformieren Sie die Daten für die Anzeige.
+Wird nach dem Lesen von Entitäten aus der Datenbank aufgerufen. Dient der Transformation der Daten für die Anzeige.
 
 ```typescript
 afterRead: async ({
-    entity,    // The entity to transform
+    row,    // The row to transform
     context
 }) => {
     // Add computed fields
     return {
-        ...entity,
-        values: {
-            ...entity.values,
-            displayName: `${entity.values.first_name} ${entity.values.last_name}`
-        }
+        ...row,
+        displayName: `${row.first_name} ${row.last_name}`
     };
 }
 ```
 
 ### `beforeDelete`
 
-Wird aufgerufen, bevor eine Entität gelöscht wird. Werfen Sie einen Fehler, um das Löschen zu blockieren.
+Wird aufgerufen, bevor ein Datensatz gelöscht wird. Werfen Sie einen Fehler, um das Löschen zu blockieren.
 
 ```typescript
 beforeDelete: async ({
-    entityId,
-    entity,
+    id,
+    row,
     context
 }) => {
-    if (entity.values.status === "published") {
+    if (row.status === "published") {
         throw new Error("Cannot delete published articles. Unpublish first.");
     }
 }
@@ -225,20 +230,20 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Wird nach dem Löschen der Zeile und vor dem Commit aufgerufen, in derselben Transaktion. Ein Fehler rollt das Löschen zurück.
+Wird aufgerufen, nachdem die Zeile gelöscht wurde und vor dem Commit, innerhalb derselben Transaktion. Ein Fehler rollt das Löschen zurück.
 
 ```typescript
 afterDelete: async ({
-    entityId,
-    entity,
+    id,
+    row,
     context
 }) => {
     // Cleanup related data
-    console.log(`Article ${entityId} deleted`);
+    console.log(`Article ${id} deleted`);
 }
 ```
 
-## Eigenschaften-Callbacks
+## Eigenschafts-Callbacks
 
 Sie können Callbacks auch auf Eigenschaftsebene für feldspezifische Transformationen definieren:
 
@@ -255,13 +260,13 @@ properties: {
 }
 ```
 
-## Die `context.data` API
+## Die `context.data`-API
 
-Jeder Callback erhält ein `context`-Objekt, das `context.data` enthält – eine vereinheitlichte Datenschicht für die Durchführung von **sammlungsübergreifenden Operationen** innerhalb von Lebenszyklus-Hooks.
+Jeder Callback erhält ein `context`-Objekt, das `context.data` enthält — eine einheitliche Datenzugriffsschicht zur Durchführung von **sammlungsübergreifenden Operationen** aus Lebenszyklus-Hooks heraus.
 
 ### Auf Sammlungen zugreifen
 
-`context.data` verwendet einen JavaScript Proxy, sodass Sie auf jede Sammlung über ihren Slug als Eigenschaft zugreifen können:
+`context.data` verwendet einen JavaScript-Proxy, sodass Sie über den Slug als Eigenschaft auf jede Sammlung zugreifen können:
 
 ```typescript
 afterSave: async ({ values, entityId, context }) => {
@@ -277,22 +282,22 @@ afterSave: async ({ values, entityId, context }) => {
 
 ### Verfügbare Methoden
 
-Jeder Sammlungs-Accessor (`context.data.<slug>`) bietet diese Methoden:
+Jeder Sammlungs-Accessor (`context.data.<slug>`) stellt die folgenden Methoden bereit:
 
 | Methode | Signatur | Beschreibung |
 |--------|-----------|-------------|
 | `.find()` | `find(params?: FindParams) → FindResponse` | Entitäten mit Filtern, Sortierung und Paginierung abfragen |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Eine einzelne Entität nach ID abrufen |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Eine einzelne Entität anhand der ID abrufen |
 | `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Eine neue Entität erstellen |
 | `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Eine bestehende Entität aktualisieren |
-| `.delete()` | `delete(id: string \| number) → void` | Eine Entität löschen |
+| `.delete()` | `delete(id: string \| number) → void` | Einen Datensatz löschen |
 | `.count()` | `count(params?: FindParams) → number` | Übereinstimmende Entitäten zählen |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Echtzeit-Abonnement (wo unterstützt) |
-| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Einer einzelnen Entität lauschen |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Eine einzelne Entität überwachen |
 
 ### Abfragen mit `.find()`
 
-Die `find()`-Methode unterstützt umfangreiche Filterung:
+Die Methode `find()` unterstützt umfassende Filterfunktionen:
 
 ```typescript
 afterSave: async ({ values, context }) => {
@@ -343,64 +348,61 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 }
 ```
 
-### Sicherheit: mit welchen Rechten `context.data` läuft
+### Sicherheit: Mit welchen Berechtigungen `context.data` ausgeführt wird
 
 :::important
-**`context.data` erbt die Rechte dessen, was den Callback ausgelöst hat.** Es ist keine feste Vertrauensstufe.
+**`context.data` erbt die Berechtigungen der Operation, die den Callback ausgelöst hat.** Es handelt sich nicht um eine feste Vertrauensstufe.
 
-- Ausgelöst durch eine **Benutzeranfrage** (REST, Realtime, eine Änderung im Admin-Panel) → **benutzergebunden**. Der Callback läuft in der RLS-gebundenen Transaktion, die für diese Anfrage geöffnet wurde; Richtlinien gelten also für Lese- *und* Schreibvorgänge. Ein Callback kann keine Zeile sehen, die sein Aufrufer nicht sehen konnte.
-- Ausgelöst durch **`rebase.dataAsAdmin` oder einen Cron-Job** (dasselbe Singleton) → **admin-gebunden**, nicht ungebunden. Dieser Treiber ist auf `{ uid: "service", roles: ["admin"] }` eingegrenzt, der Callback läuft also weiterhin in einer RLS-gebundenen Transaktion: Ihre Richtlinien werden ausgewertet — gegen diese Identität.
-- Ausgelöst durch den **Basis-Treiber** (die eingebauten Auth-Abläufe, Migrationen) → **ungebunden**. Er läuft über die Owner-Verbindung und umgeht RLS.
+- Ausgelöst durch eine **Benutzeranfrage** (REST, Realtime, eine Bearbeitung im Admin-Panel) → **benutzerbezogener Gültigkeitsbereich (User-scoped)**. Der Callback läuft innerhalb der RLS-gebundenen Transaktion, die für diese Anfrage geöffnet wurde, sodass Richtlinien für Lese- *und* Schreibvorgänge gelten. Ein Callback kann keine Zeile sehen, die sein Aufrufer nicht sehen durfte.
+- Ausgelöst durch **`rebase.dataAsAdmin` oder einen Cronjob** (dasselbe Singleton) → **adminbezogener Gültigkeitsbereich (Admin-scoped)**, nicht unbeschränkt. Dieser Treiber hat den Scope `{ uid: "service", roles: ["admin"] }`, sodass der Callback weiterhin in einer RLS-gebundenen Transaktion läuft — Ihre Richtlinien werden anhand dieser Identität ausgewertet.
+- Ausgelöst durch den **Basis-Treiber** (integrierte Authentifizierungsabläufe, Migrationen) → **ohne Gültigkeitsbereich (unscoped)**. Er läuft über die Verbindung des Eigentümers und umgeht RLS.
 :::
 
-Das ist vor allem in der Richtung wichtig, die stillschweigend fehlschlägt. RLS *filtert*, es wirft keinen Fehler — ein Callback, der eine benachbarte Zeile liest, findet sie, wenn eine Admin-Aufgabe speichert, und findet möglicherweise nichts, wenn ein Endbenutzer speichert, in beiden Fällen ohne Fehler. Schreiben Sie Callbacks, die ein leeres Ergebnis vertragen, oder greifen Sie bewusst zur Admin-Ebene:
+Dies ist vor allem in der Richtung von Bedeutung, die still fehlschlägt. RLS *filtert*, es wirft keine Fehler — ein Callback, der eine Geschwisterzeile liest, findet diese also bei einem Speichervorgang durch einen Admin-Task, findet aber möglicherweise nichts, wenn ein Endbenutzer speichert, ohne dass in beiden Fällen ein Fehler auftritt. Schreiben Sie Callbacks so, dass sie ein leeres Ergebnis tolerieren, oder greifen Sie gezielt auf die Admin-Ebene zurück:
 
 ```typescript
 afterSave: async ({ context }) => {
-    // Benutzergebunden, wenn ein Benutzer diesen Speichervorgang ausgelöst hat:
-    // RLS greift.
+    // User-scoped when a user triggered this save: RLS applies.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // Bewusst admin-gebunden — für Arbeit, die der Aufrufer tatsächlich nicht
-    // sehen soll, etwa ein Audit-Log, das er weder lesen noch bearbeiten darf.
-    // Beachten Sie: das ist die Reichweite eines Admins, kein Umgehen von RLS —
-    // eine Collection, deren einzige Regel `policy.serverContext()` ist, bleibt
-    // auch dafür verschlossen, denn das kompiliert zu `rebase.uid() IS NULL`, und
-    // die uid dieses Accessors ist `service`.
+    // Deliberately admin-scoped — for work the caller genuinely may not see,
+    // such as an audit trail they must not be able to read or edit. Note this
+    // is an admin's reach, not a bypass: a collection whose only rule is
+    // `policy.serverContext()` stays closed to it, since that compiles to
+    // `rebase.uid() IS NULL` and this accessor's uid is `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
 
-:::caution[Diese Seite behauptete das Gegenteil]
-Frühere Fassungen dieser Seite besagten, Callbacks umgingen RLS immer und hätten „vollen Datenbankzugriff unabhängig von den Berechtigungen des auslösenden Benutzers". Das war falsch, und zwar in die unsichere Richtung — es lud dazu ein, Callbacks in der Annahme zu schreiben, sie sähen immer alles.
+:::caution[Auf dieser Seite stand zuvor das Gegenteil]
+Frühere Versionen dieser Seite besagten, dass Callbacks RLS immer umgehen und „vollen Datenbankzugriff unabhängig von den Berechtigungen des auslösenden Benutzers“ haben. Das war falsch, und zwar in unsicherer Hinsicht — es verleitete dazu, Callbacks in der Annahme zu schreiben, sie könnten immer alles sehen.
 
-Das oben beschriebene Verhalten ist end-to-end gegen Postgres verifiziert, durch den Fall `"scopes context.data to the caller when a callback runs on a user request"` in der RLS-Enforcement-Suite von `@rebasepro/server-postgres`.
+Das oben beschriebene Verhalten ist für Postgres durch den Testfall `"scopes context.data to the caller when a callback runs on a user request"` in der RLS-Durchsetzungssuite von `@rebasepro/server-postgres` durchgehend verifiziert.
 :::
 
 ### Transaktionssemantik
 
 :::important
-**Was ein Callback über `context.data` schreibt, gehört zu dem Schreibvorgang, der ihn ausgelöst hat.** Auf Postgres laufen `beforeSave`, das Speichern und `afterSave` — bzw. `beforeDelete`, das Löschen und `afterDelete` — in einer Transaktion; jeder Callback wird vor dem Commit abgewartet, und `context.data` schreibt über dieselbe Transaktion.
+**Die Schreibvorgänge über `context.data` eines Callbacks sind Teil des Schreibvorgangs, der ihn ausgelöst hat.** Bei Postgres laufen `beforeSave`, das Speichern und `afterSave` — bzw. `beforeDelete`, das Löschen und `afterDelete` — innerhalb einer einzigen Transaktion. Jeder Callback wird vor dem Commit abgewartet, und `context.data` schreibt über dieselbe Transaktion.
 :::
 
-Der auslösende Schreibvorgang und alles, was seine Callbacks geschrieben haben, werden also gemeinsam oder gar nicht committet:
+Daher werden der auslösende Schreibvorgang und alles, was seine Callbacks geschrieben haben, zusammen festgeschrieben (committed) oder gar nicht:
 
-- Ein Fehler in `afterSave` oder `afterDelete` rollt den auslösenden Schreibvorgang zurück, zusammen mit jedem Schreibvorgang, den die Callbacks über `context.data` gemacht haben. Der Aufrufer erhält **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt — oder den eigenen Status des Fehlers, wenn er einen trägt: einen `RebaseApiError`, den Sie ausgelöst haben, das 409 einer Unique-Verletzung.
-- Realtime-Abonnenten erfahren von der Zeile erst nach dem Commit; ein zurückgerollter Schreibvorgang wird nie angekündigt.
-- Ein Callback hält die Transaktion offen, solange er läuft; ein langsamer Callback bedeutet also gehaltene Locks und eine belegte Pool-Verbindung.
+- Ein Fehler (Throw) aus `afterSave` oder `afterDelete` rollt den auslösenden Schreibvorgang zusammen mit jedem Schreibvorgang zurück, den die Callbacks über `context.data` getätigt haben. Der Aufrufer erhält die Antwort **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt — oder den eigenen Status des Fehlers, wenn dieser einen trägt: ein von Ihnen geworfener `RebaseApiError`, der 409-Code einer Eindeutigkeitsverletzung usw.
+- Realtime-Abonnenten erfahren erst nach dem Commit von der Zeile; ein zurückgerollter Schreibvorgang wird also niemals angekündigt.
+- Ein Callback hält die Transaktion während seiner Ausführung offen. Ein langsamer Callback blockiert somit Sperren und bindet eine Verbindung aus dem Verbindungspool.
 
-Lassen Sie einen Fehler durchschlagen, wenn der auslösende Schreibvorgang ihn nicht überleben soll. Fangen Sie ihn ab, wenn er es soll: Der fehlgeschlagene Schreibvorgang wird für sich allein zurückgenommen, der Rest wird committet.
+Lassen Sie einen Fehler werfen, wenn der auslösende Schreibvorgang diesen nicht überleben soll. Fangen Sie ihn ab, wenn er überleben soll: Der fehlgeschlagene Schreibvorgang wird isoliert rückgängig gemacht, und der Rest wird festgeschrieben.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {
-    // Das Update unten speichert diese Collection erneut und löst diesen
-    // Callback erneut aus: nur bei Neuanlage handeln, sonst endet es nie.
+    // The update below saves this collection again, which runs this callback
+    // again: act on creates only, or it never stops.
     if (status !== "new") return;
     try {
         await context.data.jobs.create({ title: values.title, status: "published" });
     } catch (error) {
-        // Nur das fehlgeschlagene Create wird zurückgenommen. Die Einreichung
-        // und diese Markierung werden committet.
+        // Only the failed create is undone. The submission and this marker commit.
         await context.data.job_submissions.update(id, {
             promotion_status: "failed",
             promotion_error: String(error)
@@ -409,13 +411,13 @@ afterSave: async ({ values, id, status, context }) => {
 }
 ```
 
-Arbeit, die die Datenbank verlassen muss — eine E-Mail, ein Webhook, ein Aufruf einer Drittanbieter-API — gehört nicht in den Rumpf des Callbacks. Sie würde die Transaktion für einen Netzwerk-Roundtrip offen halten, und nichts kann sie zurücknehmen, wenn der Schreibvorgang zurückgerollt wird. Stellen Sie dafür einen [Job](/docs/backend/jobs) ein, oder erledigen Sie sie, nachdem der Schreibvorgang zurückgekehrt ist: über einen [Realtime-Kanal](/docs/backend/realtime) veröffentlichen oder `waitUntil` in einer [Custom Function](/docs/backend/custom-functions) verwenden. [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) beschreibt, was wann passt.
+Arbeiten, die die Datenbank verlassen müssen — eine E-Mail, ein Webhook, ein Aufruf einer Drittanbieter-API —, gehören nicht in den Funktionsrumpf des Callbacks. Sie würden die Transaktion für einen Netzwerk-Roundtrip offenhalten, und nichts kann sie zurücknehmen, wenn der Schreibvorgang zurückgerollt wird. Reihen Sie dafür einen [Job](/docs/backend/jobs) in die Warteschlange ein oder führen Sie dies aus, nachdem der Schreibvorgang zurückgekehrt ist: Veröffentlichen Sie auf einem [Realtime-Kanal](/docs/backend/realtime) oder verwenden Sie `waitUntil` in einer [benutzerdefinierten Funktion](/docs/backend/custom-functions). Im Abschnitt [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) erfahren Sie, was sich am besten eignet.
 
-Auf MongoDB gilt nichts davon. Dieser Treiber führt dieselben Callbacks ohne Transaktion aus: Der Schreibvorgang ist bereits gespeichert, wenn `afterSave` läuft, und ein Fehler dort meldet das Scheitern, ohne den Schreibvorgang rückgängig zu machen.
+Bei MongoDB gilt dies alles nicht. Dieser Treiber führt dieselben Callbacks ohne Transaktion aus, sodass der Schreibvorgang bereits gespeichert ist, wenn `afterSave` läuft, und ein dortiger Fehler den Fehlschlag zwar meldet, ihn aber nicht rückgängig macht.
 
 ## Daten zwischen Sammlungen synchronisieren
 
-Eine der mächtigsten Anwendungen von Callbacks ist das **Synchronisieren von Daten über Sammlungen hinweg** mit `context.data`:
+Eine der mächtigsten Einsatzmöglichkeiten von Callbacks ist die **Synchronisierung von Daten über Sammlungen hinweg** mittels `context.data`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -433,7 +435,7 @@ const submissionsCollection = defineCollection({
     },
     callbacks: {
         afterSave: async ({ values, id, previousValues, context }) => {
-            // Wenn eine Einreichung genehmigt wird, einen veröffentlichten Job erstellen
+            // When a submission is approved, create a published job
             if (values.status === "approved" && previousValues?.status !== "approved") {
                 const newJob = await context.data.collection<Record<string, unknown>>("jobs").create({
                     title: values.title,
@@ -443,8 +445,8 @@ const submissionsCollection = defineCollection({
                     source_submission_id: id,
                 });
 
-                // Die Einreichung mit der Referenz des beworbenen Jobs aktualisieren
-                await context.data["job-submissions"].update(entityId, {
+                // Update the submission with the promoted job reference
+                await context.data.collection<Record<string, unknown>>("job_submissions").update(id, {
                     promoted_job_id: newJob.id,
                 });
             }
@@ -453,41 +455,36 @@ const submissionsCollection = defineCollection({
 });
 ```
 
-Andere sammlungsübergreifende Muster:
+Weitere sammlungsübergreifende Muster:
 
-- **Kaskadierendes Löschen**: Verwenden Sie `afterDelete`, um verknüpfte Datensätze in Kind-Sammlungen zu entfernen
-- **Denormalisierung**: Verwenden Sie `afterSave`, um Übersichtsfelder in einer übergeordneten Sammlung zu aktualisieren
-- **Audit-Protokollierung**: Verwenden Sie `afterSave` / `afterDelete`, um in eine Audit-Log-Sammlung zu schreiben
-- **Zähler**: Verwenden Sie `afterSave` / `afterDelete`, um Zählerfelder in verknüpften Entitäten zu aktualisieren
+- **Kaskadierendes Löschen**: Verwenden Sie `afterDelete`, um zugehörige Datensätze in untergeordneten Sammlungen zu entfernen
+- **Denormalisierung**: Verwenden Sie `afterSave`, um Zusammenfassungsfelder in einer übergeordneten Sammlung zu aktualisieren
+- **Audit-Logging**: Verwenden Sie `afterSave` / `afterDelete`, um in eine Audit-Log-Sammlung zu schreiben
+- **Zähler**: Verwenden Sie `afterSave` / `afterDelete`, um Zählerfelder bei zugehörigen Entitäten zu aktualisieren
 
-## Vollständige Kontextreferenz
-
-<span class="since-badge" data-since="0.21">Since 0.21</span>
+## Vollständige Kontext-Referenz
 
 Jeder Callback erhält ein `context`-Objekt vom Typ `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
-    /** Der authentifizierte Benutzer, falls vorhanden */
+    /** The authenticated user, if any */
     user?: User;
-    /** Der Treiber, der diese Operation ausführt (nur serverseitig) */
+    /** The driver running this operation (server-side only) */
     driver?: DataDriver;
-    /** Der Accessor für Abfragen — context.data.<slug>.create/update/find/delete */
+    /** The query accessor — context.data.<slug>.create/update/find/delete */
     data: RebaseSdkData;
-    /** Funktionen, Storage, E-Mail und dataAsAdmin — aber kein `data` */
+    /** Functions, storage, email and dataAsAdmin — but no `data` */
     client: RebaseCallbackClient;
-    /** Die Standard-Storage-Quelle */
+    /** The default storage source */
     storageSource: StorageSource;
 }
 ```
 
-Abfragen laufen über `context.data`. `context.client` hat kein `data`: Serverseitig
-ist es das `rebase`-Singleton, dessen einzige Datenebene das admin-gebundene
-`dataAsAdmin` ist, daher ist `context.client.data` ein Kompilierfehler.
+Führen Sie Abfragen über `context.data` aus. `context.client` besitzt kein `data`: Serverseitig ist es das `rebase`-Singleton, dessen einzige Datenebene das adminbezogene `dataAsAdmin` ist; `context.client.data` führt daher zu einem Kompilierungsfehler.
 
 ## Nächste Schritte
 
-- **[Sicherheitsregeln](/docs/collections/security-rules)** — Zeilenebene Sicherheit
-- **[Entitätshistorie](/docs/backend/history)** — Audit-Trail
+- **[Sicherheitsregeln](/docs/collections/security-rules)** — Row-Level Security
+- **[Entitätsverlauf](/docs/backend/history)** — Audit-Trail
 - **[Benutzerdefinierte Funktionen](/docs/backend/custom-functions)** — Benutzerdefinierte API-Endpunkte hinzufügen
----

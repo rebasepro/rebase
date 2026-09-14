@@ -1,15 +1,15 @@
 ---
-sourceHash: a133531cc94e5855
+sourceHash: 2e616bc4a3ea133c
 title: Adaptateurs d'authentification personnalisés
 sidebar_label: Adaptateurs d'authentification personnalisés
 description: Remplacez l'authentification intégrée de Rebase par Clerk, Firebase Auth ou votre propre fournisseur d'identité en implémentant le contrat AuthAdapter.
 ---
 
-Rebase intègre son propre système d'authentification — [configurez-le ici](/docs/backend/authentication/). Cette page traite de l'autre cas : un fournisseur d'identité que vous exploitez déjà ou pour lequel vous payez déjà.
+Rebase intègre sa propre authentification — [configurez-la ici](/docs/backend/authentication/). Cette page traite de l'autre cas de figure : un fournisseur d'identité que vous utilisez déjà, ou pour lequel vous payez déjà.
 
 ## Adaptateurs d'authentification personnalisés
 
-Rebase permet le remplacement complet du système d'authentification intégré via une architecture d'authentification modulaire. Cela dissocie la vérification de l'authentification de la base de données et des couches REST/WebSocket, permettant une intégration fluide avec des fournisseurs externes tels que **Clerk**, **Auth0**, **Firebase Auth**, ou des services d'identité JWT personnalisés.
+Rebase permet le remplacement complet du système d'authentification intégré via une architecture d'authentification modulable. Cela découple la vérification de l'authentification de la base de données et des couches REST/WebSocket, permettant une intégration fluide avec des fournisseurs externes tels que **Clerk**, **Auth0**, **Firebase Auth** ou des services d'identité JWT personnalisés.
 
 ### Le contrat AuthAdapter
 
@@ -36,7 +36,7 @@ export interface AuthAdapter {
    */
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
 
-  /** Optional user management operations (CRUD) for the Admin Dashboard panel */
+  /** Optional user management operations (CRUD) for the panel */
   userManagement?: UserManagementAdapter;
 
   /** Optional: Mount adapter-specific custom public routes (e.g. callback paths) */
@@ -45,7 +45,7 @@ export interface AuthAdapter {
   /** Optional: Mount adapter-specific admin-only routes */
   createAdminRoutes?(): Hono<any, any, any> | undefined;
 
-  /** Advertise supported capabilities (to customize Admin Dashboard UI visibility) */
+  /** Advertise supported capabilities (to customize what the panel shows) */
   getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
 
   /** Lifecycle hooks called during backend start and graceful shutdown */
@@ -70,7 +70,7 @@ export interface AuthAdapter {
 
 ### Le payload de l'utilisateur authentifié
 
-Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur doit résoudre les vérifications de jeton réussies en un objet `AuthenticatedUser` uniforme. L'injecteur de portée RLS de Rebase mappe directement ces valeurs vers les variables de session PostgreSQL au sein des transactions :
+Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur doit résoudre les vérifications de jeton réussies en un objet `AuthenticatedUser` uniforme. L'injecteur de portée RLS (RLS Scope Injector) de Rebase mappe directement ces valeurs vers des variables de session PostgreSQL au sein des transactions :
 
 ```typescript
 export interface AuthenticatedUser {
@@ -89,11 +89,11 @@ export interface AuthenticatedUser {
 
 ### Intégration rapide via `createCustomAuthAdapter`
 
-Pour les scénarios standards (tels que la validation de JWT provenant d'un service tiers), vous pouvez utiliser l'utilitaire `createCustomAuthAdapter`. Cet utilitaire gère les valeurs par défaut des capacités (capabilities) et implémente la validation de jeton WebSocket clé en main en encapsulant votre implémentation de `verifyRequest`.
+Pour les scénarios standards (tels que la validation de JWT provenant d'un service tiers), vous pouvez utiliser l'utilitaire `createCustomAuthAdapter`. Cet utilitaire gère les valeurs par défaut des fonctionnalités (`capabilities`) et implémente la validation des jetons WebSocket clé en main en encapsulant votre implémentation de `verifyRequest`.
 
 #### Exemple : Intégration avec Clerk
 
-Pour connecter un backend Rebase à **Clerk**, vous pouvez vérifier les jetons JWT Clerk à l'aide du JSON Web Key Set (JWKS) de Clerk :
+Pour connecter un backend Rebase avec **Clerk**, vous pouvez vérifier les jetons JWT Clerk à l'aide du JSON Web Key Set (JWKS) de Clerk :
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -199,9 +199,9 @@ const backend = await initializeRebaseBackend({
 
 ---
 
-### Montage des routes d'authentification et actions de l'interface d'administration
+### Montage des routes d'authentification et actions du panneau
 
-Si votre fournisseur d'authentification personnalisé nécessite de monter des points de terminaison de redirection (comme des routes de rappel OAuth ou des boucles de connexion SAML), implémentez la méthode `createAuthRoutes` sur votre adaptateur :
+Si votre fournisseur d'authentification personnalisé nécessite le montage de points de terminaison de redirection (comme des routes de callback OAuth ou des boucles de connexion SAML), implémentez la méthode `createAuthRoutes` sur votre adaptateur :
 
 ```typescript
 const myOauthAdapter: AuthAdapter = {
@@ -241,12 +241,10 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement dans le tableau de bord d'administration de Rebase, implémentez le helper `userManagement` dans les options de l'adaptateur, qui fournit des hooks pour `listUsers`, `createUser`, `updateUser` et `deleteUser`.
+Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement depuis le panneau d'administration, implémentez l'assistant `userManagement` au sein des options de l'adaptateur, qui fournit des hooks pour `listUsers`, `createUser`, `updateUser` et `deleteUser`.
 
 ## Prochaines étapes
 
 - **[Authentification](/docs/backend/authentication/)** — la configuration du fournisseur intégré
-- **[Points de terminaison et jetons](/docs/backend/auth-endpoints/)** — les routes qu'un adaptateur doit prendre en charge
-- **[Règles de sécurité (RLS)](/docs/collections/security-rules/)** — l'utilisation des claims retournés par un adaptateur
-
----
+- **[Endpoints et tokens](/docs/backend/auth-endpoints/)** — les routes qu'un adaptateur doit satisfaire
+- **[Règles de sécurité (RLS)](/docs/collections/security-rules/)** — l'usage fait des revendications (claims) renvoyées par un adaptateur

@@ -1,32 +1,32 @@
 ---
-sourceHash: 26043eb4173f3b5a
+sourceHash: fd9c410ef80129f3
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
-description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
+description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
 ---
 
-Jede Route, die der Server bereitstellt, in einer Tabelle zusammengefasst, samt den Voraussetzungen für den Zugriff.
+Jede Route, die der Server mountet, in einer Tabelle, zusammen mit den Voraussetzungen, um sie zu erreichen.
 
-Die Pfade gehen vom Standard-`basePath` `/api` aus; `REBASE_BASE_PATH` verschiebt alle
-gemeinsam. `/health`, `/livez` und `/metrics` befinden sich absichtlich außerhalb davon,
-da ein Orchestrator `/health` abfragt und den Basispfad nicht kennen muss.
-`/health` ist *zusätzlich* darunter eingebunden, sodass `/api/health` auf dieselbe Weise
-antwortet, anstatt einen 404-Fehler auszugeben, gerade wenn jemand überprüft, ob der Server
-erreichbar ist.
+Die Pfade setzen den Standard-`basePath` `/api` voraus; `REBASE_BASE_PATH` verschiebt sie
+alle gemeinsam. `/health`, `/livez` und `/metrics` befinden sich absichtlich außerhalb davon,
+da ein Orchestrator `/health` prüft und den Basispfad nicht kennen müssen sollte. `/health`
+ist *auch* darunter gemountet, sodass `/api/health` auf dieselbe Weise antwortet, anstatt
+genau in dem Moment einen 404-Fehler zurückzugeben, in dem jemand prüft, ob der Server
+noch am Leben ist.
 
-Ein Gate – `tooling/scripts/docs-verify/check-endpoint-index.mjs` – gleicht diese
-Tabelle mit den im Quellcode registrierten Routen ab, sodass keine neue Schnittstelle
-hinzugefügt werden kann, ohne hier aufgeführt zu werden.
+Ein Gate – `tooling/scripts/docs-verify/check-endpoint-index.mjs` – vergleicht diese
+Tabelle mit den vom Quellcode registrierten Routen, sodass keine neue Schnittstelle
+hinzugefügt werden kann, ohne hier aufgeführt zu sein.
 
 ## Gates
 
 | Gate | Bedeutung |
 |---|---|
-| **none** | Nicht authentifiziert. Jeder, der den Host erreichen kann, kann den Endpunkt aufrufen |
-| **session** | Ein angemeldeter Aufrufer: ein Access-Token oder ein API-Schlüssel mit Gültigkeit für die Operation |
+| **none** | Nicht authentifiziert. Jeder, der den Host erreichen kann, kann diesen Endpunkt aufrufen |
+| **session** | Ein angemeldeter Aufrufer: ein Access-Token oder ein API-Schlüssel mit Gültigkeitsbereich für die Operation |
 | **admin** | Eine Admin-Sitzung, ein Service-Schlüssel oder ein API-Schlüssel mit Admin-Berechtigung |
-| **RLS** | Authentifiziert; die Datenbank entscheidet Zeile für Zeile – siehe [Security Rules](/docs/collections/security-rules/) |
-| **dev** | Nur außerhalb der Produktionsumgebung bereitgestellt |
+| **RLS** | Authentifiziert, und die Datenbank entscheidet Zeile für Zeile – siehe [Security Rules](/docs/collections/security-rules/) |
+| **dev** | Nur außerhalb der Produktion gemountet |
 
 ## Daten
 
@@ -36,26 +36,26 @@ Liste. `:slug` ist der `slug` einer Collection.
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
-| `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug` | RLS | [Abfragen](/docs/backend/api/#filtering) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
-| `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/count` | RLS | [Abfragen](/docs/backend/api/#filtering) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
-| `PUT` | `/api/data/:slug/:id` | RLS | Veralteter Alias von `PATCH` – gleicher partieller Schreibzugriff, antwortet mit `Deprecation: true` |
+| `PUT` | `/api/data/:slug/:id` | RLS | Veralteter Alias von `PATCH` – derselbe partielle Schreibvorgang, antwortet mit `Deprecation: true` |
 | `DELETE` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/bulk` | RLS | Mehrere Zeilen einfügen, optional mit Upsert – [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/bulk` | RLS | Mehrere Zeilen anhand der ID aktualisieren – [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/bulk/delete` | RLS | Mehrere Zeilen anhand der ID löschen – [REST API](/docs/backend/api/) |
-| `POST` | `/api/data/_batch` | RLS | Collection-übergreifend in einer Transaktion schreiben – [Writing over REST](/docs/backend/writes/#cross-collection-batches) |
+| `POST` | `/api/data/_batch` | RLS | Collections-übergreifend in einer Transaktion schreiben – [Writing over REST](/docs/backend/writes/#cross-collection-batches) |
 | `GET` | `/api/data/:slug/:id/history` | RLS | [Entity History](/docs/backend/history/) |
 | `POST` | `/api/data/:slug/:id/history/:historyId/revert` | RLS | [Entity History](/docs/backend/history/) |
 
-Zählen und Aggregation sind eigene Routen, die vor `/:id` registriert sind,
-damit `aggregate` nicht als Entitäts-ID interpretiert wird. `?select=` und `?groupBy=` sind
+Zählen und Aggregation sind eigene Routen, die vor `/:id` registriert werden,
+damit `aggregate` nicht als Entity-ID interpretiert wird. `?select=` und `?groupBy=` sind
 deren Parameter, und `select` ist bei `/aggregate` erforderlich.
 
-Textsuche, Vektorsuche, Einbindung von Relationen und Feldauswahl *sind* Query-Parameter
+Volltextsuche, Vektorsuche, Einbindung von Relationen und Feldauswahl *sind* Query-Parameter
 auf `GET /api/data/:slug` und keine Routen – `search`,
 `vector_search`, `include`, `fields`. Siehe [REST API](/docs/backend/api/).
 
@@ -66,27 +66,27 @@ ein einzelnes `404 NO_COLLECTIONS` aus. Siehe [Backend only](/docs/getting-start
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | none | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/login` | none | [Auth endpoints](/docs/backend/auth-endpoints/) |
-| `POST` | `/api/auth/refresh` | none (ein Refresh-Token) | [Auth endpoints](/docs/backend/auth-endpoints/) |
-| `POST` | `/api/auth/logout` | session | [Auth endpoints](/docs/backend/auth-endpoints/) |
-| `GET` | `/api/auth/me` | session | [Auth endpoints](/docs/backend/auth-endpoints/) |
-| `PATCH` | `/api/auth/me` | session | [Auth endpoints](/docs/backend/auth-endpoints/) |
-| `GET` | `/api/auth/sessions` | session | [Auth endpoints](/docs/backend/auth-endpoints/) |
-| `DELETE` | `/api/auth/sessions` | session | Widerruft alle anderen Sitzungen |
-| `DELETE` | `/api/auth/sessions/:id` | session | Widerruft eine Sitzung |
-| `POST` | `/api/auth/forgot-password` | none | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/reset-password` | none (ein Reset-Token) | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/change-password` | session | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/send-verification` | session | [Authentication](/docs/backend/authentication/) |
-| `GET` | `/api/auth/verify-email` | none (ein Verifizierungstoken) | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/magic-link` | none | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/magic-link/verify` | none (ein Link-Token) | [Authentication](/docs/backend/authentication/) |
-| `POST` | `/api/auth/otp` | none | Einmal-Codes per E-Mail |
-| `POST` | `/api/auth/otp/verify` | none (ein Code) | Einmal-Codes per E-Mail |
-| `POST` | `/api/auth/anonymous` | none | Gast-Sitzungen. Deaktiviert, außer `ALLOW_ANONYMOUS` ist gesetzt |
-| `POST` | `/api/auth/anonymous/link` | session (ein Gast) | Wandelt einen Gast in ein reguläres Konto um |
-| `POST` | `/api/auth/find-user` | session | Deaktiviert, außer `AUTH_ALLOW_USER_LOOKUP` ist gesetzt – dient als Enumeration-Oberfläche |
+| `POST` | `/api/auth/register` | none | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/login` | none | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
+| `POST` | `/api/auth/refresh` | none (ein Refresh-Token) | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
+| `POST` | `/api/auth/logout` | session | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
+| `GET` | `/api/auth/me` | session | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
+| `PATCH` | `/api/auth/me` | session | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
+| `GET` | `/api/auth/sessions` | session | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
+| `DELETE` | `/api/auth/sessions` | session | Widerruft jede andere Sitzung |
+| `DELETE` | `/api/auth/sessions/:id` | session | Widerruft eine |
+| `POST` | `/api/auth/forgot-password` | none | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/reset-password` | none (ein Reset-Token) | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-password` | session | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/send-verification` | session | [Authentifizierung](/docs/backend/authentication/) |
+| `GET` | `/api/auth/verify-email` | none (ein Verifizierungs-Token) | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/magic-link` | none | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/magic-link/verify` | none (ein Link-Token) | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/otp` | none | Einmalcodes per E-Mail |
+| `POST` | `/api/auth/otp/verify` | none (ein Code) | Einmalcodes per E-Mail |
+| `POST` | `/api/auth/anonymous` | none | Gastsitzungen. Deaktiviert, außer wenn `ALLOW_ANONYMOUS` |
+| `POST` | `/api/auth/anonymous/link` | session (ein Gast) | Wandelt einen Gast in ein Konto um |
+| `POST` | `/api/auth/find-user` | session | Deaktiviert, außer wenn `AUTH_ALLOW_USER_LOOKUP` – stellt eine Angriffsfläche für Enumeration dar |
 | `POST` | `/api/auth/:provider` | none | Einer pro konfiguriertem OAuth/OIDC-Provider |
 | `POST` | `/api/auth/link/:provider` | session | Verknüpft einen Provider mit dem angemeldeten Konto |
 | `POST` | `/api/auth/mfa/enroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
@@ -99,87 +99,88 @@ ein einzelnes `404 NO_COLLECTIONS` aus. Siehe [Backend only](/docs/getting-start
 
 ## Admin
 
-Alles unter `/api/admin` erfordert eine Admin-Sitzung, einen Service-Schlüssel oder einen
-API-Schlüssel mit Admin-Berechtigung. Kein einzelnes Sonderrecht: Ein auf eine Collection beschränkter
-Schlüssel hat hierauf keinen Zugriff.
+Alles unter `/api/admin` erfordert eine Admin-Sitzung, einen Service-Schlüssel oder
+einen API-Schlüssel mit Admin-Berechtigung. Nicht ein einzelnes Privileg reicht aus:
+Ein Schlüssel, dessen Gültigkeitsbereich auf eine Collection beschränkt ist, hat auf nichts davon Zugriff.
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| `POST` | `/api/admin/bootstrap` | none, und nur solange kein Admin existiert | In Produktion verweigert – siehe [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
+| `POST` | `/api/admin/bootstrap` | none, und nur solange kein Admin existiert | In der Produktion verweigert – siehe [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | admin | Benutzerverwaltung |
 | `POST` | `/api/admin/users` | admin | Benutzerverwaltung |
 | `GET` | `/api/admin/users/:uid` | admin | Benutzerverwaltung |
 | `PUT` | `/api/admin/users/:uid` | admin | Benutzerverwaltung |
 | `DELETE` | `/api/admin/users/:uid` | admin | Benutzerverwaltung |
-| `POST` | `/api/admin/users/:uid/reset-password` | admin | Erstellt ein temporäres Passwort |
-| `GET` | `/api/admin/roles` | admin | Die im Projekt deklarierten Rollen |
-| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api-keys/) |
+| `POST` | `/api/admin/users/:uid/reset-password` | admin | Gibt ein temporäres Passwort aus |
+| `GET` | `/api/admin/roles` | admin | Die Rollen, die das Projekt deklariert |
+| `GET` | `/api/admin/api-keys` | admin | [API-Schlüssel](/docs/backend/api-keys/) |
 | `POST` | `/api/admin/api-keys` | admin | Der Klartext-Schlüssel wird nur einmalig bei der Erstellung zurückgegeben |
-| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
+| `GET` | `/api/admin/api-keys/:id` | admin | [API-Schlüssel](/docs/backend/api-keys/) |
+| `PUT` | `/api/admin/api-keys/:id` | admin | [API-Schlüssel](/docs/backend/api-keys/) |
+| `DELETE` | `/api/admin/api-keys/:id` | admin | [API-Schlüssel](/docs/backend/api-keys/) |
 | `GET` | `/api/admin/cron` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `GET` | `/api/admin/cron/:id` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `PUT` | `/api/admin/cron/:id` | admin | Job aktivieren oder deaktivieren |
+| `PUT` | `/api/admin/cron/:id` | admin | Einen Job aktivieren oder deaktivieren |
 | `GET` | `/api/admin/cron/:id/logs` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | admin | Job sofort ausführen |
-| `GET` | `/api/admin/backups` | admin | Backup-Übersicht |
+| `POST` | `/api/admin/cron/:id/trigger` | admin | Einen Job jetzt ausführen |
+| `GET` | `/api/admin/backups` | admin | Backup-Inventar |
 | `GET` | `/api/admin/backups/download` | admin | Streamt ein Backup |
-| `GET` | `/api/admin/logs` | admin | Der aktuelle Log-Puffer |
+| `GET` | `/api/admin/logs` | admin | Der Puffer der letzten Protokolle |
 | `GET` | `/api/admin/logs/latest` | admin | Die neuesten Einträge |
 | `GET` | `/api/admin/logs/stream` | admin | Server-Sent Events |
-| `GET` | `/api/admin/rls-audit` | admin | Das neueste Ergebnis des geplanten Audits |
-| `GET` | `/api/admin/schema/status` | admin | [Live schema editing](/docs/backend/live-schema-editing/) |
+| `GET` | `/api/admin/rls-audit` | admin | Das jüngste Ergebnis des geplanten Audits |
+| `GET` | `/api/admin/schema/status` | admin | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | admin | Plant eine Änderung; wendet sie niemals an |
-| `POST` | `/api/admin/schema/apply` | admin | Deaktiviert, außer `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` ist gesetzt |
-| `GET` | `/api/admin/schema-editor/status` | admin | Ob der Editor verfügbar ist und der Grund, falls nicht |
+| `POST` | `/api/admin/schema/apply` | admin | Deaktiviert, außer wenn `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `GET` | `/api/admin/schema-editor/status` | admin | Ob der Editor verfügbar ist, und der Grund, falls nicht |
 | `POST` | `/api/admin/schema-editor/collection/save` | admin | [Studio](/docs/studio/) – schreibt den Collection-Quellcode neu |
 | `POST` | `/api/admin/schema-editor/collection/delete` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
-| `GET` | `/api/admin/dev/emails` | dev | E-Mails, die der Development-Transport erfasst hat, anstatt sie zu senden |
+| `GET` | `/api/admin/dev/emails` | dev | E-Mails, die der Entwicklungs-Transport abgefangen hat, anstatt sie zu senden |
 
 `/api/admin/cron`, `/api/admin/logs` und `/api/admin/schema-editor` werden auch
-unter ihren Pfaden aus Versionen vor 0.17 ohne das Segment `/admin` bereitgestellt. Diese
-Aliase dienen Projekten, die noch nicht umgestellt wurden; schreiben Sie neuen Code stets gegen den kanonischen Pfad.
+unter ihren Pfaden vor Version 0.17 ohne das `/admin`-Segment bereitgestellt. Diese Aliase
+sind für Projekte gedacht, die noch nicht umgestellt wurden; schreiben Sie neuen Code gegen den kanonischen Pfad.
 
-## Storage
+## Speicher
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| `POST` | `/api/storage/upload` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `GET` | `/api/storage/sources` | session | Die benannten Storage-Quellen, die dieses Backend bereitstellt |
+| `POST` | `/api/storage/upload` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `GET` | `/api/storage/list` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `GET` | `/api/storage/sources` | session | Die benannten Speicherquellen, die dieses Backend bedient |
 | `POST` | `/api/storage/tus` | session + `storageAuthorize` | Fortsetzbare Uploads: Erstellung |
-| `GET` | `/api/storage/tus/:id` | Besitzer des Uploads | Fortsetzbare Uploads: Offset |
-| `PATCH` | `/api/storage/tus/:id` | Besitzer des Uploads | Fortsetzbare Uploads: Anhängen |
-| `DELETE` | `/api/storage/tus/:id` | Besitzer des Uploads | Fortsetzbare Uploads: Abbrechen |
+| `GET` | `/api/storage/tus/:id` | Eigentümer des Uploads | Fortsetzbare Uploads: Offset |
+| `PATCH` | `/api/storage/tus/:id` | Eigentümer des Uploads | Fortsetzbare Uploads: Anhängen |
+| `DELETE` | `/api/storage/tus/:id` | Eigentümer des Uploads | Fortsetzbare Uploads: Abbrechen |
 
-Ein Deployment ohne konfigurierten Speicher beantwortet dieses Präfix mit einem `501`-Fehler,
-der die benötigte Variable benennt, anstatt einen 404-Fehler zu liefern, als ob das Feature gar nicht existieren würde.
+Ein Deployment, für das kein Speicher konfiguriert ist, antwortet bei diesem Präfix mit
+einem `501` und nennt die Variable, die es benötigt, anstatt einen 404-Fehler auszugeben,
+als ob das Feature gar nicht existieren würde.
 
-## Functions
+## Funktionen
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| alle | `/api/functions/<name>` | was die Funktion deklariert | [Custom Functions](/docs/backend/custom-functions/) |
+| any | `/api/functions/<name>` | was auch immer die Funktion deklariert | [Benutzerdefinierte Funktionen](/docs/backend/custom-functions/) |
 
 Eine Route pro Datei unter `backend/functions/`, die Pfade stammen also aus Ihrem
-Projekt. `GET /api/functions` listet diese **nicht** auf: Eine Übersicht der
+Projekt. `GET /api/functions` listet diese **nicht** auf: Eine Übersicht über die
 benutzerdefinierten Endpunkte eines Deployments ist nicht öffentlich.
 
 ## Meta und Betrieb
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| `GET` | `/livez` | none | Nur Liveness: Läuft dieser Prozess. Greift nicht auf die Datenbank zu, weshalb dies der Probe-Pfad ist, den ein Container verwenden sollte – `RUNTIME_LIVENESS_PATH` |
-| `GET` | `/health`, `/api/health` | none | Liveness und Readiness. Berichtet über jede konfigurierte Datenquelle, nicht nur die Standardquelle |
-| `GET` | `/api/docs` | none (admin in Produktion) | Das OpenAPI 3.0-Dokument |
-| `GET` | `/api/swagger` | none | Swagger UI. Nur in der Entwicklung, außer `REBASE_ENABLE_SWAGGER` ist gesetzt |
+| `GET` | `/livez` | none | Reine Liveness: Läuft dieser Prozess? Berührt nicht die Datenbank und ist daher der Probe-Pfad, den ein Container verwenden sollte – `RUNTIME_LIVENESS_PATH` |
+| `GET` | `/health`, `/api/health` | none | Liveness und Readiness. Meldet jede konfigurierte Datenquelle, nicht nur die Standardquelle |
+| `GET` | `/api/docs` | none (admin in der Produktion) | Das OpenAPI-3.0-Dokument |
+| `GET` | `/api/swagger` | none | Swagger UI. Nur in der Entwicklung, außer wenn `REBASE_ENABLE_SWAGGER` |
 | `GET` | `/api/meta/schema-version` | none | Der Schema-Hash, aus dem dieses Backend erstellt wurde, und sonst nichts |
 | `GET` | `/api/meta/contract` | admin | Der vollständige Collection-Vertrag für `rebase generate-sdk --from`. `404`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN`, wenn gesetzt | Prometheus-Metriken, wenn `REBASE_METRICS=true` |
@@ -190,37 +191,33 @@ einen eigenen Pfad – siehe [Realtime](/docs/backend/realtime/).
 
 ## MCP-Schnittstelle
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
+Wird nur gemountet, wenn `REBASE_MCP_ENABLED=true` ist, was auch
+`REBASE_PUBLIC_URL` erfordert – siehe
+[Konfiguration](/docs/getting-started/configuration/#mcp-surface). Standardmäßig
+deaktiviert: Keine `REBASE_ROLE` aktiviert dies, da dadurch Drittanbietersoftware
+Zugriff auf das Projekt gewährt wird, was eine Entscheidung ist, die ein Mensch treffen muss.
 
-Wird nur bereitgestellt, wenn `REBASE_MCP_ENABLED=true`, was auch
-`REBASE_PUBLIC_URL` voraussetzt – siehe
-[Configuration](/docs/getting-started/configuration/#mcp-surface). Standardmäßig deaktiviert:
-Keine `REBASE_ROLE` aktiviert dies, da es Drittanbieter-Software Zugriff auf das Projekt gewährt
-und dies eine bewusste Entscheidung einer Person sein sollte.
-
-Die `.well-known`-Dokumente liegen am **Origin**, nicht unter `basePath`: RFC 8414
+Die `.well-known`-Dokumente befinden sich am **Origin**, nicht unter `basePath`: RFC 8414
 und RFC 9728 definieren diese Pfade relativ zum Origin, und ein Client ruft sie ab,
 bevor er ein Token besitzt.
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| `GET` | `/.well-known/oauth-protected-resource` | none | RFC 9728-Metadaten, die diese Ressource und ihren Autorisierungsserver benennen. Wird auch in der Form mit Pfadsuffix bereitgestellt |
-| `GET` | `/.well-known/oauth-authorization-server` | none | RFC 8414-Metadaten: Die Endpunkte, Grant Types und PKCE-Methoden, die dieses Deployment unterstützt |
-| `POST` | `/mcp` | OAuth-Bearer | Der MCP-Protokollendpunkt. Agiert **als der angemeldete Benutzer**, sodass jeder Lese- und Schreibzugriff demselben RLS unterliegt |
-| `GET` | `/mcp` | OAuth-Bearer | Der Server-Sent-Events-Stream für eine Sitzung |
-| `DELETE` | `/mcp` | OAuth-Bearer | Beendet eine Sitzung |
-| `POST` | `/api/oauth/register` | rate-limited | RFC 7591 Dynamic Client Registration. Verweigert, wenn `REBASE_MCP_OPEN_REGISTRATION=false` |
+| `GET` | `/.well-known/oauth-protected-resource` | none | RFC-9728-Metadaten, die diese Ressource und ihren Autorisierungsserver benennen. Wird auch in der Form mit Pfad-Suffix bereitgestellt |
+| `GET` | `/.well-known/oauth-authorization-server` | none | RFC-8414-Metadaten: die Endpunkte, Grant-Typen und PKCE-Methoden, die dieses Deployment unterstützt |
+| `POST` | `/mcp` | OAuth-Bearer | Der MCP-Protokoll-Endpunkt. Agiert **als der angemeldete Benutzer**, sodass jeder Lese- und Schreibvorgang denselben RLS-Regeln unterliegt |
+| `GET` | `/mcp` | OAuth-Bearer | Antwortet mit `405` und `Allow: POST, DELETE`: Dieser Server öffnet keinen server-initiierten Stream. Das Token wird zuerst überprüft, sodass ein fehlendes oder abgelaufenes Token stattdessen eine `401`-Challenge erhält |
+| `DELETE` | `/mcp` | none | Antwortet mit `204`. Der Endpunkt hält keine Sitzung aufrecht, daher gibt es nichts zu beenden |
+| `POST` | `/api/oauth/register` | ratenbegrenzt | Dynamische Client-Registrierung nach RFC 7591. Wird verweigert, wenn `REBASE_MCP_OPEN_REGISTRATION=false` |
 | `GET` | `/api/oauth/authorize` | session | Der Zustimmungsbildschirm, zu dem ein Client weitergeleitet wird |
-| `POST` | `/api/oauth/authorize/decision` | session | Die Antwort der Person darauf – genehmigen oder ablehnen |
-| `POST` | `/api/oauth/token` | Client-Credentials + PKCE | Tauscht einen Autorisierungscode ein oder aktualisiert ihn |
-| `POST` | `/api/oauth/revoke` | Client-Credentials | RFC 7009 Token-Widerruf |
+| `POST` | `/api/oauth/authorize/decision` | session | Die Antwort des Nutzers darauf – genehmigen oder ablehnen |
+| `POST` | `/api/oauth/token` | Client Credentials + PKCE | Tauscht einen Autorisierungscode aus oder aktualisiert ein Token |
+| `POST` | `/api/oauth/revoke` | Client Credentials | Token-Widerruf nach RFC 7009 |
 | `GET` | `/api/oauth/grants` | session | Welche Clients dieser Benutzer autorisiert hat |
-| `DELETE` | `/api/oauth/grants/:clientId` | session | Zieht eine Autorisierung zurück, sodass eine Person eine Zustimmung ohne Admin rückgängig machen kann |
+| `DELETE` | `/api/oauth/grants/:clientId` | session | Zieht eine Autorisierung zurück, sodass eine Person eine Zustimmung ohne einen Administrator rückgängig machen kann |
 
 ## Verwandte Themen
 
 - [REST API](/docs/backend/api/) – die Datenrouten im Detail: Filter, Sortierung, Paginierung, Fehler
-- [Auth endpoints](/docs/backend/auth-endpoints/) – Request- und Response-Formate für die obige Auth-Tabelle
-- [Environment & Configuration](/docs/getting-started/configuration/) – die Umgebungsvariablen, die bestimmen, welche dieser Endpunkte bereitgestellt werden
-
----
+- [Auth-Endpunkte](/docs/backend/auth-endpoints/) – Request- und Response-Formate für die obige Authentifizierungstabelle
+- [Umgebung & Konfiguration](/docs/getting-started/configuration/) – die Variablen, die bestimmen, welche davon gemountet werden

@@ -1,15 +1,15 @@
 ---
-sourceHash: 39e0a58a37e930cb
+sourceHash: 93d4b39a9822643d
 title: Deploy di Rebase su Hetzner Cloud
 description: Esegui il deploy di Rebase su Hetzner Cloud con Terraform o Docker Compose, per prestazioni eccellenti basate nell'UE e sovranità dei dati.
 sidebar_label: Hetzner Cloud
 ---
 
-Hetzner Cloud offre un rapporto prestazioni-prezzo straordinario ed è un'ottima scelta per i progetti che richiedono la sovranità dei dati europea, con data center a Norimberga, Falkenstein e Helsinki.
+Hetzner Cloud offre un rapporto prestazioni-prezzo straordinariamente vantaggioso ed è un'ottima scelta per i progetti che richiedono la sovranità dei dati europea, con data center a Norimberga, Falkenstein e Helsinki.
 
-Nulla di ciò che riguarda il tuo progetto è specifico di Hetzner. Una distribuzione di Rebase è composta da due elementi separabili: l'immagine runtime pubblicata e il **bundle** prodotto da `rebase build`; lo stesso bundle funziona con Docker Compose su un laptop, su Rebase Cloud, tramite l'[Helm chart](/docs/deployment/kubernetes) e su una macchina Hetzner. Il passaggio da uno all'altro comporta una modifica dell'infrastruttura, non dell'applicazione.
+Non c'è nulla di specifico per Hetzner riguardo al tuo progetto. Una distribuzione di Rebase è composta da due parti separabili: l'immagine di runtime pubblicata e il **bundle** prodotto da `rebase build`; lo stesso bundle viene eseguito con Docker Compose su un laptop, su Rebase Cloud, tramite l'[Helm chart](/docs/deployment/kubernetes) e su un'istanza Hetzner. Spostarsi tra di essi è un cambio di infrastruttura, non di applicazione.
 
-## La via più rapida: Terraform
+## Il percorso più rapido: Terraform
 
 Il modulo `terraform-hcloud-rebase` effettua il provisioning del server, di un firewall, di un IP stabile e — la parte fondamentale — di un volume per i dati di Postgres, in modo che la sostituzione dell'host non distrugga il database.
 
@@ -29,18 +29,18 @@ module "rebase" {
 }
 ```
 
-Un aspetto da verificare prima della prima esecuzione di apply: il record A per `domain` deve già puntare al server, altrimenti la verifica (challenge) Let's Encrypt di Caddy fallirà. L'indirizzo viene creato indipendentemente dal server, quindi puoi ottenerlo preventivamente con `terraform apply -target=hcloud_primary_ip.ipv4`, configurare il DNS e poi applicare la configurazione completa.
+Una cosa da verificare prima del primo apply: il record A per `domain` deve già puntare al server, altrimenti la verifica (challenge) di Let's Encrypt di Caddy fallirà. L'indirizzo viene creato indipendentemente dal server, quindi puoi ottenerlo prima con `terraform apply -target=hcloud_primary_ip.ipv4`, configurare il DNS e poi eseguire l'apply regolarmente.
 
-Il resto di questa pagina illustra la stessa procedura di distribuzione eseguita manualmente.
+Il resto di questa pagina illustra lo stesso deploy eseguito manualmente.
 
-## 1. Eseguire il provisioning di un server
+## 1. Effettuare il provisioning di un server
 
-1. Nella Hetzner Cloud Console, fai clic su **Add Server**.
+1. Nella Console Hetzner Cloud, fai clic su **Add Server**.
 2. Scegli una **Location** — Falkenstein, Norimberga o Helsinki per la residenza dei dati nell'UE.
 3. Scegli un'**Image**: Ubuntu 24.04.
-4. Scegli un **Type**: `CPX21` (3 vCPU / 4 GB) è un minimo praticabile, `CX32` (4 vCPU / 8 GB) è confortevole per il runtime più Postgres.
-5. Aggiungi un **Volume** per il database. I dati sul disco locale del server vanno persi insieme al server.
-6. Aggiungi la tua chiave SSH e procedi con la creazione.
+4. Scegli un **Type**: `CPX21` (3 vCPU / 4 GB) è una base di partenza adeguata, `CX32` (4 vCPU / 8 GB) è confortevole per il runtime più Postgres.
+5. Aggiungi un **Volume** per il database. I dati presenti sul disco locale del server andrebbero persi con l'eliminazione del server.
+6. Aggiungi la tua chiave SSH e crealo.
 
 ## 2. Installare Docker
 
@@ -51,21 +51,21 @@ apt update && apt install -y docker.io docker-compose-v2
 
 ## 3. Trasferire il bundle sul server
 
-Non è necessario compilare alcuna immagine dell'applicazione. `rebase build` genera una directory `dist-bundle`, e l'immagine del runtime pubblicata la esegue:
+Non è necessario compilare un'immagine dell'applicazione. `rebase build` genera una directory `dist-bundle`, che viene eseguita dall'immagine di runtime pubblicata:
 
 ```bash
 rebase build
 rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 ```
 
-Per una distribuzione in produzione reale, è preferibile una delle due modalità che non richiedono la copia manuale dei file sul server:
+Per una distribuzione in ambiente reale, prediligi uno dei due approcci che non richiedono la copia manuale dei file sul server:
 
-- **Integrarlo in un'immagine (bake-in)** — `FROM rebasepro/server:0.21.0`, poi `COPY dist-bundle /bundle`, ed eseguire il deploy modificando un tag.
-- **Distribuirlo via HTTP** — imposta `REBASE_BUNDLE_URL` e il runtime scaricherà ed estrarrà il bundle a ogni avvio. Questo è quanto fa il modulo Terraform descritto sopra, ed è lo stesso meccanismo utilizzato dall'Helm chart.
+- **Includilo in un'immagine** — `FROM rebasepro/server:0.21.0` seguito da `COPY dist-bundle /bundle`, e distribuisci aggiornando un tag.
+- **Distribuiscilo via HTTP** — imposta `REBASE_BUNDLE_URL` e il runtime scaricherà ed estrarrà il bundle a ogni avvio. È ciò che fa il modulo Terraform descritto sopra ed è lo stesso meccanismo utilizzato dall'Helm chart.
 
 ## 4. Configurare ed eseguire
 
-Rebase fornisce un file Compose appositamente per questo: [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). Si tratta della ricetta canonica di self-hosting — Postgres e il runtime, con il bundle montato all'interno — e vale la pena leggerlo anziché limitarsi a copiarlo, poiché i commenti spiegano ogni singola scelta.
+Rebase fornisce un file Compose proprio per questo scopo: [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). È la procedura canonica per il self-hosting — Postgres e il runtime, con il bundle montato all'interno — e vale la pena leggerlo invece di limitarsi a copiarlo, poiché i commenti spiegano ogni singola scelta.
 
 Crea l'ambiente previsto:
 
@@ -78,28 +78,33 @@ REBASE_ADMIN_EMAIL=you@yourdomain.com
 REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
 
-`REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` sono nuove: nella 0.17.3
+`REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` sono nuovi: nella versione 0.17.3
 il primo account a registrarsi diventa amministratore, anche in produzione.
 
-Tutte e sei sono obbligatorie: il file Compose le dichiara con `${VAR:?…}` e
-rifiuta l'interpolazione in loro assenza.
+Tutte e sei le variabili sono obbligatorie: il file Compose le dichiara con `${VAR:?…}` e
+rifiuta l'interpolazione se sono assenti.
 
-Le ultime due definiscono il primo amministratore. Un database appena creato non ha utenti e,
-al di fuori della produzione, il primo utente a registrarsi viene promosso ad amministratore: il che crea una race condition non appena la macchina risponde a un hostname, dato che Caddy attiva TLS prima che tu abbia digitato qualsiasi cosa. In produzione, quindi, questa finestra temporale viene chiusa e l'account viene specificato qui; il runtime lo crea una sola volta, mentre la tabella utenti è vuota, e non compie alcuna azione ai successivi avvii. Accedi e modifica la password.
+Le ultime due definiscono il primo amministratore. Un database nuovo non ha utenti e,
+al di fuori della produzione, la prima registrazione viene promossa ad amministratore — creando
+una race condition nel momento in cui la macchina risponde su un hostname, dato che Caddy
+attiva TLS prima ancora che tu possa digitare qualcosa. Di conseguenza, in produzione questa
+finestra viene chiusa e l'account viene specificato qui; il runtime lo crea una sola volta,
+quando la tabella degli utenti è vuota, e non fa nulla a ogni avvio successivo. Accedi e
+modifica la password.
 
-Quindi avvialo:
+Quindi avvia i servizi:
 
 ```bash
 docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
 ```
 
-Il runtime è in ascolto sulla porta 8080 all'interno della rete Compose.
+Il runtime rimane in ascolto sulla porta 8080 all'interno della rete Compose.
 
-`REBASE_SERVICE_KEY` ignora la row-level security. Trattala come la credenziale di un superutente del database, non come una semplice chiave API.
+`REBASE_SERVICE_KEY` bypassa la row-level security. Trattala come una credenziale da superuser del database, non come una semplice chiave API.
 
 ## 5. Terminare TLS con Caddy
 
-Non esporre mai direttamente il runtime. Caddy richiede e gestisce automaticamente i certificati Let's Encrypt; eseguirlo come ulteriore servizio Compose consente di mantenere l'intero stack in un unico file:
+Non esporre mai direttamente il runtime. Caddy effettua il provisioning dei certificati Let's Encrypt automaticamente; eseguirlo come ulteriore servizio Compose consente di mantenere l'intero stack in un unico file:
 
 ```yaml
   caddy:
@@ -111,7 +116,7 @@ Non esporre mai direttamente il runtime. Caddy richiede e gestisce automaticamen
       - caddy-data:/data
 ```
 
-Con un `Caddyfile` come segue:
+Con un `Caddyfile` simile a:
 
 ```caddyfile
 api.yourdomain.com {
@@ -123,9 +128,9 @@ Fai puntare il record A del dominio al server prima di avviare Caddy, altrimenti
 
 ## Lo storage non è opzionale
 
-Il runtime **si rifiuta di avviarsi in produzione** se è configurato lo storage locale, poiché il filesystem del container viene distrutto a ogni riavvio e un backend locale in produzione equivale a una perdita silenziosa di dati.
+Il runtime **si rifiuta di avviarsi in produzione** se è configurato lo storage locale, poiché il filesystem del container viene distrutto a ogni riavvio e un backend locale in produzione causerebbe una perdita silenziosa di dati.
 
-Hetzner Object Storage è compatibile con S3 e si trova negli stessi data center, rappresentando quindi l'abbinamento naturale:
+L'Object Storage di Hetzner è compatibile con S3 e risiede negli stessi data center, rappresentando quindi l'abbinamento naturale:
 
 ```env
 STORAGE_TYPE=s3
@@ -136,37 +141,35 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-Se il tuo progetto non gestisce alcun file caricato, imposta `FORCE_LOCAL_STORAGE=true` per confermarlo esplicitamente. Consulta [Storage](/docs/backend/storage) per una panoramica completa.
+Se il tuo progetto non gestisce alcun caricamento di file, imposta `FORCE_LOCAL_STORAGE=true` per confermarlo esplicitamente. Consulta [Storage](/docs/backend/storage) per il quadro completo.
 
-## Cosa fa l'avvio allo schema
+## Cosa comporta l'avvio per il tuo schema
 
-Con `REBASE_MIGRATE_ON_BOOT` impostato sul valore predefinito `ensure`, all'avvio il runtime effettua il provisioning delle tabelle delle collezioni **e delle relative policy di row-level security** in modo additivo. Un primo avvio su un database vuoto le rende subito disponibili: non è necessario eseguire alcun passaggio preliminare sullo schema prima che il deploy sia funzionante.
+Con `REBASE_MIGRATE_ON_BOOT` impostato sul valore predefinito `ensure`, il runtime effettua il provisioning delle tabelle delle collezioni **e delle relative policy di row-level security** all'avvio, in modalità incrementale. Al primo avvio su un database vuoto, il sistema le rende subito disponibili: non c'è alcun passaggio di schema da eseguire prima che il deploy sia funzionante.
 
-Ciò che l'avvio deliberatamente non fa mai è compiere azioni distruttive: non modifica il tipo di una colonna, non elimina colonne né modifica i valori di un enum esistente. Il riavvio di un container non deve poter alterare lo schema come effetto collaterale.
+Ciò che la procedura di avvio evita deliberatamente è qualsiasi operazione distruttiva: non modifica il tipo di una colonna, non elimina colonne né modifica i valori di un enum esistente. Il riavvio di un container non deve poter alterare lo schema come effetto collaterale.
 
-Due operazioni richiedono quindi ancora l'esecuzione di [`rebase db push`](/docs/architecture/schema-as-code), lanciato da una copia locale del repository o dalla CI, dove il controllo per i cambiamenti distruttivi e un backup siano a portata di mano:
+Due cose richiedono quindi ancora l'esecuzione di [`rebase db push`](/docs/architecture/schema-as-code), avviato da un checkout locale o dalla CI, dove il controllo per i cambiamenti distruttivi e un backup siano a portata di mano:
 
-- la RLS sulle junction table per le relazioni molti-a-molti;
+- la RLS delle tabelle di giunzione per le relazioni molti-a-molti;
 - qualsiasi modifica che non sia puramente additiva.
 
-Se il modulo o il file Compose collegano Postgres all'interfaccia di loopback — come fanno entrambi —, raggiungilo tramite un tunnel SSH:
+Se il modulo o il file Compose hanno associato Postgres all'interfaccia di loopback (come fanno entrambi), connettiti tramite un tunnel SSH:
 
 ```bash
 ssh -N -L 5433:127.0.0.1:5432 root@<your-server-ip>
 ```
 
-Una porta del database esposta a Internet è il modo in cui una distribuzione Rebase rischia di farsi leggere i record aggirando la row-level security invece di passarvi attraverso.
+Lasciare aperta verso Internet la porta del database è il modo in cui le righe di un deploy Rebase finiscono per essere lette eludendo la row-level security anziché passando attraverso di essa.
 
 ## Aggiornamento
 
-Modifica il tag dell'immagine e riavvia. Il tuo bundle rimane intatto e ogni progetto su quel runtime utilizzerà il nuovo motore.
+Aggiorna il tag dell'immagine e riavvia. Il tuo bundle rimane invariato e ogni progetto basato su tale runtime utilizzerà il nuovo motore.
 
-L'eccezione riguarda le major release di Postgres: Postgres rifiuta di avviarsi a partire da una directory di dati scritta da una versione major precedente, pertanto tale aggiornamento richiede un dump e un restore, mai un aggiornamento sul posto (in place).
+L'eccezione è la versione major di Postgres: Postgres si rifiuta di avviarsi su una directory di dati creata da una versione major precedente, pertanto tale aggiornamento richiede una procedura di dump e restore, mai sul posto (in place).
 
 ```bash
 rebase db backup --out ./backups
 # recreate the volume on the new major
 rebase db restore ./backups/<file>.dump
 ```
-
----

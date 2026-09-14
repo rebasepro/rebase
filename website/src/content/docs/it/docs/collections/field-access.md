@@ -1,5 +1,5 @@
 ---
-sourceHash: 0d49afd8ac50f59e
+sourceHash: b3e463880abd2023
 title: Accesso ai campi
 sidebar_label: Accesso ai campi
 description: Permessi di lettura e scrittura per proprietà in base al ruolo. Un chiamante ammesso dalle regole di sicurezza della riga non riceve comunque un campo che i suoi ruoli non possono leggere.
@@ -7,7 +7,8 @@ description: Permessi di lettura e scrittura per proprietà in base al ruolo. Un
 
 ## Panoramica
 
-Le [regole di sicurezza](/docs/collections/security-rules/) stabiliscono a quali **righe** accede un chiamante. `access` determina quali **campi di una riga raggiunta** può visualizzare e impostare.
+Le [regole di sicurezza](/docs/collections/security-rules/) decidono quali **righe** un chiamante può
+raggiungere. `access` decide quali **campi di una riga raggiunta** può vedere e impostare.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -31,37 +32,57 @@ const staff = defineCollection({
 });
 ```
 
-La regola sopra non applica alcun filtro di riga su `select`, quindi ogni chiamante ammesso dall'API legge ogni riga di staff. Solo un chiamante con il ruolo `hr` ottiene la colonna `salary` di una riga, e nessuno può impostarla tramite HTTP.
+La regola sopra non applica alcun filtro di riga su `select`, quindi ogni chiamante ammesso
+dall'API può leggere ogni riga di staff. Solo un chiamante con il ruolo `hr` ottiene la colonna
+`salary` di una riga, e nessuno può impostarla tramite HTTP.
 
 ## La regola
 
-`access` prevede due elenchi opzionali, e un elenco omesso non equivale a un elenco vuoto: questa differenza costituisce l'intera funzionalità.
+`access` ha due liste opzionali, e una lista omessa non equivale a una lista vuota: la
+differenza costituisce l'intera funzionalità.
 
 | `read` / `write` | Significato |
 |------------------|-------------|
-| omesso | Delega alla riga. Chiunque sia autorizzato dalle regole di sicurezza della collection a leggere (o scrivere) la riga riceve il campo. |
-| `[]` | Nessuno, tramite l'API, con qualsiasi livello di privilegio: né `admin`, né la chiave di servizio, né una lettura in-process. |
-| `["hr"]` | Un chiamante con il ruolo `hr`, **oppure** `admin`, **oppure** codice server fidato senza alcuna richiesta sottostante. |
+| omesso | Delega alla riga. Chiunque sia autorizzato a leggere (o scrivere) la riga dalle regole di sicurezza della collection ottiene il campo. |
+| `[]` | Nessuno, tramite l'API, con qualsiasi privilegio — né `admin`, né la service key, né una lettura in-process. |
+| `["hr"]` | Un chiamante con il ruolo `hr`, **o** `admin`, **o** codice server fidato non associato a una richiesta. |
 
-I ruoli sono ruoli applicativi di Rebase: gli stessi restituiti da `rebase.roles()` all'interno di una policy e rispetto ai quali compila `policy.rolesOverlap`. Provengono dal contesto della chiamata: `user.roles` nella richiesta autenticata.
+I ruoli sono ruoli applicativi di Rebase — gli stessi che `rebase.roles()` restituisce
+all'interno di una policy e su cui si basa la compilazione di `policy.rolesOverlap`. Provengono
+dal contesto della chiamata: `user.roles` nella richiesta autenticata.
 
 ### Perché `admin` passa sempre
 
-Ogni policy di base inserita da Rebase contiene un ramo `rolesOverlap(['admin'])`, e `rebase.dataAsAdmin` viene eseguito come `{ uid: "service", roles: ["admin"] }`. Una regola di campo che escludesse un amministratore da una colonna del proprio database impedirebbe anche a Studio di renderizzarla e alla CLI di esportarla. Se necessiti di una colonna che nessun amministratore possa leggere tramite l'API, usa `read: []`.
+Ogni policy di base inserita da Rebase contiene una clausola `rolesOverlap(['admin'])`, e
+`rebase.dataAsAdmin` viene eseguito come `{ uid: "service", roles: ["admin"] }`. Una regola di campo
+che potesse escludere un amministratore da una colonna del proprio database impedirebbe anche
+a Studio di renderizzarla e alla CLI di esportarla. Se serve una colonna che nessun amministratore
+possa leggere tramite l'API, si usa `read: []`.
 
-### Perché il livello fidato passa
+### Perché il piano fidato passa
 
-Una chiamata `rebase.data` in-process all'interno di un hook, di una migrazione o dell'adapter di autenticazione che verifica una password non ha alcuna richiesta né ruolo associato. Si tratta di codice server, e un elenco di ruoli non si applica ad esso. `[]` continua ad applicarsi: si tratta di una dichiarazione sulla superficie dell'API piuttosto che su chi effettua la chiamata.
+Il codice server non associato a una richiesta — una migrazione o l'adapter di autenticazione
+che verifica una password — legge senza alcun ruolo e l'elenco dei ruoli non si applica ad
+esso. `[]` si applica comunque: si tratta di un'istruzione che riguarda la superficie dell'API
+piuttosto che l'identità del chiamante.
+
+Il `context.data` di una callback non appartiene a quel piano. All'interno di una richiesta legge
+con i ruoli del chiamante, quindi le regole di campo si applicano a ciò che legge esattamente come
+si applicano alla richiesta.
 
 ## `excludeFromApi` è lo stesso meccanismo
 
-`excludeFromApi: true` è zucchero sintattico per `access: { read: [], write: [] }`. Dietro a entrambe le sintassi vi è lo stesso predicato, pertanto tutto ciò che è descritto in questa pagina si applica anche al flag. Usa la forma che ritieni più leggibile, ma non entrambe sulla stessa proprietà: tale combinazione viene rifiutata all'avvio.
+`excludeFromApi: true` è zucchero sintattico per `access: { read: [], write: [] }`. C'è un
+unico predicato dietro entrambe le sintassi, quindi tutto ciò che si trova in questa pagina si
+applica anche a questo flag. Usa la forma più leggibile — ma non entrambe sulla stessa proprietà,
+operazione che viene rifiutata all'avvio.
 
-## Cosa vede il chiamante
+## Cosa vede un chiamante
 
 ### Letture
 
-Un campo che non puoi leggere è **assente** dalla risposta. Non `null`, non una stringa vuota: la chiave semplicemente non è presente.
+Un campo che non puoi leggere è **assente** dalla risposta. Non `null`, non una stringa
+vuota: la chiave non è presente.
 
 ```json
 // GET /api/data/staff/1  as a caller holding `staff`
@@ -71,13 +92,18 @@ Un campo che non puoi leggere è **assente** dalla risposta. Non `null`, non una
 { "id": 1, "name": "Ada", "salary": 90000 }
 ```
 
-Questa scelta è intenzionale. Un valore omesso restituito come `null` sarebbe indistinguibile da un `null` salvato nel database, consentendo a un client di mappare l'intera colonna contandoli; inoltre, un'`update` che rimandasse indietro la riga sovrascriverebbe il valore reale con il null appena ricevuto.
+È una scelta deliberata. Un valore trattenuto restituito come `null` sarebbe indistinguibile da un
+`null` memorizzato, consentendo a un client di mappare l'intera colonna contandoli — e un
+`update` che rimandasse indietro la riga sovrascriverebbe il valore reale con il null ricevuto.
 
-Si applica a ogni punto di uscita: elenco (list), get singolo, destinazioni di relazioni incluse con `?include=`, risultati di `_batch`, frame realtime da `.listen()`, risultati aggregati e snapshot della [cronologia](#history).
+Si applica a ogni punto di uscita: list, get singolo, destinazioni di relazioni incluse con
+`?include=`, risultati di `_batch`, frame realtime da `.listen()`, risultati aggregati e snapshot
+della [cronologia](#cronologia).
 
 ### Query
 
-Un parametro `where`, `orderBy`, `fields`, una `select` di aggregazione o una `groupBy` che fa riferimento a un campo che non puoi leggere restituisce un **400 `FIELD_NOT_READABLE`**:
+Un `where`, `orderBy`, `fields`, `select` aggregata o `groupBy` che fa riferimento a un campo che
+non puoi leggere restituisce un errore **400 `FIELD_NOT_READABLE`**:
 
 ```http
 GET /api/data/staff?salary=gt.100000
@@ -99,42 +125,74 @@ GET /api/data/staff?salary=gt.100000
 }
 ```
 
-Senza questo controllo, il valore sarebbe leggibile un predicato alla volta: venti richieste basterebbero per una ricerca binaria su uno stipendio.
+Senza questo controllo, il valore sarebbe leggibile un predicato alla volta: venti richieste
+equivarrebbero a una ricerca binaria su uno stipendio.
 
-L'errore **indica il nome del campo**. È una decisione voluta, non una svista: il documento OpenAPI pubblicato elenca ogni proprietà di ogni collection (viene servito dall'app, non dal router dati autenticato), quindi i nomi dei campi sono già pubblici. Nascondere il nome in questo caso non proteggerebbe nulla e risponderebbe a un banale errore di battitura del chiamante con "unknown field", inducendolo a cercare un errore ortografico inesistente. **I nomi dei campi sono pubblici; i valori dei campi non lo sono.**
+L'errore **indica il nome del campo**. È una decisione consapevole, non una svista: il
+documento OpenAPI pubblicato elenca ogni proprietà di ogni collection — viene servito
+dall'app, non dal router dei dati autenticato — quindi i nomi dei campi sono già pubblici.
+Nascondere il nome qui non proteggerebbe nulla e risponderebbe a un banale refuso del chiamante
+con "unknown field", spingendolo a cercare un errore di battitura inesistente. **I nomi dei campi
+sono pubblici; i valori dei campi non lo sono.**
 
 ### Scritture
 
-Un valore inviato per un campo che non puoi scrivere restituisce un **400**, senza mai scartare la chiave in modo silenzioso: una scrittura che scarta un campo segnalerebbe un esito positivo per una modifica mai avvenuta.
+Un valore per un campo che non puoi scrivere restituisce un errore **400**, non viene mai scartato
+silenziosamente: una scrittura che scarta un campo segnalerebbe il successo di una modifica che non è
+mai avvenuta.
 
 | Codice | Quando |
-|------|------|
-| `FIELD_NOT_WRITABLE` | `write` è un elenco di ruoli che non soddisfi. Un tuo collega potrebbe ricevere un 200 con lo stesso payload. |
+|--------|--------|
+| `FIELD_NOT_WRITABLE` | `write` è un elenco di ruoli che non soddisfi. Un tuo collega potrebbe ricevere un 200 per lo stesso body. |
 | `VALIDATION_EXCLUDED_FIELDS` | `write` è `[]` (o `excludeFromApi`). Nessuno può scriverlo; la risposta è la stessa per ogni chiamante. |
 
-Entrambi contengono `details.violations` indicizzati in base al nome inviato via rete. Viene applicato in creazione, `PATCH`/`PUT`, `/bulk`, `_batch`, upsert, operazioni di campo (`{ "salary": { "$inc": 1000 } }` fa riferimento a `salary` come qualsiasi valore) e nel frame WebSocket `SAVE`.
+Entrambi contengono `details.violations` indicizzati in base al nome inviato sul wire. Applicato
+su create, `PATCH`/`PUT`, `/bulk`, `_batch`, upsert, operazioni sui campi
+(`{ "salary": { "$inc": 1000 } }` fa riferimento a `salary` come qualsiasi valore) e sul
+frame WebSocket `SAVE`.
 
 ## Ricerca
 
-La ricerca di fallback (una collection priva del blocco `search`) esegue il matching `ILIKE` sulle proprietà di tipo stringa, saltando quelle che il chiamante non può leggere. Nulla trapela tramite questa modalità.
+La ricerca di fallback — una collection senza blocco `search` — confronta tramite `ILIKE` le
+proprietà stringa, saltando quelle che il chiamante non può leggere. Nulla viene
+divulgato attraverso di essa.
 
-Una collection che **invece dichiara** un [blocco `search`](/docs/backend/api/) viene compilata in una singola colonna `tsvector` generata e condivisa tra tutti i chiamanti. Non ne esiste una variante specifica per ruolo, quindi un campo con restrizioni specificato in `search.fields` rimarrebbe *ricercabile* per chiamanti che non possono vederne il valore, risultando recuperabile un termine alla volta. Rebase rifiuta questa combinazione all'avvio: rimuovi il campo da `search.fields` oppure elimina la restrizione di lettura.
+Una collection che **dichiara** un blocco [`search`](/docs/backend/api/) viene compilata
+in una singola colonna generata `tsvector` condivisa da tutti i chiamanti. Non ne esiste una
+variante per ruolo, pertanto un campo riservato indicato in `search.fields` rimarrebbe
+*ricercabile* per i chiamanti che non possono vederne il valore — recuperabile un termine
+alla volta. Rebase rifiuta questa combinazione all'avvio: rimuovi il campo da
+`search.fields` oppure rimuovi la restrizione di lettura.
 
 ## Cronologia
 
-La [cronologia delle entità](/docs/backend/api/) memorizza l'intera riga ed è accessibile a chiunque possa leggere la riga stessa: il controllo è "puoi recuperare questa entità", non "sei un admin". Di conseguenza, la regola di lettura viene applicata anche a ciascuno snapshot memorizzato: la voce è comunque presente nell'elenco, con l'indicazione di chi l'ha modificata e quando, ma le colonne riservate sono rimosse dai suoi `values`.
+La [cronologia dell'entità](/docs/backend/api/) memorizza l'intera riga e viene fornita a
+chiunque possa leggere la riga: il controllo d'accesso si basa su "puoi recuperare questa entità",
+non su "sei un amministratore". Pertanto la regola di lettura viene applicata anche a ciascuno
+snapshot memorizzato: la voce compare comunque nell'elenco, con l'autore e la data della modifica,
+ma le colonne trattenute vengono rimosse dai suoi `values`.
 
-Il ripristino (revert) non viene influenzato. La route di ripristino legge la voce memorizzata lato server, permettendo al chiamante di ripristinare una versione di cui non può visualizzare tutti i campi, esattamente come può già sovrascrivere una riga senza doverne leggere ogni proprietà.
+Il ripristino (revert) non viene influenzato. La route di ripristino legge la voce memorizzata lato
+server, quindi un chiamante può ripristinare una versione di cui non può vedere tutti i campi —
+esattamente come può già sovrascrivere una riga senza leggerne l'intero contenuto.
 
 ## Cosa mostra il pannello di amministrazione
 
-Non c'è nulla da configurare. Studio legge tramite la stessa API, quindi un campo che il chiamante non può leggere non viene mai recapitato e il modulo non lo disegna; un campo che non può scrivere viene rifiutato se si tenta di inviarlo. Questa è una garanzia lato server, a differenza di `admin.hideFromCollection`, che si limita a impedire al pannello di *renderizzare* un campo, lasciando però il valore nel JSON.
+Niente da configurare. Lo Studio legge attraverso la stessa API, quindi un campo che il
+chiamante non può leggere non arriva mai e il modulo non lo disegna; un campo che non può
+scrivere viene rifiutato se qualcosa tenta di inviarlo. Questa è una garanzia lato server, a
+differenza di `admin.hideFromCollection`, che si limita a impedire al pannello di
+*renderizzare* un campo, lasciando il valore nel JSON.
 
 ## Tipi generati e OpenAPI
 
-I tipi `Row`, `Insert` e `Update` dell'SDK hanno un'unica struttura per tutti i chiamanti — non esiste un tipo `Row` valido sia per un lettore con il ruolo `hr` sia per uno che non lo possiede — pertanto una regola basata sui **ruoli** non li modifica. Un campo precluso a tutti (`[]` o `excludeFromApi`) ne è invece escluso, come è sempre stato.
+I tipi `Row`, `Insert` e `Update` dell'SDK hanno un'unica forma per tutti i chiamanti —
+non esiste un tipo `Row` adatto sia a un lettore con ruolo `hr` sia a uno che non lo possiede —
+quindi una regola sui **ruoli** non li modifica. Un campo precluso a tutti
+(`[]`, o `excludeFromApi`) è assente da essi, come è sempre stato.
 
-Il documento OpenAPI dichiara la regola anziché simulare una variante specifica per ogni chiamante. Ogni proprietà con restrizioni include `x-rebase-access`:
+Il documento OpenAPI dichiara la regola anziché simulare una visualizzazione specifica per chiamante.
+Ogni proprietà con restrizioni include `x-rebase-access`:
 
 ```json
 "salary": {
@@ -144,29 +202,39 @@ Il documento OpenAPI dichiara la regola anziché simulare una variante specifica
 }
 ```
 
-Un campo che nessuno può leggere è assente dallo schema di lettura e dai parametri di filtro; un campo che nessuno può scrivere è assente dallo schema di input. Le due direzioni costituiscono schemi separati e vengono valutate distintamente, quindi un token inviato da un amministratore che non viene mai riletto comparirà nel body della richiesta e non nella riga.
+Un campo che nessuno può leggere è assente dallo schema di lettura e dai parametri di
+filtro; un campo che nessuno può scrivere è assente dallo schema di input. Le due direzioni
+costituiscono schemi separati e vengono valutate separatamente, quindi un token che un
+amministratore invia e non rilegge mai appare nel corpo della richiesta ma non nella riga.
 
 ## Scritture in-process
 
-`rebase.data` e `rebase.dataAsAdmin` all'interno di un hook, di una funzione o di un cron job non sono soggetti al controllo di scrittura. È la stessa esenzione che `excludeFromApi` ha sempre avuto, ed è ciò che rende la regola concretamente applicabile: qualcosa deve pur poter salvare l'hash della password.
+Le scritture in-process — `context.data` in una callback, `rebase.dataAsAdmin` in una
+callback, una funzione o un cron job — non passano attraverso il controllo di scrittura. È
+la stessa esenzione che `excludeFromApi` ha sempre avuto, ed è ciò che rende la regola
+concretamente applicabile: qualcosa deve pur essere in grado di memorizzare l'hash della password.
 
-Le letture tramite `rebase.dataAsAdmin` possiedono il ruolo `admin`, quindi una regola sui ruoli non nasconde loro nulla. `[]` continua invece a farlo, anche per `dataAsAdmin`. Usa [`rebase.sql()`](/docs/backend/api/) se hai bisogno della colonna grezza.
+Le letture tramite `rebase.dataAsAdmin` possiedono il ruolo `admin`, quindi una regola sui ruoli non
+nasconde loro nulla. `[]` lo fa comunque — anche per `dataAsAdmin`. Usa
+[`rebase.sql()`](/docs/backend/api/) se hai bisogno della colonna grezza.
 
 ## Validazione
 
-I seguenti casi vengono rifiutati all'avvio, prima che il server gestisca qualsiasi richiesta:
+Queste configurazioni vengono rifiutate all'avvio, prima che il server gestisca qualsiasi richiesta:
 
-- `access` ed `excludeFromApi` sulla stessa proprietà: rappresentano lo stesso meccanismo e il flag prevale, rendendo inutile il blocco adiacente;
-- una stringa semplice dove è previsto un elenco (`read: "admin"`), che verrebbe interpretata come una regola non vuota che nessun chiamante soddisfa, nascondendo il campo a chiunque;
+- `access` ed `excludeFromApi` sulla stessa proprietà — sono un unico meccanismo e il
+  flag prevale, quindi il blocco accanto sarebbe inerte;
+- una stringa semplice dove è richiesta una lista (`read: "admin"`), che verrebbe interpretata come una
+  regola non vuota che nessun chiamante soddisfa, nascondendo il campo a chiunque;
 - un ruolo che non sia una stringa non vuota;
-- un campo con restrizioni indicato in `search.fields` della collection.
+- un campo con restrizioni indicato nei `search.fields` della collection.
 
-I *nomi* dei ruoli non vengono verificati rispetto a un set predefinito: i ruoli sono dati applicativi, creati ed eliminati durante l'esecuzione del server. Un errore di battitura in un nome genera un campo che nessuno può leggere, garantendo un comportamento sicuro in caso di errore (fail-safe).
+I *nomi* dei ruoli non vengono verificati rispetto a un set predefinito: i ruoli sono dati
+applicativi, creati ed eliminati durante l'esecuzione del server. Un errore di battitura in un
+ruolo genera un campo che nessuno può leggere, ovvero il comportamento fallimentare più sicuro.
 
 ## Vedi anche
 
-- [Regole di sicurezza (RLS)](/docs/collections/security-rules/) — a quali righe accede un chiamante
+- [Security Rules (RLS)](/docs/collections/security-rules/) — quali righe può raggiungere un chiamante
 - [Proprietà](/docs/collections/properties/) — la tabella completa delle opzioni
 - [Codici di errore](/docs/backend/errors/) — `FIELD_NOT_READABLE`, `FIELD_NOT_WRITABLE`
-
----

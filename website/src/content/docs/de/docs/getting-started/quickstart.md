@@ -1,115 +1,108 @@
 ---
-sourceHash: 087b1aa353fab6b5
+sourceHash: 7b2e4e449b0ca1dc
 title: Schnellstart
 sidebar_label: Schnellstart
-description: Erstellen Sie ein neues Rebase-Projekt und bringen Sie es in weniger als 2 Minuten lokal zum Laufen.
+description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
 ---
 
-## Erstellen Sie ein neues Projekt
+## Ein neues Projekt erstellen
 
 ```bash
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-Dies erstellt ein Projekt mit drei Paketen. Falls Ihnen *Collection*, *Studio*,
-*verwaltete Laufzeitumgebung*, *Bundle* oder *Ressource* neu sind: Der
-Fünf-Wort-Kasten auf [Projektstruktur](/docs/getting-started/project-structure/)
-definiert sie.
+Dadurch wird ein Projekt mit drei Packages gerüstet (scaffolded). Wenn Ihnen Begriffe wie *Collection*, *Studio*,
+*Managed Runtime*, *Bundle* oder *Resource* neu sind, werden sie im 5-Wörter-Kasten unter
+[Projektstruktur](/docs/getting-started/project-structure/) definiert.
 
 
 
 | Ordner | Beschreibung |
 |--------|-------------|
-| `frontend/` | React SPA — Vite + TypeScript mit der Rebase Admin-Benutzeroberfläche |
-| `backend/` | Ihre eigenen Functions und Crons sowie das generierte Drizzle-Schema. Es gibt keine Server-Datei — die veröffentlichte Laufzeitumgebung startet das Projekt |
-| `config/` | Konfigurationsdateien und Collection-Definitionen, die beide Seiten teilen |
+| `frontend/` | React SPA — Vite + TypeScript mit der Rebase Admin-UI |
+| `backend/` | Ihre benutzerdefinierten Funktionen und Crons sowie das generierte Drizzle-Schema. Es gibt keine Server-Datei — die veröffentlichte Runtime startet das Projekt |
+| `config/` | Konfigurationsdateien und Collection-Definitionen, die von beiden Seiten geteilt werden |
 
 ## Voraussetzungen
 
-- **Node.js** 22.22+ — jedes Scaffold, auch das headless, deklariert `"node": ">=22.22.0"`
+- **Node.js** 22.22+ — jedes Gerüst, inklusive Headless, deklariert `"node": ">=22.22.0"`
 - **pnpm** (empfohlen) oder npm
 
-Keine Datenbank zu installieren, und kein Docker. `rebase dev` betreibt eine verwaltete PostgreSQL für das Projekt, deren Daten unter `.rebase/` liegen. Siehe [Variante: Ihre eigene PostgreSQL](#variante-ihre-eigene-postgresql), wenn Sie lieber selbst eine bereitstellen — eine lokale Installation, Neon, Supabase oder den Container, den dieser Scaffold mitliefert.
+Keine Datenbank muss installiert werden und kein Docker ist nötig. `rebase dev` führt ein verwaltetes PostgreSQL für das Projekt aus, dessen Daten unter `.rebase/` liegen. Siehe [Variante: Eigene PostgreSQL-Instanz verwenden](#variante-eigene-postgresql-instanz-verwenden), falls Sie lieber eine eigene bereitstellen möchten — eine lokale Installation, Neon, Supabase oder den mit diesem Gerüst gelieferten Container.
 
 ## Ihre Umgebung ist bereits konfiguriert
 
-`init` generiert eine sofort einsatzbereite `.env` im Projektstammverzeichnis mit einem echten `JWT_SECRET`, einem Datenbank-Passwort und einem freien lokalen Datenbank-Port. Sie müssen nichts erstellen oder bearbeiten, um loszulegen.
+`init` generiert ein sofort einsatzbereites `.env` im Projektstammverzeichnis mit einem echten `JWT_SECRET`, einem Datenbankpasswort und einem freien lokalen Datenbankport. Sie müssen nichts erstellen oder bearbeiten, um loszulegen.
 
 :::caution
-Führen Sie nicht `cp .env.example .env` aus. `.env.example` ist eine Referenz für die verfügbaren Variablen — sie über Ihre `.env` zu kopieren verwirft die generierten Geheimnisse und lässt `DATABASE_URL` auf eine nicht existierende Datenbank zeigen. Bearbeiten Sie `.env` direkt, wenn Sie einen Wert ändern möchten.
+Führen Sie nicht `cp .env.example .env` aus. `.env.example` dient als Referenz für die verfügbaren Variablen — das Überschreiben Ihrer `.env` verwirft die generierten Secrets und setzt `DATABASE_URL` auf eine Datenbank, die nicht existiert. Bearbeiten Sie stattdessen die `.env` direkt, wenn Sie einen Wert ändern möchten.
 :::
 
-## Starten Sie die Entwicklungs-Server
+## Die Dev-Server starten
 
 ```bash
 pnpm install
 pnpm run dev
 ```
 
-Das ist der gesamte erste Start. Es gibt keine Datenbank zu installieren und
-keinen Schema-Schritt: ohne gesetzte `DATABASE_URL` startet `rebase dev` eine
-**verwaltete PostgreSQL (PGlite)** im Projektverzeichnis, erzeugt das
-Drizzle-Schema aus Ihren Collections und legt die Tabellen beim Start an —
-einschließlich der Beispiele `posts`, `authors` und `tags`.
+Das ist bereits der gesamte erste Durchlauf. Es muss keine Datenbank installiert und kein Schemaschritt ausgeführt werden:
+Wenn keine `DATABASE_URL` gesetzt ist, startet `rebase dev` ein **verwaltetes PostgreSQL (PGlite)**
+im Projektverzeichnis, generiert das Drizzle-Schema aus Ihren Collections und
+erstellt die Tabellen beim Booten — einschließlich der Beispiel-Tabellen `posts`, `authors` und `tags`.
 
-Beide Hälften starten zusammen:
+Es startet beide Teile zusammen:
 
 - **Backend** — REST-API, Auth, Storage, WebSocket
-- **Frontend** — das Rebase-Admin-Panel
-- **Hot Reload** für beide
+- **Frontend** — das Dashboard: Rebase CMS und Rebase Studio
+- **Hot-Reload** für beide
 
-Beide Ports werden **aus dem Pfad dieses Projekts abgeleitet** statt fest
-vergeben, sodass mehrere Rebase-Projekte nebeneinander laufen können. `rebase
-dev` gibt die beiden gebundenen URLs aus — **verwenden Sie diese**, nicht
-`localhost:3001` / `localhost:5173`. (`PORT` und `VITE_API_URL` in `.env`
-konfigurieren `rebase start`, den Produktionsserver, und werden hier ignoriert.)
-Einen Port festlegen: `rebase dev --port 3001`.
+Beide Ports werden **aus dem Pfad dieses Projekts abgeleitet** statt fest vorgegeben zu sein, sodass mehrere
+Rebase-Projekte nebeneinander laufen können. `rebase dev` gibt die beiden gebundenen URLs aus —
+**verwenden Sie diese**, nicht `localhost:3001` / `localhost:5173`. (`PORT` und `VITE_API_URL`
+in der `.env` konfigurieren `rebase start`, den Produktionsserver, und werden hier ignoriert.)
+Einen Port können Sie mit `rebase dev --port 3001` festlegen.
 
-### Wichtige Flags
+### Nützliche Flags
 
-| Flag | Bei | Wirkung |
+| Flag | Bei | Funktion |
 |---|---|---|
-| `--yes` | `init` | Fragt nie nach. **Erforderlich, wenn kein Terminal zum Nachfragen da ist**, etwa in CI. Überspringt dabei `git init` und die Installation der Abhängigkeiten — interaktiv würden die Vorgaben beides bejahen, also geben Sie `--git` / `--install` an, wenn Sie sie wollen |
+| `--yes` | `init` | Niemals nachfragen. **Erforderlich, wenn kein Terminal für Eingaben vorhanden ist**, z. B. in CI. Überspringt Git-Init und Dependency-Installation — die interaktiven Standardwerte bejahen beides; übergeben Sie also `--git` / `--install`, wenn Sie dies wünschen |
 | `--headless` | `init` | Ein Backend ohne Collection-Dateien und ohne UI — siehe [Nur Backend](/docs/getting-started/headless/) |
-| `--template <name>` | `init` | Startet von einer anderen Vorlage als der Standardvorlage |
-| `--install` / `--no-install` | `init` | Führt den Paketmanager aus — oder eben nicht |
-| `--docker` | `dev` | Nutzt PostgreSQL im Container statt der verwalteten Datenbank |
-| `--no-db` | `dev` | Startet gar keine Datenbank — weder den Container noch die verwaltete. Setzen Sie `DATABASE_URL` selbst |
+| `--template <name>` | `init` | Von einer anderen Vorlage als der Standardvorlage starten |
+| `--install` / `--no-install` | `init` | Paketmanager automatisch ausführen oder überspringen |
+| `--docker` | `dev` | PostgreSQL in einem Container anstelle der verwalteten Version verwenden |
+| `--no-db` | `dev` | Gar keine Datenbank starten — weder den Container noch die verwaltete Version. Setzen Sie `DATABASE_URL` selbst |
 
-## Variante: Ihre eigene PostgreSQL
+## Variante: Eigene PostgreSQL-Instanz verwenden
 
-Die verwaltete Datenbank ist eine Bequemlichkeit, keine Voraussetzung. Um das
-Projekt auf eine eigene PostgreSQL zu richten, kommentieren Sie `DATABASE_URL` in
-`.env` ein:
+Die verwaltete Datenbank ist eine Erleichterung, keine Voraussetzung. Um das Projekt auf
+ein selbst betriebenes Postgres zu verweisen, kommentieren Sie `DATABASE_URL` in der `.env` ein:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-Starten Sie danach die Entwicklungs-Server wie oben. Eine gesetzte
-`DATABASE_URL` wird nie angefasst, und eine, die nicht auf diese Maschine zeigt,
-bleibt vollständig unberührt.
+Starten Sie dann die Dev-Server wie oben beschrieben. Eine gesetzte `DATABASE_URL` wird niemals
+angetastet, und eine URL, die auf einen anderen Rechner verweist, bleibt völlig unberührt.
 
-Mit einer eigenen Datenbank stehen zusätzlich die Migrationsbefehle zur
-Verfügung, die die verwaltete nicht anbieten kann — sie planen Änderungen mit
-[Atlas](https://atlasgo.io/), der Schema-Migrations-Engine, mit der Rebase
-plant, und die eine zweite, leere Datenbank zum Vergleich benötigt; PGlite
-bedient genau eine:
+Mit einer eigenen Datenbank stehen Ihnen auch die Migrationsbefehle zur Verfügung, die die verwaltete Datenbank
+nicht bieten kann — diese planen Änderungen mit [Atlas](https://atlasgo.io/), der Schema-Migrationsengine,
+die Rebase zur Planung nutzt. Atlas benötigt eine zweite leere Datenbank
+für den Vergleich, und PGlite stellt exakt eine bereit:
 
 ```bash
 pnpm run db:push
 ```
 
-Der Start legt fehlende Tabellen bereits additiv an; `db push` ist also für die
-zwei Dinge da, die er bewusst auslässt:
-[RLS](/docs/collections/security-rules/) auf Junction-Tabellen — die
-Row-Level-Security von PostgreSQL, mit der Rebase durchsetzt, wer eine Zeile
-lesen darf — bei Many-to-Many-Relationen, und jede nicht rein additive Änderung:
-eine umbenannte Spalte, ein verengter Typ, ein entferntes Feld.
+Der Bootvorgang erstellt fehlende Tabellen bereits additiv. `db push` ist daher für die zwei
+Dinge gedacht, die bewusst unberührt gelassen werden: Junction-Table-
+[RLS](/docs/collections/security-rules/) — PostgreSQLs Row-Level Security, womit
+Rebase steuert, wer eine Zeile lesen darf — bei Many-to-Many-Relationen,
+sowie alle Änderungen, die nicht rein additiv sind — eine umbenannte Spalte, ein
+eingeschränkter Typ oder ein entferntes Feld.
 
-Der Scaffold liefert außerdem eine `docker-compose.yml` mit einem
-PostgreSQL-Dienst, falls Sie einen Container statt einer installierten Postgres
-bevorzugen:
+Das Gerüst enthält außerdem eine `docker-compose.yml` mit einem PostgreSQL-Dienst, falls Sie
+einen Container anstelle eines lokal installierten Postgres bevorzugen:
 
 ```bash
 docker compose up -d db
@@ -117,27 +110,27 @@ docker compose up -d db
 
 ## Eine bestehende Datenbank introspektieren (Optional)
 
-Wenn Sie eine Verbindung zu einer bestehenden Datenbank mit bereits vorhandenen Tabellen herstellen, können Sie diese introspektieren, um Ihre TypeScript-Sammlungsdateien automatisch zu generieren:
+Wenn Sie eine Verbindung zu einer bestehenden Datenbank mit bereits vorhandenen Tabellen herstellen, können Sie diese introspektieren, um Ihre TypeScript-Collection-Dateien automatisch zu generieren:
 
 ```bash
 pnpm rebase schema introspect
 ```
 
-Dies analysiert Ihre Datenbanktabellen und erzeugt die entsprechenden TypeScript-Dateien in `config/collections/`, sodass Sie sie nicht von Hand schreiben müssen.
+Dadurch werden Ihre Datenbanktabellen analysiert und entsprechende TypeScript-Dateien in `config/collections/` generiert, sodass Sie diese nicht manuell schreiben müssen.
 
-## Erster Login
+## Erste Anmeldung
 
-Wenn Sie die von `rebase dev` ausgegebene Frontend-URL öffnen, sehen Sie den Anmeldebildschirm. Der **erste Benutzer**, der sich registriert, wird automatisch zum Administrator – dies ist der Bootstrap-Prozess.
+Wenn Sie die Frontend-URL öffnen, die `rebase dev` ausgegeben hat, sehen Sie den Anmeldebildschirm. Der **erste Benutzer**, der sich registriert, wird automatisch Administrator — das ist der Bootstrap-Ablauf.
 
-1. Klicken Sie auf **Registrieren**
-2. Geben Sie Ihre E-Mail-Adresse und Ihr Passwort ein
-3. Sie sind drin — mit vollem Administratorzugriff
+1. Klicken Sie auf **Sign Up**
+2. Geben Sie Ihre E-Mail-Adresse und ein Passwort ein
+3. Sie sind eingeloggt — mit vollen Administratorrechten
 
-`rebase init` hat außerdem `REBASE_ADMIN_EMAIL` und ein generiertes `REBASE_ADMIN_PASSWORD` in die `.env` geschrieben. Das sind hier **nicht** Ihre Zugangsdaten: `rebase dev` ignoriert beide und sagt es beim Start. Sie gehören zu einem Produktionsstart — `docker compose up` oder alles mit `NODE_ENV=production` —, wo dieses Bootstrap-Fenster geschlossen ist, weil der Server unter einem Hostnamen antwortet, bevor Sie irgendetwas getippt haben. Siehe [Ihr erster Administrator](/de/docs/getting-started/deployment#ihr-erster-administrator).
+`rebase init` hat außerdem `REBASE_ADMIN_EMAIL` und ein generiertes `REBASE_ADMIN_PASSWORD` in die `.env` geschrieben. Das sind hier nicht Ihre Zugangsdaten: `rebase dev` ignoriert sie und weist beim Booten darauf hin. Sie gehören zu einem Produktionsstart — `docker compose up` oder allem mit `NODE_ENV=production` —, bei dem dieses Bootstrap-Zeitfenster geschlossen ist, da der Server bereits auf einem Hostnamen antwortet, bevor Sie etwas eingegeben haben. Siehe [Ihr erster Administrator](/docs/getting-started/deployment#your-first-admin).
 
-## Definieren Sie Ihre erste Sammlung
+## Ihre erste Collection definieren
 
-Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei. Exportieren Sie die Sammlung als **Default-Export** — so wird sie von der Registry erkannt. Der Tabellenname ist optional: er ist standardmäßig der Slug, setzen Sie ihn also nur, wenn die beiden auseinandergehen:
+Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei. Exportieren Sie die Collection als **Default-Export** — so wird sie von der Registry erfasst. Der Tabellenname ist optional: Er entspricht standardmäßig dem Slug, setzen Sie ihn also nur, wenn sie voneinander abweichen:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -188,40 +181,37 @@ export const collections = [
 ];
 ```
 
-## Erstellen Sie die Tabelle
+## Die Tabelle erstellen
 
-Speichern Sie die Datei. Das ist der ganze Schritt: `rebase dev` erzeugt
-`backend/src/schema.generated.ts` aus Ihren Collections neu, startet das Backend
-neu, und der Start legt die neue Tabelle an — Ihre **Products**-Collection
-erscheint also in der Navigation.
+Speichern Sie die Datei. Das ist bereits der gesamte Schritt: `rebase dev` regeneriert
+`backend/src/schema.generated.ts` aus Ihren Collections, startet das Backend neu
+und der Bootvorgang erstellt die neue Tabelle — sodass Ihre Collection **Products** in der
+Navigation erscheint.
 
-Dasselbe gilt für eine Property, die Sie einer bestehenden Collection
-hinzufügen: speichern, und die Spalte ist da.
+Dasselbe gilt für eine Property, die einer bereits vorhandenen Collection hinzugefügt wird: Speichern,
+und die Spalte ist vorhanden.
 
-`rebase db push` ist für die Änderungen da, die der Start bewusst auslässt —
-eine umbenannte Spalte, ein verengter Typ, ein entferntes Feld und RLS auf
-Junction-Tabellen bei Many-to-Many-Relationen. Es braucht Ihre eigene
-PostgreSQL:
+`rebase db push` wird für Änderungen benötigt, die der Bootvorgang bewusst auslässt — eine umbenannte
+Spalte, ein eingeschränkter Typ, ein entferntes Feld und Junction-Table-RLS bei
+Many-to-Many-Relationen. Dafür wird ein eigenes PostgreSQL benötigt:
 
 ```bash
 pnpm run db:push
 ```
 
-## Referenz der Datenbank-Befehle
+## Referenz der Datenbankbefehle
 
 | Befehl | Beschreibung |
 |---------|-------------|
-| `rebase schema generate` | Drizzle-Schema aus Ihren TypeScript-Sammlungen generieren. Braucht keine Datenbank — `rebase dev` führt es für Sie aus |
-| `rebase schema introspect` | TypeScript-Sammlungen aus einer bestehenden Datenbank generieren |
-| `rebase db push` | Schema-Änderungen direkt an die Datenbank übertragen. Braucht Ihre eigene PostgreSQL |
-| `rebase db generate` | SQL-Migrationsdateien generieren. Braucht Ihre eigene PostgreSQL |
-| `rebase db migrate` | Ausstehende Migrationen ausführen. Braucht Ihre eigene PostgreSQL |
+| `rebase schema generate` | Drizzle-Schema aus Ihren TypeScript-Collections generieren. Keine Datenbank erforderlich — `rebase dev` führt dies für Sie aus |
+| `rebase schema introspect` | TypeScript-Collections aus einer bestehenden Datenbank generieren |
+| `rebase db push` | Schema-Änderungen direkt in die Datenbank übertragen. Erfordert ein eigenes PostgreSQL |
+| `rebase db generate` | SQL-Migrationsdateien generieren. Erfordert ein eigenes PostgreSQL |
+| `rebase db migrate` | Ausstehende Migrationen ausführen. Erfordert ein eigenes PostgreSQL |
 
-## Was kommt als Nächstes
+## Nächste Schritte
 
-- **[Projektstruktur](/docs/getting-started/project-structure)** — Verstehen Sie den generierten Code
-- **[Sammlungen](/docs/collections)** — Ausführlicher Einblick in die Schema-Definition
+- **[Projektstruktur](/docs/getting-started/project-structure)** — Den generierten Code verstehen
+- **[Collections](/docs/collections)** — Detaillierte Einführung in die Schemadefinition
 - **[Umgebung & Konfiguration](/docs/getting-started/configuration)** — Alle Konfigurationsoptionen
-- **[Bereitstellung](/docs/getting-started/deployment)** — In Produktion bereitstellen
-
----
+- **[Deployment](/docs/getting-started/deployment)** — In Produktion bereitstellen

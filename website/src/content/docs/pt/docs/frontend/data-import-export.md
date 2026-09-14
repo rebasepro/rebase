@@ -1,15 +1,15 @@
 ---
-sourceHash: 31f58d9db3601b8c
+sourceHash: 2e2dfa451a30f422
 title: Importação e Exportação de Dados
 sidebar_label: Importação e Exportação de Dados
-description: Importe dados de arquivos CSV, JSON e Excel para suas coleções, e exporte os dados das coleções para CSV ou JSON com campos computados opcionais.
+description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e exporte dados de coleções para CSV ou JSON com campos computados opcionais.
 ---
 
 ## Visão Geral
 
-A Rebase inclui ferramentas integradas de importação e exportação de dados acessíveis diretamente do painel de administração. A importação suporta arquivos CSV, JSON e Excel com um assistente de mapeamento de colunas. A exportação suporta CSV e JSON com campos computados opcionais.
+O Rebase inclui ferramentas integradas de importação e exportação de dados acessíveis diretamente do painel de administração. A importação suporta arquivos CSV, JSON e Excel com um assistente de mapeamento de colunas. A exportação suporta CSV e JSON com campos computados opcionais.
 
-Ambos os recursos são habilitados por padrão em todas as coleções e podem ser configurados ou desativados por coleção.
+Ambos estão disponíveis em todas as coleções. A exportação pode ser configurada por coleção com campos computados; nenhum dos dois recursos pode ser desativado por coleção.
 
 ## Importando Dados
 
@@ -17,114 +17,71 @@ Ambos os recursos são habilitados por padrão em todas as coleções e podem se
 
 1. Abra uma coleção no painel de administração
 2. Clique no botão **Importar** na barra de ferramentas
-3. Selecione ou arraste e solte o seu arquivo
+3. Selecione ou arraste e solte seu arquivo
 4. Mapeie as colunas do arquivo para as propriedades da coleção
-5. Pré-visualize os dados e resolva quaisquer erros de validação
+5. Pré-visualize os dados e resolva eventuais erros de validação
 6. Clique em **Importar** para salvar todas as entidades
 
 ### Formatos Suportados
 
-| Formato | Extensões | Notas |
-|--------|-----------|-------|
+| Formato | Extensões | Observações |
+|---------|-----------|-------------|
 | CSV | `.csv` | Detecta delimitadores automaticamente |
 | JSON | `.json` | Espera um array de objetos |
 | Excel | `.xlsx` | Lê a primeira planilha |
 
 ### Mapeamento de Colunas
 
-O assistente de importação tenta automaticamente corresponder as colunas do arquivo às propriedades da coleção por nome. Você pode ajustar os mapeamentos manualmente antes de importar:
+O assistente de importação tenta corresponder automaticamente as colunas do arquivo com as propriedades da coleção pelo nome. Você pode ajustar os mapeamentos manualmente antes de importar:
 
-- **Correspondências exatas** são mapeadas automaticamente (por ex., `name` → `name`)
-- **Colunas sem correspondência** podem ser mapeadas manualmente ou ignoradas
-- A **coerção de tipos** cuida da conversão de string para número, string para booleano e análise de datas
+- **Correspondências exatas** são mapeadas automaticamente (ex.: `name` → `name`)
+- **Colunas não correspondidas** podem ser mapeadas manualmente ou ignoradas
+- **Coerção de tipos** lida com conversões de string para número, string para booleano e análise de datas
 
 ### Validação
 
-Antes de importar, o assistente valida todas as linhas contra as definições de propriedade da sua coleção:
+Antes de importar, o assistente valida todas as linhas em relação às definições de propriedade da sua coleção:
 
-- Os campos obrigatórios devem estar presentes
-- Os valores enum devem corresponder às opções definidas
-- Os tipos de dados devem ser compatíveis (por ex., um valor de texto para um campo numérico é sinalizado)
-- Os erros de validação são exibidos por linha para que você possa corrigi-los antes de importar
+- Campos obrigatórios devem estar presentes
+- Valores de enum devem corresponder às opções definidas
+- Tipos de dados devem ser compatíveis (ex.: um valor de texto em um campo numérico é sinalizado)
+- Erros de validação são exibidos linha por linha para que você possa corrigi-los antes de importar
 
 ### Configuração de Importação
 
-A importação é habilitada por padrão. Para desativá-la em uma coleção específica, use o sub-objeto `admin`:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    // Import is enabled by default
-});
-```
+A importação está disponível em todas as coleções. Não há configuração por coleção para desativá-la.
 
 ## Exportando Dados
 
 ### Como Exportar
 
 1. Abra uma coleção no painel de administração
-2. Opcionalmente aplique filtros para exportar um subconjunto de dados
+2. Opcionalmente, aplique filtros para exportar um subconjunto de dados
 3. Clique no botão **Exportar** na barra de ferramentas
 4. Escolha o formato: **CSV** ou **JSON**
-5. O arquivo é baixado imediatamente
+5. O download do arquivo inicia imediatamente
 
 ### Formatos de Exportação
 
 | Formato | Descrição |
-|--------|-------------|
-| CSV | Valores separados por vírgula, compatível com Excel e Google Sheets |
+|---------|-----------|
+| CSV | Valores separados por vírgula, compatível com Excel e Google Planilhas |
 | JSON | Array de objetos, útil para consumo programático |
 
-### Filtrando Antes de Exportar
+### Filtragem Antes da Exportação
 
-Quaisquer filtros ativos na visão da coleção são aplicados à exportação. Isso permite exportar apenas um subconjunto dos seus dados:
+Quaisquer filtros ativos na visualização da coleção são aplicados à exportação. Isso permite exportar apenas um subconjunto dos seus dados:
 
-- Aplique filtros de coluna ou termos de busca na visão da coleção
-- Clique em **Exportar** — apenas as linhas filtradas são incluídas
+- Aplique filtros de coluna ou termos de busca na visualização da coleção
+- Clique em **Exportar** — apenas as linhas filtradas serão incluídas
 
 ### Configuração de Exportação
 
-A exportação é habilitada por padrão. Você pode configurá-la com campos computados adicionais:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: true            // Enable (default: true)
-    }
-});
-
-```
-
-Para desativar a exportação:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: false
-    }
-});
-
-```
+A exportação está disponível em todas as coleções. O `admin.exportable` a configura: forneça a ele um `ExportConfig` para adicionar colunas computadas, como mostrado abaixo. O tipo também aceita um booleano, mas nada o lê — `exportable: false` não remove o botão **Exportar**.
 
 ### Adicionando Campos Computados
 
-Use o objeto `ExportConfig` para adicionar colunas computadas personalizadas às suas exportações. Essas colunas não existem no banco de dados — são calculadas no momento da exportação:
+Use o objeto `ExportConfig` para adicionar colunas computadas personalizadas às suas exportações. Essas colunas não existem no banco de dados — elas são calculadas no momento da exportação:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -158,14 +115,14 @@ const productsCollection = defineCollection({
 
 ```
 
-Cada entrada de `additionalFields` tem:
+Cada entrada de `additionalFields` possui:
 
 | Propriedade | Tipo | Descrição |
-|----------|------|-------------|
+|-------------|------|-----------|
 | `key` | `string` | Nome da coluna na exportação |
-| `builder` | `({ entity, context }) => string \| Promise<string>` | Função que computa o valor |
+| `builder` | `({ entity, context }) => string \| Promise<string>` | Função que calcula o valor |
 
-A função `builder` recebe a `entity` atual e o `RebaseContext` (que inclui o usuário autenticado), então você pode computar valores com base tanto nos dados quanto nas permissões.
+A função `builder` recebe a `entity` atual e o `RebaseContext` (que inclui o usuário autenticado), permitindo calcular valores com base tanto nos dados quanto nas permissões.
 
 ### Campos Computados Assíncronos
 
@@ -191,4 +148,4 @@ exportable: {
 
 - **[Coleções](/docs/collections)** — Defina seu modelo de dados
 - **[Visão Geral do Frontend](/docs/frontend)** — Painel de administração e componentes de UI
-- **[SDK Cliente](/docs/sdk)** — Acesso programático aos dados
+- **[SDK do Cliente](/docs/sdk)** — Acesso programático aos dados
