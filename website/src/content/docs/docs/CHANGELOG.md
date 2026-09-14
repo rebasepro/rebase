@@ -244,6 +244,45 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Security
 
+- **A guest passed `policy.registered()` on MongoDB, and over the Postgres
+  WebSocket.** A guest, a caller from anonymous sign-in, has a real uid. The
+  guest flag, `isAnonymous`, is the only thing that tells it from an account,
+  and `policy.registered()` ("signed in, and not a guest") reads it. Several
+  doors dropped the flag and treated a guest as an account:
+
+  - On MongoDB, the check that decides a single row ignored the flag. So
+    `GET /api/data/<slug>/<id>`, `POST`, `PATCH` and `DELETE` let a guest read
+    and write rows a `registered()` rule withholds, and so did the WebSocket
+    and the SDK. Lists were filtered correctly.
+  - The MongoDB WebSocket never read the flag at sign-in, whether the client
+    signed in with the platform's token or through an auth adapter. It served
+    a guest's lists, reads, writes and subscriptions as an account's.
+  - A MongoDB in-process listener, such as `listenCollection` or `listenOne`
+    on `driver.withAuth(guest)`, subscribed without the flag.
+  - The Postgres WebSocket read the flag from the token, but ran every request
+    frame (`FETCH_*`, `SAVE`, `DELETE`) as an account's. A policy on
+    `rebase.is_anonymous()` did not stop a guest there. A session signed in
+    through an auth adapter lost the flag everywhere, subscriptions included.
+    And a client with no session was treated as a guest on request frames
+    only. Over REST and on subscriptions it was not one, and now it is not
+    one anywhere.
+
+  REST on Postgres was never affected. The flag now reaches every door, and
+  each WebSocket server builds one identity for both its requests and its
+  subscriptions. If you use `policy.registered()`, or `rebase.is_anonymous()`
+  in a policy, with anonymous sign-in enabled, upgrade.
+
+- **A MongoDB WebSocket client that never signed in ignored every security
+  rule.** With `requireAuth: false`, a client that connected without signing
+  in was served by the base driver. On MongoDB that driver applies no
+  `securityRules` at all. So the client read every row of every registered
+  collection, and could create, update and delete in any of them. REST served the
+  same caller as the anonymous user and enforced the rules. The socket now
+  serves such a client as the anonymous user (`roles: ["anon"]`), as REST
+  does, for both its requests and its subscriptions. If the socket cannot
+  scope a frame, the frame now fails. It used to fall back to the base
+  driver. If you run MongoDB with `requireAuth: false`, upgrade.
+
 - **On Postgres, a realtime listener on a user's driver got its first rows
   without that user's row-level security.** This affected server code that
   calls `listenCollection` or `listenOne` on a driver scoped to a user, such as

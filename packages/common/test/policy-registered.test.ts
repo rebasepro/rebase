@@ -1,7 +1,8 @@
-import { policy } from "@rebasepro/types";
+import { policy, type CollectionConfig, type User } from "@rebasepro/types";
 
 import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
 import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { checkOperation } from "../src/util/permissions";
 
 /**
  * Two different things are called "anonymous", and conflating them is the bug.
@@ -82,6 +83,35 @@ describe("policy.registered()", () => {
             // A caller that does not know keeps the behaviour it had, rather
             // than having all of its users reclassified.
             expect(evaluate({ uid: "user-3" })).toBe(true);
+        });
+    });
+
+    /**
+     * `checkOperation` is what a caller with a user reaches: the Mongo driver
+     * for every row it holds (`fetchOne`, `save`, `delete`) and the admin UI for
+     * what it offers. It built its context from `uid` and `roles` and left the
+     * flag behind, so every guest it was handed was an account.
+     */
+    describe("checked for a user", () => {
+        const briefings = {
+            slug: "briefings",
+            name: "Briefings",
+            properties: {},
+            securityRules: [{ operations: ["all"], condition: policy.registered() }]
+        } as unknown as CollectionConfig;
+        const person = (isAnonymous: boolean): User => ({
+            uid: "user-4", displayName: null, email: null, photoURL: null,
+            providerId: "anonymous", isAnonymous, roles: []
+        });
+
+        it("refuses a guest on every operation", () => {
+            for (const operation of ["select", "insert", "update", "delete"] as const) {
+                expect(checkOperation(briefings, { user: person(true) }, null, operation, { onUnknown: "deny" })).toBe(false);
+            }
+        });
+
+        it("admits the same uid as an account", () => {
+            expect(checkOperation(briefings, { user: person(false) }, null, "select", { onUnknown: "deny" })).toBe(true);
         });
     });
 });

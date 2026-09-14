@@ -1,4 +1,4 @@
-import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -7,14 +7,6 @@ import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
 import { logger } from "@rebasepro/server";
-
-interface DriverWithAuth extends DataDriver {
-    withAuth(user: Record<string, unknown>): Promise<DataDriver>;
-}
-
-function isDriverWithAuth(driver: DataDriver): driver is DriverWithAuth {
-    return "withAuth" in driver && typeof (driver as Record<string, unknown>).withAuth === "function";
-}
 
 /**
  * Normalized user identity for WebSocket sessions — the same shape the Postgres
@@ -27,6 +19,14 @@ interface WsUserIdentity {
     photoURL?: string;
     roles: string[];
     isAdmin: boolean;
+    /**
+     * Whether this session is a guest — anonymous sign-in rather than an
+     * account. Required, so every way of signing in has to say: a guest has a
+     * real uid, and `policy.registered()` has nothing else to tell it from an
+     * account by. Neither sign-in path read it, and every frame was then
+     * scoped as an account.
+     */
+    isAnonymous: boolean;
 }
 
 interface ClientSession {
@@ -51,6 +51,38 @@ const ADMIN_ONLY_TYPES = new Set([
     "DELETE_BRANCH",
     "LIST_BRANCHES"
 ]);
+
+/**
+ * Who a socket reads and writes as, for its request frames and its
+ * subscriptions alike — one answer, so the two cannot disagree.
+ *
+ * A socket with no session (only possible with `requireAuth: false`) is the
+ * anonymous user, exactly as REST scopes the same caller. It used to get the
+ * base driver instead, which on this engine applies no security rules at all:
+ * such a socket read every row and wrote wherever it liked.
+ */
+function sessionUser(session: ClientSession | undefined): User {
+    if (!session?.user) {
+        return {
+            uid: ANONYMOUS_USER_ID,
+            displayName: null,
+            email: null,
+            photoURL: null,
+            providerId: "websocket",
+            isAnonymous: false,
+            roles: ["anon"]
+        };
+    }
+    return {
+        uid: session.user.uid,
+        email: session.user.email ?? "",
+        displayName: session.user.displayName ?? "",
+        photoURL: session.user.photoURL ?? "",
+        providerId: "jwt",
+        isAnonymous: session.user.isAnonymous,
+        roles: session.user.roles ?? []
+    };
+}
 
 function isAdminSession(session: ClientSession | undefined): boolean {
     if (!session?.user) return false;
@@ -148,7 +180,10 @@ code } } }));
                                     uid: adapterUser.uid,
                                     email: adapterUser.email,
                                     roles: adapterUser.roles ?? [],
-                                    isAdmin: !!adapterUser.isAdmin
+                                    isAdmin: !!adapterUser.isAdmin,
+                                    // Absent from an adapter with no such
+                                    // concept, and absent reads as "not a guest".
+                                    isAnonymous: adapterUser.isAnonymous === true
                                 };
                             }
                         } catch {
@@ -163,7 +198,8 @@ code } } }));
                                 displayName: jwtPayload.displayName,
                                 photoURL: jwtPayload.photoURL,
                                 roles: jwtPayload.roles ?? [],
-                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin")
+                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
+                                isAnonymous: jwtPayload.isAnonymous === true
                             };
                         }
                     }
@@ -256,27 +292,11 @@ roles: verifiedUser.roles } }));
                     assertWriteRequestValid(values as Record<string, unknown>, collection);
                 };
 
-                const getScopedDelegate = async (): Promise<DataDriver> => {
-                    const session = clientSessions.get(clientId);
-                    if (session?.user && isDriverWithAuth(driver)) {
-                        try {
-                            const userForAuth: User = {
-                                uid: session.user.uid,
-                                email: session.user.email ?? "",
-                                displayName: session.user.displayName ?? "",
-                                photoURL: session.user.photoURL ?? "",
-                                providerId: "jwt",
-                                isAnonymous: false,
-                                roles: session.user.roles ?? []
-                            };
-                            return await driver.withAuth(userForAuth);
-                        } catch (e) {
-                            logger.error("Failed to create authenticated delegate for WS request", { error: e });
-                            return driver;
-                        }
-                    }
-                    return driver;
-                };
+                // Always scoped. A failure to scope propagates to the frame's
+                // `catch` rather than falling back to the base driver, which
+                // is what it did: the fallback is the unscoped read.
+                const getScopedDelegate = (): Promise<DataDriver> =>
+                    driver.withAuth(sessionUser(clientSessions.get(clientId)));
 
                 switch (type) {
                     case "FETCH_COLLECTION": {
@@ -412,14 +432,18 @@ requestId }));
                             }));
                             return;
                         }
-                        const session = clientSessions.get(clientId);
-                        const authContext = session?.user ? { uid: session.user.uid,
-roles: session.user.roles ?? [] } : undefined;
+                        // The same principal the request frames use, guest flag
+                        // included: every re-fetch reads as it.
+                        const subscriber = sessionUser(clientSessions.get(clientId));
                         await realtimeService.handleClientMessage(clientId, {
                             type,
                             payload,
                             subscriptionId: payload?.subscriptionId
-                        }, authContext);
+                        }, {
+                            uid: subscriber.uid,
+                            roles: subscriber.roles ?? [],
+                            isAnonymous: subscriber.isAnonymous
+                        });
                         break;
                     }
                     default:

@@ -141,6 +141,10 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
     const ctx: PolicyEvalContext = {
         uid: authContext.user?.uid,
         roles: authContext.user?.roles ?? [],
+        // What `policy.registered()` reads. Left out, every guest was an
+        // account here: a document driver let a guest read, write and delete
+        // the rows `registered()` withholds, whatever user it was handed.
+        isAnonymous: authContext.user?.isAnonymous === true,
         entity
     };
 

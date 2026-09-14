@@ -26,7 +26,7 @@ import {
     StorageSource
 } from "@rebasepro/types";
 import { MongoDataService } from "../db/MongoDataService";
-import { MongoRealtimeService } from "./MongoRealtimeService";
+import { MongoRealtimeService, type SubscriptionAuthContext } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
 import { buildPropertyCallbacks, buildSdkData, callbackRefusal, checkOperation, PolicyClauses, requireCallbackClient, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
@@ -215,7 +215,7 @@ propertyCallbacks: undefined };
         // `vectorSearch` is not a thing a subscription can do — the Postgres
         // service refuses it outright rather than run it once and never again.
         { onUpdate, onError, collection, vectorSearch, ...query }: ListenCollectionProps<M>,
-        authContext?: { uid: string; roles: string[] }
+        authContext?: SubscriptionAuthContext
     ): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
@@ -304,7 +304,7 @@ propertyCallbacks: undefined };
         collection,
         onUpdate,
         onError
-    }: ListenOneProps<M>, authContext?: { uid: string; roles: string[] }): () => void {
+    }: ListenOneProps<M>, authContext?: SubscriptionAuthContext): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
         const callback = (row: Record<string, unknown> | null) => {
@@ -825,10 +825,20 @@ export class AuthenticatedMongoDriver implements DataDriver {
         return this.delegate.listenCollection(props, this.authContext());
     }
 
-    /** The acting user, in the shape the realtime subscriptions carry. */
-    private authContext(): { uid: string; roles: string[] } {
-        return { uid: this.user.uid,
-roles: this.user.roles ?? [] };
+    /**
+     * The acting user, in the shape the realtime subscriptions carry.
+     *
+     * `isAnonymous` included: a guest has a real uid, and without the flag
+     * every fetch a listener's subscription makes reads as an account, so
+     * `policy.registered()` handed a guest's listener what it withholds from a
+     * guest's `fetchCollection` on this same driver.
+     */
+    private authContext(): SubscriptionAuthContext {
+        return {
+            uid: this.user.uid,
+            roles: this.user.roles ?? [],
+            isAnonymous: this.user.isAnonymous === true
+        };
     }
 
     /**

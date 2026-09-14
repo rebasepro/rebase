@@ -87,8 +87,12 @@ describe("Mongo WebSocket requireAuth resolution", () => {
             addClient: jest.fn(),
             registerDataDriverSubscription: jest.fn()
         } as unknown as MongoRealtimeService;
+        // Every frame is served by a scoped delegate, an anonymous client's
+        // included — never the base driver, which applies no security rules.
+        const fetchCollection = jest.fn(async () => []);
         driver = {
-            fetchCollection: jest.fn(async () => []),
+            fetchCollection,
+            withAuth: jest.fn(async () => ({ fetchCollection })),
             // `FETCH_COLLECTION` now refuses a path the registry does not resolve
             // (see `websocket-unregistered-path-e2e.test.ts`); this probe uses
             // "posts", so the registry must know it or the auth gate under test is
@@ -122,6 +126,8 @@ describe("Mongo WebSocket requireAuth resolution", () => {
 
         expect(await anonymousIsRefused()).toBe(false);
         expect(driver.fetchCollection).toHaveBeenCalled();
+        // As the anonymous user, the way REST scopes the same caller.
+        expect(driver.withAuth).toHaveBeenCalledWith(expect.objectContaining({ uid: "anonymous", isAnonymous: false }));
     });
 
     /**

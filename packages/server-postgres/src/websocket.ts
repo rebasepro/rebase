@@ -1,4 +1,4 @@
-import { RealtimeService } from "./services/realtimeService";
+import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
@@ -35,9 +35,10 @@ interface WsUserIdentity {
      * Whether this session is a guest — anonymous sign-in rather than an
      * account. Read from the token, because a socket has no request to look
      * anything up on and every refetch it triggers needs the same principal the
-     * initial HTTP fetch had.
+     * initial HTTP fetch had. Required, so every way of signing in has to say:
+     * the adapter path left it out, and its guests were accounts.
      */
-    isAnonymous?: boolean;
+    isAnonymous: boolean;
     /**
      * The token's custom claims, for the same reason `isAnonymous` is here: a
      * socket has no request to look anything up on, and every refetch it
@@ -159,6 +160,32 @@ function extractErrorMessage(error: unknown): string {
 /**
  * Check if the current session belongs to an admin user.
  */
+/**
+ * Who a socket reads and writes as, for its request frames and its
+ * subscriptions alike.
+ *
+ * One answer because there were two, and they disagreed about guests. The
+ * subscriptions carried the session's `isAnonymous`; the request frames wrote
+ * `false` for every signed-in session, so a guest read and wrote as an account
+ * through `FETCH_*`, `SAVE` and `DELETE` while its subscriptions did not. And a
+ * socket with no session was a guest on the request frames (`true`) but not on
+ * its subscriptions or over REST: an unauthenticated caller is not a guest
+ * session.
+ */
+function sessionAuthContext(session: ClientSession | undefined): SubscriptionAuthContext {
+    if (!session?.user) {
+        return { uid: ANONYMOUS_USER_ID, roles: ["anon"], isAnonymous: false };
+    }
+    return {
+        uid: session.user.uid,
+        roles: session.user.roles ?? [],
+        isAnonymous: session.user.isAnonymous === true,
+        // A tenancy policy reads a claim, so a frame without them answers
+        // from the tenant of nobody.
+        ...(session.user.claims ? { claims: session.user.claims } : {})
+    };
+}
+
 function isAdminSession(session: ClientSession | undefined): boolean {
     if (!session?.user) return false;
     // Fast path: new adapter-aware sessions set isAdmin directly
@@ -304,7 +331,13 @@ channelWindowStart: Date.now() });
                                 verifiedUser = {
                                     uid: adapterUser.uid,
                                     roles: adapterUser.roles,
-                                    isAdmin: adapterUser.isAdmin
+                                    isAdmin: adapterUser.isAdmin,
+                                    // Read, as the JWT path reads it: dropped
+                                    // here, a guest signed in through an adapter
+                                    // subscribed as an account. Absent from an
+                                    // adapter with no such concept, and absent
+                                    // reads as "not a guest".
+                                    isAnonymous: adapterUser.isAnonymous === true
                                 };
                             }
                         } catch {
@@ -314,7 +347,7 @@ channelWindowStart: Date.now() });
                         // Service key: a static secret, not a JWT. Checked
                         // before verification, mirroring the HTTP middleware —
                         // verifying it as a JWT can only ever fail.
-                        verifiedUser = { uid: "service", roles: ["admin"], isAdmin: true };
+                        verifiedUser = { uid: "service", roles: ["admin"], isAdmin: true, isAnonymous: false };
                     } else {
                         // Standard JWT path
                         const jwtPayload = await extractUserFromToken(token);
@@ -433,30 +466,20 @@ roles: verifiedUser.roles }
 
                 // Helper to get correctly scoped delegate for the current request
                 const getScopedDelegate = async (): Promise<DataDriver> => {
-                    const session = clientSessions.get(clientId);
                     // Check if the driver supports RLS-scoped delegates
                     if (typeof driver.withAuth === "function") {
                         try {
-                            const userForAuth: User = session?.user
-                                ? {
-                                    uid: session.user.uid,
-                                    displayName: null,
-                                    email: null,
-                                    photoURL: null,
-                                    providerId: "websocket",
-                                    isAnonymous: false,
-                                    roles: session.user.roles ?? [],
-                                    claims: session.user.claims
-                                }
-                                : {
-                                    uid: ANONYMOUS_USER_ID,
-                                    displayName: null,
-                                    email: null,
-                                    photoURL: null,
-                                    providerId: "websocket",
-                                    isAnonymous: true,
-                                    roles: ["anon"]
-                                };
+                            const who = sessionAuthContext(clientSessions.get(clientId));
+                            const userForAuth: User = {
+                                uid: who.uid,
+                                displayName: null,
+                                email: null,
+                                photoURL: null,
+                                providerId: "websocket",
+                                isAnonymous: who.isAnonymous === true,
+                                roles: who.roles,
+                                ...(who.claims ? { claims: who.claims } : {})
+                            };
                             return await driver.withAuth(userForAuth);
                         } catch (e) {
                             logger.error("Failed to create RLS scoped delegate for WS request", { error: e });
@@ -849,30 +872,10 @@ colors: true }));
                     case "presence_state":
                     case "channel_history": {
                         wsDebug("🔄 [WebSocket Server] Routing realtime message to RealtimeService:", type);
-                        // Attach auth context from the WS session so RLS-aware refetches work
-                        const session = clientSessions.get(clientId);
-                        const authContext = session?.user
-                            ? {
-                                uid: session.user.uid,
-                                roles: session.user.roles ?? [],
-                                // A guest is a signed-in caller with no account.
-                                // Carried so a refetch's policies see what the
-                                // initial fetch saw — see `rebase.is_anonymous()`.
-                                isAnonymous: session.user.isAnonymous === true,
-                                // And the token's custom claims, for the same
-                                // reason: a tenancy policy reads one, so a
-                                // subscription without them answers every frame
-                                // from the tenant of nobody.
-                                claims: session.user.claims
-                            }
-                            : {
-                                uid: ANONYMOUS_USER_ID,
-                                roles: ["anon"],
-                                // An UNAUTHENTICATED caller, which is a
-                                // different thing again: no session at all
-                                // rather than a session with no account.
-                                isAnonymous: false
-                            };
+                        // Attach auth context from the WS session so RLS-aware
+                        // refetches read as the same principal the request
+                        // frames do.
+                        const authContext = sessionAuthContext(clientSessions.get(clientId));
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {
                             type,

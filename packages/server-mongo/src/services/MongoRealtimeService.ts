@@ -69,6 +69,13 @@ function subscriptionErrorFrame(subscriptionId: string, path: string | undefined
 export interface SubscriptionAuthContext {
     uid: string;
     roles: string[];
+    /**
+     * Whether the subscriber is a guest — anonymous sign-in rather than an
+     * account. A guest has a real uid, so without this every fetch the
+     * subscription makes reads as an account, and `policy.registered()` lets
+     * it through. Absent reads as "not a guest".
+     */
+    isAnonymous?: boolean;
 }
 
 /**
@@ -356,8 +363,17 @@ export class MongoRealtimeService implements RealtimeProvider {
         if (!this.driver) {
             throw new Error("MongoRealtimeService has no data driver — subscriptions cannot be authorized");
         }
-        const user = { uid: authContext?.uid ?? ANONYMOUS_USER_ID,
-roles: authContext?.roles ?? [] } as User;
+        // A whole `User`, not `{ uid, roles }` cast to one: the cast is how
+        // `isAnonymous` went missing without the compiler noticing.
+        const user: User = {
+            uid: authContext?.uid ?? ANONYMOUS_USER_ID,
+            roles: authContext?.roles ?? [],
+            isAnonymous: authContext?.isAnonymous === true,
+            displayName: null,
+            email: null,
+            photoURL: null,
+            providerId: "realtime"
+        };
         return this.driver.withAuth(user);
     }
 
@@ -576,13 +592,18 @@ roles: authContext?.roles ?? [] } as User;
     async handleClientMessage(
         clientId: string,
         message: { type: string; payload?: any; subscriptionId?: string },
-        _authContext?: { uid: string; roles: unknown[] }
+        _authContext?: { uid: string; roles: unknown[]; isAnonymous?: boolean }
     ): Promise<void> {
         const ws = this.clients.get(clientId);
         if (!ws) return;
 
-        const authContext = _authContext ? { uid: _authContext.uid,
-roles: (_authContext.roles ?? []).map(String) } : undefined;
+        const authContext: SubscriptionAuthContext | undefined = _authContext
+            ? {
+                uid: _authContext.uid,
+                roles: (_authContext.roles ?? []).map(String),
+                isAnonymous: _authContext.isAnonymous === true
+            }
+            : undefined;
 
         switch (message.type) {
             case "subscribe_collection": {
