@@ -2711,7 +2711,7 @@ error into an answer now calls.
 | Mongo realtime subscriptions | **BUG**, and a different class: a failed fetch was logged and nothing was sent, on the first load and on every re-fetch, so the subscriber was never told and its view stayed loading. Fixed: both fetch paths send an `ERROR` frame keyed by `subscriptionId`, through the same delivery slot rows use, so a straggler cannot report over newer rows. A 4xx keeps its message, code and `details` through `declaredErrorAnswer`. Anything else, a declared 5xx included, is masked as on Postgres. |
 | in-process `listenCollection` / `listenOne`, both backends | **BUG**, the same gap one door over. `MongoDriver.listen*` passed the realtime service no error callback, so neither the first fetch nor a re-fetch reached `onError`. Postgres reported the first fetch, but its driver-refetch `catch` blocks only logged, so the listener kept its last rows as if they were current. Fixed: the listener's `onError` is stored on the subscription record on both backends, called through the delivery slot, and handed the error as thrown (trusted code, nothing masked). `RealtimeProvider.subscribeTo*` now declares the optional `onError`. The multi-source router re-listed three arguments and would have dropped it; it now forwards all of them. |
 | Postgres in-process listener, first fetch | **OPEN**, read from the code and not reproduced. `PostgresBackendDriver.listen*` runs the first fetch itself, outside the realtime service. It reads through the base driver, so a listener on `withAuth(user)` gets its first rows without its own auth context; `injectAuthContext` scopes only the re-fetches. The first delivery takes no delivery slot either (class 44), so it can land after a newer re-fetch or after unsubscribe. And `listenOne` drops a `null` row, so a deleted row is never reported. Mongo runs the first fetch in its realtime service, scoped and slotted, and delivers `null`. |
-| Postgres socket error frames | **OPEN**: the first fetch and both re-fetches send their error frame without the delivery slot, so a failed straggler can mark a view that already shows newer rows as failed. Mongo's frames go through the slot. |
+| Postgres socket error frames | **BUG**: the first fetch and both re-fetches sent their error frame without the delivery slot. A failed straggler marked a view that already showed newer rows as failed, and a failure from a cancelled or replaced subscription reached the one now under its id. Fixed: all four `catch` blocks go through `reportSocketFetchFailure`, which always logs and sends only while the fetch holds the newest slot. The plain `canDeliver()` check would have regressed one case: the send itself throwing (a row that will not serialise) after the check claimed the slot. That answered with an error frame before, and would have left the view loading. `mayReportFailure()` also says yes to the delivery that already holds the slot. Mongo's `reportFetchFailure` had the same gap, and now uses the same predicate. A failure before any slot is claimed is the subscribe itself failing, synchronously, and is still sent. |
 | socket error frame → SDK | **gap**: the client read only `message` and `code`, so `e.details` was always empty over the socket. Fixed: frames carry `details` and the client passes them on. `status` stays `undefined`, because a frame is not an HTTP response. |
 | in-process `rebase.data` | n/a: nothing is translated, so the caller gets the `RebaseApiError` itself. |
 
@@ -2747,6 +2747,19 @@ refetch `catch` blocks, the Postgres driver's registration, the router) turns
 its cases red. So do four narrower mutations: `listenOne` alone on each
 backend, a copy of the error instead of the error, and the delivery slot
 skipped.
+
+The socket frames' slot is pinned by ten cases in the Postgres
+`test/realtime-delivery-order.test.ts`. Four still send: nothing newer on the
+first fetch or on a re-fetch, rows that fail to serialise, and a subscribe that
+throws before its fetch starts. Six must not send: a straggler behind newer
+rows, on a collection's first fetch, a collection re-fetch, a row's first fetch
+and a row re-fetch, then after unsubscribe, and to a subscription replaced
+under the same id. Reverting the fix turns the six red and leaves the four
+green. Unslotting each of the four `catch` blocks alone turns its own cases
+red, and so do the plain `canDeliver()` check and skipping slot-less failures.
+On Mongo, one case in `test/realtime-delivery-order.test.ts` and one
+real-socket case with an `afterRead` that returns a `BigInt` turn red without
+`mayReportFailure()`.
 
 ### Creating a user: the hook's report, read on one door — 2026-09-14
 

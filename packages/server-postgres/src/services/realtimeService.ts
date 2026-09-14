@@ -219,6 +219,12 @@ type Subscription = {
 };
 
 /**
+ * What `beginDelivery` returns. Called, it claims the slot for a delivery;
+ * `mayReportFailure()` asks whether this delivery's failure may be reported.
+ */
+type DeliveryCheck = (() => boolean) & { mayReportFailure: () => boolean };
+
+/**
  * PostgreSQL-specific realtime service.
  * Handles WebSocket connections and subscriptions for real-time row updates.
  *
@@ -414,15 +420,25 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      *
      * The last two are identity, not presence: the map has to still hold *this
      * exact object*, not merely something under this id.
+     *
+     * A failure goes through the same slot, by `mayReportFailure()`: an error
+     * frame from a stale, cancelled or replaced fetch would mark a view that
+     * already shows newer rows as failed, or fail another subscription's view.
+     * It also answers yes to the delivery that already claimed the slot, since
+     * that is the send itself failing (a row that will not serialise) after the
+     * check passed and before anything reached the subscriber.
      */
-    private beginDelivery(subscriptionId: string, subscription: Subscription): () => boolean {
+    private beginDelivery(subscriptionId: string, subscription: Subscription): DeliveryCheck {
         const seq = ++subscription.started;
-        return () => {
+        const canDeliver = () => {
             if (this._subscriptions.get(subscriptionId) !== subscription) return false;
             if (seq <= subscription.delivered) return false;
             subscription.delivered = seq;
             return true;
         };
+        const mayReportFailure = () =>
+            canDeliver() || (this._subscriptions.get(subscriptionId) === subscription && subscription.delivered === seq);
+        return Object.assign(canDeliver, { mayReportFailure });
     }
 
     // Add public method to register DataDriver subscriptions
@@ -626,6 +642,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     private async handleCollectionSubscription(clientId: string, request: RealTimeListenCollectionProps, authContext?: SubscriptionAuthContext) {
         const subscriptionId = request.subscriptionId;
+        // Out here so the `catch` can check it. It is claimed before the fetch
+        // starts, so a failed fetch always has one.
+        let canDeliver: DeliveryCheck | undefined;
 
         try {
             // Early validation: ensure the requested collection exists in the registry
@@ -731,7 +750,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // arriving in that window starts a refetch of its own — with nothing
             // ordering the two. Claim a slot first: this fetch is the oldest, so
             // if the refetch answers first, this one no longer delivers.
-            const canDeliver = this.beginDelivery(subscriptionId, subscription);
+            canDeliver = this.beginDelivery(subscriptionId, subscription);
 
             // Send initial data. Built from the request the subscription just
             // stored, so the first answer and every refetch after it cannot
@@ -750,13 +769,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
 
         } catch (error) {
-            const sanitized = sanitizeErrorForClient(error, request.path);
-            this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
+            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver);
         }
     }
 
     private async handleEntitySubscription(clientId: string, request: RealTimeListenEntityProps, authContext?: SubscriptionAuthContext) {
         const subscriptionId = request.subscriptionId;
+        // As in the collection case: claimed before the fetch, checked in the `catch`.
+        let canDeliver: DeliveryCheck | undefined;
 
         try {
             // Early validation: ensure the requested collection exists in the registry
@@ -784,7 +804,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Same race as the collection case: a write landing between the
             // registration above and this fetch starts a refetch that can answer
             // first, and this one must not overwrite it afterwards.
-            const canDeliver = this.beginDelivery(subscriptionId, subscription);
+            canDeliver = this.beginDelivery(subscriptionId, subscription);
 
             // Send initial data
             const row = await this.fetchEntityWithAuth(
@@ -798,9 +818,33 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
 
         } catch (error) {
-            const sanitized = sanitizeErrorForClient(error, request.path);
-            this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
+            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver);
         }
+    }
+
+    /**
+     * Answer a subscriber's failed fetch with an error frame, through the slot
+     * its rows would have used.
+     *
+     * The error is always logged (`sanitizeErrorForClient` does that), but the
+     * frame goes out only while this fetch holds the newest slot. A failed
+     * straggler used to send one regardless. The client routes errors by
+     * `subscriptionId`, so it called `onError` for a view already showing newer
+     * rows, or for the subscription that replaced this one under the same id.
+     *
+     * With no slot, the subscribe failed before its fetch began. That part runs
+     * synchronously, so nothing else can have answered the request yet.
+     */
+    private reportSocketFetchFailure(
+        clientId: string,
+        subscriptionId: string,
+        path: string,
+        error: unknown,
+        canDeliver: DeliveryCheck | undefined
+    ) {
+        const sanitized = sanitizeErrorForClient(error, path);
+        if (canDeliver && !canDeliver.mayReportFailure()) return;
+        this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
     }
 
     private async handleUnsubscribe(_clientId: string, subscriptionId: string) {
@@ -1003,8 +1047,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath, meta);
                 }
             } catch (error) {
-                const sanitized = sanitizeErrorForClient(error, notifyPath);
-                this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
+                this.reportSocketFetchFailure(subscription.clientId, subscriptionId, notifyPath, error, canDeliver);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
@@ -1312,8 +1355,7 @@ roles: ["anon"] };
                     this.sendSingleUpdate(subscription.clientId, subscriptionId, row || null);
                 }
             } catch (error) {
-                const sanitized = sanitizeErrorForClient(error, notifyPath);
-                this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
+                this.reportSocketFetchFailure(subscription.clientId, subscriptionId, notifyPath, error, canDeliver);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
