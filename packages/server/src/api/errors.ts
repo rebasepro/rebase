@@ -300,6 +300,75 @@ export interface RebaseApiError extends Error {
     details?: unknown;
 }
 
+/**
+ * The answer an error chose for itself, read the same way at every door.
+ *
+ * @see declaredErrorAnswer
+ */
+export interface DeclaredErrorAnswer {
+    /** The HTTP status the error carries. A socket frame has no slot for it. */
+    status: number;
+    code: string;
+    message: string;
+    details?: unknown;
+    /** See {@link ApiError.expected}: log it at debug, not warn. */
+    expected: boolean;
+}
+
+/**
+ * The status, code and message an error carries as its own answer — or
+ * `undefined` for an error that carries none, which is a server fault and gets
+ * masked.
+ *
+ * Two classes carry one. The server's `ApiError`, and `RebaseApiError` (or its
+ * `RebaseClientError` subclass) from `@rebasepro/types` once it has a status.
+ * The second is the browser-safe class: a `config/collections/*.ts` file is
+ * bundled into the admin SPA and cannot import this package, so it is what a
+ * collection callback throws, and what a callback refusal becomes —
+ * `callbackRefusal` returns one, and `toCallbackError` wraps anything thrown
+ * that does not already carry a status.
+ *
+ * One function because several doors turn an error into an answer: the REST
+ * error handler, the two WebSocket servers, and the Postgres realtime
+ * subscriptions. Each used to list the classes it recognised by hand. The
+ * sockets listed only `ApiError`, so a `beforeDelete` veto that REST
+ * answered as 400 `CALLBACK_REJECTED` with the author's message reached the
+ * admin panel — which writes through the socket — as `INTERNAL_ERROR`, and in
+ * production as "An unexpected error occurred".
+ *
+ * Matched by name as well as `instanceof`: a monorepo can resolve two copies of
+ * a package, and `instanceof` is false across them. Name matching is also why
+ * this file needs no runtime import of `@rebasepro/types`, which it may not
+ * have — it is in the graph of `@rebasepro/server/functions`.
+ */
+export function declaredErrorAnswer(error: unknown): DeclaredErrorAnswer | undefined {
+    if (error === null || typeof error !== "object") return undefined;
+    const e = error as { name?: unknown; message?: unknown; code?: unknown; details?: unknown; statusCode?: unknown; status?: unknown };
+
+    let status: number | undefined;
+    if (error instanceof ApiError || e.name === "ApiError") {
+        status = typeof e.statusCode === "number" ? e.statusCode : undefined;
+    } else if (typeof e.name === "string" && /^Rebase(Api|Client)Error$/.test(e.name)) {
+        // It spells its status `status`; `statusCode` wins when both are set.
+        status = typeof e.statusCode === "number" ? e.statusCode
+            : typeof e.status === "number" ? e.status
+                : undefined;
+        // Without a status it has not chosen an answer — `RebaseClientError`
+        // is also raised for plain logic errors — so it is not one here.
+        if (status === undefined) return undefined;
+    } else {
+        return undefined;
+    }
+
+    return {
+        status: status || 500,
+        code: typeof e.code === "string" && e.code ? e.code : "INTERNAL_ERROR",
+        message: typeof e.message === "string" ? e.message : String(e.message ?? ""),
+        ...(e.details !== undefined && { details: e.details }),
+        expected: error instanceof ApiError && error.expected
+    };
+}
+
 // `isRebaseApiError` was here. It read `return error instanceof Error`, so it
 // answered yes to every error while being named and used as though it
 // discriminated — the create and update handlers guarded a "classify this as
@@ -345,17 +414,6 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     const error: RebaseApiError = err;
     const reqId = typeof c.get === "function" ? c.get("requestId") : undefined;
 
-    // `RebaseApiError` from `@rebasepro/types` is the browser-safe error class,
-    // and the only one a `config/collections/*.ts` file can throw — that file is
-    // bundled into the admin SPA, so it may not import the server package. It
-    // spells its status `status` rather than `statusCode`, so normalize it here
-    // and one class then works from a collection callback, a custom function and
-    // the SDK alike.
-    //
-    // Matched by name rather than `instanceof`: a monorepo can resolve two
-    // copies of @rebasepro/types, and `instanceof` is false across them.
-    const isBrowserSafeError = /^Rebase(Api|Client)Error$/.test(error.name);
-
     /* A stale SDK, named on the errors it explains.
 
        400 and 404 only: those are what a renamed or removed field produces —
@@ -368,38 +426,34 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             ? schemaDriftCause(c.get("schemaDrift"))
             : undefined;
 
-    if (isBrowserSafeError && error.statusCode === undefined) {
-        const status = (error as { status?: unknown }).status;
-        if (typeof status === "number") error.statusCode = status;
-    }
-
-    if (error instanceof ApiError || error.name === "ApiError"
-        || (isBrowserSafeError && typeof error.statusCode === "number")) {
+    // An error that chose its own answer — `ApiError`, or the browser-safe
+    // `RebaseApiError` a collection callback throws. The same predicate the
+    // WebSocket servers use; see `declaredErrorAnswer`.
+    const answer = declaredErrorAnswer(error);
+    if (answer) {
         // Operational errors — log at warn, unless the error declares itself a
         // routine outcome (see ApiError.expected), which would otherwise put a
         // warning in the log for every anonymous page view.
-        const expected = error instanceof ApiError && error.expected;
-        handOffToRequestLog(c, error.code || "INTERNAL_ERROR", error.message);
+        handOffToRequestLog(c, answer.code, answer.message);
         if (!requestWillBeLogged(c)) {
-            const line = `[API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
+            const line = `[API] ${c.req.method} ${c.req.path} → ${answer.status} ${answer.code}: ${answer.message}` +
                 (reqId ? ` [${reqId}]` : "");
-            if (expected) {
+            if (answer.expected) {
                 logger.debug(line);
             } else {
                 logger.warn(`⚠️ ${line}`);
             }
         }
-        const apiErrorStatus = error.statusCode || 500;
-        const apiErrorDrift = driftFor(apiErrorStatus);
+        const apiErrorDrift = driftFor(answer.status);
         return c.json({
             error: {
-                message: error.message,
-                code: error.code || "INTERNAL_ERROR",
-                ...(error.details !== undefined && { details: error.details }),
+                message: answer.message,
+                code: answer.code,
+                ...(answer.details !== undefined && { details: answer.details }),
                 ...(reqId && { requestId: reqId }),
                 ...(apiErrorDrift && { cause: apiErrorDrift })
             }
-        } satisfies ErrorResponse, apiErrorStatus as ContentfulStatusCode);
+        } satisfies ErrorResponse, answer.status as ContentfulStatusCode);
     }
 
     let statusCode = error.statusCode || codeToStatus(error.code) || 500;

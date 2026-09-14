@@ -2622,6 +2622,47 @@ let a caller send an empty properties map and choose to be unvalidated. The
 collection has to come from the registry, by path. There is a test for it,
 because the mistake is invisible: everything works, and nothing is enforced.
 
+**The same class one layer out: the answer, not the check (2026-09-14).** A
+refusal is decided once, in the driver, and then each door has to turn it into a
+response. REST's error handler recognised two classes as errors that chose
+their own answer: the server's `ApiError`, and the browser-safe `RebaseApiError`
+that a collection file throws because it cannot import the server package. The
+two WebSocket catch blocks listed only `ApiError`. Every collection-callback veto
+is a `RebaseApiError` (`toCallbackError`, `callbackRefusal`), so REST answered
+400 `CALLBACK_REJECTED` with the author's message and `details.stage`, and the
+socket answered `INTERNAL_ERROR`, which production turns into "An unexpected
+error occurred". The veto still held. But the admin panel writes through the
+socket, so it reported the refusal as a server failure. Each door's list had
+been written by hand, and the socket's list stopped at the class that existed
+when it was written. The fix follows this class's rule: one exported predicate,
+`declaredErrorAnswer` in `@rebasepro/server`, which every door that turns an
+error into an answer now calls.
+
+**Sweep (2026-09-14)**, checking every place an error becomes a response:
+
+| door | result |
+|---|---|
+| REST `errorHandler` | clean. This was the reference, and it now calls `declaredErrorAnswer` instead of keeping its own inline copy. |
+| functions router | clean. It installs `errorHandler` itself. |
+| MCP tools | clean. They call REST over HTTP and pass the message on. |
+| Postgres socket, request frames (`SAVE`, `DELETE`, `FETCH_*`…) | **BUG**: it recognised `ApiError` only. Fixed. |
+| Mongo socket, request frames | **BUG**: same. Fixed. |
+| Postgres realtime subscriptions (`sanitizeErrorForClient`) | **BUG**: it read `statusCode`, and `RebaseApiError` spells it `status`, so a 403 thrown from `afterRead` arrived as "Could not load data … Check server logs" with no code. Fixed. It still hides 5xx messages, which is deliberately stricter than REST. |
+| Mongo realtime subscriptions | **OPEN**, and a different class: a failed fetch is logged and nothing is sent, so the subscriber is never told. |
+| socket error frame → SDK | **gap**: the client read only `message` and `code`, so `e.details` was always empty over the socket. Fixed: frames carry `details` and the client passes them on. `status` stays `undefined`, because a frame is not an HTTP response. |
+| in-process `rebase.data` | n/a: nothing is translated, so the caller gets the `RebaseApiError` itself. |
+
+Gates: `test/e2e/socket-callback-refusal-e2e.test.ts` (server-postgres) and
+`test/websocket-callback-refusal.test.ts` (server-mongo) send real vetoes
+through a real socket under `NODE_ENV=production`: all four hooks on Postgres,
+and `beforeSave` and `beforeDelete` on Mongo, which are the ones its driver
+converts. The Postgres file also checks that a real fault stays masked. Thirteen
+mutations each turned a test red. They covered the sockets falling back to
+`ApiError` only or dropping `details`, the predicate losing `RebaseApiError`,
+answering every error, or answering one with no status, REST skipping the
+predicate, the subscription path reading only `statusCode`, and the client
+dropping `details`.
+
 ### Creating a user: the hook's report, read on one door — 2026-09-14
 
 A create hook (the collection's `auth.onCreateUser` or the backend's

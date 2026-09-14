@@ -2,7 +2,7 @@ import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, Save
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, ApiError } from "@rebasepro/server";
+import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, declaredErrorAnswer } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
@@ -428,13 +428,19 @@ roles: session.user.roles ?? [] } : undefined;
             } catch (error: unknown) {
                 // A refused write keeps its message: it is the only thing that
                 // tells the caller what to send instead, and the generic branch
-                // below drops it in production.
-                if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
-                    const apiError = error as ApiError;
+                // below drops it in production. "Refused" is whatever REST
+                // answers with the error's own status — `ApiError`, and the
+                // `RebaseApiError` every collection-callback veto is — by the
+                // same predicate, so the two cannot list different classes.
+                const answer = declaredErrorAnswer(error);
+                if (answer) {
                     ws.send(JSON.stringify({ type: "ERROR",
 requestId,
-payload: { error: { message: apiError.message,
-code: apiError.code } } }));
+payload: { error: {
+    message: answer.message,
+    code: answer.code,
+    ...(answer.details !== undefined && { details: answer.details })
+} } }));
                     return;
                 }
                 const errorMessage = process.env.NODE_ENV === "production" ? "An unexpected error occurred" : (error instanceof Error ? error.message : "An unexpected error occurred");

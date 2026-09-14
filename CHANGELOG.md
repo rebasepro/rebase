@@ -46,6 +46,28 @@
   release that sets `ingress.maxBodySize` itself keeps its value. If yours is
   below `50m`, raise it.
 
+- **A collection-callback veto over the WebSocket is reported as a veto.** A
+  `beforeSave`, `afterSave`, `beforeDelete` or `afterDelete` that throws, or a
+  `beforeDelete` that returns `false`, is answered over REST as a 400 (403 for
+  `false`) with code `CALLBACK_REJECTED`, the author's message, and
+  `details.stage` naming the hook. Both WebSocket servers answered the same
+  refusal as `INTERNAL_ERROR`, and in production replaced the message with "An
+  unexpected error occurred". The admin panel writes through the socket, so an
+  editor whose save or delete a rule refused was told the server had failed,
+  and never saw the rule's message. The row was still protected. Only the
+  answer was wrong.
+
+  The socket now answers with the refusal's own code, message and `details`,
+  as REST does. The same applies to any `RebaseApiError` that carries a status.
+  Realtime subscriptions on Postgres had the same gap: a `RebaseApiError` 4xx
+  thrown from `afterRead` arrived as "Could not load data … Check server logs".
+  It now keeps its code and message. The client passes a frame's `details` on
+  to the `RebaseApiError` it throws, so `e.details.stage` works over both
+  transports. `e.status` stays `undefined` for a socket error, because a frame
+  is not an HTTP response. Real server faults are still masked in production.
+  REST and both sockets now decide what counts as a refusal through one
+  function, `declaredErrorAnswer` from `@rebasepro/server`.
+
 - **Scheduled backups include your users again, and can be restored.**
   `createBackupCron` left the `rebase` schema out of every dump unless told
   otherwise. The aim was to skip Atlas's revision table, but that schema also

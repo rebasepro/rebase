@@ -51,6 +51,28 @@ description: Every released change to Rebase — new features, fixes, and the br
   release that sets `ingress.maxBodySize` itself keeps its value. If yours is
   below `50m`, raise it.
 
+- **A collection-callback veto over the WebSocket is reported as a veto.** A
+  `beforeSave`, `afterSave`, `beforeDelete` or `afterDelete` that throws, or a
+  `beforeDelete` that returns `false`, is answered over REST as a 400 (403 for
+  `false`) with code `CALLBACK_REJECTED`, the author's message, and
+  `details.stage` naming the hook. Both WebSocket servers answered the same
+  refusal as `INTERNAL_ERROR`, and in production replaced the message with "An
+  unexpected error occurred". The admin panel writes through the socket, so an
+  editor whose save or delete a rule refused was told the server had failed,
+  and never saw the rule's message. The row was still protected. Only the
+  answer was wrong.
+
+  The socket now answers with the refusal's own code, message and `details`,
+  as REST does. The same applies to any `RebaseApiError` that carries a status.
+  Realtime subscriptions on Postgres had the same gap: a `RebaseApiError` 4xx
+  thrown from `afterRead` arrived as "Could not load data … Check server logs".
+  It now keeps its code and message. The client passes a frame's `details` on
+  to the `RebaseApiError` it throws, so `e.details.stage` works over both
+  transports. `e.status` stays `undefined` for a socket error, because a frame
+  is not an HTTP response. Real server faults are still masked in production.
+  REST and both sockets now decide what counts as a refusal through one
+  function, `declaredErrorAnswer` from `@rebasepro/server`.
+
 - **Scheduled backups include your users again, and can be restored.**
   `createBackupCron` left the `rebase` schema out of every dump unless told
   otherwise. The aim was to skip Atlas's revision table, but that schema also
@@ -117,6 +139,29 @@ description: Every released change to Rebase — new features, fixes, and the br
   around it.
 
 ### Security
+
+- **The MongoDB realtime socket could read and write the auth store.** MongoDB
+  has no row-level security, so on that engine the collection registry is the
+  whole access model: a `securityRule` is enforced only for a collection the
+  registry resolves, and `MongoDataService` maps any path to a physical
+  collection by name. The realtime socket forwarded `FETCH_COLLECTION`,
+  `FETCH_ONE`, `SAVE`, `DELETE`, `COUNT`, `CHECK_UNIQUE_FIELD` and the
+  `subscribe_*` frames to the driver without asking whether the path named a
+  registered data collection. For a path the registry did not know,
+  `AuthenticatedMongoDriver` resolved the collection to `undefined` and every
+  rule check short-circuits open there — `authorize(undefined)` returns `true`
+  and the query filter becomes "match all". So any authenticated client (or,
+  when `requireAuth` is off, any anonymous one) could name the auth collections
+  as the path and read `rebase_users` including password hashes, grant itself an
+  admin role by writing `rebase_user_roles`, overwrite another account's
+  password hash, or delete refresh tokens — on the one engine where nothing
+  behind the driver would stop it. The REST routes were never exposed: they
+  mount per registered slug and 404 everything else.
+
+  The socket now refuses, fail-closed, any frame whose path the registry does
+  not resolve, on every data verb and both subscribe types, with a `NOT_FOUND`
+  naming the path — the same answer REST gives an unknown collection. Registered
+  collections are unaffected, and their row security is unchanged.
 
 - **A delete over the WebSocket wrote its own audit record, and could get past
   a `beforeDelete` veto.** `DeleteProps` carried `row.values`, and both server
