@@ -11,6 +11,7 @@ import {
     iconSize,
     IconButton,
     RefreshCwIcon,
+    Tooltip,
     Typography
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
@@ -32,6 +33,14 @@ function formatDate(iso: string | undefined): string {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return "—";
     return d.toLocaleString();
+}
+
+/**
+ * The name the roles sidecar is saved under: the dump's, with the suffix
+ * `rebase db restore` looks for beside it.
+ */
+function rolesFileName(dumpName: string): string {
+    return dumpName.replace(/\.dump$/, "") + ".globals.sql";
 }
 
 export function BackupsView() {
@@ -80,16 +89,16 @@ export function BackupsView() {
         load();
     }, [load]);
 
-    const handleDownload = async (backup: BackupInfo) => {
+    const handleDownload = async (key: string, fileName: string) => {
         const c = clientRef.current;
         if (!c?.backups) return;
-        setDownloading(backup.key);
+        setDownloading(key);
         try {
-            const blob = await c.backups.download(backup.key);
+            const blob = await c.backups.download(key);
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = backup.name;
+            a.download = fileName;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -173,31 +182,55 @@ export function BackupsView() {
                     </div>
                 ) : (
                     <div className="space-y-2 max-w-3xl">
-                        {backups.map(backup => (
-                            <div
-                                key={backup.key}
-                                className={cls("flex items-center gap-3 px-4 py-3 rounded-lg border bg-surface-card", defaultBorderMixin)}
-                            >
-                                <DatabaseIcon size={iconSize.small} className="text-surface-400 shrink-0"/>
-                                <div className="flex-1 min-w-0">
-                                    <Typography variant="body2" className="truncate font-medium font-mono text-[12px]">{backup.name}</Typography>
-                                    <Typography variant="caption" color="secondary" className="text-[11px]">
-                                        {formatDate(backup.createdAt)} · {formatSize(backup.sizeBytes)}
-                                    </Typography>
-                                </div>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleDownload(backup)}
-                                    disabled={downloading === backup.key}
-                                    startIcon={downloading === backup.key
-                                        ? <CircularProgress size="smallest"/>
-                                        : <DownloadIcon size={iconSize.smallest}/>}
+                        {backups.map(backup => {
+                            // The roles sidecar travels with the dump: a restore
+                            // into a new Postgres needs both files.
+                            const globalsKey = backup.globalsKey;
+                            return (
+                                <div
+                                    key={backup.key}
+                                    className={cls("flex items-center gap-3 px-4 py-3 rounded-lg border bg-surface-card", defaultBorderMixin)}
                                 >
-                                    {downloading === backup.key ? t("studio_backups_downloading") : t("download")}
-                                </Button>
-                            </div>
-                        ))}
+                                    <DatabaseIcon size={iconSize.small} className="text-surface-400 shrink-0"/>
+                                    <div className="flex-1 min-w-0">
+                                        <Typography variant="body2" className="truncate font-medium font-mono text-[12px]">{backup.name}</Typography>
+                                        <Typography variant="caption" color="secondary" className="text-[11px]">
+                                            {formatDate(backup.createdAt)} · {formatSize(backup.sizeBytes)}
+                                        </Typography>
+                                    </div>
+                                    {globalsKey ? (
+                                        <Tooltip title={t("studio_backups_roles_file_hint")}>
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                onClick={() => handleDownload(globalsKey, rolesFileName(backup.name))}
+                                                disabled={downloading === globalsKey}
+                                                startIcon={downloading === globalsKey
+                                                    ? <CircularProgress size="smallest"/>
+                                                    : <DownloadIcon size={iconSize.smallest}/>}
+                                            >
+                                                {downloading === globalsKey ? t("studio_backups_downloading") : t("studio_backups_roles_file")}
+                                            </Button>
+                                        </Tooltip>
+                                    ) : (
+                                        <Tooltip title={t("studio_backups_no_roles_file_hint")}>
+                                            <Chip size="smallest" colorScheme="orangeDarker">{t("studio_backups_no_roles_file")}</Chip>
+                                        </Tooltip>
+                                    )}
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => handleDownload(backup.key, backup.name)}
+                                        disabled={downloading === backup.key}
+                                        startIcon={downloading === backup.key
+                                            ? <CircularProgress size="smallest"/>
+                                            : <DownloadIcon size={iconSize.smallest}/>}
+                                    >
+                                        {downloading === backup.key ? t("studio_backups_downloading") : t("download")}
+                                    </Button>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>

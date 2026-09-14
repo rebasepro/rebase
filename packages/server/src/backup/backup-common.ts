@@ -43,8 +43,31 @@ export function parseBackupTimestamp(fileName: string): Date | null {
 }
 
 /**
+ * A backup is two files: the `.dump`, and beside it a `.globals.sql` holding
+ * the cluster roles the dump's GRANTs and RLS policies name. Without that
+ * sidecar a restore into a fresh cluster stops at the first GRANT to a role
+ * that does not exist there. The CLI uploads, restores and prunes the two as
+ * a pair. This listing used to know only the `.dump`, so a backup downloaded
+ * from Studio arrived without its roles.
+ *
+ * The suffix mirrors `globalsFileForDump` in `@rebasepro/server-postgres`.
+ */
+const DUMP_SUFFIX = ".dump";
+const GLOBALS_SUFFIX = ".globals.sql";
+
+function globalsKeyFor(dumpKey: string): string {
+    return dumpKey.slice(0, -DUMP_SUFFIX.length) + GLOBALS_SUFFIX;
+}
+
+/** The only files the download route will serve. */
+function isBackupFile(key: string): boolean {
+    return key.endsWith(DUMP_SUFFIX) || key.endsWith(GLOBALS_SUFFIX);
+}
+
+/**
  * List the backups at a destination as {@link BackupInfo}, newest first.
- * Only `.dump` files are considered.
+ * One entry per `.dump`, with its `.globals.sql` sidecar attached as
+ * `globalsKey` when there is one.
  */
 export async function listBackupObjects(
     dest: BackupDestination,
@@ -55,19 +78,22 @@ export async function listBackupObjects(
         const stat = fs.statSync(dest.path);
         const dir = stat.isDirectory() ? dest.path : path.dirname(dest.path);
         if (!fs.existsSync(dir)) return [];
-        return fs
-            .readdirSync(dir)
-            .filter((f) => f.endsWith(".dump"))
+        const files = fs.readdirSync(dir);
+        const present = new Set(files);
+        return files
+            .filter((f) => f.endsWith(DUMP_SUFFIX))
             .map((f): BackupInfo => {
                 const full = path.join(dir, f);
                 const st = fs.statSync(full);
                 const createdAt = parseBackupTimestamp(f) ?? st.mtime;
+                const globals = globalsKeyFor(f);
                 return {
                     key: full,
                     name: f,
                     sizeBytes: st.size,
                     createdAt: createdAt.toISOString(),
-                    destinationKind: "local"
+                    destinationKind: "local",
+                    ...(present.has(globals) ? { globalsKey: path.join(dir, globals) } : {})
                 };
             })
             .sort(byNewest);
@@ -78,16 +104,19 @@ export async function listBackupObjects(
         bucket: dest.bucket,
         maxResults: 1000
     });
-    return result.items
-        .map((item) => item.fullPath)
-        .filter((key) => key.endsWith(".dump"))
+    const keys = result.items.map((item) => item.fullPath);
+    const present = new Set(keys);
+    return keys
+        .filter((key) => key.endsWith(DUMP_SUFFIX))
         .map((key): BackupInfo => {
             const createdAt = parseBackupTimestamp(key);
+            const globals = globalsKeyFor(key);
             return {
                 key,
                 name: key.split("/").pop() || key,
                 createdAt: createdAt ? createdAt.toISOString() : undefined,
-                destinationKind: dest.kind as BackupDestinationKind
+                destinationKind: dest.kind as BackupDestinationKind,
+                ...(present.has(globals) ? { globalsKey: globals } : {})
             };
         })
         .sort(byNewest);
@@ -110,8 +139,8 @@ export async function readBackupBytes(
         const dir = stat?.isDirectory() ? dest.path : path.dirname(dest.path);
         const resolvedDir = path.resolve(dir);
         const resolved = path.resolve(key);
-        // Only allow reads inside the backup directory, and only .dump files.
-        if (!resolved.startsWith(resolvedDir + path.sep) || !resolved.endsWith(".dump")) {
+        // Only allow reads inside the backup directory, and only backup files.
+        if (!resolved.startsWith(resolvedDir + path.sep) || !isBackupFile(resolved)) {
             return null;
         }
         if (!fs.existsSync(resolved)) return null;
@@ -119,7 +148,7 @@ export async function readBackupBytes(
     }
 
     if (!storage) return null;
-    if (!key.endsWith(".dump")) return null;
+    if (!isBackupFile(key)) return null;
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
     return { bytes: new Uint8Array(await file.arrayBuffer()), name: key.split("/").pop() || key };

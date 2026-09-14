@@ -36,7 +36,11 @@ export interface BackupCronConfig {
     retentionDays?: number;
     /** Always keep at least this many recent backups regardless of age. */
     keepMinimum?: number;
-    /** Schemas to exclude from the dump (defaults to Atlas revision schema). */
+    /**
+     * Schemas to exclude from the dump. Defaults to none, the same as
+     * `rebase db backup` — see {@link createBackupCron} for why `rebase` in
+     * particular must stay in.
+     */
     excludeSchemas?: string[];
     /** Cron job display name. */
     name?: string;
@@ -112,10 +116,32 @@ function parseOptionalInt(value: string | undefined): number | null | "invalid" 
  * Create a {@link CronJobDefinition} that dumps the database, uploads the
  * result to the configured destination, and prunes old backups. Object
  * destinations require {@link BackupCronConfig.storage}.
+ *
+ * The dump excludes nothing unless `excludeSchemas` says otherwise, and that
+ * default is not this function's to set: the option goes to `createDump`
+ * untouched, so `buildPgDumpArgs` decides for the cron and `rebase db backup`
+ * alike. The cron used to carry its own default of `["rebase"]`, meant to
+ * leave out Atlas's revision table, and it left out a lot more. `rebase` is
+ * where the framework keeps
+ * everything that is not a collection: the auth tables (`users`, identities,
+ * refresh tokens, MFA factors, recovery codes, `app_config`, `schema_meta`),
+ * API keys, record history, the job queue, cron logs, channel history,
+ * branches and idempotency keys. It also holds the functions that every
+ * generated RLS policy and CDC trigger calls (`rebase.uid()`,
+ * `rebase.roles()`, `rebase.rebase_cdc_notify()`).
+ *
+ * None of that can be left for boot to rebuild. Boot recreates the tables
+ * and functions, but never the rows in them. And a dump that has a policy
+ * or trigger on a `public` table without the function it calls cannot be
+ * restored into an empty database: `pg_restore --exit-on-error` stops at
+ * the first such statement, and every collection's generated policies call
+ * `rebase.uid()`. So every scheduled backup lost every user account, and
+ * could not be restored anyway, while `rebase db backup` took a complete
+ * one. The revision table belongs in a backup too: without it, a restored
+ * database has tables but no record of the migrations that made them.
  */
 export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
     const dbName = parseDbNameFromUrl(config.connectionString) ?? "database";
-    const excludeSchemas = config.excludeSchemas ?? ["rebase"];
 
     return {
         name: config.name ?? "Scheduled database backup",
@@ -141,7 +167,7 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
                 connectionString: config.connectionString,
                 dbName,
                 outDir,
-                excludeSchemas
+                excludeSchemas: config.excludeSchemas
             });
             log(`Dump created: ${dump.fileName} (${formatBytes(dump.sizeBytes)})`);
 
