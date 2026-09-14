@@ -521,7 +521,7 @@ jobs:
       #
       # This suite was written to be deterministic (pinned API port, adopt-or-
       # start detection, teardown that reaps only servers it owns) and then ran
-      # in no pipeline — AUDIT-2026-07-28 finding A left it open because nobody
+      # in no pipeline — the 2026-07-28 audit left it open because nobody
       # had watched an unattended run. It has now been run repeatedly, in CI mode
       # with a cold server boot, against both a fresh database and a populated
       # one: green each time. It has grown since — 36 tests, ~1.4m — as the

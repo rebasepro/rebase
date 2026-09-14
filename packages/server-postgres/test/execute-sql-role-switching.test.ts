@@ -170,7 +170,7 @@ describe("effectiveSqlRole", () => {
 
     it("only honours the exact string \"true\"", () => {
         // `=1` doing nothing is a known finding across the whole env surface
-        // (docs/audits/80-config-and-env.md); pinned here so this variable is
+        // (no shared boolean env parser yet); pinned here so this variable is
         // not quietly fixed alone and left disagreeing with the rest.
         process.env.DISABLE_DB_ROLE_SWITCHING = "1";
         expect(isRoleSwitchingOptedOut()).toBe(false);

@@ -6,10 +6,10 @@ the directory that matches how it should be read later.
 | | What it is | How to read it |
 | --- | --- | --- |
 | `docs/*.md` | **Reference.** How something works *now*. | Trust it. If it is wrong, fix it. |
-| `docs/audits/` | **Point-in-time findings.** Dated, and true as of that date. | Historical. Do not "fix" one; write a new one. |
+| `docs/audits/` | **Point-in-time findings** that still describe something open. Dated, and true as of that date. | Do not "fix" one; write a new one. A write-up whose findings are all closed is retired. |
 
-`audits/audit-map.md` is the register of what is worth auditing on its own, and
-the numbered files (`01-`…) are the sittings it has produced so far.
+`audits/audit-map.md` is the register of what is worth auditing on its own. The
+numbered files still here are the sittings whose findings are not all closed.
 
 Two constraints worth knowing before moving anything in here:
 

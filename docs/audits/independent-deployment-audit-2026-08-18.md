@@ -1,10 +1,10 @@
 # Independent deployment — where we stand
 
 Status: **audit**, 2026-08-18. No code changed.
-Supersedes the reachability tables in
-[deployment-placement-audit-2026-08-17.md](deployment-placement-audit-2026-08-17.md),
-which is one day old and already stale in two places (O8 and O9 both closed the
-same day). Read that one for the *reasoning*; read this one for the *state*.
+Supersedes the reachability tables of the 2026-08-17 deployment-placement
+audit, which was one day old and already stale in two places (O8 and O9 both
+closed the same day). That audit was retired on 2026-09-14; its two open
+decisions besides D3 are carried in G8 below.
 
 Scope: `packages/server` boot/roles/surfaces, `packages/cli` build & deploy,
 `infra/charts/rebase`, `docker/`, and `saas/backend/src/{k8s,managed,static,front-door}`.
@@ -237,6 +237,12 @@ Whole-object apply (server-side apply with field managers) versus the
 reconciler's deliberate per-field patching. Unmade. It is the price of sharing
 chart templates between self-host and platform, and it does not dissolve by
 choosing Helm. Everything in §1 rows 7–9 waits behind it.
+
+Two more decisions from the 2026-08-17 placement audit are also still unmade:
+**D4** — for a customer's own cluster (BYOC), does the platform push manifests or
+does an agent in the cluster pull them, and are secrets passed by reference rather
+than by value; and **D6** — who owns per-unit scale, the customer's dials or the
+platform's reconciler.
 
 ### G9 — Small and stale
 

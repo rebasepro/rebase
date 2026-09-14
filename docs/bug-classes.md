@@ -2142,10 +2142,11 @@ absence from a codebase that walks user data is the class.
 
 ### Last sweep — 2026-08-08, twenty-seven units
 
-An audit register (`docs/audit-map.md`) naming the units worth auditing on their
-own, and 27 written reports in `docs/audits/`, each recording what was checked
-and found clean alongside the findings. The rows below are the ones that named a
-new class or overturned an old verdict; the reports carry the rest.
+An audit register (`docs/audits/audit-map.md`) naming the units worth auditing on
+their own, and 27 written reports, each recording what was checked and found
+clean alongside the findings. The rows below are the ones that named a new class
+or overturned an old verdict. The reports whose findings were all closed have
+since been retired from the repository (2026-09-14).
 
 | checked | result |
 |---|---|

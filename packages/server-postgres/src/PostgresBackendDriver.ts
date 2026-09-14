@@ -60,8 +60,8 @@ import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-t
  * without it — every other route now refuses.
  *
  * Exact `"true"` on purpose, matching the check this replaced. `=1` and `=yes`
- * silently do nothing, which `docs/audits/80-config-and-env.md` already records
- * as a finding across the env surface; fixing it here alone would make this one
+ * silently do nothing — a known finding across the whole env surface, which has
+ * no shared boolean parser yet; fixing it here alone would make this one
  * variable disagree with the rest.
  */
 export function isRoleSwitchingOptedOut(): boolean {

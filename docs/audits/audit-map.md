@@ -11,55 +11,17 @@ Status legend:
 - **partial** — covered incidentally inside a broader audit or sweep, never on its own.
 - **never** — no dedicated pass.
 
-Forty-six units now have a dedicated write-up in [audits/](../audits/), one file per entry,
-numbered to match. Those marks were reconciled on 2026-08-09: the register had been
-left saying `partial` or `never` for units whose write-up was already sitting next to
-it — entry 3 read **never** against a fourteen-finding audit of write validation — so
-it described the repo as far less audited than it is. **A `done` mark means the pass
-happened, not that the findings are closed.** What is still open is below.
+A `done` mark means the pass happened, not that its findings are closed.
 
-Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](AUDIT-2026-07-28.md),
-[AUDIT-storage-2026-08-07.md](AUDIT-storage-2026-08-07.md),
-[api-surface-audit-2026-08-05.md](api-surface-audit-2026-08-05.md),
-[dx-audit-2026-07-25.md](dx-audit-2026-07-25.md),
-[dx-audit-2026-08-09.md](dx-audit-2026-08-09.md),
-[sdk-generation-audit-2026-08-08.md](sdk-generation-audit-2026-08-08.md),
-[type-placement-audit-2026-07-28.md](type-placement-audit-2026-07-28.md),
-`saas/SWEEP-2026-08-07.md` (the private control-plane repository, not in this
-clone), and the sweep log in
-[bug-classes.md](../bug-classes.md).
-
----
-
-## Verification pass — 2026-08-09/10
-
-The write-ups state the code as it was on the day of the pass. Most of what they
-found was closed by the `sweep/2026-08-08` fix branches, which map one-to-one onto
-the units below. Re-checking the severity-coded findings against `main`:
-**all 4 Criticals are fixed**, and of the 29 Highs checked, 26 were already fixed.
-
-The three that were not are **now fixed** (2026-08-10):
-
-1. ~~Anonymous sign-in ignores `disableSelfRegistration`~~ (unit 18, H4) — an
-   opt-in `allowAnonymous` key now gates both `/auth/anonymous` and
-   `/auth/anonymous/link` through `registration-policy.ts`, `disableSelfRegistration`
-   overrides it, and `getCapabilities()` reports `anonymousLogin`.
-   The audit's second half is **still open**: nothing downstream reads `isAnonymous`,
-   so an anonymous user holds the same `defaultRole` as a registered one and no
-   policy can say otherwise. That needs `is_anonymous` in the RLS-visible identity.
-2. ~~Storage has no rate limiter at all~~ (unit 24, H2) — the storage router now
-   shares the data/functions limiter and store. **Still open:** storage's cost is
-   bytes rather than requests, so a bytes-per-window bound per bucket is the honest
-   control; the request limiter is only the floor.
-3. ~~`checkPolicyDrift` never checks whether RLS is on~~ (unit 17, H3) — added an
-   `rlsDisabled` category from `pg_class.relrowsecurity` and PERMISSIVE/RESTRICTIVE
-   comparison from `pg_policies.permissive`. **Still open:** the audit's point (c),
-   that a body rewritten to `USING (true)` under an unchanged name still passes,
-   which needs `rls-check`'s `policy-always-true` ported in.
-
-**Coverage caveat:** 64 of the 93 High findings have not been re-checked against
-current code, so their write-ups' verdicts still stand unverified. Mediums and Lows
-were not re-checked at all. Absence from this list is not evidence of a fix.
+**Where the write-ups are.** On 2026-09-14 every finding in them was re-checked
+against the code. Four still describe open High findings, so they stay here and
+are linked from their entries: [06](06-history-and-audit-log.md),
+[15](15-backups-and-pitr.md), [17](17-rls-drift-and-scanning.md) and
+[34](34-offline-sync.md), plus the
+[independent-deployment audit](independent-deployment-audit-2026-08-18.md).
+The other fifty were retired from this repository; what they still had open is
+tracked by the maintainers outside it, re-verified item by item. Their fixes land in [bug-classes.md](../bug-classes.md)'s
+sweep log and the changelog as usual.
 
 ---
 
@@ -70,25 +32,25 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
    Every operator, on every property type, end to end: does the parser accept what the
    builder emits, does the REST layer forward every parsed param, does an unsupported
    operator 400 rather than silently widen? Prior hits: dropped params, unsorted
-   `orderBy` returning 200. **done 2026-08-09** — see [audits/01-query-parser-contract.md](01-query-parser-contract.md).
+   `orderBy` returning 200. **done 2026-08-09**.
 2. **REST API generator + route surface** — `api/rest/api-generator.ts`, `index.ts`.
    Route-by-route: auth gate present, RLS scope bound, error envelope shape, status
-   codes, pagination/count semantics. **done 2026-08-09** — see [audits/02-rest-route-surface.md](02-rest-route-surface.md).
+   codes, pagination/count semantics. **done 2026-08-09**.
 3. **Write validation & coercion** — `api/rest/write-validation.ts`, `data-transformer.ts`.
    Type coercion per property type, rejection vs. clamping (bug class 23), nested/relation
-   write shapes, unknown-key handling. **done 2026-08-08** — see [audits/03-write-validation.md](03-write-validation.md).
+   write shapes, unknown-key handling. **done 2026-08-08**.
 4. **Idempotency** — `api/rest/idempotency.ts`. Key scope, replay window, storage,
-   concurrent-duplicate behaviour, what happens on a partial failure. **done 2026-08-08** — see [audits/04-idempotency.md](04-idempotency.md).
+   concurrent-duplicate behaviour, what happens on a partial failure. **done 2026-08-08**.
 5. **Relations & junctions** — `server-postgres/src/collections/validate-relations.ts`,
    FK naming, m2m junction generation. Read shape vs. write shape asymmetry, irregular
-   plurals, cascade behaviour, orphan rows. **done 2026-08-09** — see [audits/05-relations-and-junctions.md](05-relations-and-junctions.md).
+   plurals, cascade behaviour, orphan rows. **done 2026-08-09**.
 6. **History / audit log** — `server/src/history/`, `server-postgres/src/history/`.
    Who can read it, what it records, whether it leaks columns RLS would hide. One RLS
    bypass already found here — the sibling routes were never swept. **done 2026-08-09** — see [audits/06-history-and-audit-log.md](06-history-and-audit-log.md).
 7. **Search & vector search** — `schema/search-column.ts`, `client/src/vector-search-query.test.ts`.
-   Generated-column immutability, ranking, injection surface, index maintenance. **done 2026-08-08** — see [audits/07-search-and-vector.md](07-search-and-vector.md).
+   Generated-column immutability, ranking, injection surface, index maintenance. **done 2026-08-08**.
 8. **OpenAPI generator** — `api/openapi-generator.ts`. Does the emitted spec match the
-   routes that actually exist, including auth and error responses? **done 2026-08-08** — see [audits/08-openapi-generator.md](08-openapi-generator.md).
+   routes that actually exist, including auth and error responses? **done 2026-08-08**.
 
 ## B. Schema & migrations
 
@@ -103,13 +65,13 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 12. **Boot-time schema ensure** — `boot/ddl-bootstrap.ts`, `ensure-collection-schema.ts`,
     `schema/ensure-collection-tables.ts`, `ensure-collection-policies.ts`.
     Concurrency (CREATE IF NOT EXISTS races), the six early-return gates, upgrade paths
-    from an older stamped schema. **done 2026-08-09** — see [audits/12-boot-schema-ensure.md](12-boot-schema-ensure.md).
+    from an older stamped schema. **done 2026-08-09**.
 13. **Upgrade / version-skew path** — `boot/version-skew.ts`, `schema-version.ts`,
     `tooling/scripts/record-schema-snapshot.mts`, upgrade-e2e. Every N→N+1 boot from a real
-    snapshot; the FK-rename brick is open. **done 2026-08-09** — see [audits/13-upgrade-and-version-skew.md](13-upgrade-and-version-skew.md).
+    snapshot. **done 2026-08-09**.
 14. **Doctor** — `schema/doctor.ts`, `doctor-cli.ts`, `cli/src/commands/doctor.ts`.
     Does each diagnostic fire on a real broken DB, and is its remediation text correct
-    (bug class 5)? **done 2026-08-08** — see [audits/14-doctor.md](14-doctor.md).
+    (bug class 5)? **done 2026-08-08**.
 15. **Backups & PITR** — `server/src/backup/`, `server-postgres/src/backup/`, `docs/backups.md`.
     Restore actually restores; exclude lists fail closed; PITR cutover. **done 2026-08-09** — see [audits/15-backups-and-pitr.md](15-backups-and-pitr.md).
 
@@ -117,31 +79,31 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 
 16. **RLS policy generation** — `security/rls-enforcement.ts`, `rls-bootstrap-sql.ts`,
     `sqlToPolicy`. Predicate hoisting, unqualified columns binding to the wrong table,
-    hashed/injected names, derived junction policies. **done 2026-08-09** — see [audits/16-rls-policy-generation.md](16-rls-policy-generation.md).
+    hashed/injected names, derived junction policies. **done 2026-08-09**.
 17. **RLS drift & scanning** — `policy-drift.ts`, `packages/rls-check`, `tooling/scripts/rls-scan.mts`,
     `rls-baseline.json`. Does the scanner catch what it claims — and what class of hole is
     invisible to it? **done 2026-08-09** — see [audits/17-rls-drift-and-scanning.md](17-rls-drift-and-scanning.md).
 18. **Auth core** — `server/src/auth/routes.ts`, `middleware.ts`, `require-auth.ts`,
     `session-routes.ts`, `jwt.ts`, `password.ts`, `bearer-token.ts`, `cookie-utils.ts`.
-    Token lifetime, refresh rotation/reuse detection, cookie flags, session revocation. **done 2026-08-09** — see [audits/18-auth-core.md](18-auth-core.md).
+    Token lifetime, refresh rotation/reuse detection, cookie flags, session revocation. **done 2026-08-09**.
 19. **OAuth providers** — 12 provider files (`google-`, `github-`, `apple-`, `microsoft-`,
     `facebook-`, `twitter-`, `linkedin-`, `gitlab-`, `bitbucket-`, `discord-`, `slack-`,
     `spotify-oauth.ts`). One audit, twelve implementations of the same predicate
-    (bug class 2): state/PKCE, redirect-URI validation, account-linking, email-verified trust. **done 2026-08-08** — see [audits/19-oauth-providers.md](19-oauth-providers.md).
+    (bug class 2): state/PKCE, redirect-URI validation, account-linking, email-verified trust. **done 2026-08-08**.
 20. **MFA** — `mfa.ts`, `mfa-crypto.ts`, `mfa-routes.ts`. Enrolment, recovery codes,
-    rate limiting, downgrade-to-password bypass. **done 2026-08-08** — see [audits/20-mfa.md](20-mfa.md).
+    rate limiting, downgrade-to-password bypass. **done 2026-08-08**.
 21. **Magic links & password reset** — `magic-link-routes.ts`, `reset-password-admin.ts`.
-    Token entropy/expiry/single-use, enumeration, the invite-sends-a-reset class. **done 2026-08-09** — see [audits/21-magic-links-and-reset.md](21-magic-links-and-reset.md).
+    Token entropy/expiry/single-use, enumeration, the invite-sends-a-reset class. **done 2026-08-09**.
 22. **Users, roles & admin ops** — `admin-roles-route.ts`, `admin-user-ops.ts`,
     `admin-users-route.ts`, `registration-policy.ts`, `rls-scope.ts`, bootstrap exception.
-    Privilege escalation, self-role-grant, the empty-table first-admin path. **done 2026-08-09** — see [audits/22-users-roles-admin-ops.md](22-users-roles-admin-ops.md).
+    Privilege escalation, self-role-grant, the empty-table first-admin path. **done 2026-08-09**.
 23. **API keys** — `auth/api-keys/*` (6 files). Double gating (permission list + RLS),
-    key storage/rotation/revocation, `access: "public"` semantics. **done 2026-08-09** — see [audits/23-api-keys.md](23-api-keys.md).
+    key storage/rotation/revocation, `access: "public"` semantics. **done 2026-08-09**.
 24. **Rate limiting** — `rate-limiter.ts`, `rate-limit-store.ts`. Header-spoofed client
-    identity (X-Real-IP class), per-route coverage, multi-instance correctness. **done 2026-08-09** — see [audits/24-rate-limiting.md](24-rate-limiting.md).
+    identity (X-Real-IP class), per-route coverage, multi-instance correctness. **done 2026-08-09**.
 25. **Custom & adapter auth** — `custom-auth-adapter.ts`, `builtin-auth-adapter.ts`,
     `adapter-middleware.ts`, `auth-hooks.ts`. Which callbacks are bypassed on which path
-    (signups already known to skip before/afterSave). **done 2026-08-09** — see [audits/25-adapter-and-custom-auth.md](25-adapter-and-custom-auth.md).
+    (signups already known to skip before/afterSave). **done 2026-08-09**.
 26. **Storage authorization** — `storage/routes.ts`, `keys.ts`, path canonicalization,
     signed URLs, per-source authz. **done 2026-08-07**
 27. **Secrets & encryption** — `ENCRYPTION_KEY` handling, `crypto-utils.ts`, env-var
@@ -157,25 +119,25 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 30. **Multi-source storage topology** — `storage-registry.ts`, `client/src/storage-registry.ts`,
     `rebase.json` topology, `<BASE>__<KEY>` env suffix, migration between sources. **partial**
 31. **Uploads: tus + image transforms** — `tus-handler.ts`, `image-transform.ts`.
-    Resumable-upload state, orphan cleanup, transform param validation, decompression bombs. **done 2026-08-08** — see [audits/31-uploads-tus-transforms.md](31-uploads-tus-transforms.md).
+    Resumable-upload state, orphan cleanup, transform param validation, decompression bombs. **done 2026-08-08**.
 
 ## E. Realtime, jobs, side effects
 
 32. **Realtime / CDC** — `services/routed-realtime-service.ts`, `server-postgres/src/websocket.ts`,
     `client/src/websocket.ts`, `realtime-channel.ts`. Triggers→pg_notify, RLS-safe refetch,
-    the auth race, subscription keys, row identity, reconnect/backfill. **done 2026-08-09** — see [audits/32-realtime-cdc.md](32-realtime-cdc.md).
+    the auth race, subscription keys, row identity, reconnect/backfill. **done 2026-08-09**.
 33. **Channel bus & presence** — opt-in `realtime.bus`; cross-instance correctness when the
-    default memory bus is used in a multi-pod deploy. **done 2026-08-08** — see [audits/33-channel-bus-presence.md](33-channel-bus-presence.md).
+    default memory bus is used in a multi-pod deploy. **done 2026-08-08**.
 34. **Offline sync** — `client/src/offline*.ts` (9 files + tests). Conflict resolution,
     codec/version skew, IDB store eviction, replay ordering. **done 2026-08-09** — see [audits/34-offline-sync.md](34-offline-sync.md).
 35. **Cron** — `server/src/cron/*` incl. `scale-to-zero.ts`. Missed-tick semantics,
-    overlap/locking across instances, timezone/DST, scale-to-zero vs. due jobs. **done 2026-08-09** — see [audits/35-cron.md](35-cron.md).
+    overlap/locking across instances, timezone/DST, scale-to-zero vs. due jobs. **done 2026-08-09**.
 36. **Functions** — `functions/define-function.ts`, `function-loader.ts`, `function-routes.ts`.
-    Auth defaults, error surface, loader failure modes, timeout/cancellation. **done 2026-08-08** — see [audits/36-functions.md](36-functions.md).
+    Auth defaults, error surface, loader failure modes, timeout/cancellation. **done 2026-08-08**.
 37. **Webhooks** — `services/webhook-service.ts`. Retry/backoff, signing, at-least-once
-    duplication, SSRF on user-supplied URLs. **done 2026-08-08** — see [audits/37-webhooks.md](37-webhooks.md).
+    duplication, SSRF on user-supplied URLs. **done 2026-08-08**.
 38. **Email** — `email/smtp-email-service.ts`, `templates.ts`. Template injection, bounce
-    handling, deliverability-affecting headers, failure swallowing. **done 2026-08-08** — see [audits/38-email.md](38-email.md).
+    handling, deliverability-affecting headers, failure swallowing. **done 2026-08-08**.
 
 ## F. Client SDK & codegen
 
@@ -185,14 +147,14 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     escaping, nullability, relation accessors, regeneration idempotence. **done 2026-08-08**
 41. **Typed query contract** — `query-contract.types.ts`. Do the types actually reject
     what the server rejects, and accept what it accepts? Type assertions in tests are
-    inert here — check where the contract is really enforced. **done 2026-08-08** — see [audits/41-typed-query-contract.md](41-typed-query-contract.md).
+    inert here — check where the contract is really enforced. **done 2026-08-08**.
 42. **client-postgres (direct/PostgREST path)** — `packages/client-postgres`. A second
     implementation of the data path; does it agree with the HTTP client on filters,
-    ordering, errors? **done 2026-08-08** — see [audits/42-client-postgres.md](42-client-postgres.md).
+    ordering, errors? **done 2026-08-08**.
 43. **server-mongo** — `packages/server-mongo`. Feature parity vs. Postgres, or an honest
-    statement of what it does not support. **done 2026-08-08** — see [audits/43-server-mongo.md](43-server-mongo.md).
+    statement of what it does not support. **done 2026-08-08**.
 44. **firebase package** — `packages/firebase`. Still shipped, largely legacy: audit for
-    dead surface and drift from current types. **done 2026-08-08** — see [audits/44-firebase-package.md](44-firebase-package.md).
+    dead surface and drift from current types. **done 2026-08-08**.
 
 ## G. Admin UI & UI kit
 
@@ -207,11 +169,11 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     Per-property-type: validation, dirty tracking, save/discard, nested arrays, unsaved-changes
     navigation (bug class 28). **partial**
 49. **Collection editor** — `admin/src/collection_editor`. Schema edits from the UI:
-    what it can express vs. what the backend accepts, destructive-change guards. **done 2026-08-08** — see [audits/49-collection-editor.md](49-collection-editor.md).
+    what it can express vs. what the backend accepts, destructive-change guards. **done 2026-08-08**.
 50. **Data import/export** — `admin/src/data_export`, `data_import`. Type fidelity round-trip,
-    large-file behaviour, CSV injection, partial-failure reporting. **done 2026-08-08** — see [audits/50-data-import-export.md](50-data-import-export.md).
+    large-file behaviour, CSV injection, partial-failure reporting. **done 2026-08-08**.
 51. **References & relation pickers** — `ReferenceWidget.tsx`, `RelationSelector.tsx`,
-    `ReferenceTable`, `UserSelector.tsx`. Permission-aware listing, pagination, write shape. **done 2026-08-08** — see [audits/51-references-relation-pickers.md](51-references-relation-pickers.md).
+    `ReferenceTable`, `UserSelector.tsx`. Permission-aware listing, pagination, write shape. **done 2026-08-08**.
 52. **Admin routing, layout & navigation** — `RebaseCMS.tsx`, `RebaseRouteDefs.tsx`,
     `RebaseAuthGate.tsx`, `SideDialogs.tsx`, `RebaseNavigation.tsx`. Deep links, back/forward,
     side-panel stacking, auth-gate flicker. **partial**
@@ -226,7 +188,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     round-trip. **partial**
 57. **Plugins: AI and Insights** — `packages/plugin-ai`, `packages/plugin-insights`,
     `packages/inference`. Prompt/data leakage, cost controls, failure UX, inference
-    correctness on real schemas. **done 2026-08-08** — see [audits/57-ai-insights-plugins.md](57-ai-insights-plugins.md).
+    correctness on real schemas. **done 2026-08-08**.
 
 ## H. CLI & developer experience
 
@@ -238,9 +200,9 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 61. **`rebase db` / `schema`** — push/pull safety, destructive gate, dry-run honesty. **partial**
 62. **`rebase cloud`** — `commands/cloud/`. JSON-mode off-TTY, error messages, auth,
     idempotency of deploy. **partial**
-63. **`rebase eject`** — does the ejected project actually build and run? **done 2026-08-08** — see [audits/63-cli-eject.md](63-cli-eject.md).
+63. **`rebase eject`** — does the ejected project actually build and run? **done 2026-08-08**.
 64. **CLI auth, api-keys, apps, telemetry, skills commands** — smaller surfaces, never
-    swept together: consent, storage of credentials, what telemetry sends. **done 2026-08-08** — see [audits/64-cli-small-commands.md](64-cli-small-commands.md).
+    swept together: consent, storage of credentials, what telemetry sends. **done 2026-08-08**.
 65. **Scaffolded templates** — `tooling/scripts/check-templates.mjs`, `test-cli-init-*-project`.
     Every template: installs, typechecks, boots, deploys. `NODE_ENV` baked into builds
     was found here. **partial**
@@ -250,11 +212,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     later pass drove the published CLI against real Postgres rather than the repo, so
     its findings are reproductions; still not a dedicated pass over error text alone.
 67. **MCP server** — `packages/mcp`. Tool surface, authz, what it exposes about the DB.
-    **done** — see [audits/67-mcp-server.md](67-mcp-server.md). H1/H2/H3/M1 have since been
-    fixed, so that write-up reads worse than the current code; **M2 is still open** — zero-config
-    discovery falls back to the dev server's service key (`{uid:"service", roles:["admin"]}`,
-    `mcp/src/index.ts:261`), and the recommended startup warning naming the credential in use was
-    never implemented. The README also documents 26 tools where 40 ship.
+    **done 2026-08-08**. The README's tool tables are generated and gated since.
 
 ## I. Cloud / SaaS control plane
 
@@ -285,14 +243,13 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     "guards" have baselines that only ever grow. **partial**
 79. **Logging & observability** — `utils/logger.ts`, `logging.ts`, `request-logger.ts`,
     `metrics/`, `ApiError.expected`. Log levels, PII in logs, cardinality, what's missing
-    when something breaks in prod. **done 2026-08-08** — see [audits/79-logging-observability.md](79-logging-observability.md).
+    when something breaks in prod. **done 2026-08-08**.
 80. **Config & env** — `server/src/env.ts`, `boot/env.ts`, `saas/backend/src/env.ts`,
     `validate-config.ts`. Fail-closed on missing/invalid, the collection-key allowlist that
-    silently drops unknown keys. **done 2026-08-09** — see [audits/80-config-and-env.md](80-config-and-env.md).
+    silently drops unknown keys. **done 2026-08-09**.
 81. **Public API surface & compat policy** — `contracts/`, `tooling/scripts/check-api-surface.mjs`,
     `contracts/derived-names.txt`, `docs/compatibility.md`. What is public, what may change,
-    what is frozen. **done 2026-08-05** (surface, [api-surface-audit-2026-08-05.md](api-surface-audit-2026-08-05.md))
-    / **done 2026-08-08** (policy, see [audits/81-compat-policy.md](81-compat-policy.md))
+    what is frozen. **done 2026-08-05** (surface) / **done 2026-08-08** (policy)
 82. **Types placement & duplication** — the `WhereFilterOp`-in-two-places class,
     admin-types split, generated SDK copies. **done 2026-07-28**
 83. **Performance & scale** — N+1s, work growing faster than input (class 24), pagination
@@ -302,7 +259,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     the missing AI/agents section. **partial**
 85. **Website** — `website/`, marketing claims vs. shipped features, Lighthouse, legal TODOs. **partial**
 86. **Examples & agent skills** — `examples/*`, `tooling/rebase-agent-skills/`. Do they run against
-    the current version, and do the skills describe the current API? **done 2026-08-08** — see [audits/86-examples-and-skills.md](86-examples-and-skills.md).
+    the current version, and do the skills describe the current API? **done 2026-08-08**.
 
 ---
 

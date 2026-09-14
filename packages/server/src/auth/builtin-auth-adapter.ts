@@ -233,8 +233,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // This closes the entry point. An ALREADY OPEN socket is a separate
             // question: nothing re-checks a connection after AUTHENTICATE, so a
             // session revoked mid-connection survives until it reconnects. That
-            // is recorded in docs/audits/32 (H3) and is a decision about socket
-            // lifetime, not a line missing from here.
+            // is a decision about socket lifetime, stated on the realtime docs
+            // page (backend/realtime.md), not a line missing from here.
             if (await isAccessTokenRevoked(authRepository, payload)) {
                 logger.warn("[Security Audit] Refused a revoked access token", {
                     eventType: "auth.token.revoked",
