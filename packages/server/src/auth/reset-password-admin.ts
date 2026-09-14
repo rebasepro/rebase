@@ -5,6 +5,8 @@
  * 1. Collection-level hook (`auth.onResetPassword` on the collection)
  * 2. Backend-level hook (`AuthHooks.onAdminResetPassword`)
  * 3. Built-in default (send reset email, or generate temp password)
+ *
+ * Whichever of them runs, the account's existing sessions end.
  */
 
 import { Hono } from "hono";
@@ -14,6 +16,7 @@ import { createRequireAuth, requireAdmin } from "./middleware";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { generateSecurePassword, generateSecureToken, hashToken } from "./admin-user-ops";
+import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import { getPasswordResetTemplate, resolveEmailBranding } from "../email/templates";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
@@ -61,6 +64,10 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
         // Distinguishes "email was never configured" from "email is configured but
         // the send failed" — both fall back to a temporary password.
         let emailDeliveryFailed = false;
+        // Set by the branches that choose the new password here, and written
+        // once, below. The hooks and the emailed link leave it unset: a hook
+        // does its own writing, and a link lets the user choose.
+        let newPasswordHash: string | undefined;
 
         // Parse optional body — if a password is provided, set it directly
         const body = await c.req.json().catch(() => ({}));
@@ -73,10 +80,7 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
                     `Password too weak: ${validation.errors.join(", ")}`
                 );
             }
-            const passwordHash = await ops.hashPassword(password);
-            await authRepo.updatePassword(existing.id, passwordHash);
-            temporaryPassword = undefined;
-            invitationSent = false;
+            newPasswordHash = await ops.hashPassword(password);
         }
         // 1. Collection-level hook (closest to the data)
         else if (collectionAuthConfig?.onResetPassword) {
@@ -108,13 +112,18 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
             const isEmailConfigured = !!(emailService && emailService.isConfigured());
 
             if (isEmailConfigured) {
+                const token = generateSecureToken();
+                const tokenHash = hashToken(token);
+                const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+                // Outside the `try` below, deliberately. Its `catch` answers
+                // "the email did not go out" with a temporary password, which is
+                // right for a failed send and wrong for a failed database write:
+                // when minting the token fails, the honest answer is a 500 and
+                // the password left as it was, not a new one nobody asked for.
+                await authRepo.createPasswordResetToken(existing.id, tokenHash, expiresAt);
+
                 try {
-                    const token = generateSecureToken();
-                    const tokenHash = hashToken(token);
-                    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-                    await authRepo.createPasswordResetToken(existing.id, tokenHash, expiresAt);
-
                     const baseUrl = emailConfig?.resetPasswordUrl || "";
                     const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
 
@@ -137,18 +146,28 @@ displayName: existing.displayName }, appName, logoUrl);
                     logger.error("Failed to send reset email", { error: emailError instanceof Error ? emailError.message : emailError });
                     // Fall back to returning the temporary password
                     const clearPassword = generateSecurePassword();
-                    const passwordHash = await ops.hashPassword(clearPassword);
-                    await authRepo.updatePassword(existing.id, passwordHash);
+                    newPasswordHash = await ops.hashPassword(clearPassword);
                     temporaryPassword = clearPassword;
                     emailDeliveryFailed = true;
                 }
             } else {
                 // No email service — generate password, set it, and return one-time
                 const clearPassword = generateSecurePassword();
-                const passwordHash = await ops.hashPassword(clearPassword);
-                await authRepo.updatePassword(existing.id, passwordHash);
+                newPasswordHash = await ops.hashPassword(clearPassword);
                 temporaryPassword = clearPassword;
             }
+        }
+
+        // An admin reset is what an administrator reaches for when an account
+        // is compromised, so it ends every session the account holds, on every
+        // branch. That includes the ones that write no password here: an
+        // emailed link changes nothing until the user opens it, and a hook's
+        // password is invisible to this route — either way, a stolen refresh
+        // token would otherwise go on minting access tokens in the meantime.
+        if (newPasswordHash) {
+            await replaceUserPassword(authRepo, existing.id, newPasswordHash);
+        } else {
+            await revokeAllSessions(authRepo, existing.id);
         }
 
         const userRoles = await authRepo.getUserRoleIds(existing.id);

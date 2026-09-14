@@ -13,6 +13,7 @@ import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie } from "./cookie-utils";
 import { isAnonymousAuthOpen } from "./registration-policy";
+import { revokeAllSessions } from "./token-revocation";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
 
@@ -195,11 +196,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        await authRepo.deleteAllRefreshTokensForUser(userCtx.uid);
-        // Belt and braces: a refresh already in flight can insert a rotated
-        // token a moment after the delete has run and walk away with a live
-        // session. The watermark voids it on its next use.
-        await authRepo.setTokensValidAfter?.(userCtx.uid, new Date()).catch(() => undefined);
+        // The rows and the watermark both: a refresh already in flight can
+        // insert a rotated token a moment after the delete has run and walk
+        // away with a live session, and the watermark voids it on its next use.
+        await revokeAllSessions(authRepo, userCtx.uid);
         return c.json({
             success: true,
             message: "All sessions revoked successfully"

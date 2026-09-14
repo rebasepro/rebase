@@ -116,6 +116,28 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   If a collection has `history: true`, or a `beforeDelete` that refuses on the
   row's contents, and anything deletes through the socket or the SDK, upgrade.
 
+- **An admin password reset left the account's existing sessions signed in.**
+  Resetting a user's password from the admin panel, or through
+  `POST /api/admin/users/:uid/reset-password` and `PUT /api/admin/users/:uid`,
+  changed the credential and revoked nothing. That applied whether the admin set
+  the password directly, emailed a link, or got a temporary one. A stolen
+  refresh token went on minting access tokens for the rest of its lifetime —
+  after the one action an administrator takes when an account has been phished.
+  Only the user's own reset and change-password signed the other sessions out.
+
+  Every way of setting a password on an existing account now ends its sessions:
+  the refresh tokens are deleted and, on Postgres, every access token issued
+  before the reset is refused. That covers `userManagement.updateUser` with a
+  `password` too. The emailed-link mode now ends them when the link is sent
+  rather than when it is opened, and so does a reset handled by an
+  `onResetPassword` or `onAdminResetPassword` hook.
+
+- **A database error during an admin reset set a new password.** Minting the
+  reset token shared a `try` with sending the email, so a failed write took the
+  "email failed" path: a fresh password was written over the user's and handed
+  to the admin as a temporary one. It now answers 500 and leaves the password
+  alone.
+
 ## [0.21.0] - 2026-09-14
 
 ### Breaking

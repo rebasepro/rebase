@@ -661,6 +661,39 @@ serve it tells the caller something true. It was not needed here only because
 the nested read already supported it. Serving the request as though the
 parameter were not there is the one option that is never correct.
 
+### Session revocation, applied at two of ten doors — 2026-09-14
+
+The second axis again, in auth. "A password changed, so end every session" was
+two lines — `deleteAllRefreshTokensForUser`, then `setTokensValidAfter` —
+repeated after `updatePassword` by hand. They followed the self-service reset
+and change-password, and none of the admin paths: the ones an administrator
+uses *during an incident* (audits 21 H1, 22 M3). A phished account reset from
+the panel kept the attacker's refresh token minting access tokens for its full
+lifetime.
+
+The pair is now one helper, `replaceUserPassword` (write + `revokeAllSessions`)
+in `auth/token-revocation.ts`, beside the watermark's read.
+`password-change-revokes-sessions.test.ts` enumerates the feature, not the
+routes: every way to set a password on an existing account, each driven through
+`createBuiltinAuthAdapter` against a stateful store, on a repository with the
+watermark and one without. Running both shapes is what holds each half — with
+the watermark, a missing row delete is invisible on refresh. Source guards fail
+if anything but the helper calls `updatePassword`, or adds `passwordHash` to an
+object after building it. Mutation-tested: each half removed turns ten cases red.
+
+| checked | result |
+|---|---|
+| admin reset: `{ password }`, no email service, send failed | **BUG** — password written, sessions kept. Fixed. |
+| admin reset: link emailed, collection `onResetPassword`, `onAdminResetPassword` | **BUG** — nothing ended until the user opened the link, if ever. Now revokes on every branch. |
+| `PUT /admin/users/:uid` with `password` | **BUG** — `updates.passwordHash = …`, then `updateUser`. Fixed. |
+| `userManagement.updateUser({ password })` | **BUG** — the same shape. Fixed. |
+| admin reset when minting the reset token fails | **BUG** (class 4, audit 38 L2) — shared the email's `try`, so a DB error wrote and returned a new password. Now a 500. |
+| self-service reset, change-password, `DELETE /auth/sessions` | clean — now call the helper |
+| `POST /auth/anonymous/link` (`updateUser` with `passwordHash`) | clean — the first credential on a guest account, and the route re-mints the caller's session. The guard allowlists it. |
+| MongoDB driver | **OPEN** — no watermark, so an access token outlives any revocation until it expires. |
+| collection `onResetPassword` returning `temporaryPassword` | **OPEN** — the route never writes it and the hook's context cannot, so the documented example shows the admin a password that does not work. |
+| `isAccessTokenRevoked`, same-second token | **OPEN** (class 55) — the comment and the test's title say a token from the watermark's own second is revoked; the code (`<`) and the test's assertion let it through. |
+
 ---
 
 ## 18. A predicate that discriminates nothing

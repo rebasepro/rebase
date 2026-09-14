@@ -23,7 +23,7 @@ import type {
 } from "@rebasepro/types";
 
 import { Hono } from "hono";
-import { isAccessTokenRevoked } from "./token-revocation";
+import { isAccessTokenRevoked, replaceUserPassword } from "./token-revocation";
 import { hasAdministrativeRole } from "./admin-roles";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
@@ -453,10 +453,14 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
             if (data.displayName !== undefined) updateData.displayName = data.displayName;
             if (data.photoUrl !== undefined) updateData.photoUrl = data.photoUrl;
             if (data.metadata !== undefined) updateData.metadata = data.metadata;
-            if (data.password) {
-                updateData.passwordHash = await resolvedOps.hashPassword(data.password);
-            }
+            const passwordHash = data.password ? await resolvedOps.hashPassword(data.password) : undefined;
             const user = await repo.updateUser(id, updateData);
+            // A new password ends the account's sessions, whichever door set
+            // it — so it goes through the same helper as every route does,
+            // rather than riding along in `updateData`.
+            if (user && passwordHash) {
+                await replaceUserPassword(repo, id, passwordHash);
+            }
             return user ? toAuthUserData(user) : null;
         },
 

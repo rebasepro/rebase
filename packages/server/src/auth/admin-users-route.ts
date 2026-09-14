@@ -20,6 +20,7 @@ import { createRequireAuth, requireAdmin } from "./middleware";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
+import { replaceUserPassword } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
@@ -349,16 +350,23 @@ values: prepResult.values },
         if (email !== undefined) updates.email = normalizeEmail(email);
         if (displayName !== undefined) updates.displayName = displayName;
 
+        let passwordHash: string | undefined;
         if (password) {
             const validation = ops.validatePasswordStrength(password);
             if (!validation.valid) {
                 throw ApiError.badRequest(`Password too weak: ${validation.errors.join(". ")}`);
             }
-            updates.passwordHash = await ops.hashPassword(password);
+            passwordHash = await ops.hashPassword(password);
         }
 
         if (Object.keys(updates).length > 0) {
             await authRepo.updateUser(uid, updates);
+        }
+        // Not folded into `updates`: an administrator setting someone's password
+        // is a reset, and a reset ends that account's sessions. Writing the hash
+        // through `updateUser` is how this route used to skip that.
+        if (passwordHash) {
+            await replaceUserPassword(authRepo, uid, passwordHash);
         }
 
         if (roles !== undefined && Array.isArray(roles)) {
