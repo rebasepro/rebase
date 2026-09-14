@@ -88,7 +88,12 @@ describe("Mongo WebSocket requireAuth resolution", () => {
             registerDataDriverSubscription: jest.fn()
         } as unknown as MongoRealtimeService;
         driver = {
-            fetchCollection: jest.fn(async () => [])
+            fetchCollection: jest.fn(async () => []),
+            // `FETCH_COLLECTION` now refuses a path the registry does not resolve
+            // (see `websocket-unregistered-path-e2e.test.ts`); this probe uses
+            // "posts", so the registry must know it or the auth gate under test is
+            // masked by the path gate in front of it.
+            registry: { getCollectionByPath: (p: string) => (p === "posts" ? { slug: "posts" } : undefined) }
         } as unknown as MongoDriver;
     });
 

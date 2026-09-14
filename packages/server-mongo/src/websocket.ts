@@ -216,6 +216,38 @@ roles: verifiedUser.roles } }));
                     }
                 }
 
+                /**
+                 * Refuse a frame whose path names no registered data collection.
+                 *
+                 * MongoDB has no row-level security, so on this engine the
+                 * registry *is* the access model: `securityRules` are enforced
+                 * only for a collection the registry resolves, and
+                 * `MongoDataService.getCollection` maps any path to a physical
+                 * collection by replacing `/` with `_`. A path the registry does
+                 * not know therefore reaches the database with no rule to apply —
+                 * `AuthenticatedMongoDriver.authorize(undefined)` answers
+                 * "allowed" and the RLS filter for an undefined collection is
+                 * "match all" — which put the auth store (`rebase_users` and its
+                 * password hashes, `rebase_user_roles`, `rebase_refresh_tokens`)
+                 * one frame away from any caller: authenticated, or anonymous
+                 * when `requireAuth` is false.
+                 *
+                 * The socket is the one client-facing door onto this driver. REST
+                 * mounts routes per registered slug and 404s everything else, and
+                 * in-process writes are trusted server code — so the registry
+                 * check lives here, at the boundary this door owns, exactly as the
+                 * write validation beside it does. A `notFound` matches what REST
+                 * answers for an unknown collection, and does not distinguish a
+                 * collection that exists in Mongo from one that does not.
+                 */
+                const assertRegisteredPath = (path: string | undefined): void => {
+                    if (!path || !driver.registry?.getCollectionByPath(path)) {
+                        throw ApiError.notFound(
+                            `Unknown collection at path "${path ?? ""}": it is not a registered data collection.`
+                        );
+                    }
+                };
+
                 /** @see the Postgres socket — same rule, same reason. */
                 const assertWriteRequest = (path: string | undefined, values: unknown): void => {
                     if (!path || !values || typeof values !== "object") return;
@@ -249,6 +281,7 @@ roles: verifiedUser.roles } }));
                 switch (type) {
                     case "FETCH_COLLECTION": {
                         const request: FetchCollectionProps = payload;
+                        assertRegisteredPath(request.path);
                         const delegate = await getScopedDelegate();
                         const rows = await delegate.fetchCollection(request);
                         ws.send(JSON.stringify({ type: "FETCH_COLLECTION_SUCCESS",
@@ -258,6 +291,7 @@ requestId }));
                     }
                     case "FETCH_ONE": {
                         const request: FetchOneProps = payload;
+                        assertRegisteredPath(request.path);
                         const delegate = await getScopedDelegate();
                         const row = await delegate.fetchOne(request);
                         ws.send(JSON.stringify({ type: "FETCH_ONE_SUCCESS",
@@ -271,6 +305,7 @@ requestId }));
                         // the socket is a second way in, and it used to be the
                         // unchecked one. Collection from the registry by path,
                         // never from the client's `request.collection`.
+                        assertRegisteredPath(request.path);
                         assertWriteRequest(request.path, request.values as Record<string, unknown>);
                         const delegate = await getScopedDelegate();
                         const row = await delegate.save(request);
@@ -281,6 +316,7 @@ requestId }));
                     }
                     case "DELETE": {
                         const request: DeleteProps = payload;
+                        assertRegisteredPath(request.row?.path);
                         const delegate = await getScopedDelegate();
                         // The address, and nothing else the frame says: the
                         // driver reads the row and resolves the collection by
@@ -296,6 +332,7 @@ requestId }));
                     }
                     case "CHECK_UNIQUE_FIELD": {
                         const { path, name, value, id, collection } = payload;
+                        assertRegisteredPath(path);
                         const delegate = await getScopedDelegate();
                         const isUnique = await delegate.checkUniqueField(path, name, value, id, collection);
                         ws.send(JSON.stringify({ type: "CHECK_UNIQUE_FIELD_SUCCESS",
@@ -305,6 +342,7 @@ requestId }));
                     }
                     case "COUNT": {
                         const request: FetchCollectionProps = payload;
+                        assertRegisteredPath(request.path);
                         const delegate = await getScopedDelegate();
                         const count = await delegate.count!(request);
                         ws.send(JSON.stringify({ type: "COUNT_SUCCESS",
@@ -357,6 +395,23 @@ requestId }));
                     case "subscribe_collection":
                     case "subscribe_one":
                     case "unsubscribe": {
+                        // A subscription is a read that re-runs on every matching
+                        // write, so an unregistered path leaks exactly as
+                        // FETCH_COLLECTION does — and re-leaks. Refused here, with
+                        // the subscription id the client keys its errors on, since
+                        // `handleClientMessage`'s frames carry no `requestId`.
+                        if (type !== "unsubscribe" && !driver.registry?.getCollectionByPath(payload?.path)) {
+                            ws.send(JSON.stringify({
+                                type: "ERROR",
+                                requestId,
+                                subscriptionId: payload?.subscriptionId,
+                                payload: { error: {
+                                    message: `Unknown collection at path "${payload?.path ?? ""}": it is not a registered data collection.`,
+                                    code: "NOT_FOUND"
+                                } }
+                            }));
+                            return;
+                        }
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user ? { uid: session.user.uid,
 roles: session.user.roles ?? [] } : undefined;

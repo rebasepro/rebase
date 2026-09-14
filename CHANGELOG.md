@@ -113,6 +113,29 @@
 
 ### Security
 
+- **The MongoDB realtime socket could read and write the auth store.** MongoDB
+  has no row-level security, so on that engine the collection registry is the
+  whole access model: a `securityRule` is enforced only for a collection the
+  registry resolves, and `MongoDataService` maps any path to a physical
+  collection by name. The realtime socket forwarded `FETCH_COLLECTION`,
+  `FETCH_ONE`, `SAVE`, `DELETE`, `COUNT`, `CHECK_UNIQUE_FIELD` and the
+  `subscribe_*` frames to the driver without asking whether the path named a
+  registered data collection. For a path the registry did not know,
+  `AuthenticatedMongoDriver` resolved the collection to `undefined` and every
+  rule check short-circuits open there — `authorize(undefined)` returns `true`
+  and the query filter becomes "match all". So any authenticated client (or,
+  when `requireAuth` is off, any anonymous one) could name the auth collections
+  as the path and read `rebase_users` including password hashes, grant itself an
+  admin role by writing `rebase_user_roles`, overwrite another account's
+  password hash, or delete refresh tokens — on the one engine where nothing
+  behind the driver would stop it. The REST routes were never exposed: they
+  mount per registered slug and 404 everything else.
+
+  The socket now refuses, fail-closed, any frame whose path the registry does
+  not resolve, on every data verb and both subscribe types, with a `NOT_FOUND`
+  naming the path — the same answer REST gives an unknown collection. Registered
+  collections are unaffected, and their row security is unchanged.
+
 - **A delete over the WebSocket wrote its own audit record, and could get past
   a `beforeDelete` veto.** `DeleteProps` carried `row.values`, and both server
   drivers took them as the row being deleted: they were what `beforeDelete` and
