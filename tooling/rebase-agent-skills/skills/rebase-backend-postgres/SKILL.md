@@ -328,26 +328,10 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 
 ### RebaseBackendConfig Options
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `collectionsDir` | `string` | — | Auto-discover collection definition files |
-| `functionsDir` | `string` | — | Auto-discover custom Hono route files |
-| `cronsDir` | `string` | — | Auto-discover cron job files |
-| `server` | `http.Server` | — | Node.js HTTP server instance |
-| `app` | `Hono<HonoEnv>` | — | Hono application instance |
-| `basePath` | `string` | `"/api"` | Base path for all API routes |
-| `database` | `DatabaseAdapter` | — | Adapter API (takes precedence over `bootstrappers`) |
-| `bootstrappers` | `BackendBootstrapper[]` | — | Bootstrapper protocol (alternative to `database`) |
-| `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication configuration or external adapter |
-| `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration |
-| `history` | `true \| { retention?: number }` | — | Enable entity audit trail. Pass `true` or `{ retention: 90 }` for TTL in days |
-| `enableSwagger` | `boolean` | `true` | Enable OpenAPI/Swagger documentation |
-| `cronPersistence` | `boolean` | `true` | Persist cron execution logs to database |
-| `maxBodySize` | `number` | `10485760` (10MB) | Max request body size in bytes. `0` to disable |
-| `csrf` | `{ origin: string \| string[] \| (origin: string) => boolean }` | — | CSRF protection (opt-in, disabled by default) |
-| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection, on every data path (REST, realtime, server-side `rebase.dataAsAdmin`) |
-| `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table without RLS has no authorization model, so serving it would hand every row to every logged-in user. `"serve"` overrides, for trusted callers only |
-| `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | — | Log level configuration |
+The full `RebaseBackendConfig` table — every option, its default, and what the runtime fills it from — is in the **`rebase-basics`** skill: `../rebase-basics/references/backend-configuration.md`. Two defaults differ between a hand-written call and the runtime, and are the ones to check first:
+
+- **`history`** is off when omitted from `initializeRebaseBackend`; the runtime passes `REBASE_HISTORY`, which defaults to `true`.
+- **`enableSwagger`** defaults to `true` (spec public at `/api/docs`); the runtime passes `false` in production unless `REBASE_ENABLE_SWAGGER` is set, which keeps the spec admin-only.
 
 ### Auth Configuration (RebaseAuthConfig)
 

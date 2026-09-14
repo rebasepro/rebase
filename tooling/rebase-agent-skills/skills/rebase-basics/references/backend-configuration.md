@@ -10,43 +10,53 @@ The main entry point for initializing a Rebase backend server. Returns a `Rebase
 import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server";
 ```
 
+A scaffolded project does not build this object: `rebase dev` and the published runtime boot from the bundle, reading collections and hooks from `config/` and everything else from environment variables. Pass it directly only when you own the server process (an ejected project, or Rebase embedded in your own server). Where the runtime fills an option from the environment, the row says so.
+
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `server` | `Server` (Node `http.Server`) | — | **Required.** The HTTP server instance |
+| `server` | `Server` (Node `http.Server`) | — | **Required.** The HTTP server instance — used for the WebSocket upgrade and graceful shutdown |
 | `app` | `Hono<HonoEnv>` | — | **Required.** The Hono application instance |
-| `collections` | `CollectionConfig[]` | `[]` | Inline collection definitions. Declaring **none** (and no `collectionsDir`) is what makes the server derive them from the live database instead, so every RLS-protected table is served with nothing to define. There is no `mode` flag — it was removed, because it could only ever agree with this or contradict it |
+| `collections` | `AnyCollectionConfig[]` | `[]` | Inline collection definitions. Declaring **none** (and no `collectionsDir`) is what makes the server derive them from the live database instead, so every RLS-protected table is served with nothing to define. There is no `mode` flag — it was removed, because it could only ever agree with this or contradict it |
 | `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty) |
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
 | `database` | `DatabaseAdapter` | — | Database adapter (takes precedence over `bootstrappers`) |
-| `bootstrappers` | `BackendBootstrapper[]` | `[]` | Database bootstrappers. Use one per engine for multiple engines in a single instance (e.g. Postgres + MongoDB); mark one `isDefault` |
+| `bootstrappers` | `BackendBootstrapper[]` | — | Internal: the runtime builds these from the `database()` declarations in `config/resources.ts`, one per data source, and `collection.dataSource` routes by their `id`. Pass `database` instead |
 | ~~`dataSources`~~ | — | — | **Removed.** Declare each one with `database("<key>")` in `config/resources.ts`. The backend reads the declarations; passing this key is refused at boot, by name, with the replacement in the message. Collections on a `direct`/`custom` transport are still client-only — the backend skips data routes for them |
-| `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
-| `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
-| `history` | `HistoryConfig` (`boolean \| { retention?: number }`) | `true` | Entity history / audit log. `retention` is in days |
-| `enableSwagger` | `boolean` | `true` | Enable OpenAPI spec at `/api/docs` and Swagger UI at `/api/swagger` (dev only) |
-| `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers |
-| `cronsDir` | `string` | — | Directory for auto-discovered cron job handlers |
+| `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter. **`requireAuth`, `jwtSecret`, `serviceKey`, `allowRegistration`, OAuth providers and `email` all live inside this object**, not at the top level |
+| `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources, and include a `"(default)"` key — none is promoted. The runtime builds it from the `bucket()` declarations |
+| `history` | `HistoryConfig` (`boolean \| { retention?: number }`) | off | Entity history / audit log. `retention` is in days. Omitted here means off; the runtime passes `REBASE_HISTORY`, which defaults to `true` |
+| `enableSwagger` | `boolean` | `true` | `true` serves the OpenAPI spec at `/api/docs` publicly; `false` serves it to admins only. Swagger UI at `/api/swagger` is mounted outside production either way. The runtime passes `REBASE_ENABLE_SWAGGER`, and `false` in production when that is unset |
+| `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers. The runtime discovers `backend/functions` |
+| `cronsDir` | `string` | — | Directory for auto-discovered cron job handlers. The runtime discovers `backend/crons` |
 | `cronPersistence` | `boolean` | `true` | Persist cron job execution logs to the database |
-| `maxBodySize` | `number` | `10485760` (10 MB) | Max request body size in bytes. Set `0` to disable |
-| `csrf` | `{ origin: string \| string[] \| ((origin: string) => boolean) }` | — | CSRF protection (opt-in, disabled by default) |
+| `maxBodySize` | `number` | `10485760` (10 MB) | Max request body size in bytes. Set `0` to disable. Storage uploads use the storage config's `maxFileSize` instead |
+| `csrf` | `{ origin: string \| string[] \| ((origin: string) => boolean) }` | — | CSRF protection (opt-in, disabled by default: mobile apps, cross-origin SPAs and CLIs consume the same API) |
 | `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection. Same type as per-collection `callbacks`, and fires on **every** data path (REST, realtime/WebSocket, server-side `rebase.dataAsAdmin`). Order: global → collection → property |
 | `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table with RLS disabled carries no authorization model, and every authenticated request runs as `rebase_user`, so serving one hands every row to every logged-in user. Excluded tables are logged with the SQL to protect them. `"serve"` serves them anyway; only sensible when every caller is already trusted |
-| `schemaEditor` | `boolean` | — | Force the schema-editor routes on or off. Defaults to enabled when `collectionsDir` is set, outside production, in `cms` mode |
+| `schemaEditor` | `boolean` | — | Force the schema-editor routes on or off. Defaults to enabled when `collectionsDir` is set, outside production, in `cms` mode. `false` on a built bundle |
+| `liveSchema` | `LiveSchemaConfig` | — | Live schema editing (changing the database and committing the change). Mounts whenever there is a `collectionsDir`; this configures *who* may act |
 | ~~`storageSources`~~ | — | — | **Removed.** Declare each one with `bucket("<key>")` in `config/resources.ts`. Collection properties still point at it by key via `StorageConfig.storageSource`. (The `<Rebase storageSources>` *prop* is unrelated and still exists — pass `declaredStorageSources()`) |
-| `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | `"info"` | Log level configuration |
+| `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | `LOG_LEVEL`, else `"info"` | Log level configuration. Outranks `LOG_LEVEL` when set |
 | `storageAuthorize` | `StorageAuthorize` | — | **Per-object access control**, the storage analogue of RLS. Without one, any authenticated user can read, overwrite, delete or list any key they can name — and `GET /storage/list?prefix=` means they need not guess. See the boot guard below |
+| `storagePolicies` | `StoragePolicy[]` | — | Path-pattern access rules (`{ path: "users/:uid/**", allow: … }`). A key no policy matches is refused; `storageAuthorize` still runs when none matched. Satisfies the boot guard on its own |
 | `storagePublicRead` | `boolean` | `false` | Serve stored objects to unauthenticated readers |
 | `storageInsecureAllowAnyAuthenticated` | `boolean` | `false` | Opt out of the storage boot guard. Named to be read twice |
-| `jobs` | `JobQueueOptions` | — | The durable job queue: `{ enabled, tasks, concurrency, pollIntervalMs, visibilityTimeoutMs, maxAttempts, backoff }`. Off unless asked for |
-| `rateLimit` | `DataRateLimitConfig` | — | Rate limiting for the data API |
-| `compression` | `boolean` | `true` | gzip/brotli responses |
-| `functionsTimeoutMs` | `number` | — | Per-invocation timeout for custom functions |
-| `functionsSelection` | `FunctionSelection` | — | Which functions this process serves (split deployments) |
-| `functionsUpstream` | `string` | — | Forward `/api/functions/*` to another process instead of mounting them |
-| `surfaces` | `RuntimeSurfaceOptions` | — | Which route groups this process mounts (`api`/`functions`/`worker` roles) |
-| `ownership` | `RuntimeOwnershipOptions` | — | Which background responsibilities this process owns (cron timers, job workers) |
-| `provisionSchema` | `boolean` | `true` | Whether **this process** runs the boot DDL. Exactly one process in a split deployment may |
+| `storageTriggers` | `StorageTrigger[]` | — | Run a handler when an object lands (`"finalize"`) or goes (`"delete"`), matched by path pattern. A throwing handler is logged, never fails the upload |
+| `storageRenditionCache` | `RenditionCacheConfig` | off | Cache image transforms back into the bucket |
+| `jobs` | `JobQueueOptions` | off | The durable job queue: `{ enabled, tasks, concurrency, pollIntervalMs, visibilityTimeoutMs, maxAttempts, backoff }`. Needs `enabled: true` and a driver that can run SQL |
+| `rateLimit` | `DataRateLimitConfig` | on, loose | Data-API rate limiting per caller: an API key by id, a user by uid, anyone else by IP. Counts are in-process unless you pass a `store`; `{ enabled: false }` when the edge already does this |
+| `compression` | `boolean` | `true` | gzip/deflate responses. Set `false` when a proxy already compresses |
+| `functionsTimeoutMs` | `number` | `30000` | Per-request ceiling for `/api/functions/*` (or `REBASE_FUNCTIONS_TIMEOUT_MS`). `0` disables it; a timeout answers 504 |
+| `functionsSelection` | `FunctionSelection` | — | Internal: which functions this process serves, from `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`. An unknown name fails the boot |
+| `functionsUpstream` | `string` | — | Internal: forward `/api/functions/*` to another process (`REBASE_FUNCTIONS_UPSTREAM`). Only consulted when the `functions` surface is off |
+| `surfaces` | `RuntimeSurfaceOptions` | all but `mcp` | Which HTTP surfaces this process mounts, as `{ auth, data, storage, admin, functions, cron, meta, realtime, mcp }` booleans; name only what differs. Every surface is on unless named, except `mcp`, which is off unless named. The runtime derives it from `REBASE_ROLE` |
+| `ownership` | `RuntimeOwnershipOptions` | all | Which background singletons this process runs: `{ cronScheduler, jobWorkers, rlsAudit }`. Separate from `surfaces` — serving the cron admin routes and firing the jobs are different questions |
+| `provisionSchema` | `boolean` | `true` | Internal: whether **this process** runs the boot DDL. Exactly one process in a split deployment may; derived from `REBASE_ROLE` |
+| `rlsAudit` | `RlsAuditConfig` | off | Periodic RLS audit served at `GET /api/admin/rls-audit`: `{ enabled, intervalMs, runOnBoot, schemas }`. Needs the optional peer `@rebasepro/rls-check` |
+| `corsHandled` | `boolean` | `false` | Internal: declares that the app installs its own CORS middleware, suppressing the "no CORS configuration detected" warning |
 | `schemaVersion` / `runtimeVersion` | `string` | — | Stamps carried from the bundle manifest |
+
+**CORS itself is not a config key.** The runtime sets it from the `CORS_ORIGINS` and `FRONTEND_URL` environment variables, and a production boot fails if neither is set.
 
 > **IMPORTANT FOR AGENTS: storage refuses to boot in production without an access
 > model.** When storage is configured and `NODE_ENV=production`,

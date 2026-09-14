@@ -625,79 +625,12 @@ The backend is configured by the object passed to `initializeRebaseBackend(confi
 
 > A scaffolded project does not build this object itself. `rebase dev` and the published runtime boot from the bundle: collections and `storageAuthorize` come from `config/index.ts`, and everything else from environment variables. Pass this object directly only when embedding Rebase in a server you own.
 
-### Required
+Every option, with its default and what the runtime fills it from, is in the **`rebase-basics`** skill: `../rebase-basics/references/backend-configuration.md`. The points that matter for the API:
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `server` | `Server` | Node HTTP server — used for the WebSocket upgrade and graceful shutdown |
-| `app` | `Hono<HonoEnv>` | The Hono app the routes are mounted onto |
-
-### Collections and routing
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `collections` | `AnyCollectionConfig[]` | — | Collections to serve |
-| `collectionsDir` | `string` | — | Directory to auto-discover collections from |
-| `basePath` | `string` | `"/api"` | Prefix for every API route |
-| ~~`dataSources`~~ | — | — | **Removed.** Declared with `database("<key>")` in `config/resources.ts`; the backend reads the declarations and refuses this key at boot |
-| `surfaces` | `RuntimeSurfaceOptions` | all | Which HTTP surfaces this process mounts. Omit to mount everything |
-| `ownership` | `RuntimeOwnershipOptions` | all | Which background singletons this process runs (cron scheduler, job worker) |
-| `provisionSchema` | `boolean` | `true` | Whether this process creates the collection schema and its RLS policies at boot. `false` on every process but one in a split deployment |
-
-### Database and authentication
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `database` | `DatabaseAdapter` | — | Takes precedence over `bootstrappers` |
-| `bootstrappers` | `BackendBootstrapper[]` | — | Used when no `database` adapter is given |
-| `auth` | `RebaseAuthConfig \| AuthAdapter` | — | **`requireAuth`, `jwtSecret`, `serviceKey`, `allowRegistration`, OAuth providers and `email` all live inside this object**, not at the top level |
-| `baas` | `BaasOptions` | — | `unprotectedTables: "exclude" \| "serve"` — what to do with introspected tables that have RLS disabled |
-
-### Storage
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `storage` | `BackendStorageConfig \| StorageController \| Record<string, …>` | One backend, or a map of them for multi-bucket setups |
-| ~~`storageSources`~~ | — | **Removed.** Declared with `bucket("<key>")` in `config/resources.ts` |
-| `storageAuthorize` | `StorageAuthorize` | Per-object access control. **In production, storage refuses to boot unless this, `storagePublicRead`, or `storageInsecureAllowAnyAuthenticated` is set** |
-| `storagePublicRead` | `boolean` | Unauthenticated reads. Writes, deletes and listing still require auth |
-| `storageInsecureAllowAnyAuthenticated` | `boolean` | Opts out of the boot guard: any signed-in user may touch any key. Single-tenant only |
-
-### Functions, cron and jobs
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `functionsDir` | `string` | — | Directory of custom functions |
-| `functionsTimeoutMs` | `number` | `30000` | Per-request ceiling for `/api/functions/*`. `0` disables it; a timeout answers 504 |
-| `functionsSelection` | `FunctionSelection` | — | Serve only some of the bundle's functions. An unknown name fails the boot |
-| `functionsUpstream` | `string` | — | Forward `/api/functions/*` elsewhere. Only consulted when the `functions` surface is off |
-| `cronsDir` | `string` | — | Directory of cron definitions |
-| `cronPersistence` | `boolean` | `true` | Persist cron execution logs to the database |
-| `jobs` | `JobQueueOptions` | off | The durable job queue. Requires `enabled: true` and a driver that can run SQL |
-
-### Request handling
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `rateLimit` | `DataRateLimitConfig` | on, loose | Per caller: API key by id, user by uid, everyone else by IP. In-process counts unless you supply a `store` |
-| `maxBodySize` | `number` | 10 MB | `0` disables it. Storage uploads use the storage config's `maxFileSize` instead |
-| `compression` | `boolean` | `true` | Set `false` when a proxy already compresses |
-| `csrf` | `{ origin }` | off | Opt-in. Off by default because mobile apps, cross-origin SPAs and CLIs consume the same API |
-| `corsHandled` | `boolean` | `false` | Declares that the app installs its own CORS middleware, suppressing the "no CORS configuration detected" warning |
-
-**CORS itself is not a config key.** It is set from the `CORS_ORIGINS` and `FRONTEND_URL` environment variables, and a production boot fails if neither is set.
-
-### Everything else
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks, run before per-collection ones on every data path |
-| `history` | `HistoryConfig` | off | `true`, or `{ retention }` in days |
-| `logging` | `{ level }` | — | `"error" \| "warn" \| "info" \| "debug"` |
-| `enableSwagger` | `boolean` | dev only | Swagger UI at `/api/swagger` |
-| `schemaEditor` | `boolean` | see note | Defaults to on when `collectionsDir` is set, outside production, in `cms` mode. Always `false` on a bundle boot |
-| `schemaVersion` | `string` | computed | The version this deployment serves, as recorded at build time |
-| `runtimeVersion` | `string` | — | Reported by the contract endpoint. Informational |
+- **`requireAuth`, `jwtSecret`, `serviceKey`, `allowRegistration`, OAuth providers and `email` live inside `auth`**, not at the top level.
+- **Storage refuses to boot in production** unless `storageAuthorize`, `storagePolicies`, `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set.
+- **`rateLimit` is on by default**, with loose per-caller limits (API key by id, user by uid, everyone else by IP), counted in-process unless you supply a `store`.
+- **CORS itself is not a config key.** It is set from the `CORS_ORIGINS` and `FRONTEND_URL` environment variables, and a production boot fails if neither is set.
 
 ### Pagination is not configurable
 
