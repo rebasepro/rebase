@@ -68,10 +68,13 @@ is the useful part; keep it stated as a fact about what gets installed.
 ## Operating Context
 
 - Adoption starts at a terminal: `pnpm dlx @rebasepro/cli init`, then
-  `docker compose up -d db`, `pnpm run db:push`, `pnpm run dev`. Panel on
-  `:5173`, API on `:3001`.
-- Self-hosting is the deployment story: the developer runs it on their own
-  infrastructure and holds their own credentials.
+  `pnpm install` and `pnpm run dev` — no Docker and no schema step. With no
+  `DATABASE_URL` set, `rebase dev` runs a managed PostgreSQL (PGlite) inside the
+  project and creates the tables at boot. Ports are derived from the project's
+  path, so the panel and API URLs are the ones `rebase dev` prints.
+- Self-hosting is the default deployment story: the developer runs it on their
+  own infrastructure and holds their own credentials. Rebase Cloud runs the same
+  bundle on the same published runtime image, as a private beta.
 - `npx @rebasepro/rls-check $DATABASE_URL` audits a database Rebase has never
   seen, with nothing installed — the one claim that can be verified by a stranger
   in seconds.
@@ -89,23 +92,26 @@ is the useful part; keep it stated as a fact about what gets installed.
   restore, serverless functions, cron.
 - Studio: SQL editor, schema visualizer, RLS editor, logs, API explorer.
 - MCP server; scoped API keys; installable agent skills.
-- Admin panel views: virtualized spreadsheet table, card grid, list, and
-  arbitrary custom React views. Import/export in CSV, JSON, and Excel.
+- Admin panel views: virtualized spreadsheet table, card grid, list, kanban
+  board, and arbitrary custom React views. Import/export in CSV, JSON, and Excel.
 
 **Durable constraints**
 
 - Open source, MIT, at `github.com/rebasepro/rebase`. Packages publish to npm
-  under `@rebasepro/*`; current line is `0.13.x`.
-- **Self-host is the only thing that ships today.** There is no purchasable
-  managed Rebase tier, and no surface may present one as available, priced, or
-  deployable. Pre-launch lead capture *is* allowed: a clearly-labelled
-  "not launched yet" lane and a waitlist are legitimate, and both ship on the
-  home page today. The internal cloud work under `saas/` is not product truth —
-  never describe its capabilities, tenancy, or timeline publicly.
-- **The `/europe` exception:** that page argues self-hosting and nothing else. Its
-  counterweight to "you are the only processor" is *"being the only processor is
-  also a job"* — never a hosted tier we would rather sell. This restriction is
-  specific to `/europe`, not site-wide.
+  under `@rebasepro/*`, all at one version, and the line is still `0.x`: a
+  public beta, not a 1.0.
+- **Self-hosting ships without conditions; Rebase Cloud is a private beta.**
+  Cloud is live, runs real tenants, and opens in batches. It is priced per
+  resource — what a project reserves, not per seat — and there are no plan
+  tiers and no "Pro" plan. Access is requested, not bought from a page. Every
+  surface that mentions it quotes the one `cloud.status` string
+  (`website/src/i18n/en.ts`), so the status cannot drift page to page. Never
+  present it as generally available or self-serve, and never quote a price the
+  pricing page does not.
+- **`/europe` argues control, not location.** Its point is who the second party
+  is: self-host and there is none, or let Rebase Cloud operate it with the
+  processor and sub-processor named. It does not claim competitors cannot host
+  in the EU — they can. See `website/PRODUCT.md`.
 - `pnpm` exclusively. Node `>=22.22.0` for the server line.
 - React `>=19.2.7`, `react-router` 8, Tailwind CSS v4, Radix UI, lucide-react.
 - Authorization is Postgres RLS. A `securityRules` edit is only real once a
@@ -142,13 +148,13 @@ workspace), *BaaS / CMS / Full* (the three adoption modes).
 - **Client logos and case studies are real and already shipped** — see
   `website/src/components/ClientLogos.astro` (logo wall, with the assets in
   `website/public/img/logos/`) and `website/src/components/CaseStudiesCarousel.astro`
-  (three named projects with live URLs). Note the logo wall is deliberately
+  (seven named projects with live URLs). Note the logo wall is deliberately
   labelled as teams shipping on *"Rebase and FireCMS"*, not on Rebase alone;
   future copy must keep that distinction rather than implying they are all
   Rebase users.
 - **Absences future work must not fabricate:** no written testimonials or
-  pull-quotes, no published benchmarks, no user or download counts, no pricing
-  for a hosted tier.
+  pull-quotes, no published benchmarks, no user or download counts, no price
+  list for Rebase Cloud (it is priced per resource, by request).
 
 ## Product Principles
 
