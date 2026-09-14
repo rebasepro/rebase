@@ -205,12 +205,6 @@ the reason.
   `decodeURIComponent` over the path with no `URIError` guard. The SDK encodes
   every key segment (`encodeStorageKey`), so this reaches only a caller that
   builds the URL itself and leaves a `%` unencoded — which should get a 400.
-- **Non-TUS uploads stop at 10 MB by default, whatever the storage limit says.**
-  The global `bodyLimit` (`maxBodySize`, `REBASE_MAX_BODY_SIZE`, 10 MB by
-  default) is registered on `${basePath}/*` before the storage router is
-  mounted, so it runs first and answers `413` before the upload route's own,
-  larger limit (`maxFileSize`, 50 MB by default) is consulted. Raise the global
-  limit as well, or upload over TUS in chunks smaller than it.
 
 ## Where the code lives
 

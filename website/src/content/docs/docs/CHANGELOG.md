@@ -9,6 +9,20 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+- **Uploads between 10 MB and 50 MB work.** `POST /api/storage/upload` has its
+  own body limit, the storage config's `maxFileSize` (50 MB by default), and
+  the docs said it overrode the global `maxBodySize` (10 MB by default). It
+  never did. The global limit runs first on every route under the base path and
+  answers `413` on the `Content-Length` alone, so every non-TUS upload above
+  10 MB was refused before the storage limit was checked. That includes every
+  upload from the admin panel. Now the upload route is taken out of the global
+  limit and meets only its own, whether `maxFileSize` is larger or smaller than
+  `maxBodySize`. Every other route keeps the global limit, the rest of
+  `/storage` included. TUS is unchanged: each `PATCH` chunk is still capped by
+  `maxBodySize`, and the whole file by `maxFileSize`. A proxy in front of the
+  runtime has its own limit, which still applies. The Helm chart's ingress
+  defaults to `12m`.
+
 - **Scheduled backups include your users again, and can be restored.**
   `createBackupCron` left the `rebase` schema out of every dump unless told
   otherwise. The aim was to skip Atlas's revision table, but that schema also

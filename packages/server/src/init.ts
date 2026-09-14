@@ -750,8 +750,12 @@ export interface RebaseBackendConfig {
      * Maximum request body size in bytes for API routes (default: 10MB).
      * Set to 0 to disable the global limit entirely.
      *
-     * Note: Storage upload routes use their own limit from the storage config's
-     * `maxFileSize` property (default: 50MB), which takes precedence over this.
+     * Note: `POST /storage/upload` is not under this limit. It is capped by the
+     * storage config's `maxFileSize` instead (default: 50MB), whether that is
+     * larger or smaller than this. Every other route stays under this limit,
+     * the rest of `/storage` included. A TUS upload is many requests, so this
+     * caps each chunk (`PATCH /storage/tus/:id`), and `maxFileSize` caps the
+     * whole file.
      */
     maxBodySize?: number;
     /**
@@ -1077,7 +1081,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     installUnmatchedApiEnvelope(config.app, basePath);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
-    configureMiddlewares(config.app, basePath, isProduction, config);
+    const middlewares = configureMiddlewares(config.app, basePath, isProduction, config);
 
     const collectionRegistry = new BackendCollectionRegistry();
     // Declared data sources — drives engine resolution (capabilities) and the
@@ -2379,8 +2383,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const storageAuthorizeData: { current?: import("@rebasepro/types").StorageAuthorizeData } = {};
 
     if (storageController) {
-        // Storage uploads get their own body limit, derived from the storage config's
-        // maxFileSize (default 50MB), which overrides the global API body limit.
+        // `POST /upload` gets its own body limit, the storage config's
+        // maxFileSize (default 50MB), in place of the global API body limit.
+        // "In place of" takes the exemption at the mount below. Without it,
+        // both limits run and the smaller one always wins, so the global 10MB
+        // refused every upload above it.
         const storageMaxSize = (
             config.storage && typeof config.storage === "object" && "type" in config.storage
                 ? (config.storage as BackendStorageConfig).maxFileSize
@@ -2426,9 +2433,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             authorizeData: () => storageAuthorizeData.current,
             renditionCache: config.storageRenditionCache,
             triggers: config.storageTriggers,
-            // The same number the body limit above is derived from. The
-            // resumable route has no body limit in front of it — a chunked
-            // upload is many small bodies — so it has to be told.
+            // The same number the upload route's body limit is derived from.
+            // The resumable route only has the global limit in front of it,
+            // and that caps each chunk, not the file: a chunked upload is many
+            // small bodies. So it has to be told the file limit.
             maxFileSize: storageMaxSize,
             // Per-property `maxSize` / `acceptedFiles`, resolved from the
             // registry rather than from the request: the limits have to be the
@@ -2470,8 +2478,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             storageRouter.use("/*", createDataRateLimiter(rateLimitConfig));
         }
 
-        // Apply a permissive body limit specifically for the upload endpoint
-        storageRouter.use("/upload", bodyLimit({
+        // The upload endpoint's own body limit. The same path is exempted from
+        // the global limit where the router is mounted, below.
+        const uploadPath = "/upload";
+        storageRouter.use(uploadPath, bodyLimit({
             maxSize: storageMaxSize,
             onError: (c) => errorHandler(
                 new ApiError(
@@ -2487,7 +2497,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Only the HTTP surface is optional. The controller, the registry and
         // the access-control boot guard above are not: a process that serves no
         // storage routes still hands `rebase.storage` to every function it runs.
-        if (surfaces.storage) config.app.route(`${basePath}/storage`, storageRouter);
+        if (surfaces.storage) {
+            config.app.route(`${basePath}/storage`, storageRouter);
+            // Only the upload route. Every other path under `/storage` stays on
+            // the global limit, TUS included: `PATCH /tus/:id` reads its chunk
+            // into memory, and the global limit is the only cap on one chunk.
+            middlewares.exemptFromBodyLimit(`${basePath}/storage${uploadPath}`);
+        }
     } else {
         // No storage backend: say so, instead of 404ing as if the route were a
         // typo. A bare 404 reads as "wrong URL" and sends people debugging

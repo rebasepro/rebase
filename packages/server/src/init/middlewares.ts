@@ -26,12 +26,33 @@ interface MiddlewareConfig {
     };
 }
 
+export interface ConfiguredMiddlewares {
+    /**
+     * Take one path out of the global body limit, for a route that installs
+     * its own.
+     *
+     * Two `bodyLimit`s on one path do not combine into "the inner one wins".
+     * Each answers 413 on the `Content-Length` alone, so the global one, which
+     * runs first, refuses everything above its size before the route's own
+     * limit is consulted. A route that needs a *larger* ceiling has to be taken
+     * out of the global one. Only the code that installs the replacement limit
+     * should call this. Called from anywhere else, it leaves a path with no
+     * limit at all.
+     *
+     * The path is matched exactly. A prefix would take every sibling route
+     * with it.
+     */
+    exemptFromBodyLimit(path: string): void;
+}
+
 export function configureMiddlewares(
     app: Hono<HonoEnv>,
     basePath: string,
     isProduction: boolean,
     config: MiddlewareConfig
-): void {
+): ConfiguredMiddlewares {
+    const carriesOwnBodyLimit = new Set<string>();
+
     // Request ID (correlation)
     app.use(`${basePath}/*`, requestId());
 
@@ -46,10 +67,12 @@ export function configureMiddlewares(
         logger.debug("Response compression enabled");
     }
 
-    // Request Body Size Limit
+    // Request Body Size Limit. It is registered here, before any router is
+    // mounted, so the exemption set is read per request: the routes that
+    // carry their own limit are mounted later and add themselves to it then.
     const maxBodySize = config.maxBodySize ?? 10 * 1024 * 1024; // 10MB default
     if (maxBodySize > 0) {
-        app.use(`${basePath}/*`, bodyLimit({
+        const limitBody = bodyLimit({
             maxSize: maxBodySize,
             onError: (c) => errorHandler(
                 new ApiError(
@@ -59,7 +82,11 @@ export function configureMiddlewares(
                 ),
                 c
             ) as Response
-        }));
+        });
+        // `c.req.path` is the path Hono routed on, already decoded, so it is
+        // the same string the route's own limit is matched against.
+        app.use(`${basePath}/*`, (c, next) =>
+            carriesOwnBodyLimit.has(c.req.path) ? next() : limitBody(c, next));
         logger.debug("Request body limit configured", { maxSizeMB: Math.round(maxBodySize / 1024 / 1024) });
     }
 
@@ -97,4 +124,10 @@ export function configureMiddlewares(
     // is already subscribed by the time this line runs — so the first thing every
     // reader would see is itself connecting.
     app.use(`${basePath}/*`, logMiddleware({ ignorePaths: [`${basePath}/logs/stream`] }));
+
+    return {
+        exemptFromBodyLimit: (path) => {
+            carriesOwnBodyLimit.add(path);
+        }
+    };
 }
