@@ -2,18 +2,18 @@
 sourceHash: 24ecb93e6262aeca
 title: Slots
 sidebar_label: Slots
-description: Referenz für alle UI-Erweiterungspunkt-Slots, die in Rebase verfügbar sind — benannte Stellen, an denen Sie benutzerdefinierte Komponenten einfügen können.
+description: Referenz für alle in Rebase verfügbaren UI-Erweiterungspunkt-Slots – benannte Stellen, an denen Sie benutzerdefinierte Komponenten einfügen können.
 ---
 
-## Überblick
+## Übersicht
 
-Slots sind benannte UI-Erweiterungspunkte, an denen Sie benutzerdefinierte React-Komponenten einfügen können. Jeder Slot hat typisierte Props, die für seine Position in der UI spezifisch sind. Rebase liefert 29 integrierte Slots, die die Startseite, Navigation, Collection-Views, Entity-Formulare, Dashboards und mehr abdecken.
+Slots sind benannte UI-Erweiterungspunkte, an denen Sie benutzerdefinierte React-Komponenten einfügen können. Jeder Slot verfügt über typisierte Props, die für seine Position in der Benutzeroberfläche spezifisch sind. Rebase wird mit 29 integrierten Slots ausgeliefert, die die Startseite, die Navigation, Collection-Ansichten, Entity-Formulare, Dashboards und mehr abdecken.
 
 ## Verwendung
 
-### Über die `<Rebase>`-Prop
+### Über den `<Rebase>`-Prop
 
-```tsx
+```tsx no-verify
 <Rebase
     client={client}
     slots={[
@@ -46,7 +46,7 @@ const myPlugin: RebasePlugin = {
 ```
 
 :::note
-`order` steuert die Renderreihenfolge — niedrigere Werte werden zuerst gerendert. Der Standard ist `50`.
+`order` steuert die Rendering-Reihenfolge – niedrigere Werte werden zuerst gerendert. Der Standardwert ist `50`.
 :::
 
 ## Verfügbare Slots
@@ -55,67 +55,67 @@ const myPlugin: RebasePlugin = {
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `home.actions` | `PluginGenericProps` | Aktionen im Header der Startseite |
+| `home.actions` | `PluginGenericProps` | Aktionen in der Kopfzeile der Startseite |
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Zusätzliche Karten auf der Startseite |
 | `home.children.start` | `PluginGenericProps` | Inhalt am Anfang der Startseite |
 | `home.children.end` | `PluginGenericProps` | Inhalt am Ende der Startseite |
-| `home.card.widget` | `HomeCardWidgetSlotProps` | Kompaktes Widget in einer Collection-Karte der Startseite |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Kompaktes Widget innerhalb einer Collection-Karte auf der Startseite |
 | `home.collection.actions` | `PluginHomePageActionsProps` | Aktionen auf Collection-Karten der Startseite |
 
 #### Navigation
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `navigation.header` | `NavigationSlotProps` | Unter dem Logo in der Sidebar-Schublade |
-| `navigation.footer` | `NavigationSlotProps` | Über dem Einklapp-Umschalter unten in der Schublade |
+| `navigation.header` | `NavigationSlotProps` | Unterhalb des Logos im Drawer der Seitenleiste |
+| `navigation.footer` | `NavigationSlotProps` | Oberhalb des Einklapp-Umschalters am unteren Rand des Drawers |
 
-#### Collection-View
+#### Collection-Ansicht
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
 | `collection.actions` | `CollectionActionsProps` | Toolbar-Aktionen am Ende (nach Collection-`Actions`) |
-| `collection.actions.start` | `CollectionActionsProps` | Toolbar-Aktionen am Anfang (neben den Filtern) |
-| `collection.header.action` | `CollectionHeaderActionProps` | Aktionsschaltflächen der Spaltenüberschriften |
-| `collection.add-column` | `CollectionAddColumnProps` | „Spalte hinzufügen"-Bereich im Tabellenkopf |
-| `collection.error` | `CollectionErrorProps` | Anzeige des Fehlerzustands einer Collection |
-| `collection.toolbar` | `CollectionToolbarProps` | Zusätzliche Widgets in der Toolbar-Zeile der Collection |
-| `collection.empty-state` | `CollectionEmptyStateProps` | Benutzerdefinierter Leerzustand, wenn die Collection keine Daten hat |
-| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets über der Collection-Tabelle |
-| `collection.filter-panel` | `CollectionFilterPanelProps` | Benutzerdefinierte Filter-Sidebar neben der Tabelle. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `collection.actions.start` | `CollectionActionsProps` | Toolbar-Aktionen am Anfang (neben Filtern) |
+| `collection.header.action` | `CollectionHeaderActionProps` | Aktionsschaltflächen im Spaltenkopf |
+| `collection.add-column` | `CollectionAddColumnProps` | Bereich „Spalte hinzufügen“ im Tabellenkopf |
+| `collection.error` | `CollectionErrorProps` | Anzeige des Fehlerzustands für eine Collection |
+| `collection.toolbar` | `CollectionToolbarProps` | Zusätzliche Widgets innerhalb der Collection-Toolbar-Zeile |
+| `collection.empty-state` | `CollectionEmptyStateProps` | Benutzerdefinierter Leerzustand, wenn die Collection keine Daten enthält |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets oberhalb der Collection-Tabelle |
+| `collection.filter-panel` | `CollectionFilterPanelProps` | Benutzerdefinierte Filter-Seitenleiste neben der Tabelle. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
 
-#### Entität / Formular
+#### Entity / Formular
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
 | `form.actions` | `PluginFormActionProps` | Aktionen in der Aktionsleiste des Entity-Formulars |
-| `form.actions.top` | `PluginFormActionProps` | Aktionen über der Formular-Aktionsleiste |
-| `form.before` | `PluginFormActionProps` | Inhalt vor dem Formulartitel/der Feldliste |
+| `form.actions.top` | `PluginFormActionProps` | Aktionen oberhalb der Formular-Aktionsleiste |
+| `form.before` | `PluginFormActionProps` | Inhalt vor dem Formulartitel bzw. der Feldliste |
 | `form.after` | `PluginFormActionProps` | Inhalt nach der Formular-Feldliste |
-| `entity.row.actions` | `EntityRowActionsProps` | Aktionen pro Zeile in Entity-Tabellen. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
-| `entity.field.before` | `EntityFieldSlotProps` | UI, die vor einem einzelnen Formularfeld eingefügt wird. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
-| `entity.field.after` | `EntityFieldSlotProps` | UI, die nach einem einzelnen Formularfeld eingefügt wird. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `entity.row.actions` | `EntityRowActionsProps` | Zeilenweise Aktionen in Entity-Tabellen. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
+| `entity.field.before` | `EntityFieldSlotProps` | UI, die vor einem einzelnen Formularfeld eingefügt wird. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
+| `entity.field.after` | `EntityFieldSlotProps` | UI, die nach einem einzelnen Formularfeld eingefügt wird. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
 
 #### Dashboard
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `dashboard.widget` | `DashboardWidgetProps` | Widgets auf dem Dashboard/der Startseite. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `dashboard.widget` | `DashboardWidgetProps` | Widgets auf dem Dashboard bzw. der Startseite. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
 
 #### Global
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | Collection-übergreifende Suchleisten-Komponente. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
-| `shell.toolbar` | `ShellToolbarProps` | Toolbar-Aktionen auf oberster Ebene in der App-Bar. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `global.search` | `GlobalSearchProps` | Collection-übergreifende Suchleisten-Komponente. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
+| `shell.toolbar` | `ShellToolbarProps` | Aktionen in der Top-Level-Toolbar der App-Leiste. **Wird noch nicht gerendert** – deklariert, wird jedoch derzeit noch an keiner Stelle im Admin gerendert. |
 
 #### Kanban
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `kanban.setup` | `KanbanSetupProps` | Kanban-Board-Setup-UI |
-| `kanban.add-column` | `KanbanAddColumnProps` | „Spalte hinzufügen" in der Kanban-Ansicht |
+| `kanban.setup` | `KanbanSetupProps` | UI zur Einrichtung des Kanban-Boards |
+| `kanban.add-column` | `KanbanAddColumnProps` | „Spalte hinzufügen“ in der Kanban-Ansicht |
 
-## Slot-Props-Referenz
+## Referenz der Slot-Props
 
 Alle Slot-Prop-Typen werden aus `@rebasepro/types` exportiert und können für typsichere Slot-Komponenten importiert werden:
 
@@ -123,4 +123,10 @@ Alle Slot-Prop-Typen werden aus `@rebasepro/types` exportiert und können für t
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";
 ```
 
-Jeder Props-Typ bietet Zugriff auf den für die Position des Slots relevanten Kontext — Collection-Metadaten, Entity-Daten, Navigationszustand und mehr. Weitere Details zu den Eigenschaften finden Sie in den einzelnen Typdefinitionen.
+Jeder Props-Typ bietet Zugriff auf den Kontext, der für die Position des jeweiligen Slots relevant ist – Collection-Metadaten, Entity-Daten, Navigationsstatus und mehr. Vollständige Eigenschaftsdetails finden Sie in den einzelnen Typdefinitionen.
+
+## Verwandte Themen
+
+- [Komponenten-Überschreibungen (Swizzling)](/docs/frontend/component-overrides/) – wenn ein Slot nicht ausreicht
+- [Rebase erweitern](/docs/frontend/extending/) – die restliche Erweiterungsfläche
+- [Plugins](/docs/plugins/) – Slot-Inhalte als Plugin bereitstellen

@@ -1,51 +1,64 @@
 ---
-sourceHash: 103f52d34c1d28b6
+sourceHash: 476cbf3fe099d5c3
 title: Propriétés
 sidebar_label: Propriétés
-description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types chaîne de caractères, nombre, booléen, date, tableau, carte (map), référence, relation et géopoint.
+description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
 ## Vue d'ensemble
 
-Les propriétés définissent les colonnes de votre table de base de données et la manière dont elles sont affichées dans l'interface utilisateur d'administration. Chaque propriété a un `type` qui détermine :
+Les propriétés définissent les colonnes de votre table de base de données ainsi que la manière dont elles sont affichées dans l'interface d'administration. Chaque propriété possède un `type` qui détermine :
 
-- Le **type de colonne de base de données** (via la génération de schéma Drizzle)
+- Le **type de colonne de la base de données** (via la génération de schéma Drizzle)
 - Le composant de **champ de formulaire**
-- Le rendu de la **cellule de tableau**
+- Le moteur de rendu de **cellule de tableau**
 - Les règles de **validation**
 
 ## Types de propriétés
 
 | Type | Description | Colonne PostgreSQL |
 |------|-------------|-------------------|
-| `string` | Texte, sélection, markdown, téléchargement de fichier, URL, e-mail | `varchar`, `text`, `jsonb` |
+| `string` | Texte, select, markdown, téléversement de fichier, URL, e-mail | `varchar`, `text`, `jsonb` |
 | `number` | Entier, décimal, devise | `integer`, `numeric`, `bigint`, `serial` |
-| `boolean` | Interrupteur vrai/faux | `boolean` |
+| `boolean` | Bascule vrai/faux | `boolean` |
 | `date` | Date, date et heure, horodatage | `timestamp`, `date` |
 | `array` | Liste ordonnée de valeurs | `jsonb` |
 | `map` | Objet clé-valeur | `jsonb` |
 | `geopoint` | Paire latitude/longitude | `jsonb` |
-| `reference` | Référence intégrée à une autre entité | `varchar` (stocke l'ID) |
+| `reference` | Référence intégrée vers une autre entité | `varchar` (stocke l'ID) |
 | `relation` | Relation de clé étrangère SQL | Utilise le tableau `relations` |
+| `vector` | Embedding, pour la recherche des plus proches voisins | `VECTOR(n)` (pgvector) |
+| `binary` | Octets bruts, lus et écrits en base64 | `bytea` |
 
 ## Propriétés communes
 
 Tous les types de propriétés partagent ces options :
 
 | Propriété | Type | Description |
-|----------|------|-------------|
-| `type` | `string` | **Obligatoire.** Type de données (voir ci-dessus) |
-| `name` | `string` | Étiquette d'affichage. Par défaut la clé de la propriété, embellie — `publishDate` → "Publish Date". |
+|-----------|------|-------------|
+| `type` | `string` | **Requis.** Type de données (voir ci-dessus) |
+| `name` | `string` | Libellé d'affichage. Par défaut, la clé de la propriété mise en forme — `publishDate` → "Publish Date". Définissez-le lorsque cette dérivation est incorrecte : `"URL"` plutôt que "Url". |
 | `description` | `string` | Texte d'aide affiché sous le champ |
-| `defaultValue` | `any` | Valeur par défaut pour les nouvelles entités |
+| `defaultValue` | `any` | Valeur par défaut pour les nouvelles entités. Une valeur littérale — une chaîne, un nombre, un booléen, une date, un identifiant d'enum, ou un document `map`/`array` — devient également le `DEFAULT` de la colonne, de sorte qu'une ligne insérée par tout ce qui n'est pas le panneau d'administration (l'API REST, un seed, `psql`) la reçoit également |
 | `validation` | `object` | Règles de validation |
 | `propertyConfig` | `string` | Clé de configuration de propriété enregistrée |
-| `columnName` | `string` | Nom de colonne de base de données explicite (contourne la conversion snake_case) |
+| `columnName` | `string` | Nom explicite de la colonne en base de données (contourne la conversion en snake_case) |
 | `callbacks` | `PropertyCallbacks` | Hooks pour les transformations `afterRead` et `beforeSave` |
-| `dynamicProps` | `function` | Constructeur de propriétés dynamiques (voir Champs conditionnels) |
-| `conditions` | `PropertyConditions` | Conditions déclaratives JSON Logic |
+| `excludeFromApi` | `boolean` | Ne jamais mentionner cette colonne sur l'API, dans aucune direction — utile pour un hash de mot de passe ou un jeton de vérification. La valeur est toujours écrite et interrogeable côté serveur ; elle est retirée de chaque ligne servie par l'API, pour chaque appelant y compris les administrateurs et les clés de service, et elle est absente des types générés `Row`, `Insert` et `Update` ainsi que du schéma OpenAPI. Équivalent syntaxique de `access: { read: [], write: [] }` — les deux reposent sur le même mécanisme, et définir les deux sur une même propriété est refusé au démarrage |
+| `access` | `{ read?: string[]; write?: string[] }` | Qui peut lire et qui peut écrire ce champ spécifique, par rôle. Une liste omise délègue aux [règles de sécurité](/docs/collections/security-rules/) de la ligne ; `[]` signifie personne via l'API ; une liste de rôles correspond à ces rôles plus `admin`. Un champ non lisible est **absent** des réponses plutôt que `null`, et une écriture ciblant un champ non modifiable renvoie une 400. Voir [Accès aux champs](/docs/collections/field-access/) |
+| `metadata` | `Record<string, unknown>` | Tout ce dont votre propre code a besoin d'associer à une propriété. Rebase ne le lit pas ; il survit à la sérialisation sans modification |
+| `dynamicProps` | `function` | Générateur de propriété dynamique (voir [Champs conditionnels](/docs/collections/validation-and-conditions/#conditional-fields)). **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `conditions` | `PropertyConditions` | Conditions déclaratives JSON Logic. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+
+:::note[Ce que signifie « formulaire d'administration uniquement »]
+Plusieurs options ci-dessous portent cette mention : elles configurent le formulaire généré par le panneau et
+rien d'autre — l'API accepte une écriture qui les ignore, et aucune contrainte
+ne les applique en base. Une règle qui doit s'appliquer à chaque appelant est une
+[règle de validation](/docs/collections/validation-and-conditions/) ou une
+[règle de sécurité](/docs/collections/security-rules/).
+:::
 
 ### Configuration de l'interface utilisateur (`admin`)
 
@@ -64,20 +77,35 @@ price: {
 ```
 
 | Propriété | Type | Description |
-|----------|------|-------------|
-| `admin.readOnly` | `boolean` | Empêche l'édition |
-| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactiver avec info-bulle optionnelle |
-| `admin.hideFromCollection` | `boolean` | Masquer de la vue tableau |
-| `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue tableau) |
+|-----------|------|-------------|
+| `admin.readOnly` | `boolean` | Empêche la modification |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactive avec infobulle optionnelle |
+| `admin.hideFromCollection` | `boolean` | Masque de la vue en tableau |
+| `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue en tableau) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
 | `admin.Field` | `React.ComponentType` | Composant de champ personnalisé |
 | `admin.Preview` | `React.ComponentType` | Composant de cellule de tableau personnalisé |
+| `admin.Filter` | `React.ComponentType` | Champ de filtre personnalisé pour cette propriété. Prioritaire sur la surcharge `Collection.FilterField` au niveau de la collection et sur le champ intégré par type |
+| `admin.filterOperators` | `WhereFilterOp[]` | Restreint les opérateurs proposés lors du filtrage sur cette propriété. L'ensemble proposé est l'**intersection** des capacités du moteur, des valeurs par défaut du type et de cette liste — vous pouvez uniquement restreindre, jamais ajouter un opérateur que le moteur ne peut pas exécuter. `[]` désactive le filtrage sur la propriété |
+| `admin.customProps` | `unknown` | Tout ce dont votre propre `Field` ou `Preview` a besoin. Rebase le transmet tel quel |
 
-## Propriétés de type chaîne de caractères
+#### `PropertyDisabledConfig`
 
-Le type `string` est le plus polyvalent — selon les options que vous définissez, il s'affiche sous différents widgets.
+La forme objet de `admin.disabled`. Le contrôle reste visible et grisé,
+ce qui constitue la différence avec `admin.readOnly` — un utilisateur peut voir la forme de
+ce qu'il n'est pas autorisé à remplir.
 
-### Champ de texte
+| Propriété | Type | Description |
+|-----------|------|-------------|
+| `disabledMessage` | `string` | Raison pour laquelle cette propriété est désactivée, affichée à l'utilisateur. Sans cela, un contrôle grisé n'explique rien |
+| `clearOnDisabled` | `boolean` | Définit la valeur sur `null` lorsque la propriété devient désactivée, afin qu'une valeur obsolète ne soit pas enregistrée avec l'entité |
+| `hidden` | `boolean` | Masque entièrement le champ lorsqu'il est désactivé, plutôt que de le griser |
+
+## Propriétés de chaîne (String)
+
+Le type `string` est le plus polyvalent — selon les options que vous définissez, il s'affiche sous forme de différents widgets.
+
+### Champ texte
 
 Un champ de saisie de texte simple sur une seule ligne.
 
@@ -93,13 +121,15 @@ name: {
 
 ### Texte multiligne
 
-Définissez `multiline: true` pour afficher une zone de texte (textarea).
+Définissez `admin.multiline` pour effectuer le rendu sous forme de zone de texte (textarea). Cela modifie la façon dont le champ est dessiné,
+pas ce que contient la colonne ; cela réside donc dans le bloc `admin` avec le reste des
+options de présentation.
 
 ```typescript
 description: {
     type: "string",
     name: "Description",
-    multiline: true
+    admin: { multiline: true }
 }
 ```
 
@@ -107,13 +137,13 @@ description: {
 
 ### Éditeur Markdown
 
-Définissez `markdown: true` pour afficher un éditeur Markdown complet avec barre d'outils.
+Définissez `admin.markdown` pour afficher un éditeur markdown complet avec barre d'outils.
 
 ```typescript
 body: {
     type: "string",
     name: "Blog text",
-    markdown: true
+    admin: { markdown: true }
 }
 ```
 
@@ -121,12 +151,13 @@ body: {
 
 ### Champ e-mail
 
-Définissez `email: true` pour ajouter une validation de format e-mail et afficher avec une icône e-mail.
+Définissez `email: true` pour ajouter la validation du format d'e-mail et l'afficher avec une icône d'e-mail.
 
 ```typescript
 email: {
     type: "string",
     name: "User email",
+    email: true,
     validation: { required: true }
 }
 ```
@@ -135,7 +166,7 @@ email: {
 
 ### Champ URL
 
-Définissez `url: true` pour ajouter une validation de format URL et afficher avec une icône de lien.
+Définissez `url: true` pour ajouter la validation du format d'URL et l'afficher avec une icône de lien.
 
 ```typescript
 website: {
@@ -147,29 +178,29 @@ website: {
 
 <FieldWidgetPreview client:only="react" variant="url" />
 
-### Téléchargement de fichier
+### Téléversement de fichier
 
-Définissez `storage` pour afficher une zone de dépôt de fichier.
+Définissez `storage` pour afficher une zone de dépôt pour le téléversement de fichiers. La colonne reste une chaîne de caractères — ce qui
+y est écrit est la clé de l'objet dans le bucket :
 
 ```typescript
 avatar: {
     type: "string",
     name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
+    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
 }
 ```
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
-### Sélection (énumération)
+Toutes les options disponibles dans `storage`, ainsi que la variante multi-fichiers de ce même champ, sont détaillées sur
+[Téléversements de fichiers](/docs/collections/file-uploads).
 
-Définissez `enum` pour afficher une liste déroulante. Voir la section [Valeurs d'énumération](#valeurs-dénumération) pour plus de détails.
+### Select (enum)
 
-```typescript
+Définissez `enum` pour afficher une liste déroulante select. Voir [Valeurs d'énumération](/docs/collections/validation-and-conditions/#enum-values) pour plus de détails.
+
+```typescript no-verify
 category: {
     type: "string",
     name: "Category",
@@ -184,40 +215,90 @@ category: {
 
 ### Sélection multiple
 
-Définissez `enum` + `multiSelect: true` pour permettre de choisir plusieurs valeurs.
+Plusieurs valeurs issues d'un ensemble fixe correspondent à un **tableau de chaînes enum**, et non à un indicateur sur
+une chaîne unique : la colonne contient plusieurs valeurs, la propriété qui la décrit est donc le tableau.
+`columnType: "text[]"` est ce qui en fait une colonne Postgres unique plutôt qu'une jointure.
 
-```typescript
+```typescript no-verify
 locales: {
-    type: "string",
+    type: "array",
     name: "Available locales",
-    multiSelect: true,
-    enum: [
-        { id: "es", label: "Spanish", color: "pink" },
-        { id: "en", label: "English", color: "blueLight" },
-        { id: "fr", label: "French", color: "purpleLight" },
-    ]
+    columnType: "text[]",
+    of: {
+        type: "string",
+        name: "Locale",
+        enum: [
+            { id: "es", label: "Spanish", color: "pink" },
+            { id: "en", label: "English", color: "blueLight" },
+            { id: "fr", label: "French", color: "purpleLight" },
+        ]
+    }
 }
 ```
 
 <FieldWidgetPreview client:only="react" variant="multi_select" />
 
-### Options de chaîne de caractères
+### Options des chaînes
 
 | Propriété | Type | Description |
-|----------|------|-------------|
-| `admin.multiline` | `boolean` | Rendu en tant que zone de texte (textarea) |
-| `admin.markdown` | `boolean` | Rendu en tant qu'éditeur Markdown |
-| `email` | `boolean` | Validation du format e-mail |
-| `url` | `boolean` | Validation du format URL |
-| `storage` | `StorageConfig` | Activer le téléchargement de fichiers |
-| `enum` | `EnumValues` | Rendu en tant que liste déroulante (select) |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | Colonne de base de données : `"varchar" \| "text" \| "char" \| "uuid"` |
-| `isId` | `boolean \| string` | Primary key, and who fills it: `"manual"`, `"uuid"`, or any other string used verbatim as the column's SQL default expression. The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
-| `userSelect` | `boolean` | Rendu en tant que sélecteur d'utilisateur |
-| `admin.previewAsTag` | `boolean` | Afficher cette chaîne comme une étiquette dans les aperçus |
-| `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
+|-----------|------|-------------|
+| `admin.multiline` | `boolean` | Rendu sous forme de zone de texte (textarea) |
+| `admin.markdown` | `boolean` | Rendu sous forme d'éditeur markdown |
+| `email` | `boolean` | Validation du format d'e-mail |
+| `url` | `boolean` | Validation du format d'URL |
+| `storage` | `StorageConfig` | Active le téléversement de fichiers — voir [Téléversements de fichiers](/docs/collections/file-uploads) |
+| `enum` | `EnumValues` | Rendu sous forme de liste déroulante de sélection |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonne de base de données. Par défaut `varchar`, ou `uuid` lorsque `isId` l'indique. `text` pour les chaînes sans limite de taille, `char` pour une longueur fixe |
+| `isId` | `boolean \| string` | Marque la propriété comme clé primaire et indique qui la renseigne : `"manual"` (vous-même), `"uuid"` (`gen_random_uuid()`), ou toute autre chaîne, utilisée textuellement comme expression SQL par défaut de la colonne — brute (`nanoid()`) ou sous forme de template (``"sql`nanoid()`"``). La fonction doit exister ; rien ici ne la crée. `"increment"` est une stratégie pour les **nombres** et ne fait rien ici, et `"cuid"` est refusé au chargement de la configuration |
+| `autoValue` | `"user_on_create" \| "user_on_update"` | Marque la colonne avec l'**uid de l'utilisateur actif** — à la création uniquement, ou à chaque écriture. Voir [Colonnes d'audit](#colonnes-daudit) |
+| `userSelect` | `boolean` | Rendu sous forme de sélecteur d'utilisateur. La valeur est une simple colonne de chaîne contenant l'identifiant de l'utilisateur — rien ne la résout ni ne la vérifie à l'entrée. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `admin.previewAsTag` | `boolean` | Affiche cette chaîne sous forme de tag dans les aperçus |
+| `admin.clearable` | `boolean` | Ajoute une icône pour effacer la valeur (définir sur null) |
+| `admin.urlPreview` | `PreviewType` | Comment afficher une chaîne contenant une URL : un lien, ou un aperçu d'image, d'audio ou de vidéo intégré. Présentation uniquement — le fait que la valeur *soit* une URL dépend de l'indicateur `url` sur la propriété, à partir duquel le contrat OpenAPI est généré |
 
-## Propriétés de type nombre
+### Colonnes d'audit
+
+`autoValue` sur une chaîne de caractères est l'équivalent `created_by` / `updated_by` de la même
+option sur une [date](#options-de-date) :
+
+```typescript
+createdBy: {
+    type: "string",
+    name: "Created by",
+    autoValue: "user_on_create",
+    admin: { readOnly: true }
+},
+
+updatedBy: {
+    type: "string",
+    name: "Updated by",
+    autoValue: "user_on_update"
+}
+```
+
+La valeur provient du contexte de l'appel, jamais du corps de la requête — le pilote
+écrase tout ce qui a été envoyé, de sorte qu'un appelant ne peut pas prétendre être quelqu'un d'autre en
+fournissant le champ. Une colonne dont la valeur est fournie par l'appelant n'est pas une colonne
+d'audit.
+
+En l'absence d'utilisateur actif — une requête anonyme, un jeton de service, un script de seed — la
+colonne est définie sur `null`. Associez-la à `validation: { required: true }` et cela
+devient une erreur 400 à la place : une collection qui exige de savoir qui a écrit une ligne est une
+collection qui ne peut pas accepter une écriture anonyme.
+
+Il n'y a pas de clé étrangère. L'uid est une chaîne de caractères, le magasin d'utilisateurs peut être une
+base de données totalement différente, et un utilisateur supprimé ne doit pas emporter la piste d'audit avec lui —
+déclarez une [relation](/docs/collections/relations) si vous souhaitez une jointure.
+
+:::note[Une seule clé primaire par collection]
+`isId` ne peut être revendiqué que par une seule propriété. Une seconde sera refusée au
+chargement de la configuration plutôt qu'ignorée silencieusement : les clés primaires composites ne sont pas prises en charge, et
+une configuration en déclarant deux doit être interprétée comme une demande que Rebase ne peut pas satisfaire. Si
+vous souhaitiez définir une contrainte d'unicité sur plusieurs colonnes, il s'agit d'un
+[index](/docs/backend/indexes) unique.
+:::
+
+## Propriétés numériques (Number)
 
 ```typescript
 price: {
@@ -235,18 +316,34 @@ quantity: {
 
 <FieldWidgetPreview client:only="react" variant="number" />
 
-Les champs de nombre s'affichent comme un champ de saisie standard avec validation numérique.
+Les champs numériques s'affichent sous forme de champ de saisie de texte standard avec validation numérique.
 
-### Options de nombre
+### Options numériques
 
 | Propriété | Type | Description |
-|----------|------|-------------|
-| `enum` | `EnumValues` | Rendu en tant que liste déroulante avec des valeurs numériques. Unlike a string enum this creates **no Postgres enum type** — the column stays `NUMERIC` or `INTEGER`, so the panel offers the values and the database does not enforce them |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
-| `isId` | `boolean \| string` | Primary key: `"manual"`, `"increment"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is always `INTEGER GENERATED BY DEFAULT AS IDENTITY` — `columnType` beside it is ignored, with a warning |
-| `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
+|-----------|------|-------------|
+| `enum` | `EnumValues` | Rendu sous forme de select avec des valeurs numériques. Contrairement à un enum de chaînes, cela ne crée **aucun type enum Postgres** — la colonne reste `NUMERIC` ou `INTEGER`, de sorte que le panneau propose les valeurs mais la base de données ne les impose pas |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Vaut par défaut `integer` lorsque `validation.integer` ou `isId` indique que la valeur est entière, `numeric` sinon |
+| `precision` / `scale` | `number` | Nombre total de chiffres significatifs et de chiffres après la virgule sur une colonne `numeric` — `NUMERIC(10, 2)`. L'argent manipulé sans cela est un `NUMERIC` sans limite qui conserve tout ce que l'appelant a envoyé, et ne peut pas être restreint ultérieurement sans réécrire la colonne |
+| `isId` | `boolean \| string` | Marque la propriété comme clé primaire : `"manual"`, `"increment"`, ou toute autre chaîne utilisée textuellement comme expression SQL par défaut de la colonne. `"increment"` est toujours `INTEGER GENERATED BY DEFAULT AS IDENTITY` — la propriété `columnType` définie à ses côtés est ignorée avec un avertissement, car toute clé étrangère pointant vers une clé numérique est de type `INTEGER` et une clé plus large serait référencée par des colonnes plus étroites |
+| `admin.clearable` | `boolean` | Ajoute une icône pour effacer la valeur (définir sur null) |
+| `admin.format` | `NumberFormatOptions` | Formate le nombre sous forme de devise, de pourcentage ou avec des décimales fixes. Si omis, la valeur brute est affichée — un nombre dans la base de données est affiché tel quel |
 
-## Propriétés de type booléen
+#### `NumberFormatOptions`
+
+Présentation uniquement. La valeur stockée ne change jamais — un affichage arrondi reste
+le nombre complet dans la colonne et dans l'API.
+
+| Propriété | Type | Description |
+|-----------|------|-------------|
+| `style` | `"decimal" \| "currency" \| "percent"` | Vaut `"decimal"` par défaut. `"currency"` requiert `currency` |
+| `currency` | `string` | Code ISO 4217 — `"EUR"`, `"USD"`. Le définir implique `style: "currency"`, le cas courant se résume donc à une seule clé |
+| `locale` | `string` | Tag BCP 47. Par défaut, la locale du panneau, ce qui permet au même montant de s'afficher sous la forme `1,234.50` pour un lecteur et `1.234,50` pour un autre |
+| `minimumFractionDigits` | `number` | Complète avec au moins ce nombre de décimales — `2` affiche `5` sous la forme `5.00` |
+| `maximumFractionDigits` | `number` | Arrondit à au plus ce nombre de décimales. Ne modifie pas la valeur stockée |
+| `notation` | `"standard" \| "compact"` | `"compact"` affiche `12000` sous la forme `12K`. Pratique dans une colonne de tableau étroite |
+
+## Propriétés booléennes (Boolean)
 
 ```typescript
 active: {
@@ -258,13 +355,13 @@ active: {
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
-Les champs booléens s'affichent sous forme d'interrupteur.
+Les booléens s'affichent sous forme d'interrupteur à bascule (switch).
 
-## Propriétés de type date
+## Propriétés de date (Date)
 
-### Date seule
+### Date uniquement
 
-Définissez `mode: "date"` pour afficher un sélecteur de date sans heure.
+Définissez `mode: "date"` pour afficher un sélecteur de date sans l'heure.
 
 ```typescript
 event_date: {
@@ -278,7 +375,7 @@ event_date: {
 
 ### Date et heure
 
-Le mode par défaut `"date_time"` inclut la date et l'heure.
+Le mode par défaut `"date_time"` inclut à la fois la date et l'heure.
 
 ```typescript
 arrival_time: {
@@ -292,7 +389,7 @@ arrival_time: {
 
 ### Horodatages automatiques
 
-Utilisez `autoValue` pour définir automatiquement les horodatages à la création ou à la mise à jour.
+Utilisez `autoValue` pour définir automatiquement des horodatages lors de la création ou de la mise à jour.
 
 ```typescript
 createdAt: {
@@ -309,138 +406,57 @@ updatedAt: {
 }
 ```
 
+`on_update` est un déclencheur (trigger) de base de données, pas seulement une empreinte au niveau de la couche applicative. Rebase écrit la
+colonne à chaque sauvegarde qu'il effectue — ainsi un hook `beforeSave` voit la nouvelle valeur — et
+installe un déclencheur `BEFORE UPDATE` qui l'écrit pour toutes les autres opérations. Sans ce
+déclencheur, un script de seed, un rétro-remplissage de migration ou une ligne modifiée dans `psql` laisserait la
+colonne prétendre que la ligne n'a pas changé, et tout processus la lisant pour décider quoi
+réindexer ou renvoyer ignorerait cette ligne.
+
+Le déclencheur réside dans `drizzle/triggers.sql`, appliqué par `rebase db push` et au
+démarrage par la vérification du schéma — Atlas ne peut pas le gérer, pour la même raison qu'il
+ne peut pas gérer les utilitaires de recherche textuelle intégrale (full-text search).
+
 ### Options de date
 
 | Propriété | Type | Description |
-|----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Date seule ou date + heure (par défaut : `"date_time"`) |
-| `autoValue` | `"on_create" \| "on_update"` | Horodatages définis automatiquement |
-| `columnType` | `"timestamp" \| "date" \| "time"` | `"timestamp" \| "date" \| "time"` |
-| `timezone` | `string` | Chaîne de fuseau horaire pour évaluer la date |
-| `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
+|-----------|------|-------------|
+| `mode` | `"date" \| "date_time"` | Date uniquement ou date + heure (par défaut : `"date_time"`). Choisit le widget ; la colonne reste identique dans les deux cas. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `autoValue` | `"on_create" \| "on_update"` | Définit automatiquement les horodatages. `on_create` est un `DEFAULT now()` ; `on_update` est un déclencheur `BEFORE UPDATE` **ainsi qu'**une empreinte au niveau applicatif, de sorte qu'un `UPDATE` direct issu d'un seed ou d'une migration met également à jour la colonne |
+| `columnType` | `"timestamp" \| "date" \| "time"` | La colonne de base de données. Vaut par défaut `timestamp` **avec fuseau horaire** |
+| `timezone` | `string` | Fuseau horaire dans lequel le sélecteur lit et écrit la valeur. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `admin.clearable` | `boolean` | Ajoute une icône pour effacer la valeur (définir sur null) |
 
-## Propriétés de type tableau
+## Propriétés de tableau et d'objet (Array et Map)
 
-### Répétition simple
+Les deux types composites — une liste répétable et un objet structuré, tous deux
+stockés sous forme de JSONB sauf si un tableau natif Postgres convient. Les éléments répétés, éditeurs de blocs,
+groupes, éditeurs clé-valeur et toutes les options associées sont décrits dans
+**[Tableaux et objets](/docs/collections/arrays-and-maps)**.
 
-Utilisez `of` pour définir une liste répétable d'éléments.
+## Propriétés géopoint (Geopoint)
+
+Une paire latitude/longitude, stockée en `jsonb` — `{ latitude, longitude }`, ce que
+décrivent le type TypeScript généré, le schéma OpenAPI et le champ de formulaire.
 
 ```typescript
-tags: {
-    type: "array",
-    name: "Tags",
-    of: { type: "string" }
+location: {
+    type: "geopoint",
+    name: "Location"
 }
 ```
 
-<FieldWidgetPreview client:only="react" variant="repeat" />
+Les écritures acceptent le même format, ou un `GeoPoint` de `@rebasepro/types` :
+`new GeoPoint(41.4036, 2.1744)`.
 
-### Téléchargement multi-fichiers
+Il n'y a pas d'autres options que celles partagées par toutes les propriétés. La colonne n'est pas
+indexée spatialement et il n'y a pas d'opérateur de distance pour filtrer : un geopoint est
+une valeur que vous stockez et affichez, pas une valeur selon laquelle vous effectuez des recherches. Pour cela, modélisez les deux
+nombres dans leurs propres colonnes.
 
-Combinez `of` avec `storage` pour un téléchargement de fichiers multiples.
+## Propriétés de référence (Reference)
 
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
-
-### Éditeur de blocs
-
-Utilisez `oneOf` pour créer un éditeur de blocs avec plusieurs types de contenu. Chaque clé crée un type de carte que les utilisateurs peuvent choisir.
-
-```typescript
-content: {
-    type: "array",
-    name: "Content",
-    oneOf: {
-        properties: {
-            text: {
-                type: "map",
-                properties: {
-                    body: { type: "string", name: "Text", markdown: true }
-                }
-            },
-            image: {
-                type: "map",
-                properties: {
-                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
-                    caption: { type: "string", name: "Caption" }
-                }
-            }
-        }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="block" />
-
-### Options de tableau
-
-| Propriété | Type | Description |
-|----------|------|-------------|
-| `of` | `Property \| Property[]` | Schéma de propriété pour les éléments du tableau |
-| `oneOf` | `object` | Tableau d'objets typés avec plusieurs types de discriminateurs |
-| `admin.expanded` | `boolean` | Le champ doit-être initialement développé (par défaut : true) |
-| `admin.minimalistView` | `boolean` | Afficher les propriétés enfants directement sans panneau extensible |
-| `admin.sortable` | `boolean` | Les éléments peuvent-ils être réordonnés (par défaut : true) |
-| `admin.canAddElements` | `boolean` | De nouveaux éléments peuvent-ils être ajoutés (par défaut : true) |
-
-## Propriétés de type carte (Map)
-
-### Groupe (structuré)
-
-Utilisez `properties` pour définir un objet structuré avec des champs nommés.
-
-```typescript
-address: {
-    type: "map",
-    name: "Address",
-    properties: {
-        street: { type: "string", name: "Street" },
-        zip: { type: "string", name: "Postal code" }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="group" />
-
-### Clé-valeur (libre)
-
-Définissez `keyValue: true` pour afficher un éditeur de paires clé-valeur arbitraires.
-
-```typescript
-metadata: {
-    type: "map",
-    name: "Key value",
-    keyValue: true
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="key_value" />
-
-### Options de carte (Map)
-
-| Propriété | Type | Description |
-|----------|------|-------------|
-| `properties` | `Properties` | Enregistrement des propriétés incluses dans la carte |
-| `propertiesOrder` | `string[]` | Clés ordonnées pour le rendu |
-| `admin.previewProperties` | `string[]` | Propriétés à afficher dans l'aperçu du tableau |
-| `admin.spreadChildren` | `boolean` | Afficher les propriétés enfants comme des colonnes séparées dans la vue tableau |
-| `admin.minimalistView` | `boolean` | Afficher les propriétés sans panneau d'encapsulation |
-| `admin.expanded` | `boolean` | Le champ doit-être initialement développé (par défaut : true) |
-| `keyValue` | `boolean` | Rendu en tant qu'éditeur de paires clé-valeur arbitraires |
-
-## Propriétés de référence
-
-Les références permettent de créer un lien vers des entités d'une autre collection. Elles s'affichent sous forme de carte d'aperçu montrant les détails de l'entité référencée.
+Les références créent des liens vers des entités d'une autre collection. Elles s'affichent sous forme de carte d'aperçu montrant les détails de l'entité référencée.
 
 ```typescript
 client: {
@@ -455,125 +471,71 @@ client: {
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
-Sur Postgres, une `reference` est une clé étrangère comme une autre : elle suit donc la même règle `ON DELETE` qu'une relation `belongsTo` — facultative c'est `SET NULL`, obligatoire c'est `RESTRICT`. Voir [Relations](/docs/collections/relations).
-
+Sur Postgres, une `reference` est une clé étrangère comme une autre, elle suit donc la même règle `ON DELETE` qu'une relation `belongsTo` : optionnelle équivaut à `SET NULL`, requise équivaut à `RESTRICT`. Voir [Relations](/docs/collections/relations).
 
 ### Options de référence et de relation
 
-Elles s'appliquent aux propriétés `reference` comme aux propriétés `relation`.
+Ces options s'appliquent à la fois aux propriétés `reference` et `relation`.
 
 | Propriété | Type | Description |
-|----------|------|-------------|
-| `admin.fixedFilter` | `FilterValues` | Filtre les entités proposées dans le sélecteur |
-| `admin.widget` | `"select" \| "dialog"` | Quel widget sélectionne l'entité liée (relations uniquement) |
-| `admin.includeId` | `boolean` | Afficher l'id de l'entité liée dans les aperçus (par défaut : true) |
-| `admin.includeEntityLink` | `boolean` | Afficher un lien ouvrant l'entité liée (par défaut : true) |
-| `admin.previewProperties` | `string[]` | Quelles propriétés de la cible apparaissent dans l'aperçu (max. 3) |
+|-----------|------|-------------|
+| `admin.fixedFilter` | `FilterValues` | Filtre les entités proposées dans le widget de sélection |
+| `admin.widget` | `"select" \| "dialog"` | Quel widget permet de sélectionner l'entité liée (relations uniquement) |
+| `admin.includeId` | `boolean` | Affiche l'identifiant de l'entité liée dans les aperçus (par défaut : true) |
+| `admin.includeEntityLink` | `boolean` | Affiche un lien ouvrant l'entité liée (par défaut : true) |
+| `admin.previewProperties` | `string[]` | Quelles propriétés de la cible apparaissent dans l'aperçu (max 3) |
+| `admin.renderInForm` | `boolean` | Affiche une relation de type **many** sous la forme d'un sélecteur dans le formulaire en plus de l'onglet qu'elle possède déjà. Vaut `false` par défaut : la vue de l'entité répertorie déjà les lignes liées dans un onglet, les deux surfaces sont donc redondantes par définition. Sans effet sur une relation to-one, qui ne dispose pas d'onglet |
 
-## Valeurs d'énumération
+## Propriétés vectorielles (Vector)
 
-Utilisé avec les propriétés de type chaîne de caractères ou nombre pour afficher les listes déroulantes :
-
-```typescript
-// Simple array
-enum: ["draft", "published", "archived"]
-
-// With labels
-enum: [
-    { id: "draft", label: "Draft" },
-    { id: "published", label: "Published" },
-    { id: "archived", label: "Archived" }
-]
-
-// With colors (for Kanban columns and chips)
-enum: [
-    { id: "draft", label: "Draft", color: "grayDark" },
-    { id: "published", label: "Published", color: "greenDark" },
-    { id: "archived", label: "Archived", color: "orangeDark" }
-]
-```
-
-## Validation
+Une colonne d'embedding, pour la recherche des plus proches voisins. Postgres uniquement.
 
 ```typescript
-validation: {
-    required: true,             // Field is required
-    unique: true,               // Must be unique in the table
-    requiredMessage: "Custom error message",
-
-    // String-specific
-    min: 2,                     // Minimum length
-    max: 200,                   // Maximum length
-    matches: /^[a-z]+$/,       // Regex pattern
-
-    // Number-specific
-    min: 0,                     // Minimum value
-    max: 1000,                  // Maximum value
-    integer: true,              // Must be integer
-
-    // Array-specific
-    min: 1,                     // Minimum items
-    max: 10,                    // Maximum items
+embedding: {
+    type: "vector",
+    name: "Embedding",
+    dimensions: 1536
 }
 ```
 
-Email and URL formats are **not** validation rules. `email` and `url` are flags
-on the property itself, beside `type` — statements about the data that the
-OpenAPI contract is generated from, rather than form behaviour:
+| Propriété | Type | Description |
+|-----------|------|-------------|
+| `dimensions` | `number` | **Requis.** Longueur du vecteur. Se compile en `VECTOR(n)`. |
+| `index` | `VectorIndexConfig \| false` | Comment l'index ANN est construit. Si omis, un index HNSW pour la distance cosinus. `false` n'en crée aucun. |
+
+Un index ANN est créé avec la colonne, de sorte que `vectorSearch` est approximatif et
+rapide plutôt qu'un scan exact. Il est configuré pour la distance **cosinus**, qui est
+la mesure par défaut de `vectorSearch` à moins que vous ne transmettiez `distance` — un index ne prend en charge
+qu'un seul opérateur, donc une requête `l2` sur un index cosinus bascule silencieusement sur
+un scan séquentiel. `method` (`hnsw` ou `ivfflat`), `distance` (un ou plusieurs), `m`,
+`efConstruction` et `lists` sont tous configurables sur `index`. Au-delà de 2000 dimensions, pgvector
+ne peut construire aucun des deux types d'index, la colonne est donc laissée sans index et le démarrage l'indique.
+
+Interrogez-le avec [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search), qui couvre
+également les prérequis d'installation de pgvector et la façon d'optimiser l'index. Pour les
+index btree, GIN et BRIN standards sur n'importe quelle collection, consultez
+[Index](/docs/backend/indexes).
+
+## Propriétés binaires (Binary)
+
+Octets bruts, stockés sous forme de `bytea`. Les valeurs transitent par l'API sous forme de **chaînes base64** —
+y compris `defaultValue`.
 
 ```typescript
-properties: {
-    email: { type: "string", name: "Email", email: true },
-    website: { type: "string", name: "Website", url: true }
+signature: {
+    type: "binary",
+    name: "Signature"
 }
 ```
 
-## Champs conditionnels
+Les fichiers volumineux ont leur place dans le [stockage](/docs/backend/storage), pas dans une colonne : un
+`bytea` est lu et écrit intégralement avec la ligne.
 
-Vous pouvez rendre les champs dynamiques afin qu'ils réagissent aux valeurs de l'entité. Il existe deux façons de procéder :
+Les valeurs d'énumération, les règles de validation et les champs conditionnels disposent de leur propre page :
+[Validation et conditions](/docs/collections/validation-and-conditions/).
 
-### 1. Conditions JSON Logic (Déclaratives)
-
-Vous pouvez utiliser la propriété `conditions` pour définir des règles JSON Logic déclaratives qui peuvent être sérialisées et modifiées visuellement dans l'éditeur de collection.
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    conditions: {
-        disabled: { "==": [{ "var": "values.is_free" }, true] },
-        required: { "!=": [{ "var": "values.is_free" }, true] },
-        min: 0,
-        clearOnDisabled: true // Set to null if field gets disabled
-    }
-}
-```
-
-L'objet conditions vous donne accès à :
-- `disabled`, `hidden`, `readOnly`
-- `required`, `min`, `max`
-- `defaultValue`
-- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
-- `referencePath`, `referenceFilter`
-- `canAddElements`, `sortable` (pour les tableaux)
-
-### 2. Constructeurs de propriétés (Programmatiques)
-
-Pour un comportement complexe qui ne peut pas être exprimé via JSON Logic, vous pouvez utiliser `dynamicProps` qui évalue une fonction Javascript.
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
-        validation: values.is_free ? {} : { required: true, min: 0 }
-    })
-}
-```
-
-## Prochaines étapes
+## Étapes suivantes
 
 - **[Relations](/docs/collections/relations)** — Clés étrangères et jointures
-- **[Règles de sécurité](/docs/collections/security-rules)** — Sécurité au niveau des lignes
+- **[Règles de sécurité](/docs/collections/security-rules)** — Sécurité au niveau des lignes (RLS)
 - **[Champs personnalisés](/docs/frontend/custom-fields)** — Créer des composants de champs personnalisés

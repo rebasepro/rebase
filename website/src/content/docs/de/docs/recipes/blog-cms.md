@@ -8,11 +8,11 @@ description: Erstellen Sie ein vollständiges Blog-CMS mit Artikeln, Autoren, Ka
 ## Übersicht
 
 Erstellen Sie ein Blog-Backend mit:
-- **Artikeln** mit Markdown-Inhalten und Titelbildern
+- **Artikeln** mit Markdown-Inhalt und Titelbildern
 - **Autoren** mit Profilen
 - **Kategorien** mit einer Many-to-Many-Beziehung
 
-## Sammlungen
+## Collections
 
 ### Autoren
 
@@ -32,7 +32,7 @@ export const authorsCollection = defineCollection({
         },
         email: {
             type: "string",
-            name: "E-Mail",
+            name: "Email",
             email: true,
             validation: { required: true, unique: true }
         },
@@ -80,11 +80,11 @@ export const categoriesCollection = defineCollection({
         },
         color: {
             type: "string",
-            name: "Farbe",
+            name: "Color",
             enum: [
-                { id: "blue", label: "Blau", color: "blue" },
-                { id: "green", label: "Grün", color: "green" },
-                { id: "red", label: "Rot", color: "pink" },
+                { id: "blue", label: "Blue", color: "blue" },
+                { id: "green", label: "Green", color: "green" },
+                { id: "red", label: "Red", color: "pink" },
                 { id: "orange", label: "Orange", color: "orange" }
             ]
         }
@@ -105,7 +105,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    publishedAt?: string | null;
+    publishedAt?: Date | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -117,32 +117,49 @@ export const articlesCollection = defineCollection({
     properties: {
         title: {
             type: "string",
-            name: "Titel",
+            name: "Title",
             validation: { required: true }
         },
         slug: {
             type: "string",
-            name: "URL-Slug",
+            name: "URL Slug",
             validation: { required: true, unique: true }
         },
         author: {
             type: "relation",
-            name: "Autor",
-            relationName: "author"
+            name: "Author",
+            relation: {
+                kind: "belongsTo",
+                target: () => authorsCollection,
+                localKey: "author_id"
+            }
+        },
+        categories: {
+            type: "relation",
+            name: "Categories",
+            relation: {
+                kind: "manyToMany",
+                target: () => categoriesCollection,
+                through: {
+                    table: "article_categories",
+                    sourceColumn: "article_id",
+                    targetColumn: "category_id"
+                }
+            }
         },
         status: {
             type: "string",
             name: "Status",
             enum: [
-                { id: "draft", label: "Entwurf", color: "gray" },
-                { id: "review", label: "In Überprüfung", color: "orange" },
-                { id: "published", label: "Veröffentlicht", color: "green" }
+                { id: "draft", label: "Draft", color: "gray" },
+                { id: "review", label: "In Review", color: "orange" },
+                { id: "published", label: "Published", color: "green" }
             ],
             defaultValue: "draft"
         },
         cover_image: {
             type: "string",
-            name: "Titelbild",
+            name: "Cover Image",
             storage: {
                 storagePath: "articles/covers",
                 acceptedFiles: ["image/*"]
@@ -150,44 +167,26 @@ export const articlesCollection = defineCollection({
         },
         content: {
             type: "string",
-            name: "Inhalt",
+            name: "Content",
             admin: { markdown: true }
         },
         excerpt: {
             type: "string",
-            name: "Auszug",
+            name: "Excerpt",
             admin: { multiline: true },
             validation: { max: 300 }
         },
         publishedAt: {
             type: "date",
-            name: "Veröffentlicht am"
+            name: "Published At"
         },
         createdAt: {
             type: "date",
-            name: "Erstellt am",
+            name: "Created At",
             autoValue: "on_create",
-            readOnly: true
+            admin: { readOnly: true }
         }
     },
-    relations: [
-        {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => authorsCollection,
-            localKey: "author_id"
-        },
-        {
-            kind: "manyToMany",
-            relationName: "categories",
-            target: () => categoriesCollection,
-            through: {
-                table: "article_categories",
-                sourceColumn: "article_id",
-                targetColumn: "category_id"
-            }
-        }
-    ],
     callbacks: {
         beforeSave: async ({ values, status }) => {
             // Auto-generate slug
@@ -198,7 +197,8 @@ export const articlesCollection = defineCollection({
             }
             // Set publishedAt when publishing
             if (values.status === "published" && !values.publishedAt) {
-                values.publishedAt = new Date().toISOString();
+                // `publishedAt` is a `date` property, so its value is a Date.
+                values.publishedAt = new Date();
             }
             return values;
         }
@@ -219,23 +219,23 @@ export const articlesCollection = defineCollection({
 
 ## Einrichtung
 
-1. Fügen Sie alle drei Sammlungen zu Ihrer `config/collections/index.ts` hinzu
-2. Run `rebase schema generate`
-3. Run `rebase db push`
-4. Starten Sie den Entwicklungs-Server neu
+1. Fügen Sie alle drei Collections zu Ihrer `config/collections/index.ts` hinzu
+2. Führen Sie `rebase schema generate` aus
+3. Führen Sie `rebase db push` aus
+4. Starten Sie den Dev-Server neu
 
 Sie verfügen nun über ein voll funktionsfähiges Blog-CMS mit:
 - Autorenverwaltung mit Avatar-Uploads
-- Kategorisierung über Many-to-Many-Beziehungen
+- Kategorie-Tagging über Many-to-Many-Beziehungen
 - Markdown-Inhaltsbearbeitung
-- Workflow: Entwurf → Überprüfung → Veröffentlicht
-- Automatisch generierte URL-Slugs
+- Draft → Review → Published-Workflow
+- Automatisch generierten URL-Slugs
 - RLS-Richtlinien, die Autoren auf ihre eigenen Beiträge beschränken
-- Vollständiger Prüfpfad über die Entitätshistorie
+- Vollständigem Audit-Trail durch Entity-Historie
 
-## Abfragen aus dem SDK
+## Abfragen über das SDK
 
-Verwenden Sie das Client-SDK, um Artikel mit ihren Beziehungen abzurufen:
+Verwenden Sie das Client-SDK, um Artikel mit ihren Relationen abzurufen:
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.
@@ -265,3 +265,10 @@ for (const article of articles) {
     console.log(article.categories);      // Array of related entities
 }
 ```
+
+
+## Verwandte Themen
+
+- [Definieren von Collections](/docs/collections/) — die Collection-API, die dieses Rezept verwendet
+- [Relationen](/docs/collections/relations/) — die Autoren- und Tag-Verknüpfungen im Detail
+- [Sicherheitsregeln (RLS)](/docs/collections/security-rules/) — Veröffentlichen, ohne Entwürfe preiszugeben

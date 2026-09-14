@@ -2,12 +2,12 @@
 sourceHash: 22cf5bf2953fb715
 title: Sicherheitsregeln (RLS)
 sidebar_label: Sicherheitsregeln
-description: Definieren Sie Row Level Security (RLS)-Richtlinien für Ihre Sammlungen mithilfe von praktischen Shortcuts oder rohen SQL-Ausdrücken.
+description: Definieren Sie Row-Level-Security-Richtlinien für Ihre Collections mithilfe praktischer Shortcuts oder reiner SQL-Ausdrücke.
 ---
 
 ## Übersicht
 
-Sicherheitsregeln ermöglichen es Ihnen, **Row Level Security (RLS)**-Richtlinien für Ihre PostgreSQL-Tabellen direkt in Ihren Sammlungsdefinitionen zu definieren. Wenn das Drizzle-Schema generiert wird, erstellt Rebase die entsprechenden `CREATE POLICY`-Anweisungen.
+Mit Sicherheitsregeln können Sie **Row Level Security (RLS)**-Richtlinien für Ihre PostgreSQL-Tabellen direkt in Ihren Collection-Definitionen festlegen. Wenn das Drizzle-Schema generiert wird, erstellt Rebase die entsprechenden `CREATE POLICY`-Anweisungen.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -23,17 +23,17 @@ const postsCollection = defineCollection({
 });
 ```
 
-## Funktionsweise
+## Wie es funktioniert
 
-1. Sie definieren `securityRules` für eine Sammlung
-2. `rebase schema generate` erstellt ein Drizzle-Schema mit aktivierter RLS
+1. Sie definieren `securityRules` in einer Collection
+2. `rebase schema generate` erstellt das Drizzle-Schema mit aktiviertem RLS
 3. `rebase db push` oder `rebase db migrate` wendet die Richtlinien auf PostgreSQL an
 4. Jede Abfrage wird automatisch nach dem Kontext des aktuellen Benutzers gefiltert
 
-Die Identität des authentifizierten Benutzers ist in SQL verfügbar über:
+Die Identität des authentifizierten Benutzers ist in SQL über Folgendes verfügbar:
 
 | Funktion | Rückgabewert |
-|----------|---------|
+|----------|--------------|
 | `rebase.uid()` | Die ID des aktuellen Benutzers |
 | `rebase.roles()` | Kommagetrennte App-Rollen-IDs |
 | `rebase.jwt()` | Vollständige JWT-Claims als JSONB |
@@ -42,21 +42,21 @@ Diese werden vom Rebase-Backend automatisch pro Transaktion gesetzt.
 
 ## Praktische Shortcuts
 
-### Eigentümerbasierter Zugriff
+### Besitzerbasierter Zugriff
 
-Das einfachste Muster — Benutzer können nur auf Zeilen zugreifen, die sie besitzen:
+Das einfachste Muster — Benutzer können nur auf Zeilen zugreifen, die sie selbst besitzen:
 
 ```typescript
 securityRules: [
-    { operation: "all", ownerField: "userId" }
+    { operation: "all", ownerField: "user_id" }
 ]
 ```
 
-Dies erzeugt: `USING (user_id = rebase.uid())`
+Dies generiert: `USING (user_id = rebase.uid())`
 
 ### Öffentlicher Zugriff
 
-Jedem (einschließlich nicht authentifizierten Benutzern) das Lesen erlauben:
+Erlaubt jedem (einschließlich nicht authentifizierten Benutzern) das Lesen:
 
 ```typescript
 securityRules: [
@@ -64,21 +64,25 @@ securityRules: [
 ]
 ```
 
-Dies erzeugt: `USING (true)`
+Dies generiert: `USING (true)`
 
 ### Authentifizierter Zugriff
 
-Jedem authentifizierten Benutzer erlauben:
+Erlaubt den Zugriff für jeden angemeldeten Benutzer. Dies ist eine `condition` und kein `access`-Shortcut — `access` hat genau einen Wert, nämlich `"public"` —, da „angemeldet“ eine Prüfung des Aufrufers darstellt und der Builder der Ort ist, an dem Prüfungen gegen den Aufrufer stattfinden:
 
 ```typescript
+import { policy } from "@rebasepro/types";
+
 securityRules: [
-    { operation: "select", access: "authenticated" }
+    { operation: "select", condition: policy.authenticated() }
 ]
 ```
 
+`policy.authenticated()` ist auch für anonyme *Anmeldungen* (`sign-in`) wahr, bei denen eine echte Benutzerzeile und eine echte Sitzung erzeugt werden. Verwenden Sie `policy.registered()`, wenn ein Gast sich nicht qualifizieren soll — etwa beim Verfassen einer Bewertung, beim Beitreten zu einer Organisation oder beim Ausgeben von Geld.
+
 ### Rollenbasierter Zugriff
 
-Operationen auf bestimmte Rollen beschränken:
+Beschränken Sie Operationen auf bestimmte Rollen:
 
 ```typescript
 securityRules: [
@@ -87,7 +91,83 @@ securityRules: [
 ]
 ```
 
-## Rohe SQL-Ausdrücke
+### Mitgliedschaftsbasierter / Relationaler Zugriff
+
+Um den Zugriff basierend auf der Mitgliedschaft in einer *verwandten* Collection einzugrenzen — z. B. „nur Zeilen, zu deren Team der Aufrufer gehört“ —, verwenden Sie die strukturierte `condition` mit `policy.existsIn`. Dies wird zu einer einzelnen korrelierten `EXISTS`-Unterabfrage kompiliert (keine Abfragen pro Zeile) und ist die sichere First-Class-Alternative zum manuellen Schreiben des unten gezeigten reinen SQLs.
+
+```typescript
+import { policy } from "@rebasepro/types";
+
+// documents visible only to members of the document's team:
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.existsIn({
+            collection: "team_members",         // the join / membership collection
+            where: policy.and(
+                // correlate to the row being checked:
+                policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
+                // …and to the caller:
+                policy.compare(policy.field("user_id"), "eq", policy.authUid()),
+            ),
+        }),
+    },
+]
+```
+
+Innerhalb von `where` bezieht sich `policy.field(...)` auf eine Spalte der verknüpften Collection (`team_members`), während sich `policy.outerField(...)` auf eine Spalte der zu prüfenden Zeile (`documents`) bezieht. Kombinieren Sie dies mit `policy.authUid()`, um die Abfrage auf den aktuellen Benutzer einzugrenzen. Da dies von der Datenbank erzwungen wird, betrachtet die Admin-UI dies als serverseitig maßgeblich.
+
+#### Der `policy`-Builder im Detail
+
+Wird aus `@rebasepro/types` importiert. Ausdrücke lassen sich zusammensetzen; Operanden bilden die Blätter.
+
+| Ausdruck | Kompiliert zu |
+|---|---|
+| `policy.true()` / `policy.false()` | `true` / `false` |
+| `policy.and(…)` / `policy.or(…)` | Konjunktion / Disjunktion |
+| `policy.not(e)` | Negation |
+| `policy.compare(left, op, right)` | Ein Vergleich zwischen zwei Operanden |
+| `policy.rolesOverlap(roles)` | Der Aufrufer hat **mindestens eine** dieser App-Rollen |
+| `policy.rolesContain(roles)` | Der Aufrufer hat **alle** dieser App-Rollen |
+| `policy.authenticated()` | Angemeldet — `rebase.uid()` ist gesetzt **und ist kein anonymer Sentinel-Wert**. `IS NOT NULL` allein wäre eine Tautologie, da ein anonymer Request einen Sentinel-Wert setzt, anstatt ihn ungesetzt zu lassen |
+| `policy.registered()` | **Mit einem Konto** angemeldet — `authenticated()` und kein Gast. Siehe unten |
+| `policy.serverContext()` | `rebase.uid() IS NULL` — siehe den Warnhinweis unten |
+| `policy.existsIn({ collection, where })` | Eine korrelierte `EXISTS`-Unterabfrage |
+| `policy.raw(sql)` | Ein Escape-Hatch, wird unverändert eingefügt |
+
+| Operand | Bedeutung |
+|---|---|
+| `policy.field(name)` | Eine Spalte der zu prüfenden Collection — oder, innerhalb von `existsIn`, der gejointen Collection |
+| `policy.outerField(name)` | Innerhalb von `existsIn`, eine Spalte der äußeren Zeile |
+| `policy.literal(value)` | Ein String, eine Zahl, ein Boolean oder `null` |
+| `policy.authUid()` | `rebase.uid()` |
+| `policy.authRoles()` | `rebase.roles()` |
+
+### `authenticated()` und `registered()`
+
+Zwei unterschiedliche Dinge werden als anonym bezeichnet, und es lohnt sich, genau zu unterscheiden, was eine Regel meint.
+
+Ein **nicht authentifizierter** Request besitzt keinerlei Session. Ihm wird eine Sentinel-ID zugewiesen, sodass `rebase.uid()` auf dem Benutzerpfad niemals `NULL` ist, und `policy.authenticated()` schließt ihn aus — genau das sorgt dafür, dass es „angemeldet“ bedeutet und nicht „jeder“.
+
+Ein **Gast** ist das andere: eine Session ohne eine reale Person dahinter. `POST /auth/anonymous` generiert eine echte Benutzerzeile mit einer echten UID, sodass ein Gast jeden Test besteht, der die ID prüft. Das ist der Sinn des Features — ein Warenkorb vor dem Checkout, ein Entwurf vor der Registrierung — und es bedeutet, dass `authenticated()` für jeden wahr ist, der auf *Als Gast fortfahren* geklickt hat, was weder E-Mail noch Passwort noch die Zustimmung zu irgendetwas erfordert.
+
+`policy.registered()` ist `authenticated()` plus „kein Gast“. Verwenden Sie es überall dort, wo es in einer Regel um eine Person geht, die für etwas zur Verantwortung gezogen werden könnte: das Verfassen einer Bewertung, der Beitritt zu einer Organisation, das Ausgeben von Geld. Greifen Sie zu `authenticated()`, wenn Gäste ausdrücklich willkommen sind.
+
+```ts
+// Anyone with a session, guests included — a draft cart.
+{ operation: "insert", check: policy.authenticated() }
+
+// Someone with an account.
+{ operation: "insert", check: policy.registered() }
+```
+
+Unter der Haube reist das Gast-Flag mit der Session mit — es befindet sich im Access Token und gelangt als `rebase.is_anonymous()` in die Datenbank —, sodass eine Richtlinie diese Frage ohne Lookup stellen kann. Eine Datenbank, die von einem Server bedient wird, der zu alt ist, um dies zu setzen, interpretiert jede Session als Konto; genau dieses Verhalten hatte das betreffende Deployment bereits zuvor.
+
+:::caution[`serverContext()` wird durch das Server-Singleton nicht erfüllt]
+Es kompiliert zu `rebase.uid() IS NULL`, und `rebase.dataAsAdmin` läuft als `uid: "service"` — es ist also **falsch** für den Zugriffspunkt, den die meisten Leute mit „dem Server“ meinen. Eine Collection mit `disableDefaultPolicies: true`, deren einzige Regel `serverContext()` ist, verweigert diese Schreibzugriffe (`42501`) und gibt null Zeilen zurück — HTTP 200, leer — für diese Lesezugriffe. `rebase.sql()` ist der Zugriffspunkt, der Richtlinien tatsächlich umgeht.
+:::
+
+## Reine SQL-Ausdrücke
 
 Für komplexe Logik verwenden Sie `using` und `withCheck`:
 
@@ -103,37 +183,37 @@ securityRules: [
 - **`using`** — Filtert, welche bestehenden Zeilen sichtbar sind (gilt für SELECT, UPDATE, DELETE)
 - **`withCheck`** — Validiert neue Zeilenwerte (gilt für INSERT, UPDATE)
 
-Spaltenreferenzen verwenden die `{column_name}`-Syntax, die zu der vollständig tabellenqualifizierten Spalte aufgelöst wird.
+Spaltenreferenzen verwenden die Syntax `{column_name}`, die zur vollständig tabellenqualifizierten Spalte aufgelöst wird.
 
-## Kombination von Shortcuts und SQL
+## Shortcuts und SQL kombinieren
 
-Mischen Sie praktische Shortcuts mit rohem SQL:
+Kombinieren Sie praktische Shortcuts mit reinem SQL:
 
 ```typescript
 securityRules: [
-    // Admins können alles tun
+    // Admins can do anything
     { operation: "all", roles: ["admin"], using: "true" },
-    // Reguläre Benutzer können nur ihre eigenen Zeilen sehen
-    { operation: "select", ownerField: "userId" },
-    // Benutzer können einfügen, aber nur für sich selbst
-    { operation: "insert", withCheck: "{userId} = rebase.uid()" },
-    // Gesperrte Zeilen können nicht aktualisiert werden
+    // Regular users can only see their own rows
+    { operation: "select", ownerField: "user_id" },
+    // Users can insert, but only for themselves
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
+    // Locked rows cannot be updated
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
 ```
 
 ## Permissiv vs. Restriktiv
 
-PostgreSQL hat zwei Richtlinienmodi:
+PostgreSQL bietet zwei Richtlinien-Modi:
 
-- **Permissiv** (Standard) — Mehrere permissive Richtlinien werden miteinander **verknüpft (OR)**. Wenn eine davon erfolgreich ist, wird der Zugriff gewährt.
-- **Restriktiv** — Restriktive Richtlinien werden miteinander **verknüpft (AND)**. Alle müssen erfolgreich sein.
+- **Permissive** (Standard) — Mehrere permissive Richtlinien werden mit **ODER (OR)** verknüpft. Wenn eine davon zutrifft, wird der Zugriff gewährt.
+- **Restrictive** — Restriktive Richtlinien werden mit **UND (AND)** verknüpft. Alle müssen zutreffen.
 
 ```typescript
 securityRules: [
-    // Permissiv: Eigentümer können auf ihre Zeilen zugreifen
-    { operation: "all", ownerField: "userId" },
-    // Restriktiv: aber gesperrte Zeilen können nicht aktualisiert werden
+    // Permissive: owners can access their rows
+    { operation: "all", ownerField: "user_id" },
+    // Restrictive: but locked rows cannot be updated
     { operation: "update", mode: "restrictive", using: "{is_locked} = false", withCheck: "{is_locked} = false" }
 ]
 ```
@@ -141,12 +221,12 @@ securityRules: [
 ## Operationen
 
 | Operation | SQL-Äquivalent | Beschreibung |
-|-----------|---------------|-------------|
+|-----------|----------------|--------------|
 | `"select"` | `SELECT` | Zeilen lesen |
 | `"insert"` | `INSERT` | Neue Zeilen erstellen |
 | `"update"` | `UPDATE` | Bestehende Zeilen ändern |
 | `"delete"` | `DELETE` | Zeilen entfernen |
-| `"all"` | Alle oben genannten | Abkürzung für alle Operationen |
+| `"all"` | Alle oben genannten | Kurzform für alle Operationen |
 
 Sie können auch `operations` (Plural) verwenden, um eine Regel auf mehrere Operationen anzuwenden:
 
@@ -156,19 +236,33 @@ Sie können auch `operations` (Plural) verwenden, um eine Regel auf mehrere Oper
 
 ## Vollständiges SecurityRule-Interface
 
-```typescript
-interface SecurityRule {
-    name?: string;              // Menschlich lesbarer Richtlinienname
-    operation?: SecurityOperation;   // Einzelne Operation
-    operations?: SecurityOperation[]; // Mehrere Operationen
-    mode?: "permissive" | "restrictive"; // Standard: "permissive"
-    access?: "public" | "authenticated";
-    ownerField?: string;        // Spalte, die die Benutzer-ID des Eigentümers enthält
-    roles?: string[];           // App-Rollen, für die diese Richtlinie gilt
-    using?: string;             // Roher SQL USING-Ausdruck
-    withCheck?: string;         // Roher SQL WITH CHECK-Ausdruck
+`SecurityRule` ist eine **Union**, kein einzelnes offenes Objekt: Eine Regel wählt genau eine Möglichkeit, ihr Prädikat auszudrücken; die anderen sind mit `never` typisiert, sodass ihre Vermischung ein Compilerfehler ist, anstatt einer Richtlinie, die die Hälfte dessen, was Sie geschrieben haben, stillschweigend ignoriert.
+
+```typescript no-verify
+// Shared by every variant
+interface SecurityRuleBase {
+    name?: string;                        // Policy name. Omit it and one is derived
+    operation?: SecurityOperation;        // "select" | "insert" | "update" | "delete" | "all"
+    operations?: SecurityOperation[];     // …or several at once
+    mode?: "permissive" | "restrictive";  // Default: "permissive"
+    roles?: string[];                     // App roles, via rebase.roles()
+    pgRoles?: string[];                   // Native Postgres roles — the CREATE POLICY `TO` clause.
+                                          // NOT the same as `roles`. Default: ["public"]
 }
+
+// …plus exactly one of:
+{ ownerField: string }                        // <column> = rebase.uid()
+{ access: "public" }                          // the one shortcut — "no row filter"
+{ condition: PolicyExpression;                // the structured builder — `policy.*`
+  check?: PolicyExpression }                  // defaults to `condition`, as Postgres does
+{ using?: string; withCheck?: string }        // raw SQL
 ```
+
+`roles` und `pgRoles` werden häufig verwechselt. `roles` ist eine Anwendungsrolle, die *innerhalb* der `USING`- / `WITH CHECK`-Klausel über `rebase.roles()` erzwungen wird. `pgRoles` ist eine Datenbankrolle und steuert, an welche Verbindungen die Richtlinie überhaupt angehängt wird. Fast jedes Projekt benötigt `roles`.
+
+:::tip[Befüllen der Spalte, die `ownerField` benennt]
+`ownerField` vergleicht eine Spalte mit `rebase.uid()`; es trägt dort nichts ein. Deklarieren Sie diese Spalte als String mit [`autoValue: "user_on_create"`](/docs/collections/properties#audit-columns), und der Treiber stempelt beim Einfügen die UID des agierenden Benutzers ein, wodurch alles überschrieben wird, was der Request-Body gesendet hat — was die Prämisse der Richtlinie wahr macht. Eine Spalte, die der Aufrufer bereitstellt, ist eine Spalte, bei der der Aufrufer lügen kann.
+:::
 
 ## Beispiele
 
@@ -176,13 +270,13 @@ interface SecurityRule {
 
 ```typescript
 securityRules: [
-    // Jeder kann veröffentlichte Beiträge lesen
+    // Anyone can read published posts
     { operation: "select", using: "{status} = 'published'" },
-    // Autoren können ihre eigenen Entwürfe sehen
+    // Authors can see their own drafts
     { operation: "select", ownerField: "authorId" },
-    // Autoren können ihre eigenen Beiträge erstellen und bearbeiten
+    // Authors can create and edit their own posts
     { operations: ["insert", "update"], ownerField: "authorId" },
-    // Nur Admins können löschen
+    // Only admins can delete
     { operation: "delete", roles: ["admin"] }
 ]
 ```
@@ -198,11 +292,11 @@ securityRules: [
 ]
 ```
 
-## Anonymer Zugriff (Öffentliche Einfügungen)
+## Anonymer Zugriff (Öffentliche Inserts)
 
-Ein häufiges Bedürfnis ist es, **nicht authentifizierten Benutzern** das Übermitteln von Daten zu ermöglichen — Kontaktformulare, Newsletter-Anmeldungen, öffentliche Anwendungen. Rebase bietet hierfür ein klares Muster.
+Eine häufige Anforderung besteht darin, **nicht authentifizierten Benutzern** das Übermitteln von Daten zu erlauben — Kontaktformulare, Newsletter-Anmeldungen, öffentliche Bewerbungen. Rebase bietet hierfür ein sauberes Muster.
 
-### Empfohlen: `access: "public"` mit `withCheck`
+### Empfohlen: Eine reine `withCheck`-Regel
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -212,7 +306,7 @@ const contactMessagesCollection = defineCollection({
     name: "Contact Messages",
     table: "contact_messages",
     securityRules: [
-        // Jeder kann eine Kontaktanfrage senden
+        // Anyone can submit a contact message
         {
             operation: "insert",
             // A raw rule carries `using` (which rows are visible) and `withCheck`
@@ -220,7 +314,7 @@ const contactMessagesCollection = defineCollection({
             using: "true",
             withCheck: "true"
         },
-        // Nur Admins können Nachrichten lesen, aktualisieren oder löschen
+        // Only admins can read, update, or delete messages
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
     properties: {
@@ -229,9 +323,9 @@ const contactMessagesCollection = defineCollection({
 });
 ```
 
-Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohne Authentifizierung ermöglicht.
+Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohne erforderliche Authentifizierung erlaubt.
 
-### Für Lead-Generierung / Anmeldungen
+### Für Lead-Erfassung / Registrierungen
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -241,9 +335,9 @@ const leadSignupsCollection = defineCollection({
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
     securityRules: [
-        // Anonyme Einfügungen erlauben
+        // Allow anonymous inserts
         { operation: "insert", using: "true", withCheck: "true" },
-        // Admins können alle Anmeldungen einsehen
+        // Admins can view all signups
         { operation: "select", roles: ["admin"] }
     ],
     properties: {
@@ -254,24 +348,24 @@ const leadSignupsCollection = defineCollection({
 
 ### Wie anonyme Anfragen funktionieren
 
-Wenn eine Anfrage ohne JWT-Token eingeht, setzt das Rebase-Backend die PostgreSQL-Sitzungsvariablen auf:
+Wenn eine Anfrage ohne JWT-Token eintrifft, setzt das Rebase-Backend die PostgreSQL-Sitzungsvariablen auf:
 
 | Variable | Wert |
-|----------|-------|
-| `app.userId` | `'anonymous'` |
+|----------|------|
+| `app.user_id` | `'anonymous'` |
 | `app.user_roles` | `''` (leer) |
 
 Das bedeutet:
 
 - `rebase.uid()` gibt `'anonymous'` zurück
-- `rebase.roles()` gibt eine leere Zeichenkette zurück
-- `access: "public"`-Richtlinien werden erfolgreich ausgeführt, da sie `USING (true)` / `WITH CHECK (true)` generieren
-- `access: "authenticated"`-Richtlinien schlagen fehl, da sie eine echte Benutzer-ID prüfen
-- `ownerField`-Richtlinien schlagen fehl, da keine Zeile `userId = 'anonymous'` haben wird (es sei denn, dies ist explizit festgelegt)
+- `rebase.roles()` gibt einen leeren String zurück
+- `access: "public"`-Richtlinien sind erfolgreich, da sie `USING (true)` / `WITH CHECK (true)` erzeugen
+- `policy.authenticated()`-Bedingungen schlagen fehl, da sie nach einer echten Benutzer-ID prüfen
+- `ownerField`-Richtlinien schlagen fehl, da keine Zeile `user_id = 'anonymous'` haben wird (sofern nicht explizit festgelegt)
 
-### Fortgeschritten: Rohes SQL für Anonyme
+### Erweitert: Reines SQL für anonyme Zugriffe
 
-Wenn Sie eine feinere Kontrolle benötigen, verwenden Sie rohes SQL:
+Wenn Sie eine granularere Kontrolle benötigen, verwenden Sie reines SQL:
 
 ```typescript
 securityRules: [
@@ -283,12 +377,28 @@ securityRules: [
 ```
 
 :::tip
-Vermeiden Sie das ältere Muster, `string_to_array(rebase.roles(), ',')` für anonymen Zugriff zu prüfen. Der `access: "public"`-Shortcut ist einfacher und generiert die korrekte Richtlinie automatisch.
+Vermeiden Sie das veraltete Muster, `string_to_array(rebase.roles(), ',')` für den anonymen Zugriff zu prüfen. Der `access: "public"`-Shortcut ist einfacher und generiert automatisch die korrekte Richtlinie.
 :::
+
+## Zeilen hier, Felder nebenan
+
+Sicherheitsregeln beantworten eine Frage: **Welche Zeilen** erreicht dieser Aufrufer. Sie werden von Postgres selbst bei jeder Anweisung durchgesetzt, unabhängig von der Route — weshalb sie das Autorisierungsmodell darstellen und alles darüber reine Bequemlichkeit ist.
+
+Sie sagen nichts über die *Spalten* einer Zeile aus, die ein Aufrufer tatsächlich erreicht. Eine Richtlinie, die es einem Mitarbeiter erlaubt, die Zeilen seines Teams zu lesen, erlaubt es ihm, jedes Feld dieser Zeilen zu lesen, einschließlich des Gehalts. Genau dafür gibt es das Eigenschafts-basierte [`access`](/docs/collections/field-access/):
+
+```typescript
+salary: {
+    type: "number",
+    // Everyone the rules above let read the row; only HR gets this column.
+    access: { read: ["hr"], write: [] }
+}
+```
+
+Beide ergänzen sich und widersprechen sich nie: Eine Feldregel kann den Zeilenzugriff nicht erweitern, und eine Zeile, die Sie nicht lesen können, besitzt keine Felder, über die man sprechen könnte. Rollen sind dieselben Rollen — `rebase.roles()` innerhalb einer Richtlinie, `user.roles` im Request —, sodass `rolesOverlap(['hr'])` in einer Regel und `access: { read: ["hr"] }` auf einer Eigenschaft dasselbe `hr` bedeuten. Feldregeln werden vom Server und nicht von Postgres angewendet, sodass sie die API-Oberfläche abdecken; eine Abfrage, die über `rebase.sql()` ausgeführt wird, sieht jede Spalte, genau so, wie sie RLS umgeht.
 
 ## Nächste Schritte
 
-- **[Beziehungen](/docs/collections/relations)** — Fremdschlüssel und Joins
-- **[Entitäts-Callbacks](/docs/collections/callbacks)** — Lifecycle-Hooks
-- **[Benutzerdefinierte Funktionen](/docs/backend/custom-functions)** — Benutzerdefinierte API-Endpunkte
----
+- **[Feldzugriff](/docs/collections/field-access)** — Lese-/Schreibrollen pro Feld
+- **[Relationen](/docs/collections/relations)** — Fremdschlüssel und Joins
+- **[Entity-Callbacks](/docs/collections/callbacks)** — Lifecycle-Hooks
+- **[Custom Functions](/docs/backend/custom-functions)** — Benutzerdefinierte API-Endpunkte

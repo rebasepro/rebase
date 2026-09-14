@@ -475,7 +475,7 @@ and that is a pattern you can only see if the skips are recorded.
   `Error: Cron job "<id>" timed out after <N>ms`
   The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
 - **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
-- **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from the Rebase Studio UI.
+- **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from Rebase Studio.
 
 ---
 

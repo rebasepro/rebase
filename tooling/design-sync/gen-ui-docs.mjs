@@ -296,7 +296,7 @@ function main() {
             const summary = (dts.match(/\/\*\*\s*\n\s*\*\s*(.+?)\s*\n/) || [])[1] || `${name} from @rebasepro/ui.`;
 
             let md = `---\ntitle: ${name}\nsidebar_label: ${name}\n`;
-            md += `description: ${name} — a component from @rebasepro/ui, the library the Rebase admin panel is built from.\n---\n\n`;
+            md += `description: ${name} — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.\n---\n\n`;
             md += `\`\`\`ts\nimport { ${name} } from "@rebasepro/ui";\n\`\`\`\n\n`;
 
             if (props.length) {
@@ -328,7 +328,7 @@ function main() {
     for (const [section, names] of Object.entries(bySection)) {
         const label = SECTION_LABEL[section] || section;
         let md = `---\ntitle: ${label}\nsidebar_label: Overview\n`;
-        md += `description: ${label} in @rebasepro/ui — the component library the Rebase admin panel is built from.\n---\n\n`;
+        md += `description: ${label} in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.\n---\n\n`;
         md += `${names.length} components.\n\n`;
         md += names.sort().map(n => `- [${n}](/docs/ui/${section}/${n.toLowerCase()})`).join("\n") + "\n";
         fs.writeFileSync(path.join(OUT, section, "index.mdx"), md);

@@ -9,15 +9,22 @@ description: Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht mit Diagram
 
 Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht, die Analysen neben Ihrem Admin-Panel anzeigt.
 
-## Die Dashboard-Komponente erstellen
+## Dashboard-Komponente erstellen
 
 ```tsx
 import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
+type OrderRow = { id: string; total: number };
+
 function DashboardView() {
     const context = useRebaseContext();
-    const [stats, setStats] = useState({
+    const [stats, setStats] = useState<{
+        totalOrders: number;
+        totalRevenue: number;
+        activeProducts: number;
+        recentOrders: OrderRow[];
+    }>({
         totalOrders: 0,
         totalRevenue: 0,
         activeProducts: 0,
@@ -30,7 +37,7 @@ function DashboardView() {
             // `find` resolves to { data, meta } — the rows are on `data`, and they are
             // flat, so it is `o.total` rather than `o.values.total`.
             const { data: orders } = await context.data
-                .collection<{ total: number }>("orders")
+                .collection<OrderRow>("orders")
                 .find({ limit: 1000 });
 
             const { data: products } = await context.data
@@ -49,17 +56,17 @@ function DashboardView() {
 
     return (
         <div className="p-8">
-            <h1 className="text-2xl font-semibold mb-6">Dashboard</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.01em] mb-6">Dashboard</h1>
             <div className="grid grid-cols-3 gap-4 mb-8">
                 <StatCard title="Total Orders" value={stats.totalOrders} />
                 <StatCard title="Revenue" value={`$${stats.totalRevenue.toFixed(2)}`} />
                 <StatCard title="Active Products" value={stats.activeProducts} />
             </div>
-            <h2 className="text-lg font-semibold mb-4">Recent Orders</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.01em] mb-4">Recent Orders</h2>
             <ul>
                 {stats.recentOrders.map(order => (
                     <li key={order.id}>
-                        Order #{order.id} — ${order.values.total}
+                        Order #{order.id} — ${order.total}
                     </li>
                 ))}
             </ul>
@@ -70,8 +77,8 @@ function DashboardView() {
 function StatCard({ title, value }: { title: string; value: string | number }) {
     return (
         <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-6">
-            <p className="text-sm text-surface-500">{title}</p>
-            <p className="text-3xl font-semibold">{value}</p>
+            <p className="text-xs text-surface-500">{title}</p>
+            <p className="text-xl font-semibold">{value}</p>
         </div>
     );
 }
@@ -85,36 +92,78 @@ const views: AppView[] = [
         slug: "dashboard",
         name: "Dashboard",
         view: <DashboardView />,
-        admin: {
-            icon: "dashboard",
-            group: "Analytics"
-        }
+        icon: "LayoutDashboard",
+        group: "Analytics"
     }
 ];
 
 ```
 
-Übergeben Sie es dem Navigationscontroller:
+Übergeben Sie sie an den Navigations-Controller:
 
 ```typescript
 const navigationStateController = useBuildNavigationStateController({
     views,
     collections: () => collections,
-    // ...
+    // These four are required — the controller resolves navigation against them.
+    authController,
+    data,
+    collectionRegistryController,
+    urlController
 });
 ```
 
-Das Dashboard erscheint nun in der Seitenleiste unter „Analytics“ und ist unter `/dashboard` zugänglich.
+Das Dashboard erscheint nun in der Seitenleiste unter "Analytics" und ist unter `/dashboard` erreichbar.
+
+### Die Gruppe unten anheften
+
+Gruppen mit dem Namen `"Admin"` oder `"Settings"` sinken im Drawer unter die anderen, basierend auf einem String-Vergleich des Namens. Dies kann schnell verloren gehen – wird die Beschriftung übersetzt, funktioniert die Sortierung unbemerkt nicht mehr – geben Sie es daher stattdessen explizit an:
+
+```tsx
+{ slug: "dashboard", name: "Dashboard", view: <DashboardView />, group: "Ajustes", pinToBottom: true }
+```
+
+Das Setzen von `pinToBottom` bei einer beliebigen Ansicht in einer Gruppe heftet die gesamte Gruppe an, da der Drawer Gruppen statt einzelner Ansichten sortiert.
+
+## Navigation aus einer benutzerdefinierten Ansicht
+
+Eine View-Komponente erhält keine Props. Um irgendwohin zu navigieren – zu einer anderen benutzerdefinierten Ansicht, einer Collection, einer Entität – verwenden Sie `useUrlController`, das aus `@rebasepro/cms` exportiert wird:
+
+```tsx
+import { useUrlController } from "@rebasepro/cms";
+
+function DashboardView() {
+    const urlController = useUrlController();
+
+    return (
+        <>
+            <button onClick={() => urlController.navigate(urlController.buildAppUrlPath("reports"))}>
+                Reports
+            </button>
+            <button onClick={() => urlController.navigate(urlController.buildUrlCollectionPath("orders"))}>
+                All orders
+            </button>
+            <button onClick={() => urlController.navigate(urlController.buildUrlCollectionPath("orders/B34SAP8Z"))}>
+                Order B34SAP8Z
+            </button>
+        </>
+    );
+}
+```
+
+Bauen Sie den Pfad dynamisch zusammen, anstatt ihn fest einzuprogrammieren: Collection-URLs haben ein Präfix (`orders` → `/c/orders`), und dieses Präfix ist nicht Teil des öffentlichen Vertrags.
+
+`useSidePanel` öffnet eine Entität im Seitenbereich anstatt zu navigieren, was bei einer Zeile in einer Liste normalerweise das gewünschte Verhalten ist.
 
 ## Diagramme hinzufügen
 
-Installieren Sie eine Diagrammbibliothek:
+Installieren Sie eine Diagramm-Bibliothek:
 
 ```bash
 pnpm add recharts
 ```
 
-Verwenden Sie es dann in Ihrem Dashboard:
+Verwenden Sie sie anschließend in Ihrem Dashboard:
 
 ```tsx
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
@@ -136,4 +185,3 @@ function RevenueChart({ data }) {
 
 - **[Benutzerdefinierte Ansichten](/docs/frontend)** — Frontend-Übersicht
 - **[Hooks-Referenz](/docs/hooks)** — Verfügbare Hooks
----

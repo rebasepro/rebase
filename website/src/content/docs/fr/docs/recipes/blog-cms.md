@@ -2,15 +2,15 @@
 sourceHash: b2d69a15f60b73b7
 title: "Recette : CMS de blog"
 sidebar_label: CMS de blog
-description: Créez un CMS de blog complet avec des articles, des auteurs, des catégories, une édition de texte enrichi et des téléchargements d'images.
+description: Créez un CMS de blog complet avec des articles, des auteurs, des catégories, l'édition de texte enrichi et le téléversement d'images.
 ---
 
-## Vue d'ensemble
+## Aperçu
 
 Créez un backend de blog avec :
-- Des **articles** avec du contenu Markdown et des images de couverture
-- Des **auteurs** avec des profils
-- Des **catégories** avec une relation plusieurs-à-plusieurs
+- Des **articles** avec contenu Markdown et images de couverture
+- Des **auteurs** avec profils
+- Des **catégories** avec une relation many-to-many
 
 ## Collections
 
@@ -105,7 +105,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    publishedAt?: string | null;
+    publishedAt?: Date | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -128,7 +128,24 @@ export const articlesCollection = defineCollection({
         author: {
             type: "relation",
             name: "Author",
-            relationName: "author"
+            relation: {
+                kind: "belongsTo",
+                target: () => authorsCollection,
+                localKey: "author_id"
+            }
+        },
+        categories: {
+            type: "relation",
+            name: "Categories",
+            relation: {
+                kind: "manyToMany",
+                target: () => categoriesCollection,
+                through: {
+                    table: "article_categories",
+                    sourceColumn: "article_id",
+                    targetColumn: "category_id"
+                }
+            }
         },
         status: {
             type: "string",
@@ -167,27 +184,9 @@ export const articlesCollection = defineCollection({
             type: "date",
             name: "Created At",
             autoValue: "on_create",
-            readOnly: true
+            admin: { readOnly: true }
         }
     },
-    relations: [
-        {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => authorsCollection,
-            localKey: "author_id"
-        },
-        {
-            kind: "manyToMany",
-            relationName: "categories",
-            target: () => categoriesCollection,
-            through: {
-                table: "article_categories",
-                sourceColumn: "article_id",
-                targetColumn: "category_id"
-            }
-        }
-    ],
     callbacks: {
         beforeSave: async ({ values, status }) => {
             // Auto-generate slug
@@ -198,7 +197,8 @@ export const articlesCollection = defineCollection({
             }
             // Set publishedAt when publishing
             if (values.status === "published" && !values.publishedAt) {
-                values.publishedAt = new Date().toISOString();
+                // `publishedAt` is a `date` property, so its value is a Date.
+                values.publishedAt = new Date();
             }
             return values;
         }
@@ -219,23 +219,23 @@ export const articlesCollection = defineCollection({
 
 ## Configuration
 
-1. Ajoutez les trois collections à votre fichier `config/collections/index.ts`
+1. Ajoutez les trois collections à votre `config/collections/index.ts`
 2. Exécutez `rebase schema generate`
 3. Exécutez `rebase db push`
 4. Redémarrez le serveur de développement
 
-Vous disposez maintenant d'un CMS de blog entièrement fonctionnel avec :
-- Gestion des auteurs avec téléchargement d'avatars
-- Tagging de catégories via des relations plusieurs-à-plusieurs
+Vous disposez désormais d'un CMS de blog entièrement fonctionnel avec :
+- Gestion des auteurs avec téléversement d'avatars
+- Étiquetage par catégories via des relations many-to-many
 - Édition de contenu Markdown
-- Flux de travail Brouillon → Révision → Publié
-- Slugs d'URL auto-générés
-- Politiques RLS limitant les auteurs à leurs propres publications
-- Journal d'audit complet via l'historique des entités
+- Flux de travail Brouillon → En révision → Publié
+- Slugs d'URL générés automatiquement
+- Règles RLS limitant les auteurs à leurs propres articles
+- Piste d'audit complète grâce à l'historique des entités
 
-## Interrogation depuis le SDK
+## Requêtes depuis le SDK
 
-Utilisez le SDK client pour récupérer des articles avec leurs relations :
+Utilisez le SDK client pour récupérer les articles avec leurs relations :
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.
@@ -265,3 +265,10 @@ for (const article of articles) {
     console.log(article.categories);      // Array of related entities
 }
 ```
+
+
+## Voir aussi
+
+- [Définir des collections](/docs/collections/) — l'API de collection utilisée dans cette recette
+- [Relations](/docs/collections/relations/) — les liaisons d'auteurs et de catégories, en détail
+- [Règles de sécurité (RLS)](/docs/collections/security-rules/) — publier sans exposer les brouillons

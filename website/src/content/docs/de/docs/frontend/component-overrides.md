@@ -5,19 +5,19 @@ sidebar_label: Komponenten-Overrides
 description: Überschreiben Sie Standard-UI-Komponenten durch benutzerdefinierte Implementierungen auf Anwendungs- oder Collection-Ebene.
 ---
 
-## Überblick
+## Übersicht
 
-Rebase erlaubt es Ihnen, Standard-UI-Komponenten durch Ihre eigenen benutzerdefinierten Implementierungen zu überschreiben. Dies implementiert ein Docusaurus-artiges Komponenten-Swizzling-Modell, das zwei Anpassungsmuster unterstützt:
-- **Eject-Modus** (Standard): Ihre Komponente ersetzt die integrierte vollständig.
-- **Wrap-Modus** (`wrap: true`): Ihre Komponente umschließt das Original. Die integrierte Komponente wird als `OriginalComponent`-Prop übergeben, sodass Sie sie innerhalb Ihres benutzerdefinierten Layouts/Ihrer Logik rendern können.
+Mit Rebase können Sie Standard-UI-Komponenten durch Ihre eigenen benutzerdefinierten Implementierungen überschreiben. Dies implementiert ein Komponenten-Swizzling-Modell im Docusaurus-Stil, das zwei Anpassungsmuster unterstützt:
+- **Eject-Modus** (Standard): Ihre Komponente ersetzt die integrierte Komponente vollständig.
+- **Wrap-Modus** (`wrap: true`): Ihre Komponente umschließt das Original. Die integrierte Komponente wird als `OriginalComponent`-Prop übergeben, sodass Sie sie innerhalb Ihres benutzerdefinierten Layouts bzw. Ihrer Logik rendern können.
 
-Komponenten-Overrides können **global** auf Anwendungsebene (auf dem `<Rebase>`-Provider) oder **lokal** auf Collection-Ebene (innerhalb einzelner Collection-Definitionen) angewendet werden.
+Komponenten-Overrides können **global** auf Anwendungsebene (am `<Rebase>`-Provider) oder **lokal** auf Collection-Ebene (innerhalb einzelner Collection-Definitionen) angewendet werden.
 
 ---
 
 ## Globale Komponenten-Overrides
 
-Um Komponenten global über Ihre gesamte Anwendung hinweg zu überschreiben, übergeben Sie ein `components`-Objekt an den Root-`<Rebase>`-Provider.
+Um Komponenten global für Ihre gesamte Anwendung zu überschreiben, übergeben Sie ein `components`-Objekt an den Root-`<Rebase>`-Provider.
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -58,7 +58,7 @@ function App() {
 
 ## Komponenten-Overrides auf Collection-Ebene
 
-Um Komponenten nur für eine bestimmte Collection zu überschreiben, fügen Sie ihrer Definition ein `components`-Objekt hinzu. Dies ist nützlich, um Leerzustände, Karten oder Detailansichten für bestimmte Modelle anzupassen.
+Um Komponenten nur für eine bestimmte Collection zu überschreiben, fügen Sie deren Definition ein `components`-Objekt hinzu. Dies ist nützlich, um Empty States, Karten oder Detailansichten für bestimmte Modelle anzupassen.
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
@@ -98,37 +98,60 @@ const productsCollection = defineCollection({
 
 ---
 
-## Bereiche überschreibbarer Komponenten
+## Gültigkeitsbereiche überschreibbarer Komponenten
 
-### App-bezogene Komponenten (`AppComponentName`)
+### Komponenten mit App-Gültigkeitsbereich (`AppComponentName`)
 
 Diese Komponenten können nur auf Ebene des Root-`<Rebase>`-Providers überschrieben werden, da sie die Struktur auf Shell-Ebene darstellen.
 
 | Komponenten-Schlüssel | Beschreibung |
 |---|---|
-| `"Shell.AppBar"` | Die Kopfleiste oben auf der Seite |
-| `"Shell.Drawer"` | Die einklappbare Hauptnavigations-Sidebar |
+| `"Shell.AppBar"` | Die Kopfzeile am oberen Rand der Seite |
+| `"Shell.Drawer"` | Die einklappbare Haupt-Sidebar-Navigationsleiste |
 | `"Shell.DrawerNavigationItem"` | Einzelne Links innerhalb der Sidebar |
-| `"Shell.DrawerNavigationGroup"` | Einklappbare Navigationsgruppen-Überschriften in der Sidebar |
+| `"Shell.DrawerNavigationGroup"` | Einklappbare Navigationsgruppen-Header in der Sidebar |
 | `"HomePage"` | Die Standard-Startseite im Content-Modus |
 | `"HomePage.CollectionCard"` | Einzelne Collection-Karten auf der Startseite |
-| `"Auth.LoginView"` | Das Overlay, das bei der Anforderung der Authentifizierung angezeigt wird |
+| `"Auth.LoginView"` | Das Overlay, das bei einer Authentifizierungsanforderung angezeigt wird |
 
-### Collection-bezogene Komponenten (`CollectionComponentName`)
+### Komponenten mit Collection-Gültigkeitsbereich (`CollectionComponentName`)
 
-Diese Komponenten können global (als Standard für alle Collections) oder auf einzelnen Collections überschrieben werden.
+Diese Komponenten können global überschrieben werden (und fungieren als Standardwerte für alle Collections) oder auf Ebene einzelner Collections.
 
 | Komponenten-Schlüssel | Beschreibung |
 |---|---|
-| `"Collection.View"` | Die gesamte Collection-Startseite |
-| `"Collection.Table"` | Die standardmäßige tabellarische Tabellenansicht |
-| `"Collection.Card"` | Der Wrapper des Kartenansichts-Elements |
+| `"Collection.View"` | Die gesamte Übersichtsseite der Collection |
+| `"Collection.Table"` | Die standardmäßige tabellarische Ansicht |
+| `"Collection.Card"` | Der Wrapper für Einträge in der Kartenansicht |
 | `"Collection.EmptyState"` | Ansicht, die angezeigt wird, wenn eine Collection leer ist |
 | `"Collection.Actions"` | Toolbar-Schaltflächen über der Tabelle/den Karten |
-| `"Collection.FilterField"` | Benutzerdefiniertes Filterfeld für eine Spalte |
+| `"Collection.FilterField"` | Benutzerdefiniertes Filtereingabefeld für eine Spalte |
 | `"Entity.Form"` | Das Detailformular zum Erstellen/Aktualisieren |
-| `"EditView.FormActions"` | Schaltflächenleiste zum Absenden/Abbrechen des Formulars |
+| `"EditView.FormActions"` | Button-Leiste zum Absenden/Abbrechen des Formulars |
 | `"DetailView"` | Schreibgeschützte Detailansicht |
-| `"Entity.SidePanel"` | Der Seitenleisten-Container für Formular/Detail |
-| `"EntityPreview"` | Inline-Vorschau des Referenz-/Relations-Chips |
+| `"Entity.SidePanel"` | Der Seitenbereich-Container (Side Panel) für Formular/Detail |
+| `"EntityPreview"` | Inline-Chip-Vorschau für Referenzen/Relationen |
 | `"Entity.MissingReference"` | Wird gerendert, wenn eine referenzierte Entität fehlt |
+
+:::note[Drei Schlüssel weichen vom `Entity.`-Muster ab]
+`"DetailView"`, `"EntityPreview"` und `"EditView.FormActions"` tragen kein `Entity.`-Präfix.
+`"Entity.DetailView"`, `"Entity.Preview"` und `"Entity.FormActions"` sind
+nicht im Union-Typ enthalten – sie führen zu Typfehlern, und in reinem JavaScript
+wird der Override schlichtweg niemals angewendet.
+:::
+
+Ihre Ersatzkomponente erhält dieselben Props, die der integrierten Komponente übergeben wurden. Die
+Override-Map gibt keinen Props-Typ pro Schlüssel vor – `ComponentOverride<P>` setzt als Standardwert für
+`P` den Typ `Record<string, unknown>` ein – typisieren Sie den Parameter daher selbst oder übergeben Sie ein
+Typargument, wenn Sie eine Typprüfung für die Props wünschen. Einige der integrierten Komponenten exportieren
+einen Props-Typ, den Sie importieren und wiederverwenden können: `CollectionViewProps` (`@rebasepro/ui`);
+`CollectionEmptyStateProps`, `CollectionActionsProps` und
+`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` und
+`EntityFormActionsProps` (`@rebasepro/cms`). Die übrigen besitzen keinen exportierten Props-Typ
+– definieren Sie hierfür die Struktur (Shape), die Sie tatsächlich auslesen.
+
+## Verwandte Themen
+
+- [Rebase erweitern](/docs/frontend/extending/) — Erweiterungspunkte, die keinen Override erfordern
+- [Benutzerdefinierte Felder](/docs/frontend/custom-fields/) — Ersetzen des Editors einer einzelnen Eigenschaft anstelle einer ganzen Komponente
+- [Slots](/docs/frontend/slots/) — Erweitern einer Komponente, anstatt sie zu ersetzen

@@ -63,7 +63,7 @@ Server im Projektstamm, und ein absoluter Pfad ist die eine Zeile dieser Datei,
 die sich nicht committen lässt. Es steht dort, weil `~/.rebase/projects.json`
 rechnerweit gilt — ein Projekt, das kein eigenes Verzeichnis nennt, fällt auf das
 zurück, was zuletzt irgendein Projekt auf diesem Rechner gespeichert hat. Siehe
-[die Rangfolge](/de/docs/ai/mcp#auf-welches-verzeichnis-er-wirkt).
+[die Rangfolge](/de/docs/ai/mcp#auf-welches-verzeichnis-er-zugreift).
 
 ## Warum ein Pointer statt einer Kopie
 

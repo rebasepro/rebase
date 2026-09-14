@@ -1,42 +1,35 @@
 ---
-sourceHash: f10be03939ad9c7f
+sourceHash: 13eea3897cdb7bee
 title: Callbacks de Entidade
 sidebar_label: Callbacks
-description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades são criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
+description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
 ---
 
 ## Visão Geral
 
-Callbacks permitem que você se conecte ao ciclo de vida da entidade para:
+Os callbacks permitem que você se conecte ao ciclo de vida da entidade para:
 
 - **Sincronizar dados entre coleções** — copiar ou mover entidades entre tabelas em mudanças de status
-- **Transformar dados** antes de salvar (campos calculados, slugificação)
+- **Transformar dados** antes de salvar (campos computados, geração de slugs)
 - **Validar** regras de negócio além da validação de esquema
-- **Acionar efeitos colaterais** após escritas (enviar e-mails, sincronizar APIs, atualizar caches)
+- **Disparar efeitos colaterais** após gravações (enviar e-mails, sincronizar APIs, atualizar caches)
 - **Filtrar/transformar** dados após a leitura
 - **Operações em cascata** — limpar registros relacionados na exclusão
 
 ## Onde os callbacks são executados
 
-Uma coleção tem dois blocos de callbacks, e a única diferença é qual runtime os executa.
+Uma coleção possui dois blocos de callback, e a única diferença é qual ambiente de execução (runtime) os executa.
 
 | | `callbacks` | `admin.browserCallbacks` |
 |---|---|---|
-| Executa em | o servidor | o painel de administração, no navegador |
-| Dispara para | REST, o SDK, realtime, `dataAsAdmin` | leituras e escritas feitas pelo painel |
-| Chega ao navegador | não — os corpos são removidos do bundle | sim, por inteiro |
-| Usar para | tudo o que segue | coleções com as quais o painel fala diretamente |
+| Executa em | no servidor | no painel de administração, no navegador |
+| Disparado para | REST, SDK, realtime, `dataAsAdmin` | leituras e gravações feitas pelo painel |
+| Chega ao navegador | não — os corpos são removidos do bundle | sim, na íntegra |
+| Usar para | tudo abaixo | coleções com as quais o painel se comunica diretamente |
 
-**`callbacks` é o que você quer.** Ele roda em todo caminho que chega ao
-servidor, então nada o contorna, e seu corpo nunca deixa a máquina — uma chave
-de API ou uma leitura de `process.env` ali está segura. O resto desta página é
-sobre `callbacks`.
+**`callbacks` é o que você procura.** Ele é executado em todos os caminhos que chegam ao servidor, de modo que nada o contorna, e seu corpo nunca sai da máquina — uma chave de API ou uma leitura de `process.env` ali é segura. O restante desta página é sobre `callbacks`.
 
-`admin.browserCallbacks` existe para um caso: uma coleção em um transporte
-`direct` ou `custom`, que o painel lê e escreve *sozinho*, sem nenhum servidor
-Rebase no caminho da requisição. Nada do lado do servidor vê essas operações,
-então `callbacks` nunca pode disparar para elas, e este bloco é o único lugar
-onde a lógica de ciclo de vida delas pode viver.
+`admin.browserCallbacks` existe para um caso: uma coleção em um transporte `direct` ou `custom`, que o próprio painel lê e grava sem nenhum servidor Rebase no caminho da requisição. Nada no lado do servidor vê essas operações, portanto, `callbacks` nunca pode disparar para elas, e este bloco é o único lugar onde a lógica de ciclo de vida delas pode residir.
 
 ```typescript
 import type { CollectionConfig } from "@rebasepro/types";
@@ -44,7 +37,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 const eventsCollection: CollectionConfig = {
     slug: "events",
     name: "Events",
-    dataSource: "analytics",      // declarado com transport: "direct"
+    dataSource: "analytics",      // declared with transport: "direct"
     properties: {
         city: { name: "City", type: "string" },
         code: { name: "Code", type: "string" }
@@ -57,26 +50,20 @@ const eventsCollection: CollectionConfig = {
 };
 ```
 
-Duas regras decorrem de "chega a todo visitante", e nenhuma delas é estilística:
+Duas regras decorrem de "enviado para cada visitante", e nenhuma delas é estilística:
 
-1. **Sem segredos.** Nenhuma chave de API, nenhum `process.env`, nada que você
-   se importaria que fosse lido no bundle. Isso pertence a `callbacks`.
-2. **Não é uma fronteira de segurança.** Um `browserCallbacks.afterRead` que
-   oculta um campo o oculta *depois* que o navegador já tem a linha — num
-   transporte direto o documento bruto veio direto do armazenamento. É
-   apresentação. A ocultação que precisa se sustentar vai em `callbacks`, ou nas
-   regras do próprio armazenamento.
+1. **Sem segredos.** Sem chaves de API, sem `process.env`, nada que você se importaria que um leitor do bundle visse. Isso pertence ao `callbacks`.
+2. **Não é um limite de segurança.** Um `browserCallbacks.afterRead` que oculta um campo o faz *depois* que o navegador já possui a linha — em um transporte direto, o documento bruto veio direto do repositório de dados. Trata-se de apresentação. Redações que precisam ser garantidas devem ficar em `callbacks` ou nas regras do próprio repositório.
 
-Numa coleção com transporte de servidor — o padrão, e quase certamente a sua — o
-servidor já executou `callbacks` antes de a linha chegar ao painel, então um
-`browserCallbacks.afterRead` roda *além* dele. Escreva-o idempotente, ou não o
-escreva.
+Em uma coleção com transporte de servidor — o padrão, e quase certamente a sua —, o servidor já executou `callbacks` antes que a linha chegue ao painel, então um `browserCallbacks.afterRead` é executado *além* dele. Escreva-o para ser idempotente ou não o escreva.
 
 ## Definindo Callbacks
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
 
+// The row shape is inferred from `properties`, so `values.title` below is a
+// `string` without anything being written twice.
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
@@ -106,19 +93,19 @@ const articlesCollection = defineCollection({
             return values;
         },
 
-        afterSave: async ({ values, entityId }) => {
+        afterSave: async ({ values, id }) => {
             // Send notification
-            console.log(`Article ${entityId} saved: ${values.title}`);
+            console.log(`Article ${id} saved: ${values.title}`);
         },
 
-        beforeDelete: async ({ entityId }) => {
+        beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
             // Throw to block the deletion
         },
 
-        afterRead: async ({ entity }) => {
+        afterRead: async ({ row }) => {
             // Transform data after loading
-            return entity;
+            return row;
         }
     }
 });
@@ -128,12 +115,12 @@ const articlesCollection = defineCollection({
 
 ### `beforeSave`
 
-Chamado antes de uma entidade ser gravada no banco de dados. Retorne os valores modificados.
+Chamado antes que um registro seja gravado no banco de dados. Retorne os valores modificados.
 
 ```typescript
 beforeSave: async ({
     values,       // Entity values
-    entityId,     // Entity ID (null for new entities)
+    id,           // Entity ID (null for new entities)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context
@@ -143,7 +130,7 @@ beforeSave: async ({
 }
 ```
 
-Lance um erro para **bloquear o salvamento**:
+Lance um erro para **bloquear o salvamento**. A gravação nunca chega ao banco de dados e o chamador recebe **400** com sua mensagem e o código `CALLBACK_REJECTED`:
 
 ```typescript
 beforeSave: async ({ values }) => {
@@ -154,9 +141,31 @@ beforeSave: async ({ values }) => {
 }
 ```
 
+```json
+{ "error": { "message": "Price cannot be negative", "code": "CALLBACK_REJECTED",
+             "details": { "stage": "beforeSave", "path": "products" } } }
+```
+
+Para escolher o status e o código por conta própria — um 409 para um conflito, um 422 para algo bem formatado, mas inaceitável —, lance um `RebaseApiError`:
+
+```typescript
+import { RebaseApiError } from "@rebasepro/types";
+
+beforeSave: async ({ values }) => {
+    if (await isTaken(values.slug)) {
+        throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
+    }
+    return values;
+}
+```
+
+:::note
+Importe-o de `@rebasepro/types`, não de `@rebasepro/server`. Um arquivo de coleção é compartilhado com o frontend — a build do Vite do painel de administração lê este mesmo diretório —, portanto, ele só pode importar pacotes que executam em um navegador. O `RebaseApiError` é a versão segura para o navegador, e é a mesma classe que o SDK do cliente lança.
+:::
+
 ### `afterSave`
 
-Chamado depois que a linha é gravada e antes do commit, dentro da mesma transação. Um erro reverte o salvamento — veja [Semântica de Transação](#semântica-de-transação).
+Chamado depois que a linha é gravada e antes do commit, dentro da mesma transação. Lançar um erro desfaz o salvamento — consulte [Semântica de Transação](#semântica-de-transação).
 
 ```typescript
 afterSave: async ({
@@ -178,7 +187,7 @@ Chamado quando uma operação de salvamento falha.
 ```typescript
 afterSaveError: async ({
     values,
-    entityId,
+    id,
     error,
     context
 }) => {
@@ -192,31 +201,28 @@ Chamado após a leitura de entidades do banco de dados. Transforme os dados para
 
 ```typescript
 afterRead: async ({
-    entity,    // The entity to transform
+    row,    // The row to transform
     context
 }) => {
     // Add computed fields
     return {
-        ...entity,
-        values: {
-            ...entity.values,
-            displayName: `${entity.values.first_name} ${entity.values.last_name}`
-        }
+        ...row,
+        displayName: `${row.first_name} ${row.last_name}`
     };
 }
 ```
 
 ### `beforeDelete`
 
-Chamado antes de uma entidade ser excluída. Lance um erro para bloquear a exclusão.
+Chamado antes que um registro seja excluído. Lance um erro para bloquear a exclusão.
 
 ```typescript
 beforeDelete: async ({
-    entityId,
-    entity,
+    id,
+    row,
     context
 }) => {
-    if (entity.values.status === "published") {
+    if (row.status === "published") {
         throw new Error("Cannot delete published articles. Unpublish first.");
     }
 }
@@ -224,22 +230,22 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Chamado depois que a linha é excluída e antes do commit, dentro da mesma transação. Um erro reverte a exclusão.
+Chamado depois que a linha é excluída e antes do commit, dentro da mesma transação. Lançar um erro desfaz a exclusão.
 
 ```typescript
 afterDelete: async ({
-    entityId,
-    entity,
+    id,
+    row,
     context
 }) => {
     // Cleanup related data
-    console.log(`Article ${entityId} deleted`);
+    console.log(`Article ${id} deleted`);
 }
 ```
 
 ## Callbacks de Propriedade
 
-Você também pode definir callbacks no nível da propriedade para transformações específicas de campo:
+Você também pode definir callbacks no nível de propriedade para transformações específicas de campos:
 
 ```typescript
 properties: {
@@ -256,11 +262,11 @@ properties: {
 
 ## A API `context.data`
 
-Todo callback recebe um objeto `context` que inclui `context.data` — uma camada unificada de acesso a dados para realizar **operações entre coleções** a partir de hooks de ciclo de vida.
+Cada callback recebe um objeto `context` que inclui `context.data` — uma camada unificada de acesso a dados para realizar **operações entre coleções** de dentro dos hooks de ciclo de vida.
 
 ### Acessando Coleções
 
-`context.data` usa um Proxy JavaScript, então você pode acessar qualquer coleção pelo seu slug como uma propriedade:
+O `context.data` usa um Proxy JavaScript, portanto você pode acessar qualquer coleção pelo slug dela como uma propriedade:
 
 ```typescript
 afterSave: async ({ values, entityId, context }) => {
@@ -280,14 +286,14 @@ Cada acessor de coleção (`context.data.<slug>`) fornece estes métodos:
 
 | Método | Assinatura | Descrição |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Consulta entidades com filtros, ordenação e paginação |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Busca uma única entidade por ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Cria uma nova entidade |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Atualiza uma entidade existente |
-| `.delete()` | `delete(id: string \| number) → void` | Exclui uma entidade |
-| `.count()` | `count(params?: FindParams) → number` | Conta entidades correspondentes |
+| `.find()` | `find(params?: FindParams) → FindResponse` | Consultar entidades com filtros, ordenação e paginação |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Buscar uma única entidade por ID |
+| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Criar uma nova entidade |
+| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Atualizar uma entidade existente |
+| `.delete()` | `delete(id: string \| number) → void` | Excluir um registro |
+| `.count()` | `count(params?: FindParams) → number` | Contar entidades correspondentes |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Assinatura em tempo real (onde suportado) |
-| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Escuta uma única entidade |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Escutar uma única entidade |
 
 ### Consultando com `.find()`
 
@@ -342,53 +348,51 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 }
 ```
 
-### Segurança: com que privilégios `context.data` é executado
+### Segurança: com quais privilégios o `context.data` é executado
 
 :::important
-**`context.data` herda os privilégios daquilo que acionou o callback.** Não é um nível de confiança fixo.
+**`context.data` herda os privilégios daquilo que disparou o callback.** Não se trata de um nível de confiança fixo.
 
-- Acionado por uma **requisição de usuário** (REST, tempo real, uma edição no painel de administração) → **com escopo de usuário**. O callback é executado dentro da transação vinculada a RLS aberta para essa requisição, portanto as políticas se aplicam a leituras *e* escritas. Um callback não pode ver uma linha que seu chamador não poderia ver.
-- Acionado por **`rebase.dataAsAdmin` ou um job cron** (o mesmo singleton) → **com escopo de administrador**, não sem escopo. Esse driver está limitado a `{ uid: "service", roles: ["admin"] }`, portanto o callback continua sendo executado numa transação vinculada a RLS: suas políticas são avaliadas, contra essa identidade.
-- Acionado pelo **driver base** (os fluxos de autenticação integrados, as migrações) → **sem escopo**. É executado na conexão proprietária e ignora o RLS.
+- Disparado por uma **requisição de usuário** (REST, realtime, uma edição no painel de administração) → **escopo de usuário**. O callback é executado dentro da transação associada a RLS aberta para essa requisição, de modo que as políticas se aplicam a leituras *e* gravações. Um callback não pode ver uma linha que seu chamador não pôde ver.
+- Disparado por **`rebase.dataAsAdmin` ou um cron job** (o mesmo singleton) → **escopo de admin**, e não sem escopo. Esse driver tem escopo definido como `{ uid: "service", roles: ["admin"] }`, de modo que o callback ainda é executado em uma transação associada a RLS — suas políticas são avaliadas contra essa identidade.
+- Disparado pelo **driver base** (fluxos de autenticação integrados, migrações) → **sem escopo**. Ele é executado na conexão proprietária e ignora o RLS.
 :::
 
-Isso importa sobretudo na direção que falha em silêncio. O RLS *filtra*, não levanta erros — então um callback que lê uma linha vizinha a encontrará quando uma tarefa administrativa salvar e pode não encontrar nada quando um usuário final salvar, sem erro em nenhum dos casos. Escreva callbacks que tolerem um resultado vazio, ou recorra deliberadamente ao plano de administração:
+Isso importa mais na direção que falha silenciosamente. O RLS *filtra*, não lança erros — portanto, um callback que lê uma linha irmã a encontrará quando uma tarefa de administração salvar e poderá não encontrar nada quando um usuário final salvar, sem nenhum erro em ambos os casos. Escreva callbacks que tolerem um resultado vazio ou acesse o plano administrativo deliberadamente:
 
 ```typescript
 afterSave: async ({ context }) => {
-    // Com escopo de usuário quando foi um usuário que acionou este salvamento:
-    // o RLS se aplica.
+    // User-scoped when a user triggered this save: RLS applies.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // Escopo de administrador deliberado — para trabalho que o chamador
-    // realmente não deve ver, como um log de auditoria que ele não pode ler nem
-    // editar. Atenção: é o alcance de um administrador, não uma dispensa do RLS
-    // — uma coleção cuja única regra seja `policy.serverContext()` continua
-    // fechada para ele, porque isso compila para `rebase.uid() IS NULL` e o uid
-    // deste acessor é `service`.
+    // Deliberately admin-scoped — for work the caller genuinely may not see,
+    // such as an audit trail they must not be able to read or edit. Note this
+    // is an admin's reach, not a bypass: a collection whose only rule is
+    // `policy.serverContext()` stays closed to it, since that compiles to
+    // `rebase.uid() IS NULL` and this accessor's uid is `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
 
-:::caution[Esta página afirmava o contrário]
-Versões anteriores desta página afirmavam que os callbacks sempre ignoram o RLS e têm «acesso completo ao banco de dados independentemente das permissões do usuário que os aciona». Isso estava errado, e errado na direção insegura — convidava a escrever callbacks presumindo que sempre podiam ver tudo.
+:::caution[Esta página costumava dizer o oposto]
+Versões anteriores desta página afirmavam que os callbacks sempre ignoravam o RLS e tinham "acesso total ao banco de dados, independentemente das permissões do usuário acionador". Isso estava incorreto e incorreto na direção insegura — convidava à escrita de callbacks com a premissa de que sempre poderiam ver tudo.
 
-O comportamento descrito acima é verificado ponta a ponta contra o Postgres pelo caso `"scopes context.data to the caller when a callback runs on a user request"` na suíte de aplicação de RLS do `@rebasepro/server-postgres`.
+O comportamento acima é verificado de ponta a ponta no Postgres pelo caso `"scopes context.data to the caller when a callback runs on a user request"` na suíte de imposição de RLS do `@rebasepro/server-postgres`.
 :::
 
 ### Semântica de Transação
 
 :::important
-**O que um callback escreve pelo `context.data` faz parte da escrita que o acionou.** No Postgres, `beforeSave`, o salvamento e `afterSave` — ou `beforeDelete`, a exclusão e `afterDelete` — rodam dentro de uma única transação; cada callback é aguardado antes do commit, e o `context.data` escreve por essa mesma transação.
+**As gravações de `context.data` de um callback fazem parte da gravação que o disparou.** No Postgres, o `beforeSave`, o salvamento e o `afterSave` — ou o `beforeDelete`, a exclusão e o `afterDelete` — são executados dentro de uma única transação, cada callback aguardado antes do commit, e o `context.data` grava através dessa mesma transação.
 :::
 
-Então a escrita que aciona o callback e tudo o que seus callbacks escreveram são confirmados juntos ou não são confirmados:
+Portanto, a gravação que disparou o processo e tudo o que seus callbacks gravaram fazem commit juntos ou não fazem nada:
 
-- Um erro lançado em `afterSave` ou `afterDelete` reverte a escrita que o acionou, junto com toda escrita feita pelos callbacks via `context.data`. Quem chamou recebe **400 `CALLBACK_REJECTED`**, com `details.stage` indicando o hook — ou o status próprio do erro, quando ele carrega um: um `RebaseApiError` que você lançou, o 409 de uma violação de unicidade.
-- Os assinantes de realtime só ficam sabendo da linha depois do commit, então uma escrita revertida nunca é anunciada.
-- Um callback mantém a transação aberta enquanto roda, então um callback lento é um lock retido e uma conexão do pool ocupada.
+- Um erro lançado a partir de `afterSave` ou `afterDelete` desfaz a gravação disparadora, juntamente com todas as gravações de `context.data` feitas pelos callbacks. O chamador recebe a resposta **400 `CALLBACK_REJECTED`** com `details.stage` indicando o hook — ou com o status próprio do erro quando ele possui um: um `RebaseApiError` que você lançou, um 409 de violação de unicidade.
+- Os assinantes de realtime só são notificados sobre a linha após o commit, portanto, uma gravação desfeita (rollback) nunca é anunciada.
+- Um callback mantém a transação aberta enquanto é executado; portanto, um callback lento significa um lock retido e uma conexão do pool ocupada.
 
-Deixe o erro se propagar quando a escrita que o acionou não deve sobreviver a ele. Capture-o quando deve: a escrita que falhou é desfeita sozinha, e o resto é confirmado.
+Deixe uma falha lançar um erro quando a gravação disparadora não deve sobreviver a ela. Capture-a quando ela deve sobreviver: a gravação com falha é desfeita isoladamente, e o restante faz commit.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {
@@ -407,13 +411,13 @@ afterSave: async ({ values, id, status, context }) => {
 }
 ```
 
-Trabalho que precisa sair do banco de dados — um e-mail, um webhook, uma chamada a uma API de terceiros — não pertence ao corpo do callback. Ele manteria a transação aberta durante uma ida e volta pela rede, e nada pode desfazê-lo quando a escrita é revertida. Enfileire um [job](/docs/backend/jobs) para isso, ou faça-o depois que a escrita retornar: publique em um [canal de realtime](/docs/backend/realtime) ou use `waitUntil` em uma [função customizada](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) explica qual usar.
+Trabalhos que precisam sair do banco de dados — um e-mail, um webhook, uma chamada a uma API de terceiros — não pertencem ao corpo do callback. Isso manteria a transação aberta durante uma viagem de ida e volta pela rede (round trip), e nada pode reverter isso caso a gravação sofra rollback. Enfileire um [job](/docs/backend/jobs) para isso ou faça-o após o retorno da gravação: publique em um [canal de realtime](/docs/backend/realtime) ou use `waitUntil` em uma [função personalizada](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) indica qual é a melhor opção.
 
-No MongoDB nada disso vale. Esse driver roda os mesmos callbacks sem transação: a escrita já está gravada quando `afterSave` roda, e um erro ali relata a falha sem desfazer a escrita.
+No MongoDB, nada disso se aplica. Esse driver executa os mesmos callbacks sem uma transação, portanto, a gravação já está armazenada quando `afterSave` é executado, e lançar um erro ali relata a falha sem desfazê-la.
 
 ## Sincronizando Dados Entre Coleções
 
-Um dos usos mais poderosos de callbacks é a **sincronização de dados entre coleções** usando `context.data`:
+Um dos usos mais poderosos dos callbacks é a **sincronização de dados entre coleções** usando `context.data`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -442,7 +446,7 @@ const submissionsCollection = defineCollection({
                 });
 
                 // Update the submission with the promoted job reference
-                await context.data["job-submissions"].update(entityId, {
+                await context.data.collection<Record<string, unknown>>("job_submissions").update(id, {
                     promoted_job_id: newJob.id,
                 });
             }
@@ -458,34 +462,29 @@ Outros padrões entre coleções:
 - **Log de auditoria**: Use `afterSave` / `afterDelete` para gravar em uma coleção de log de auditoria
 - **Contadores**: Use `afterSave` / `afterDelete` para atualizar campos de contagem em entidades relacionadas
 
-## Referência Completa do Contexto
+## Referência Completa do Context
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
-Todo callback recebe um objeto `context` do tipo `RebaseCallContext`:
+Cada callback recebe um objeto `context` do tipo `RebaseCallContext`:
 
 ```typescript
 interface RebaseCallContext {
-    /** O usuário autenticado, se houver */
+    /** The authenticated user, if any */
     user?: User;
-    /** O driver que executa esta operação (apenas no servidor) */
+    /** The driver running this operation (server-side only) */
     driver?: DataDriver;
-    /** O acessor das consultas — context.data.<slug>.create/update/find/delete */
+    /** The query accessor — context.data.<slug>.create/update/find/delete */
     data: RebaseSdkData;
-    /** Funções, storage, e-mail e dataAsAdmin — mas sem `data` */
+    /** Functions, storage, email and dataAsAdmin — but no `data` */
     client: RebaseCallbackClient;
-    /** A fonte de storage padrão */
+    /** The default storage source */
     storageSource: StorageSource;
 }
 ```
 
-Consulte pelo `context.data`. `context.client` não tem `data`: no servidor ele é
-o singleton `rebase`, cujo único plano de dados é o `dataAsAdmin`, com escopo de
-administrador, então `context.client.data` é um erro de compilação.
+Faça consultas através de `context.data`. O `context.client` não possui `data`: no lado do servidor, ele é o singleton `rebase`, cujo único plano de dados é o `dataAsAdmin` de escopo de admin, portanto, `context.client.data` é um erro de compilação.
 
 ## Próximos Passos
 
-- **[Regras de Segurança](/docs/collections/security-rules)** — Segurança em Nível de Linha
-- **[Histórico de Entidade](/docs/backend/history)** — Trilha de auditoria
+- **[Regras de Segurança](/docs/collections/security-rules)** — Row Level Security
+- **[Histórico de Entidades](/docs/backend/history)** — Trilha de auditoria
 - **[Funções Personalizadas](/docs/backend/custom-functions)** — Adicione endpoints de API personalizados
----

@@ -8,7 +8,7 @@ description: Import data from CSV, JSON, and Excel files into your collections, 
 
 Rebase includes built-in data import and export tools accessible directly from the admin panel. Import supports CSV, JSON, and Excel files with a column-mapping wizard. Export supports CSV and JSON with optional computed fields.
 
-Both features are enabled by default on all collections and can be configured or disabled per collection.
+Both are available on every collection. Export can be configured per collection with computed fields; neither can be switched off per collection.
 
 ## Importing Data
 
@@ -48,19 +48,8 @@ Before importing, the wizard validates all rows against your collection's proper
 
 ### Import Configuration
 
-Import is enabled by default. To disable it on a specific collection, use the `admin` sub-object:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    // Import is enabled by default
-});
-```
+Import is available on every collection. There is no per-collection setting
+that turns it off.
 
 ## Exporting Data
 
@@ -88,38 +77,9 @@ Any active filters in the collection view are applied to the export. This lets y
 
 ### Export Configuration
 
-Export is enabled by default. You can configure it with additional computed fields:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: true            // Enable (default: true)
-    }
-});
-
-```
-
-To disable export:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: false
-    }
-});
-
-```
+Export is available on every collection. `admin.exportable` configures it: give it
+an `ExportConfig` to add computed columns, below. The type also accepts a boolean,
+but nothing reads it — `exportable: false` does not remove the **Export** button.
 
 ### Adding Computed Fields
 

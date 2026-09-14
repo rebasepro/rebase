@@ -6,13 +6,13 @@ description: Collections are the core building block of Rebase — each collecti
 
 ## What is a Collection?
 
-A **collection** is a TypeScript object that describes a database table and how it should appear in the admin UI. It defines:
+A **collection** is a TypeScript object that describes a database table and how it should appear in Rebase CMS. It defines:
 
 - **Schema** — Properties (columns), their types, and validation rules
 - **Relations** — Foreign keys, junction tables, and join paths
 - **Security** — Row Level Security policies
 - **Lifecycle hooks** — Callbacks for create, update, delete operations
-- **Admin UI behavior** — View modes, inline editing, entity views, actions — all under `admin`
+- **CMS behavior** — View modes, inline editing, entity views, actions — all under `admin`
 
 ## Declaring one: `defineCollection`
 

@@ -388,9 +388,9 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. If a token expires during an active session, the client automatically re-authenticates and re-subscribes.
+3. The token is verified once, when the socket authenticates, and the server does not check it again for the life of the connection. An access token that expires, a session that is revoked or a role that is taken away does not change what an open socket may read until it re-authenticates or reconnects. The SDK re-authenticates its socket each time it refreshes its token, and disconnects it on sign-out; a client speaking the protocol directly keeps the identity it opened with until it reconnects.
 
-This means each user only receives updates for records they have permission to see.
+This means each socket only receives updates for records its authenticated identity may see.
 
 Running more than one instance — the LISTEN/NOTIFY bus, what presence does
 across processes, and writing your own transport — has a page of its own:
@@ -475,7 +475,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Past the channel frame budget above |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
-| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 With no handler attached, these are logged as a warning. They used to be
 discarded entirely: there was no promise to reject and no channel to deliver to,

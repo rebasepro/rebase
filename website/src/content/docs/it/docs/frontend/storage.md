@@ -1,93 +1,27 @@
 ---
-sourceHash: 1134b2a4207579d3
-title: Archiviazione e Caricamento File
-sidebar_label: Archiviazione e Caricamento File
-description: Aggiungi campi di caricamento file alle tue collezioni, gestisci i file programmaticamente e indirizza i caricamenti verso backend di archiviazione diversi.
+sourceHash: 3e810cd447c9dd8a
+title: Storage e caricamento file
+sidebar_label: Storage e caricamento file
+description: Aggiungi campi per il caricamento di file alle tue collezioni, gestisci i file a livello programmatico e instrada i caricamenti verso diversi backend di storage.
 ---
 
 ## Panoramica
 
-Rebase fornisce supporto integrato per il caricamento di file nei moduli di collezione:
+Rebase offre il supporto integrato per il caricamento dei file nei moduli delle collezioni:
 
 - Campi di caricamento file **drag-and-drop**
-- **Anteprime delle immagini** nei moduli e nelle celle della tabella
-- **Caricamenti di più file** tramite proprietà array
+- **Anteprime delle immagini** nei moduli e nelle celle delle tabelle
+- **Caricamento di file multipli** tramite proprietà di tipo array
 - **Filtraggio per tipo MIME** e limiti di dimensione
-- **Nomi file personalizzati** tramite funzioni di callback
+- **Nomi di file personalizzati** tramite funzioni di callback
 
-## Campi di Caricamento File
+## Campi per il caricamento di file
 
-Per aggiungere caricamenti di file a una collezione, usa la configurazione `storage` su una proprietà di tipo stringa:
+Un campo file è una proprietà stringa con un blocco `storage`, oppure un array di essi per gestire più file. La sezione [Campi di caricamento file](/docs/collections/file-uploads/) spiega come dichiararne uno: ogni opzione di `storage` e quali di queste vengono applicate dal server anziché solo dall'uploader del pannello.
 
-```typescript
-properties: {
-    image: {
-        type: "string",
-        name: "Product Image",
-        storage: {
-            storagePath: "products",       // Subdirectory in storage
-            acceptedFiles: ["image/*"],    // MIME type filter
-            maxSize: 5 * 1024 * 1024,      // 5MB max
-            fileName: (context) => {        // Custom filename
-                return context.entityId + "_" + context.file.name;
-            }
-        }
-    }
-}
-```
+## Storage multi-backend
 
-### Opzioni di Configurazione dello Storage
-
-| Proprietà | Tipo | Descrizione |
-|----------|------|-------------|
-| `storagePath` | `string` | Sottodirectory all'interno del backend di archiviazione |
-| `storageSource` | `string` | Sorgente di archiviazione con nome — indirizza i caricamenti verso un backend specifico (ad es. `"firebase"`, `"media"`). Vedi [Archiviazione Multi-Backend](#archiviazione-multi-backend). |
-| `public` | `boolean` | Archivia i file sotto il prefisso `public/` e li serve tramite URL stabili, senza token, permanenti e memorizzabili nella CDN (sicuri da persistere e collegare direttamente). Il valore predefinito è `false` (i file privati usano URL firmati a breve durata). |
-| `acceptedFiles` | `string[]` | Tipi MIME consentiti (ad es. `["image/*"]`, `["application/pdf"]`) |
-| `maxSize` | `number` | Dimensione massima del file in byte |
-| `fileName` | `function` | Generatore di nomi file personalizzato |
-| `metadata` | `object` | Metadati aggiuntivi da archiviare con il file |
-| `storeUrl` | `boolean` | Archivia l'URL completo invece del percorso relativo |
-
-## Caricamenti di Più File
-
-Avvolgi la proprietà storage in un array per caricare più file:
-
-```typescript
-photos: {
-    type: "array",
-    name: "Photos",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "photos",
-            acceptedFiles: ["image/*"]
-        }
-    }
-}
-```
-
-## Caricamenti di Documenti
-
-Carica file non immagine come i PDF:
-
-```typescript
-documents: {
-    type: "array",
-    name: "Documents",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "documents",
-            acceptedFiles: ["application/pdf", "image/*"]
-        }
-    }
-}
-```
-
-## Archiviazione Multi-Backend
-
-Quando il tuo backend ha più backend di archiviazione configurati (ad es. locale + S3 + GCS), puoi indirizzare singole proprietà verso backend specifici usando `storageSource`:
+Quando il tuo backend ha più backend di storage configurati (es. locale + S3 + GCS), puoi instradare le singole proprietà verso backend specifici utilizzando `storageSource`:
 
 ```typescript
 image: {
@@ -101,9 +35,9 @@ image: {
 }
 ```
 
-### Sorgenti Dirette del Frontend
+### Sorgenti dirette lato frontend
 
-Per backend di archiviazione **diretti** (ad es. Firebase Storage dove il browser carica direttamente nel cloud), registrali tramite la prop `storageSources` su `<Rebase>`:
+Per i backend di storage **diretti** (ad es. Firebase Storage, dove il browser esegue l'upload direttamente sul cloud), registrali tramite la prop `storageSources` su `<Rebase>`:
 
 ```tsx
 import type { RebaseStorageSource } from "@rebasepro/app";
@@ -120,17 +54,17 @@ import type { RebaseStorageSource } from "@rebasepro/app";
 ```
 
 | Proprietà | Tipo | Descrizione |
-|----------|------|-------------|
-| `key` | `string` | Identificatore univoco — deve corrispondere a `storageSource` nelle configurazioni di proprietà |
-| `engine` | `string` | Nome del motore di archiviazione (ad es. `"firebase"`, `"gcs"`, `"s3"`) |
-| `transport` | `"server" \| "direct"` | `"server"` fa da proxy attraverso il backend; `"direct"` carica dal browser |
-| `source` | `StorageSource` | Implementazione `StorageSource` lato client (richiesta per il transport `"direct"`) |
+|-----------|------|-------------|
+| `key` | `string` | Identificatore univoco — deve corrispondere a `storageSource` nelle configurazioni delle proprietà |
+| `engine` | `string` | Nome del motore di storage (es. `"firebase"`, `"gcs"`, `"s3"`) |
+| `transport` | `"server" \| "direct"` | `"server"` esegue il proxy tramite il backend; `"direct"` carica dal browser |
+| `source` | `StorageSource` | Implementazione lato client di `StorageSource` (richiesta per il trasporto `"direct"`) |
 
-Il sistema risolve automaticamente la sorgente corretta per proprietà — le proprietà di collezione con `storageSource: "firebase"` useranno la sorgente diretta corrispondente, mentre le proprietà senza `storageSource` (o con `transport: "server"`) passeranno attraverso il backend di Rebase.
+Il sistema risolve automaticamente la sorgente corretta per ciascuna proprietà: le proprietà della collezione con `storageSource: "firebase"` utilizzeranno la sorgente diretta corrispondente, mentre le proprietà senza `storageSource` (o con `transport: "server"`) passeranno attraverso il backend di Rebase.
 
 ## Hook useStorageSource
 
-Per operazioni sui file programmatiche al di fuori dei moduli di collezione:
+Per operazioni programmatiche sui file al di fuori dei moduli delle collezioni:
 
 ```typescript
 import { useStorageSource } from "@rebasepro/app";
@@ -149,10 +83,10 @@ const { url } = await storageSource.getSignedUrl(result.key);
 ```
 
 :::tip
-`useStorageSource()` restituisce la sorgente di archiviazione **predefinita**. Per le configurazioni multi-backend, la risoluzione per proprietà è gestita automaticamente dai binding dei campi del modulo e dal `StorageSourcesContext`. Nella maggior parte dei casi non è necessario risolvere le sorgenti manualmente.
+`useStorageSource()` restituisce la sorgente di storage **predefinita**. Per le configurazioni multi-backend, la risoluzione per singola proprietà è gestita automaticamente dai binding dei campi del modulo e dallo `StorageSourcesContext`. Nella maggior parte dei casi non è necessario risolvere manualmente le sorgenti.
 :::
 
-## Prossimi Passi
+## Passaggi successivi
 
-- **[Configurazione dell'Archiviazione Backend](/docs/backend/storage)** — Configurazione di S3, GCS e archiviazione locale
-- **[Proprietà](/docs/collections/properties)** — Tutti i tipi di proprietà, inclusa l'archiviazione
+- **[Configurazione dello storage di backend](/docs/backend/storage)** — Configurazione di S3, GCS e storage locale
+- **[Proprietà](/docs/collections/properties)** — Tutti i tipi di proprietà, incluso lo storage

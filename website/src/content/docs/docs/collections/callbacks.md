@@ -484,8 +484,6 @@ Other cross-collection patterns:
 
 ## Full Context Reference
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 Every callback receives a `context` object of type `RebaseCallContext`:
 
 ```typescript

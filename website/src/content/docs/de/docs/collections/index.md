@@ -1,5 +1,5 @@
 ---
-sourceHash: 7bd4e27e22c6c53b
+sourceHash: 8bade8e09da44b98
 title: Collections
 sidebar_label: Collections
 description: Collections sind der zentrale Baustein von Rebase – jede Collection wird auf eine Datenbanktabelle abgebildet und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.
@@ -7,17 +7,21 @@ description: Collections sind der zentrale Baustein von Rebase – jede Collecti
 
 ## Was ist eine Collection?
 
-Eine **Collection** ist ein TypeScript-Objekt, das eine Datenbanktabelle und deren Darstellung in der Admin-UI beschreibt. Sie definiert:
+Eine **Collection** ist ein TypeScript-Objekt, das eine Datenbanktabelle beschreibt und festlegt, wie sie im Rebase CMS dargestellt werden soll. Sie definiert:
 
-- **Schema** — Eigenschaften (Spalten), ihre Typen und Validierungsregeln
+- **Schema** — Properties (Spalten), deren Typen und Validierungsregeln
 - **Relationen** — Fremdschlüssel, Junction-Tabellen und Join-Pfade
-- **Sicherheit** — Row Level Security-Richtlinien (RLS-Policies)
-- **Lifecycle-Hooks** — Callbacks für Erstell-, Aktualisierungs- und Löschoperationen
-- **Admin-UI-Verhalten** — Ansichtsmodi, Inline-Bearbeitung, Entitätsansichten, Aktionen – alles unter `admin`
+- **Sicherheit** — Row-Level-Security-Richtlinien (RLS)
+- **Lifecycle-Hooks** — Callbacks für Erstell-, Aktualisierungs- und Löschoperationen (Create, Update, Delete)
+- **CMS-Verhalten** — Ansichtsmodi, Inline-Bearbeitung, Entity-Ansichten, Aktionen – alles unter `admin`
 
-## Deklaration: `defineCollection`
+## Deklarieren einer Collection: `defineCollection`
 
-Ummanteln Sie das Literal mit `defineCollection`. Zur Laufzeit ist es die Identitätsfunktion – sie gibt das Objekt unverändert zurück – und verursacht somit keinen Overhead. Der Vorteil liegt in der Typinferenz: Ein `const`-Typparameter erfasst Ihre `properties`-Schlüssel als Literal-Typen, und die schlüsselförmigen Felder des `admin`-Blocks werden anschließend gegen diese geprüft. Ein Name, der nicht zu Ihren Properties gehört, führt zu einem **Kompilierfehler** (Compile Error) und nicht nur zu einem fehlenden Vorschlag bei der Autovervollständigung.
+Hüllen Sie das Literal in `defineCollection` ein. Zur Laufzeit ist dies die Identitätsfunktion – sie
+gibt das Objekt unverändert zurück – sie kostet also nichts. Was man gewinnt, ist Typinferenz: Ein `const`-Typparameter
+erfasst Ihre `properties`-Schlüssel als Literal-Typen, und die schlüsselförmigen
+Felder des `admin`-Blocks werden anschließend dagegen geprüft. Ein Name, der keine
+Ihrer Properties ist, führt zu einem **Kompilierfehler** und nicht nur zu einem fehlenden Vorschlag.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -46,16 +50,18 @@ const products = defineCollection({
     }
 ```
 
-Die überprüften Felder sind `display`, `sort`, `propertiesOrder` und `listProperties`.
+Die geprüften Felder sind `display`, `sort`, `propertiesOrder` und `listProperties`.
 Neben einem einfachen Property-Schlüssel werden drei Formen akzeptiert:
 
 | Form | Beispiel | Hinweise |
 | --- | --- | --- |
-| Punktierter Pfad in eine `map` | `"profile.displayName"` | Die **Wurzel (Root)** muss eine echte Property sein; der Pfad darunter wird nicht überprüft. |
-| Spalte einer untergeordneten Collection | `"subcollection:orders"` | Nur für `propertiesOrder` / `listProperties`. |
-| Ein `additionalFields`-Schlüssel | `"score" as AdditionalFieldKey` | Erfordert den Typecast – siehe unten. |
+| Pfad mit Punktnotation in eine `map` | `"profile.displayName"` | Die **Root** muss eine echte Property sein; der darunter liegende Pfad wird nicht geprüft. |
+| Spalte einer Child-Collection | `"subcollection:orders"` | Nur `propertiesOrder` / `listProperties`. |
+| Ein `additionalFields`-Schlüssel | `"score" as AdditionalFieldKey` | Erfordert den Cast – siehe unten. |
 
-`AdditionalFieldDelegate.key` ist ein einfacher `string`, sodass das Typsystem keine Möglichkeit hat zu wissen, welche zusätzlichen Schlüssel eine Collection deklariert. Anstatt diese Felder wieder für jeden beliebigen String zu öffnen, macht der Typecast die Ausnahme explizit:
+`AdditionalFieldDelegate.key` ist ein einfacher `string`, daher kann das Typsystem nicht wissen,
+welche zusätzlichen Schlüssel eine Collection deklariert. Anstatt diese Felder für jeden beliebigen String zu öffnen,
+macht der Cast die Ausnahme explizit:
 
 ```typescript
 import type { AdditionalFieldKey } from "@rebasepro/cms-types";
@@ -63,9 +69,11 @@ import type { AdditionalFieldKey } from "@rebasepro/cms-types";
 propertiesOrder: ["title", "score" as AdditionalFieldKey]
 ```
 
-Importieren Sie dies aus `@rebasepro/cms-types` in einem Projekt, das über ein Admin-Panel verfügt – dies ist die Version, die auch den `admin`-Block typprüft. Ein Headless-BaaS-Projekt, das keinen Admin-Block hat, importiert dieselbe Funktion stattdessen aus `@rebasepro/common`.
+Importieren Sie es in einem Projekt mit Admin-Panel aus `@rebasepro/cms-types` – dies ist
+die Version, die auch den `admin`-Block typprüft. Ein Headless-BaaS-Projekt, das keinen
+Admin-Block hat, importiert dieselbe Funktion stattdessen aus `@rebasepro/common`.
 
-Das direkte Annotieren des Typs funktioniert weiterhin und wird ebenfalls überprüft:
+Die direkte Typannotation funktioniert weiterhin und wird auch weiterhin geprüft:
 
 ```typescript
 import type { PostgresCollectionConfig } from "@rebasepro/types";
@@ -80,15 +88,20 @@ const products: PostgresCollectionConfig = {
 };
 ```
 
-aber eine Annotation *validiert lediglich die Struktur* – sie kann Ihre Property-Namen nicht einsehen, sodass die Schlüsselfelder in `admin` darauf zurückfallen, jeden beliebigen String zu akzeptieren. Bevorzugen Sie `defineCollection`, es sei denn, Sie müssen den Typ explizit benennen.
+aber eine Typannotation *validiert nur die Form* – sie kann Ihre Property-Namen nicht sehen, sodass die
+Schlüsselfelder in `admin` darauf zurückfallen, jeden beliebigen String zu akzeptieren. Bevorzugen Sie `defineCollection`, es sei denn,
+Sie müssen den Typ explizit benennen.
 
 :::note
-`buildCollection` und `buildProperty` existieren nicht mehr. `buildCollection` ist `defineCollection` ohne Typinferenz; `buildProperty` hat eine Property lediglich in einen Typ gewickelt, den sie ohnehin schon hatte. Siehe [Changelog](/docs/changelog) für die Einzeilen-Migration.
+`buildCollection` und `buildProperty` existieren nicht mehr. `buildCollection` ist
+`defineCollection` ohne die Typinferenz; `buildProperty` hüllte eine Property in einen Typ ein, den sie
+bereits hatte. Siehe [Changelog](/docs/changelog) für die einzeilige Migration.
 :::
 
 ## Anatomie: Der Vertrag und das Panel
 
-Eine Datei, zwei Zielgruppen. Alles, was für die *Datenbank und die API* relevant ist, befindet sich auf oberster Ebene; alles, was das *Admin-Panel* rendert, liegt innerhalb von `admin`.
+Eine Datei, zwei Zielgruppen. Alles, was für die *Datenbank und die API* relevant ist, befindet sich auf der
+obersten Ebene; alles, was das *Admin-Panel* rendert, liegt innerhalb von `admin`.
 
 ```typescript
 const posts = {
@@ -111,21 +124,30 @@ const posts = {
 };
 ```
 
-Die Trennung ist nicht nur kosmetischer Natur. Sie ermöglicht es Rebase, als eigenständiges Backend zu fungieren:
+Die Aufteilung ist nicht nur kosmetischer Natur. Sie ermöglicht es Rebase, eigenständig als Backend zu fungieren:
 
-- Ein **BaaS- oder Headless**-Projekt definiert niemals einen `admin`-Block. Seine Collections – oder gar keine Collections, da der BaaS-Modus die Datenbank introspektiert – beschreiben Daten und Autorisierung, sonst nichts. `@rebasepro/types` enthält keinerlei UI-Code, sodass der Abhängigkeitsbaum eines Headless-Projekts rein serverseitig bleibt.
-- Das **Backend liest niemals innerhalb des Blocks**. Er wird verworfen, bevor eine Collection an den Contract-Endpunkt oder in ein Build-Bundle serialisiert wird, und ist von der Schema-Versionierung ausgeschlossen – die Änderung eines Icons führt also nicht dazu, dass jedes generierte SDK als veraltet gemeldet wird.
+- Ein **BaaS- oder Headless**-Projekt schreibt niemals einen `admin`-Block. Seine Collections – oder überhaupt keine
+  Collections, da der BaaS-Modus die Datenbank per Introspektion erfasst – beschreiben Daten und
+  Autorisierung, sonst nichts. `@rebasepro/types` enthält keinen UI-Code, sodass der Abhängigkeitsbaum eines
+  Headless-Projekts rein serverseitig bleibt.
+- Das **Backend liest niemals innerhalb des Blocks**. Er wird verworfen, bevor eine Collection an
+  den Contract-Endpunkt oder in ein Build-Bundle serialisiert wird, und er ist von der
+  Schema-Versionierung ausgeschlossen – das Ändern eines Icons führt also nicht dazu, dass jedes generierte SDK als
+  veraltet gemeldet wird.
 
 ### Der `admin`-Block existiert nur, wenn Sie die Admin-Typen installieren
 
-`@rebasepro/types` deklariert kein `admin`-Feld – weder auf einer Collection noch auf einer Property. In einem BaaS-Projekt ist das Hinzufügen ein **Typfehler**. `@rebasepro/cms-types` fügt es mittels Declaration Merging wieder hinzu, sodass eine einzige Zeile pro Projekt ausreicht, um es zu aktivieren:
+`@rebasepro/types` deklariert kein `admin`-Feld – weder für eine Collection noch für eine Property. In
+einem BaaS-Projekt ist das Schreiben eines solchen Feldes ein **Typfehler**. `@rebasepro/cms-types` fügt es mittels
+Declaration Merging wieder hinzu, sodass eine einzige Zeile pro Projekt ausreicht, um es zu aktivieren:
 
 ```typescript no-verify
 // config/cms.d.ts
 /// <reference types="@rebasepro/cms-types" />
 ```
 
-Danach verfügen die reinen Core-Typen über einen vollständig typisierten Block – ein Tippfehler wie `icoon` führt zu einem Fehler, und Sie erhalten Autovervollständigung:
+Danach enthalten einfache Core-Typen einen vollständig typisierten Block – ein Tippfehler wie `icoon` führt zu einem Fehler,
+und Sie erhalten Autovervollständigung:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -142,21 +164,29 @@ const posts = defineCollection({
 ```
 
 <!-- docs-verify: ignore -->
-Eine Augmentation gilt für das gesamte TypeScript-*Programm*, und `config/` sowie `frontend/` sind separate Programme – weshalb die Referenz in das Config-Paket gehört. Es gibt keinen `AdminCollectionConfig`-Wrapper-Typ: Sobald das Feld hineingemergt ist, dient `CollectionConfig` als primärer Typ bei der Erstellung.
+Eine Typ-Augmentation gilt für das gesamte TypeScript-*Programm*, und `config/` sowie `frontend/`
+sind separate Programme – weshalb die Referenz in das Config-Paket gehört. Es gibt
+keinen `AdminCollectionConfig`-Wrapper-Typ: Mit dem zusammengeführten Feld ist `CollectionConfig`
+der Authoring-Typ.
 
 :::note[Warum ein BaaS-Projekt keinen Overhead hat]
-Ein Property-Typ in einer BaaS-Installation enthält kein `Field`, kein `columnWidth`, kein `hideFromCollection` – diese befinden sich in `AdminPropertyOptions` im Admin-Paket. Diese Garantie wird aktiv überprüft und nicht nur behauptet: `e2e/baas-typecheck/src/admin_absent.ts` verwendet `@ts-expect-error` auf `admin`, sodass der Build fehlschlägt, falls das Feld im Core jemals wieder beschreibbar werden sollte.
+Ein Property-Typ in einer BaaS-Installation besitzt kein `Field`, kein `columnWidth`, kein
+`hideFromCollection` – diese befinden sich in `AdminPropertyOptions` im Admin-Paket. Die
+Garantie wird nicht nur behauptet, sondern überprüft: `e2e/baas-typecheck/src/admin_absent.ts` verwendet
+`@ts-expect-error` auf `admin`, sodass der Build fehlschlägt, falls das Feld im
+Core jemals wieder beschreibbar werden sollte.
 :::
 
 ### Migration von einer flachen Collection
 
-Vor Version 0.11 befanden sich diese Felder auf oberster Ebene. Um sie zu verschieben:
+Vor Version 0.11 befanden sich diese Felder auf der obersten Ebene. Um sie zu verschieben:
 
 ```bash
 node scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
-Es meldet alles, was nicht sicher automatisch verschoben werden kann – insbesondere Darstellungsoptionen innerhalb von `relations[].overrides`, welche manuell zu `overrides: { admin: { … } }` angepasst werden müssen.
+Es meldet alles, was nicht sicher verschoben werden kann – insbesondere Darstellungsoptionen innerhalb von
+`relations[].overrides`, die manuell auf `overrides: { admin: { … } }` angepasst werden müssen.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -211,110 +241,116 @@ export const productsCollection = defineCollection({
 
 ```
 
-## Wichtige Eigenschaften
+## Wichtigste Properties
 
 ### Identifikation
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `slug` | `string` | **Erforderlich.** URL-sicherer Bezeichner. Wird in der Admin-UI-URL und im REST-API-Pfad (`/api/data/{slug}`) verwendet. |
 | `name` | `string` | **Erforderlich.** Anzeigename (Plural). Wird in der Navigation und in Seitenüberschriften angezeigt. |
-| `singularName` | `string` | Anzeigename für eine einzelne Entität. Wird in „Neues Produkt“, „Produkt bearbeiten“ usw. verwendet. |
-| `description` | `string` | Ein Satz darüber, was diese Collection enthält, der über der Liste angezeigt wird. Markdown. |
-| `table` | `string` | PostgreSQL-Tabellenname. Standardmäßig `toSnakeCase(slug)` – setzen Sie ihn nur, um die URL von der Tabelle zu entkoppeln, z. B. eine bestehende `blog_posts`-Tabelle, die unter `/posts` bereitgestellt wird. |
+| `singularName` | `string` | Anzeigename für eine einzelne Entity. Wird in „Neues Produkt“, „Produkt bearbeiten“ usw. verwendet. |
+| `description` | `string` | Ein Satz darüber, was diese Collection enthält; wird über der Liste angezeigt. Markdown. |
+| `table` | `string` | Name der PostgreSQL-Tabelle. Standardmäßig `toSnakeCase(slug)` – nur angeben, um die URL von der Tabelle zu entkoppeln, z. B. eine bestehende Tabelle `blog_posts`, die unter `/posts` bereitgestellt wird. |
 | `admin.icon` | `string` | Ein [Lucide](https://lucide.dev/icons)-Icon-Name, z. B. `"FileText"`, `"ShoppingCart"`. Ein gerendertes Element funktioniert ebenfalls, aber der Name übersteht die Serialisierung, weshalb der Schema-Editor diesen zurückschreibt. |
 
 ### Schema
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `properties` | `Properties` | **Erforderlich.** Map aus Property-Schlüssel → Property-Definition. Jeder Schlüssel wird zu einer Datenbankspalte. |
 | `relations` | `Relation[]` | SQL-Relationen – Fremdschlüssel, Junction-Tabellen. Siehe [Relationen](/docs/collections/relations). |
-| `securityRules` | `SecurityRule[]` | Row Level Security-Richtlinien. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
+| `securityRules` | `SecurityRule[]` | Row-Level-Security-Richtlinien. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Postgres-Indizes, die diese Tabelle benötigt. Siehe [Indizes](/docs/backend/indexes). |
-| `search` | `SearchConfig` | Gewichtete Volltextsuche über die von Ihnen angegebenen Felder, einschließlich JSONB- und Array-Inhalten. Nur Postgres. Siehe [Suche](/docs/backend/search). |
+| `search` | `SearchConfig` | Gerankte Volltextsuche über die von Ihnen benannten Felder, einschließlich JSONB- und Array-Inhalten. Nur Postgres. Siehe [Suche](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Collection als Authentifizierungs-Collection markieren (Benutzerverwaltung, Passwort-Reset etc.) |
-| `schema` | `string` | Postgres-Schema, in dem sich die Tabelle befindet – `"public"`, `"rebase"`, `"auth"`. Standard ist `"public"`. |
-| `disableDefaultPolicies` | `boolean` | Entfernt die Basis-Policies, die der Generator einfügt – ein Admin/Server-SELECT und bei einer Auth-Collection ein Self-Read plus ein Admin-Only-Schreibgate – und übernimmt die volle Verantwortung für das RLS dieser Collection. Standardmäßig `false`. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
-| `softDelete` | `boolean \| { field?: string }` | Wandelt `delete` in einen Zeitstempel um und blendet markierte Zeilen bei jedem Lesezugriff aus. `true` verwendet `deletedAt`; die Objektform benennt das Feld um. Die Collection muss diese `date`-Property selbst deklarieren. Nur Postgres – siehe [Soft delete](/docs/collections/soft-delete). |
-| `strictWrites` | `boolean` | Weist einen Schreibvorgang mit einem 400-Fehler ab, der ein Feld benennt, das diese Collection nicht deklariert. Standardmäßig `true`. Setzen Sie dies nur dann auf `false`, wenn die Spalte tatsächlich existiert und nicht deklariert ist – z. B. durch einen Trigger befüllt oder introspektiert statt manuell definiert. |
+| `schema` | `string` | Postgres-Schema, in dem die Tabelle liegt – `"public"`, `"rebase"`, `"auth"`. Standardmäßig `"public"`. |
+| `disableDefaultPolicies` | `boolean` | Entfernt die vom Generator injizierten Standard-Richtlinien – ein Admin-/Server-SELECT und bei einer Auth-Collection ein Self-Read plus ein Admin-only Write-Gate – und übernimmt die volle Verantwortung für das RLS dieser Collection. Standardmäßig `false`. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
+| `softDelete` | `boolean \| { field?: string }` | Wandelt `delete` in einen Zeitstempel um und blendet mit einem Zeitstempel versehene Zeilen bei jedem Lesevorgang aus. `true` verwendet `deletedAt`; die Objektform benennt das Feld um. Die Collection muss diese `date`-Property selbst deklarieren. Nur Postgres – siehe [Soft Delete](/docs/collections/soft-delete). |
+| `strictWrites` | `boolean` | Weist Schreibvorgänge, die ein nicht von dieser Collection deklariertes Feld angeben, mit einem 400-Fehler ab. Standardmäßig `true`. Setzen Sie dies nur dann auf `false`, wenn die Spalte tatsächlich existiert und nicht deklariert ist – etwa durch einen Trigger befüllt oder per Introspektion ermittelt, anstatt explizit definiert. |
 
 ### UI-Konfiguration
 
 Alle folgenden Optionen gehören in `admin`.
 
-| Eigenschaft | Typ | Standard | Beschreibung |
+| Property | Typ | Standard | Beschreibung |
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Standard-Ansichtsmodus |
 | `enabledViews` | `ViewMode[]` | Alle vier | Welche Ansichtsmodi verfügbar sind |
 | `kanban` | `KanbanConfig` | — | Kanban-Konfiguration (Spalten-Property). Immer zusammen mit `orderProperty` verwenden – siehe [Ansichtsmodi](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Schlüssel der **String**-Property, die den Drag-and-Drop-Reihenfolgeschlüssel enthält. Erforderlich für ein funktionierendes Kanban-Board |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | Wie Entitäten zur Bearbeitung geöffnet werden |
-| `sideDialogWidth` | `number \| string` | — | Breite des Seitendialogs |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | Wie Entities zur Bearbeitung geöffnet werden |
+| `sideDialogWidth` | `number \| string` | — | Breite des seitlichen Dialogs |
 | `inlineEditing` | `boolean` | `true` | Inline-Bearbeitung in der Tabellenansicht aktivieren |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Standard-Zeilenhöhe in der Tabelle |
 | `pagination` | `boolean \| number` | `true` (50) | Paginierung aktivieren und/oder Seitengröße festlegen |
-| `listProperties` | `string[]` | — | Eigenschaften, die in der Listenansicht angezeigt werden sollen |
+| `listProperties` | `string[]` | — | Properties, die in der Listenansicht angezeigt werden sollen |
 | `propertiesOrder` | `string[]` | — | Spaltenreihenfolge in der Tabellenansicht |
 | `selectionEnabled` | `boolean` | `true` | Zeilenauswahl aktivieren |
 | `hideFromNavigation` | `boolean` | `false` | In der Sidebar-Navigation ausblenden |
 | `defaultSelectedView` | `string \| function` | — | Standardmäßig zu öffnende Ansicht oder Subcollection |
 
-### Entitätsoptionen
+### Entity-Optionen
 
-Innerhalb von `admin`, mit Ausnahme von `history`, welches ein Backend-Feature ist und auf oberster Ebene verbleibt.
+Innerhalb von `admin`, außer `history`, welches ein Backend-Feature ist und auf der obersten Ebene verbleibt.
 
-| Eigenschaft | Typ | Standard | Beschreibung |
+| Property | Typ | Standard | Beschreibung |
 |----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Automatisches Speichern bei Feldänderung |
+| `formAutoSave` | `boolean` | `false` | Automatisches Speichern bei Feldänderungen |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Nicht gespeicherte Änderungen sichern |
-| `hideIdFromForm` | `boolean` | `false` | Entitäts-ID im Formular ausblenden |
+| `hideIdFromForm` | `boolean` | `false` | Entity-ID im Formular ausblenden |
 | `hideIdFromCollection` | `boolean` | `false` | ID-Spalte in der Tabelle ausblenden |
-| `includeJsonView` | `boolean` | `true` | Rohwerte im Datensatz-Inspektor anzeigen |
-| `history` | `boolean` | `false` | Änderungen im Entitätsverlauf nachverfolgen |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Standardwerte bei jedem Speichern anwenden |
-| `previewProperties` | `string[]` | — | Eigenschaften, die in Referenzvorschauen angezeigt werden sollen |
-| `display` | `EntityDisplay` | — | Was die einzelnen Anzeigerollen befüllt – siehe [Entitätsanzeige](#entity-display) |
+| `includeJsonView` | `boolean` | `true` | Die Rohwerte im Record-Inspector anbieten |
+| `history` | `boolean` | `false` | Änderungen in der Entity-Historie nachverfolgen |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Standardwerte bei jedem Speichervorgang anwenden |
+| `previewProperties` | `string[]` | — | Properties, die in Referenz-Vorschauen angezeigt werden sollen |
+| `display` | `EntityDisplay` | — | Was jede Anzeige-Rolle ausfüllt – siehe [Entity-Darstellung](#entity-darstellung) |
 
 ### Erweitert
 
-Auf oberster Ebene, da das Backend diese liest:
+Auf der obersten Ebene, da das Backend sie liest:
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `callbacks` | `CollectionCallbacks` | Lifecycle-Hooks (`beforeSave`, `afterSave`, `beforeDelete` usw.) |
-| `childCollections` | `() => CollectionConfig[]` | Die Collections, die unter einer Entität dieser Collection verschachtelt sind. Wird während der Normalisierung anhand der jeweiligen Treiber-Ausdrücke befüllt – ein Firestore-`subcollections`, eine Postgres-`hasMany`-Relation – daher ist ein benutzerdefinierter Treiber der einzige Grund, dies manuell festzulegen |
-| `dataSource` | `string` | Welche registrierte Datenquelle dieser Collection zugrunde liegt (Standard: die unbenannte Datenquelle) |
-| `engine` | `string` | Die zugrunde liegende Engine – `"postgres"`, `"firestore"`, `"mongodb"`. Wird aus `dataSource` aufgelöst; nur zum Überschreiben angeben |
+| `callbacks` | `CollectionCallbacks` | Lifecycle-Hooks (`beforeSave`, `afterSave`, `beforeDelete` etc.) |
+| `childCollections` | `() => CollectionConfig[]` | Die unter einer Entity dieser Collection geschachtelten Collections. Wird während der Normalisierung aus dem befüllt, womit der Treiber sie ausdrückt – ein Firestore-`subcollections`, eine Postgres-`hasMany`-Relation – daher ist ein benutzerdefinierter Treiber der einzige Grund, dies manuell festzulegen |
+| `dataSource` | `string` | Welche registrierte Datenquelle diese Collection stützt (Standard: die unbenannte Datenquelle) |
+| `engine` | `string` | Die dahinterliegende Engine – `"postgres"`, `"firestore"`, `"mongodb"`. Wird aus `dataSource` aufgelöst; nur angeben, um es zu überschreiben |
 | `databaseId` | `string` | Datenbank oder Schema innerhalb der Engine |
-| `metadata` | `Record<string, unknown>` | Beliebige Daten, die Ihr eigener Code an eine Collection anhängen muss. Rebase liest dies nicht; es übersteht die Serialisierung unverändert |
-| `ownerId` | `string` | **Nur Admin-Formular – wird weder von der API noch von der Datenbank erzwungen.** Die Benutzer-ID, die der Collection-Editor einer erstellten Collection zuweist und neben ihrem Namen anzeigt. Nichts im Request-Pfad greift darauf zu |
+| `metadata` | `Record<string, unknown>` | Alles, was Ihr eigener Code an einer Collection anheften muss. Rebase liest dies nicht; es übersteht die Serialisierung unverändert |
+| `ownerId` | `string` | **Nur Admin-Formular – wird weder von der API noch von der Datenbank erzwungen.** Die Benutzer-ID, die der Collection-Editor einer von ihm erstellten Collection zuweist und neben ihrem Namen anzeigt. Nichts im Request-Pfad greift darauf zu |
 
-`subcollections` und `path` existieren nur in den Konfigurationen für **Dokumentendatenbanken** – `FirebaseCollectionConfig` und, für `path`, `MongoDBCollectionConfig`:
+`subcollections` und `path` gibt es nur bei Konfigurationen für **Dokumentendatenbanken** –
+`FirebaseCollectionConfig` und, für `path`, `MongoDBCollectionConfig`:
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `subcollections` | `() => CollectionConfig[]` | **Nur Firestore.** Collections, die unter jedem Dokument verschachtelt sind. Eine Postgres-Collection drückt dasselbe mit einer `hasMany`-[Relation](/docs/collections/relations) aus, wodurch `childCollections` befüllt wird |
-| `path` | `string` | **Nur Firestore und MongoDB.** Der Pfad oder Collection-Name auf Engine-Ebene, falls dieser vom Slug abweicht |
+| `subcollections` | `() => CollectionConfig[]` | **Nur Firestore.** Unter jedem Dokument geschachtelte Collections. Eine Postgres-Collection drückt dasselbe mit einer `hasMany`-[Relation](/docs/collections/relations) aus, wodurch `childCollections` befüllt wird |
+| `path` | `string` | **Nur Firestore und MongoDB.** Der Pfad oder Collection-Name in der Engine, wenn er sich vom Slug unterscheidet |
 
-Und innerhalb von `admin`, da nur das Panel diese rendert:
+Und innerhalb von `admin`, da nur das Panel sie darstellt:
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `admin.entityActions` | `EntityAction[]` | Benutzerdefinierte Aktionen auf Entitäten (Archivieren, Veröffentlichen usw.) |
-| `admin.Actions` | `React.ComponentType` | Benutzerdefinierte Toolbar-Aktionskomponente |
-| `admin.entityViews` | `EntityCustomView[]` | Benutzerdefinierte Tabs in der Entitäts-Detailansicht |
+| `admin.entityActions` | `EntityAction[]` | Benutzerdefinierte Aktionen auf Entities (Archivieren, Veröffentlichen etc.) |
+| `admin.Actions` | `React.ComponentType` | Benutzerdefinierte Komponente für Toolbar-Aktionen |
+| `admin.entityViews` | `EntityCustomView[]` | Benutzerdefinierte Tabs in der Entity-Detailansicht |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Berechnete/virtuelle Spalten |
 | `admin.exportable` | `boolean \| ExportConfig` | Datenexport aktivieren |
-| `admin.components` | `CollectionComponentOverrideMap` | UI-Komponenten-Overrides mit Collection-Gültigkeitsbereich |
+| `admin.components` | `CollectionComponentOverrideMap` | Collection-spezifische UI-Komponenten-Overrides |
 
-Das Definieren eines dieser sechs Felder auf oberster Ebene führt zu einem Boot-Zeit-Fehler mit einer Meldung, die den Schlüssel und dessen neuen Ablageort nennt.
+Das Definieren eines dieser sechs Felder auf der obersten Ebene führt zu einem Fehler beim Start (Boot-Time Error)
+mit einer Meldung, die den Schlüssel nennt und angibt, wohin er verschoben wurde.
 
-## Entitätsanzeige
+## Entity-Darstellung
 
-Jede Oberfläche, die einen Datensatz darstellt, rendert eine Teilmenge von sechs Rollen: **title**, **subtitle**, **image**, **status**, **date** und **tags**. Eine Zeile in einer Liste besteht aus Bild + Titel + Untertitel + Status + Datum, eine Karte ist dasselbe mit dem Bild obenauf, ein Referenz-Picker besteht aus Titel + Untertitel und eine Seitenüberschrift zeigt nur den Titel.
+Jede Oberfläche, die einen Datensatz darstellt, zeichnet eine Untermenge von sechs Rollen: **title**,
+**subtitle**, **image**, **status**, **date** und **tags**. Eine Listenzeile besteht aus image +
+title + subtitle + status + date, eine Karte ist dasselbe mit dem Bild oben, ein
+Referenz-Picker besteht aus title + subtitle und eine Seitenüberschrift zeigt nur den Titel.
 
-Jede Rolle wird von Ihren Properties abgeleitet und kann stattdessen explizit definiert werden – als Property-Pfad oder als Funktion:
+Jede Rolle wird aus Ihren Properties abgeleitet und jede kann stattdessen explizit angegeben werden – als
+Property-Pfad oder als Funktion:
 
 ```typescript
 const exercises = defineCollection({
@@ -336,11 +372,13 @@ const exercises = defineCollection({
 });
 ```
 
-Alles, was Sie weglassen, behält seinen abgeleiteten Wert; das Angeben einer einzelnen Rolle verpflichtet Sie also nicht dazu, alle sechs anzugeben.
+Alles, was Sie weglassen, behält seinen abgeleiteten Wert. Das Festlegen einer Rolle bedeutet
+also nicht, dass alle sechs definiert werden müssen.
 
 ### Berechnete und asynchrone Rollen
 
-Ein Resolver kann `async` sein, wodurch eine Rolle Werte lesen kann, die der Datensatz selbst nicht enthält – etwa ein Dokument in einer Subcollection oder einen Wert hinter einer API:
+Ein Resolver kann `async` sein, wodurch eine Rolle Daten lesen kann, die der Datensatz
+selbst nicht enthält – etwa ein Dokument in einer Subcollection oder einen Wert hinter einer API:
 
 ```typescript
 admin: {
@@ -354,32 +392,44 @@ admin: {
 }
 ```
 
-Während das Promise aussteht, zeigt die Oberfläche den abgeleiteten Wert an und ersetzt ihn durch den aufgelösten Wert, sobald er eintrifft – ein Titel wird niemals als Spinner dargestellt. Ergebnisse werden pro Datensatz und Rolle zwischengespeichert, und gleichzeitige Abfragen für dasselbe Paar teilen sich einen einzigen Aufruf. Eine Liste mit fünfzig Zeilen löst daher jede Zeile nur einmal auf, anstatt bei jedem Render-Vorgang erneut.
+Während das Promise ausgeführt wird, zeigt die Oberfläche den abgeleiteten Wert an und ersetzt ihn durch den
+aufgelösten Wert, sobald dieser eintrifft – ein Titel ist niemals ein Lade-Spinner. Die Ergebnisse werden
+pro Datensatz und pro Rolle zwischengespeichert, und gleichzeitige Abfragen für dasselbe Paar teilen sich einen einzigen Aufruf. So
+löst eine Liste von fünfzig Zeilen jede Zeile einmal auf, anstatt einmal pro Render-Vorgang.
 
-Geben Sie `undefined` zurück, wenn ein Datensatz keinen Wert für die Rolle aufweist; der eigene Fallback der Oberfläche weiß besser, was stattdessen dorthin gehört (eine Überschrift verwendet den Singular-Namen der Collection, ein Link die ID). Ein Resolver, der einen Fehler wirft, wird wie `undefined` behandelt und einmalig protokolliert – ein Titel, der nicht abgerufen werden kann, darf nicht die gesamte Zeile zum Absturz bringen.
+Geben Sie `undefined` zurück, wenn ein Datensatz keinen Wert für die Rolle hat; der eigene
+Fallback der Oberfläche weiß besser, was stattdessen dorthin gehört (eine Überschrift verwendet den
+Singular-Namen der Collection, ein Link verwendet die ID). Ein Resolver, der einen Fehler wirft, wird
+wie `undefined` behandelt und einmal protokolliert – ein Titel, der nicht abgerufen werden kann, darf nicht
+die gesamte Zeile zum Absturz bringen, die ihn anzeigt.
 
-Bevorzugen Sie einen Pfad, wann immer sich der Wert direkt im Datensatz befindet: Ein Pfad behält das eigene Rendering der Property bei, sodass ein Enum-Status ein farbiger Chip bleibt und ein Datum formatiert wird, was ein Resolver, der einen reinen String zurückgibt, nicht leisten kann.
+Bevorzugen Sie einen Pfad, wann immer der Wert im Datensatz vorhanden ist: Ein Pfad behält das
+eigene Rendering der Property bei, sodass ein Enum-Status ein farbiger Chip bleibt und ein Datum formatiert
+wird – was ein Resolver, der einen reinen String zurückgibt, nicht ausdrücken kann.
 
 :::note[`titleProperty` ersetzt]
-`admin.titleProperty` wurde zugunsten von `admin.display.title` entfernt. Derselbe String funktioniert dort weiterhin, und das neue Feld akzeptiert auch einen Resolver. Eine Collection, die noch den alten Schlüssel verwendet, wird von `defineCollection` mit dem gewohnten Fehler für unbekannte Schlüssel abgewiesen.
+`admin.titleProperty` wurde zugunsten von `admin.display.title` entfernt. Derselbe
+String funktioniert dort, und das neue Feld akzeptiert auch einen Resolver. Eine Collection, die noch
+den alten Schlüssel verwendet, wird von `defineCollection` mit dem üblichen
+Fehler für unbekannte Schlüssel abgelehnt.
 :::
 
 ### Auswahl der Titel-Property
-Wenn `display.title` nicht gesetzt ist, wird die als Anzeigetitel der Entität verwendete Property (Vorschauen, Header) automatisch ermittelt:
-1. Wenn `propertiesOrder` explizit definiert ist, wird die erste Eigenschaft (außer ID) gewählt, die entweder vom Typ `relation` oder `string` ist.
-2. Wenn kein `propertiesOrder` definiert ist, durchsucht das Framework die Properties der Reihe nach und wählt die erste Eigenschaft vom Typ `string`.
+Wenn `display.title` nicht festgelegt ist, wird die Property, die als Anzeige-Titel der Entity verwendet wird (Vorschauen, Überschriften), automatisch aufgelöst:
+1. Wenn `propertiesOrder` explizit definiert ist, wird die erste Property (außer der ID), die entweder vom Typ `relation` oder `string` ist, als Titel ausgewählt.
+2. Wenn keine `propertiesOrder` definiert ist, durchsucht das Framework die Properties der Reihe nach und wählt die erste Property vom Typ `string` aus.
 
-### Relationsvorschauen in Tabellen
-Wenn `propertiesOrder` explizit gesetzt ist, werden Relations-Properties **nicht** automatisch aus den standardmäßigen Vorschau-Spalten herausgefiltert (wohingegen sie bei ungeordneten Standards ausgeschlossen werden, um langsame Join-Operationen zu vermeiden).
+### Relation-Vorschauen in Tabellen
+Wenn `propertiesOrder` explizit gesetzt ist, werden Relation-Properties **nicht** automatisch aus den Standard-Vorschau-Spalten herausgefiltert (während sie bei ungeordneten Standardeinstellungen ausgeschlossen werden, um langsame Join-Operationen zu vermeiden).
 
 ### Wie ein Titelwert gerendert wird
-Was auch immer die Titel-Property enthält, das Panel rendert einen String. Ein Datum wird formatiert, ein Array zusammengefügt und eine Relation – die als `{ id, data: { values } }` anstelle von reinem Text ankommt – wird nach dem ersten vorkommenden Feld unter `name`, `title`, `label` oder `displayName` in der verknüpften Zeile durchsucht, mit Fallback auf ihre ID. Daher kann ein Titel eine `relation`-Property referenzieren und dennoch als Name statt als UUID dargestellt werden.
+Ganz gleich, was die Titel-Property enthält, das Panel rendert einen String. Ein Datum wird formatiert, ein Array zusammengefügt und eine Relation – die als `{ id, data: { values } }` anstelle von reinem Text ankommt – wird in der zugehörigen Zeile nach der ersten Übereinstimmung von `name`, `title`, `label` oder `displayName` durchsucht, mit Fallback auf deren ID. So kann ein Titel eine `relation`-Property referenzieren und dennoch als Name statt als UUID lesbar sein.
 
-Dies ist kein exportierter Helper: Es ist das Standardverhalten jeder Oberfläche, die einen Datensatz darstellt. Es muss nichts aufgerufen oder importiert werden.
+Dies ist kein exportierter Helper: Es ist genau das, was jede Oberfläche, die einen Datensatz anzeigt, bereits automatisch tut. Es muss nichts aufgerufen und nichts importiert werden.
 
 ## Collection Builder
 
-Verwenden Sie für dynamische Collections, die sich je nach Benutzer oder externen Daten ändern, eine Builder-Funktion:
+Für dynamische Collections, die sich basierend auf dem Benutzer oder externen Daten ändern, verwenden Sie eine Builder-Funktion:
 
 ```typescript
 const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
@@ -397,7 +447,8 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 
 ## Filtern und Sortieren
 
-Sie können Standardfilter oder erzwungene Filter festlegen. Da alle drei Optionen die Präsentation betreffen – also womit das Panel öffnet –, befinden sie sich in `admin`:
+Sie können Standard- oder erzwungene Filter festlegen. Alle drei dienen der Darstellung – womit
+das Panel geöffnet wird – und liegen daher in `admin`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -424,14 +475,14 @@ const invoices = defineCollection({
 });
 ```
 
-Ein `fixedFilter` schränkt ein, was das Panel *anfragt*; er stellt keine Sicherheitsgrenze dar. Was ein Aufrufer tatsächlich lesen darf, bestimmt eine [Sicherheitsregel](/docs/collections/security-rules), die von der Datenbank für jeden Aufrufer durchgesetzt wird, egal ob über das Panel oder nicht.
+Ein `fixedFilter` schränkt lediglich ein, was das Panel *anfordert*; er ist keine Sicherheitsgrenze. Was
+ein Aufrufer tatsächlich lesen darf, bestimmt eine [Sicherheitsregel](/docs/collections/security-rules),
+die von der Datenbank für jeden Aufrufer durchgesetzt wird, unabhängig davon, ob es sich um das Panel handelt oder nicht.
 
 ## Nächste Schritte
 
-- **[Entitäts-Callbacks](/docs/collections/callbacks)** — Lifecycle-Hooks zur Datensynchronisation zwischen Collections, Validierung und Nebeneffekten
-- **[Properties](/docs/collections/properties)** — Alle Property-Typen und Optionen
+- **[Entity-Callbacks](/docs/collections/callbacks)** — Lifecycle-Hooks zur Datensynchronisation zwischen Collections, Validierung und Seiteneffekten
+- **[Properties](/docs/collections/properties)** — Alle Property-Typen und -Optionen
 - **[Relationen](/docs/collections/relations)** — Fremdschlüssel, Junction-Tabellen, Joins
 - **[Sicherheitsregeln](/docs/collections/security-rules)** — Row Level Security
 - **[Ansichtsmodi](/docs/frontend/view-modes)** — Liste, Tabelle, Karten, Kanban
-
----

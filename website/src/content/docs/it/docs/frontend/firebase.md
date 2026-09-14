@@ -1,43 +1,39 @@
 ---
-sourceHash: 619a84a6bea05de9
+sourceHash: 3e18de6e2b935fc7
 title: Firebase
 sidebar_label: Firebase
-description: "@rebasepro/firebase runs the Rebase admin panel against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved."
+description:"\"@rebasepro/firebase esegue Rebase CMS con Firestore, Firebase Auth e Firebase Storage: un adapter lato client, senza alcun server Rebase coinvolto.\""
 ---
 
-:::note[Questa pagina è disponibile solo in inglese]
-La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
+`@rebasepro/firebase` collega Rebase CMS a Firebase. Le tue
+collection descrivono i documenti Firestore, e il pannello li legge e scrive
+tramite l'SDK di Firebase.
+
+:::caution[Sperimentale e strutturalmente diverso dal resto di Rebase]
+Questo è un **adapter lato client**. Non è presente alcun server Rebase: il
+browser comunica direttamente con Firebase, quindi tutto ciò che il backend di Rebase fornisce —
+la row-level security, l'API REST, l'SDK generato, le funzioni, i cron, il
+modello di accesso allo storage — non fa parte di questa configurazione.
+
+L'autorizzazione è gestita tramite le **Firebase Security Rules**, scritte e distribuite in Firebase.
+Le `securityRules` di Rebase su una collection non si applicano.
 :::
 
-`@rebasepro/firebase` points the Rebase admin panel at Firebase. Your
-collections describe Firestore documents, and the panel reads and writes them
-through the Firebase SDK.
-
-:::caution[Experimental, and structurally different from the rest of Rebase]
-This is a **client-side adapter**. There is no Rebase server in the picture: the
-browser talks to Firebase directly, so everything Rebase's backend provides —
-row-level security, the REST API, the generated SDK, functions, crons, the
-storage access model — is not part of this arrangement.
-
-Authorization is **Firebase Security Rules**, written and deployed in Firebase.
-Rebase's `securityRules` on a collection do not apply.
-:::
-
-## Installation
+## Installazione
 
 ```bash
 pnpm add @rebasepro/firebase firebase
 ```
 
-Peer dependencies: `firebase` (10, 11 or 12), `react` ≥ 19, `react-dom` ≥ 19, and
-optionally `typesense` for text search.
+Peer dependencies: `firebase` (10, 11 o 12), `react` ≥ 19, `react-dom` ≥ 19 e,
+facoltativamente, `typesense` per la ricerca testuale.
 
-## What it gives you
+## Cosa offre
 
-- **`RebaseFirebaseApp`** — a complete admin app: Firebase Auth login, routing,
-  and CRUD over Firestore built from your collection definitions.
-- **Hooks per service** — auth, Firestore, storage, App Check, user management.
-- **Text search adapters** — Algolia, Typesense, Pinecone, or local.
+- **`RebaseFirebaseApp`** — un'applicazione di amministrazione completa: login con Firebase Auth, routing
+  e CRUD su Firestore basate sulle definizioni delle tue collection.
+- **Hook per servizio** — auth, Firestore, storage, App Check, gestione utenti.
+- **Adapter per la ricerca testuale** — Algolia, Typesense, Pinecone o locale.
 
 ```tsx title="src/App.tsx" no-verify
 import { RebaseFirebaseApp } from "@rebasepro/firebase";
@@ -51,24 +47,30 @@ export default function App() {
 }
 ```
 
-A working example lives in [`examples/firebase`](https://github.com/rebasepro/rebase/tree/main/examples/firebase).
+Un esempio funzionante è disponibile in [`examples/firebase`](https://github.com/rebasepro/rebase/tree/main/examples/firebase).
 
-## What does not carry over
+## Cosa non è incluso
 
-Everything on this site that describes the Rebase **backend** describes the
-PostgreSQL (or MongoDB) path, not this one:
+Tutto ciò che in questo sito descrive il **backend** di Rebase fa riferimento al
+percorso PostgreSQL (o MongoDB), non a questo:
 
 | | |
 |---|---|
-| Row-level security | Firebase Security Rules instead, written in Firebase |
-| REST API and generated SDK | Absent — the browser uses the Firebase SDK |
-| Functions and crons | Cloud Functions for Firebase instead |
-| Storage access model | Firebase Storage rules instead |
-| Studio, `rls-check`, migrations | Postgres features; not applicable |
+| Row-level security | Sostituita dalle Firebase Security Rules, scritte in Firebase |
+| API REST e SDK generato | Assenti — il browser utilizza l'SDK di Firebase |
+| Funzioni e cron | Sostituiti da Cloud Functions for Firebase |
+| Modello di accesso allo storage | Sostituito dalle regole di Firebase Storage |
+| Studio, `rls-check`, migrazioni | Funzionalità di Postgres; non applicabili |
 
-## Choosing it
+## Quando sceglierlo
 
-Take this when you already have a Firebase project and want a better admin panel
-over it. If you are choosing a backend rather than adapting to one you have,
-the [PostgreSQL path](/docs/getting-started/quickstart/) is the one the rest of
-this documentation is about.
+Scegli questa opzione se hai già un progetto Firebase e desideri un pannello di amministrazione
+migliore per gestirlo. Se stai scegliendo un backend da zero piuttosto che adattarti a uno esistente,
+il [percorso PostgreSQL](/docs/getting-started/quickstart/) è quello a cui fa riferimento
+il resto di questa documentazione.
+
+## Contenuti correlati
+
+- [Configurazione frontend](/docs/frontend/) — il pannello di cui questo sostituisce il data layer
+- [Autenticazione e Login](/docs/frontend/authentication/) — l'interfaccia di accesso, valida per entrambe le opzioni
+- [Definizione delle Collection](/docs/collections/) — la struttura delle collection interpretata da entrambi i driver

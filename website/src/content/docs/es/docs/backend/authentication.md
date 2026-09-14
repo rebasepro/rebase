@@ -1,23 +1,34 @@
 ---
-sourceHash: 5f3f6e8bcd4db79e
+sourceHash: 099cfa22ee1f8493
 title: Autenticación
 sidebar_label: Autenticación
-description: Configure la autenticación JWT, los proveedores OAuth, el email SMTP, los hooks de autenticación y los adaptadores de autenticación personalizados en el backend.
+description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
 ---
 
-## Resumen
+La autenticación abarca tres páginas porque implica tres tareas. Esta trata sobre la **configuración**: lo que se incluye en el bloque `auth` y en el entorno.
 
-Rebase incluye un sistema de autenticación de backend completo:
+- [Endpoints y tokens](/docs/backend/auth-endpoints/) — las rutas que monta el backend, las estructuras de respuesta, MFA, el contexto de base de datos que ve una política, JWKS y claves de servicio.
+- [Adaptadores de autenticación personalizados](/docs/backend/auth-adapters/) — sustitución del proveedor integrado por Clerk, Firebase Auth o uno propio.
 
-- **Tokens JWT** — Flujo de token de acceso y de refresco con expiración configurable
+## Descripción general
+
+Rebase incluye un sistema completo de autenticación en el backend:
+
+- **Tokens JWT** — Flujo de tokens de acceso y actualización con expiración configurable
 - **Proveedores OAuth** — Google, LinkedIn, GitHub, Microsoft, Apple y más
-- **Email SMTP** — Flujos de restablecimiento de contraseña y verificación de email
-- **Hooks de autenticación** — Hooks de ciclo de vida para la creación de usuarios y más
+- **Correo SMTP** — Flujos de restablecimiento de contraseña y verificación de correo electrónico
+- **Hooks de autenticación** — Hooks del ciclo de vida para la creación de usuarios y más
 - **Adaptadores de autenticación personalizados** — Conecte Firebase Auth, Auth0, Clerk o cualquier proveedor externo
-- **Clave de servicio** — Clave estática para autenticación de servidor a servidor
-- **Auto-bootstrapping** — El primer usuario obtiene automáticamente el rol de administrador
+- **Clave de servicio** — Clave estática para autenticación servidor a servidor
+- **Auto-bootstrapping** — Fuera de producción, el primer usuario obtiene automáticamente el rol de administrador; un despliegue en producción define a su administrador mediante `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ## Configuración
+
+:::note[Dónde va esto]
+**Runtime gestionado:** entorno — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` y los pares `*_CLIENT_ID` / `*_CLIENT_SECRET` del proveedor, uno para cada uno de los doce proveedores ([la nomenclatura](#la-nomenclatura-en-variables-de-entorno); el de Apple son cuatro claves, no un par). La colección de usuarios es aquella que el bundle designe (`collections/users` por convención).
+**Sin ruta gestionada:** `auth.hooks`. Son funciones; haga eject para pasarlas.
+**Ejected:** `initializeRebaseBackend({ auth })` en `backend/src/index.ts`.
+:::
 
 El bloque `auth` en `initializeRebaseBackend` controla toda la autenticación del backend:
 
@@ -51,6 +62,7 @@ const backend = await initializeRebaseBackend({
                     name: env.SMTP_NAME,               // Optional EHLO/HELO hostname
                 },
                 appName: env.APP_NAME,
+                logoUrl: env.EMAIL_LOGO_URL,           // Logo shown atop the default templates
                 resetPasswordUrl: env.FRONTEND_URL,    // URL for password reset page
             }
             : undefined,
@@ -65,19 +77,177 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-:::caution[Los callbacks de colección no se disparan para los usuarios de autenticación]
-La creación y actualización de usuarios a través del sistema de autenticación — registro, gestión
-de usuarios por parte del administrador y OAuth — escriben **directamente** en el almacén de usuarios y omiten el
-pipeline de guardado de colecciones. Un callback `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete`
-en la colección de autenticación (usuarios) **no** se ejecutará para estas rutas. Para
-efectos secundarios como aprovisionar un equipo personal al registrarse, use los hooks del ciclo de vida
-de autenticación (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), que
-reciben el registro de usuario completamente poblado.
+### El bloque `auth`, en detalle
+
+| Clave | Tipo | Por defecto | Qué hace |
+|-----|------|---------|--------------|
+| `collection` | `CollectionConfig` | — | La colección de usuarios. Consulte [Configuración de autenticación a nivel de colección](#configuración-de-autenticación-a-nivel-de-colección) |
+| `jwtSecret` | `string` | — | Secreto de firma HS256. Requerido en producción |
+| `signingKeys` | `JwtSigningKeyConfig[]` | — | Claves de firma asimétricas — consulte [Tokens asimétricos y JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
+| `activeKid` | `string` | primera clave | Cuál de las `signingKeys` genera nuevos tokens |
+| `accessExpiresIn` | `string` | `1h` | Tiempo de vida del token de acceso |
+| `refreshExpiresIn` | `string` | `30d` | Tiempo de vida del token de actualización. Deslizante: cada rotación lo renueva. El runtime pasa `JWT_REFRESH_EXPIRES_IN`, cuyo valor predeterminado es `400d` |
+| `requireAuth` | `boolean` | `true` | Requiere una sesión para la API de datos |
+| `allowRegistration` | `boolean` | `false` | Habilita `POST /api/auth/register`. Fuera de producción, el primer usuario en una tabla vacía se admite de cualquier manera; en producción, el administrador se define con `REBASE_ADMIN_EMAIL` |
+| `disableSelfRegistration` | `boolean` | `false` | Mecanismo de corte: también cierra la ventana de inicialización del primer usuario que `allowRegistration: false` deja abierta |
+| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente no condicionado por `allowRegistration` — una aplicación pública principalmente de lectura puede requerir sesiones sin cuentas |
+| `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` para flujos de invitación por correo electrónico |
+| `defaultRole` | `string` | — | Rol asignado a un usuario recién registrado cuando no se especifica ninguno |
+| `serviceKey` | `string` | — | Clave estática para llamadas servidor a servidor — consulte [Autenticación mediante clave de servicio](/docs/backend/auth-endpoints/#service-key-authentication) |
+| `email` | `EmailConfig` | — | SMTP, para restablecimiento de contraseña, verificación, invitaciones y enlaces mágicos |
+| `magicLink` | `boolean` | `false` | Habilita el inicio de sesión por correo electrónico sin contraseña. Requiere que `email` esté configurado; sin ello, las rutas responden `503 EMAIL_NOT_CONFIGURED` |
+| `emailOtp` | `boolean` | `false` | Habilita códigos de inicio de sesión de seis dígitos por correo electrónico — consulte [Códigos de un solo uso por correo electrónico](#códigos-de-un-solo-uso-por-correo-electrónico). Mismo requisito de correo |
+| `cookieAuth` | `CookieAuthConfig` | — | Entrega el token de actualización como una cookie `httpOnly` `Secure` `SameSite` en lugar de en el cuerpo JSON — ver más abajo |
+| `providers` | `OAuthProvider[]` | `[]` | El array canónico de OAuth; los campos de proveedores nombrados se resuelven en él |
+| `allowedRedirectUris` | `string[]` | — | Restringe qué URIs de redirección aceptan las rutas OAuth |
+| `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
+
+#### Tokens de actualización en una cookie `httpOnly`
+
+```typescript no-verify
+auth: { cookieAuth: { sameSite: "Lax" } }
+```
+
+El token de actualización es la credencial de larga duración, y en el modo predeterminado con cuerpo JSON cualquier ataque XSS en la página puede leerlo. `cookieAuth` lo traslada a una cookie que el propio JavaScript de la página no puede tocar. El token de **acceso** permanece en el cuerpo JSON, ya que el cliente debe incluirlo en un encabezado `Authorization`.
+
+Deben cumplirse dos condiciones, o de lo contrario el inicio de sesión fallará en lugar de degradarse de forma controlada: las solicitudes del cliente a los endpoints de autenticación necesitan `credentials: "include"`, y CORS debe permitir credenciales — lo que implica una lista de orígenes explícita, nunca `origin: "*"`. `AUTH_COOKIE_SAME_SITE` es el nombre de variable de entorno para `sameSite`, y `AUTH_COOKIE_SECURE` para `secure`.
+
+La cookie lleva la directiva `Secure` a menos que la desactive, y nada relativo a la solicitud puede alterarlo: este flag solía leerse del protocolo de la solicitud, que es `http` detrás de cualquier proxy de terminación TLS, haciendo que el token de actualización viajara en texto plano en la topología de producción más común. `AUTH_COOKIE_SECURE=false` es la única alternativa para un despliegue servido genuinamente sobre HTTP plano — una dirección LAN, un appliance — y emite una advertencia en el arranque. `http://localhost` no lo necesita: los navegadores lo tratan como un origen confiable y aceptan cookies `Secure` en él.
+
+| Clave | Por defecto | |
+|-----|---------|--|
+| `cookieName` | `__rb_refresh` | |
+| `domain` | dominio actual | |
+| `path` | `/` | |
+| `sameSite` | `Lax` | `None` es solo para un frontend genuinamente cross-site |
+| `secure` | `true` | Seguro por defecto; `AUTH_COOKIE_SECURE=false` para HTTP plano |
+
+:::caution[Los callbacks de colección no se ejecutan para usuarios de autenticación]
+La creación y actualización de usuarios mediante el sistema de autenticación — registro, administración de usuarios y OAuth — escribe **directamente** en el almacén de usuarios y omite la canalización de guardado de colecciones. Los callbacks `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` en la colección de autenticación (usuarios) **no** se ejecutarán en estas rutas. Para efectos secundarios como aprovisionar un equipo personal durante el registro, utilice los hooks del ciclo de vida de autenticación (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), los cuales reciben el registro de usuario completamente poblado.
+
+OAuth ejecuta menos hooks que el registro normal. El inicio de sesión con un proveedor dispara `afterUserCreate` cuando crea la cuenta, y ningún otro hook del ciclo de vida: `beforeUserCreate`, `beforeLogin` y `onAuthenticated` no se ejecutan en la ruta de OAuth, por lo que cualquier validación o registro de auditoría asociado a ellos nunca verá a un usuario de OAuth.
 :::
+
+### Protección contra bots
+
+La limitación de tasa (rate limiting) acota a un único emisor. Mil direcciones enviando una solicitud cada una nunca alcanzan la ventana por IP — y `/auth/register`, `/auth/forgot-password` y `/auth/magic-link` envían correos, por lo que el costo de un formulario desprotegido se paga con la reputación de su dominio de envío.
+
+```ts
+auth: {
+    captcha: {
+        enabled: true,
+        provider: "turnstile",              // or "hcaptcha"
+        secret: process.env.CAPTCHA_SECRET
+    }
+}
+```
+
+O desde el entorno, que es lo que tiene un despliegue gestionado:
+
+```bash
+CAPTCHA_PROVIDER=turnstile
+CAPTCHA_SECRET=...
+CAPTCHA_ROUTES=register,forgotPassword,magicLink,emailOtp   # optional; this is the default
+```
+
+El cliente envía el token del widget como `captchaToken` en el cuerpo JSON, o en el encabezado propio del widget `cf-turnstile-response` / `h-captcha-response`. Se aceptan ambos; configure `tokenField` para usar una clave de cuerpo diferente.
+
+**`login` no está protegido por defecto.** Un desafío (challenge) en cada inicio de sesión penaliza a todos los usuarios reales, y el credential stuffing es precisamente para lo que sirven el limitador de tasa y el bloqueo de cuentas. Añádalo a `routes` si lo desea.
+
+#### Falla en modo cerrado (fail-closed)
+
+Si no se puede contactar al proveedor, la verificación falla y la solicitud es rechazada. De lo contrario, un atacante capaz de provocar dicha interrupción podría desactivar la protección, que es exactamente lo que un desafío no debe permitir.
+
+La contrapartida es que una caída del proveedor bloquea los registros. Esto es evidente, visible y se revierte eliminando una sola clave de configuración — un fallo preferible a uno silencioso que solo se descubre cuando el dominio de correo entra en listas negras.
+
+#### Una mala configuración impide el arranque
+
+`enabled: true` sin proveedor, con un proveedor desconocido o sin secreto impedirá el inicio. Un desafío ausente de forma silenciosa mientras la configuración indica que está activo es el único fallo que no se puede tolerar.
+
+Al emisor de la solicitud solo se le comunica que el desafío falló — nunca si el token estuvo ausente, mal formado, ya utilizado o fue inverificable. El motivo exacto se envía al registro (log), ya que darle pistas a un script le indica cómo sortear la barrera.
+
+### Correo electrónico en desarrollo
+
+Sin `SMTP_HOST`, los correos de autenticación no tienen adónde ir. En lugar de rechazar la solicitud, un servidor de desarrollo captura el mensaje e imprime sus enlaces:
+
+```
+⚠️  No SMTP is configured, so auth email is being captured here instead of sent.
+ℹ️  [email] Sign in to Acme → you@example.com
+             http://localhost:5173/auth/magic-link?token=…
+```
+
+Siga el enlace y el flujo se completará. Nada cambia con respecto al token: se genera, almacena y valida exactamente igual que si viniera de una bandeja de entrada real; solo la entrega es diferente.
+
+Esto se activa siempre que se cumplan estas tres condiciones, y no hay ningún parámetro que las altere:
+
+- `SMTP_HOST` no está configurado — un servidor de correo configurado siempre tiene prioridad;
+- `NODE_ENV` no es `production`. Un correo de restablecimiento de contraseña capturado contiene un token de restablecimiento funcional, por lo que el búfer de captura actúa como un almacén de credenciales y no debe existir en producción;
+- `FRONTEND_URL` es una URL `http(s)` absoluta, ya que de lo contrario el enlace enviado por correo no tendría base y quedaría inservible.
+
+Si alguna de ellas no se cumple, `POST /auth/magic-link` y `POST /auth/forgot-password` responderán con `503 EMAIL_NOT_CONFIGURED` como de costumbre. En producción, configure `SMTP_HOST` (o `auth.email.sendEmail`) para enviar correos de manera real.
+
+#### Leer el correo capturado sin una terminal
+
+El registro solo es útil para quien lo esté observando. Un servidor en Docker, una segunda ventana o una línea que se pasó por alto al hacer scroll pueden hacer que el enlace impreso sea difícil de encontrar — por ello, la misma captura se sirve a través de HTTP:
+
+```
+GET    /api/admin/dev/emails      → { enabled: true, messages: [ … ] }
+DELETE /api/admin/dev/emails      → empties the mailbox
+```
+
+Cada mensaje contiene `to`, `subject`, `at`, las partes `html` y `text`, y `links` — las URLs absolutas encontradas en el cuerpo, en el orden del documento, que es la información que realmente se necesita.
+
+Es de acceso exclusivo para administradores, protegido por la misma compuerta que utilizan cron, los registros y las copias de seguridad, y responde con `501 DEV_MAILBOX_UNAVAILABLE` cuando no hay nada que servir — al estar configurado SMTP, los correos se entregan en lugar de retenerse. `NODE_ENV=production` lo rechaza sin importar cualquier otra condición: lo que estos mensajes contienen es un acceso válido.
+
+### Códigos de un solo uso por correo electrónico
+
+Un enlace mágico abre la sesión en el dispositivo que tenga abierta la bandeja de entrada. Ese suele ser el dispositivo adecuado en una laptop, pero el equivocado en cualquier otro caso: un televisor, una terminal, un segundo navegador, un quiosco. Un código salva esa distancia, ya que la persona lo traslada manualmente.
+
+```ts
+auth: {
+    emailOtp: true,   // or AUTH_EMAIL_OTP=true
+    email: { /* … */ }
+}
+```
+
+```ts
+await rebase.auth.sendEmailOtp("someone@example.com");
+// …the person reads six digits out of their inbox…
+const { user } = await rebase.auth.verifyEmailOtp("someone@example.com", "384102");
+```
+
+La dirección se envía de nuevo junto con el código, y esto no es solo por conveniencia. Lo que se almacena es un hash de la dirección *y* el código juntos, por lo que un intento de adivinanza es un intento contra una cuenta específica — no contra todas las cuentas de la tabla a la vez, que es lo que propiciaría una búsqueda basada únicamente en el código entre un millón de posibilidades.
+
+El resto de factores que hacen que seis dígitos sean suficientes:
+
+- **Diez minutos** y un solo uso.
+- **Cinco intentos de verificación por dirección por ventana**, indexados por la dirección en lugar de la IP del emisor: una IP puede ser rotada por el atacante, mientras que la cuenta bajo ataque no. Los conteos residen donde resida el almacén de límite de tasa del despliegue — por réplica por defecto, compartido con `REBASE_RATE_LIMIT_STORE=sql`.
+- **Dígitos uniformes**, generados con `randomInt` en lugar de un módulo de bytes aleatorios.
+- `POST /auth/otp` responde de manera idéntica para una dirección sin cuenta, por lo que no puede utilizarse para averiguar si alguien es cliente.
+
+Leer un código de la bandeja de entrada demuestra la titularidad de la dirección, por lo que un inicio de sesión exitoso la marca como verificada — exactamente igual que al seguir un enlace mágico.
+
+### Personalización de marca en los correos predeterminados
+
+Las plantillas integradas de restablecimiento de contraseña, verificación, invitación, bienvenida y enlace mágico muestran un logotipo encima de la tarjeta. Este proviene de `email.logoUrl`:
+
+```ts
+email: {
+    // …
+    appName: "Acme",
+    logoUrl: "https://acme.example/logo.png"   // 48×48, absolute https URL
+}
+```
+
+Debe ser un **PNG o JPG en una URL `http(s)` absoluta**. Los clientes de correo no renderizan SVG y bloquean los URIs `data:`, y la imagen es descargada por el cliente del destinatario en lugar de por su servidor — por lo tanto, una ruta relativa, un URI de datos o un archivo local no mostrarán ningún logotipo en lugar de una imagen rota. `appName` se utiliza como texto `alt`, de modo que un cliente con imágenes desactivadas siga mostrando el nombre.
+
+El valor por defecto es deliberadamente asimétrico. `appName` recurre por defecto a `Rebase`, pero el logotipo solo recurre al isotipo de Rebase mientras la instalación **no** haya cambiado de nombre. Si define `appName` con cualquier otro valor, no obtendrá ningún logotipo hasta que configure `logoUrl` — de lo contrario, los usuarios de Acme recibirían la marca de Rebase en correos firmados por el dominio de Acme.
+
+Si reemplaza una plantilla mediante `email.templates`, nada de esto aplica: su función toma el control de la totalidad del cuerpo.
 
 ### Proveedores OAuth
 
-Cada proveedor OAuth se configura con al menos un `clientId`. Algunos proveedores requieren un `clientSecret`:
+Cada proveedor OAuth se configura como mínimo con un `clientId`. Algunos proveedores requieren un `clientSecret`:
 
 ```typescript
 auth: {
@@ -96,65 +266,60 @@ auth: {
 }
 ```
 
-#### Los nombres en el entorno
+`gitlab` también admite un `baseUrl` opcional para una instancia autoalojada de GitLab.
 
-Un despliegue gestionado o por bundle no tiene un bloque `auth` donde escribir
-— configura el servidor íntegramente a través del entorno —, así que cada
-proveedor de arriba tiene un par `<PROVEEDOR>_CLIENT_ID` /
-`<PROVEEDOR>_CLIENT_SECRET`, y hacen falta las dos mitades antes de que el
-proveedor se configure siquiera:
+#### La nomenclatura en variables de entorno
+
+Un despliegue gestionado o en bundle no dispone de un bloque `auth` en el cual escribir — configura el servidor en su totalidad a través del entorno —, por lo que cada proveedor mencionado anteriormente dispone de un par `<PROVIDER>_CLIENT_ID` / `<PROVIDER>_CLIENT_SECRET`, y ambas partes deben definirse antes de que el proveedor se configure por completo:
 
 ```bash
 DISCORD_CLIENT_ID=…
 DISCORD_CLIENT_SECRET=…
 ```
 
-`GET /api/auth/config` incluye entonces `discord` en `enabledProviders`, que es
-la forma de comprobar que el par ha llegado.
+`GET /api/auth/config` listará entonces `discord` en `enabledProviders`, lo cual sirve para comprobar que el par de variables se cargó correctamente.
 
-Apple es la excepción: no tiene client secret estático, porque Rebase firma un
-JWT ES256 de vida corta en cada intercambio de tokens. Necesita los cuatro
-valores `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` y
-`APPLE_PRIVATE_KEY` — el contenido del archivo `.p8`, saltos de línea incluidos.
+Apple es la excepción: no tiene un client secret estático, ya que Rebase firma un JWT ES256 de corta duración para cada intercambio de tokens. Requiere los cuatro valores: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` y `APPLE_PRIVATE_KEY` — el contenido del archivo `.p8`, con saltos de línea incluidos.
 
-Dos opciones no tienen nombre en el entorno y requieren el bloque `auth` (es
-decir, un backend ejectado o configurado por código): `microsoft.tenantId`, que
-si no queda en `common` y reporta toda dirección como no verificada, y
-`gitlab.baseUrl`, para una instancia autoalojada.
+Dos opciones no tienen equivalente en variables de entorno y requieren el bloque `auth` (es decir, un backend ejected o configurado por código): `microsoft.tenantId`, que de lo contrario utiliza por defecto `common` y reporta cada dirección como no verificada, y `gitlab.baseUrl`, para una instancia autoalojada.
 
-### Vinculación de Cuentas entre Métodos de Inicio de Sesión
+Cada campo nombrado se resuelve al inicio dentro de `auth.providers`, que es el array canónico y el punto de extensión para cualquier cosa que los campos nombrados no cubran. Las entradas se construyen con las funciones factoría `create*Provider`, y ambas formas se combinan — los campos nombrados se agregan después de las entradas explícitas:
 
-¿Qué ocurre cuando alguien se registra con email/contraseña como
-`ada@example.com` y más tarde pulsa "Iniciar sesión con Google" en una cuenta de
-Google con esa misma dirección? Rebase **vincula ambas en una sola cuenta**,
-pero solo cuando el proveedor afirma que el email está verificado. Nunca crea en
-silencio una segunda cuenta para la misma dirección.
+```typescript no-verify
+import { createGoogleProvider, createGitHubProvider } from "@rebasepro/server";
 
-En `POST /api/auth/<provider>` el orden de resolución es:
+auth: {
+    providers: [
+        createGoogleProvider({ clientId: "…", clientSecret: "…" }),
+        createGitHubProvider({ clientId: "…", clientSecret: "…" })
+    ]
+}
+```
 
-1. **Identidad de proveedor ya conocida**: si esa identidad exacta del proveedor
-   ya ha iniciado sesión antes, se devuelve ese usuario. El email no se consulta.
-2. **Cuenta existente con el mismo email y el proveedor lo ha verificado**: la
-   identidad se adjunta a la cuenta existente y el usuario inicia sesión en ella.
-   Una cuenta, dos formas de entrar.
-3. **Cuenta existente con el mismo email pero el proveedor NO lo ha
-   verificado**: se rechaza con `403 EMAIL_NOT_VERIFIED`. No se crea ni se
-   modifica nada.
-4. **No hay ninguna cuenta con ese email**: se crea una cuenta nueva.
+#### Restringir las URIs de redirección
 
-El paso 3 es el caso crítico para la seguridad. Si bastara con un email no
-verificado del proveedor, cualquiera que lograra que un proveedor emitiera una
-dirección que no le pertenece podría apoderarse de la cuenta de Rebase
-correspondiente. Google siempre afirma `email_verified` para las cuentas de
-Google reales, por lo que el paso 2 es la vía habitual del inicio de sesión con
-Google; el paso 3 afecta sobre todo a proveedores que permiten al usuario
-indicar una dirección arbitraria sin confirmar.
+```typescript no-verify
+auth: { allowedRedirectUris: ["https://admin.example.com/"] }
+```
 
-Este comportamiento no es configurable: deliberadamente no existe ninguna opción
-para vincular con emails no verificados.
+Si no se configura, la única comprobación sobre una redirección de OAuth es la coincidencia de URI registrada del propio proveedor — lo que autoriza **cualquier** URI registrada en ese cliente OAuth, incluida la entrada de `localhost` que alguien añadió para desarrollo y el host de staging que nadie eliminó. Listar los orígenes a los que este backend realmente da servicio lo restringe a estos. Las URIs se comparan por origen más ruta; los parámetros de consulta (query), fragmentos y la barra diagonal final se ignoran.
 
-Para recuperarse de un rechazo del paso 3, el usuario inicia sesión con su
-método existente y llama al endpoint de vinculación explícito:
+### Vinculación de cuentas entre métodos de inicio de sesión
+
+¿Qué ocurre cuando alguien se registra con correo/contraseña como `ada@example.com`, y más tarde hace clic en "Iniciar sesión con Google" con una cuenta de Google que tiene esa misma dirección? Rebase **vincula ambas en una sola cuenta** — pero únicamente cuando el proveedor certifica que el correo está verificado. Nunca crea de forma silenciosa una segunda cuenta para la misma dirección.
+
+En `POST /api/auth/<provider>`, el orden de resolución es:
+
+1. **Identidad de proveedor conocida** — si esta identidad exacta del proveedor ha iniciado sesión antes, se devuelve ese usuario. No se consulta el correo electrónico.
+2. **Cuenta existente con el mismo correo electrónico, proveedor verificado** — la identidad se asocia a la cuenta existente y se inicia sesión con el usuario en ella. Una cuenta, dos vías de acceso.
+3. **Cuenta existente con el mismo correo electrónico, proveedor NO verificado** — rechazada con `403 EMAIL_NOT_VERIFIED`. No se crea ni se modifica nada.
+4. **Sin cuenta con ese correo electrónico** — se crea una nueva cuenta.
+
+El paso 3 es el caso crítico a nivel de seguridad. Si un correo electrónico de proveedor no verificado bastara para vincular cuentas, cualquiera que lograse que un proveedor emitiera una dirección que no le pertenece podría apoderarse de la cuenta de Rebase correspondiente. Google siempre declara `email_verified` para cuentas reales de Google, por lo que el paso 2 es la ruta habitual para el inicio de sesión con Google; el paso 3 detecta principalmente proveedores que permiten a los usuarios proporcionar una dirección arbitraria sin confirmar.
+
+Este comportamiento no es configurable — deliberadamente no existe ninguna opción para vincular cuentas mediante correos no verificados.
+
+Para recuperarse de un rechazo en el paso 3, el usuario inicia sesión con su método existente y llama al endpoint de vinculación explícito:
 
 ```http
 POST /api/auth/link/google
@@ -163,198 +328,42 @@ Authorization: Bearer <access token>
 { "idToken": "..." }
 ```
 
-La vinculación estando autenticado **no** exige intencionadamente un email
-verificado, y tampoco exige que los emails coincidan: la dirección de Google de
-un usuario a menudo no es la que usa en la aplicación. La asimetría es
-deliberada: en el inicio de sesión, el email del proveedor es la única prueba
-que liga la identidad entrante con una cuenta, mientras que aquí quien llama ya
-ha demostrado ser el propietario al disponer de una sesión válida. Devuelve
-`409 IDENTITY_ALREADY_LINKED` si esa identidad de proveedor pertenece a otro
-usuario, y es idempotente si ya está vinculada a quien llama.
+La vinculación mientras se está autenticado intencionalmente **no** requiere un correo electrónico verificado, ni exige que los correos coincidan en absoluto — la dirección de Google de un usuario a menudo no es su dirección en la aplicación. La asimetría es deliberada: al iniciar sesión, el correo del proveedor es la única evidencia que vincula la identidad entrante con una cuenta, mientras que aquí el emisor ya ha demostrado la titularidad al contar con una sesión válida. Devuelve `409 IDENTITY_ALREADY_LINKED` si esa identidad de proveedor pertenece a otro usuario, y es idempotente si ya está vinculada al emisor.
 
 #### La dirección inversa
 
 Un usuario que se registró con Google y no tiene contraseña:
 
-- **Registrarse con el mismo email** se rechaza con `409 EMAIL_EXISTS`.
-- **`POST /api/auth/change-password`** devuelve `400 INVALID_ACCOUNT`: no hay
-  ninguna contraseña previa contra la que verificar.
-- **`forgot-password` → `reset-password` es la vía admitida para añadir una.**
-  Vuelve a demostrar la propiedad de la dirección por email, tras lo cual la
-  cuenta dispone de ambos métodos de inicio de sesión.
+- **El registro con el mismo correo** se rechaza con `409 EMAIL_EXISTS`.
+- **`POST /api/auth/change-password`** devuelve `400 INVALID_ACCOUNT` — no existe una contraseña previa con la cual contrastar.
+- **`forgot-password` → `reset-password` es el método admitido para agregar una.** Vuelve a validar la posesión de la dirección por correo electrónico, tras lo cual la cuenta dispondrá de ambos métodos de inicio de sesión.
 
-## Endpoints de Autenticación
+## Tablas creadas automáticamente
 
-Todos los endpoints de autenticación se montan en `/api/auth/`:
+En el primer arranque, Rebase aprovisiona automáticamente el esquema `auth` y las siguientes tablas en la base de datos (vinculadas al esquema definido en su colección, p. ej., `rebase`):
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `POST` | `/api/auth/register` | Crear una nueva cuenta |
-| `POST` | `/api/auth/login` | Iniciar sesión con email/contraseña |
-| `POST` | `/api/auth/refresh` | Refrescar el token de acceso |
-| `POST` | `/api/auth/<provider>` | Inicio de sesión OAuth (p. ej., `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | Vincular un proveedor OAuth a la cuenta autenticada |
-| `POST` | `/api/auth/logout` | Revocar el token de refresco |
-| `POST` | `/api/auth/forgot-password` | Enviar email de restablecimiento de contraseña |
-| `POST` | `/api/auth/reset-password` | Restablecer la contraseña con un token |
-| `POST` | `/api/auth/find-user` | Resolver un email a un perfil público mínimo (opt-in) |
-
-Todos los endpoints de la API de datos requieren una cabecera `Authorization: Bearer <token>` válida cuando `requireAuth: true` (el valor predeterminado).
-
-### Formato de respuesta
-
-Todos los endpoints que emiten una sesión responden con el mismo envoltorio:
-`register`, `login`, cada proveedor OAuth, `magic-link/verify`, `otp/verify`,
-`anonymous`, `anonymous/link` y `mfa/challenge/verify`.
-
-```json
-{
-  "user": {
-    "uid": "8f1c2a6e-…",
-    "email": "jane@example.com",
-    "displayName": "Jane Doe",
-    "photoURL": null,
-    "providerId": "password",
-    "isAnonymous": false,
-    "emailVerified": true,
-    "roles": ["editor"],
-    "metadata": {}
-  },
-  "tokens": {
-    "accessToken": "eyJhbGciOi…",
-    "refreshToken": "9b2e…",
-    "accessTokenExpiresAt": 1700000000000
-  }
-}
-```
-
-Devuelve el token de acceso como `Authorization: Bearer <accessToken>`.
-`accessTokenExpiresAt` son milisegundos desde la época.
-
-`POST /api/auth/refresh` responde con el mismo envoltorio, con dos salvedades:
-`user` se omite por completo cuando la cuenta no se puede releer, así que trátalo
-como opcional ahí, y `providerId` siempre es `password`, sea cual sea el método
-con el que se creó la sesión.
-
-:::caution[El SDK cliente aplana este envoltorio — el HTTP directo no]
-El JSON anterior es el formato tal y como viaja por la red, y es lo que devuelve
-`fetch("/api/auth/login")`: el token vive en **`body.tokens.accessToken`**.
-
-El [SDK cliente](/docs/sdk/authentication) desenvuelve `tokens` antes de
-entregarte la sesión, por lo que `auth.signInWithEmail()` se resuelve en un
-**`{ user, accessToken, refreshToken }`** aplanado.
-
-Ambas formas son reales; pertenecen a dos capas distintas. Leer la forma del SDK
-desde un `fetch` directo produce `undefined`, lo que se manifiesta como «el
-inicio de sesión funcionó pero no hay token de acceso»: el inicio de sesión
-estuvo bien, el token estaba un nivel más abajo.
-:::
-
-Con `cookieAuth` habilitado, el token de refresco viaja como una cookie
-`httpOnly` y `tokens.refreshToken` es una cadena vacía en el cuerpo. El token de
-acceso no se ve afectado.
-
-### Invitar a compañeros por email
-
-Los flujos de invitación necesitan convertir una dirección de email en un ID de usuario, pero la colección `users`
-está protegida por RLS frente al cliente. En lugar de crear a mano una función de servidor de
-administrador, active la búsqueda integrada:
-
-```typescript no-verify
-await initializeRebaseBackend({
-    auth: {
-        // ...
-        allowUserLookup: true,   // enables POST /api/auth/find-user
-    },
-});
-```
-
-Luego, desde el cliente:
-
-```typescript
-const profile = await client.auth.findUserByEmail("teammate@example.com");
-// → { uid, displayName, photoURL } | null   (never email/roles/metadata)
-if (profile) {
-    await client.data.team_members.create({ team_id, userId: profile.uid });
-}
-```
-
-El endpoint es **solo para autenticados** y devuelve únicamente `uid`, `displayName`
-y `photoURL` — nunca el email, los roles o los metadatos del usuario consultado. Está
-**desactivado de forma predeterminada** porque permite a cualquier usuario con sesión iniciada sondear qué emails tienen
-cuentas; actívelo solo cuando su UX de invitaciones lo necesite.
-
-## Tablas Autocreadas
-
-En el primer inicio, Rebase aprovisiona automáticamente el esquema `auth` y las siguientes tablas en la base de datos (vinculadas al esquema definido en su colección, p. ej., `rebase`):
-
-- **`rebase.users`** — Cuentas de usuario con email, hash de contraseña, metadatos y una columna `roles` text[] (los roles se almacenan como arrays de texto en línea para optimizar las consultas y evitar joins).
-- **`rebase.refresh_tokens`** — Sesiones de larga duración que llevan tokens de refresco hasheados, agentes de usuario y direcciones IP. Incluye un índice único en `token_hash` y una restricción única en `(userId, user_agent, ip_address)` para rastrear las sesiones de dispositivos activas.
-- **`rebase.password_reset_tokens`** — Tokens de un solo uso y caducables para los flujos de recuperación de contraseña.
-- **`rebase.mfa_factors`** — Métodos de autenticación multifactor inscritos (p. ej., secretos TOTP cifrados con AES-256).
-- **`rebase.mfa_challenges`** — Registros de verificación que rastrean los intentos de verificación MFA activos.
+- **`rebase.users`** — Cuentas de usuario con correo electrónico, hash de contraseña, metadatos y una columna text[] `roles` (los roles se almacenan como arrays de texto en línea para optimizar consultas y evitar joins).
+- **`rebase.refresh_tokens`** — Sesiones de larga duración que contienen tokens de actualización hasheados, user agents y direcciones IP. Incluye un índice único en `token_hash` y una restricción única en `(user_id, user_agent, ip_address)` para rastrear sesiones de dispositivos activos.
+- **`rebase.password_reset_tokens`** — Tokens de un solo uso con expiración para los flujos de recuperación de contraseña.
+- **`rebase.mfa_factors`** — Métodos de autenticación multifactor registrados (p. ej., secretos TOTP cifrados con AES-256).
+- **`rebase.mfa_challenges`** — Registros de verificación que rastrean los intentos activos de verificación MFA.
 - **`rebase.recovery_codes`** — Códigos de respaldo/recuperación multifactor hasheados.
 - **`rebase.app_config`** — Almacén clave-valor para configuraciones del sistema.
 
-## Contexto de Base de Datos de Seguridad a Nivel de Fila (RLS)
+## Inicialización del primer usuario (Bootstrap)
 
-Rebase conecta la autenticación de la petición directamente con la seguridad a nivel de fila (RLS) de PostgreSQL. Cada consulta de base de datos ejecutada a través de un driver con alcance de usuario se ejecuta dentro de una transacción de base de datos (`db.transaction()`) que configura parámetros de configuración locales a la transacción:
+Cuando no existen usuarios en la base de datos y el servidor **no** se está ejecutando con `NODE_ENV=production`, la primera persona que se registre se convierte automáticamente en administrador. A partir de ese momento, el registro queda regulado por el ajuste `allowRegistration`.
 
-*   `app.userId` — El ID único (`uid`) del usuario autenticado. Por defecto es `'anon'` para las peticiones no autenticadas.
-*   `app.user_roles` — Una cadena separada por comas que lista los roles asignados al usuario.
-*   `app.jwt` — Una cadena JSON que contiene la carga completa de claims del JWT (`{"sub": "<uid>", "roles": [...]}`).
+En producción esa ventana está cerrada, ya que un host con un nombre público es accesible antes de que su operador se haya registrado, y cualquiera que llegue primero se apropiaría de él. En su lugar, un despliegue de producción designa a su primer administrador en las variables de entorno — `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD`, creados en el arranque mientras la tabla aún esté vacía — o asigna el rol mediante la clave de servicio. Con la ventana cerrada, una tabla vacía rechaza el registro de inicialización con `SETUP_REQUIRED` (e informa de ello), una primera cuenta creada mediante registro abierto es una cuenta común, `GET /api/auth/config` nunca reporta `needsSetup`, `POST /api/admin/bootstrap` rechaza la solicitud y el registro de arranque emite una advertencia si la tabla está vacía y no se ha especificado ningún administrador.
 
-Estos parámetros se configuran localmente durante la duración de la transacción usando la función `set_config` de Postgres:
-```sql
-SELECT 
-    set_config('app.userId', $1, true),
-    set_config('app.user_roles', $2, true),
-    set_config('app.jwt', $3, true);
-```
-
-### Funciones Auxiliares de Políticas de PostgreSQL
-
-Para facilitar la escritura de políticas de seguridad a nivel de fila, Rebase crea funciones auxiliares bajo el esquema `auth` durante el bootstrapping de la base de datos:
-
-*   **`rebase.uid()`** — Devuelve el ID del usuario autenticado como `text`, o `NULL` si no está establecido:
-    ```sql
-    CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
-        SELECT NULLIF(current_setting('app.user_id', true), '');
-    $$ LANGUAGE sql STABLE;
-    ```
-*   **`rebase.roles()`** — Devuelve la cadena de roles separada por comas:
-    ```sql
-    CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text AS $$
-        SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
-    $$ LANGUAGE sql STABLE;
-    ```
-*   **`rebase.jwt()`** — Devuelve la carga completa del JWT como un objeto `jsonb`:
-    ```sql
-    CREATE OR REPLACE FUNCTION rebase.jwt() RETURNS jsonb AS $$
-        SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
-    $$ LANGUAGE sql STABLE;
-    ```
-
-Puede usar estos auxiliares directamente en sus reglas de seguridad personalizadas o migraciones de base de datos:
-```sql
-CREATE POLICY owner_access ON posts
-    FOR ALL
-    TO public
-    USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
-```
-
-## Bootstrap del Primer Usuario
-
-Cuando no existen usuarios en la base de datos, la primera persona que se registra se convierte automáticamente en administrador. Después de eso, el registro se controla mediante el ajuste `allowRegistration`.
-
-Esto garantiza que siempre pueda inicializar un despliegue nuevo sin necesidad de sembrar la base de datos manualmente. Para evitar ejecuciones concurrentes y condiciones de carrera en la generación del esquema durante la recarga en caliente (HMR) o el inicio, las operaciones de bootstrapping se sincronizan mediante un bloqueo consultivo de Postgres:
+En un entorno local, esto significa que siempre se puede inicializar una base de datos limpia sin tener que sembrarla manualmente. Para evitar ejecuciones simultáneas y condiciones de carrera en la generación del esquema durante el hot reloading (HMR) o el arranque, las operaciones de inicialización se sincronizan mediante un advisory lock de Postgres:
 ```sql
 SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```
 
-## Configuración de Autenticación a Nivel de Colección
+## Configuración de autenticación a nivel de colección
 
-En lugar de depender únicamente de las reglas de autenticación predeterminadas de la base de datos, puede marcar cualquier colección de Postgres (como `users.ts` o una colección personalizada `members.ts`) como la colección de autenticación. Esto se configura mediante la propiedad `auth` en la colección misma:
+En lugar de depender exclusivamente de las reglas de autenticación predeterminadas de la base de datos, puede marcar cualquier colección de Postgres (como `users.ts` o una colección personalizada `members.ts`) como la colección de autenticación. Esto se configura a través de la propiedad `auth` en la propia colección:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -393,276 +402,17 @@ const membersCollection = defineCollection({
 });
 ```
 
-Cuando se llaman los hooks personalizados (`onCreateUser`, `onResetPassword`), reciben una fachada `AuthCollectionContext` que contiene:
-- `hashPassword(password: string): Promise<string>` — Hashea la contraseña usando el algoritmo de hashing configurado (p. ej., scrypt).
-- `sendEmail?: (options) => Promise<void>` — Envía un email (solo disponible cuando el servicio de email está configurado).
-- `emailConfigured: boolean` — Si el servicio de email está configurado.
-- `appName: string` — El nombre de la app de la configuración de email.
+Cuando se llaman los hooks personalizados (`onCreateUser`, `onResetPassword`), estos reciben una fachada `AuthCollectionContext` que contiene:
+- `hashPassword(password: string): Promise<string>` — Genera el hash de la contraseña utilizando el algoritmo de hashing configurado (p. ej., scrypt).
+- `sendEmail?: (options) => Promise<EmailSendResult>` — Envía un correo electrónico (disponible solo cuando el servicio de correo está configurado). Resuelve con la información reportada por el proveedor — `messageId`, `accepted`, `rejected` — para que un hook pueda almacenar el ID y enlazar una respuesta posterior con este.
+- `emailConfigured: boolean` — Indica si el servicio de correo electrónico está configurado.
+- `appName: string` — El nombre de la aplicación proveniente de la configuración de correo.
 - `resetPasswordUrl: string` — La URL base del enlace de restablecimiento de contraseña.
 
-## Autenticación con Clave de Servicio
+## Pasos siguientes
 
-Para la comunicación de servidor a servidor (p. ej., cron jobs, servicios externos), configure una clave de servicio estática:
-
-```typescript
-auth: {
-    serviceKey: process.env.REBASE_SERVICE_KEY,
-    // ...
-}
-```
-
-Los clientes se autentican con la cabecera `Authorization: Bearer <service-key>`. 
-
-### Clave Interna por Arranque
-
-Si no se proporciona `REBASE_SERVICE_KEY` en su configuración, Rebase genera automáticamente una **clave interna por arranque** aleatoria. 
-
-Esta clave nunca se registra y nunca sale del proceso. La usa el singleton `rebase` para autenticarse contra las propias APIs del plano de control del servidor (auth, storage, etc.). Esto garantiza que las tareas administrativas (como enviar un email de bienvenida o generar una URL de almacenamiento) siempre funcionen de forma inmediata en desarrollo y producción sin requerir una gestión manual de claves.
-
-### Protección Contra Ataques de Temporización y Requisitos de la Clave
-
-Para prevenir ataques de temporización, Rebase valida tanto la clave de servicio configurada por el usuario como la clave interna usando una comparación de cadenas de tiempo constante (`safeCompare`). La clave de servicio configurada por el usuario **debe tener al menos 32 caracteres de longitud**; si se configura una clave de menos de 32 caracteres, Rebase lanzará un error de configuración al iniciar y fallará de forma cerrada (fail-closed).
-
-
-## Adaptadores de Autenticación Personalizados
-
-Rebase permite el reemplazo completo del sistema de autenticación integrado mediante una arquitectura de autenticación conectable. Esto desacopla la verificación de autenticación de las capas de base de datos y REST/WebSocket, permitiendo una integración fluida con proveedores externos como **Clerk**, **Auth0**, **Firebase Auth** o servicios de identidad JWT personalizados.
-
-### El Contrato AuthAdapter
-
-Puede implementar la interfaz `AuthAdapter` directamente para un control completo. La definición de la interfaz es la siguiente:
-
-```typescript
-import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server";
-import { AuthenticatedUser, AuthAdapterCapabilities, UserManagementAdapter, UserCreationPrepareResult, UserCreationFinalizeResult } from "@rebasepro/types";
-
-export interface AuthAdapter {
-  /** Unique identifier for this auth adapter (e.g., "clerk", "custom") */
-  readonly id: string;
-
-  /**
-   * Verifies an incoming HTTP request and returns the authenticated user payload.
-   * Called by Hono authentication middleware on every REST endpoint.
-   */
-  verifyRequest(request: Request): Promise<AuthenticatedUser | null>;
-
-  /**
-   * Verifies a raw token string (e.g. for WebSocket connection handshake phase 1).
-   * If omitted, a synthetic request is automatically constructed.
-   */
-  verifyToken?(token: string): Promise<AuthenticatedUser | null>;
-
-  /** Optional user management operations (CRUD) for the Admin Dashboard panel */
-  userManagement?: UserManagementAdapter;
-
-  /** Optional: Mount adapter-specific custom public routes (e.g. callback paths) */
-  createAuthRoutes?(): Hono<any, any, any> | undefined;
-
-  /** Optional: Mount adapter-specific admin-only routes */
-  createAdminRoutes?(): Hono<any, any, any> | undefined;
-
-  /** Advertise supported capabilities (to customize Admin Dashboard UI visibility) */
-  getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
-
-  /** Lifecycle hooks called during backend start and graceful shutdown */
-  initialize?(): Promise<void>;
-  destroy?(): Promise<void>;
-
-  /** Custom user lifecycle hooks (e.g., hash passwords before collection writes) */
-  prepareUserCreation?(
-    values: Record<string, unknown>,
-    collectionAuth?: unknown
-  ): Promise<UserCreationPrepareResult>;
-
-  finalizeUserCreation?(
-    entity: { id: string; values: Record<string, unknown> },
-    clearPassword?: string
-  ): Promise<UserCreationFinalizeResult>;
-
-  /** Static service key to bypass checks for server-to-server calls */
-  serviceKey?: string;
-}
-```
-
-### La Carga del Usuario Autenticado
-
-Independientemente del proveedor de autenticación externo elegido, su adaptador debe resolver las verificaciones de token exitosas a un objeto `AuthenticatedUser` uniforme. El Inyector de Alcance RLS de Rebase mapea estos valores directamente a variables de sesión de PostgreSQL dentro de las transacciones:
-
-```typescript
-export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.userId' -> rebase.uid()
-  email: string;                  // User email address
-  displayName?: string | null;    // Optional display name
-  photoUrl?: string | null;        // Optional avatar URL
-  roles: string[];                // Maps to pg local 'app.user_roles' -> rebase.roles()
-  isAdmin: boolean;               // Grants global superuser privileges if true
-  rawToken?: string;              // The original token string (for downstream forwarding)
-  claims?: Record<string, any>;   // Custom claims/metadata (available in rebase.jwt())
-}
-```
-
----
-
-### Integración Rápida vía `createCustomAuthAdapter`
-
-Para escenarios estándar (como validar JWTs de un servicio de terceros), puede usar la utilidad `createCustomAuthAdapter`. Esta utilidad gestiona los valores predeterminados de capabilities e implementa la validación de tokens WebSocket de forma inmediata, envolviendo su implementación de `verifyRequest`.
-
-#### Ejemplo: Integración con Clerk
-
-Para conectar un backend de Rebase con **Clerk**, puede verificar los tokens JWT de Clerk usando el conjunto de claves web JSON (JWKS) de Clerk:
-
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
-import { createCustomAuthAdapter } from "@rebasepro/server";
-import { createRemoteJWKSet, jwtVerify } from "jose";
-
-// Clerk JWKS URL
-const CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json";
-const JWKS = createRemoteJWKSet(new URL(CLERK_JWKS_URL));
-
-const clerkAuthAdapter = createCustomAuthAdapter({
-    serviceKey: process.env.REBASE_SERVICE_KEY,
-    verifyRequest: async (request) => {
-        const authHeader = request.headers.get("Authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) return null;
-
-        try {
-            // Verify Clerk JWT token against JWKS
-            const { payload } = await jwtVerify(token, JWKS);
-            
-            const metadata = payload.metadata as Record<string, unknown> | undefined;
-            const roles = Array.isArray(metadata?.roles) ? metadata.roles as string[] : [];
-            
-            return {
-                uid: payload.sub!,
-                email: (payload as Record<string, unknown>).email as string || "",
-                displayName: (payload as Record<string, unknown>).name as string || null,
-                roles: roles,
-                isAdmin: roles.includes("admin"),
-                claims: payload as Record<string, unknown>
-            };
-        } catch (error) {
-            console.error("Clerk token verification failed:", error);
-            return null; // Fail-closed
-        }
-    },
-    capabilities: {
-        hasBuiltInAuthRoutes: false, // Login is managed by Clerk UI
-        emailPasswordLogin: false,
-        registrationEnabled: false,
-        passwordReset: false,
-        profileUpdate: false,
-        sessionManagement: false
-    }
-});
-
-const backend = await initializeRebaseBackend({
-    auth: clerkAuthAdapter,
-    // ...
-});
-```
-
-#### Ejemplo: Integración con Firebase Auth
-
-Para verificar los tokens de Firebase Auth usando los certificados públicos de Firebase:
-
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
-import { createCustomAuthAdapter } from "@rebasepro/server";
-import { createRemoteJWKSet, jwtVerify } from "jose";
-
-const FIREBASE_JWKS_URL = "https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com";
-const JWKS = createRemoteJWKSet(new URL(FIREBASE_JWKS_URL));
-const FIREBASE_PROJECT_ID = "my-firebase-project-id";
-
-const firebaseAuthAdapter = createCustomAuthAdapter({
-    serviceKey: process.env.REBASE_SERVICE_KEY,
-    verifyRequest: async (request) => {
-        const authHeader = request.headers.get("Authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) return null;
-
-        try {
-            const { payload } = await jwtVerify(token, JWKS, {
-                issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
-                audience: FIREBASE_PROJECT_ID
-            });
-
-            const roles = Array.isArray((payload as Record<string, unknown>).roles) ? (payload as Record<string, unknown>).roles as string[] : [];
-
-            return {
-                uid: payload.sub!,
-                email: (payload as Record<string, unknown>).email as string || "",
-                displayName: (payload as Record<string, unknown>).name as string || null,
-                photoUrl: (payload as Record<string, unknown>).picture as string || null,
-                roles: roles,
-                isAdmin: roles.includes("admin"),
-                claims: payload as Record<string, unknown>
-            };
-        } catch (error) {
-            console.error("Firebase token verification failed:", error);
-            return null;
-        }
-    }
-});
-
-const backend = await initializeRebaseBackend({
-    auth: firebaseAuthAdapter,
-    // ...
-});
-```
-
----
-
-### Montaje de Rutas de Autenticación y Acciones de la UI de Administración
-
-Si su proveedor de autenticación personalizado requiere montar endpoints de redirección (como rutas de callback OAuth o bucles de inicio de sesión SAML), implemente el método `createAuthRoutes` en su adaptador:
-
-```typescript
-const myOauthAdapter: AuthAdapter = {
-    id: "custom-oauth",
-    verifyRequest: async (req) => ({
-        // validate the token, then return the caller
-        uid: "…",
-        email: "user@example.com",
-        roles: [],
-        isAdmin: false
-    }),
-    getCapabilities: () => ({
-        hasBuiltInAuthRoutes: true,
-        emailPasswordLogin: false,
-        registrationEnabled: false,
-        passwordReset: false,
-        adminPasswordReset: false,
-        sessionManagement: false,
-        profileUpdate: false,
-        emailVerification: false,
-        magicLink: false,
-        anonymousLogin: false,
-        enabledProviders: []
-    }),
-    createAuthRoutes: () => {
-        const app = new Hono<HonoEnv>();
-        
-        // Mounted automatically under /api/auth/callback
-        app.get("/callback", async (c) => {
-            const code = c.req.query("code");
-            // Exchange code for provider tokens and set cookies/redirect
-            return c.redirect("/dashboard");
-        });
-        
-        return app;
-    }
-};
-```
-
-Si desea permitir operaciones CRUD de usuarios directamente dentro del Panel de Administración de Rebase, implemente el helper `userManagement` dentro de las opciones del adaptador, que proporciona hooks para `listUsers`, `createUser`, `updateUser` y `deleteUser`.
-
-
-## Próximos Pasos
-
-- **[Autenticación del Frontend](/docs/frontend/authentication)** — UI de inicio de sesión, controlador de autenticación, gestión de usuarios
-- **[Reglas de Seguridad (RLS)](/docs/collections/security-rules)** — Control de acceso a nivel de fila
-- **[Autenticación del SDK del Cliente](/docs/sdk/authentication)** — Métodos de autenticación en el SDK del cliente
+- **[Endpoints y tokens](/docs/backend/auth-endpoints/)** — cada ruta que monta esta configuración
+- **[Adaptadores de autenticación personalizados](/docs/backend/auth-adapters/)** — utilización de su propio proveedor de identidad
+- **[Autenticación en Frontend](/docs/frontend/authentication/)** — interfaz de inicio de sesión, controlador de autenticación, gestión de usuarios
+- **[Reglas de seguridad (RLS)](/docs/collections/security-rules/)** — control de acceso a nivel de fila
+- **[Autenticación en el SDK de cliente](/docs/sdk/authentication/)** — métodos de autenticación en el SDK de cliente

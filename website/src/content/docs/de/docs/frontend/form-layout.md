@@ -2,23 +2,23 @@
 sourceHash: 3830846c0457a79f
 title: Formular-Layout
 sidebar_label: Formular-Layout
-description: Steuern Sie die Anordnung des Entitätsformulars — Spaltenbreiten, Abschnitte und die Metadaten-Leiste.
+description: Steuern Sie die Anordnung des Entitätsformulars – Spaltenbreiten (Spans), Abschnitte und die Metadaten-Leiste.
 ---
 
 ## Übersicht
 
-Das Entitätsformular wird aus Ihren Eigenschaften generiert. Standardmäßig leitet es ein zweispaltiges Layout aus den Eigenschaftstypen ab, sodass eine Collection ohne explizite Layout-Angaben dennoch ein übersichtliches Formular erhält und nicht eine lange Abfolge von Eingabefeldern in voller Breite:
+Das Entitätsformular wird aus Ihren Eigenschaften generiert. Standardmäßig leitet es ein zweispaltiges Layout aus den Eigenschaftstypen ab. Eine Collection ohne explizite Layout-Angaben erhält so dennoch ein Formular, das sich wie ein echtes Formular anfühlt, anstatt wie eine lange Abfolge von Eingabefeldern in voller Breite:
 
-- Die ID und die `createdAt` / `updatedAt`-Zeitstempel wandern schreibgeschützt in eine Metadaten-Leiste
-- Kurze Enums, Booleans, Datumsangaben und Zahlen belegen eine schmale Breite
-- Langer Text, Markdown, Arrays, Maps und Speicherfelder belegen die volle Breite
-- Alles andere belegt die Hälfte
+- die ID und die `createdAt`- / `updatedAt`-Zeitstempel werden schreibgeschützt in eine Metadaten-Leiste ausgelagert
+- kurze Enums, Booleans, Datumsangaben und Zahlen belegen einen schmalen Bereich
+- langer Text, Markdown, Arrays, Maps und Speicherfelder (Storage Fields) belegen die volle Breite
+- alles andere belegt die halbe Breite
 
-Verwenden Sie `admin.form`, wenn das abgeleitete Layout nicht zu Ihren Anforderungen passt.
+Verwenden Sie `admin.form`, wenn das abgeleitete Ergebnis nicht zu Ihrem Anwendungsfall passt.
 
 ## Feldbreite
 
-Die Breite eines Feldes ist ein **Span** (Spaltenbereich) über ein vierspaltiges Raster. `4` entspricht der vollen Breite der Hauptspalte.
+Die Breite eines Feldes ist ein **Span** (eine Spaltenbreite) über ein vier-spaltiges Raster. `4` entspricht der vollen Breite der Hauptspalte.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -47,13 +47,13 @@ const productsCollection = defineCollection({
 });
 ```
 
-Spans richten sich an einem gemeinsamen Raster aus. Dadurch werden zwei Felder unabhängig von ihrer Deklarationsreihenfolge korrekt aneinander ausgerichtet. Sie ersetzen `admin.widthPercentage`, dessen reine Prozentwerte sich nicht sauber ausrichten ließen. Wenn eine Collection dieses noch verwendet, sollte der nächstgelegene Span gewählt werden (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, ansonsten `4`).
+Spans docken an ein gemeinsames Raster an, wodurch zwei Felder unabhängig von ihrer Deklarationsreihenfolge bündig ausgerichtet werden. Sie ersetzen `admin.widthPercentage`, dessen reine Prozentwerte sich nicht sauber ausrichten ließen. Collections, die dies noch nutzen, sollten den nächstliegenden Span wählen (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, sonst `4`).
 
-Bei Layouts, die zu schmal für zwei Spalten sind — das Seitenpanel, der Split-Pane-Bereich, ein Smartphone — kollabiert das Raster zu einer einzelnen Spalte und Spans werden ignoriert.
+Bei Layouts, die zu schmal für zwei Spalten sind – etwa im Seitenpanel, der geteilten Ansicht (Split Pane) oder auf Smartphones –, fällt das Raster auf eine einzelne Spalte zusammen und Spans werden ignoriert.
 
 ## Abschnitte
 
-`sections` gruppiert die Hauptspalte unter Überschriften. Ein Abschnitt mit Titel kann einklappbar sein; ein unbenannter Abschnitt nicht.
+`sections` gruppiert die Hauptspalte unter Überschriften. Ein Abschnitt mit Titel kann eingeklappt werden; ein unbetitelter Abschnitt nicht.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -91,13 +91,13 @@ const ordersCollection = defineCollection({
 });
 ```
 
-Eine Eigenschaft, die von keinem Abschnitt benannt wird, geht niemals verloren: Sie landet im letzten unbenannten Abschnitt oder in einer unbenannten nachstehenden Gruppe, falls keiner vorhanden ist. Das Hinzufügen einer Spalte zur Datenbank führt daher nicht dazu, dass ein Feld stillschweigend aus dem Formular verschwindet.
+Eine Eigenschaft, die in keinem Abschnitt genannt wird, geht niemals verloren: Sie landet im letzten unbetitelten Abschnitt oder in einer unbetitelten Gruppe am Ende, falls keiner vorhanden ist. Das Hinzufügen einer Spalte zur Datenbank kann daher nicht dazu führen, dass ein Feld unbemerkt aus dem Formular verschwindet.
 
-Ein Validierungsfehler innerhalb eines eingeklappten Abschnitts klappt diesen automatisch aus, sodass sich ein Fehler niemals hinter einer geschlossenen Überschrift verbergen kann.
+Ein Validierungsfehler innerhalb eines eingeklappten Abschnitts klappt diesen automatisch auf, sodass sich ein Fehler niemals hinter einer geschlossenen Überschrift verbergen kann.
 
 ## Die Metadaten-Leiste
 
-`sidebar` verschiebt Felder aus der Hauptspalte in eine schmale Leiste daneben — Status, Eigentümerschaft, Veröffentlichungsdaten, Flags.
+`sidebar` verschiebt Felder aus der Hauptspalte in eine schmale Leiste daneben – Status, Zuständigkeit, Veröffentlichungsdaten, Flags.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -122,19 +122,25 @@ const postsCollection = defineCollection({
 });
 ```
 
-Die Leiste nutzt das Raster nicht, daher wird `span` für die darin enthaltenen Felder ignoriert. Wenn kein Platz für eine Leiste vorhanden ist, wird sie als gewöhnlicher vorangestellter Abschnitt gerendert, sodass auf einem Smartphone oder im Seitenpanel nichts verloren geht.
+Die Leiste verwendet das Raster nicht, daher wird `span` für Felder darin ignoriert. Wenn kein Platz für eine Leiste vorhanden ist, wird sie als regulärer vorangestellter Abschnitt gerendert, sodass auf einem Smartphone oder im Seitenpanel nichts verloren geht.
 
-`showRecordMeta` platziert den schreibgeschützten Datensatz-Block — id, created, updated — am Ende der Leiste. Der Standardwert ist `true`, wann immer eine Leiste angezeigt wird. Dies ersetzt `hideIdFromForm` für die meisten Collections: Die ID ist kein Feld mehr in der Mitte des Formulars, sondern wird zu einer kopierbaren Metadatenzeile.
+`showRecordMeta` platziert den schreibgeschützten Datensatz-Block – ID, Erstellungs- und Aktualisierungsdatum – am Ende der Leiste. Der Standardwert ist `true`, sobald eine Leiste angezeigt wird, und ersetzt `hideIdFromForm` für die meisten Collections: Die ID ist damit kein Feld mehr mitten im Formular, sondern eine kopierbare Metadatenzeile.
 
-Setzen Sie `sidebar: []`, um die abgeleitete Leiste vollständig zu unterdrücken und jedes Feld in der Hauptspalte zu belassen.
+Setzen Sie `sidebar: []`, um die abgeleitete Leiste vollständig zu unterdrücken und alle Felder in der Hauptspalte zu belassen.
 
 ## Referenz
 
 | Eigenschaft | Typ | Beschreibung |
-|----------|------|-------------|
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite über das vierspaltige Formularraster |
-| `admin.form.sidebar` | `string[]` | Eigenschaftsschlüssel, die in der Metadaten-Leiste angezeigt werden |
-| `admin.form.sections` | `FormSection[]` | Benannte Gruppen für die Hauptspalte |
-| `admin.form.showRecordMeta` | `boolean` | Zeigt id/created/updated am Ende der Leiste an |
+|---|---|---|
+| `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite im vierspaltigen Formularraster |
+| `admin.form.sidebar` | `string[]` | In der Metadaten-Leiste angezeigte Eigenschaftsschlüssel |
+| `admin.form.sections` | `FormSection[]` | Betitelte Gruppen für die Hauptspalte |
+| `admin.form.showRecordMeta` | `boolean` | ID/Erstellt/Aktualisiert am Ende der Leiste anzeigen |
 
 `FormSection` ist `{ key, title?, properties, collapsed?, collapsible? }`.
+
+## Verwandte Themen
+
+- [Custom Fields](/docs/frontend/custom-fields/) — das Feld, das durch ein Layout angeordnet wird
+- [Entity Views](/docs/frontend/entity-views/) — ein eigener Tab neben dem Formular
+- [Properties](/docs/collections/properties/) — die Eigenschaftsoptionen, die ein Layout ausliest

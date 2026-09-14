@@ -11,7 +11,7 @@ Rebase is a full-stack platform with four layers:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend Layer                           │
-│  React Admin UI  •  Custom Views  •  Plugins  •  Your App      │
+│  Rebase CMS + Studio  •  Custom Views  •  Plugins  •  Your App │
 │  @rebasepro/app  •  @rebasepro/ui  •  @rebasepro/studio       │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP + WebSocket
@@ -89,7 +89,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 ## Data Flow
 
 ### Read Flow
-1. User opens a collection in the admin UI
+1. User opens a collection in Rebase CMS
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
 3. Backend queries PostgreSQL via Drizzle ORM
 4. Data transformer deserializes database records into entity format

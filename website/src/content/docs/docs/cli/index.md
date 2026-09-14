@@ -169,7 +169,7 @@ Applies all unapplied migrations to the database.
 
 ```bash
 rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
-rebase db backups                       # list what is stored
+rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
@@ -419,7 +419,7 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-<span class="since-badge" data-since="0.21">Since 0.21</span> `db connect` opens a local port that *is* the managed database (no public
+`db connect` opens a local port that *is* the managed database (no public
 endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 #### Resources

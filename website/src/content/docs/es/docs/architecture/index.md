@@ -1,18 +1,18 @@
 ---
-sourceHash: 08efd8549191e760
-title: Resumen de la Arquitectura
+sourceHash: fa7350988287074c
+title: Visión general de la arquitectura
 sidebar_label: Arquitectura
-description: Comprenda cómo el backend, el frontend, el SDK del cliente y la base de datos de Rebase se integran para formar un Backend-as-a-Service completo.
+description: Comprende cómo el backend, frontend, SDK del cliente y la base de datos de Rebase se integran para formar un Backend-as-a-Service completo.
 ---
 
-## Arquitectura del Sistema
+## Arquitectura del sistema
 
 Rebase es una plataforma full-stack con cuatro capas:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend Layer                           │
-│  React Admin UI  •  Custom Views  •  Plugins  •  Your App      │
+│  Rebase CMS + Studio  •  Custom Views  •  Plugins  •  Your App │
 │  @rebasepro/app  •  @rebasepro/ui  •  @rebasepro/studio       │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP + WebSocket
@@ -20,7 +20,7 @@ Rebase es una plataforma full-stack con cuatro capas:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Backend Layer                            │
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
-│  @rebasepro/server                                             │
+│  @rebasepro/server                                         │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ Drizzle ORM
                             ▼
@@ -30,85 +30,84 @@ Rebase es una plataforma full-stack con cuatro capas:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Componentes Clave
+## Componentes clave
 
-### Sistema de Inicialización (Bootstrapper)
+### Sistema de adaptadores de base de datos
 
-El backend se inicializa a través de un sistema de inicialización basado en plugins. La lógica específica de la base de datos se desacopla en su propio paquete, y los inicializadores (bootstrappers) se encargan de la inicialización de la base de datos, la autenticación y los servicios internos.
+El backend se inicializa mediante un patrón unificado de adaptador de base de datos. La lógica específica de la base de datos se desacopla en su propio paquete, y el adaptador gestiona automáticamente el pooling de conexiones, la resolución de esquemas y el enrutamiento de eventos en tiempo real.
 
 ```typescript
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
 
 database: createPostgresAdapter({
-        connectionString: process.env.DATABASE_URL!
-    })
+    connectionString: process.env.DATABASE_URL!
+})
 ```
 
-Las colecciones se resuelven automáticamente contra el inicializador configurado a través del registro interno de inyección de dependencias.
+Las colecciones se resuelven automáticamente con el adaptador configurado mediante el registro interno de inyección de dependencias.
 
 :::tip
-El `createPostgresAdapter` maneja automáticamente el pool de conexiones a la base de datos, la resolución de esquemas y la configuración de `LISTEN/NOTIFY` en tiempo real.
+El `createPostgresAdapter` gestiona automáticamente el pooling de conexiones a la base de datos, la resolución de esquemas y la configuración de `LISTEN/NOTIFY` en tiempo real.
 :::
 
-### Registro de Colecciones
+### Registro de colecciones
 
-El `BackendCollectionRegistry` es el índice en tiempo de ejecución de todas las colecciones, sus tablas PostgreSQL, enums y relaciones Drizzle. Se completa al iniciar a partir de sus definiciones de colección.
+El `BackendCollectionRegistry` es el índice en tiempo de ejecución de todas las colecciones, sus tablas de PostgreSQL, enums y relaciones de Drizzle. Se puebla al iniciar a partir de las definiciones de tus colecciones.
 
-### Servicio en Tiempo Real
+### Servicio en tiempo real
 
 La sincronización en tiempo real utiliza el mecanismo nativo `LISTEN/NOTIFY` de PostgreSQL:
 
-1. Ocurre una mutación de datos (inserción, actualización, eliminación)
-2. El backend emite una `NOTIFY` en un canal
+1. Ocurre una mutación de datos (insert, update, delete)
+2. El backend emite un `NOTIFY` en un canal
 3. El `RealtimeService` recibe la notificación
 4. Transmite el cambio a todos los clientes WebSocket conectados
 5. Los componentes de React se vuelven a renderizar con los nuevos datos
 
-Para **implementaciones multi-instancia** (por ejemplo, Cloud Run con múltiples réplicas), proporcione una `connectionString` en su PostgresBootstrapper para que todas las réplicas compartan la misma conexión `LISTEN`.
+Para **despliegues con múltiples instancias** (por ejemplo, Cloud Run con múltiples réplicas), proporciona un `connectionString` en tu PostgresBootstrapper para que todas las réplicas compartan la misma conexión `LISTEN`.
 
-### Registro de Almacenamiento
+### Registro de almacenamiento
 
-Al igual que los controladores, los backends de almacenamiento se registran en un registro. Puede tener múltiples proveedores de almacenamiento (local, S3) y enrutar diferentes campos de archivo a diferentes backends usando `storageId`.
+Al igual que los drivers, los backends de almacenamiento se registran en un registro. Puedes tener múltiples proveedores de almacenamiento (local, S3) y enrutar diferentes campos de archivos a diferentes backends mediante `storageId`.
 
-## Mapa de Paquetes
+## Mapa de paquetes
 
 | Paquete | Rol | Usado por |
 |---------|------|---------|
 | `@rebasepro/types` | Interfaces de TypeScript para colecciones, propiedades, entidades, plugins | Todo |
 | `@rebasepro/server` | Inicialización del servidor backend, API REST, autenticación, almacenamiento, WebSocket | Backend |
-| `@rebasepro/client` | SDK del cliente — Transporte HTTP, WebSocket, autenticación | Frontend |
-| `@rebasepro/app` | Framework React — Scaffold, controladores, formularios, rutas, hooks | Frontend |
-| `@rebasepro/ui` | Librería de componentes de UI autónoma (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/app` | Vistas de inicio de sesión, hooks del controlador de autenticación, gestión de usuarios | Frontend |
-| `@rebasepro/studio` | Editor de colecciones, consola SQL, consola JS, editor RLS, navegador de almacenamiento | Frontend |
-| `@rebasepro/cli` | CLI para generación de esquemas, migraciones de DB, generación de SDK | Herramientas de desarrollo |
-| `@rebasepro/forms` | Gestión ligera del estado de formularios de React | Frontend |
+| `@rebasepro/client` | SDK del cliente — transporte HTTP, WebSocket, autenticación | Frontend |
+| `@rebasepro/app` | Framework de React — Scaffold, controladores, formularios, rutas, hooks | Frontend |
+| `@rebasepro/ui` | Biblioteca de componentes de UI independiente (Tailwind v4 + Radix) | Frontend |
+| `@rebasepro/app` | Vistas de inicio de sesión, hooks de controladores de autenticación, gestión de usuarios | Frontend |
+| `@rebasepro/studio` | Editor de colecciones, consola SQL, consola JS, editor de RLS, explorador de almacenamiento | Frontend |
+| `@rebasepro/cli` | CLI para generación de esquemas, migraciones de BD, generación de SDK | Herramientas de desarrollo |
+| `@rebasepro/forms` | Gestión ligera del estado de formularios en React | Frontend |
 | `@rebasepro/plugin-ai` | Plugin de autocompletado de campos impulsado por IA | Frontend |
 | `@rebasepro/plugin-data-import-export` | Importación y exportación de CSV/JSON/Excel | Frontend |
-| `@rebasepro/inference` | Detección automática de esquemas a partir de datos de base de datos existentes | Backend/CLI |
+| `@rebasepro/inference` | Detección automática del esquema a partir de datos existentes de la base de datos | Backend/CLI |
 
-## Flujo de Datos
+## Flujo de datos
 
-### Flujo de Lectura
-1. El usuario abre una colección en la interfaz de administración
-2. El SDK del cliente envía `GET /api/data/:slug` + abre una suscripción WebSocket
+### Flujo de lectura
+1. El usuario abre una colección en Rebase CMS
+2. El SDK del cliente envía `GET /api/data/:slug` + abre una suscripción por WebSocket
 3. El backend consulta PostgreSQL a través de Drizzle ORM
 4. El transformador de datos deserializa los registros de la base de datos al formato de entidad
 5. La respuesta se envía al frontend, los componentes se renderizan
-6. WebSocket mantiene la vista sincronizada en tiempo real
+6. El WebSocket mantiene la vista sincronizada en tiempo real
 
-### Flujo de Escritura
+### Flujo de escritura
 1. El usuario edita una entidad en el formulario
-2. Se ejecutan las callbacks `beforeSave` (validación, transformación)
+2. Se ejecutan los callbacks `beforeSave` (validación, transformación)
 3. El SDK del cliente envía `PATCH /api/data/:slug/:id`
-4. El backend serializa los valores, ejecuta `UPDATE` de Drizzle
-5. Se ejecutan las callbacks `afterSave` (efectos secundarios)
-6. La transmisión `NOTIFY` activa la actualización de WebSocket a todos los clientes
+4. El backend serializa los valores, ejecuta el `UPDATE` de Drizzle
+5. Se ejecutan los callbacks `afterSave` (efectos secundarios)
+6. La difusión de `NOTIFY` activa la actualización por WebSocket a todos los clientes
 7. Si el historial está habilitado, se registra una instantánea
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[Esquema como Código](/docs/architecture/schema-as-code)** — El enfoque TypeScript-first
-- **[Resumen del Backend](/docs/backend)** — Configuración del servidor
-- **[Colecciones](/docs/collections)** — Defina su esquema de datos
----
+- **[Schema as Code](/docs/architecture/schema-as-code)** — El enfoque centrado en TypeScript
+- **[Visión general del backend](/docs/backend)** — Configuración del servidor
+- **[Colecciones](/docs/collections)** — Define tu esquema de datos

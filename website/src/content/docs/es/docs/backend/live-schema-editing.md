@@ -1,21 +1,12 @@
 ---
 sourceHash: 7253b4b5232fa542
-title: Live schema editing
-description: Create and alter collections against a running backend — committed to your repository first, then applied.
+title: Edición de esquemas en vivo
+description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
 
-:::note[Esta página solo está disponible en inglés]
-La traducción está pendiente. El contenido siguiente está en inglés.
-:::
+El editor de esquemas del panel de administración reescribe el código fuente de tus colecciones. Eso funciona en tu máquina y en ningún otro lugar: los archivos de un servidor desplegado se reconstruyen a partir de tu repositorio en cada despliegue, por lo que una edición realizada allí se descartaría en el siguiente.
 
-The schema editor in the admin panel rewrites your collection source. That works
-on your machine and nowhere else: a deployed server's files are rebuilt from
-your repository on every deploy, so an edit made there would be discarded on the
-next one.
-
-Live schema editing is the answer to that. It **commits the change to your
-repository, then applies the DDL** — so the edit survives the next deploy,
-because the deploy is built from it.
+La edición de esquemas en vivo es la solución a eso. **Confirma el cambio en tu repositorio y luego aplica el DDL**, de modo que la edición sobrevive al siguiente despliegue, ya que el despliegue se compila a partir de ella.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -23,17 +14,13 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-All three are admin-gated, like every other `/api/admin` surface. Applying needs
-one thing more than being an admin — see [Who may apply](#who-may-apply).
+Las tres están restringidas a administradores, al igual que cualquier otra superficie de `/api/admin`. La aplicación requiere algo más que ser administrador; consulta [Quién puede aplicar cambios](#quién-puede-aplicar-cambios).
 
-## Plan before you apply
+## Planifica antes de aplicar
 
-`/plan` has no side effects. Post the collection as it should end up, and it
-tells you what the change means:
+`/plan` no tiene efectos secundarios. Envía la colección tal como debería quedar y te indicará qué implica el cambio:
 
-`$ADMIN_TOKEN` es un token de acceso de administrador — el `accessToken` que
-devuelve el inicio de sesión de una cuenta con el rol de administrador. Nada en
-la máquina lo define por ti.
+`$ADMIN_TOKEN` es un token de acceso de administrador: el `accessToken` que devuelve un inicio de sesión para una cuenta con el rol de administrador. Nada en la máquina lo configura por ti.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -55,46 +42,29 @@ curl -X POST https://your-app/api/admin/schema/plan \
 }
 ```
 
-This is not a convenience. Two of the three verdicts are refusals, and one of
-them is a refusal you would otherwise only discover by pressing the button on a
-live database.
+Esto no es una simple comodidad. Dos de los tres veredictos son rechazos, y uno de ellos es un rechazo que, de otro modo, solo descubrirías al presionar el botón en una base de datos en vivo.
 
-## The three verdicts
+## Los tres veredictos
 
-| Verdict | Meaning |
+| Veredicto | Significado |
 |---|---|
-| `safe` | The boot-time ensure path expresses it and the result matches your configuration. Applied. |
-| `diverges` | It applies *in part*, leaving a database that does not match your configuration — and nothing reports it. Refused. |
-| `needs-migration` | The ensure path cannot express it at all. Refused. |
+| `safe` | La ruta ensure en el arranque lo expresa y el resultado coincide con tu configuración. Aplicado. |
+| `diverges` | Se aplica *en parte*, dejando una base de datos que no coincide con tu configuración, y nada lo reporta. Rechazado. |
+| `needs-migration` | La ruta ensure no puede expresarlo en absoluto. Rechazado. |
 
-`diverges` is the one worth understanding, because these changes look like they
-worked:
+`diverges` es el que vale la pena comprender, porque parece que estos cambios funcionaron:
 
-- **A required property added to a table that already holds rows** arrives
-  **nullable**. `NOT NULL` is checked against every row already there, and rows
-  written before the property existed have no value for it. On an **empty**
-  table there is nothing to check, so the constraint is applied and this is
-  `safe`.
-- **Making an existing property required** has the same shape: `SET NOT NULL`
-  scans the table, so it is `safe` on an empty one and `diverges` on a populated
-  one until you backfill.
+- **Una propiedad obligatoria agregada a una tabla que ya contiene filas** llega como **anulable** (nullable). `NOT NULL` se comprueba contra cada fila existente, y las filas escritas antes de que existiera la propiedad no tienen ningún valor para ella. En una tabla **vacía** no hay nada que comprobar, por lo que la restricción se aplica y esto es `safe`.
+- **Hacer que una propiedad existente sea obligatoria** tiene la misma dinámica: `SET NOT NULL` escanea la tabla, por lo que es `safe` en una vacía y `diverges` en una con datos hasta que hagas un backfill.
 
-Two changes that used to be `diverges` are now `safe`, because the ensure path
-carries them out:
+Dos cambios que solían ser `diverges` ahora son `safe`, porque la ruta ensure los lleva a cabo:
 
-- **A value added to an existing enum** lands, via
-  `ALTER TYPE … ADD VALUE IF NOT EXISTS`. It used to be skipped along with the
-  whole type, and the first row using the new value was rejected by a type that
-  had never heard of it.
-- **Relaxing a required property** drops the `NOT NULL`. It used to be left in
-  place, so writes omitting the property still failed.
+- **Un valor agregado a un enum existente** se aplica mediante `ALTER TYPE … ADD VALUE IF NOT EXISTS`. Antes se omitía junto con todo el tipo, y la primera fila que usaba el nuevo valor era rechazada por un tipo que nunca había oído hablar de él.
+- **Hacer opcional una propiedad obligatoria** elimina el `NOT NULL`. Antes se dejaba en su lugar, por lo que las escrituras que omitían la propiedad seguían fallando.
 
-### Constraints that are asked for and not applied
+### Restricciones solicitadas y no aplicadas
 
-A change can be applicable and still leave something your configuration asks for
-unenforced — a required property over a populated table is the case. That is not
-a refusal, so it does not appear in `changes`; it appears in
-`withheldConstraints`, with the obstacle and what would clear it:
+Un cambio puede ser aplicable y aun así dejar sin aplicar algo que tu configuración solicita; una propiedad obligatoria en una tabla con datos es el caso típico. Esto no es un rechazo, por lo que no aparece en `changes`; aparece en `withheldConstraints`, con el obstáculo y lo que lo resolvería:
 
 ```json
 {
@@ -109,55 +79,37 @@ a refusal, so it does not appear in `changes`; it appears in
 }
 ```
 
-The boot-time ensure path reports the same thing as a warning. Until this
-existed, a withheld constraint was withheld in silence.
+La ruta ensure en el arranque reporta lo mismo como una advertencia. Antes de que esto existiera, una restricción retenida se retenía en silencio.
 
-`needs-migration` covers everything the ensure path cannot do: dropping a
-collection or a property, changing a type, renaming a column, changing a primary
-key, removing an enum value. Each refusal names the change and what to do
-instead.
+`needs-migration` cubre todo lo que la ruta ensure no puede hacer: eliminar una colección o una propiedad, cambiar un tipo, renombrar una columna, cambiar una clave primaria, eliminar un valor de un enum. Cada rechazo especifica el cambio y qué hacer en su lugar.
 
-## What gets committed
+## Qué se confirma
 
-Not just the collection file. A schema change touches several generated
-artifacts, and a stale one breaks the next deploy:
+No solo el archivo de la colección. Un cambio de esquema afecta a varios artefactos generados, y uno desactualizado romperá el siguiente despliegue:
 
-- `config/collections/<name>.ts` — the collection itself
-- `backend/src/schema.generated.ts` — the Drizzle schema
+- `config/collections/<name>.ts` — la colección en sí
+- `backend/src/schema.generated.ts` — el esquema de Drizzle
 - `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
-Those paths are relative to your **project**, not to your repository. When the
-two are the same — a `rebase init` project, which is the usual case — there is
-nothing to think about. When your project sits in a subdirectory of a larger
-repository, the paths are prefixed with it, found by walking up from your
-collections directory to the nearest `rebase.json`. A project with no
-`rebase.json` keeps the plain paths.
+Estas rutas son relativas a tu **proyecto**, no a tu repositorio. Cuando ambos son lo mismo —un proyecto `rebase init`, que es el caso habitual—, no hay nada de qué preocuparse. Cuando tu proyecto se encuentra en un subdirectorio de un repositorio más grande, las rutas se prefijan con él, ubicándolo subiendo desde tu directorio de colecciones hasta el `rebase.json` más cercano. Un proyecto sin `rebase.json` conserva las rutas simples.
 
-The commit message describes the change rather than announcing one, and is
-attributed to the admin who made it. A schema change with an author and a diff
-in your project's history is something neither Firebase nor Supabase gives you —
-their table edits are invisible to your repository.
+El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye al administrador que lo realizó. Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
 
-## Who may apply
+## Quién puede aplicar cambios
 
-Being an admin is enough to **plan**. Planning has no side effects, and a CI job
-asking whether a proposed collection change is applicable is a good use of it.
+Ser administrador es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
 
-Applying is a second privilege, because applying writes a commit and a commit
-carries an author:
+Aplicar los cambios es un privilegio adicional, porque aplicar escribe un commit y un commit lleva un autor:
 
-| Caller | Plan | Apply |
+| Solicitante | Planificar | Aplicar |
 |---|---|---|
-| A signed-in admin | yes | yes |
-| An API key | yes | no |
-| The server's service key | yes | no |
+| Un administrador autenticado | sí | sí |
+| Una clave de API | sí | no |
+| La service key del servidor | sí | no |
 
-A credential is not an author. `api-key:7c3f…` in your CI environment is not
-somebody, and letting it write to your repository produces exactly the
-unattributable history this feature exists to replace.
+Una credencial no es un autor. `api-key:7c3f…` en tu entorno de CI no es una persona, y permitirle escribir en tu repositorio produce exactamente el historial sin atribuir que esta característica busca reemplazar.
 
-If an automated schema change is what you want — a migration pipeline, say —
-turn it on deliberately:
+Si lo que deseas es un cambio de esquema automatizado (por ejemplo, un pipeline de migraciones), actívalo deliberadamente:
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -166,13 +118,9 @@ initializeRebaseBackend({
 })
 ```
 
-or `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. The commit is then attributed
-to the credential by name — `Rebase API key (7c3f)` — so reading `git log` a
-month later still tells you which changes a person made.
+o `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. El commit se atribuirá entonces a la credencial por su nombre —`Rebase API key (7c3f)`—, de modo que leer `git log` un mes después te seguirá diciendo qué cambios fueron realizados por una persona.
 
-`GET /api/admin/schema/status` reports what *you* may do, not only what the
-server supports, so a panel can disable the control and say why rather than
-refusing you after you have decided:
+`GET /api/admin/schema/status` reporta lo que *tú* puedes hacer, no solo lo que el servidor admite, para que un panel pueda deshabilitar el control y explicar el motivo en lugar de rechazarte después de que hayas tomado la decisión:
 
 ```json
 {
@@ -184,42 +132,29 @@ refusing you after you have decided:
 }
 ```
 
-## If your project keeps versioned migrations
+## Si tu proyecto mantiene migraciones versionadas
 
-Applying here does **not** write a migration, and cannot: a migration is Atlas's
-format with an integrity file, minted by an external binary against a throwaway
-database, and a running server has neither.
+Aplicar cambios aquí **no** escribe una migración, ni puede hacerlo: una migración utiliza el formato de Atlas con un archivo de integridad, generado por un binario externo contra una base de datos desechable, y un servidor en ejecución no tiene ninguno de los dos.
 
-What it does write is `drizzle/schema.sql` — which is exactly what
-`rebase db generate` diffs against. So the migration is one command away:
+Lo que sí escribe es `drizzle/schema.sql`, que es exactamente contra lo que `rebase db generate` calcula las diferencias. Por lo tanto, la migración está a un solo comando de distancia:
 
 ```bash
 rebase db generate
 ```
 
-The plan and the result both say so when your project has migrations, because
-the failure otherwise is quiet: your database has the change and your repository
-describes it, but the next environment built by replaying migrations does not,
-and nothing said anything.
+Tanto el plan como el resultado lo advierten cuando tu proyecto tiene migraciones, porque de lo contrario el fallo pasa desapercibido: tu base de datos tiene el cambio y tu repositorio lo describe, pero el siguiente entorno construido reproduciendo las migraciones no lo tendrá, y nada habrá avisado.
 
-A project provisioned by boot-ensure — the managed runtime, and any self-host
-leaving `REBASE_MIGRATE_ON_BOOT` at its default — needs no migration at all. Its
-collections are the schema, and the next boot reconciles.
+Un proyecto aprovisionado mediante boot-ensure (el runtime administrado y cualquier entorno autohospedado que deje `REBASE_MIGRATE_ON_BOOT` en su valor predeterminado) no necesita ninguna migración en absoluto. Sus colecciones son el esquema, y el siguiente arranque se encarga de reconciliarlo.
 
-## Commit first, then apply
+## Primero el commit, luego aplicar
 
-The order matters and it is not arbitrary.
+El orden importa y no es arbitrario.
 
-If the DDL ran first and the commit failed, your database would have a column
-your repository does not describe. The ensure path never drops anything, so the
-next deploy would neither remove it nor mention it — an invisible column, absent
-from your collections, until somebody went looking.
+Si el DDL se ejecutara primero y el commit fallara, tu base de datos tendría una columna que tu repositorio no describe. La ruta ensure nunca elimina nada, por lo que el siguiente despliegue no la quitaría ni la mencionaría: una columna invisible, ausente de tus colecciones, hasta que alguien se pusiera a buscar.
 
-Committing first fails the other way: the repository describes something the
-database does not have yet. That is the ordinary state of every project between
-an edit and a deploy, and boot reconciles it on the next start.
+Hacer primero el commit falla en el sentido contrario: el repositorio describe algo que la base de datos aún no tiene. Ese es el estado habitual de cualquier proyecto entre una edición y un despliegue, y el arranque lo reconcilia en el siguiente inicio.
 
-So a failed apply is **not an error**. The response says so:
+Por lo tanto, una aplicación fallida **no es un error**. La respuesta así lo indica:
 
 ```json
 {
@@ -230,42 +165,30 @@ So a failed apply is **not an error**. The response says so:
 }
 ```
 
-## Where this works
+## Dónde funciona esto
 
-The dividing line is whether the running server has your **source on disk** —
-not whether it is production.
+La línea divisoria es si el servidor en ejecución tiene tu **código fuente en disco**, no si está en producción.
 
 ### MongoDB
 
-Everything above describes Postgres, where a schema change means DDL. On MongoDB
-there is no table to alter: adding a property adds nothing, removing one removes
-nothing, and a document written yesterday is still valid tomorrow.
+Todo lo anterior describe Postgres, donde un cambio de esquema implica DDL. En MongoDB no hay tablas que modificar: agregar una propiedad no añade nada, quitar una no elimina nada, y un documento escrito ayer sigue siendo válido mañana.
 
-So every change is applicable, nothing is ever refused, and the plan has no
-statements — the commit *is* the change. The panel says "Commit" rather than
-"Commit and apply", and does not claim anything ran against the database.
+Así que cada cambio es aplicable, nunca se rechaza nada y el plan no contiene sentencias: el commit *es* el cambio. El panel muestra «Commit» en lugar de «Commit and apply», y no afirma que se haya ejecutado nada contra la base de datos.
 
-The one thing worth reading carefully is a removal. On Postgres, removing a
-property is refused because it would drop a column. On MongoDB the field stays
-in every document that has it; your API simply stops serving it. The change says
-so rather than leaving you to assume the relational answer.
+Lo único que vale la pena leer con atención es una eliminación. En Postgres, eliminar una propiedad se rechaza porque descartaría una columna. En MongoDB, el campo permanece en cada documento que lo contiene; tu API simplemente deja de servirlo. El cambio lo especifica en lugar de dejarte asumir la respuesta relacional.
 
-| Deployment | Works |
+| Despliegue | Funciona |
 |---|---|
-| `rebase dev` on your machine | yes |
-| Self-host with the project mounted | yes |
-| Self-host from a built bundle | yes, with `liveSchema.repository` |
-| Rebase Cloud, or any bundle | yes, with `liveSchema.repository` |
+| `rebase dev` en tu máquina | sí |
+| Autohospedado con el proyecto montado | sí |
+| Autohospedado desde un bundle compilado | sí, con `liveSchema.repository` |
+| Rebase Cloud o cualquier bundle | sí, con `liveSchema.repository` |
 
-A bundle is compiled output, so there is no collection source in it. Configure
-`liveSchema.repository` and the source is fetched from your repository instead;
-without it the routes answer `SCHEMA_EDITING_NO_REPOSITORY` and say why.
+Un bundle es una salida compilada, por lo que no contiene el código fuente de las colecciones. Si configuras `liveSchema.repository`, el código fuente se obtiene de tu repositorio en su lugar; sin esto, las rutas responden `SCHEMA_EDITING_NO_REPOSITORY` y explican el motivo.
 
-### A deployment with no source on disk
+### Un despliegue sin código fuente en disco
 
-A bundle is compiled output — every Cloud tenant, and any self-host serving a
-build. There is no collection source for the editor to rewrite, so point it at
-the repository the source actually lives in:
+Un bundle es una salida compilada: todos los tenants de Cloud y cualquier autohospedado que sirva una compilación. No hay código fuente de colecciones que el editor pueda reescribir, así que apúntalo al repositorio donde realmente reside el código fuente:
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -285,11 +208,9 @@ initializeRebaseBackend({
 })
 ```
 
-The change is then read from the repository, rewritten with the same editor that
-runs locally, and committed back through the Git Data API — a blob, a tree, a
-commit and a ref update. Nothing is cloned and nothing is left on disk.
+El cambio se lee entonces desde el repositorio, se reescribe con el mismo editor que se ejecuta localmente y se vuelve a confirmar a través de la API Git Data: un blob, un tree, un commit y una actualización de ref. No se clona nada ni se deja nada en disco.
 
-`auth` takes a token or a GitHub App installation:
+`auth` acepta un token o una instalación de GitHub App:
 
 ```typescript no-verify
 auth: {
@@ -300,35 +221,25 @@ auth: {
 }
 ```
 
-Use the token for a single project committing to a repository you already own —
-standing up an App so your own server can commit to it is a lot of ceremony for
-a one-line credential. Use the App for a control plane holding one key across
-many projects, which is what Rebase Cloud does: one App, an installation per
-project, and no per-customer secret to rotate.
+Usa el token para un único proyecto que realice commits en un repositorio del que ya eres propietario; configurar una App para que tu propio servidor pueda hacer commits en ella es demasiado protocolo para una credencial de una sola línea. Usa la App para un plano de control que gestione una sola clave para muchos proyectos, que es lo que hace Rebase Cloud: una App, una instalación por proyecto y ningún secreto por cliente que rotar.
 
-The token needs `contents: read and write` on that repository, and nothing else.
+El token necesita permisos de `contents: read and write` en ese repositorio, y nada más.
 
-On a machine that has the repository, the commit is a plain `git commit` —
-nothing to authenticate, no token, no network. A deployment without one commits
-through the Git Data API instead, with no clone — see
-[A deployment with no source on disk](#a-deployment-with-no-source-on-disk).
+En una máquina que tiene el repositorio, el commit es un simple `git commit`: nada que autenticar, sin token, sin red. Un despliegue sin él realiza el commit a través de la API Git Data en su lugar, sin clonar; consulta [Un despliegue sin código fuente en disco](#un-despliegue-sin-código-fuente-en-disco).
 
-Two things that make it safe to run against a repository somebody else is
-working in:
+Dos cosas que hacen que sea seguro ejecutarlo contra un repositorio en el que otra persona está trabajando:
 
-- It stages **only** the files it generated. A schema commit that swept up
-  half-finished work would be a commit nobody could review, and it refuses
-  outright if the tree already has one of its own files modified.
-- The remote path never force-updates a ref. If something landed while the
-  commit was being built, the update is rejected — losing somebody's commit
-  silently is worse than failing.
+- Hace **stage** **únicamente** de los archivos que generó. Un commit de esquema que barriera con trabajo a medio terminar sería un commit que nadie podría revisar, y se rechaza de plano si el árbol ya tiene modificado alguno de sus propios archivos.
+- La ruta remota nunca actualiza una ref de forma forzada (`force-update`). Si se integró algo mientras se construía el commit, la actualización se rechaza: perder el commit de alguien en silencio es peor que fallar.
 
-## Limits
+## Limitaciones
 
-- Only additive changes. Everything else is refused with a reason, because the
-  ensure path is the only thing that changes a schema and it can only add.
-- No migration file is written. A project provisioned by boot-ensure needs none;
-  a project provisioned by migrations should run `rebase db generate`, which
-  mints one through Atlas with the integrity hash Atlas requires.
-- Postgres only. The capability is detected on the driver, and other engines
-  answer `SCHEMA_EDITING_UNSUPPORTED`.
+- Solo cambios aditivos. Cualquier otra cosa se rechaza con un motivo, porque la ruta ensure es lo único que modifica un esquema y solo puede agregar.
+- No se escribe ningún archivo de migración. Un proyecto aprovisionado mediante boot-ensure no necesita ninguno; un proyecto aprovisionado mediante migraciones debe ejecutar `rebase db generate`, que genera uno a través de Atlas con el hash de integridad que Atlas requiere.
+- Solo para Postgres. La capacidad se detecta en el controlador (driver), y otros motores responden `SCHEMA_EDITING_UNSUPPORTED`.
+
+## Relacionado
+
+- [Generación de esquemas](/docs/cli/schema/) — las mismas ediciones desde la línea de comandos
+- [Definición de colecciones](/docs/collections/) — lo que el editor está reescribiendo
+- [Studio](/docs/studio/) — el panel detrás del cual están estas rutas

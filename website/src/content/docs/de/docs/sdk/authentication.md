@@ -2,26 +2,25 @@
 sourceHash: 9268d903ba4bf874
 title: Authentifizierung
 sidebar_label: Authentifizierung
-description: Clientseitige Authentifizierung mit dem Rebase SDK — Anmeldung per E-Mail/Passwort, OAuth-Anbieter, Sitzungsverwaltung und Listener für den Authentifizierungsstatus.
+description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
 ---
 
-## Überblick
+## Übersicht
 
-Das Modul `client.auth` übernimmt die Benutzerauthentifizierung, die Token-Verwaltung und die Persistenz von Sitzungen. Sobald sich ein Benutzer anmeldet, enthalten alle nachfolgenden Datenanfragen automatisch das JWT.
+Das Modul `client.auth` verwaltet die Benutzerauthentifizierung, Token-Verwaltung und Sitzungspersistenz. Sobald sich ein Benutzer anmeldet, enthalten alle nachfolgenden Datenanfragen automatisch das JWT.
 
-Das SDK persistiert Sitzungen standardmäßig im `localStorage` und aktualisiert Tokens automatisch, bevor sie ablaufen.
+Das SDK speichert Sitzungen standardmäßig im `localStorage` und aktualisiert Tokens automatisch, bevor sie ablaufen.
 
-:::note[Jede Anmeldemethode liefert eine abgeflachte Sitzung]
+:::note[Jede Anmeldemethode liefert eine verflachte Sitzung zurück]
 `signInWithEmail`, `signUp` und jede `signInWith*`-Methode geben
-**`{ user, accessToken, refreshToken }`** zurück — das SDK hat die Hülle bereits
-für dich ausgepackt.
+**`{ user, accessToken, refreshToken }`** zurück — das SDK hat den
+Umschlag bereits für Sie entpackt.
 
-Die darunterliegende REST-API gibt das Token stattdessen verschachtelt zurück,
-als `{ user, tokens: { accessToken, … } }`. Dieser Unterschied ist nur relevant,
-wenn du `/api/auth/*` zusätzlich direkt mit `fetch` aufrufst: Dort ist
-`body.accessToken` `undefined` und das Token liegt unter
-`body.tokens.accessToken`. Siehe
-[das Format der REST-API](/docs/backend/authentication).
+Die darunterliegende REST-API gibt das Token stattdessen verschachtelt zurück, als
+`{ user, tokens: { accessToken, … } }`. Dieser Unterschied ist nur relevant, wenn Sie
+`/api/auth/*` auch direkt mit `fetch` aufrufen, wobei `body.accessToken` `undefined` ist
+und das Token unter `body.tokens.accessToken` liegt. Siehe
+[das Wire-Format](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## E-Mail / Passwort
@@ -48,11 +47,11 @@ const { user } = await client.auth.signUp(
 
 ## OAuth-Anbieter
 
-Das SDK enthält dedizierte Methoden für gängige OAuth-Anbieter sowie ein generisches `signInWithOAuth()` für jeden benutzerdefinierten Anbieter.
+Das SDK enthält dedizierte Methoden für beliebte OAuth-Anbieter sowie ein generisches `signInWithOAuth()` für jeden benutzerdefinierten Anbieter.
 
 ### Google
 
-Unterstützt drei Aufrufvarianten:
+Unterstützt drei Aufrufarten:
 
 ```typescript
 // ID-token flow (One Tap / Sign In With Google button)
@@ -65,7 +64,7 @@ await client.auth.signInWithGoogle({ accessToken: googleAccessToken });
 await client.auth.signInWithGoogle({ code: authCode, redirectUri: "https://..." });
 ```
 
-### Andere Anbieter
+### Weitere Anbieter
 
 Jeder Anbieter folgt dem Authorization-Code-Flow mit `(code, redirectUri)`:
 
@@ -105,13 +104,130 @@ await client.auth.signInWithOAuth("custom-provider", {
 });
 ```
 
+## Magic Links
+
+Ein Ein-Klick-Anmeldelink per E-Mail. Der Link führt zu einer Seite Ihrer Anwendung und enthält ein Token; übergeben Sie das Token zurück, um es gegen eine Sitzung einzutauschen.
+
+```typescript
+// 1. Ask for the link. `redirectTo` is where the link points.
+await client.auth.sendMagicLink("user@example.com");
+
+// 2. On the landing page, trade the token for a session.
+const token = new URLSearchParams(location.search).get("token")!;
+const { user } = await client.auth.verifyMagicLink(token);
+```
+
+`sendMagicLink` liefert die gleiche Antwort, unabhängig davon, ob für die Adresse ein Konto existiert oder nicht. Das ist Absicht: Ein Endpunkt, der „Benutzer existiert nicht“ meldet, wäre ein Orakel für die Konto-Enumeration (Account Enumeration). Nutzen Sie das Ergebnis daher nicht, um einer Person mitzuteilen, ob sie registriert ist — der Endpunkt weiß es nicht.
+
+Beide erfordern einen im Backend konfigurierten E-Mail-Dienst, andernfalls antworten sie mit 503 `EMAIL_NOT_CONFIGURED`.
+
+## Einmalcodes
+
+Ein sechsstelliger Code per E-Mail für Fälle, in denen ein Link unpraktisch ist — eine native App, ein zweites Gerät, ein Browser, der Links beschädigt.
+
+```typescript
+const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
+
+// The address goes back with the code, because the code is only valid for it.
+const { user } = await client.auth.verifyEmailOtp("user@example.com", "418293");
+```
+
+Das Senden der Adresse zusammen mit dem Code stellt sicher, dass ein sechsstelliger Rateversuch ein Versuch gegen *ein einzelnes* Konto bleibt und nicht gegen alle Konten gleichzeitig gerichtet ist.
+
+## Anonyme Sitzungen
+
+Melden Sie einen Besucher ganz ohne Anmeldedaten an, sodass er die App nutzen kann, bevor er einen Grund zur Registrierung hat:
+
+```typescript
+const { user } = await client.auth.signInAnonymously();
+user.isAnonymous;   // true
+```
+
+Das Konto ist echt: Es besitzt eine ID, Rollen und eine Sitzung, sodass Row-Level Security seine Zeilen genauso eingrenzt wie bei einem registrierten Benutzer. Was es nicht hat, ist ein Weg zurück — niemand kann sich ein zweites Mal *als* dieses Konto anmelden, daher geht alles, was ihm gehört, mit der Sitzung verloren.
+
+Mit `linkAnonymous` hört es auf, ein Wegwerfkonto zu sein. Der Benutzer **behält seine ID**, sodass alles, was er im anonymen Zustand erstellt hat, in seinem Besitz bleibt:
+
+```typescript
+await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
+```
+
+| Fehler | Bedeutung |
+|---------|-------|
+| `ANONYMOUS_AUTH_DISABLED` (403) | Das Backend hat die anonyme Authentifizierung nicht aktiviert |
+| `NOT_ANONYMOUS` (400) | Die aktuelle Sitzung gehört zu einem regulären Konto |
+| `EMAIL_EXISTS` (409) | Für die Adresse existiert bereits ein Konto — melden Sie sich stattdessen bei diesem an |
+
+## Einen Anbieter mit einem bestehenden Konto verknüpfen
+
+`signInWithGoogle` und Co. melden einen Benutzer *an*. `linkProvider` verknüpft eine Anbieteridentität mit dem bereits angemeldeten Konto, sodass dieselbe Person über beide Wege zurückkehren kann:
+
+```typescript
+await client.auth.linkProvider("google", { idToken });
+```
+
+Die Sitzung beweist bereits den Kontobesitz. Im Gegensatz zur Anmeldung muss der Anbieter die E-Mail-Adresse daher nicht verifiziert haben, und die beiden Adressen müssen nicht übereinstimmen. Die Verknüpfung gelingt idempotent (`alreadyLinked: true`), wenn diese Identität dem Konto bereits zugeordnet ist, und verweigert die Verknüpfung mit `IDENTITY_ALREADY_LINKED` (409), wenn sie zu einem anderen Konto gehört.
+
+## Benutzer per E-Mail nachschlagen
+
+```typescript
+const profile = await client.auth.findUserByEmail("user@example.com");
+// { uid, displayName, photoURL } | null
+```
+
+Drei unkritische Felder und nichts weiter — genug, um „Sie laden Jane ein“ anzuzeigen, bevor eine Einladung gesendet wird.
+
+## Multi-Faktor-Authentifizierung
+
+TOTP-Faktoren — eine Authentifikator-App — plus die Challenge, die eine Sitzung von `aal1` auf `aal2` hochstuft.
+
+### Faktor registrieren
+
+```typescript
+const { factor, totp, recoveryCodes } = await client.auth.mfa.enroll({
+    friendlyName: "Phone"
+});
+
+showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
+showRecoveryCodes(recoveryCodes);
+```
+
+**Zeigen Sie die Wiederherstellungscodes einmalig und nie wieder an.** Da nur deren Hashes gespeichert werden, können sie später nicht mehr angezeigt werden.
+
+Der Faktor ist erst nutzbar, wenn der Benutzer nachweist, dass sein Authentifikator einen Code aus diesem Secret generiert hat:
+
+```typescript
+await client.auth.mfa.verify(factor.id, "418293");
+```
+
+### Mit MFA anmelden
+
+Eine Anmeldung an einem Konto mit eingerichteter MFA liefert eine Sitzung mit `aal1` zurück. Starten Sie eine Challenge und beantworten Sie diese, um die eigentliche Sitzung zu erhalten:
+
+```typescript
+const factors = await client.auth.mfa.listFactors();
+const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+
+// A TOTP code, or one of the recovery codes.
+const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+```
+
+`verifyChallenge` erstellt die `aal2`-Sitzung, und dieser Client übernimmt sie, wodurch die Tokens aus der Anmeldung ersetzt werden. Eine Challenge läuft nach fünf Minuten ab, und eine Challenge, deren Rateversuche das Limit erreicht haben, bleibt für den Rest ihrer Lebensdauer ungültig — andernfalls würde eine offene Challenge unbegrenzte Versuche für sechs Ziffern ermöglichen.
+
+### Faktor entfernen
+
+```typescript
+await client.auth.mfa.unenroll(factorId);
+```
+
+Erfordert eine `aal2`-Sitzung — also eine, die bereits eine Challenge beantwortet hat —, damit ein gestohlenes `aal1`-Token MFA nicht deaktivieren kann. Durch das Entfernen des letzten verifizierten Faktors werden auch die Wiederherstellungscodes gelöscht.
+
 ## Abmelden
 
 ```typescript
 await client.auth.signOut();
 ```
 
-Dies widerruft das Refresh-Token auf dem Server, löscht die lokale Sitzung und löst ein `SIGNED_OUT`-Ereignis aus.
+Dies widerruft das Refresh-Token auf dem Server, leert die lokale Sitzung und löst ein `SIGNED_OUT`-Event aus.
 
 ## Sitzungsverwaltung
 
@@ -122,7 +238,7 @@ const session = client.auth.getSession();
 // { accessToken, refreshToken, expiresAt, user } | null
 ```
 
-### Aktuellen Benutzer abrufen (servergeprüft)
+### Aktuellen Benutzer abrufen (serververifiziert)
 
 ```typescript
 const user = await client.auth.getUser();
@@ -140,15 +256,79 @@ const updatedUser = await client.auth.updateUser({
 
 ### Token aktualisieren
 
-Die Token-Aktualisierung erfolgt automatisch, Sie können sie aber auch manuell auslösen:
+Die Token-Aktualisierung erfolgt automatisch, Sie können sie jedoch auch manuell auslösen:
 
 ```typescript
 const session = await client.auth.refreshSession();
 ```
 
-## Listener für den Authentifizierungsstatus
+## Wo die Sitzung gespeichert wird: `authFlowMode`
 
-Reagieren Sie in Ihrer gesamten Anwendung auf Authentifizierungsänderungen:
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" }
+});
+```
+
+| Modus | Wo sich das Refresh-Token befindet | Wann man ihn verwendet |
+|------|----------------------------|----------------|
+| `"json"` *(Standard)* | Im Response-Body zurückgegeben, im `localStorage` gehalten | Eine native App, ein Skript, alles ohne den Cookie-Speicher eines Browsers |
+| `"cookie"` | Ein **HttpOnly**-Cookie, das das Backend setzt | Eine Browser-App. Skripte auf Ihrer Seite können es nicht lesen, was es XSS-sicher macht |
+
+Der Cookie-Modus erfordert `auth.cookieAuth` im Backend und wird von der generierten Frontend-Vorlage standardmäßig verwendet.
+
+## Auf die Wiederherstellung der Sitzung warten
+
+**Eine wiederhergestellte Sitzung ist beim ersten Rendern noch nicht verfügbar.** `getSession()` ist synchron, weshalb es beim Laden der Seite `null` zurückgibt, während die Wiederherstellung noch läuft — und im Cookie-Modus läuft *immer* eine Wiederherstellung, da sich das Refresh-Token in einem Cookie befindet, das die Seite nicht lesen kann, sodass der Client beim Server ein neues Access-Token anfragen muss.
+
+Das synchrone Auslesen führt bei jedem Neuladen zu einem kurzen Aufblitzen des abgemeldeten Zustands (Flash):
+
+```typescript no-verify
+// Wrong: renders the signed-out view for one round trip, every reload.
+const session = client.auth.getSession();
+if (!session) return <SignIn />;
+```
+
+`isInitialized()` löst auf, sobald der Client den Versuch abgeschlossen hat — unabhängig davon, ob eine Sitzung gefunden wurde oder nicht:
+
+```typescript
+async function currentUser() {
+    await client.auth.isInitialized();
+    return client.auth.getSession()?.user ?? null;
+}
+```
+
+In React entspricht das einem einzigen Effect:
+
+```tsx
+import { useEffect, useState } from "react";
+
+function useCurrentUser() {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        client.auth.isInitialized().then(() => {
+            if (cancelled) return;
+            setUser(client.auth.getSession()?.user ?? null);
+            setLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    return { user, loading };
+}
+```
+
+`useRebaseAuthController` in `@rebasepro/app` erledigt dies bereits, sodass eine auf der generierten Vorlage aufbauende App dies automatisch mitbringt.
+
+Eine erfolgreiche Wiederherstellung erreicht `onAuthStateChange` auch als `TOKEN_REFRESHED` — es *ist* eine Aktualisierung —, aber ein Listener allein kann Ihnen nicht sagen, ob die Wiederherstellung abgeschlossen ist: Ein Start ohne Sitzung löst gar nichts aus, was von einem noch laufenden Vorgang nicht zu unterscheiden ist. Warten Sie für diese Prüfung `isInitialized()` ab und nutzen Sie den Listener für spätere Änderungen.
+
+## Auth-Status-Listener
+
+Reagieren Sie auf Authentifizierungsänderungen in Ihrer gesamten Anwendung:
 
 ```typescript
 const unsubscribe = client.auth.onAuthStateChange((event, session) => {
@@ -160,6 +340,13 @@ const unsubscribe = client.auth.onAuthStateChange((event, session) => {
 // Stop listening
 unsubscribe();
 ```
+
+| Event | Wann |
+|-------|------|
+| `SIGNED_IN` | Eine Anmeldung oder Registrierung wurde abgeschlossen |
+| `TOKEN_REFRESHED` | Das Access-Token wurde erneuert — einschließlich der stillen Erneuerung, die eine Sitzung beim Laden der Seite wiederherstellt |
+| `USER_UPDATED` | `updateUser()` hat das Profil geändert |
+| `SIGNED_OUT` | Eine Abmeldung oder eine Aktualisierung, die endgültig fehlgeschlagen ist |
 
 ## Passwortverwaltung
 
@@ -199,7 +386,7 @@ await client.auth.sendVerificationEmail();
 await client.auth.verifyEmail(token);
 ```
 
-## Sitzungsverwaltung (mehrere Geräte)
+## Sitzungsverwaltung (Multi-Device)
 
 ```typescript
 // List all active sessions
@@ -212,7 +399,7 @@ await client.auth.revokeSession(sessionId);
 await client.auth.revokeAllSessions();
 ```
 
-## Authentifizierungskonfiguration
+## Auth-Konfiguration
 
 Fragen Sie die Authentifizierungskonfiguration des Backends ab:
 
@@ -236,7 +423,7 @@ const config = await client.auth.getAuthConfig();
 
 ## Benutzerdefinierter Sitzungsspeicher
 
-Standardmäßig werden Sitzungen im `localStorage` gespeichert. Sie können dies mit der Option `auth` anpassen:
+Standardmäßig werden Sitzungen im `localStorage` gespeichert. Sie können dies über die Option `auth` anpassen:
 
 ```typescript
 import { createRebaseClient, createCookieStorage } from "@rebasepro/client";
@@ -256,7 +443,7 @@ const client = createRebaseClient({
 });
 ```
 
-## Form des User-Objekts
+## Struktur des User-Objekts
 
 ```typescript
 // Canonical type — import from @rebasepro/types
@@ -277,4 +464,4 @@ interface User {
 
 - **[Daten abfragen](/docs/sdk/querying)** — CRUD-Operationen und Query-Builder
 - **[Echtzeit-Abonnements](/docs/sdk/realtime)** — Live-Daten mit WebSockets
-- **[Authentifizierung im Backend](/docs/backend/authentication)** — Serverseitige Authentifizierungskonfiguration
+- **[Authentifizierungs-Backend](/docs/backend/authentication)** — Serverseitige Auth-Konfiguration

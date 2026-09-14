@@ -1,19 +1,19 @@
 ---
-sourceHash: a133531cc94e5855
+sourceHash: 2e616bc4a3ea133c
 title: Adapter di autenticazione personalizzati
 sidebar_label: Adapter di autenticazione personalizzati
-description: Sostituisci l'autenticazione integrata di Rebase con Clerk, Firebase Auth o il tuo provider di identità implementando il contratto AuthAdapter.
+description: Sostituisci l'autenticazione integrata di Rebase con Clerk, Firebase Auth o il tuo identity provider implementando il contratto AuthAdapter.
 ---
 
-Rebase include un proprio sistema di autenticazione — [configuralo qui](/docs/backend/authentication/). Questa pagina riguarda l'altro scenario: un provider di identità che già gestisci o per cui già paghi.
+Rebase include un proprio sistema di autenticazione — [configuralo qui](/docs/backend/authentication/). Questa pagina riguarda l'altro caso: un identity provider già attivo o per cui paghi già un abbonamento.
 
 ## Adapter di autenticazione personalizzati
 
-Rebase consente la sostituzione completa del sistema di autenticazione integrato tramite un'architettura di autenticazione modulare. Questo separa la verifica dell'autenticazione dal database e dai livelli REST/WebSocket, consentendo un'integrazione trasparente con provider esterni come **Clerk**, **Auth0**, **Firebase Auth** o servizi di identità JWT personalizzati.
+Rebase consente la sostituzione completa del sistema di autenticazione integrato tramite un'architettura di autenticazione modulare (pluggable). In questo modo la verifica dell'autenticazione viene disaccoppiata dal database e dai layer REST/WebSocket, consentendo un'integrazione trasparente con provider esterni come **Clerk**, **Auth0**, **Firebase Auth** o servizi di identità JWT personalizzati.
 
 ### Il contratto AuthAdapter
 
-Puoi implementare direttamente l'interfaccia `AuthAdapter` per un controllo completo. La definizione dell'interfaccia è la seguente:
+È possibile implementare direttamente l'interfaccia `AuthAdapter` per ottenere il controllo completo. La definizione dell'interfaccia è la seguente:
 
 ```typescript
 import { Hono } from "hono";
@@ -36,7 +36,7 @@ export interface AuthAdapter {
    */
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
 
-  /** Optional user management operations (CRUD) for the Admin Dashboard panel */
+  /** Optional user management operations (CRUD) for the panel */
   userManagement?: UserManagementAdapter;
 
   /** Optional: Mount adapter-specific custom public routes (e.g. callback paths) */
@@ -45,7 +45,7 @@ export interface AuthAdapter {
   /** Optional: Mount adapter-specific admin-only routes */
   createAdminRoutes?(): Hono<any, any, any> | undefined;
 
-  /** Advertise supported capabilities (to customize Admin Dashboard UI visibility) */
+  /** Advertise supported capabilities (to customize what the panel shows) */
   getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
 
   /** Lifecycle hooks called during backend start and graceful shutdown */
@@ -68,9 +68,9 @@ export interface AuthAdapter {
 }
 ```
 
-### Il payload dell'utente autenticato
+### Il payload AuthenticatedUser
 
-Indipendentemente dal provider di autenticazione esterno scelto, il tuo adapter deve risolvere le verifiche dei token andate a buon fine in un oggetto `AuthenticatedUser` uniforme. L'iniettore di scope RLS di Rebase mappa questi valori direttamente sulle variabili di sessione PostgreSQL all'interno delle transazioni:
+Indipendentemente dal provider di autenticazione esterno scelto, il tuo adapter deve risolvere le verifiche dei token andate a buon fine in un oggetto uniforme `AuthenticatedUser`. L'RLS Scope Injector di Rebase mappa direttamente questi valori nelle variabili di sessione PostgreSQL all'interno delle transazioni:
 
 ```typescript
 export interface AuthenticatedUser {
@@ -89,7 +89,7 @@ export interface AuthenticatedUser {
 
 ### Integrazione rapida tramite `createCustomAuthAdapter`
 
-Per gli scenari standard (come la convalida di JWT provenienti da un servizio di terze parti), puoi utilizzare l'utility `createCustomAuthAdapter`. Questa utility gestisce i valori predefiniti delle funzionalità e implementa la convalida dei token WebSocket out-of-the-box avvolgendo la tua implementazione di `verifyRequest`.
+Per scenari standard (come la convalida di JWT provenienti da un servizio di terze parti), puoi utilizzare l'utility `createCustomAuthAdapter`. Questa utility gestisce i valori predefiniti delle funzionalità (capabilities) e implementa la convalida dei token WebSocket out-of-the-box eseguendo il wrapping della tua implementazione di `verifyRequest`.
 
 #### Esempio: Integrazione con Clerk
 
@@ -199,9 +199,9 @@ const backend = await initializeRebaseBackend({
 
 ---
 
-### Montare route di autenticazione e azioni della UI di amministrazione
+### Montaggio di rotte di autenticazione e azioni del pannello
 
-Se il tuo provider di autenticazione personalizzato richiede l'attivazione di endpoint di reindirizzamento (come le route di callback OAuth o i cicli di accesso SAML), implementa il metodo `createAuthRoutes` sul tuo adapter:
+Se il tuo provider di autenticazione personalizzato richiede il montaggio di endpoint di reindirizzamento (come le route di callback OAuth o i loop di login SAML), implementa il metodo `createAuthRoutes` sul tuo adapter:
 
 ```typescript
 const myOauthAdapter: AuthAdapter = {
@@ -241,12 +241,10 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-Se desideri consentire le operazioni CRUD sugli utenti direttamente all'interno dell'Admin Dashboard di Rebase, implementa l'helper `userManagement` all'interno delle opzioni dell'adapter, che fornisce gli hook per `listUsers`, `createUser`, `updateUser` e `deleteUser`.
+Se desideri consentire le operazioni CRUD sugli utenti direttamente all'interno del pannello, implementa l'helper `userManagement` all'interno delle opzioni dell'adapter, che fornisce hook per `listUsers`, `createUser`, `updateUser` e `deleteUser`.
 
 ## Prossimi passi
 
 - **[Autenticazione](/docs/backend/authentication/)** — la configurazione del provider integrato
-- **[Endpoint e token](/docs/backend/auth-endpoints/)** — le route che un adapter deve soddisfare
+- **[Endpoint e token](/docs/backend/auth-endpoints/)** — le rotte che un adapter deve soddisfare
 - **[Regole di sicurezza (RLS)](/docs/collections/security-rules/)** — a cosa servono i claim restituiti da un adapter
-
----

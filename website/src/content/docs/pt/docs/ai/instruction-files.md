@@ -63,7 +63,7 @@ servidor na raiz do projeto, e um caminho absoluto é a única linha desse arqui
 que não pode ser commitada. Ele está ali porque `~/.rebase/projects.json` vale
 para a máquina inteira — um projeto que não nomeia um diretório próprio acaba
 usando o que o último projeto daquela máquina gravou. Veja
-[a precedência](/pt/docs/ai/mcp#em-qual-diretório-ele-age).
+[a precedência](/pt/docs/ai/mcp#em-qual-diretório-ele-atua).
 
 ## Por que um ponteiro em vez de uma cópia
 

@@ -1,19 +1,21 @@
 ---
 sourceHash: 35d04e650c33c5cb
-title: SDK do Cliente
-sidebar_label: SDK do Cliente
-description: Use o SDK do Cliente Rebase para interagir com o seu backend a partir de qualquer aplicação JavaScript — operações de dados, autenticação, armazenamento e subscrições em tempo real.
+title: Client SDK — Primeiros Passos
+sidebar_label: Primeiros Passos
+description: Instale e configure o Rebase Client SDK para interagir com seu backend a partir de qualquer aplicação JavaScript ou TypeScript.
 ---
 
 ## Visão Geral
 
-O pacote `@rebasepro/client` oferece um SDK JavaScript com segurança de tipo para interagir com o seu backend Rebase. Ele lida com:
+O pacote `@rebasepro/client` fornece um SDK JavaScript type-safe para interagir com o seu backend Rebase. Ele lida com:
 
 - **Operações de dados** — CRUD com filtragem, ordenação e paginação
-- **Obtenção de relações** — Inclua entidades relacionadas com `.include()`
-- **Subscrições em tempo real** — Atualizações em tempo real baseadas em WebSocket
-- **Autenticação** — Gestão de tokens, login, registo
-- **Armazenamento** — Carregamento e download de ficheiros
+- **Busca de relações** — Inclua entidades relacionadas com `.include()`
+- **Inscrições em tempo real** — Atualizações ao vivo baseadas em WebSocket
+- **Sincronização offline e local-first** — Banco de dados local de registros opt-in, gravações offline instantâneas, consultas em tempo real
+- **Autenticação** — Gerenciamento de tokens, login, cadastro, OAuth
+- **Armazenamento** — Upload, download e gerenciamento de arquivos
+- **Funções customizadas** — Chame endpoints de servidor customizados
 
 ## Instalação
 
@@ -21,324 +23,126 @@ O pacote `@rebasepro/client` oferece um SDK JavaScript com segurança de tipo pa
 pnpm add @rebasepro/client
 ```
 
-## Configuração
+## Criando um Cliente
+
+O `rebase dev` deriva uma porta livre a partir do caminho do projeto em vez de usar uma fixa, portanto **leia a `baseUrl` da URL que ele exibiu** — não há uma porta compartilhada por todos os projetos. Em um frontend Vite, essa é a `VITE_API_URL` que o scaffold escreve no `.env`; em um script, uma variável de ambiente própria.
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({
-    baseUrl: import.meta.env.VITE_API_URL
+    baseUrl: import.meta.env.VITE_API_URL,
 });
 ```
 
-O cliente gere automaticamente os tokens de autenticação — uma vez que um utilizador inicia sessão, todos os pedidos subsequentes incluem o JWT.
-
-## Operações de Dados
-
-Aceda a qualquer coleção através de `client.data.<collectionName>` (camelCase) ou `client.data.collection<Record<string, unknown>>("slug")` (kebab-case):
+A `websocketUrl` é derivada automaticamente de `baseUrl` (`http → ws`, `https → wss`). Você pode substituí-la explicitamente se necessário:
 
 ```typescript
-// Property-style access (auto-converts to kebab-case)
-client.data.blogPosts    // → "blog-posts"
-client.data.users        // → "users"
-
-// Dynamic access by slug
-client.data.collection("blog-posts")
-```
-
-### Encontrar (Listar)
-
-```typescript
-// All products (default limit: 20)
-const { data, meta } = await client.data.products.find();
-
-// With pagination, filtering, and sorting
-const { data, meta } = await client.data.products.find({
-    where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["createdAt", "desc"],
-    limit: 25,
-    offset: 0
-});
-
-// data é Entity<M>[]  — cada item tem { id, values, path }
-// meta tem { total, limit, offset, hasMore }
-```
-
-### Encontrar por ID
-
-```typescript
-const product = await client.data.products.findById(42);
-// Entity<M> | undefined
-```
-
-### Criar
-
-```typescript
-const newProduct = await client.data.products.create({
-    name: "New Product",
-    price: 29.99,
-    active: true
-});
-
-// With a specific ID
-const newProduct = await client.data.products.create(
-    { name: "Custom ID Product" },
-    "my-custom-id"
-);
-```
-
-### Atualizar
-
-```typescript
-const updated = await client.data.products.update(42, {
-    name: "Updated Name",
-    price: 39.99
+const client = createRebaseClient({
+    baseUrl: import.meta.env.VITE_API_URL,
+    websocketUrl: import.meta.env.VITE_WS_URL,
 });
 ```
 
-### Apagar
+### Opções de Configuração
 
-```typescript
-await client.data.products.delete(42);
+| Opção | Tipo | Descrição |
+|--------|------|-------------|
+| `baseUrl` | `string` | URL do backend. Leia a partir do que o `rebase dev` exibiu, ou do seu deploy |
+| `websocketUrl` | `string` | URL do WebSocket — derivada automaticamente de `baseUrl` se omitida |
+| `token` | `string` | Token JWT estático para chamadas server-to-server |
+| `apiPath` | `string` | Prefixo da API (padrão: `"/api"`) |
+| `fetch` | `typeof fetch` | Implementação customizada de fetch (ex.: para SSR) |
+| `onUnauthorized` | `() => Promise<boolean>` | Manipulador customizado de 401 — retorne `true` para tentar novamente |
+| `realtime` | `boolean` | Abre o WebSocket (padrão `true`) — defina como `false` em scripts pontuais |
+| `collections` | `Record<string, string>` | Mapeia nomes de acessadores para slugs de coleções |
+| `offline` | `boolean \| OfflineConfig` | [Sincronização local-first](/docs/sdk/offline) — desativada por padrão |
+
+## Geração de SDK Tipado
+
+Gere um cliente totalmente tipado a partir das definições de suas coleções:
+
+```bash
+rebase generate-sdk
 ```
 
-## Construtor de Query Fluente
-
-Encadeie métodos para queries mais expressivas:
+Em seguida, passe o parâmetro de tipo `Database` para `createRebaseClient` para obter autocompletar completo:
 
 ```typescript
+import { createRebaseClient } from "@rebasepro/client";
+import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
+
+const client = createRebaseClient<Database>({
+    baseUrl: import.meta.env.VITE_API_URL,
+    collections: collectionsDictionary,
+});
+
+// Full autocomplete on collection names and field types
+const { data } = await client.data.products.find();
+```
+
+Quando `Database` é fornecido, o `createRebaseClient` retorna uma instância de `CreateRebaseClientResult<DB>`. Isso mapeia acessadores de coleção em camelCase diretamente em `client.data` para seus tipos correspondentes, oferecendo autocompletar completo em operações e tipos de coleção (ex.: `client.data.products.find()`).
+
+O `collectionsDictionary` mapeia cada acessador de volta para o slug utilizado na comunicação (wire). Passe-o sempre que um slug não for um nome de propriedade válido — `my-notes` só é acessível como `client.data.myNotes` porque o dicionário especifica isso.
+
+### Nomes de campos
+
+**O nome de um campo na rede (wire) é a sua chave de propriedade**, e a API usa camelCase por padrão em toda a sua extensão. Uma propriedade `createdAt` armazenada em uma coluna `created_at` é `row.createdAt`, e a chave estrangeira de uma relação é `authorId` mesmo que a coluna permaneça `author_id`. O `where` e o `orderBy` são baseados no mesmo tipo `Row`, portanto o que compila é aquilo a que o backend responde.
+
+Uma chave de propriedade que *você* escreveu é a sua chave, qualquer que seja seu formato — nada renomeia um nome que você escolheu. As duas chaves que são derivadas em vez de declaradas, a chave estrangeira de uma relação e uma coluna lida por introspecção, são camelCase.
+
+`Row` descreve uma leitura, `Insert` um `create()` e `Update` um `update()` — eles não têm o mesmo formato. Colunas anuláveis são `T | null` em `Row`, a chave primária está sempre presente em uma leitura e nunca pode ser definida em uma atualização, e o alvo de um `belongsTo` pode ser escrito tanto como a relação (`{ author: 5 }`) quanto como sua chave estrangeira (`{ authorId: 5 }`).
+
+## Exemplo Rápido
+
+```typescript
+// Create
+const product = await client.data.products.create({
+    name: "Camera",
+    price: 299,
+});
+
+// Query with filters
 const { data } = await client.data.products
     .where("price", ">=", 100)
-    .where("active", "==", true)
     .orderBy("createdAt", "desc")
     .limit(10)
     .find();
-```
 
-### Métodos Disponíveis
-
-| Método | Descrição | Exemplo |
-|--------|-------------|---------|
-| `.where(field, op, value)` | Adiciona uma condição de filtro | `.where("age", ">=", 18)` |
-| `.orderBy(field, dir)` | Ordena os resultados | `.orderBy("name", "asc")` |
-| `.limit(n)` | Limita a contagem de resultados | `.limit(25)` |
-| `.offset(n)` | Ignora os primeiros N resultados | `.offset(50)` |
-| `.search(text)` | Pesquisa de texto completo | `.search("laptop")` |
-| `.include(...relations)` | Inclui entidades relacionadas | `.include("author", "tags")` |
-| `.find()` | Executa a query | Retorna `FindResult<M>` |
-| `.listen(onUpdate)` | Subscreve atualizações em tempo real | Retorna `unsubscribe()` |
-
-### Operadores de Filtro
-
-| Operador | Alias | Descrição |
-|----------|-------|-------------|
-| `"=="` | `"eq"` | Igual |
-| `"!="` | `"neq"` | Não igual |
-| `">"` | `"gt"` | Maior que |
-| `">="` | `"gte"` | Maior ou igual a |
-| `"<"` | `"lt"` | Menor que |
-| `"<="` | `"lte"` | Menor ou igual a |
-| `"in"` | | Valor no array |
-| `"not-in"` | `"nin"` | Valor não no array |
-| `"array-contains"` | `"cs"` | Campo do array contém valor |
-| `"array-contains-any"` | `"csa"` | Campo do array contém qualquer dos valores |
-
-## Obtenção de Relações
-
-As relações podem ser incluídas nos resultados da query para que as entidades relacionadas sejam devolvidas juntamente com os dados primários, em vez de apenas os seus IDs de chave estrangeira.
-
-### Usando `include()` (Fluente)
-
-```typescript
-// Incluir relações específicas
-const { data } = await client.data.posts
-    .include("author", "categories")
-    .find();
-
-// Incluir todas as relações definidas
-const { data } = await client.data.posts
-    .include("*")
-    .find();
-```
-
-### Usando `find({ include })` (Parâmetros)
-
-```typescript
-const { data } = await client.data.posts.find({
-    include: ["author", "categories"]
-});
-```
-
-### Combinando com Filtros
-
-```typescript
-const { data } = await client.data.posts
-    .where("status", "==", "published")
-    .include("author")
-    .orderBy("publishedAt", "desc")
-    .limit(10)
-    .find();
-```
-
-### Lendo Dados de Relação
-
-Quando as relações são incluídas, a resposta contém **tanto** a chave estrangeira escalar como o objeto de relação hidratado:
-
-```typescript
-const { data } = await client.data.posts
-    .include("author")
-    .find();
-
-for (const post of data) {
-    // Chave estrangeira escalar — sempre presente
-    console.log(post.values.authorId);    // "uuid-1234"
-
-    // Relação hidratada — presente quando incluída
-    console.log(post.values.author?.name); // "Jane Doe"
-}
-```
-
-> **Nota:** Sem `.include("author")`, apenas o campo escalar `authorId` é retornado. O objeto `author` hidratado será `undefined`.
-
-### Nomes de Relação
-
-Os nomes das relações que passa para `include()` devem corresponder ao `relationName` definido no array `relations` da coleção. Por exemplo:
-
-```typescript
-// Collection definition
-relations: [
-    { relationName: "author", target: () => usersCollection, ... },
-    { relationName: "categories", target: () => categoriesCollection, ... }
-]
-
-// SDK usage — names must match
-client.data.articles.include("author", "categories").find()
-```
-
-## Subscrições em Tempo Real
-
-Subscreva as alterações da coleção via WebSocket:
-
-```typescript
-// Subscrever todos os produtos ativos
+// Real-time subscription
 const unsubscribe = client.data.products.listen(
-    { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        console.log("Products updated:", response.data);
-    }
+    { where: { active: ["==", true] } },
+    (response) => console.log("Updated:", response.data)
 );
-
-// Desinscrever quando terminar
-unsubscribe();
-```
-
-Subscrever uma única entidade:
-
-```typescript
-const unsubscribe = client.data.products.listenById(
-    42,
-    (entity) => {
-        console.log("Product changed:", entity);
-    }
-);
-```
-
-Também pode subscrever através do construtor de query fluente:
-
-```typescript
-const unsubscribe = client.data.products
-    .where("active", "==", true)
-    .orderBy("createdAt", "desc")
-    .limit(20)
-    .listen(
-        (response) => console.log("Updated:", response.data),
-        (error) => console.error("Error:", error)
-    );
-```
-
-O cliente WebSocket lida com a reconexão automaticamente.
-
-## Autenticação
-
-```typescript
-// Login
-const session = await client.auth.signIn("user@example.com", "password");
-
-// Registar
-const session = await client.auth.signUp("user@example.com", "password");
-
-// Google OAuth
-const session = await client.auth.signInWithGoogle(googleIdToken);
-
-// Atualizar token
-await client.auth.refreshToken();
-
-// Logout
-await client.auth.signOut();
-
-// Obter utilizador atual
-const user = client.auth.getUser();
-```
-
-## Armazenamento
-
-```typescript
-// Carregar
-const result = await client.storage.uploadFile(file, "products/image.jpg");
-
-// Obter URL
-const url = await client.storage.getDownloadURL("products/image.jpg");
-
-// Apagar
-await client.storage.deleteFile("products/image.jpg");
-```
-
-## Endpoints Personalizados
-
-Chame endpoints de servidor personalizados (Cloud Functions, rotas personalizadas, etc.):
-
-```typescript
-const result = await client.call<{ summary: string }>("functions/generate-summary", {
-    articleId: 42
-});
 ```
 
 ## Usando com React
 
-Num frontend Rebase, o cliente é tipicamente criado uma vez e partilhado via contexto:
+Em um frontend Rebase, o cliente é criado uma vez e compartilhado via contexto:
 
-```tsx
-const client = createRebaseClient({ baseUrl: API_URL, websocketUrl: WS_URL });
+```tsx no-verify
+import { createRebaseClient } from "@rebasepro/client";
 
-// Passar para o provedor Rebase
+const client = createRebaseClient({ baseUrl: API_URL });
+
 <Rebase client={client} ...>
 ```
 
-Aceda a partir de qualquer componente:
+Acesse-o a partir de qualquer componente:
 
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
 
 function MyComponent() {
     const client = useRebaseClient();
-    // Usar client.data, client.auth, client.storage
+    // client.data, client.auth, client.storage, client.functions
 }
 ```
 
-## Gerador de SDK
-
-Gere um SDK de cliente totalmente tipado a partir das suas definições de coleção:
-
-```bash
-rebase generate-sdk
-```
-
-Isto cria tipos TypeScript para todas as suas entidades, para que obtenha autocompletar e verificação de tipo ao usar o cliente. Tanto as chaves estrangeiras escalares como os objetos de relação são incluídos nos tipos `Database` gerados.
-
 ## Próximos Passos
 
-- **[Relações](/docs/collections/relations)** — Defina relações entre coleções
-- **[Visão Geral do Frontend](/docs/frontend)** — Estrutura e componentes React
-- **[Visão Geral do Backend](/docs/backend)** — Configuração do servidor
-
----
+- **[Consultando Dados](/docs/sdk/querying)** — CRUD, filtros, paginação e relações
+- **[Autenticação](/docs/sdk/authentication)** — Login, cadastro, OAuth, sessões
+- **[Inscrições em Tempo Real](/docs/sdk/realtime)** — Dados em tempo real com WebSockets
+- **[Sincronização Offline e Local-First](/docs/sdk/offline)** — Trabalhe sem conexão e sincronize quando ela retornar
+- **[Armazenamento e Arquivos](/docs/sdk/storage)** — Faça upload, download e gerencie arquivos
