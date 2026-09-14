@@ -462,7 +462,7 @@ Rebase supports Multi-Factor Authentication via TOTP (Time-based One-Time Passwo
 ```typescript
 interface MfaFactor {
   id: string;
-  userId: string;
+  uid: string;
   factorType: "totp";       // Only TOTP is supported
   friendlyName?: string;
   verified: boolean;

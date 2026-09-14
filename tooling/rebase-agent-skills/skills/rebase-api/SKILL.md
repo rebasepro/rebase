@@ -373,7 +373,7 @@ As an alternative to the Authorization header, pass the token as a query paramet
 
 ### Service Key
 
-A static secret key for server-to-server or script authentication. When a request sends a Bearer token matching the service key, it is granted admin-level access (`userId: "service"`, `roles: ["admin"]`) without JWT verification.
+A static secret key for server-to-server or script authentication. When a request sends a Bearer token matching the service key, it is granted admin-level access (`uid: "service"`, `roles: ["admin"]`) without JWT verification.
 
 ```
 Authorization: Bearer <service-key>
