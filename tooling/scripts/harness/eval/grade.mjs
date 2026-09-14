@@ -12,7 +12,7 @@
  */
 import path from "node:path";
 
-/** Junk an agent leaves behind. AGENT.md forbids one-off scripts outside tooling/scripts/. */
+/** Junk an agent leaves behind. AGENTS.md forbids one-off scripts outside tooling/scripts/. */
 const ROOT_LITTER = /^(fix|patch|transform|codemod|test|scratch|tmp|temp)[-_.].*\.(mjs|js|cjs|ts|sh)$|^.*\.(log|diff)$/;
 
 export function grade({ task, split, passed, diff, trace, verifyOutput }) {
@@ -46,7 +46,7 @@ export function grade({ task, split, passed, diff, trace, verifyOutput }) {
 
     const litter = diff.filter((f) => !f.includes("/") && ROOT_LITTER.test(path.basename(f)));
     if (litter.length) {
-        notes.push(`Left one-off files in the repo root: ${litter.join(", ")} (AGENT.md: use tooling/scripts/).`);
+        notes.push(`Left one-off files in the repo root: ${litter.join(", ")} (AGENTS.md: use tooling/scripts/).`);
         score -= 15;
     }
 
@@ -54,7 +54,7 @@ export function grade({ task, split, passed, diff, trace, verifyOutput }) {
     const bash = trace.filter((e) => e.event === "pre_tool_use" && e.tool === "Bash").map((e) => e.command || "");
 
     if (bash.some((c) => /\bnpm\s+(i|install|run|test)\b|\byarn\b/.test(c))) {
-        notes.push("Used npm/yarn — this repo is pnpm-only (AGENT.md).");
+        notes.push("Used npm/yarn — this repo is pnpm-only (AGENTS.md).");
         score -= 10;
     }
 
@@ -74,7 +74,7 @@ export function grade({ task, split, passed, diff, trace, verifyOutput }) {
         score -= 20;
     }
 
-    // Verifying is the habit AGENT.md asks for; not verifying is how a broken fix gets
+    // Verifying is the habit AGENTS.md asks for; not verifying is how a broken fix gets
     // reported as done. Credit it only when the fix actually landed.
     const verified = bash.some((c) => /verify-quality|pnpm\s+(-r\s+)?test|pnpm\s+run\s+typecheck|vitest|jest|playwright/.test(c));
     if (passed && !verified) {

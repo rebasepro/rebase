@@ -100,7 +100,7 @@ packages/forms/.yarn/
 
 # The same scratch scripts, ANYWHERE — not only at the root.
 #
-# AGENT.md bans one-off scripts in the repo root *and inside any package
+# AGENTS.md bans one-off scripts in the repo root *and inside any package
 # directory*, but every pattern above is root-anchored, so only half of that was
 # enforced. `website/.v.mjs` — a throwaway Playwright screenshot script writing
 # into an agent scratchpad — sailed past all of them and sat untracked in the
@@ -184,7 +184,6 @@ app/backend/scratch/
 .antigravity/
 .claude/
 .fallowrc.json
-AGENT.md
 
 # Marketing & asset templates
 og-template.html

@@ -30,6 +30,56 @@ This applies to:
 2. **Obtain explicit user request** — only execute a deploy command if the user explicitly asks you to (e.g., "deploy everything" or "run the deploy command").
 3. **Explain before executing** — before running a deployment command on behalf of the user, explain exactly what commands will be executed and what they will do.
 
+## The preflight gate
+
+`pnpm harness:preflight` runs `tooling/scripts/harness/deploy/preflight.mjs` before
+a deploy. It catches:
+
+- a lockfile regenerated in a worktree
+- a drizzle migration that will be silently skipped
+- a `securityRules` edit with no migration behind it
+- `saas/config` not compiling
+- a deploy aimed at a control plane that does not serve production
+
+In the maintainers' agent setup, a `PreToolUse` hook runs the same checks before
+anything that deploys: `gcloud run deploy`, `gcloud builds submit`,
+`kubectl apply/set image/rollout/delete`, `terraform apply`, `rebase cloud deploy`
+and `pnpm deploy:*`. A failing check blocks the command. Run it yourself before
+you start, so the hook reads a stamp instead of re-running the checks inline. What
+each check means, and how to add one, is in `tooling/scripts/harness/README.md`.
+
+## Releasing: never without explicit consent
+
+**Never publish, release or tag any Rebase package without the user's explicit,
+in-the-moment consent for that specific release.** This rule is absolute. None of
+these satisfy it:
+
+- a standing instruction
+- "finish this and ship it"
+- a task list that ends in "release"
+- a green test suite
+- an earlier approval of a different release
+
+Choosing the version number is also the user's call.
+
+Unless asked for that exact release, never run:
+
+- `npm publish`, `pnpm publish` or `pnpm -r publish`
+- `gh workflow run publish.yml` on any channel, **including a dry run**
+- `git tag v*`, or pushing a tag
+- the version-bump scripts
+- anything that pushes an image to a registry under `rebasepro/`
+
+Pushing to `main` also publishes a canary of every package.
+
+The reason it is absolute: a published npm version cannot be unpublished, a pushed
+tag is already on the branch, and every scaffolded project pulls
+`rebasepro/server:<version>`. None of it can be undone.
+
+**What to do instead:** prepare everything up to the irreversible step. Write the
+CHANGELOG, run the gates, get the tree green. Then stop, report what is ready,
+and name the exact command that would publish it.
+
 ## Summary
 
 The agent should prepare and test code locally. **Deployment commands can only be executed by the agent if the user explicitly asks them to.**

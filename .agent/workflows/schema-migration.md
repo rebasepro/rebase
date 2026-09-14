@@ -75,7 +75,7 @@ export default postsCollection;
 ```
 
 `defineCollection` is an identity function at runtime; the point is the
-overloads. It captures the literal property keys, so `admin.titleProperty`,
+typing. It captures the literal property keys, so `admin.display.title`,
 `admin.propertiesOrder` and friends complete over this collection's own
 properties, and it brings the `admin` augmentation with it so a typo inside an
 `admin` block is a compile error rather than a silently ignored key.

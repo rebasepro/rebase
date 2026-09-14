@@ -245,7 +245,7 @@ jobs:
 
       # The agent harness's own tests. They need neither a database nor a build,
       # and nothing else covers `tooling/scripts/harness/` — including the deploy
-      # preflight that AGENT.md describes as an enforced gate.
+      # preflight that .agent/workflows/deployment.md describes.
       - name: Harness tests
         run: pnpm run test:harness
 
