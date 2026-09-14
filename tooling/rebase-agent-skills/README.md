@@ -68,7 +68,7 @@ it — rather than 84,000 characters of reference in front of every question.
 The `skills` CLI can install from a directory:
 
 ```bash
-npx skills add /path/to/rebase/rebase-agent-skills/skills
+npx skills add /path/to/rebase/tooling/rebase-agent-skills/skills
 ```
 
 To pick up later edits to that directory:
@@ -93,7 +93,7 @@ If you are actively contributing to or developing these skills, use a symlink so
 For example, to test with Cursor:
 
 ```bash
-ln -s /path/to/rebase-agent-skills/skills /path/to/your/test-project/.cursor/rules
+ln -s /path/to/rebase/tooling/rebase-agent-skills/skills /path/to/your/test-project/.cursor/rules
 ```
 
 ## 🤝 Contributing

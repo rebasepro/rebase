@@ -7,7 +7,28 @@ description: Guide for setting up and using file storage in Rebase. Use this ski
 
 Rebase provides built-in file storage with support for local filesystem, S3-compatible services, and Google Cloud Storage (GCS), TUS v1.0.0 resumable uploads, on-the-fly image transformation, a multi-backend registry, and frontend storage sources.
 
-> **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first before using this skill. Storage requires a running Rebase backend with `initializeRebaseBackend()`.
+> **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first before using this skill. Storage requires a running Rebase backend.
+
+## Declaring buckets (scaffolded projects)
+
+Since 0.17.0 a bucket is a **declared resource**, not a backend option. A scaffolded project never calls `initializeRebaseBackend` — declare the bucket in `config/resources.ts` and bind it from the environment:
+
+```ts
+// config/resources.ts
+import { bucket } from "@rebasepro/types";
+
+export const files = bucket({ engine: "s3" });           // the default bucket: S3_BUCKET, S3_REGION, …
+export const media = bucket("media", { engine: "s3" });  // a named one: S3_BUCKET__MEDIA, S3_REGION__MEDIA, …
+```
+
+- **Env suffix `<BASE>__<KEY>`.** The default bucket reads the plain names in [Environment Variables](#environment-variables). A named bucket reads each of them with its key appended, uppercased, non-alphanumerics collapsed to `_`: `bucket("media-cdn")` reads `S3_BUCKET__MEDIA_CDN`.
+- **Shared credentials.** `bucket("media", { engine: "s3", account: "minio" })` keeps its own `S3_BUCKET__MEDIA` but falls back to `S3_ACCESS_KEY_ID__MINIO`, `S3_SECRET_ACCESS_KEY__MINIO`, `S3_ENDPOINT__MINIO` (and region, path style) when no per-bucket value is set.
+- **One default.** Uploads whose property names no `storageSource` go to the default-keyed `bucket()`, or to a named bucket marked `default: true`. Mark one; do not rely on declaration order.
+- **Engines** are `local`, `s3` and `gcs` on the server. `transport: "direct"` declares a bucket the client talks to itself, with the backend out of the path.
+- **Unbound is not an error.** In development an unbound bucket stands in as a local directory; in production it stays off and its routes answer `501 STORAGE_NOT_CONFIGURED`. `rebase status` names the variable it is waiting on. A project that declares no bucket at all still gets one default bucket, typed by `STORAGE_TYPE`.
+- **Point a property at a bucket by handle:** `storage: { storageSource: media }` (the key string works too).
+
+The `storage` option below is the **ejected / custom-server** form — what you pass when you call `initializeRebaseBackend` yourself. Passing the removed `storageSources` config key is refused at boot.
 
 ## Storage Configuration
 
@@ -17,7 +38,7 @@ The `storage` option in `initializeRebaseBackend()` accepts three forms:
 |------|------|-------------|
 | Single config | `BackendStorageConfig` | `{ type: 'local' | 's3' | 'gcs', ... }` — creates a single `(default)` backend |
 | Single controller | `StorageController` | A custom controller instance — registered as `(default)` |
-| Multi-backend map | `Record<string, BackendStorageConfig \| StorageController>` | Named backends, first becomes `(default)` if no `(default)` key |
+| Multi-backend map | `Record<string, BackendStorageConfig \| StorageController>` | Named backends. Include a `(default)` key — none is promoted in its place |
 
 ### LocalStorageConfig
 
@@ -219,7 +240,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-> **IMPORTANT FOR AGENTS:** If no `"(default)"` key is provided, the first entry is automatically registered as the default (with a console warning). The REST API routes use the default controller unless a `?storageId=<key>` query parameter is provided (see [REST API Endpoints](#rest-api-endpoints)). Use `storageRegistry.get("media")` or `storageRegistry.getOrDefault("media")` to access named backends programmatically.
+> **IMPORTANT FOR AGENTS:** Include a `"(default)"` key. Nothing is promoted to default any more — a map without one has no default backend, so an upload whose property names no `storageSource` has nowhere to go. The REST API routes use the default controller unless a `?storageId=<key>` query parameter is provided (see [REST API Endpoints](#rest-api-endpoints)). Use `storageRegistry.get("media")` or `storageRegistry.getOrDefault("media")` to access named backends programmatically.
 
 ### StorageRegistry API
 
@@ -262,7 +283,7 @@ storage: new MyGCSStorageController({ projectId: "...", bucket: "..." }),
 
 ## Environment Variables
 
-The backend validates storage-related environment variables via a Zod schema:
+The backend validates storage-related environment variables via a Zod schema. These bind the default bucket; a bucket declared as `bucket("<key>")` reads the same names with `__<KEY>` appended (see [Declaring buckets](#declaring-buckets-scaffolded-projects)).
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -277,6 +298,7 @@ The backend validates storage-related environment variables via a Zod schema:
 | `S3_FORCE_PATH_STYLE` | `"true" \| "false"` | — | Enable path-style URLs |
 | `GCS_BUCKET` | `string` | — | GCS bucket name |
 | `GCS_PROJECT_ID` | `string` | — | Google Cloud project ID (auto-detected on GCP) |
+| `GCS_KEY_FILENAME` | `string` (path) | — | Service account key file for this bucket, instead of ADC |
 | `GOOGLE_APPLICATION_CREDENTIALS` | `string` (path) | — | Path to GCP service account key JSON file |
 
 ```env
@@ -336,7 +358,7 @@ GKE, no keys), on S3 it's `s3://…`. You never branch on the provider yourself.
 **Switching backend is env only** — no code change:
 ```env
 STORAGE_TYPE=gcs           # was: local (or s3)
-STORAGE_GCS_BUCKET=my-bucket
+GCS_BUCKET=my-bucket
 # creds via Workload Identity/ADC on GCP, or GOOGLE_APPLICATION_CREDENTIALS
 ```
 

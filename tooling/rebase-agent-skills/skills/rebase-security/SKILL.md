@@ -315,12 +315,14 @@ The scoped DataDriver is the layer where database-level RLS is enforced. For Pos
 
 ```sql
 SELECT
-    set_config('app.user_id', :userId, true),
+    set_config('app.uid', :uid, true),
+    set_config('app.user_id', :uid, true),          -- pre-rename alias, still written for legacy policies
     set_config('app.user_roles', :rolesString, true),
+    set_config('app.is_anonymous', :isAnonymous, true),
     set_config('app.jwt', :jwtClaims, true)
 ```
 
-PostgreSQL RLS policies use `rebase.uid()`, `rebase.roles()`, and `rebase.jwt()` to read these session variables and enforce row-level access control. (The pre-1.0 `auth.*` spellings are rewritten on compile and still work, but the backend names the collections still carrying them at boot — write `rebase.*`.)
+PostgreSQL RLS policies use `rebase.uid()`, `rebase.roles()`, `rebase.is_anonymous()` and `rebase.jwt()` to read these session variables and enforce row-level access control. `app.uid` is the canonical variable; write new policies against the functions, never against `app.user_id`. (The pre-1.0 `auth.*` spellings are rewritten on compile and still work, but the backend names the collections still carrying them at boot — write `rebase.*`.)
 
 > **IMPORTANT:** On PostgreSQL this layer is where authorization actually happens; the others narrow the request on the way to it. A table with RLS disabled is not served at all. The document engines have no equivalent and rely on Layers 1–3 and 5 — see [When the database cannot enforce it](#when-the-database-cannot-enforce-it).
 

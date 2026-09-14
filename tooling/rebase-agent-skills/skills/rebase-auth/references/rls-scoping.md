@@ -43,13 +43,13 @@ API keys use a service identity for RLS scoping: `uid: "api-key:{id}"`, `roles: 
 
 The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (global and collection callbacks) and `c.get("user")` (custom functions):
 
-| Auth Method | `userId` | `roles` | When It Occurs |
+| Auth Method | `uid` | `roles` | When It Occurs |
 |---|---|---|---|
 | JWT (end-user) | Real user ID (e.g. `"abc123"`) | User's assigned roles (e.g. `["viewer"]`) | Normal authenticated requests |
 | Service Key | `"service"` | `["admin"]` | Server-side `rebase.dataAsAdmin` calls, cron jobs, or any request with `Authorization: Bearer <serviceKey>` |
 | API Key (default) | `"api-key:{id}"` | `["service"]` | Machine-to-machine API key requests |
 | API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | Admin API key requests |
-| Anonymous | `"anon"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
+| Anonymous | `"anonymous"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
 > **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Callbacks live in the driver rather than the route layer, so global and collection callbacks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a callback distinguishes a server-internal read from an end-user one. `rebase.data` does not exist — not on the type and not at runtime — so the privileged plane has exactly one name.

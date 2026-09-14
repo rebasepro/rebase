@@ -63,7 +63,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 5. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
 
-6. **Respect the monorepo structure:** See the [Package Reference](#package-reference) section below for the full list of packages and when to use each.
+6. **Respect the monorepo structure:** See `references/monorepo.md` for the full list of packages and when to use each.
 
 7. **Never deploy unless explicitly asked:** Agents should never run `rebase cloud deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
 

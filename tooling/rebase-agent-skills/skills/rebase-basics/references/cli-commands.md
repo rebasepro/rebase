@@ -6,6 +6,7 @@
 |--------|-------------|
 | `--version`, `-v` | Show CLI version number |
 | `--help`, `-h` | Show help message |
+| `--debug` | Print the stack trace when a command fails (or `REBASE_DEBUG=1`) |
 
 ## Full Command Reference
 
@@ -17,6 +18,12 @@
 | `rebase dev` | Start development server (backend + frontend concurrently) |
 | `rebase build` | Build the apps declared in rebase.json into a deployable bundle |
 | `rebase start` | Start the backend server in production mode |
+| `rebase apps list` | Show the apps `rebase.json` declares and their build outputs. `apps init` writes a `rebase.json` inferred from the project; `apps config <app>` prints an app's client configuration |
+| `rebase eject [app]` | Take ownership of the server process: writes the backend entrypoint and a Dockerfile, and sets `runtime: "custom"`. One-way — platform runtime upgrades stop reaching the project. `--dry-run` lists the changes |
+
+<!-- docs-verify: ignore -->
+`rebase normalize-imports <dir>` completes the relative imports in compiled
+output so Node ESM can load it; `--check` reports instead of rewriting.
 
 ### `rebase init` Options
 
@@ -130,6 +137,7 @@ rebase build && rebase start
 |---------|-------------|
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
 | `rebase schema introspect` | Introspect a live database → generate Rebase collection files |
+| `rebase schema stale` | Report generated schema files the collections have moved past. `--fix` regenerates them |
 | `rebase schema --help` | Show schema command help |
 
 > **IMPORTANT FOR AGENTS:** Schema commands are delegated to the active database driver plugin (e.g. `@rebasepro/server-postgres`). The plugin must be installed in `backend/package.json` or the command will fail with `Could not detect an active database plugin`.
@@ -159,7 +167,7 @@ rebase build && rebase start
 | `rebase db backup` | Write a backup of the current database |
 | `rebase db backups` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
-| `rebase db pull` | Introspect the live database back into collection files |
+| `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize`. One-directional — it can never write to a remote database. (Turning a database into collection files is `rebase schema introspect`) |
 | `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes |
 | `rebase db stop` | Stop the managed local database |
 | `rebase db reset` | Delete and recreate the managed local database |
@@ -228,5 +236,28 @@ rebase auth reset-password user@example.com MyNewPass!
 | Command | Description |
 |---------|-------------|
 | `rebase doctor` | Detect three-way schema drift between collections, Drizzle schema, and live DB |
+| `rebase status` | Show every declared resource (databases, buckets, topics, queues, crons, functions) and whether the variables it reads are set. `--json` for scripts |
+| `rebase resources` | List the resources this project declares, declared and implicit. `--write` regenerates the committed resource graph; `--check` fails when it is stale |
 
 > **IMPORTANT FOR AGENTS:** `rebase doctor` compares collection definitions, the generated Drizzle schema (`schema.generated.ts`), and the actual PostgreSQL database. Run it after any manual DB changes or when suspecting schema drift.
+
+### API Keys
+
+| Command | Description |
+|---------|-------------|
+| `rebase api-keys list` | List all service API keys |
+| `rebase api-keys create` | Create a scoped key: `--name`, and `--permissions '<json>'` or `--full-access`; optionally `--admin`, `--rate-limit`, `--expires 90d` |
+| `rebase api-keys revoke <id>` | Revoke a key |
+| `rebase api-keys --help` | Show API key command help |
+
+### Agent Skills
+
+| Command | Description |
+|---------|-------------|
+| `rebase skills install` | Install these skills for your AI coding assistant. `--agent claude,cursor` (or `all`) skips detection, and is required without a TTY |
+
+### Usage Sharing
+
+| Command | Description |
+|---------|-------------|
+| `rebase telemetry` | Anonymous usage sharing, opt-in and off by default. Subcommands `status` (default), `show` (the exact payload), `enable`, `disable` |

@@ -15,7 +15,6 @@ rebase/
 │   ├── common/
 │   ├── cms-types/            # `defineCollection` and the authored collection shape
 │   ├── client/               # the SDK
-│   ├── client-postgres/
 │   ├── server/               # BaaS — Hono coordinator. Never imports a UI package
 │   ├── server-postgres/      # database driver
 │   ├── server-mongo/         # database driver
@@ -36,7 +35,7 @@ rebase/
 └── package.json
 ```
 
-The tiers are adoption modes, not separate products — see `MODULAR-ARCHITECTURE.md`.
+The tiers are adoption modes, not separate products — see `docs/MODULAR-ARCHITECTURE.md`.
 A BaaS install is `server` + a driver + `client`, with no React in the tree.
 
 ## Package Reference
@@ -50,7 +49,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, `CollectionConfig`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
 | `@rebasepro/cms` | The CMS: `RebaseCMS`, collection views, entity forms, collection editor — built from your collection definitions | The admin panel. Needs collection files |
-| `@rebasepro/studio` | The BaaS console: SQL editor, schema visualizer, RLS editor, storage browser, logs, API explorer, API keys, backups, cron | Database tooling. Ships on BaaS with no CMS — `admin` is an optional peer |
+| `@rebasepro/studio` | The BaaS console: SQL editor, schema visualizer, RLS editor, storage browser, logs, API explorer, API keys, backups, cron | Database tooling. Ships on BaaS with no CMS — `@rebasepro/cms` is an optional peer |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/firebase` | Firebase client adapter | When connecting to a Firebase backend |
 | `@rebasepro/common` | Shared utilities, `defaultUsersCollection` | Shared constants and default collection exports |

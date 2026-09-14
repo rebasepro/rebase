@@ -51,7 +51,7 @@ const client = createRebaseClient({
 const unsubscribe = client.data.products.listen(
     undefined, // FindParams — pass undefined for all records
     (response) => {
-        console.log("Products updated:", response.data);   // Entity<M>[]
+        console.log("Products updated:", response.data);   // M[] — flat rows
         console.log("Total:", response.meta.total);
     },
     (error) => {
@@ -99,17 +99,17 @@ learn that its sort was dropped.
 ```typescript no-verify
 listen(
     params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    onUpdate: (response: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-The `FindResponse<M>` contains:
+The `FindResult<M>` contains:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `data` | `Entity<M>[]` | Array of matching entities |
-| `meta.total` | `number` | Number of entities returned |
+| `data` | `M[]` | Matching rows, flat — read `row.name`, there is no `.values` wrapper |
+| `meta.total` | `number` | Matching rows in total |
 | `meta.limit` | `number` | Requested limit |
 | `meta.offset` | `number` | Requested offset |
 | `meta.hasMore` | `boolean` | Whether more records exist beyond limit |
@@ -119,9 +119,9 @@ The `FindResponse<M>` contains:
 ```typescript
 const unsubscribe = client.data.products.listenById(
     "product-123",
-    (entity) => {
-        if (entity) {
-            console.log("Product changed:", entity.values);
+    (row) => {
+        if (row) {
+            console.log("Product changed:", row);   // the flat row — no `.values`
         } else {
             console.log("Product was deleted");
         }
@@ -137,12 +137,12 @@ const unsubscribe = client.data.products.listenById(
 ```typescript no-verify
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-The callback receives `undefined` when the entity is deleted.
+The callback receives `undefined` when the row is deleted.
 
 ### Unsubscribing
 
@@ -194,7 +194,7 @@ const unsubscribe = client.data.orders
 
 ```typescript no-verify
 listen(
-    onUpdate: (data: FindResponse<M>) => void,
+    onUpdate: (data: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void
 ```
@@ -203,13 +203,9 @@ listen(
 
 ## Update Delivery: Instant Patch + Correctness Refetch
 
-Rebase uses a two-phase update strategy for collection subscriptions:
+Every update a subscriber receives is a **debounced refetch under the subscriber's own scope**. When a row changes, the server waits out a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), re-runs the subscription's query with its original filters and sort order *as that subscriber* (so RLS binds the reader, not the writer), and sends the result as `collection_update` (or `single_update` for a `listenById`). Multiple rapid mutations within the 300ms window are coalesced into a single database query.
 
-1. **Phase 1 — Instant entity patch (`collection_entity_patch`):** When a single entity changes, the server immediately pushes a lightweight patch message. The client merges this into its cached collection data for near-instant cross-tab feedback — no database query needed.
-
-2. **Phase 2 — Debounced full refetch (`collection_update`):** After a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), the server runs a full collection query with the original filters and sort order, then sends the authoritative update. This ensures correctness when filters, sort order, or pagination are affected by the change.
-
-This gives sub-millisecond perceived latency for simple updates and guaranteed correctness for complex queries. Multiple rapid mutations within the 300ms window are coalesced into a single database query.
+There used to be an instant row patch (`collection_patch`) ahead of the refetch. Nothing sends it any more: it carried the row as the *writer* had read it, which a subscriber the row's RLS hides could see. The type is still declared; do not wait for the frame.
 
 ## Subscription Deduplication and Caching
 
@@ -221,8 +217,8 @@ The client SDK automatically deduplicates subscriptions:
 - The server subscription is only unsubscribed when the **last** callback for that key is removed.
 
 Deduplication keys are computed deterministically:
-- **Collection subscriptions:** JSON of `{ path, filter, limit, startAfter, orderBy, order, searchString, collection.name }` with sorted keys.
-- **Entity subscriptions:** `"${path}|${entityId}"`.
+- **Collection subscriptions:** JSON of every query field (`path`, `filter`, `logical`, `limit`, `offset`, `orderBy`, `searchString`, …) plus `collection.name`, with sorted keys.
+- **Row subscriptions:** `"${path}|${id}"`.
 
 ## WebSocket Protocol (Raw / Low-Level)
 
@@ -234,7 +230,7 @@ For environments where the SDK is not available, you can use the raw WebSocket p
 2. Send an `AUTHENTICATE` message with your JWT token.
 3. Wait for `AUTH_SUCCESS` before sending subscription or other messages.
 4. Send `subscribe_collection` or `subscribe_one` to start receiving data.
-5. Receive `collection_update`, `entity_update`, and `collection_entity_patch` messages.
+5. Receive `collection_update` and `single_update` messages.
 6. Send `unsubscribe` to stop a subscription.
 
 ### Authentication Step (Required First)
@@ -258,7 +254,7 @@ ws.onopen = () => {
 
 | Response Type | Payload | Description |
 |--------------|---------|-------------|
-| `AUTH_SUCCESS` | `{ userId, roles }` | Token accepted, session authenticated |
+| `AUTH_SUCCESS` | `{ uid, roles }` | Token accepted, session authenticated |
 | `AUTH_ERROR` | `{ error: { message, code } }` | Token rejected |
 
 Auth error codes:
@@ -292,7 +288,7 @@ ws.send(JSON.stringify({
     payload: {
         subscriptionId: "sub_product_42",
         path: "products",
-        entityId: "42"
+        id: "42"
     }
 }));
 ```
@@ -314,22 +310,16 @@ ws.onmessage = (event) => {
 
     switch (message.type) {
         case "collection_update":
-            // Full collection data after refetch
+            // The subscription's query, re-run under this session's scope
             console.log("Collection:", message.subscriptionId);
-            console.log("Entities:", message.entities); // Entity[]
+            console.log("Rows:", message.rows);   // flat rows
+            console.log("Meta:", message.meta);   // { total?, hasMore, … } when sent
             break;
 
-        case "entity_update":
-            // Single entity update
-            console.log("Entity:", message.subscriptionId);
-            console.log("Data:", message.entity); // Entity | null
-            break;
-
-        case "collection_entity_patch":
-            // Lightweight instant patch for a collection subscription
-            console.log("Patch:", message.subscriptionId);
-            console.log("Entity ID:", message.entityId);
-            console.log("Entity:", message.entity); // Entity | null (null = deleted)
+        case "single_update":
+            // A row subscription
+            console.log("Row:", message.subscriptionId);
+            console.log("Data:", message.row);    // flat row, or null when deleted
             break;
 
         case "ERROR":
@@ -348,7 +338,7 @@ ws.onmessage = (event) => {
 |------|---------|-------------|
 | `AUTHENTICATE` | `{ token }` | Authenticate the WebSocket session with a JWT |
 | `subscribe_collection` | `{ subscriptionId, path, filter?, orderBy?, order?, limit?, offset?, startAfter?, searchString? }` | Subscribe to collection changes |
-| `subscribe_one` | `{ subscriptionId, path, entityId }` | Subscribe to a single entity |
+| `subscribe_one` | `{ subscriptionId, path, id }` | Subscribe to a single row |
 | `unsubscribe` | `{ subscriptionId }` | Unsubscribe from a subscription |
 | `join_channel` | `{ channel }` | Join a broadcast channel |
 | `leave_channel` | `{ channel }` | Leave a broadcast channel |
@@ -358,11 +348,11 @@ ws.onmessage = (event) => {
 | `presence_state` | `{ channel }` | Request full presence entity |
 | `channel_history` | `{ channel, sinceSeq?, limit? }` | Request retained messages after `sinceSeq` (retained channels only) |
 | `FETCH_COLLECTION` | `{ path, filter?, orderBy?, limit?, offset?, … }` | One-shot collection fetch (request/response) |
-| `FETCH_ONE` | `{ path, entityId }` | One-shot entity fetch |
-| `SAVE` | `{ path, entityId?, values, status }` | Create or update an entity |
-| `DELETE` | `{ path, entityId }` | Delete an entity |
-| `COUNT` | `{ path, filter?, … }` | Count entities matching criteria |
-| `CHECK_UNIQUE_FIELD` | `{ path, name, value, entityId?, collection? }` | Check field uniqueness |
+| `FETCH_ONE` | `{ path, id }` | One-shot row fetch |
+| `SAVE` | `{ path, id?, values, status }` | Create or update a row |
+| `DELETE` | `{ row: { id, path } }` | Delete a row |
+| `COUNT` | `{ path, filter?, … }` | Count rows matching criteria |
+| `CHECK_UNIQUE_FIELD` | `{ path, name, value, id?, collection? }` | Check field uniqueness |
 
 > **IMPORTANT FOR AGENTS:** the one-shot operations are named `FETCH_ONE`,
 > `SAVE`, `DELETE` and `COUNT` — **not** `FETCH_ENTITY`, `SAVE_ENTITY`,
@@ -377,19 +367,19 @@ ws.onmessage = (event) => {
 
 | Type | Key Fields | Description |
 |------|-----------|-------------|
-| `AUTH_SUCCESS` | `{ requestId, payload: { userId, roles } }` | Authentication successful |
+| `AUTH_SUCCESS` | `{ requestId, payload: { uid, roles } }` | Authentication successful |
 | `AUTH_ERROR` | `{ requestId, payload: { error: { message, code } } }` | Authentication failed |
-| `collection_update` | `{ subscriptionId, entities }` | Full collection data (authoritative refetch) |
-| `entity_update` | `{ subscriptionId, entity }` | Single entity data (entity or `null` if deleted) |
-| `collection_entity_patch` | `{ subscriptionId, entityId, entity }` | Instant single-entity patch for a collection subscription |
+| `collection_update` | `{ subscriptionId, rows, pks?, meta? }` | The subscription's rows, re-read under the subscriber's scope. `pks` names the key columns; `meta` carries `total`/`hasMore` |
+| `single_update` | `{ subscriptionId, row }` | A row subscription's row, or `null` if deleted |
+| `collection_patch` | `{ subscriptionId, id, row, pks? }` | Declared in the types, **sent by nothing** — every delivery is a refetch |
 | `broadcast` | `{ channel, event, payload, seq? }` | Broadcast from another channel member. `seq` is present only on retained channels |
 | `presence_state` | `{ channel, presences }` | Full presence entity |
 | `presence_diff` | `{ channel, joins, leaves }` | Incremental presence update |
 | `channel_history` | `{ channel, messages, retained, latestSeq? }` | Retained messages a client missed. `retained: false` means the channel keeps no history |
 | `ERROR` | `{ requestId?, payload: { error: { message, code } } }` | General error |
-| `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { entities } }` | Response to FETCH_COLLECTION |
-| `FETCH_ONE_SUCCESS` | `{ requestId, payload: { entity } }` | Response to `FETCH_ONE` |
-| `SAVE_SUCCESS` | `{ requestId, payload: { entity } }` | Response to `SAVE` |
+| `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { rows } }` | Response to FETCH_COLLECTION |
+| `FETCH_ONE_SUCCESS` | `{ requestId, payload: { row } }` | Response to `FETCH_ONE` (`row` is `null` when not found) |
+| `SAVE_SUCCESS` | `{ requestId, payload: { row } }` | Response to `SAVE` |
 | `DELETE_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to `DELETE` |
 | `COUNT_SUCCESS` | `{ requestId, payload: { count } }` | Response to `COUNT` |
 | `CHECK_UNIQUE_FIELD_SUCCESS` | `{ requestId, payload: { isUnique } }` | Response to CHECK_UNIQUE_FIELD |
@@ -767,11 +757,12 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies:
 1. The client sends an `AUTHENTICATE` message with a JWT token.
 2. The server verifies the token (via `extractUserFromToken` or a custom `AuthAdapter`).
 3. Every subscription refetch runs inside a PostgreSQL transaction with:
-   - `set_config('app.user_id', ...)` 
+   - `set_config('app.uid', ...)` (and the legacy alias `app.user_id`)
    - `set_config('app.user_roles', ...)`
+   - `set_config('app.is_anonymous', ...)`
    - `set_config('app.jwt', ...)`
 4. RLS policies are enforced — each user only sees records they have permission to access.
-5. If no auth context is present, the server defaults to `{ userId: "anon", roles: ["anon"] }`.
+5. If no auth context is present, the server defaults to `{ uid: "anonymous", roles: ["anon"] }`.
 
 ### Auto-Authentication
 

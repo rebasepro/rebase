@@ -35,10 +35,10 @@ export const env = loadEnv({
 
 ```typescript no-verify
 function loadEnv(): RebaseEnv;
-function loadEnv<E extends z.AnyZodObject>(options: { extend: E }): RebaseEnv & z.infer<E>;
+function loadEnv<E extends z.ZodObject<z.ZodRawShape>>(options: { extend: E }): RebaseEnv & z.infer<E>;
 ```
 
-When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) with your custom Zod object, so all fields are validated together in a single pass.
+When `extend` is provided, the base `rebaseEnvSchema` and your custom Zod object are each parsed on their own and the results merged — deliberately not `.merge()`, which breaks when your schema was built by a different copy of zod. Issues from both are reported together, and the production refinements run over the merged result.
 
 ### The `loadEnv()` schema
 

@@ -12,44 +12,55 @@ This document is the single source of truth for the visual design language used 
 
 ## 0. Ground truth — the UI reference ships with your project
 
-Rebase ships a live reference of every UI pattern it uses. **It is installed in your project already** — you do not need the Rebase monorepo to see it.
+Rebase ships a live reference of every UI pattern it uses: `UIReferenceView`, on the `@rebasepro/app/debug` subpath. **It is installed in your project already** — you do not need the Rebase monorepo to see it.
 
 ### Read the source
 
-The reference is plain TSX, shipped in the `@rebasepro/app` package. Read it directly:
+The TSX lives in the Rebase repository, under `packages/app/src/debug/`:
 
 ```
-node_modules/@rebasepro/app/src/components/Debug/UIReferenceView.tsx
-node_modules/@rebasepro/app/src/components/Debug/crm-dashboard/       # dashboard composition
-node_modules/@rebasepro/app/src/components/Debug/collection-views/    # table, card, kanban
+packages/app/src/debug/UIReferenceView.tsx
+packages/app/src/debug/crm-dashboard/       # dashboard composition
+packages/app/src/debug/collection-views/    # table, card, kanban
 ```
 
-Its header says *"All markup / styles are copied verbatim from source files. DO NOT add invented styles."* — that makes it the highest-fidelity reference available. **When this document and `UIReferenceView.tsx` disagree, the file wins.**
+The npm package publishes only its build, so in your project the same code is `node_modules/@rebasepro/app/dist/debug.js` — compiled but not minified, class strings intact, and each file headed by a `// src/debug/…` comment. Read that, or the TSX on GitHub (`github.com/rebasepro/rebase`, same paths).
+
+Its header says the markup and classes are copied from the source files they name, with no invented styles — that makes it the highest-fidelity reference available. **When this document and `UIReferenceView` disagree, the reference wins.**
 
 ### See it rendered
 
-The route is registered by `@rebasepro/cms` in every Rebase app. Start the dev server and open:
+`/debug/ui` is not a framework route: the Rebase repository's own app registers the reference as a hidden custom view. Do the same in yours while you work:
 
-```
-http://localhost:5173/debug/ui
+```tsx
+import type { AppView } from "@rebasepro/cms-types";
+import { UIReferenceView } from "@rebasepro/app/debug";
+
+// <RebaseCMS collections={collections} views={[uiReference]} />
+export const uiReference: AppView = {
+    slug: "debug/ui",
+    name: "UI reference",
+    hideFromNavigation: true,
+    view: UIReferenceView
+};
 ```
 
-It is hidden (not linked from the drawer) but always present. Use it to check spacing and dark mode before you call a view done.
+Then open `/debug/ui` on the frontend URL `rebase dev` prints. Use it to check spacing and dark mode before you call a view done. It is a development aid, a quarter of a megabyte of demo UI: drop it before shipping, or load it with `React.lazy` as the Rebase app does.
 
 ### What to read for what you're building
 
 | Building | Read |
 |---|---|
 | Any view at all | `references/view-patterns.md` (whole-view skeletons) |
-| A list of records | `Debug/collection-views/CollectionTableDemo.tsx` |
-| A dashboard / home page | `Debug/crm-dashboard/CrmDashboardDemo.tsx`, `DashboardMetrics.tsx` |
-| A card or kanban layout | `Debug/collection-views/CardViewDemo.tsx`, `KanbanBoardDemo.tsx` |
+| A list of records | `debug/collection-views/CollectionTableDemo.tsx` |
+| A dashboard / home page | `debug/crm-dashboard/CrmDashboardDemo.tsx`, `DashboardMetrics.tsx` |
+| A card or kanban layout | `debug/collection-views/CardViewDemo.tsx`, `KanbanBoardDemo.tsx` |
 | A form or dialog | `UIReferenceView.tsx` → `user-dialog` section |
 | Component props & API | the `rebase-ui-components` skill |
 
 ### The rule
 
-Before writing a new view, **read `references/view-patterns.md` and copy the closest skeleton**. Extend an existing pattern; do not invent a layout. If nothing fits, read `UIReferenceView.tsx` and compose from the sections there.
+Before writing a new view, **read `references/view-patterns.md` and copy the closest skeleton**. Extend an existing pattern; do not invent a layout. If nothing fits, read `UIReferenceView` and compose from the sections there.
 
 ---
 
@@ -753,17 +764,15 @@ Before submitting UI code, verify you have NONE of these:
 
 ## 20. Reference Components
 
-When building new views, always reference these existing implementations. All of them ship in your `node_modules` — the packages publish their `src`, so these paths resolve in any Rebase project:
+When building new views, always reference these existing implementations. The paths are in the Rebase repository (read them on GitHub, `github.com/rebasepro/rebase`): the npm packages publish only `dist`, not `src`, so none of these files is in your `node_modules`. The reference itself is the exception — its compiled, readable copy is `node_modules/@rebasepro/app/dist/debug.js` (see §0).
 
-| Component            | Location (from your project root)                                                     | What it demonstrates           |
-|----------------------|---------------------------------------------------------------------------------------|--------------------------------|
-| `UIReferenceView`    | `node_modules/@rebasepro/app/src/components/Debug/UIReferenceView.tsx`                | **Everything** — see §0        |
-| `NavigationCard`     | `node_modules/@rebasepro/cms/src/components/HomePage/NavigationCard.tsx`             | Card pattern, plain icon treatment |
-| `SmallNavigationCard`| `node_modules/@rebasepro/cms/src/components/HomePage/SmallNavigationCard.tsx`        | Compact card with mixins       |
-| `ContentHomePage`    | `node_modules/@rebasepro/cms/src/components/HomePage/ContentHomePage.tsx`            | Page layout, Container usage   |
-| `NavigationGroup`    | `node_modules/@rebasepro/cms/src/components/HomePage/NavigationGroup.tsx`            | Section headers, grouping      |
-
-If you are working *inside the Rebase monorepo*, drop the `node_modules/@rebasepro/` prefix and use `packages/app/…` / `packages/cms/…` instead.
+| Component            | Location (in the Rebase repository)                         | What it demonstrates           |
+|----------------------|-------------------------------------------------------------|--------------------------------|
+| `UIReferenceView`    | `packages/app/src/debug/UIReferenceView.tsx`                | **Everything** — see §0        |
+| `NavigationCard`     | `packages/cms/src/components/HomePage/NavigationCard.tsx`   | Card pattern, plain icon treatment |
+| `SmallNavigationCard`| `packages/cms/src/components/HomePage/SmallNavigationCard.tsx` | Compact card with mixins    |
+| `ContentHomePage`    | `packages/cms/src/components/HomePage/ContentHomePage.tsx`  | Page layout, Container usage   |
+| `NavigationGroup`    | `packages/cms/src/components/HomePage/NavigationGroup.tsx`  | Section headers, grouping      |
 
 Whole-view skeletons built from these live in **`references/view-patterns.md`**, next to this file.
 
