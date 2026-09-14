@@ -2,7 +2,7 @@ import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, Save
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, declaredErrorAnswer } from "@rebasepro/server";
+import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, ApiError, declaredErrorAnswer } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
