@@ -26,7 +26,7 @@
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { CLI_INVOCATIONS, loadCliCommands, loadCliFlags, loadWorkspaceBins } from "./cli-commands.mjs";
-import { AGENT_INSTRUCTION_GLOBS } from "./extract.mjs";
+import { AGENT_INSTRUCTION_GLOBS, PACKAGE_README_GLOBS } from "./extract.mjs";
 
 /**
  * Everything outside `website/` that a reader copies a shell command from.
@@ -60,7 +60,7 @@ const DOC_GLOBS = [
     // `@rebasepro/mcp`, and the unscoped name on npm belongs to somebody else.
     // Check 4 below already knew how to catch that — it had simply never been
     // pointed at the files.
-    "packages/*/README.md",
+    ...PACKAGE_README_GLOBS,
     ...AGENT_INSTRUCTION_GLOBS
 ];
 

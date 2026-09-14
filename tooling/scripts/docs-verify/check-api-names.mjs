@@ -18,7 +18,7 @@
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { loadSdkExports, PACKAGE_ENTRIES } from "./sdk-exports.mjs";
-import { extractSnippets, AGENT_INSTRUCTION_GLOBS } from "./extract.mjs";
+import { extractSnippets, AGENT_INSTRUCTION_GLOBS, PACKAGE_README_GLOBS } from "./extract.mjs";
 
 /** All locales, plus the skills — everything a reader might copy from. */
 const ALL_DOC_GLOBS = [
@@ -29,6 +29,8 @@ const ALL_DOC_GLOBS = [
     // and no glob in this repository covered them. One level deep on purpose:
     // every example has its own `node_modules` here, which a `**` glob walks.
     "examples/*/*.md",
+    // The npm landing page of every package. See PACKAGE_README_GLOBS.
+    ...PACKAGE_README_GLOBS,
     // …and so are the repo's own agent instructions. See AGENT_INSTRUCTION_GLOBS.
     ...AGENT_INSTRUCTION_GLOBS
 ];

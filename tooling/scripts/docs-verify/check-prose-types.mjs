@@ -29,13 +29,14 @@
  */
 import { readFileSync, globSync } from "node:fs";
 import path from "node:path";
-import { AGENT_INSTRUCTION_GLOBS } from "./extract.mjs";
+import { AGENT_INSTRUCTION_GLOBS, PACKAGE_README_GLOBS } from "./extract.mjs";
 
 const DOC_GLOBS = [
     "website/src/content/docs/**/*.md",
     "website/src/content/docs/**/*.mdx",
     "tooling/rebase-agent-skills/**/*.md",
     "examples/*/*.md",
+    ...PACKAGE_README_GLOBS,
     ...AGENT_INSTRUCTION_GLOBS
 ];
 
