@@ -75,7 +75,7 @@ import { _setRebaseMock, _resetRebaseMock } from "@rebasepro/server";
 // Only works when NODE_ENV=test
 beforeEach(() => {
     _setRebaseMock({
-        data: mockDataLayer,
+        dataAsAdmin: mockDataLayer,   // the server singleton has no `data` key
         email: mockEmailService,
     });
 });

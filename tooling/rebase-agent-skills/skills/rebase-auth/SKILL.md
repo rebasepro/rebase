@@ -153,7 +153,9 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 
 ### First-User Bootstrap
 
-> **IMPORTANT FOR AGENTS:** The very first user registered (via `POST /auth/register` or OAuth) is automatically promoted to `"admin"`. This prevents the chicken-and-egg problem. All subsequent users receive the `defaultRole`.
+> **IMPORTANT FOR AGENTS:** Outside production (`NODE_ENV !== "production"`), the very first user registered (via `POST /auth/register` or OAuth) is automatically promoted to `"admin"`. This prevents the chicken-and-egg problem. All subsequent users receive the `defaultRole`.
+>
+> **In production that window is closed** — whoever reached a public registration form first would own the deployment. An empty production database answers registration with `403 SETUP_REQUIRED` instead. Name the first admin with `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` before the first boot (the account is created only against an empty user table, and the variables are ignored outside production), or assign the `admin` role with the service key.
 
 ### Inviting teammates by email
 
@@ -168,7 +170,8 @@ this — enable `allowUserLookup` and use the built-in primitive:
 const profile = await rebase.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.dataAsAdmin.team_members.create({ team_id, user_id: profile.uid });
+    // `rebase.data` in the browser — `dataAsAdmin` is server-only, undefined here
+    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
 }
 ```
 
