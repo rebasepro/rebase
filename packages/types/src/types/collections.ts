@@ -754,12 +754,16 @@ export interface AuthCollectionConfig {
     enabled: boolean;
 
     /**
-     * Called when an admin creates a user via the collection REST API.
+     * Called when an admin creates a user, through the collection REST API or
+     * `POST /admin/users`.
      *
      * Default: generate password → hash → normalize email → save →
      *          send invitation email (or return temp password if no email configured).
      *
-     * Override to implement custom invitation flows, LDAP sync, etc.
+     * Override to implement custom invitation flows, LDAP sync, etc. The hook
+     * then owns delivery: Rebase sends no invitation of its own, and the
+     * response reports the hook's `invitationSent` and shows its
+     * `temporaryPassword` to the admin.
      */
     onCreateUser?: (
         values: Record<string, unknown>,

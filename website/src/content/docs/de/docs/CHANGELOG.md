@@ -13,6 +13,20 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ### Fixed
 
+- **`POST /admin/users` leaves delivery to a create hook, and shows the admin
+  the hook's temporary password.** A collection's `auth.onCreateUser` or a
+  backend's `AuthHooks.onAdminCreateUser` replaces Rebase's own delivery: the
+  hook sends its own invitation or chooses a temporary password, and reports
+  which. A `POST` to the auth collection honoured that. `POST /admin/users`
+  ignored it and treated the hook's password as one Rebase had generated. With
+  email configured, that meant minting a password-reset token and sending
+  Rebase's own invitation: a second email when the hook had already sent one,
+  with a link that competes with the password the hook chose. The response then
+  left that password out, so the admin who has to pass it on never saw it. A
+  hook that sent its own invitation and returned no password was reported as
+  `invitationSent: false`. Both ways of creating a user now go through one
+  step, so they give the same answer.
+
 - **Uploads between 10 MB and 50 MB work.** `POST /api/storage/upload` has its
   own body limit, the storage config's `maxFileSize` (50 MB by default), and
   the docs said it overrode the global `maxBodySize` (10 MB by default). It

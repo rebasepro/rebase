@@ -14,6 +14,7 @@ import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from 
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+import { completeUserCreation } from "../../auth/admin-user-ops";
 import { findRelation, getJunctionConfigForRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
     createIdempotencyStore,
@@ -1140,33 +1141,25 @@ export class RestApiGenerator {
                     status: "new"
                 });
 
-                const result = prepared.hookHandledEmail
-                    ? { temporaryPassword: prepared.clearPassword,
-invitationSent: prepared.invitationSent }
-                    : this.authAdapter.finalizeUserCreation
-                        ? await this.authAdapter.finalizeUserCreation(
-                            // `driver.save` returns the flat row — the row IS the
-                            // values. Reading `entity.values` here (an Entity-era
-                            // leftover) handed the adapter `undefined`, whose
-                            // `.email` threw inside the invite-email try block —
-                            // reported as "email delivery failed", so no
-                            // invitation was ever sent.
-                            { id: entity.id as string,
+                // `POST /admin/users` goes through the same step, so the two
+                // doors agree on whether a create hook already delivered the
+                // credentials.
+                const finalize = this.authAdapter.finalizeUserCreation?.bind(this.authAdapter);
+                const delivery = await completeUserCreation(prepared, finalize && (clearPassword => finalize(
+                    // `driver.save` returns the flat row — the row IS the
+                    // values. Reading `entity.values` here (an Entity-era
+                    // leftover) handed the adapter `undefined`, whose
+                    // `.email` threw inside the invite-email try block —
+                    // reported as "email delivery failed", so no
+                    // invitation was ever sent.
+                    { id: entity.id as string,
 values: entity as Record<string, unknown> },
-                            prepared.clearPassword
-                        )
-                        : { invitationSent: false };
+                    clearPassword
+                )));
 
                 const response = this.formatResponse(entity) as Record<string, unknown>;
 
-
-
-                return c.json({
-                    ...response,
-                    invitationSent: result.invitationSent,
-                    ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {}),
-                    ...("emailDeliveryFailed" in result && result.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
-                }, 201);
+                return c.json({ ...response, ...delivery }, 201);
             }
 
             // Deliberately not applied to the auth-signup branch above: that

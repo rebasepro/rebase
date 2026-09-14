@@ -2622,6 +2622,34 @@ let a caller send an empty properties map and choose to be unvalidated. The
 collection has to come from the registry, by path. There is a test for it,
 because the mistake is invisible: everything works, and nothing is enforced.
 
+### Creating a user: the hook's report, read on one door — 2026-09-14
+
+A create hook (the collection's `auth.onCreateUser` or the backend's
+`AuthHooks.onAdminCreateUser`) reports that it owns delivery, whether it sent an
+invitation, and the temporary password it chose. The collection REST route read
+all three before deciding whether to send Rebase's own invitation.
+`POST /admin/users` called the finalize step directly and read none of them.
+With email configured, it sent Rebase's invitation after the hook's and left the
+hook's password out of the response. A hook that sent its own invitation came
+back as `invitationSent: false`.
+
+The decision lives in `completeUserCreation` now, and both doors hand it the
+prepare step's whole result. `admin-create-hook-delivery.test.ts` runs every case
+through both doors from one adapter. The old route turns the six admin-door
+cases red. Disabling the hook branch inside the shared function turns all twelve
+red.
+
+Swept by listing what each create door decides on its own:
+
+| decided per door | result |
+|---|---|
+| whether a hook already delivered (`hookHandledEmail`, `invitationSent`, `temporaryPassword`) | **BUG** — fixed, above |
+| the response's delivery fields | clean — `completeUserCreation` builds them for both |
+| which hook runs | clean — both call `prepareAdminUserValues` |
+| what is persisted | **OPEN** — the REST route saves every value the prepare step returns. `POST /admin/users` saves five of them (`email`, `passwordHash`, `displayName`, `photoUrl`, `metadata`), so the `emailVerified: true` the built-in prepare step sets is dropped and both repositories store `false`. Accepting the invitation does not verify the account, and `decideOAuthAutoLink` refuses to link an OAuth sign-in to an unverified account that has a password. The same user created through the REST route is verified. |
+| `beforeUserCreate` | **OPEN** — fires on `POST /admin/users`, registration and `UserManagementAdapter.createUser`, not on the collection REST route. That route writes through `driver.save`, so it runs collection callbacks instead: validation that has to hold on every create has to be written twice. |
+| `client.admin.createUser`'s return type | **OPEN** (class 21) — `{ user: AdminUser }` in `@rebasepro/types`, `@rebasepro/client` and Studio's editor typings, so a TypeScript caller cannot read the route's `temporaryPassword`, `invitationSent` or `emailDeliveryFailed` without a cast. `resetPassword` declares all three. |
+
 ---
 
 ## 43. Acquired, then lost before anything could release it

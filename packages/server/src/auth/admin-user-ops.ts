@@ -15,7 +15,12 @@ import { normalizeEmail } from "@rebasepro/common";
 import type { AuthRepository } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
-import type { AuthCollectionConfig, AuthCollectionContext } from "@rebasepro/types";
+import type {
+    AuthCollectionConfig,
+    AuthCollectionContext,
+    UserCreationFinalizeResult,
+    UserCreationPrepareResult
+} from "@rebasepro/types";
 import { getUserInvitationTemplate, resolveEmailBranding } from "../email/templates";
 import { logger } from "../utils/logger";
 
@@ -250,4 +255,43 @@ emailDeliveryFailed: true };
     // No email service — return the temporary password
     return { temporaryPassword: clearPassword,
 invitationSent: false };
+}
+
+/**
+ * The step after a new user's row is written: who delivers the credentials,
+ * and what the create response says about it.
+ *
+ * A create hook that ran owns delivery. What it reported is the answer: the
+ * invitation it says it sent, and the temporary password it chose, which the
+ * admin has to see because it is the one the user will be told. The framework
+ * sends nothing of its own. Without a hook, `finalize` runs: the built-in
+ * invitation, or the generated password when email is not configured or fails.
+ *
+ * Both doors that create a user call this, the auth collection's REST route
+ * and `POST /admin/users`. The second used to call `finalizeAdminUserCreation`
+ * directly and read neither `hookHandledEmail` nor `invitationSent`, so it
+ * handled a hook's password as if the framework had generated it. With email
+ * configured it sent its own invitation, a second one when the hook had sent
+ * its own, and left the password out of the response. The decision lives here
+ * so that the two doors cannot disagree about it again.
+ *
+ * The result has exactly the fields a create response carries, with absent
+ * ones left out.
+ */
+export async function completeUserCreation(
+    prepared: UserCreationPrepareResult,
+    finalize?: (clearPassword: string | undefined) => Promise<UserCreationFinalizeResult>
+): Promise<UserCreationFinalizeResult> {
+    const result: UserCreationFinalizeResult = prepared.hookHandledEmail
+        ? { temporaryPassword: prepared.clearPassword,
+invitationSent: prepared.invitationSent }
+        : finalize
+            ? await finalize(prepared.clearPassword)
+            : { invitationSent: false };
+
+    return {
+        invitationSent: result.invitationSent,
+        ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {}),
+        ...(result.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
+    };
 }

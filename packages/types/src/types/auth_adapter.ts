@@ -267,7 +267,11 @@ export interface UserCreationPrepareResult {
     values: Record<string, unknown>;
     /** Cleartext password for post-save processing (email or admin display). */
     clearPassword?: string;
-    /** Whether the hook already handled the invitation (email, etc.). */
+    /**
+     * Whether the hook already handled the invitation (email, etc.). When
+     * `true`, `finalizeUserCreation` is skipped and `clearPassword` is returned
+     * to the admin as the temporary password.
+     */
     hookHandledEmail: boolean;
     /** Whether an invitation was sent (only relevant when hookHandledEmail is true). */
     invitationSent: boolean;
@@ -528,6 +532,12 @@ export interface AuthAdapter {
      *
      * Handles post-save work: sending invitation emails, generating
      * password-reset tokens, or falling back to returning a temporary password.
+     *
+     * Not called when `prepareUserCreation` reported `hookHandledEmail`. A
+     * create hook then owns delivery, and the response carries the
+     * `invitationSent` and `clearPassword` the prepare step returned. This
+     * holds for both ways of creating a user: a `POST` to the auth collection
+     * and `POST /admin/users`.
      *
      * @param entity - The persisted entity (id + values).
      * @param clearPassword - The cleartext password from the prepare step (if any).

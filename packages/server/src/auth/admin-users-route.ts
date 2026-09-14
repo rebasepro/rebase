@@ -19,7 +19,7 @@ import type { AuthRepository } from "./interfaces";
 import { createRequireAuth, requireAdmin } from "./middleware";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
-import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
+import { prepareAdminUserValues, finalizeAdminUserCreation, completeUserCreation } from "./admin-user-ops";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
@@ -308,10 +308,15 @@ offset: 0 });
             await authRepo.setUserRoles(user.id, roles);
         }
 
-        const finalizeResult = await finalizeAdminUserCreation(
+        // Through the same step as the collection REST route, which is what
+        // decides whether a create hook already delivered the credentials. This
+        // route used to call `finalizeAdminUserCreation` itself, and so sent its
+        // own invitation after a hook's and dropped the hook's password from
+        // the response.
+        const delivery = await completeUserCreation(prepResult, clearPassword => finalizeAdminUserCreation(
             { id: user.id,
 values: prepResult.values },
-            prepResult.clearPassword,
+            clearPassword,
             {
                 authRepo,
                 emailService,
@@ -319,20 +324,12 @@ values: prepResult.values },
                 resolvedHooks: ops,
                 collectionAuthConfig
             }
-        );
+        ));
 
         const userRoles = await authRepo.getUserRoleIds(user.id);
         const adminUser = toAdminUser(user, userRoles);
 
-        return c.json(
-            {
-                user: adminUser,
-                invitationSent: finalizeResult.invitationSent,
-                ...(finalizeResult.temporaryPassword ? { temporaryPassword: finalizeResult.temporaryPassword } : {}),
-                ...(finalizeResult.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
-            },
-            201
-        );
+        return c.json({ user: adminUser, ...delivery }, 201);
     });
 
     router.put("/users/:uid", requireAdmin, async (c) => {
