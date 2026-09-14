@@ -15,7 +15,7 @@
  *      generated from English by website/scripts/translate_docs.mjs). Compiles
  *      each fenced ts/js block against workspace source.
  *
- * Both stages also cover the repository's *own* agent instructions — `AGENT.md`,
+ * Both stages also cover the repository's *own* agent instructions — `AGENTS.md`,
  * `.agent/workflows/` (see AGENT_INSTRUCTION_GLOBS in
  * docs-verify/extract.mjs). They were the one documentation surface no glob
  * reached, and they drifted the whole time everything else stayed clean: the

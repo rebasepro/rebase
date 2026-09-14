@@ -88,7 +88,7 @@ release carries `version-pin: ignore`.
 
 `website/`, `tooling/rebase-agent-skills/`, `examples/*/`, `packages/*/README.md`,
 the marketing components, the MCP manifests — and the repository's own agent
-instructions: `AGENT.md` and `.agent/workflows/*.md`
+instructions: `AGENTS.md` and `.agent/workflows/*.md`
 (`AGENT_INSTRUCTION_GLOBS` in `extract.mjs`).
 
 The package READMEs joined late, and paid for themselves on the first run:
@@ -98,7 +98,7 @@ That is the npm landing page for the server, and the check that catches the
 mistake had existed for months — it had just never been pointed at the file.
 
 That was the shell-command check alone. The name, prose-type and snippet stages
-followed at 0.21.0 (`PACKAGE_README_GLOBS` in `extract.mjs`), and their first
+followed after 0.21.0 (`PACKAGE_README_GLOBS` in `extract.mjs`), and their first
 run reported 27 findings in ten of the twenty-one READMEs — `<Rebase collections
 dataSource>`, `buildSnapshotPropertiesFromData`, `RebaseUser`: names renamed or
 deleted months before, on the page npm shows for the package.
@@ -108,7 +108,7 @@ tables are generated from `ALL_TOOLS` by `pnpm generate:mcp-readme` and diffed
 here, because a hand-maintained table of forty tools is a table that says six.
 
 That last group was added because the gap was load-bearing. While every checked
-surface reported zero findings, `AGENT.md` and
+surface reported zero findings, the then-untracked `AGENT.md` and
 `.agent/workflows/schema-migration.md` went on teaching relations as `target` +
 `cardinality` + `direction` on the property — a shape the authored relation type
 had replaced with a closed `kind` union, and `direction` had stopped existing
@@ -116,9 +116,8 @@ anywhere in `packages/types`. An agent that read them wrote code that did not
 compile. A documentation surface nothing globs is a documentation surface that
 drifts.
 
-`AGENT.md` is `.gitignore`d, so CI never sees it and it contributes nothing
-there; it is globbed for the local run, where it is edited. The blocking gate
-rests on the two tracked surfaces.
+Both are tracked now — the root `AGENTS.md` replaced the gitignored `AGENT.md`,
+which CI never saw — so the blocking gate holds all of it.
 
 One wrinkle worth knowing if you extend this: `checkRunScripts` derives a fence's
 working directory from the doc's own path, which is right for an example README

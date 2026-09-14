@@ -21,7 +21,6 @@
 | `rebase apps list` | Show the apps `rebase.json` declares and their build outputs. `apps init` writes a `rebase.json` inferred from the project; `apps config <app>` prints an app's client configuration |
 | `rebase eject [app]` | Take ownership of the server process: writes the backend entrypoint and a Dockerfile, and sets `runtime: "custom"`. One-way — platform runtime upgrades stop reaching the project. `--dry-run` lists the changes |
 
-<!-- docs-verify: ignore -->
 `rebase normalize-imports <dir>` completes the relative imports in compiled
 output so Node ESM can load it; `--check` reports instead of rewriting.
 

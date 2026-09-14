@@ -62,7 +62,7 @@ function docFiles(root) {
         ...globSync("website/src/content/docs/**/*.mdx", { cwd: root }),
         ...globSync("tooling/rebase-agent-skills/**/*.md", { cwd: root }),
         ...globSync("examples/*/*.md", { cwd: root }),
-        ...globSync("AGENT.md", { cwd: root }),
+        ...globSync("AGENTS.md", { cwd: root }),
         ...globSync(".agent/workflows/*.md", { cwd: root }),
         ...globSync("README.md", { cwd: root })
     ].filter(rel =>
