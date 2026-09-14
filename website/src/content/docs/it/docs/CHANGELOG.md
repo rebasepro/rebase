@@ -13,6 +13,27 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ### Fixed
 
+- **A realtime subscription on MongoDB reports a failed read.** When the fetch
+  behind a WebSocket subscription failed, the Mongo server logged the error and
+  sent nothing. That happened on the first load and on every refresh after a
+  change. The client got neither rows nor an error, so the admin panel's view
+  stayed loading and the SDK listener's `onError` never fired. The server now
+  sends an error for that subscription. A refusal keeps its code and message,
+  as it does over REST and on Postgres: an `afterRead` that throws
+  `new RebaseApiError("…", { status: 403, code: "FORBIDDEN" })` reaches
+  `onError` with code `FORBIDDEN` and that message. Any other failure, a 5xx
+  included, arrives as `Could not load data for "<path>". Check server logs for
+  details.` with code `INTERNAL_ERROR`, and the error itself goes to the log.
+  A refusal is logged as a warning, not an error.
+
+- **Date and read-only fields in the entity form match the other fields.**
+  Since 0.20.0 the form draws its controls at `small` (32px, 14px text). Two
+  field types kept the old size. A date field drew at 48px, because its binding
+  never passed the form's `size` on. A read-only field had a fixed 48px box and
+  printed its value in 16px text. So a column that mixed text, date and
+  read-only fields showed three heights and two text sizes. Both now follow the
+  form's `size`, and a read-only value is printed at the inputs' 14px.
+
 - **`POST /admin/users` leaves delivery to a create hook, and shows the admin
   the hook's temporary password.** A collection's `auth.onCreateUser` or a
   backend's `AuthHooks.onAdminCreateUser` replaces Rebase's own delivery: the

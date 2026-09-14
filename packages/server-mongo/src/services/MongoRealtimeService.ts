@@ -21,7 +21,49 @@ import {
 import { WebSocket } from "ws";
 
 import type { MongoDriver } from "./MongoDriver";
-import { logger } from "@rebasepro/server";
+import { declaredErrorAnswer, logger } from "@rebasepro/server";
+
+/**
+ * The answer a failed fetch chose for its caller, when it chose one.
+ *
+ * A deliberate 4xx — the server's `ApiError`, or the `RebaseApiError` a
+ * collection callback throws because a collection file cannot import the
+ * server — was decided about this caller, and its message and code are written
+ * for them. It is recognised by `declaredErrorAnswer`, the predicate REST and
+ * this socket's request frames use. A declared 5xx is not one: its message is
+ * about the server, and the Postgres subscription path masks it too.
+ */
+const refusalOf = (error: unknown) => {
+    const answer = declaredErrorAnswer(error);
+    return answer && answer.status >= 400 && answer.status < 500 ? answer : undefined;
+};
+
+/**
+ * The frame that tells a subscriber its fetch failed, addressed by the
+ * subscription id the client keys its listeners on — the shape of the
+ * `INVALID_LIMIT` refusal below.
+ *
+ * A refusal keeps its message, code and details. Anything else is a fault
+ * whose text can name internals (hosts, collections, a document's values), so
+ * the subscriber reads a generic message, the same words the Postgres path
+ * uses, and the full error goes to the log.
+ */
+function subscriptionErrorFrame(subscriptionId: string, path: string | undefined, error: unknown) {
+    const refusal = refusalOf(error);
+    const message = refusal?.message ?? `Could not load data for "${path ?? ""}". Check server logs for details.`;
+    return {
+        type: "ERROR",
+        subscriptionId,
+        payload: {
+            error: {
+                message,
+                code: refusal?.code ?? "INTERNAL_ERROR",
+                ...(refusal?.details !== undefined && { details: refusal.details })
+            }
+        },
+        error: message
+    };
+}
 
 /** The acting user for a subscription, as the driver and the socket carry it. */
 export interface SubscriptionAuthContext {
@@ -56,6 +98,13 @@ interface Subscription {
     config: (CollectionSubscriptionConfig | SingleSubscriptionConfig) & { authContext?: SubscriptionAuthContext };
     changeStream?: ChangeStream;
     callback?: (data: any) => void;
+    /**
+     * Told when a fetch for this subscription fails — the initial one or any
+     * re-fetch. Without it the failure was logged and nothing else happened:
+     * the subscriber had been sent neither rows nor an error, so its view
+     * stayed loading and its `onError` never fired.
+     */
+    onError?: (error: unknown) => void;
     /**
      * How many deliveries have been started for this subscription, and the
      * highest that has already reached the callback.
@@ -128,12 +177,51 @@ export class MongoRealtimeService implements RealtimeProvider {
     }
 
     /**
+     * Tell the subscriber a fetch failed, through the slot the rows would have
+     * used.
+     *
+     * The slot matters as much for an error as for rows. Without it, a fetch
+     * that a newer delivery has overtaken would mark a view showing current
+     * data as failed, and one whose subscription was cancelled or replaced
+     * under the same id would fail a different subscription's view.
+     */
+    private reportFetchFailure(
+        subscriptionId: string,
+        subscription: Subscription,
+        canDeliver: () => boolean,
+        error: unknown
+    ): void {
+        const target = subscription.type === "single" ? "row" : "collection";
+        const refusal = refusalOf(error);
+        if (refusal) {
+            // The caller was refused; the server did not fail. Logged at the
+            // level the HTTP error handler gives the same refusal.
+            const line = `[API ${refusal.status} ${refusal.code}] fetching ${target} for subscription ${subscriptionId}: ${refusal.message}`;
+            if (refusal.expected) logger.debug(line);
+            else logger.warn(`⚠️ ${line}`);
+        } else {
+            logger.error(`Error fetching ${target} for subscription ${subscriptionId}`, { error: error });
+        }
+
+        if (!subscription.onError || !canDeliver()) return;
+        try {
+            subscription.onError(error);
+        } catch (reportError) {
+            // Contained: the initial fetch is not awaited, so a throw would be
+            // an unhandled rejection, and `notifyUpdate` is awaited by the
+            // write that triggered it, which would then fail.
+            logger.error(`Could not report a failed fetch to subscription ${subscriptionId}`, { error: reportError });
+        }
+    }
+
+    /**
      * Subscribe to collection changes
      */
     subscribeToCollection(
         subscriptionId: string,
         config: CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext },
-        callback?: (rows: Record<string, unknown>[]) => void
+        callback?: (rows: Record<string, unknown>[]) => void,
+        onError?: (error: unknown) => void
     ): void {
         // Clean up existing subscription if any
         this.unsubscribe(subscriptionId);
@@ -162,6 +250,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                 config,
                 changeStream,
                 callback,
+                onError,
                 started: 0,
                 delivered: 0
             };
@@ -191,6 +280,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                 type: "collection",
                 config,
                 callback,
+                onError,
                 started: 0,
                 delivered: 0
             };
@@ -236,7 +326,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                 callback(rows);
             }
         } catch (error) {
-            logger.error(`Error fetching collection for subscription ${subscriptionId}`, { error: error });
+            this.reportFetchFailure(subscriptionId, subscription, canDeliver, error);
         }
     }
 
@@ -261,7 +351,8 @@ roles: authContext?.roles ?? [] } as User;
     subscribeToOne(
         subscriptionId: string,
         config: SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext },
-        callback?: (row: Record<string, unknown> | null) => void
+        callback?: (row: Record<string, unknown> | null) => void,
+        onError?: (error: unknown) => void
     ): void {
         // Clean up existing subscription if any
         this.unsubscribe(subscriptionId);
@@ -293,6 +384,7 @@ roles: authContext?.roles ?? [] } as User;
                 config,
                 changeStream,
                 callback,
+                onError,
                 started: 0,
                 delivered: 0
             };
@@ -328,6 +420,7 @@ roles: authContext?.roles ?? [] } as User;
                 type: "single",
                 config,
                 callback,
+                onError,
                 started: 0,
                 delivered: 0
             };
@@ -362,7 +455,7 @@ roles: authContext?.roles ?? [] } as User;
                 callback(row || null);
             }
         } catch (error) {
-            logger.error(`Error fetching row for subscription ${subscriptionId}`, { error: error });
+            this.reportFetchFailure(subscriptionId, subscription, canDeliver, error);
         }
     }
 
@@ -530,6 +623,9 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                             subscriptionId,
                             rows
                         }));
+                    },
+                    (error) => {
+                        ws.send(JSON.stringify(subscriptionErrorFrame(subscriptionId, message.payload?.path, error)));
                     }
                 );
                 break;
@@ -552,6 +648,9 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                             subscriptionId,
                             row
                         }));
+                    },
+                    (error) => {
+                        ws.send(JSON.stringify(subscriptionErrorFrame(subscriptionId, message.payload?.path, error)));
                     }
                 );
                 break;

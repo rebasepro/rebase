@@ -20,12 +20,13 @@
  */
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 
-type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
+type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void };
 
 const defer = <T>(): Deferred<T> => {
     let resolve!: (value: T) => void;
-    const promise = new Promise<T>(r => { resolve = r; });
-    return { promise, resolve };
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
 };
 
 /** A change stream whose events the test fires by hand. */
@@ -163,6 +164,52 @@ describe("MongoDB realtime delivery order", () => {
         await settle();
 
         expect(seen[seen.length - 1]).toBeNull();
+    });
+
+    // A failed fetch is reported to the subscriber, and the report takes the
+    // same slot rows would. An error is a delivery like any other, and could
+    // otherwise land exactly where a stale delivery used to.
+    it("does not let a failed straggler report over a newer delivery", async () => {
+        const { service, changeStream, collectionFetches } = setup();
+        const seen: unknown[] = [];
+        const errors: unknown[] = [];
+
+        service.subscribeToCollection("s1", { path: "notes" } as any, rows => seen.push(rows), e => errors.push(e));
+        await settle();
+        changeStream.fire("change", { operationType: "update" });
+        await settle();
+
+        collectionFetches[1].resolve([{ title: "after the change" }]);
+        await settle();
+        collectionFetches[0].reject(new Error("the initial fetch timed out"));
+        await settle();
+
+        expect(seen).toEqual([[{ title: "after the change" }]]);
+        expect(errors).toEqual([]);
+    });
+
+    it("does not report an old subscription's failure to a new one with the same id", async () => {
+        const { service, collectionFetches } = setup();
+        const firstErrors: unknown[] = [];
+        const secondErrors: unknown[] = [];
+
+        service.subscribeToCollection("s1", { path: "notes" } as any, () => undefined, e => firstErrors.push(e));
+        await settle();
+        service.subscribeToCollection("s1", { path: "notes" } as any, () => undefined, e => secondErrors.push(e));
+        await settle();
+
+        collectionFetches[0].reject(new Error("the old subscription's query failed"));
+        await settle();
+
+        expect(firstErrors).toEqual([]);
+        expect(secondErrors).toEqual([]);
+
+        // Its own failure still reaches it.
+        const own = new Error("the new subscription's query failed");
+        collectionFetches[1].reject(own);
+        await settle();
+
+        expect(secondErrors).toEqual([own]);
     });
 
     it("still delivers the ordinary case", async () => {

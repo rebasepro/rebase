@@ -2708,7 +2708,8 @@ error into an answer now calls.
 | Postgres socket, request frames (`SAVE`, `DELETE`, `FETCH_*`…) | **BUG**: it recognised `ApiError` only. Fixed. |
 | Mongo socket, request frames | **BUG**: same. Fixed. |
 | Postgres realtime subscriptions (`sanitizeErrorForClient`) | **BUG**: it read `statusCode`, and `RebaseApiError` spells it `status`, so a 403 thrown from `afterRead` arrived as "Could not load data … Check server logs" with no code. Fixed. It still hides 5xx messages, which is deliberately stricter than REST. |
-| Mongo realtime subscriptions | **OPEN**, and a different class: a failed fetch is logged and nothing is sent, so the subscriber is never told. |
+| Mongo realtime subscriptions | **BUG**, and a different class: a failed fetch was logged and nothing was sent, on the first load and on every re-fetch, so the subscriber was never told and its view stayed loading. Fixed: both fetch paths send an `ERROR` frame keyed by `subscriptionId`, through the same delivery slot rows use, so a straggler cannot report over newer rows. A 4xx keeps its message, code and `details` through `declaredErrorAnswer`. Anything else, a declared 5xx included, is masked as on Postgres. |
+| in-process `listenCollection` / `listenOne`, both backends | **OPEN**, the same gap one door over: a failed fetch behind an in-process subscription is logged and the listener's `onError` is never called. `MongoDriver.listen*` passes the realtime service no error callback, and the Postgres driver-refetch `catch` blocks only log. |
 | socket error frame → SDK | **gap**: the client read only `message` and `code`, so `e.details` was always empty over the socket. Fixed: frames carry `details` and the client passes them on. `status` stays `undefined`, because a frame is not an HTTP response. |
 | in-process `rebase.data` | n/a: nothing is translated, so the caller gets the `RebaseApiError` itself. |
 
@@ -2722,6 +2723,14 @@ mutations each turned a test red. They covered the sockets falling back to
 answering every error, or answering one with no status, REST skipping the
 predicate, the subscription path reading only `statusCode`, and the client
 dropping `details`.
+
+`test/realtime-subscription-error.test.ts` (server-mongo) subscribes over a real
+socket, also under `NODE_ENV=production`, to collections whose `afterRead`
+throws a 403 `RebaseApiError`, a plain `Error` and a declared 503. It checks
+the first load of a collection and of a row, and a re-fetch after a successful
+load. Two cases in `test/realtime-delivery-order.test.ts` pin the delivery slot.
+Nine mutations each turned a test red, and reverting the fix turns every
+socket case red.
 
 ### Creating a user: the hook's report, read on one door — 2026-09-14
 

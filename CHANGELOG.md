@@ -4,6 +4,19 @@
 
 ### Fixed
 
+- **A realtime subscription on MongoDB reports a failed read.** When the fetch
+  behind a WebSocket subscription failed, the Mongo server logged the error and
+  sent nothing. That happened on the first load and on every refresh after a
+  change. The client got neither rows nor an error, so the admin panel's view
+  stayed loading and the SDK listener's `onError` never fired. The server now
+  sends an error for that subscription. A refusal keeps its code and message,
+  as it does over REST and on Postgres: an `afterRead` that throws
+  `new RebaseApiError("…", { status: 403, code: "FORBIDDEN" })` reaches
+  `onError` with code `FORBIDDEN` and that message. Any other failure, a 5xx
+  included, arrives as `Could not load data for "<path>". Check server logs for
+  details.` with code `INTERNAL_ERROR`, and the error itself goes to the log.
+  A refusal is logged as a warning, not an error.
+
 - **Date and read-only fields in the entity form match the other fields.**
   Since 0.20.0 the form draws its controls at `small` (32px, 14px text). Two
   field types kept the old size. A date field drew at 48px, because its binding
