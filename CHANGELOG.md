@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- **Date and read-only fields in the entity form match the other fields.**
+  Since 0.20.0 the form draws its controls at `small` (32px, 14px text). Two
+  field types kept the old size. A date field drew at 48px, because its binding
+  never passed the form's `size` on. A read-only field had a fixed 48px box and
+  printed its value in 16px text. So a column that mixed text, date and
+  read-only fields showed three heights and two text sizes. Both now follow the
+  form's `size`, and a read-only value is printed at the inputs' 14px.
+
 - **`POST /admin/users` leaves delivery to a create hook, and shows the admin
   the hook's temporary password.** A collection's `auth.onCreateUser` or a
   backend's `AuthHooks.onAdminCreateUser` replaces Rebase's own delivery: the

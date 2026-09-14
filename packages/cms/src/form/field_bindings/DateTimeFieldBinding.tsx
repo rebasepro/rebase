@@ -32,7 +32,8 @@ export function DateTimeFieldBinding({
     touched,
     property,
     includeDescription,
-    hideLabel
+    hideLabel,
+    size = "small"
 }: DateTimeFieldProps) {
 
     const { locale } = useCustomizationController();
@@ -47,7 +48,11 @@ export function DateTimeFieldBinding({
     return (
         <>
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
+                {/* The form's `size`, like every other control. Dropped here,
+                    the kit's own default (`large`, 48px) put each date field
+                    16px taller than the 32px text fields beside it. */}
                 <DateTimeField
+                    size={size}
                     value={internalValue}
                     onChange={(dateValue) => setValue(dateValue)}
                     mode={property.mode}

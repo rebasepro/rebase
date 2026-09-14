@@ -28,7 +28,8 @@ export function ReadOnlyFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    context
+    context,
+    size = "small"
 }: FieldProps<Property>) {
 
     // if (!context.entityId)
@@ -53,18 +54,25 @@ export function ReadOnlyFieldBinding({
                     "w-full overflow-x-scroll no-scrollbar flex items-center",
                     skipCardWrapper
                         ? ""
-                        // `min-h-12` is `TextField`'s own `large` height, which is
-                        // what every editable field in the form is. At 40px a
-                        // read-only field sat 8px short of the input beside it,
-                        // so a row holding one of each had its two boxes'
-                        // baselines and bottom edges disagree — the field looked
-                        // misaligned rather than uneditable.
                         // `px-3` is what `TextField` gives its input, so a
                         // read-only value starts on the same vertical line as
                         // the text beside it. It was `px-4 md:px-6`, which in a
                         // one-column span spent a sixth of the box on empty
                         // margin and pushed short values towards the middle.
-                        : "rounded-lg border border-hairline-strong px-3 min-h-12 opacity-80"
+                        : cls("rounded-lg border border-hairline-strong px-3 text-sm opacity-80", {
+                            // The height an editable field of the form's `size`
+                            // renders at — the kit's control height plus its 1px
+                            // hairline on each side — so a row holding one of
+                            // each has its baselines and bottom edges agree. This
+                            // was a fixed `min-h-12` (48px) with the page's 16px
+                            // text: once the form went to `small`, a read-only
+                            // field stood 14px taller than the text field beside
+                            // it and printed its value a size above every
+                            // input's `text-sm`.
+                            "min-h-[34px]": size === "small",
+                            "min-h-[42px]": size === "medium",
+                            "min-h-[50px]": size === "large"
+                        })
                 )}>
 
                 <ErrorBoundary>
