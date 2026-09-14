@@ -566,8 +566,8 @@ client and only need a backend bootstrapper.
 initializeRebaseBackend({
   bootstrappers: [pgBootstrapper /* isDefault */, mongoBootstrapper],
   collections: [
-    { slug: "products" },                  // → Postgres (default)
-    { slug: "orders", driver: "mongodb" }  // → MongoDB
+    { slug: "products" },                      // → Postgres (default)
+    { slug: "orders", dataSource: "mongodb" }  // → the bootstrapper with id "mongodb"
   ],
 });
 ```
@@ -576,12 +576,13 @@ Routing is automatic and resolved by collection path: list/entity views,
 references, board, import/export, and `context.data` all hit the right backend
 with no per-collection wiring. The data-source key matches the backend
 bootstrapper id/type (e.g. `"mongodb"`). RLS is applied per-engine where
-supported. The deprecated `drivers={{ key: driver }}` prop is a shorthand for a
-single `direct` database declaration.
+supported.
 
-> **Migration note:** collection-level `driver` is deprecated in favor of
-> `dataSource`. It still works (and provides the engine hint), so existing
-> Firestore collections using `driver: "firestore"` keep functioning.
+> **There is no collection-level `driver` field**, and no `drivers` prop on
+> `<Rebase>`. A collection names its source with `dataSource`; `engine`
+> (`"postgres"`, `"firestore"`, `"mongodb"`, …) is stamped from that source
+> during normalization. The Firestore and MongoDB collection types declare it
+> as their literal discriminant (`engine: "firestore"`).
 
 ## Common Property Options (BaseProperty)
 
