@@ -1,9 +1,10 @@
 import { DataService } from "./services/dataService";
 import { BranchService } from "./services/BranchService";
-import { RealtimeService } from "./services/realtimeService";
+import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { DrizzleClient } from "./interfaces";
 import {
+    ANONYMOUS_USER_ID,
     DatabaseAdmin,
     DataDriver,
     DeleteProps,
@@ -162,6 +163,26 @@ function assertActingUserForAutoValues(
 function fetchErrorListener(onError: ((error: Error) => void) | undefined): ((error: unknown) => void) | undefined {
     if (!onError) return undefined;
     return (error) => onError(error instanceof Error ? error : new Error(String(error)));
+}
+
+/**
+ * The principal a user's reads run as, for the transaction a request opens and
+ * for a subscription alike.
+ *
+ * One definition because there were two. The subscription's copy was built by
+ * hand after the fact and left out `isAnonymous`, so a guest's refetches ran as
+ * an account: a policy that excludes guests filtered the first read and not the
+ * ones after a change.
+ */
+function authContextOf(user: User | undefined): SubscriptionAuthContext {
+    return {
+        uid: user?.uid || ANONYMOUS_USER_ID,
+        roles: user?.roles ?? [],
+        isAnonymous: user?.isAnonymous === true,
+        // A tenancy policy reads a claim. Spread rather than set, so a caller
+        // carrying none produces no key at all.
+        ...(user?.claims ? { claims: user.claims } : {})
+    };
 }
 
 export class PostgresBackendDriver implements DataDriver {
@@ -614,70 +635,41 @@ export class PostgresBackendDriver implements DataDriver {
         return rows;
     }
 
-    listenCollection<M extends Record<string, unknown>>({
-                                                            path,
-                                                            collection,
-                                                            filter,
-                                                            limit,
-                                                            offset,
-                                                            startAfter,
-                                                            orderBy,
-                                                            searchString,
-                                                            order,
-                                                            onUpdate,
-                                                            onError
-                                                        }: ListenCollectionProps<M>): () => void {
-
+    /**
+     * Listen to a collection: the rows now, then again after every change.
+     *
+     * The realtime service runs every read, the first one included, as
+     * `authContext` — which {@link AuthenticatedPostgresBackendDriver} supplies,
+     * and which defaults to this driver's own user (a driver bound to a
+     * request's transaction has one). With neither, the reads run as the
+     * anonymous user, as the refetches always did.
+     */
+    listenCollection<M extends Record<string, unknown>>(
+        // Forwarded whole rather than re-listed: the list named nine of the
+        // query's fields, so `logical` was dropped and an `or(...)` listener
+        // was handed every row. Held back, as they always were here:
+        // `vectorSearch`, which a subscription cannot serve, and `page` and
+        // `withDeleted`, which the stored request has no field for.
+        { path, collection, startAfter, onUpdate, onError, vectorSearch: _vectorSearch, page: _page, withDeleted: _withDeleted, ...query }: ListenCollectionProps<M>,
+        authContext: SubscriptionAuthContext | undefined = this.user ? authContextOf(this.user) : undefined
+    ): () => void {
         const subscriptionId = this.generateSubscriptionId();
-        const reportError = fetchErrorListener(onError);
 
-        // Type-adapter wrapper: RealtimeService expects a union callback signature
-        const callbackWrapper = (rows: Record<string, unknown>[]) => {
-            onUpdate(rows);
-        };
-
-        // Store the subscription in RealtimeService properly using the new public method
-        this.realtimeService.registerDataDriverSubscription(subscriptionId, {
-            clientId: "driver",
-            type: "collection" as const,
+        this.realtimeService.startDataDriverSubscription(subscriptionId, {
+            type: "collection",
             path,
             collectionRequest: {
-                filter,
-                orderBy,
-                order,
-                limit,
-                offset,
+                ...query,
                 startAfter: startAfter as Record<string, unknown> | undefined,
-                databaseId: collection?.databaseId,
-                searchString
+                databaseId: collection?.databaseId
             },
-            onError: reportError
+            authContext,
+            onError: fetchErrorListener(onError)
+        }, (rows) => {
+            if (Array.isArray(rows)) onUpdate(rows);
         });
 
-        // Store the callback for this subscription
-        this.realtimeService.addSubscriptionCallback(subscriptionId, callbackWrapper as (data: Record<string, unknown> | Record<string, unknown>[] | null) => void);
-
-        // Send initial data immediately
-        this.fetchCollection({
-            path: path,
-            collection,
-            filter,
-            limit,
-            offset,
-            startAfter,
-            orderBy,
-            searchString,
-            order
-        }).then(rows => {
-            callbackWrapper(rows);
-        }).catch(error => {
-            reportError?.(error);
-        });
-
-        return () => {
-            this.realtimeService.removeSubscriptionCallback(subscriptionId);
-            this.realtimeService.subscriptions.delete(subscriptionId);
-        };
+        return () => this.realtimeService.unsubscribe(subscriptionId);
     }
 
     async fetchOne<M extends Record<string, unknown>>({
@@ -737,51 +729,30 @@ export class PostgresBackendDriver implements DataDriver {
         return row;
     }
 
-    listenOne<M extends Record<string, unknown>>({
-                                                        path,
-                                                        id,
-                                                        collection,
-                                                        onUpdate,
-                                                        onError
-                                                    }: ListenOneProps<M>): () => void {
-
+    /**
+     * Listen to one row: the row now, then again after every change, and
+     * `null` when it is not there — deleted, never created, or not readable by
+     * the subscriber. Reads as {@link listenCollection} does.
+     */
+    listenOne<M extends Record<string, unknown>>(
+        { path, id, onUpdate, onError }: ListenOneProps<M>,
+        authContext: SubscriptionAuthContext | undefined = this.user ? authContextOf(this.user) : undefined
+    ): () => void {
         const subscriptionId = this.generateSubscriptionId();
-        const reportError = fetchErrorListener(onError);
-        const callbackWrapper = (row: Record<string, unknown> | null) => {
-            if (row)
-                onUpdate(row);
-        };
 
-        // Register the subscription with the RealtimeService
-        this.realtimeService.registerDataDriverSubscription(subscriptionId, {
-            clientId: "driver",
-            type: "single" as const,
+        this.realtimeService.startDataDriverSubscription(subscriptionId, {
+            type: "single",
             path,
             id,
-            onError: reportError
+            authContext,
+            onError: fetchErrorListener(onError)
+        }, (row) => {
+            // `null` is delivered, not dropped: it is how a listener learns its
+            // row is gone. Dropped, the listener kept the last row it had.
+            if (!Array.isArray(row)) onUpdate(row);
         });
 
-        // Store the callback for this subscription
-        this.realtimeService.addSubscriptionCallback(subscriptionId, callbackWrapper as (data: Record<string, unknown> | Record<string, unknown>[] | null) => void);
-
-        // Fetch initial data
-        this.fetchOne({
-            path,
-            id,
-            collection
-        })
-            .then(row => {
-                if (row) onUpdate(row);
-            })
-            .catch(error => {
-                reportError?.(error);
-            });
-
-        // Return the unsubscribe function
-        return () => {
-            this.realtimeService.removeSubscriptionCallback(subscriptionId);
-            this.realtimeService.subscriptions.delete(subscriptionId);
-        };
+        return () => this.realtimeService.unsubscribe(subscriptionId);
     }
 
     /**
@@ -2284,13 +2255,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // viewer when it returns.
         const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
             await runInWriteScope(writeScope, () => this.delegate.db.transaction(async (tx) => {
-                let uid = this.user?.uid;
-                if (!uid) {
+                if (!this.user?.uid) {
                     logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
-                    uid = "anonymous";
                 }
-
-                const userRoles = this.user?.roles ?? [];
                 if (!this.user?.roles) {
                     logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
                 }
@@ -2314,19 +2281,11 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 // account. Anonymous sign-in mints a real user row and a real uid,
                 // so without it the two are the same principal inside the database
                 // and every rule meaning "signed in" also means "anybody who called
-                // POST /auth/anonymous". See `rebase.is_anonymous()`.
-                await applyAuthContext(
-                    tx,
-                    {
-                        uid,
-                        roles: userRoles,
-                        isAnonymous: this.user?.isAnonymous === true,
-                        // The token's custom claims reach the database as
-                        // `rebase.jwt()`, which is what a tenancy policy reads.
-                        claims: this.user?.claims
-                    },
-                    this.delegate.rlsUserRole
-                );
+                // POST /auth/anonymous". See `rebase.is_anonymous()`. The
+                // token's custom claims reach the database as `rebase.jwt()`,
+                // which is what a tenancy policy reads. The same principal a
+                // listener on this driver subscribes as — see `authContextOf`.
+                await applyAuthContext(tx, authContextOf(this.user), this.delegate.rlsUserRole);
 
                 const txEntityService = new DataService(tx, this.delegate.registry);
                 const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
@@ -2377,30 +2336,15 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     }
 
     /**
-     * Injects the authenticated user's context into the most recently
-     * registered realtime subscription so RLS-aware polling can apply.
+     * The delegate is the base driver, on the owner connection. The user's
+     * identity goes in with the subscription, so the first read runs as them
+     * like every refetch after it. It used to be stamped onto the last
+     * registered subscription once the delegate had returned — by which time
+     * the first read had been issued unscoped, and a listener was handed rows
+     * its policies deny.
      */
-    private injectAuthContext(unsubscribe: () => void): () => void {
-        const authContext = {
-            uid: this.user?.uid || "anonymous",
-            roles: this.user?.roles ?? [],
-            // A refetch evaluates the same policies as the fetch that opened
-            // the subscription, and a tenancy policy reads a claim. Spread
-            // rather than set, so a caller carrying none produces exactly the
-            // object this has always produced.
-            ...(this.user?.claims ? { claims: this.user.claims } : {})
-        };
-        const entries = Array.from(this.delegate.realtimeService.subscriptions.entries());
-        const lastEntry = entries[entries.length - 1];
-        const lastSub = lastEntry?.[1] as Record<string, unknown> | undefined;
-        if (lastSub && lastSub.clientId === "driver") {
-            lastSub.authContext = authContext;
-        }
-        return unsubscribe;
-    }
-
     listenCollection<M extends Record<string, unknown>>(props: ListenCollectionProps<M>): () => void {
-        return this.injectAuthContext(this.delegate.listenCollection(props));
+        return this.delegate.listenCollection(props, authContextOf(this.user));
     }
 
     async fetchOne<M extends Record<string, unknown>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
@@ -2408,7 +2352,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     }
 
     listenOne<M extends Record<string, unknown>>(props: ListenOneProps<M>): () => void {
-        return this.injectAuthContext(this.delegate.listenOne(props));
+        return this.delegate.listenOne(props, authContextOf(this.user));
     }
 
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {

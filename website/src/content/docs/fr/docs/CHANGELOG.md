@@ -11,7 +11,41 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Removed
+
+- **`RealtimeService.registerDataDriverSubscription`, `addSubscriptionCallback`
+  and `removeSubscriptionCallback`** (`@rebasepro/server-postgres`). They
+  registered an in-process listener in two steps and left its first read to the
+  caller, which is how that read came to run unscoped (see Security).
+  `startDataDriverSubscription(id, request, callback)` registers the listener
+  and delivers its first rows. The request carries the subscriber's
+  `authContext`. `unsubscribe(id)` cancels it.
+
 ### Fixed
+
+- **A realtime listener on Postgres gets its first delivery in order, hears a
+  deleted row, and keeps its whole query.** `listenCollection` and `listenOne`
+  fetched their first delivery themselves, outside the realtime service that
+  serves every refresh after it. Four faults came with that:
+
+  - A slow first read could arrive after a newer refresh and put the listener
+    back on the rows from before the change, where it stayed until the next
+    write. It could also arrive after you had unsubscribed. The first read now
+    takes the same delivery slot as every refresh.
+  - `listenOne` dropped `null`. A listener whose row was deleted, or never
+    existed, heard nothing and kept the last row it had. It now receives
+    `null`, as it does on MongoDB.
+  - `listenCollection` passed on nine of the query's fields and dropped the
+    rest. A listener with an `or(...)` group (`logical`) was handed every row,
+    on the first delivery and after every change. The whole query is now
+    stored with the subscription, `logical`, `include`, `fields`, `distinct`
+    and `searchExplain` included.
+  - A listener on the base driver, with no user, read its first rows as the
+    server and every refresh as the anonymous user, so its rows changed on the
+    first write. Both are now read as the anonymous user, as on MongoDB. A
+    listener on a driver bound to a request, such as `context.data` inside a
+    collection callback, had its refreshes read as the anonymous user too. It
+    now reads as that request's user throughout.
 
 - **An in-process realtime listener hears when a read fails.** Server code
   that listens with `listenCollection({ onUpdate, onError })` or `listenOne`
@@ -201,6 +235,29 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   by hand.
 
 ### Security
+
+- **On Postgres, a realtime listener on a user's driver got its first rows
+  without that user's row-level security.** This affected server code that
+  calls `listenCollection` or `listenOne` on a driver scoped to a user, such as
+  `driver.withAuth(user)` or a function's `requireDriver(c)`. The first
+  delivery was read on the base driver, the server context, before the user's
+  identity was attached to the subscription. Only the refreshes after a change
+  read as the user. So on a connection that bypasses RLS, which is when
+  `rlsUserRole` is set (a superuser, a `BYPASSRLS` role, or the owner of the
+  tables), the first delivery carried every user's rows, and `listenOne` handed
+  over a row the user may not read. The next refresh dropped them again.
+
+  A guest's refreshes had a gap of their own. The identity attached to them
+  left out `isAnonymous`, so a policy that excludes guests did not exclude them
+  after a change.
+
+  The first read now runs in the realtime service, as the subscriber, like
+  every refresh. The subscriber's identity is part of the subscription from the
+  start, `isAnonymous` and the token's claims included, and it is built by the
+  same function that scopes a request's transaction. The WebSocket
+  subscriptions that the SDK and the admin panel use were not affected: their
+  first read was already scoped. So was MongoDB's. If your server code listens
+  through a user's driver on Postgres, upgrade.
 
 - **The MongoDB realtime socket could read and write the auth store.** MongoDB
   has no row-level security, so on that engine the collection registry is the

@@ -333,35 +333,160 @@ title: "added" }]
         ]);
     });
 
+    /**
+     * An in-process listener, as `PostgresBackendDriver.listen*` starts one.
+     * Its first fetch is `collectionFetches[0]` / `entityFetches[0]`.
+     */
+    const startDriverListener = (
+        type: "collection" | "single",
+        seen: unknown[],
+        errors: unknown[] = [],
+        authContext?: { uid: string; roles: string[] }
+    ) => service.startDataDriverSubscription(
+        "drv-1",
+        type === "collection"
+            ? { type, path: "notes", collectionRequest: {}, authContext, onError: error => errors.push(error) }
+            : { type, path: "notes", id: "n1", authContext, onError: error => errors.push(error) },
+        data => seen.push(data)
+    );
+
     it("orders deliveries to DataDriver callbacks too", async () => {
         // The driver path has its own debounce and its own delivery, and had
         // the same missing check.
         const seen: unknown[] = [];
-        service.registerDataDriverSubscription("drv-1", {
-            clientId: "driver",
-            type: "collection",
-            path: "notes",
-            collectionRequest: {}
-        });
-        service.addSubscriptionCallback("drv-1", rows => seen.push(rows));
-
-        await notify();
-        await runDebounce();
-        expect(collectionFetches).toHaveLength(1);
+        startDriverListener("collection", seen);
+        await settle();
+        collectionFetches[0].resolve([{ id: "n1",
+title: "initial" }]);
+        await settle();
 
         await notify();
         await runDebounce();
         expect(collectionFetches).toHaveLength(2);
 
-        collectionFetches[1].resolve([{ id: "n1",
+        await notify();
+        await runDebounce();
+        expect(collectionFetches).toHaveLength(3);
+
+        collectionFetches[2].resolve([{ id: "n1",
 title: "newer" }]);
         await settle();
-        collectionFetches[0].resolve([{ id: "n1",
+        collectionFetches[1].resolve([{ id: "n1",
 title: "older" }]);
         await settle();
 
-        expect(seen).toEqual([[{ id: "n1",
-title: "newer" }]]);
+        expect(seen).toEqual([
+            [{ id: "n1",
+title: "initial" }],
+            [{ id: "n1",
+title: "newer" }]
+        ]);
+    });
+
+    // The first fetch used to run in the driver, outside this service: no
+    // slot, no subscriber identity, and a row listener's `null` dropped. The
+    // e2e proof, against a real database, is
+    // `test/e2e/listener-first-fetch-e2e.test.ts`.
+    describe("a DataDriver listener's first fetch", () => {
+        it("reads as the subscriber it was started with", async () => {
+            const auth = { uid: "user-a", roles: ["editor"] };
+            startDriverListener("collection", [], [], auth);
+            startDriverListener("single", [], [], auth);
+            await settle();
+
+            expect(service["fetchCollectionWithAuth"]).toHaveBeenCalledWith("notes", {}, auth);
+            expect(service["fetchEntityWithAuth"]).toHaveBeenCalledWith("notes", "n1", auth);
+        });
+
+        it("does not overwrite a newer refetch", async () => {
+            const seen: unknown[] = [];
+            startDriverListener("collection", seen);
+            await settle();
+            expect(collectionFetches).toHaveLength(1);
+
+            await notify();
+            await runDebounce();
+            expect(collectionFetches).toHaveLength(2);
+
+            collectionFetches[1].resolve([{ id: "n1",
+title: "after the change" }]);
+            await settle();
+            collectionFetches[0].resolve([{ id: "n1",
+title: "before the change" }]);
+            await settle();
+
+            expect(seen).toEqual([[{ id: "n1",
+title: "after the change" }]]);
+        });
+
+        it("does not overwrite a newer refetch of a row", async () => {
+            const seen: unknown[] = [];
+            startDriverListener("single", seen);
+            await settle();
+
+            await notify();
+            await runDebounce();
+            expect(entityFetches).toHaveLength(2);
+
+            entityFetches[1].resolve({ id: "n1",
+title: "after the change" });
+            await settle();
+            entityFetches[0].resolve({ id: "n1",
+title: "before the change" });
+            await settle();
+
+            expect(seen).toEqual([{ id: "n1",
+title: "after the change" }]);
+        });
+
+        it("delivers nothing to a listener cancelled while it ran", async () => {
+            const seen: unknown[] = [];
+            startDriverListener("collection", seen);
+            await settle();
+
+            service.unsubscribe("drv-1");
+            collectionFetches[0].resolve([{ id: "n1",
+title: "too late" }]);
+            await settle();
+
+            expect(seen).toEqual([]);
+        });
+
+        it("hands a row listener null when the row is not there", async () => {
+            const seen: unknown[] = [];
+            startDriverListener("single", seen);
+            await settle();
+
+            entityFetches[0].resolve(undefined);
+            await settle();
+
+            expect(seen).toEqual([null]);
+        });
+
+        it("reports a failure as thrown", async () => {
+            const failure = new Error("the first fetch failed");
+            const errors: unknown[] = [];
+            startDriverListener("collection", [], errors);
+            await settle();
+
+            collectionFetches[0].reject(failure);
+            await settle();
+
+            expect(errors).toHaveLength(1);
+            expect(errors[0]).toBe(failure);
+        });
+
+        it("reports no failure to a listener cancelled while it ran", async () => {
+            const errors: unknown[] = [];
+            startDriverListener("collection", [], errors);
+            await settle();
+
+            service.unsubscribe("drv-1");
+            collectionFetches[0].reject(new Error("the first fetch failed"));
+            await settle();
+
+            expect(errors).toEqual([]);
+        });
     });
 
     // A failed refetch for an in-process listener used to be logged and
@@ -370,28 +495,22 @@ title: "newer" }]]);
     describe("a DataDriver listener's failed refetch", () => {
         const failure = new Error("the refetch failed");
 
-        const registerDriverListener = (
-            type: "collection" | "single",
-            seen: unknown[],
-            errors: unknown[]
-        ) => {
-            service.registerDataDriverSubscription("drv-1", {
-                clientId: "driver",
-                type,
-                path: "notes",
-                ...(type === "collection" ? { collectionRequest: {} } : { id: "n1" }),
-                onError: error => errors.push(error)
-            });
-            service.addSubscriptionCallback("drv-1", data => seen.push(data));
+        /** Start a listener and let its first fetch answer, so what follows is a refetch. */
+        const startAndLoad = async (type: "collection" | "single", seen: unknown[], errors: unknown[]) => {
+            startDriverListener(type, seen, errors);
+            await settle();
+            if (type === "collection") collectionFetches[0].resolve([]);
+            else entityFetches[0].resolve({ id: "n1", title: "initial" });
+            await settle();
         };
 
         it("reaches a collection listener as thrown", async () => {
             const errors: unknown[] = [];
-            registerDriverListener("collection", [], errors);
+            await startAndLoad("collection", [], errors);
 
             await notify();
             await runDebounce();
-            collectionFetches[0].reject(failure);
+            collectionFetches[1].reject(failure);
             await settle();
 
             expect(errors).toHaveLength(1);
@@ -400,12 +519,12 @@ title: "newer" }]]);
 
         it("reaches a row listener as thrown", async () => {
             const errors: unknown[] = [];
-            registerDriverListener("single", [], errors);
+            await startAndLoad("single", [], errors);
 
             await notify();
             await runDebounce();
-            expect(entityFetches).toHaveLength(1);
-            entityFetches[0].reject(failure);
+            expect(entityFetches).toHaveLength(2);
+            entityFetches[1].reject(failure);
             await settle();
 
             expect(errors).toHaveLength(1);
@@ -415,33 +534,33 @@ title: "newer" }]]);
         it("is not reported over a newer delivery", async () => {
             const seen: unknown[] = [];
             const errors: unknown[] = [];
-            registerDriverListener("collection", seen, errors);
+            await startAndLoad("collection", seen, errors);
 
             await notify();
             await runDebounce();
             await notify();
             await runDebounce();
-            expect(collectionFetches).toHaveLength(2);
+            expect(collectionFetches).toHaveLength(3);
 
-            collectionFetches[1].resolve([{ id: "n1",
+            collectionFetches[2].resolve([{ id: "n1",
 title: "newer" }]);
             await settle();
-            collectionFetches[0].reject(failure);
+            collectionFetches[1].reject(failure);
             await settle();
 
-            expect(seen).toEqual([[{ id: "n1",
+            expect(seen).toEqual([[], [{ id: "n1",
 title: "newer" }]]);
             expect(errors).toEqual([]);
         });
 
         it("is not reported to a listener cancelled while it ran", async () => {
             const errors: unknown[] = [];
-            registerDriverListener("collection", [], errors);
+            await startAndLoad("collection", [], errors);
 
             await notify();
             await runDebounce();
             service.unsubscribe("drv-1");
-            collectionFetches[0].reject(failure);
+            collectionFetches[1].reject(failure);
             await settle();
 
             expect(errors).toEqual([]);

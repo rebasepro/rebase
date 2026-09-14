@@ -21,9 +21,8 @@ import type { CollectionConfig } from "@rebasepro/types";
  */
 
 const mockRealtimeService = {
-    registerDataDriverSubscription: jest.fn(),
-    addSubscriptionCallback: jest.fn(),
-    removeSubscriptionCallback: jest.fn(),
+    startDataDriverSubscription: jest.fn(),
+    unsubscribe: jest.fn(),
     subscriptions: new Map(),
     notifyUpdate: jest.fn()
 } as unknown as RealtimeService;

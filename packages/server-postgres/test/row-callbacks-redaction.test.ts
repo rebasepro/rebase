@@ -56,9 +56,8 @@ const RAW_CUSTOMER = {
 
 const mockDb = {} as unknown as NodePgDatabase;
 const mockRealtimeService = {
-    registerDataDriverSubscription: jest.fn(),
-    addSubscriptionCallback: jest.fn(),
-    removeSubscriptionCallback: jest.fn(),
+    startDataDriverSubscription: jest.fn(),
+    unsubscribe: jest.fn(),
     subscriptions: new Map(),
     notifyUpdate: jest.fn()
 } as unknown as RealtimeService;

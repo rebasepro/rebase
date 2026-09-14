@@ -102,7 +102,7 @@ describe("WebSocket Server authorization", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
+            startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
 
         // Mock PostgresBackendDriver admin capabilities
@@ -300,7 +300,7 @@ describe("WebSocket Server SQL error handling", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
+            startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
 
         // Mock PostgresBackendDriver admin capabilities
@@ -459,7 +459,7 @@ describe("WebSocket Server requireAuth resolution", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
+            startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
         mockDriver = {
             key: "postgres",
@@ -598,7 +598,7 @@ payload: { n } }
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn(),
+            startDataDriverSubscription: jest.fn(),
             handleClientMessage: jest.fn(async () => {})
         } as unknown as RealtimeService;
 
@@ -687,7 +687,7 @@ describe("WebSocket Server SQL audit line", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
+            startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
         mockDriver = {
             key: "postgres",
@@ -800,7 +800,7 @@ describe("WebSocket Server list limits", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
+            startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
         mockDriver = {
             key: "postgres",

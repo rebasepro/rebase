@@ -104,7 +104,7 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
 
         mockRealtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
+            startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
 
         createPostgresWebSocket(mockServer = {} as Server, mockRealtimeService, mockDriver, {

@@ -177,6 +177,20 @@ type StoredCollectionRequest = {
 type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
 
 /**
+ * What an in-process listener asks for: the read, and who it reads as.
+ * See {@link RealtimeService.startDataDriverSubscription}.
+ */
+export type DataDriverSubscriptionRequest = {
+    path: string;
+    /** The subscriber. Absent reads as the anonymous user. */
+    authContext?: SubscriptionAuthContext;
+    onError?: (error: unknown) => void;
+} & (
+    | { type: "collection"; collectionRequest: StoredCollectionRequest }
+    | { type: "single"; id: string | number }
+);
+
+/**
  * A registered subscription, plus the two counters that order its deliveries.
  *
  * Every update a subscription delivers is a full re-fetch, and more than one
@@ -425,29 +439,51 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         };
     }
 
-    // Add public method to register DataDriver subscriptions
-    registerDataDriverSubscription(subscriptionId: string, subscription: {
-        clientId: string;
-        type: "collection" | "single";
-        path: string;
-        id?: string | number;
-        collectionRequest?: StoredCollectionRequest;
-        authContext?: SubscriptionAuthContext;
-        onError?: (error: unknown) => void;
-    }) {
-        this.debugLog("📋 [RealtimeService] Registering DataDriver subscription:", subscriptionId, subscription.authContext ? "(with auth)" : "(no auth)");
-        this._subscriptions.set(subscriptionId, { ...subscription, started: 0, delivered: 0 });
-    }
-
-    // Add callback management methods
-    addSubscriptionCallback(subscriptionId: string, callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void) {
-        this.debugLog("📋 [RealtimeService] Adding callback for subscription:", subscriptionId);
+    /**
+     * Start an in-process listener: register it, then deliver its first rows.
+     *
+     * The first fetch runs here, as the subscriber and through a delivery slot,
+     * the way every refetch after it does. `PostgresBackendDriver.listen*` used
+     * to run it themselves, outside this service, and got all three wrong: a
+     * listener on `withAuth(user)` read its first rows on the owner connection,
+     * so it was handed rows its policies deny; a slow first fetch landed over a
+     * newer refetch, and after an unsubscribe; and a row listener never heard a
+     * `null`. The subscriber's identity is part of the request because a
+     * subscription registered first and stamped with it afterwards has a first
+     * fetch that ran before the stamp.
+     *
+     * No `authContext` reads as the anonymous user, first fetch and refetches
+     * alike — see {@link fetchCollectionWithAuth}.
+     */
+    startDataDriverSubscription(
+        subscriptionId: string,
+        request: DataDriverSubscriptionRequest,
+        callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
+    ): void {
+        this.debugLog("📋 [RealtimeService] Starting DataDriver subscription:", subscriptionId, request.authContext ? "(with auth)" : "(no auth)");
+        const subscription: Subscription = { clientId: "driver", ...request, started: 0, delivered: 0 };
+        this._subscriptions.set(subscriptionId, subscription);
         this.subscriptionCallbacks.set(subscriptionId, callback);
+        void this.deliverFirstToDataDriver(subscriptionId, subscription, callback);
     }
 
-    removeSubscriptionCallback(subscriptionId: string) {
-        this.debugLog("📋 [RealtimeService] Removing callback for subscription:", subscriptionId);
-        this.subscriptionCallbacks.delete(subscriptionId);
+    private async deliverFirstToDataDriver(
+        subscriptionId: string,
+        subscription: Subscription,
+        callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
+    ): Promise<void> {
+        // Claimed before the fetch, as the socket's first fetch claims it: this
+        // is the oldest read, so a refetch started while it runs outranks it.
+        const canDeliver = this.beginDelivery(subscriptionId, subscription);
+        try {
+            const data = subscription.type === "collection"
+                ? await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext)
+                : (await this.fetchEntityWithAuth(subscription.path, String(subscription.id), subscription.authContext)) ?? null;
+            if (canDeliver()) callback(data);
+        } catch (error) {
+            logger.error(`❌ [RealtimeService] Error in the first fetch for DataDriver subscription ${subscriptionId}`, { error: error });
+            this.reportDriverFetchFailure(subscriptionId, subscription, canDeliver, error);
+        }
     }
 
     // =============================================================================

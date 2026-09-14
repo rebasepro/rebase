@@ -59,7 +59,7 @@ describe("the websocket's debug tracing is level-gated", () => {
         mockWssInstance = null;
         createPostgresWebSocket(
             {} as Server,
-            { addClient: jest.fn(), registerDataDriverSubscription: jest.fn() } as unknown as RealtimeService,
+            { addClient: jest.fn(), startDataDriverSubscription: jest.fn() } as unknown as RealtimeService,
             { key: "postgres", initialised: true, admin: {} } as unknown as PostgresBackendDriver,
             { requireAuth: true, jwtSecret: "test-jwt-secret" }
         );

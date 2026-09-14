@@ -23,9 +23,8 @@ const mockDb = {
 } as unknown as NodePgDatabase;
 
 const mockRealtimeService = {
-    registerDataDriverSubscription: jest.fn(),
-    addSubscriptionCallback: jest.fn(),
-    removeSubscriptionCallback: jest.fn(),
+    startDataDriverSubscription: jest.fn(),
+    unsubscribe: jest.fn(),
     subscriptions: new Map(),
     notifyUpdate: jest.fn()
 } as unknown as RealtimeService;
@@ -446,78 +445,165 @@ email: "test@example.com" });
             expect(result).toEqual([{ id: 1 }]);
         });
 
-        it("should override listenCollection to inject auth context", () => {
-            const mockUnsubscribe = jest.fn();
+        // The user's identity goes in WITH the listener, so the first read runs
+        // as them. It used to be stamped onto the last registered subscription
+        // after the delegate returned, by which time that read had been issued
+        // on the owner connection. The e2e proof is
+        // `test/e2e/listener-first-fetch-e2e.test.ts`.
+        describe("listening", () => {
+            const onUpdate = () => undefined;
 
-            // Clear original map instead of reassigning
-            mockRealtimeService.subscriptions.clear();
+            it("hands the delegate its user's identity with a collection listener", () => {
+                const mockUnsubscribe = jest.fn();
+                const listen = jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => mockUnsubscribe);
+                const props = { path: "test", onUpdate };
 
-            // The act of calling the delegated method should update the last subscription
-            jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => {
-                mockRealtimeService.subscriptions.set("sub1", { clientId: "driver",
-authContext: undefined });
-                return mockUnsubscribe;
+                const unsub = authDelegate.listenCollection(props);
+
+                expect(unsub).toBe(mockUnsubscribe);
+                expect(listen).toHaveBeenCalledWith(props, { uid: "test-user", roles: [], isAnonymous: false });
             });
 
-            const unsub = authDelegate.listenCollection({ path: "test",
-collection: {} as unknown as CollectionConfig,
-callbacks: {} as unknown as Record<string, unknown> });
+            it("hands the delegate its user's identity with a row listener", () => {
+                const mockUnsubscribe = jest.fn();
+                const listen = jest.spyOn(delegate, "listenOne").mockImplementationOnce(() => mockUnsubscribe);
+                const props = { path: "test", id: "123", onUpdate };
 
-            expect(unsub).toBe(mockUnsubscribe);
-            expect(mockRealtimeService.subscriptions.get("sub1").authContext).toEqual({ uid: "test-user",
-roles: [] });
-        });
+                const unsub = authDelegate.listenOne(props);
 
-        it("should override listenOne to inject auth context", () => {
-            const mockUnsubscribe = jest.fn();
-
-            mockRealtimeService.subscriptions.clear();
-
-            jest.spyOn(delegate, "listenOne").mockImplementationOnce(() => {
-                mockRealtimeService.subscriptions.set("sub2", { clientId: "driver",
-authContext: undefined });
-                return mockUnsubscribe;
+                expect(unsub).toBe(mockUnsubscribe);
+                expect(listen).toHaveBeenCalledWith(props, { uid: "test-user", roles: [], isAnonymous: false });
             });
 
-            const unsub = authDelegate.listenOne({ path: "test",
-id: "123",
-collection: {} as unknown as CollectionConfig,
-callbacks: {} as unknown as Record<string, unknown> });
+            it("carries a guest's isAnonymous and its token's claims", async () => {
+                // The hand-built copy this replaced dropped `isAnonymous`, so a
+                // guest's refetches were read as an account's.
+                const guest = await delegate.withAuth({
+                    uid: "guest-1",
+                    roles: ["member"],
+                    isAnonymous: true,
+                    claims: { org_id: "org-9" }
+                } as never);
+                const listen = jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => jest.fn());
 
-            expect(unsub).toBe(mockUnsubscribe);
-            expect(mockRealtimeService.subscriptions.get("sub2").authContext).toEqual({ uid: "test-user",
-roles: [] });
-        });
+                guest.listenCollection!({ path: "test", onUpdate });
 
-        it("should handle listenCollection gracefully if delegate fails to add a subscription", () => {
-            const mockUnsubscribe = jest.fn();
-            mockRealtimeService.subscriptions.clear();
-            jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => mockUnsubscribe);
-            const unsub = authDelegate.listenCollection({ path: "empty-test",
-collection: {} as unknown as CollectionConfig,
-callbacks: {} as unknown as Record<string, unknown> });
-            expect(unsub).toBe(mockUnsubscribe);
-        });
-
-        it("should skip authContext injection if the last subscription has a non-driver clientId", () => {
-            // `injectAuthContext` writes into whichever subscription happens to be
-            // LAST in the map, on the assumption that the delegate call it just
-            // made registered it. The `clientId === "driver"` guard is what keeps
-            // that assumption honest: without it, a subscription registered by
-            // some other client — a websocket session belonging to a different
-            // user — would be stamped with this request's uid and roles, and the
-            // RLS-aware poller would then read rows as the wrong user.
-            const mockUnsubscribe = jest.fn();
-            mockRealtimeService.subscriptions.clear();
-            jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => {
-                mockRealtimeService.subscriptions.set("sub-ext", { clientId: "external-client",
-authContext: undefined });
-                return mockUnsubscribe;
+                expect(listen).toHaveBeenCalledWith(expect.anything(), {
+                    uid: "guest-1",
+                    roles: ["member"],
+                    isAnonymous: true,
+                    claims: { org_id: "org-9" }
+                });
             });
-            authDelegate.listenCollection({ path: "test",
-collection: {} as unknown as CollectionConfig,
-callbacks: {} as unknown as Record<string, unknown> });
-            expect(mockRealtimeService.subscriptions.get("sub-ext").authContext).toBeUndefined();
+
+            it("writes its identity into no other subscription", () => {
+                // What the stamping it replaced had to be guarded against: a
+                // websocket session belonging to another user sitting last in
+                // the map, and reading as this user from then on.
+                mockRealtimeService.subscriptions.clear();
+                mockRealtimeService.subscriptions.set("sub-ext", { clientId: "external-client", authContext: undefined });
+
+                authDelegate.listenCollection({ path: "test", onUpdate });
+
+                expect(mockRealtimeService.subscriptions.get("sub-ext").authContext).toBeUndefined();
+            });
+
+            it("starts the subscription with the realtime service as the user", () => {
+                authDelegate.listenOne({ path: "test", id: "123", onUpdate });
+
+                expect(mockRealtimeService.startDataDriverSubscription).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({
+                        type: "single",
+                        path: "test",
+                        id: "123",
+                        authContext: { uid: "test-user", roles: [], isAnonymous: false }
+                    }),
+                    expect.any(Function)
+                );
+            });
+
+            it("starts a listener on the base driver with no identity", () => {
+                // Read as the anonymous user by the realtime service, first
+                // fetch and refetches alike.
+                delegate.listenCollection({ path: "test", onUpdate });
+
+                expect(mockRealtimeService.startDataDriverSubscription).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({ type: "collection", authContext: undefined }),
+                    expect.any(Function)
+                );
+            });
+
+            it("starts a listener on a driver bound to a request as that request's user", () => {
+                // What `context.data` is inside a collection callback: a base
+                // driver constructed with the request's user. It used to
+                // subscribe with no identity, so its refetches read as the
+                // anonymous user.
+                const bound = new PostgresBackendDriver(mockDb, mockRealtimeService, delegate.registry, {
+                    uid: "u-7", roles: ["editor"], isAnonymous: false
+                } as never);
+
+                bound.listenCollection({ path: "test", onUpdate });
+
+                expect(mockRealtimeService.startDataDriverSubscription).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({ authContext: { uid: "u-7", roles: ["editor"], isAnonymous: false } }),
+                    expect.any(Function)
+                );
+            });
+
+            it("stores the whole query with the subscription", () => {
+                // Hand-listed, it named nine fields and dropped `logical`, so an
+                // `or(...)` listener was handed every row.
+                const logical = { type: "or" as const, conditions: [{ column: "title", operator: "==" as const, value: "a" }] };
+                delegate.listenCollection({
+                    path: "test",
+                    collection: { databaseId: "db-2" } as unknown as CollectionConfig,
+                    filter: { done: ["==", false] },
+                    logical,
+                    orderBy: "title",
+                    order: "asc",
+                    limit: 5,
+                    offset: 10,
+                    startAfter: { title: "m" },
+                    searchString: "report",
+                    searchExplain: true,
+                    include: { author: true },
+                    fields: ["id", "title"],
+                    distinct: true,
+                    onUpdate
+                });
+
+                const [, request] = (mockRealtimeService.startDataDriverSubscription as jest.Mock).mock.calls[0];
+                expect(request.collectionRequest).toEqual({
+                    filter: { done: ["==", false] },
+                    logical,
+                    orderBy: "title",
+                    order: "asc",
+                    limit: 5,
+                    offset: 10,
+                    startAfter: { title: "m" },
+                    searchString: "report",
+                    searchExplain: true,
+                    include: { author: true },
+                    fields: ["id", "title"],
+                    distinct: true,
+                    databaseId: "db-2"
+                });
+            });
+
+            it("passes a row listener's null on", () => {
+                // How a listener learns its row is gone. It used to be dropped.
+                const heard: unknown[] = [];
+                delegate.listenOne({ path: "test", id: "123", onUpdate: (row) => heard.push(row) });
+
+                const [, , deliver] = (mockRealtimeService.startDataDriverSubscription as jest.Mock).mock.calls[0];
+                deliver({ id: "123" });
+                deliver(null);
+
+                expect(heard).toEqual([{ id: "123" }, null]);
+            });
         });
 
         it("should delegate fetchAvailableDatabases via admin without a transaction", async () => {

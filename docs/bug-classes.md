@@ -2710,7 +2710,10 @@ error into an answer now calls.
 | Postgres realtime subscriptions (`sanitizeErrorForClient`) | **BUG**: it read `statusCode`, and `RebaseApiError` spells it `status`, so a 403 thrown from `afterRead` arrived as "Could not load data … Check server logs" with no code. Fixed. It still hides 5xx messages, which is deliberately stricter than REST. |
 | Mongo realtime subscriptions | **BUG**, and a different class: a failed fetch was logged and nothing was sent, on the first load and on every re-fetch, so the subscriber was never told and its view stayed loading. Fixed: both fetch paths send an `ERROR` frame keyed by `subscriptionId`, through the same delivery slot rows use, so a straggler cannot report over newer rows. A 4xx keeps its message, code and `details` through `declaredErrorAnswer`. Anything else, a declared 5xx included, is masked as on Postgres. |
 | in-process `listenCollection` / `listenOne`, both backends | **BUG**, the same gap one door over. `MongoDriver.listen*` passed the realtime service no error callback, so neither the first fetch nor a re-fetch reached `onError`. Postgres reported the first fetch, but its driver-refetch `catch` blocks only logged, so the listener kept its last rows as if they were current. Fixed: the listener's `onError` is stored on the subscription record on both backends, called through the delivery slot, and handed the error as thrown (trusted code, nothing masked). `RealtimeProvider.subscribeTo*` now declares the optional `onError`. The multi-source router re-listed three arguments and would have dropped it; it now forwards all of them. |
-| Postgres in-process listener, first fetch | **OPEN**, read from the code and not reproduced. `PostgresBackendDriver.listen*` runs the first fetch itself, outside the realtime service. It reads through the base driver, so a listener on `withAuth(user)` gets its first rows without its own auth context; `injectAuthContext` scopes only the re-fetches. The first delivery takes no delivery slot either (class 44), so it can land after a newer re-fetch or after unsubscribe. And `listenOne` drops a `null` row, so a deleted row is never reported. Mongo runs the first fetch in its realtime service, scoped and slotted, and delivers `null`. |
+| Postgres in-process listener, first fetch | **BUG, security**, reproduced against a real database (2026-09-15) and fixed. `PostgresBackendDriver.listen*` ran the first fetch itself, outside the realtime service, on the base driver. With `rlsUserRole` set, a `withAuth(user)` listener's first delivery held every user's rows, and `listenOne` handed over a row the user's policy denies. `injectAuthContext` stamped the user onto the subscription only after that read, and left out `isAnonymous`, so a guest's re-fetches also passed a policy that excludes guests. The first delivery took no slot (class 44): a held first fetch landed over a newer re-fetch, and after unsubscribe. `listenOne` dropped `null`, so a deleted or missing row was never reported. And the hand-listed query dropped `logical`, so an `or(...)` listener was handed every row. Fixed the Mongo way: `RealtimeService.startDataDriverSubscription` takes the subscriber's identity at registration (`authContextOf`, the same helper `withTransaction` uses), then runs the first fetch through `fetchCollectionWithAuth` / `fetchEntityWithAuth` in a delivery slot. A failure goes to `onError` through that slot, as thrown. |
+| Mongo guest identity, socket and in-process listener | **OPEN**, read from the code and not reproduced. `policy.registered()` ("signed in and not a guest") reads `isAnonymous` in `securityRuleFilter.ts`, and two doors never carry it. The socket's `getScopedDelegate` builds its user with `isAnonymous: false`, its `subscribe_*` `authContext` is `{ uid, roles }`, and so is `AuthenticatedMongoDriver.authContext()` for `listen*`. So a guest may pass a `registered()` rule over the Mongo socket and in a Mongo in-process listener. This is the omission Postgres's `injectAuthContext` had. The Postgres socket reads `jwtPayload.isAnonymous`. |
+| Postgres in-process listener, fields it does not carry | **OPEN**, found while fixing the row above. `vectorSearch`, `page` and `withDeleted` are still not stored with the subscription. The socket refuses `vectorSearch` with `VECTOR_SEARCH_NOT_LIVE` and turns `page` into an offset; the in-process listener ignores both, so `.vectorSearch(…).listen()` in server code gets an ordinary listing. Mongo's in-process listener drops `vectorSearch` too. |
+| Postgres `RealtimeProvider.subscribeTo*` | **OPEN**, no caller in the tree. On Postgres they only register: no first fetch, and `logical` and `offset` are left out of the stored request. Mongo's run a first fetch. Anything reaching Postgres through the multi-source router's `subscribeTo*` would wait for the first write before hearing anything. |
 | Postgres socket error frames | **OPEN**: the first fetch and both re-fetches send their error frame without the delivery slot, so a failed straggler can mark a view that already shows newer rows as failed. Mongo's frames go through the slot. |
 | socket error frame → SDK | **gap**: the client read only `message` and `code`, so `e.details` was always empty over the socket. Fixed: frames carry `details` and the client passes them on. `status` stays `undefined`, because a frame is not an HTTP response. |
 | in-process `rebase.data` | n/a: nothing is translated, so the caller gets the `RebaseApiError` itself. |
@@ -2747,6 +2750,23 @@ refetch `catch` blocks, the Postgres driver's registration, the router) turns
 its cases red. So do four narrower mutations: `listenOne` alone on each
 backend, a copy of the error instead of the error, and the delivery slot
 skipped.
+
+The Postgres first fetch is gated by `test/e2e/listener-first-fetch-e2e.test.ts`.
+It runs against a real Postgres as a superuser with `rebase_user` provisioned,
+which is the posture where the base connection bypasses RLS. It has ten cases:
+scope for a collection, a row and a guest; a base-driver listener whose first
+rows match its re-fetch; a first fetch held open in `afterRead` while a newer
+re-fetch lands, for a collection and a row; unsubscribe during that fetch; a
+deleted row; a missing row; and an `or(...)` group. All ten failed before the
+fix. Seven cases in `test/realtime-delivery-order.test.ts` pin the service's
+slot, `null` and identity. Nine in `test/postgresDataDriver.test.ts` pin what
+the driver hands over: the user's identity with `isAnonymous` and claims, a
+request-bound driver's own user, no identity on the base driver, the whole
+query, and `null`. Ten mutations
+each turned the tests written for them red: the identity not passed, passed
+without `isAnonymous` or claims, or ignored by the first fetch; the slot
+skipped for rows or for the error; `null` dropped or sent as `undefined`;
+`logical` dropped; and a request-bound driver's user ignored.
 
 ### Creating a user: the hook's report, read on one door — 2026-09-14
 
