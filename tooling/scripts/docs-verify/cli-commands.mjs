@@ -45,6 +45,13 @@ export function loadCliCommands(root) {
         return found.length ? new Set(found) : null;
     };
 
+    // …and so does `cli.ts` itself. `namespacedCommands` is the list of
+    // commands that own their `--help`, not the list of commands:
+    // `normalize-imports` dispatches, is in the global help, and is in neither
+    // it nor the list above, so the npm README's command table was reported as
+    // naming a command that "exits 1" when it runs fine.
+    for (const name of cases(cli) ?? []) top.add(name);
+
     const sub = new Map([
         ["auth", cases(read(root, "packages/cli/src/commands/auth.ts"))],
         ["skills", cases(read(root, "packages/cli/src/commands/skills.ts"))],
