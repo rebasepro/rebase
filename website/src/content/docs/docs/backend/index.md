@@ -95,7 +95,7 @@ only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
 `storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
-`history` in its object form (`{ maxEntries, ttlDays }`)
+`history` in its object form (`{ retention }`)
 
 `schemaEditor` is forced off in a built bundle: the editor rewrites collection
 *source* files, and a bundle holds compiled output.

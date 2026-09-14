@@ -142,6 +142,11 @@ callback on the auth (users) collection will **not** run for these paths. For
 side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
+
+OAuth runs fewer of them than registration does. A provider sign-in fires
+`afterUserCreate` when it creates the account, and no other lifecycle hook:
+`beforeUserCreate`, `beforeLogin` and `onAuthenticated` do not run on the OAuth
+route, so a check or an audit trail hung on them never sees an OAuth user.
 :::
 
 ### Bot protection

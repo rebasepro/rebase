@@ -60,10 +60,14 @@ need a column no administrator reads through the API, that is `read: []`.
 
 ### Why the trusted plane passes
 
-An in-process `rebase.data` call in a hook, a migration, or the auth adapter
-verifying a password has no request and no roles behind it. Those are server
-code, and a role list does not apply to them. `[]` still does: that is a
-statement about the API surface rather than about who is calling.
+Server code with no request behind it — a migration, or the auth adapter
+verifying a password — reads with no roles at all, and a role list does not
+apply to it. `[]` still does: that is a statement about the API surface rather
+than about who is calling.
+
+A callback's `context.data` is not that plane. Inside a request it reads with the
+caller's roles, so the field rules apply to what it reads exactly as they apply
+to the request.
 
 ## `excludeFromApi` is the same mechanism
 
@@ -204,10 +208,10 @@ posts and never reads back appears in the request body and not in the row.
 
 ## In-process writes
 
-`rebase.data` and `rebase.dataAsAdmin` in a hook, a function or a cron job do not
-pass through the write check. That is the same exemption `excludeFromApi` has
-always had, and it is what makes the rule enforceable at all: something has to be
-able to store the password hash.
+In-process writes — `context.data` in a callback, `rebase.dataAsAdmin` in a
+callback, a function or a cron job — do not pass through the write check. That
+is the same exemption `excludeFromApi` has always had, and it is what makes the
+rule enforceable at all: something has to be able to store the password hash.
 
 Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
 hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
