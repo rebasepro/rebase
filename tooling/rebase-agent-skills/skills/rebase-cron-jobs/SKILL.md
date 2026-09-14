@@ -5,7 +5,7 @@ description: Guide for scheduling recurring background tasks with Rebase's built
 
 # Rebase Cron Jobs
 
-> **IMPORTANT FOR AGENTS**: Rebase has a **built-in cron scheduler** — do NOT install external libraries (`node-cron`, `agenda`, `bull`) or set up separate worker processes. Drop a TypeScript file in the `crons/` directory.
+> **IMPORTANT FOR AGENTS**: Rebase has a **built-in cron scheduler** — do NOT install external libraries (`node-cron`, `agenda`, `bull`) or set up separate worker processes. Drop a TypeScript file in the `backend/crons/` directory.
 
 > **IMPORTANT FOR AGENTS**: Every cron handler receives `ctx.rebase` — the server-side Rebase singleton, the same object `import { rebase } from "@rebasepro/server"` returns. `ctx.rebase.dataAsAdmin` is **THE** primary way cron jobs read/write data. Always use it in examples, never raw SQL or direct DB imports. `ctx.client` was the old name for the same object and has been removed — a handler that destructures `client` no longer compiles.
 
@@ -23,7 +23,9 @@ Rebase includes a built-in cron job scheduler for running recurring background t
 
 ## Setup
 
-Enable cron jobs by adding `cronsDir` to your backend config:
+**Nothing to enable in a scaffolded project.** Create `backend/crons/` and drop a file in it: `rebase dev`, `rebase build` and the runtime discover that directory on their own, and the backend app's `crons` key in `rebase.json` moves it if you need to. There is no `backend/src/index.ts` to edit.
+
+Only an **ejected** project, or a server you wire yourself, passes the directory to `initializeRebaseBackend`:
 
 ```typescript no-verify
 const backend = await initializeRebaseBackend({
@@ -32,11 +34,11 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-### Configuration Options
+### Configuration Options (ejected / custom server)
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `cronsDir` | `string` | — | Absolute path to the directory containing cron job files. Required to enable cron jobs. |
+| `cronsDir` | `string` | — | Absolute path to the directory containing cron job files. The runtime sets it from `rebase.json`; pass it yourself only on a hand-wired server. |
 | `cronPersistence` | `boolean` | `true` | Enable/disable database persistence for execution logs. When `false`, logs are kept in-memory only. |
 
 ```typescript no-verify

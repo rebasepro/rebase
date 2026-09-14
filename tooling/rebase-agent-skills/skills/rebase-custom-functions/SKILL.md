@@ -5,7 +5,7 @@ description: Guide for adding custom API endpoints to a Rebase backend using the
 
 # Custom API Functions
 
-> **IMPORTANT FOR AGENTS**: Rebase supports **auto-discovered custom Hono routes** via the `functionsDir` config option. **Do NOT** modify the main Hono `app` instance or create standalone Express/Fastify servers. Instead, drop a TypeScript file in the `functions/` directory and Rebase will auto-mount it.
+> **IMPORTANT FOR AGENTS**: Rebase supports **auto-discovered custom Hono routes**. **Do NOT** modify the main Hono `app` instance or create standalone Express/Fastify servers. Instead, drop a TypeScript file in `backend/functions/` and Rebase will auto-mount it.
 
 ## Overview
 
@@ -25,7 +25,9 @@ Custom functions let you add arbitrary HTTP endpoints to your Rebase backend. Th
 
 ## Setup
 
-Enable custom functions by adding `functionsDir` to your backend config:
+**Nothing to enable in a scaffolded project.** `rebase dev`, `rebase build` and the runtime discover `backend/functions/` on their own — the scaffold ships `backend/functions/hello.ts` — and the backend app's `functions` key in `rebase.json` moves the directory if you need to. There is no `backend/src/index.ts` to edit.
+
+Only an **ejected** project, or a server you wire yourself, passes the directory to `initializeRebaseBackend`:
 
 ```typescript no-verify
 const backend = await initializeRebaseBackend({
