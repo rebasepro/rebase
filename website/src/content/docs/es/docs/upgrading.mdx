@@ -1,5 +1,5 @@
 ---
-sourceHash: 02ee62af305e1df6
+sourceHash: 2535b00e3193eca2
 slug: es/docs/upgrading
 title: Actualización
 description: Qué deja de funcionar cuando migras una aplicación existente a la versión actual y qué hacer en cada caso.
@@ -11,7 +11,7 @@ Cinco saltos, de los más recientes a los más antiguos. Empieza en el que esté
 
 | Estás en | Leer | Qué efectos tiene |
 |---|---|---|
-| **0.18 – 0.20** | [0.18 → next](/docs/upgrading/0-18-to-next/) | Aún no publicado: lo que está fusionado en `main` y ya se describe en esta documentación. `context.client.data` deja de compilar en un callback de colección; consulta a través de `context.data`. 0.19 y 0.20 no declaran cambios incompatibles, por lo que este es un solo salto desde 0.18. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` deja de compilar en un callback de colección —consulta a través de `context.data`— y `selectedEntities` da paso a una selección que puede representar filas que nadie ha cargado. 0.19 y 0.20 no declaran cambios incompatibles, por lo que este es un solo salto desde 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Once cambios incompatibles, la mayoría son errores de compilación en lugar de cambios silenciosos de comportamiento. `rebase.data` desaparece en tiempo de ejecución, los rangos de dependencias peer se restringen a intercalaciones (^), y la versión mínima de Node pasa a 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Los paquetes de administración se renombran, los recursos se declaran en lugar de configurarse y un bundle compilado antes no arrancará en un entorno de ejecución actual. 0.15 y 0.16 no rompen nada, por lo que este es un solo salto desde 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Cada clave en tránsito usa camelCase, y el inicio de sesión anónimo pasa a ser opcional (opt-in). |

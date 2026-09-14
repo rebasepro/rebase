@@ -1,5 +1,5 @@
 ---
-sourceHash: 02ee62af305e1df6
+sourceHash: 2535b00e3193eca2
 slug: de/docs/upgrading
 title: Upgrade
 description: Was kaputtgeht, wenn Sie eine bestehende App auf das aktuelle Release migrieren, und was jeweils dagegen zu tun ist.
@@ -11,7 +11,7 @@ Fünf Schritte, die neuesten zuerst. Beginnen Sie mit der Version, die direkt ü
 
 | Sie sind auf | Lesen | Was sich für Sie ändert |
 |---|---|---|
-| **0.18 – 0.20** | [0.18 → next](/docs/upgrading/0-18-to-next/) | Noch nicht veröffentlicht: was auf `main` zusammengeführt und in diesen Docs bereits beschrieben ist. `context.client.data` kompiliert in einem Collection-Callback nicht mehr – führen Sie Abfragen über `context.data` aus. 0.19 und 0.20 deklarieren keine Breaking Changes, daher ist dies ein einziger Schritt ab 0.18. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` kompiliert in einem Collection-Callback nicht mehr – führen Sie Abfragen über `context.data` aus –, und `selectedEntities` weicht einer Auswahl, die auch für Zeilen stehen kann, die niemand geladen hat. 0.19 und 0.20 deklarieren keine Breaking Changes, daher ist dies ein einziger Schritt ab 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Elf Breaking Changes, die meisten davon eher Kompilierfehler als stillschweigende Verhaltensänderungen. `rebase.data` fällt zur Laufzeit weg, Peer-Ranges verengen sich auf Carets und die minimale Node-Version steigt auf 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Die Admin-Pakete werden umbenannt, Ressourcen werden deklariert statt konfiguriert, und ein zuvor erstelltes Bundle startet auf einer aktuellen Laufzeitumgebung nicht mehr. 0.15 und 0.16 brechen nichts, daher ist dies ein einziger Schritt ab 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Jeder Wire-Key verwendet camelCase und die anonyme Anmeldung ist Opt-in. |

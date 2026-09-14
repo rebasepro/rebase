@@ -1,5 +1,5 @@
 ---
-sourceHash: 02ee62af305e1df6
+sourceHash: 2535b00e3193eca2
 slug: pt/docs/upgrading
 title: Atualização
 description: O que quebra ao migrar um aplicativo existente para a versão atual e o que fazer em cada caso.
@@ -11,7 +11,7 @@ Cinco etapas, da mais recente para a mais antiga. Comece na etapa logo acima da 
 
 | Você está na versão | Leia | O que isso impacta |
 |---|---|---|
-| **0.18 – 0.20** | [0.18 → next](/docs/upgrading/0-18-to-next/) | Ainda não lançado: o que já foi integrado na `main` e descrito nesta documentação. `context.client.data` deixa de compilar em um callback de coleção — faça consultas por meio de `context.data`. As versões 0.19 e 0.20 não declaram breaking changes, portanto este é um único salto a partir da 0.18. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` deixa de compilar em um callback de coleção — faça consultas por meio de `context.data` — e `selectedEntities` dá lugar a uma seleção que pode representar linhas que ninguém carregou. As versões 0.19 e 0.20 não declaram breaking changes, portanto este é um único salto a partir da 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Onze breaking changes, a maioria sendo erros de compilação em vez de alterações silenciosas de comportamento. `rebase.data` desaparece em tempo de execução, os intervalos de peer dependencies se restringem a circunflexos (carets) e a versão mínima do Node passa a ser 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Os pacotes de admin foram renomeados, os recursos são declarados em vez de configurados e um bundle construído anteriormente não inicializará em um runtime atual. As versões 0.15 e 0.16 não quebram nada, portanto este é um único salto a partir da 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Todas as chaves trafegadas na rede (wire keys) usam camelCase, e o login anônimo passa a ser opt-in. |

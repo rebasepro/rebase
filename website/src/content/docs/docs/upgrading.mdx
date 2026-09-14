@@ -11,7 +11,7 @@ downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
-| **0.18 – 0.20** | [0.18 → next](/docs/upgrading/0-18-to-next/) | Not released yet: what is merged on `main` and already described in these docs. `context.client.data` stops compiling in a collection callback — query through `context.data`. 0.19 and 0.20 declare no breaking change, so this is one hop from 0.18. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` stops compiling in a collection callback — query through `context.data` — and `selectedEntities` gives way to a selection that can stand for rows nobody has loaded. 0.19 and 0.20 declare no breaking change, so this is one hop from 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Eleven breaking changes, most of them compile errors rather than silent behaviour changes. `rebase.data` disappears at runtime, peer ranges narrow to carets, and the Node floor moves to 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | The admin packages are renamed, resources are declared rather than configured, and a bundle built before it will not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop from 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Every wire key is camelCase, and anonymous sign-in is opt-in. |

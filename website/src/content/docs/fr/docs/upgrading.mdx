@@ -1,5 +1,5 @@
 ---
-sourceHash: 02ee62af305e1df6
+sourceHash: 2535b00e3193eca2
 slug: fr/docs/upgrading
 title: Mise à niveau
 description: Ce qui casse lorsque vous migrez une application existante vers la version actuelle, et comment traiter chaque problème.
@@ -11,7 +11,7 @@ Cinq étapes, de la plus récente à la plus ancienne. Commencez par celle qui s
 
 | Vous êtes en | À lire | Ce que cela implique |
 |---|---|---|
-| **0.18 – 0.20** | [0.18 → next](/docs/upgrading/0-18-to-next/) | Pas encore publié : ce qui est fusionné sur `main` et déjà décrit dans cette documentation. `context.client.data` ne compile plus dans un callback de collection — effectuez vos requêtes via `context.data`. Les versions 0.19 et 0.20 ne déclarent aucun changement cassant, il s'agit donc d'une seule étape depuis la 0.18. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` ne compile plus dans un callback de collection — effectuez vos requêtes via `context.data` — et `selectedEntities` cède la place à une sélection qui peut désigner des lignes que personne n'a chargées. Les versions 0.19 et 0.20 ne déclarent aucun changement cassant, il s'agit donc d'une seule étape depuis la 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Onze changements cassants, la plupart étant des erreurs de compilation plutôt que des changements de comportement silencieux. `rebase.data` disparaît au runtime, les plages de peer dependencies sont restreintes aux carets (^), et la version minimale de Node passe à 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Les paquets admin sont renommés, les ressources sont déclarées plutôt que configurées, et un bundle compilé avant cela ne démarrera pas sur un runtime actuel. Les versions 0.15 et 0.16 ne cassent rien, il s'agit donc d'une seule étape depuis la 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Chaque clé réseau est en camelCase, et la connexion anonyme nécessite désormais une activation explicite (opt-in). |
