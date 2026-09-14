@@ -1,19 +1,26 @@
 # Preview cards
 
-`card.html` is the single source for every preview image the project serves.
-`render.mjs` shoots it at each size the platforms want:
+Three scripts render the site's preview images, and two of them write the same
+files. Check which one owns an image before you re-render it.
 
-| Output | Size | Used by |
-| --- | --- | --- |
-| `../public/img/social-preview.png` | 1280×640 | GitHub repo → **Settings → Social preview** (uploaded by hand; GitHub has no API for it) |
-| `../public/img/teaser.png` | 1200×630 | `og:image` — [`src/layouts/Layout.astro:41`](../src/layouts/Layout.astro) and the JSON-LD `screenshot` |
-| `../public/img/twitter_teaser.png` | 1200×630 | `twitter:image` — [`src/layouts/Layout.astro:181`](../src/layouts/Layout.astro) |
+| Output | Size | Rendered by | Used by |
+| --- | --- | --- | --- |
+| `../public/img/social-preview.png` | 1280×640 | `og/render.mjs`, from `og/card.html` | GitHub repo → **Settings → Social preview** (uploaded by hand; GitHub has no API for it) |
+| `../public/img/teaser.png` | 1200×630 | `scripts/og/render.mjs`, from `scripts/og/teaser.html` | The default `ogImage` in `src/layouts/Layout.astro` — `og:image`, `twitter:image` and the JSON-LD `screenshot` of any page that passes none |
+| `../public/img/twitter_teaser.png` | 1200×630 | `scripts/og/render.mjs`, as a copy of `teaser.png` | Nothing in `src/`: `twitter:image` follows `ogImage` now |
+| `../public/img/og/*.png` | 1200×630 | `scripts/generate_og_images.mjs` | The per-route cards pages pass as `ogImage`, and the docs' `og:image` in `astro.config.mjs` |
+
+This directory's template, `card.html`, now owns only the GitHub social preview.
+From the repo root:
 
 ```bash
-pnpm --filter website og
+node website/og/render.mjs            # add --open to preview the results
 ```
 
-Add `--open` to preview the results.
+It needs `@playwright/test` and ImageMagick's `magick` on the path. It **also
+overwrites `teaser.png` and `twitter_teaser.png`** with this card, replacing the
+hero card `scripts/og/` renders. Unless that is what you want, discard those two
+files afterwards or re-run `node website/scripts/og/render.mjs`.
 
 ## Notes for whoever edits it next
 

@@ -197,7 +197,7 @@ Every major page is a variation on the same three acts:
 └── /cli             CLI tour
 /compare             Comparison hub  (was /why-rebase)
 ├── /rebase-vs-*     8 head-to-head pages
-└── /alternatives/*  7 programmatic pages from src/data/alternatives.ts
+└── /alternatives/*  6 programmatic pages from src/data/alternatives.ts
 /rls-check           The free audit — the proof for claim 1, on its own page
 /pricing  /demo  /about  /manifesto  /contact  /pitch
 /startups /agencies /kit-digital /europe    campaign pages
@@ -222,12 +222,15 @@ overview · Compare). The footer mirrors it.
 | `/admin` | `/cms` | Renamed with the product (2026-08-27). |
 | `/editing` | `/cms` | Folded into the CMS page: content and fields are what the CMS is, not a sibling of it. |
 
-**Two A/B tests are parked at weight 0** in `src/scripts/ab-testing.ts`
-(`navigation-structure` also in `src/layouts/Layout.astro`). `navigation-structure`
-was splitting 50/50 between the mega-nav and a flat four-link nav — which meant
-half of all visitors never saw the backend/panel split the whole site is
-organised around. `manifesto-banner-text` varied a banner that no longer renders
-(§6, *Nothing sits above the header*). Flip the weights to run either again.
+**`navigation-structure` runs 50/50** in `src/scripts/ab-testing.ts` until
+2027-09-30, between the mega-nav and a flat four-link nav (both in
+`src/components/Header.astro`). It sat parked at 0% until 2026-09-05, because
+the flat arm means half of all visitors never see the backend/panel split the
+whole site is organised around; that split is now the thing under test, and
+`header_link_click` carries the variant so the arms can be told apart. Dial the
+exposure in the weights rather than switching it off. `manifesto-banner-text`
+was deleted the same day: it varied a banner no page mounts (§6, *Nothing sits
+above the header*).
 
 ## 5. Page contracts
 
@@ -546,7 +549,7 @@ there once. Do not re-implement any of them inline on a page.
   it sat above the header on the home page, in raw `#0070F4` (white on it is
   3.74:1), and it made a values line the first sentence a cold visitor read.
   Off the home page since 2026-09-02; the manifesto link lives in the footer
-  and `manifesto-banner-text` is parked (§4). `showBanner` still exists on
+  and `manifesto-banner-text` is deleted (§4). `showBanner` still exists on
   `Layout.astro`; no page passes it.
 - **No emoji, anywhere.**
 - **No English sentence in a page component.** Every marketing page goes through

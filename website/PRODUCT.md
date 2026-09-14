@@ -3,9 +3,10 @@
 <!-- impeccable:product-schema 1 -->
 
 The marketing site and documentation at `rebase.pro`. Inherits
-[`/PRODUCT.md`](../docs/PRODUCT.md) for shared Rebase truth — users, positioning,
-capabilities, brand commitments, and the self-host-only constraint. This file
-records only what is specific to the site.
+[`docs/PRODUCT.md`](../docs/PRODUCT.md) for shared Rebase truth — users,
+positioning, capabilities and brand commitments. This file records only what is
+specific to the site, including how it may describe Rebase Cloud, a live private
+beta (Product Principles, 5).
 
 ## Platform
 
@@ -66,8 +67,9 @@ The docs exist to keep that developer building without leaving.
 - Machine-readable surfaces are generated at build time: `llms.txt`, the sitemap,
   per-page `.md` variants, and the changelog copy. A page absent from the sidebar
   is absent from `llms.txt`.
-- An A/B testing harness exists (`src/scripts/ab-testing.ts`); the
-  `navigation-structure` variant is parked at weight 0 rather than deleted.
+- An A/B testing harness exists (`src/scripts/ab-testing.ts`). Two experiments
+  run 50/50: `navigation-structure` (the mega-nav against a flat nav) and
+  `hero-register` (the home hero's art, subtle against loud).
 - `/dev/demos` is an internal gallery of the site's live demo components.
 - The site consumes the real product packages (`@rebasepro/ui`,
   `@rebasepro/cms`, `@rebasepro/app`) as workspace dependencies, so demos run

@@ -25,7 +25,6 @@ Run from `website/`. This repo uses `pnpm` exclusively.
 | `pnpm build` | Production build to `./dist/` (runs `prebuild` first) |
 | `pnpm preview` | Preview the production build locally |
 | `pnpm generate-all` | Regenerate the changelog copy, `llms.txt` and the sitemap |
-| `pnpm genAPI` | Regenerate the API reference from TypeDoc |
 | `pnpm deploy` | Build and deploy to Firebase Hosting (`rebase-578f2`) |
 
 ## Structure
@@ -78,9 +77,11 @@ Never hand-edit these; change the source or the generator in `scripts/`.
 
 - **Removed routes carry 301s in `firebase.json`** (`/features` → `/product`,
   `/why-rebase` → `/compare`). Don't resurrect them.
-- **The `navigation-structure` A/B variant is parked at weight 0**, not deleted
-  (`src/scripts/ab-testing.ts`, `src/layouts/Layout.astro`). Flip the weights to
-  run it again.
+- **The `navigation-structure` A/B test is live, 50/50**, so half of visitors get
+  the flat nav (`src/scripts/ab-testing.ts`; the two navs are in
+  `src/components/Header.astro`). Re-weighting only moves new visitors: the
+  assigner in `src/layouts/Layout.astro` re-rolls a stored assignment only when
+  it names an arm that no longer exists, or its 90-day cookie has lapsed.
 - **`NeatBackground` does not render in headless screenshots.** It is decoration,
   never a section's only light — pair it with CSS radial gradients.
 - Open legal items are tracked privately.

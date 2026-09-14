@@ -69,7 +69,7 @@ const CONTENT_DIR = path.resolve('./src/content/docs');
 /**
  * Directories that are generated, and must not be translated.
  *
- * `docs/ui/**` is written by the AST generator from the `.design-sync`
+ * `docs/ui/**` is written by the AST generator from the `tooling/design-sync`
  * previews — it is regenerated wholesale, and nothing regenerates a
  * translation of it. Translating it once produces ~495 files (99 pages × 5
  * locales) that the generator does not own and will never update, so they
@@ -85,9 +85,10 @@ const EXCLUDED_DIRS = ['docs/ui'];
  * Individual generated files, excluded for the same reason.
  *
  * `docs/CHANGELOG.md` is copied from the repo-root CHANGELOG by
- * `scripts/copy_changelog.js` on every `generate-all`, and `check:generated`
- * gates that it matches. Only the English copy is regenerated, so a translated
- * one is stale from the next release onward — and it is the one document where
+ * `scripts/copy_repo_docs.js` on every `generate-all`, and `check:generated`
+ * gates that it matches. The same script writes each locale's copy as the
+ * English text behind a pending-translation note, so a translation made here
+ * would be overwritten on the next run — and it is the one document where
  * being one release behind is worst.
  */
 const EXCLUDED_FILES = ['docs/CHANGELOG.md'];
