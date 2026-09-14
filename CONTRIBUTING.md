@@ -250,8 +250,10 @@ single file:
 | Jest | everything else | `pnpm --filter @rebasepro/ui test -- chip-contrast` |
 
 `packages/server-postgres` has both: `test` is Jest over `test/*`, and
-`test:e2e` is Vitest against the **built** `dist`, so build the package before
-running it.
+`test:e2e` is Vitest over `test/e2e`. The e2e loads its workspace dependencies
+from source, so an edit is under test without a rebuild — except in the three
+files that start the CLI or `rebase-server` as a child process, which loads
+`dist`. Build before running the whole suite.
 
 `@rebasepro/server` runs Jest under `NODE_OPTIONS="--experimental-vm-modules"`.
 Its `test` script sets that for you; a bare `pnpm exec jest` in that package fails on
@@ -273,7 +275,8 @@ docker compose -f app/backend/docker-compose.yml up -d db
 
 The build is not optional for any of them: the CLI suite scaffolds a project
 that consumes every package as built output and refuses to start otherwise, and
-the Vitest suites import `dist` directly. Then, and this is all of them — CI
+three server-postgres files start the CLI and `rebase-server` as child
+processes, which load `dist`. Then, and this is all of them — CI
 runs no e2e suite that is not on this list:
 
 ```bash

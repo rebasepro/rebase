@@ -274,9 +274,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
-      # suite scaffolds a project that consumes every package as built output
-      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
+      # processes, which load built dist, and the CLI suite scaffolds a project
+      # that consumes every package as built output (its `assertPackagesBuilt`
+      # guard fails otherwise). This job runs on its
       # own runner, so the `checks` job's build does not reach it — build here. Only
       # `./packages/*`, not the admin app, which the e2e never boots.
       - name: Build packages
@@ -447,9 +448,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
-      # suite scaffolds a project that consumes every package as built output
-      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
+      # processes, which load built dist, and the CLI suite scaffolds a project
+      # that consumes every package as built output (its `assertPackagesBuilt`
+      # guard fails otherwise). This job runs on its
       # own runner, so the `checks` job's build does not reach it — build here. Only
       # `./packages/*`, not the admin app, which the e2e never boots.
       - name: Build packages
@@ -593,9 +595,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
-      # suite scaffolds a project that consumes every package as built output
-      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
+      # processes, which load built dist, and the CLI suite scaffolds a project
+      # that consumes every package as built output (its `assertPackagesBuilt`
+      # guard fails otherwise). This job runs on its
       # own runner, so the `checks` job's build does not reach it — build here. Only
       # `./packages/*`, not the admin app, which the e2e never boots.
       - name: Build packages
@@ -768,9 +771,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
-      # suite scaffolds a project that consumes every package as built output
-      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
+      # processes, which load built dist, and the CLI suite scaffolds a project
+      # that consumes every package as built output (its `assertPackagesBuilt`
+      # guard fails otherwise). This job runs on its
       # own runner, so the `checks` job's build does not reach it — build here. Only
       # `./packages/*`, not the admin app, which the e2e never boots.
       - name: Build packages

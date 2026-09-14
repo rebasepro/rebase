@@ -866,7 +866,7 @@ on it:
 | `onAdminResetPassword` → `temporaryPassword` | **BUG** — the same shape. This hook *could* write through `authRepo`; nothing held it to that. Same fix. |
 | `invitationSent`, on both reset hooks | clean — a report of what the hook did, passed through |
 | `AuthCollectionCreateResult.temporaryPassword`, `onAdminCreateUser` | clean — the hook writes `values.passwordHash` itself, as its doc requires. Nothing checks the two agree. |
-| `hookHandledEmail` / `invitationSent` from a create hook | **OPEN** (class 42) — the REST data path (`api-generator.ts`) honours them. `POST /admin/users` reads neither, so with email configured it sends its own invitation after the hook's, and drops the hook's `temporaryPassword` from the response. |
+| `hookHandledEmail` / `invitationSent` from a create hook | **BUG** (class 42) — the REST data path (`api-generator.ts`) honoured them. `POST /admin/users` read neither, so with email configured it sent its own invitation after the hook's and dropped the hook's `temporaryPassword` from the response. Fixed in 8c5a265d8: both create doors call `completeUserCreation`. See class 42's 2026-09-14 entry. |
 
 ---
 
@@ -3702,3 +3702,19 @@ twelve mutations. The badge writer: space handling, blank-line handling, the
 fence guard, the locales skipped, the removals not counted, every badge treated
 as released. The `NOT_NEW` pruner, the pending-page rule, the rename hint, the
 release skipping badges or `NOT_NEW`, and the stamp carry ignoring counts.
+
+**One the sweep missed:** the upgrade guide's day-after answer was "nothing".
+Its one rule for `[Unreleased]`'s page, one `## ` section per Breaking bullet,
+only ran while `[Unreleased]` had a `### Breaking`, and straight after a cut it
+has none. So a page left as `-to-next` was judged only by "names the version",
+which one sentence of prose satisfies. On a simulated 0.22.0 cut of main, a
+`0-21-to-next.mdx` that said "this ships as 0.22" went through the release's own
+`verify:docs:strict` still opening "Nothing here is released yet". The count now
+holds at zero: an empty `[Unreleased]` may not have a page with sections, and the
+finding names the release that shipped them and the name to rename it to. A
+second `-to-next` page beside the one `[Unreleased]` goes to, which is what a
+rename by copy leaves, is a finding too. The replayed 0.22.0 cut, prepared, still
+passes on both sides. Gate: two more cases in `release-docs.test.mjs` kill six
+mutations: the zero-count rule off, applied with bullets too, said twice beside the
+rename hint, naming no release, and the stray check off or counting the page
+`[Unreleased]` goes to.

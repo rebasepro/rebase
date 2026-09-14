@@ -267,3 +267,44 @@ test("after the cut, the same page covers the release; left as -to-next, the rel
     assert.equal(finding.version, "0.21.0");
     assert.match(finding.reason, /0-18-to-next\.mdx, rename that page and its translations to …-to-0-21\.mdx/);
 });
+
+test("after the cut, a page left as -to-next is refused even when its prose names the release, and said once", (t) => {
+    const changelog = `# Changelog\n\n## [Unreleased]\n\n${breaking("0.21.0")}\n${released018}`;
+    const base = { "CHANGELOG.md": changelog,
+[GUIDE]: "---\ntitle: Upgrading\n---\n",
+[`${CONTENT}/docs/upgrading/0-17-to-0-18.mdx`]: hop("0.17", "0.18", 1) };
+    const page = `${CONTENT}/docs/upgrading/0-18-to-next.mdx`;
+
+    // "Names the version" is satisfied by one sentence of prose, so it is the
+    // empty [Unreleased] that refuses the page.
+    const namesIt = tree(t, { ...base,
+[page]: `${hop("0.18", "the next release", 2)}\nThis ships as 0.21.\n` });
+    const findings = checkUpgradeCoverage(namesIt.root).findings;
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].version, "Unreleased");
+    assert.match(findings[0].reason, /0-18-to-next\.mdx has 2 `## ` section\(s\), and \[Unreleased\] declares no/);
+    assert.match(findings[0].reason, /0\.21\.0 shipped them.*…-to-0-21\.mdx/);
+
+    // Without the prose, the coverage finding already says to rename it; the
+    // zero-count rule does not repeat it.
+    const silent = tree(t, { ...base,
+[page]: hop("0.18", "the next release", 2) });
+    assert.deepEqual(checkUpgradeCoverage(silent.root).findings.map(f => f.version), ["0.21.0"]);
+
+    // An empty [Unreleased] with no -to-next page is the ordinary state between releases.
+    const between = tree(t, { ...base,
+[`${CONTENT}/docs/upgrading/0-18-to-0-21.mdx`]: hop("0.18", "0.21", 2) });
+    assert.deepEqual(checkUpgradeCoverage(between.root).findings, []);
+});
+
+test("a -to-next page beside the page [Unreleased] goes to is what a rename by copy leaves, and is refused", (t) => {
+    const changelog = `# Changelog\n\n${breaking("Unreleased")}\n## [0.20.0] - 2026-09-01\n\n${released018}`;
+    const d = tree(t, { "CHANGELOG.md": changelog,
+[GUIDE]: "---\ntitle: Upgrading\n---\n",
+[`${CONTENT}/docs/upgrading/0-17-to-0-18.mdx`]: hop("0.17", "0.18", 1),
+[`${CONTENT}/docs/upgrading/0-18-to-0-21.mdx`]: hop("0.18", "0.21", 2),
+[`${CONTENT}/docs/upgrading/0-18-to-next.mdx`]: hop("0.18", "the next release", 2) });
+    const [finding, ...rest] = checkUpgradeCoverage(d.root).findings;
+    assert.deepEqual(rest, []);
+    assert.match(finding.reason, /0-18-to-next\.mdx is named -to-next, but \[Unreleased\] goes to .*0-18-to-0-21\.mdx/);
+});

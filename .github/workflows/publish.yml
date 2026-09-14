@@ -907,13 +907,37 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          cd "$(mktemp -d)"
 
+          # Wait for EVERY package at this version, not just the CLI. `npx`
+          # resolves the CLI's whole dependency tree, and each package reaches
+          # the npm API on its own schedule. 0.21.0 waited for
+          # `@rebasepro/cli`, found it, then died with `ETARGET … No matching
+          # version found for @rebasepro/server-postgres@0.21.0` six seconds
+          # after the publish. That skipped everything after this step,
+          # GitHub Release included. The old loop also fell through to `npx`
+          # after its last attempt instead of failing.
+          #
+          # `--prefer-online` so each poll asks the registry. Without it, npm
+          # can answer from a copy it cached before the version appeared, and
+          # keep answering from it for minutes.
+          PACKAGES="$(node tooling/scripts/publishable-packages.mjs)"
           for attempt in $(seq 1 20); do
-            if npm view "@rebasepro/cli@${VERSION}" version >/dev/null 2>&1; then break; fi
-            echo "waiting for @rebasepro/cli@${VERSION} to appear on the registry (${attempt}/20)…"
+            missing=""
+            for pkg in $PACKAGES; do
+              if [ "$(npm view --prefer-online "${pkg}@${VERSION}" version 2>/dev/null)" != "$VERSION" ]; then
+                missing="${missing} ${pkg}"
+              fi
+            done
+            [ -z "$missing" ] && break
+            if [ "$attempt" = "20" ]; then
+              echo "::error::Still not visible on npm at ${VERSION} after 20 attempts:${missing}"
+              exit 1
+            fi
+            echo "waiting for${missing} at ${VERSION} (${attempt}/20)…"
             sleep 15
           done
+
+          cd "$(mktemp -d)"
 
           # `--yes` because there is no TTY here to answer the prompts.
           npx --yes "@rebasepro/cli@${VERSION}" init smoke --yes
@@ -957,8 +981,17 @@ jobs:
           echo "✓ Published ${VERSION}: init → dev → register → read returned 200."
 
       # ── GitHub Release ──────────────────────────────────────
+      #
+      # Guarded on the tag push, not on every step before it. By the time the
+      # tag is on origin the release IS out: npm has it and the tag names it.
+      # A failure after that point (the image, the chart, the smoke test)
+      # still fails the run, but it must not also leave the release without
+      # its notes. Under the implicit `success()` it did: 0.16.0 lost its
+      # GitHub Release to the chart-pull step and 0.21.0 to the smoke test,
+      # and both had to be created by hand. `!cancelled()` rather than
+      # `always()`, so cancelling a run still stops it.
       - name: Create GitHub Release (with CHANGELOG notes)
-        if: ${{ !inputs.dry_run && steps.notes.outputs.found == 'true' }}
+        if: ${{ !cancelled() && !inputs.dry_run && steps.bump.outcome == 'success' && steps.notes.outputs.found == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -968,7 +1001,7 @@ jobs:
             --latest
 
       - name: Create GitHub Release (auto-generated notes)
-        if: ${{ !inputs.dry_run && steps.notes.outputs.found == 'false' }}
+        if: ${{ !cancelled() && !inputs.dry_run && steps.bump.outcome == 'success' && steps.notes.outputs.found == 'false' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -1042,8 +1075,13 @@ jobs:
       # already mints for npm provenance, and the registry checks that the
       # repository owner in the OIDC claim matches the `io.github.rebasepro/`
       # namespace the server name asks for.
+      #
+      # Last means nothing waits on this step. It does not mean this step
+      # waits on everything. It needs only the npm tarball, so it is guarded
+      # on the tag push like the GitHub Release above. Under the implicit
+      # `success()`, 0.21.0's smoke-test failure skipped it.
       - name: Publish to the MCP Registry
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !cancelled() && !inputs.dry_run && steps.bump.outcome == 'success' }}
         working-directory: packages/mcp
         run: |
           VERSION="${{ steps.version.outputs.version }}"
