@@ -4,6 +4,7 @@ import { logger } from "@rebasepro/server";
 // Imported from the module rather than the package barrel: the barrel is
 // mocked below, so `ApiError` would come back undefined through it.
 import { ApiError } from "../../server/src/api/errors";
+import { RebaseApiError } from "@rebasepro/types";
 
 // Suppress logger output during tests
 jest.mock("@rebasepro/server", () => ({
@@ -12,7 +13,11 @@ jest.mock("@rebasepro/server", () => ({
         warn: jest.fn(),
         info: jest.fn(),
         debug: jest.fn()
-    }
+    },
+    // The real predicate: what this file pins is that a subscription error is
+    // recognised the way the REST handler recognises it.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer
 }));
 
 const mockLogger = logger as unknown as {
@@ -307,6 +312,21 @@ describe("pg-error-utils", () => {
             const result = sanitizeErrorForClient(error, "posts");
 
             expect(result).toEqual({ message: "Row not visible", code: "NOT_FOUND" });
+        });
+
+        it("passes a callback's RebaseApiError through, reading its `status`", () => {
+            // What an `afterRead` throws to refuse a read — the collection file
+            // cannot import `ApiError`. REST answers it 403 with this message.
+            const refusal = new RebaseApiError("Drafts are visible to their author only.", {
+                status: 403,
+                code: "FORBIDDEN"
+            });
+
+            expect(sanitizeErrorForClient(refusal, "posts")).toEqual({
+                message: "Drafts are visible to their author only.",
+                code: "FORBIDDEN"
+            });
+            expect(mockLogger.error).not.toHaveBeenCalled();
         });
 
         it("still sanitizes a 5xx ApiError — server internals stay server-side", () => {

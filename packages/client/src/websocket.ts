@@ -44,6 +44,19 @@ function extractMessageError(message: WebSocketMessage): { errorMessage: string;
 errorCode };
 }
 
+/**
+ * The error an `ERROR` frame describes, with the server's `details` when it
+ * sent them — `{ stage, path }` for a collection-callback refusal, the object
+ * the REST envelope carries for the same veto. `status` stays `undefined`:
+ * a frame is not an HTTP response (see `RebaseErrorInit.status`).
+ */
+function frameError(message: WebSocketMessage): RebaseApiError {
+    const { errorMessage, errorCode } = extractMessageError(message);
+    const errPayload = (message.payload as WebSocketErrorPayload | undefined)?.error;
+    const details = typeof errPayload === "object" && errPayload !== null ? errPayload.details : undefined;
+    return new RebaseApiError(errorMessage, { code: errorCode, details });
+}
+
 export interface RebaseWebSocketConfig {
     websocketUrl: string;
     /** Optional auth token getter for WebSocket authentication */
@@ -668,8 +681,7 @@ export class RebaseWebSocketClient {
             // The refresh did not produce usable credentials. Report the original
             // error and drop the registration, so a later mount can try again
             // rather than attaching to a subscription that will never load.
-            const { errorMessage, errorCode } = extractMessageError(message);
-            const error = new RebaseApiError(errorMessage, { code: errorCode });
+            const error = frameError(message);
             if (messageType === "subscribe_collection") {
                 this.failCollectionSubscription(subscriptionKey, error);
             } else {
@@ -702,16 +714,14 @@ export class RebaseWebSocketClient {
                         if (refreshed && pendingReq.message) {
                             this.doSendMessage(pendingReq.message, pendingReq.resolve, pendingReq.reject).catch(pendingReq.reject);
                         } else {
-                            const { errorMessage, errorCode } = extractMessageError(message);
-                            pendingReq.reject(new RebaseApiError(errorMessage, { code: errorCode }));
+                            pendingReq.reject(frameError(message));
                         }
                     }).catch(err => {
                         pendingReq.reject(err);
                     });
                 } else {
                     this.pendingRequests.delete(requestId);
-                    const { errorMessage, errorCode } = extractMessageError(message);
-                    pendingReq.reject(new RebaseApiError(errorMessage, { code: errorCode }));
+                    pendingReq.reject(frameError(message));
                 }
             } else {
                 this.pendingRequests.delete(requestId);
@@ -873,8 +883,7 @@ export class RebaseWebSocketClient {
                     collectionSub.subscribeTimeout = undefined;
                     collectionSub.subscribeInFlight = false;
 
-                    const { errorMessage, errorCode } = extractMessageError(message);
-                    const error = new RebaseApiError(errorMessage, { code: errorCode });
+                    const error = frameError(message);
                     collectionSub.callbacks.forEach(callback => {
                         if (callback.onError) {
                             callback.onError(error);
@@ -904,8 +913,7 @@ export class RebaseWebSocketClient {
                     entitySub.subscribeTimeout = undefined;
                     entitySub.subscribeInFlight = false;
 
-                    const { errorMessage, errorCode } = extractMessageError(message);
-                    const error = new RebaseApiError(errorMessage, { code: errorCode });
+                    const error = frameError(message);
                     entitySub.callbacks.forEach(callback => {
                         if (callback.onError) {
                             callback.onError(error);

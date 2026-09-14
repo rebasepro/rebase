@@ -698,6 +698,33 @@ code: "ERR_001" } }
             }
         });
 
+        it("hands a callback veto's details to the error, as REST does", async () => {
+            const { client, ws } = await setupConnected();
+
+            const promise = client.fetchCollection({ path: "contracts" });
+            const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
+
+            ws.onmessage!({ data: JSON.stringify({
+                type: "ERROR",
+                requestId: msg.requestId,
+                payload: { error: {
+                    message: "This contract is under legal hold.",
+                    code: "CALLBACK_REJECTED",
+                    details: { stage: "beforeDelete", path: "contracts" }
+                } }
+            }) });
+
+            const error = await promise.then(() => undefined, (e: unknown) => e);
+            expect(error).toBeInstanceOf(ApiError);
+            expect(error).toMatchObject({
+                message: "This contract is under legal hold.",
+                code: "CALLBACK_REJECTED",
+                details: { stage: "beforeDelete", path: "contracts" }
+            });
+            // A frame is not an HTTP response — `status` stays unset.
+            expect((error as ApiError).status).toBeUndefined();
+        });
+
         it("handles string error in payload", async () => {
             const { client, ws } = await setupConnected();
 

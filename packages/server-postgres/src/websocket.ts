@@ -8,7 +8,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, ApiError } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -903,12 +903,6 @@ code: "INVALID_LIMIT" } }
                     }));
                     return;
                 }
-                // A refused write is the caller's mistake, and its message is
-                // the only thing that says what to send instead — the same
-                // reasoning as `ListLimitError` above. Left to the generic
-                // branch it becomes INTERNAL_ERROR with the text dropped in
-                // production, so the socket would refuse the write and decline
-                // to say why.
                 // "This server cannot branch" is a refusal too, and the same
                 // reasoning applies twice over: the generic branch would drop
                 // the text in production, and the text is the only thing that
@@ -926,14 +920,31 @@ code: "BRANCHING_UNSUPPORTED" } }
                     }));
                     return;
                 }
-                if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
-                    const apiError = error as ApiError;
-                    logger.warn(`[WebSocket Server] Refused a write: ${apiError.message}`);
+                // A refused write is the caller's mistake, and its message is
+                // the only thing that says what to send instead — the same
+                // reasoning as `ListLimitError` above. Left to the generic
+                // branch it becomes INTERNAL_ERROR with the text dropped in
+                // production, so the socket would refuse the write and decline
+                // to say why.
+                //
+                // "Refused" means whatever REST answers with the error's own
+                // status, by the same predicate: an `ApiError`, and the
+                // `RebaseApiError` every collection-callback veto is. Listing
+                // only the first here is how a `beforeDelete` veto reached the
+                // admin panel as "An unexpected error occurred".
+                const answer = declaredErrorAnswer(error);
+                if (answer) {
+                    const line = `[WebSocket Server] Refused: ${answer.code} ${answer.message}`;
+                    if (answer.expected) logger.debug(line);
+                    else logger.warn(line);
                     ws.send(JSON.stringify({
                         type: "ERROR",
                         requestId,
-                        payload: { error: { message: apiError.message,
-code: apiError.code } }
+                        payload: { error: {
+                            message: answer.message,
+                            code: answer.code,
+                            ...(answer.details !== undefined && { details: answer.details })
+                        } }
                     }));
                     return;
                 }

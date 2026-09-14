@@ -13,7 +13,7 @@ jest.mock("ws", () => ({
 }));
 
 /**
- * The real validator and the real `ApiError`, deliberately.
+ * The real validator and the real `declaredErrorAnswer`, deliberately.
  *
  * The claim under test is that this socket and the HTTP write routes refuse the
  * same payload, and a stubbed validator could only show that *something* was
@@ -33,7 +33,7 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     splitFieldOps: require("../../server/src/api/rest/field-ops").splitFieldOps,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    ApiError: require("../../server/src/api/errors").ApiError
+    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";

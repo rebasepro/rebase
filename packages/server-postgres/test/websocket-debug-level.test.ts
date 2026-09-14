@@ -26,7 +26,7 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     assertWriteRequestValid: require("../../server/src/api/rest/write-validation").assertWriteRequestValid,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    ApiError: require("../../server/src/api/errors").ApiError
+    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";

@@ -112,6 +112,7 @@ function createStorageRoutes
 function createTwitterProvider
 function createUnconfiguredEmailService
 function createUploadConstraintResolver
+function declaredErrorAnswer
 function declaredUniqueTargets
 function defaultBackoff
 function defineCron
@@ -265,6 +266,7 @@ interface DataRepository { checkUniqueField, count, delete, fetchCollection, fet
 interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
 interface DatabaseConnection { close, isConnected, type }
 interface DdlBootstrapper { ensureObject, isReadable, step }
+interface DeclaredErrorAnswer { code, details, expected, message, status }
 interface DevEmailSink { clear, list, sendEmail }
 interface DriverConnection { connectionString, db, pool, query }
 interface DriverRegistry { get, getDefault, getOrDefault, has, list, register, size }

@@ -1,5 +1,9 @@
 export interface WebSocketErrorPayload {
-    error?: string | { message: string; code?: string };
+    /**
+     * `details` is what the REST envelope carries under the same name — for a
+     * collection-callback refusal, `{ stage, path }` naming the hook.
+     */
+    error?: string | { message: string; code?: string; details?: unknown };
     message?: string;
     code?: string;
 }

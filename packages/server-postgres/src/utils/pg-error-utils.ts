@@ -7,13 +7,14 @@
  * a message that is safe and helpful to show to end-users.
  */
 
-import { logger } from "@rebasepro/server";
+import { declaredErrorAnswer, logger } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
 
 /**
  * Shape of a deliberate client-facing error — `ApiError` from
- * `@rebasepro/server`, or anything else carrying a 4xx `statusCode`.
+ * `@rebasepro/server`, `RebaseApiError` from `@rebasepro/types`, or anything
+ * else carrying a 4xx `statusCode`.
  *
  * Matched structurally rather than with `instanceof`: `@rebasepro/server` can
  * be loaded twice (published dist vs. workspace source), which breaks class
@@ -32,8 +33,20 @@ interface ClientFacingError extends Error {
  *
  * A thrown `ApiError` is a decision the server made about the request, not a
  * database failure: its message and code are already written for the client.
+ *
+ * So is a `RebaseApiError` — what a collection callback throws, since a
+ * collection file cannot import the server package. It spells its status
+ * `status`, and reading only `statusCode` here turned an `afterRead` that
+ * refused with a 403 into "Could not load data … Check server logs" on a
+ * subscription, where REST and the socket's own requests answer the 403.
+ * Recognised by the predicate those doors use, `declaredErrorAnswer`.
  */
-function asClientFacingError(error: unknown): ClientFacingError | null {
+function asClientFacingError(error: unknown): Pick<ClientFacingError, "statusCode" | "code" | "message" | "expected"> | null {
+    const answer = declaredErrorAnswer(error);
+    if (answer) {
+        if (answer.status < 400 || answer.status >= 500) return null;
+        return { statusCode: answer.status, code: answer.code, message: answer.message, expected: answer.expected };
+    }
     if (!(error instanceof Error)) return null;
     const e = error as ClientFacingError;
     if (typeof e.statusCode !== "number" || e.statusCode < 400 || e.statusCode >= 500) return null;

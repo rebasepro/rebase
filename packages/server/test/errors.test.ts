@@ -1,5 +1,7 @@
-import { ApiError, errorHandler } from "../src/api/errors";
+import { ApiError, declaredErrorAnswer, errorHandler } from "../src/api/errors";
 import { logger } from "../src/utils/logger";
+import { RebaseApiError, RebaseClientError } from "@rebasepro/types";
+import { callbackRefusal, toCallbackError } from "@rebasepro/common";
 
 // ── Minimal Hono-context mock ────────────────────────────────────────────
 function createMockContext(method = "GET", path = "/test") {
@@ -175,6 +177,20 @@ code: "RATE_LIMITED" });
         debug.mockRestore();
     });
 
+    it("answers a collection-callback veto with its own status, code, message and details", () => {
+        const { c, getStatus, getBody } = createMockContext("DELETE", "/api/data/contracts/c-1");
+        errorHandler(toCallbackError(new Error("This contract is under legal hold."), "beforeDelete", "contracts") as Error, c);
+
+        expect(getStatus()).toBe(400);
+        expect(getBody()).toEqual({
+            error: {
+                message: "This contract is under legal hold.",
+                code: "CALLBACK_REJECTED",
+                details: { stage: "beforeDelete", path: "contracts" }
+            }
+        });
+    });
+
     it("logs an expected error at debug, not warn — no noise for anonymous refresh", () => {
         const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
         const debug = jest.spyOn(logger, "debug").mockImplementation(() => {});
@@ -186,5 +202,53 @@ code: "RATE_LIMITED" });
         expect(debug).toHaveBeenCalledTimes(1);
         warn.mockRestore();
         debug.mockRestore();
+    });
+});
+
+// ── declaredErrorAnswer — the one rule REST and both sockets read ─────────
+describe("declaredErrorAnswer", () => {
+    it("reads a thrown-Error veto as 400 CALLBACK_REJECTED with the author's message", () => {
+        expect(declaredErrorAnswer(toCallbackError(new Error("Locked."), "beforeSave", "posts"))).toEqual({
+            status: 400,
+            code: "CALLBACK_REJECTED",
+            message: "Locked.",
+            details: { stage: "beforeSave", path: "posts" },
+            expected: false
+        });
+    });
+
+    it("reads a `return false` veto as 403 CALLBACK_REJECTED", () => {
+        expect(declaredErrorAnswer(callbackRefusal("beforeDelete", "posts"))).toMatchObject({
+            status: 403,
+            code: "CALLBACK_REJECTED",
+            message: "beforeDelete refused the operation"
+        });
+    });
+
+    it("reads an ApiError, and one from a second copy of the package, by name", () => {
+        expect(declaredErrorAnswer(ApiError.notFound("No row"))).toMatchObject({ status: 404, code: "NOT_FOUND", message: "No row" });
+        const otherCopy = Object.assign(new Error("Refused"), { name: "ApiError", statusCode: 409, code: "CONFLICT" });
+        expect(declaredErrorAnswer(otherCopy)).toMatchObject({ status: 409, code: "CONFLICT", message: "Refused" });
+    });
+
+    it("reads a RebaseApiError by name, since instanceof fails across copies", () => {
+        const otherCopy = Object.assign(new Error("Over quota"), { name: "RebaseApiError", status: 429, code: "RATE_LIMITED" });
+        expect(declaredErrorAnswer(otherCopy)).toMatchObject({ status: 429, code: "RATE_LIMITED", message: "Over quota" });
+    });
+
+    it("carries `expected` from an ApiError, so a routine outcome logs at debug", () => {
+        expect(declaredErrorAnswer(ApiError.unauthenticated("No session"))?.expected).toBe(true);
+    });
+
+    it("declines a RebaseApiError with no status — it has not chosen an answer", () => {
+        expect(declaredErrorAnswer(new RebaseApiError("x"))).toBeUndefined();
+        expect(declaredErrorAnswer(new RebaseClientError("x", { code: "REALTIME_DISABLED" }))).toBeUndefined();
+    });
+
+    it("declines everything else, which each door masks as a server fault", () => {
+        expect(declaredErrorAnswer(new Error("boom"))).toBeUndefined();
+        expect(declaredErrorAnswer(Object.assign(new Error("x"), { statusCode: 400, code: "BAD" }))).toBeUndefined();
+        expect(declaredErrorAnswer("a string")).toBeUndefined();
+        expect(declaredErrorAnswer(null)).toBeUndefined();
     });
 });
