@@ -8,13 +8,13 @@
  * `@theme` variables that nothing references, so unused tokens are simply
  * absent from :root and every value looks like drift.
  *
- * Usage: node ../.design-sync/audit/site-drift.mjs [url]
+ * Usage: cd .ds-sync && node ../tooling/design-sync/audit/site-drift.mjs [url]
  */
 import { chromium } from "playwright";
 import fs from "fs";
 
 const URL = process.argv[2] || "http://localhost:4331/";
-const THEME = "/Users/francesco/rebase/packages/ui/dist/theme.css";
+const THEME = new URL("../../../packages/ui/dist/theme.css", import.meta.url);
 
 const src = fs.readFileSync(THEME, "utf8");
 const rawColors = [...src.matchAll(/(--color-[\w-]+):\s*([^;]+);/g)].map(m => m[2].trim());

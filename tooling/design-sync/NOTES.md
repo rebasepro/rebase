@@ -27,7 +27,8 @@ points at that. Without this step every preview renders unstyled.
   not `prefers-color-scheme`.
 - The Tailwind CLI is installed into `.ds-sync/`, and `tooling/design-sync/node_modules`
   is a symlink to it so `@import 'tailwindcss'` resolves from the entry file.
-  Recreate on a fresh clone: `ln -sfn ../.ds-sync/node_modules tooling/design-sync/node_modules`.
+  Recreate on a fresh clone: `ln -sfn ../../.ds-sync/node_modules tooling/design-sync/node_modules`
+  (the target is relative to the link's own directory).
 - **`.ds-sync/` is a toolchain, not a cache.** It is gitignored and it sits next
   to genuinely disposable directories, so it reads as scratch and has been
   deleted by mistake during a root cleanup. It now carries its own
@@ -47,7 +48,9 @@ points at that. Without this step every preview renders unstyled.
 ## Install / build
 
 - **Do not run a workspace-wide `pnpm install`.** This repo has a gitignored
-  `saas/` workspace member and an untracked `app/*` importer; a wholesale install
+  `saas/` workspace member, and `app/*` in `pnpm-workspace.yaml` also matches
+  the gitignored build outputs `app/dist-bundle` and `app/dist-bundle-acceptance`,
+  which carry a `package.json` and so are importers too; a wholesale install
   prunes importers. `node_modules` and `packages/ui/dist` were already present
   and fresh, so this sync skipped the install entirely.
 - `--node-modules packages/ui/node_modules` resolves `react`/`react-dom` fine.
@@ -172,8 +175,8 @@ installed, and after a `package-build.mjs` (they load `ds-bundle/_ds_bundle.js`,
 so `rebuild.sh` alone is not enough — that trap cost two false readings):
 
 ```
-cd .ds-sync && node ../.design-sync/audit/measure.mjs
-cd .ds-sync && node ../.design-sync/audit/measure-colors.mjs
+cd .ds-sync && node ../tooling/design-sync/audit/measure.mjs
+cd .ds-sync && node ../tooling/design-sync/audit/measure-colors.mjs
 ```
 
 **Before**: `size="large"` meant 42px on a Button and 64px on a TextField. There
@@ -225,7 +228,7 @@ Two measurement caveats for whoever re-runs this:
 ## Marketing site alignment (2026-08-02)
 
 `tooling/design-sync/audit/site-drift.mjs` measures the site against the DS tokens.
-Run it against a dev server: `cd .ds-sync && node ../.design-sync/audit/site-drift.mjs`.
+Run it against a dev server: `cd .ds-sync && node ../tooling/design-sync/audit/site-drift.mjs`.
 
 **Read tokens from `theme.css` on disk, never from the page.** Tailwind v4
 tree-shakes `@theme` variables nothing references, so a page-based read finds
@@ -336,11 +339,13 @@ now live in `cfg.overrides`:
 
 ## Preview sources
 
-`packages/app/src/components/Debug/UIReferenceView.tsx` (route `/debug/ui`) is
-the canonical composition source and is worth reading first — it explicitly
-mirrors real screens rather than inventing styles. Its sibling demos carry
+`packages/app/src/debug/UIReferenceView.tsx` is the canonical composition
+source and is worth reading first — it explicitly mirrors real screens rather
+than inventing styles. It is published as `@rebasepro/app/debug`; the
+`/debug/ui` route that renders it exists only in the dogfood app
+(`app/frontend/src/App.tsx`). Its sibling demos carry
 fabricated datasets that the heavy data views need:
-`Debug/crm-dashboard/CrmDashboardDemo` and `Debug/collection-views`
+`debug/crm-dashboard/CrmDashboardDemo` and `debug/collection-views`
 (`CollectionTableDemo`, `CardViewDemo`, `KanbanBoardDemo`).
 
 Sanity-check every ported prop against the current `<Name>.d.ts` — see the API

@@ -1,9 +1,8 @@
 import { chromium } from "playwright";
-import { pathToFileURL } from "url";
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1200, height: 900 } });
-await p.goto(pathToFileURL("/Users/francesco/rebase/.design-sync/audit/size-audit.html").href);
+await p.goto(new URL("size-audit.html", import.meta.url).href);
 await p.waitForTimeout(1200);
 const rows = await p.evaluate(() => window.__measure());
 await b.close();

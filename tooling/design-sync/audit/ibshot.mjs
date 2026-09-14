@@ -1,12 +1,12 @@
 import { chromium } from "playwright";
-import { pathToFileURL } from "url";
+import { fileURLToPath } from "url";
 const b = await chromium.launch();
 const p = await b.newPage({ viewport:{width:640,height:260}, deviceScaleFactor:3 });
-await p.goto(pathToFileURL("/Users/francesco/rebase/.design-sync/audit/ib.html").href);
+await p.goto(new URL("ib.html", import.meta.url).href);
 await p.waitForTimeout(900);
 const r = await p.evaluate(()=>window.__ib());
 const bad = r.filter(x=>!x.square||x.overflows);
 console.log(`${r.length} combos | non-square or overflowing: ${bad.length}`);
 bad.forEach(x=>console.log("  BAD",x.k,"btn",x.btn,"icon",x.icon,x.square?"":"(not square)",x.overflows?"(overflows)":""));
-await p.screenshot({ path:"/Users/francesco/rebase/.design-sync/audit/ib.png", clip:{x:0,y:0,width:560,height:230} });
+await p.screenshot({ path:fileURLToPath(new URL("ib.png", import.meta.url)), clip:{x:0,y:0,width:560,height:230} });
 await b.close();

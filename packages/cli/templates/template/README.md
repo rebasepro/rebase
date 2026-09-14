@@ -34,8 +34,8 @@ pnpm dev   # or: npm run dev
 ```
 
 That is the whole first run. `rebase dev` generates the Drizzle schema from
-`config/collections`, starts the database, creates the tables — including the
-example `posts`, `authors` and `tags` — and serves the API and the admin panel.
+`config/collections`, starts the database, creates a table for every collection
+declared there, and serves the API and the admin panel.
 
 `rebase dev` prints the two URLs it actually bound. The first account you
 register becomes the admin. `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` in

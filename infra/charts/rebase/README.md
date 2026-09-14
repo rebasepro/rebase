@@ -9,9 +9,21 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set config.adminEmail=you@example.com \
+  --set config.adminPassword='<at least 12 characters>' \
   --set ingress.host=api.example.com \
   --set image.repository=my-registry/my-app
 ```
+
+The admin pair is how anyone signs in at all. Every pod runs with
+`NODE_ENV=production`, where the first account to register is **not** promoted
+to admin, and the chart ships with self-registration off — so the runtime
+creates this account once, at boot, while the user table is empty. The chart
+refuses to render without it, unless `existingSecret` names a Secret carrying
+`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD`. Setting
+`config.allowSelfRegistration=true` gets past that refusal but not the problem:
+it only drops `DISABLE_SELF_REGISTRATION`, and in production nobody who
+registers becomes an admin. Sign in, then change the password.
 
 This chart deploys the **runtime**. It does not deploy Postgres — use
 CloudNativePG, a managed database, or your own StatefulSet, and point
@@ -93,8 +105,8 @@ and the split stays an internal topology decision rather than a change to your
 product's public surface. The price is that the assets must be *built* for that
 path, which the runtime checks.
 
-`rebase deploy` for the admin is then an image tag bump on one Deployment. The
-backend does not restart.
+Releasing a new admin is then a `helm upgrade` that bumps that app's
+`staticApps[].image.tag`. One Deployment rolls; the backend does not restart.
 
 ## Sizing, and the one thing that differs per cluster
 
@@ -117,9 +129,10 @@ request, so a generous limit costs nothing at rest on most clusters and is what
 absorbs a traffic spike.
 
 **The floor and the ratio band are your cluster's, not this chart's.** The
-defaults above are sized for an ordinary Kubernetes cluster — nodes you rent
-whole, where a 100m request reserves 100m. Two substrates disagree, and both do
-so silently:
+chart's own defaults — `100m` / `256Mi` requests with `1` / `1Gi` limits (the
+`functions` limit is `2` / `2Gi`), not the example above — are sized for an
+ordinary Kubernetes cluster: nodes you rent whole, where a 100m request reserves
+100m. Two substrates disagree, and both do so silently:
 
 | Cluster | Per-pod floor | memory:CPU band | What happens outside it |
 |---|---|---|---|
@@ -167,6 +180,8 @@ Every one of these is a configuration that produces no error at runtime — the
 deployment comes up and something quietly stops being true. `helm install` fails
 with the value to change:
 
+- self-registration off with no `config.adminEmail` and no `existingSecret`; an
+  `adminPassword` under 12 characters; an `adminEmail` with no dot in its domain
 - more than one HTTP process with `sharedState.rateLimitStore=memory`
 - `functions.enabled` / `worker.enabled` while `split=false`
 - two static apps claiming one path, or one claiming a path under `/api`

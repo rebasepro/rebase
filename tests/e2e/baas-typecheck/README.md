@@ -23,8 +23,9 @@ error, naming the offending file. Because the program resolves `@rebasepro/*` to
 `jsx` is deliberately left unset: a `.tsx` file containing real JSX anywhere in
 the BaaS graph fails too.
 
-This pairs with `pnpm check:types-headless`, which scans for the *presence* of a
-`react` specifier in core sources and in built `.d.ts`. Two different questions:
+This pairs with the type-level headless guard, which scans for the *presence* of
+a `react` specifier: `pnpm check:types-headless` in core sources and manifests,
+`pnpm check:types-headless:dts` in the built `.d.ts`. Two different questions:
 the guard asks "does any core file name React?", this fixture asks "does the BaaS
 type surface still work when React does not exist?". Both are needed — the guard
 cannot see through a type alias, and the fixture cannot see an unused import.
@@ -36,6 +37,10 @@ cannot see through a type alias, and the fixture cannot see an unused import.
   security rules and callbacks, typed against core `CollectionConfig`. This is
   the proof that the *schema* half of a collection is fully typed with no React.
 - `src/sdk.ts` — `@rebasepro/client` usage, including typed accessors.
+- `src/admin_absent.ts` — the negative half: `admin` on a property or a
+  collection, and the `Admin*Options` types, must not compile from core.
+  `@ts-expect-error` is the assertion, so the file fails if any of them ever
+  starts to.
 
 ## Run
 

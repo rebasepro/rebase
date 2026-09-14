@@ -16,7 +16,8 @@
  *   2. Every `@rebasepro/…` subpath in them is one the package actually
  *      publishes, read from its own `exports` map — which catches the other
  *      half of the same drift, a guard import pointed at a subpath that is not
- *      there.
+ *      there. A longer path *into* a package must start with something its
+ *      `files` ships, since that is all `node_modules` will hold.
  *   3. Every pointer file the scaffold writes names an agent the skills
  *      installer actually supports.
  *   4. Every script in the scaffold's own `package.json` is named in the
@@ -31,9 +32,8 @@ import { loadSdkExports } from "./sdk-exports.mjs";
 
 /** Every file that is loaded into a session, or documents one that is. */
 const INSTRUCTION_GLOBS = [
-    "packages/cli/templates/template/ai-instructions.md",
+    "packages/cli/templates/**/ai-instructions.md",
     "packages/cli/templates/template/CLAUDE.md",
-    "packages/cli/templates/overlays/*/ai-instructions.md",
     "website/src/content/docs/**/ai/instruction-files.md"
 ];
 
@@ -58,6 +58,12 @@ const NOT_ACCESSORS = new Set(["json", "pro", "website"]);
  */
 function publishedSpecifiers(root) {
     const out = new Set();
+    /**
+     * Package name → the top-level entries its tarball carries, from `files`;
+     * `null` when it has no allowlist, or one this cannot read without a glob
+     * engine, and so ships whatever it ships.
+     */
+    const shipped = new Map();
     for (const rel of globSync("packages/*/package.json", { cwd: root })) {
         let pkg;
         try {
@@ -71,9 +77,19 @@ function publishedSpecifiers(root) {
             if (key === "." || key === "./package.json") continue;
             out.add(pkg.name + key.replace(/^\./, ""));
         }
+        const files = Array.isArray(pkg.files) ? pkg.files : null;
+        shipped.set(
+            pkg.name,
+            files && !files.some((f) => f.includes("*"))
+                ? new Set(files.map((f) => f.replace(/^\.\//, "").split("/")[0]))
+                : null
+        );
     }
-    return out;
+    return { specifiers: out, shipped };
 }
+
+/** What npm puts in every tarball whatever `files` says. */
+const ALWAYS_SHIPPED = /^(package\.json|readme|license|licence|changelog)(\..*)?$/i;
 
 /** Backticked spans and fenced lines — where an identifier is shown, not described. */
 function* codeSpans(text) {
@@ -95,7 +111,7 @@ export function checkAiInstructions(root) {
     const findings = [];
     const { membersOf } = loadSdkExports(root);
     const members = membersOf("@rebasepro/types", "RebaseServerClient");
-    const specifiers = publishedSpecifiers(root);
+    const { specifiers, shipped } = publishedSpecifiers(root);
 
     // A resolution failure would silently pass every file. Say so instead.
     if (!members.size) {
@@ -144,12 +160,28 @@ export function checkAiInstructions(root) {
             for (const m of span.text.matchAll(/@rebasepro\/[\w.-]+(?:\/[\w.-]+)*/g)) {
                 const written = m[0];
                 if (specifiers.has(written)) continue;
-                // Three or more segments past the scope is a path *into* a
-                // package — `@rebasepro/app/src/components/…` is a file to read,
-                // not an import specifier, and this check has nothing to say
-                // about it. Exactly one segment past the package name is a
-                // subpath claim, and that is checkable.
                 const segments = written.split("/");
+                // Three or more segments past the scope is a path *into* a
+                // package: a file the reader is sent to open in node_modules,
+                // not an import specifier. What is checkable is whether the
+                // tarball carries it at all. The scaffold's UI rule sent every
+                // assistant to `@rebasepro/app/src/components/…` while that
+                // package's `files` was `["dist"]` — a file no install contains.
+                if (segments.length > 3) {
+                    const pkgName = `${segments[0]}/${segments[1]}`;
+                    const top = shipped.get(pkgName);
+                    if (top === null || top?.has(segments[2]) || ALWAYS_SHIPPED.test(segments[2])) continue;
+                    report(
+                        lineAt(text, span.index),
+                        top === undefined
+                            ? `\`${written}\` is a path into \`${pkgName}\`, which is not a package in this repository.`
+                            : `\`${written}\` is not in the published \`${pkgName}\`: its \`files\` ships ` +
+                              `${[...top].sort().join(", ")}, not \`${segments[2]}/\`. Name an export instead.`
+                    );
+                    continue;
+                }
+                // Exactly one segment past the package name is a subpath claim,
+                // and that is checkable against `exports`.
                 if (segments.length !== 3) continue;
                 report(
                     lineAt(text, span.index),

@@ -175,7 +175,7 @@ variable "acme_email" {
 # is. The runtime creates it once, while the user table is still empty.
 
 variable "admin_email" {
-  description = "Email of the first admin account, created at first boot. Required unless allow_self_registration is true."
+  description = "Email of the first admin account, created at first boot while the user table is empty. Set it: the runtime runs in production, where the first account to register is not promoted to admin, so without this the deployment has no administrator. Not enforced at plan time."
   type        = string
   default     = null
 }
@@ -193,7 +193,7 @@ variable "admin_password" {
 }
 
 variable "allow_self_registration" {
-  description = "Leave the public sign-up form open instead of seeding an admin. The first person to reach it becomes this deployment's administrator, so this is off by default."
+  description = "Drop DISABLE_SELF_REGISTRATION, the kill switch on public sign-up. It does not open sign-up by itself (that is ALLOW_REGISTRATION=true in `extra_env`), and in production nobody who registers becomes an administrator, so it is no substitute for `admin_email`."
   type        = bool
   default     = false
 }

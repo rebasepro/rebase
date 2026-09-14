@@ -12,11 +12,11 @@
  * under, and packages/ui/dist/theme.css documents that a layered import stops
  * its @theme block from registering.
  *
- * Regenerate with .design-sync/build-css.sh (see NOTES.md).
+ * Regenerate with tooling/design-sync/rebuild.sh (see NOTES.md).
  * ------------------------------------------------------------------------- */
 
 @import 'tailwindcss';
-@import '../packages/ui/dist/index.css';
+@import '../../packages/ui/dist/index.css';
 @plugin "@tailwindcss/typography";
 
 /* Dark mode is CLASS-based (.dark), not prefers-color-scheme. */
@@ -24,7 +24,7 @@
 
 /* Class detection: the DS source is what the shipped components reference;
    the authored previews are what the cards themselves reference. */
-@source '../packages/ui/src/**/*.{ts,tsx}';
+@source '../../packages/ui/src/**/*.{ts,tsx}';
 @source './previews/**/*.tsx';
 
 /* Safelist of layout/typography glue.
@@ -57,6 +57,8 @@
 @source inline('overflow-{auto,hidden,visible,x-auto,y-auto}');
 @source inline('text-surface-{300,400,500,600,700,800,900}');
 @source inline('bg-surface-{50,100,200,800,900,950}');
+@source inline('bg-surface-{frame,sheet,card,raised,lifted,field,well,scrim}');
+@source inline('border-hairline{,-strong}');
 @source inline('{text,bg,border}-primary');
 @source inline('shrink-0');
 @source inline('grow');

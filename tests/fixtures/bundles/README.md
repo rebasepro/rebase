@@ -21,8 +21,8 @@ and cannot see:
 - RLS that stopped being applied at boot.
 
 Those are precisely the regressions a fleet-wide auto-upgrade turns into an
-outage for everyone at once. `PLATFORM-PLAN-2026-07.md` called this corpus "the
-license to auto-roll fleet patches", and until now it did not exist.
+outage for everyone at once. A corpus that catches them is what makes rolling
+fleet patches automatically defensible at all, and until now it did not exist.
 
 ## The rules
 
