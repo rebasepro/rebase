@@ -2709,7 +2709,9 @@ error into an answer now calls.
 | Mongo socket, request frames | **BUG**: same. Fixed. |
 | Postgres realtime subscriptions (`sanitizeErrorForClient`) | **BUG**: it read `statusCode`, and `RebaseApiError` spells it `status`, so a 403 thrown from `afterRead` arrived as "Could not load data … Check server logs" with no code. Fixed. It still hides 5xx messages, which is deliberately stricter than REST. |
 | Mongo realtime subscriptions | **BUG**, and a different class: a failed fetch was logged and nothing was sent, on the first load and on every re-fetch, so the subscriber was never told and its view stayed loading. Fixed: both fetch paths send an `ERROR` frame keyed by `subscriptionId`, through the same delivery slot rows use, so a straggler cannot report over newer rows. A 4xx keeps its message, code and `details` through `declaredErrorAnswer`. Anything else, a declared 5xx included, is masked as on Postgres. |
-| in-process `listenCollection` / `listenOne`, both backends | **OPEN**, the same gap one door over: a failed fetch behind an in-process subscription is logged and the listener's `onError` is never called. `MongoDriver.listen*` passes the realtime service no error callback, and the Postgres driver-refetch `catch` blocks only log. |
+| in-process `listenCollection` / `listenOne`, both backends | **BUG**, the same gap one door over. `MongoDriver.listen*` passed the realtime service no error callback, so neither the first fetch nor a re-fetch reached `onError`. Postgres reported the first fetch, but its driver-refetch `catch` blocks only logged, so the listener kept its last rows as if they were current. Fixed: the listener's `onError` is stored on the subscription record on both backends, called through the delivery slot, and handed the error as thrown (trusted code, nothing masked). `RealtimeProvider.subscribeTo*` now declares the optional `onError`. The multi-source router re-listed three arguments and would have dropped it; it now forwards all of them. |
+| Postgres in-process listener, first fetch | **OPEN**, read from the code and not reproduced. `PostgresBackendDriver.listen*` runs the first fetch itself, outside the realtime service. It reads through the base driver, so a listener on `withAuth(user)` gets its first rows without its own auth context; `injectAuthContext` scopes only the re-fetches. The first delivery takes no delivery slot either (class 44), so it can land after a newer re-fetch or after unsubscribe. And `listenOne` drops a `null` row, so a deleted row is never reported. Mongo runs the first fetch in its realtime service, scoped and slotted, and delivers `null`. |
+| Postgres socket error frames | **OPEN**: the first fetch and both re-fetches send their error frame without the delivery slot, so a failed straggler can mark a view that already shows newer rows as failed. Mongo's frames go through the slot. |
 | socket error frame → SDK | **gap**: the client read only `message` and `code`, so `e.details` was always empty over the socket. Fixed: frames carry `details` and the client passes them on. `status` stays `undefined`, because a frame is not an HTTP response. |
 | in-process `rebase.data` | n/a: nothing is translated, so the caller gets the `RebaseApiError` itself. |
 
@@ -2731,6 +2733,20 @@ the first load of a collection and of a row, and a re-fetch after a successful
 load. Two cases in `test/realtime-delivery-order.test.ts` pin the delivery slot.
 Nine mutations each turned a test red, and reverting the fix turns every
 socket case red.
+
+The in-process fix is gated on both backends against a real database.
+`test/realtime-subscription-error.test.ts` (server-mongo) has four listener
+cases, and `test/e2e/listener-fetch-error-e2e.test.ts` (server-postgres) has
+four more. Each checks with `toBe` that the listener gets the thrown instance,
+on a collection, on a row, through `withAuth`, and on a re-fetch after a
+successful load. Four cases in the Postgres `test/realtime-delivery-order.test.ts`
+pin the re-fetch report and its delivery slot, and one in
+`packages/server/test/routed-realtime-service.test.ts` pins the router.
+Reverting each of the four fixes on its own (the Mongo driver, the Postgres
+refetch `catch` blocks, the Postgres driver's registration, the router) turns
+its cases red. So do four narrower mutations: `listenOne` alone on each
+backend, a copy of the error instead of the error, and the delivery slot
+skipped.
 
 ### Creating a user: the hook's report, read on one door — 2026-09-14
 

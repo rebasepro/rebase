@@ -13,16 +13,27 @@
  * that is where a leaked message matters. A real mongod, the real driver
  * running the real callbacks, the real socket handler on a real HTTP server,
  * and a raw `ws` client.
+ *
+ * The in-process door had the same gap: `driver.listenCollection({ onError })`
+ * passed the realtime service no error callback, so the listener heard
+ * nothing either. It is trusted server code, so it gets the error as thrown,
+ * unmasked.
  */
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, type Db } from "mongodb";
 import { createServer, type Server } from "node:http";
 import { WebSocket as NodeWebSocket } from "ws";
-import { RebaseApiError, type CollectionConfig } from "@rebasepro/types";
+import { RebaseApiError, type CollectionConfig, type DataDriver, type User } from "@rebasepro/types";
 import { MongoDriver } from "../src/services/MongoDriver";
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "../src/factory";
 import { createMongoWebSocket } from "../src/websocket";
+
+// One instance each, thrown on every read, so an in-process listener can be
+// checked for the error as thrown rather than a copy of it.
+const officersOnly = new RebaseApiError("Dossiers are open to case officers only.", { status: 403, code: "FORBIDDEN" });
+const poolExhausted = new Error("pool for mongodb://ops:hunter2@10.0.0.7:27017 exhausted");
+const contractSealed = new RebaseApiError("This contract is sealed.", { status: 403, code: "FORBIDDEN" });
 
 /** Refuses every read, as a callback that gates a whole collection would. */
 const dossiers: CollectionConfig = {
@@ -32,7 +43,7 @@ const dossiers: CollectionConfig = {
     properties: { title: { name: "Title", type: "string" } },
     callbacks: {
         afterRead: () => {
-            throw new RebaseApiError("Dossiers are open to case officers only.", { status: 403, code: "FORBIDDEN" });
+            throw officersOnly;
         }
     }
 };
@@ -45,7 +56,7 @@ const ledgers: CollectionConfig = {
     properties: { title: { name: "Title", type: "string" } },
     callbacks: {
         afterRead: () => {
-            throw new Error("pool for mongodb://ops:hunter2@10.0.0.7:27017 exhausted");
+            throw poolExhausted;
         }
     }
 };
@@ -75,7 +86,7 @@ const contracts: CollectionConfig = {
     properties: { title: { name: "Title", type: "string" } },
     callbacks: {
         afterRead: ({ row }) => {
-            if (sealed) throw new RebaseApiError("This contract is sealed.", { status: 403, code: "FORBIDDEN" });
+            if (sealed) throw contractSealed;
             return row;
         }
     }
@@ -83,60 +94,98 @@ const contracts: CollectionConfig = {
 
 type Frame = { type: string; subscriptionId?: string; payload?: any; error?: string; rows?: unknown[] };
 
+/** What an in-process listener was handed, in the order it was handed it. */
+type Heard = { rows: unknown } | { error: Error };
+
+/** The error it was handed, or what it got instead, for `toBe` to name. */
+const errorIn = (heard: Heard) => ("error" in heard ? heard.error : heard);
+
+/**
+ * Deliveries in arrival order. `next()` resolves with the next one and rejects
+ * when none arrives in time, which is what a subscriber left waiting looks
+ * like from outside.
+ */
+function inbox<T>(label: string) {
+    const queued: T[] = [];
+    const waiting: ((item: T) => void)[] = [];
+    return {
+        push(item: T) {
+            const waiter = waiting.shift();
+            if (waiter) waiter(item);
+            else queued.push(item);
+        },
+        next(): Promise<T> {
+            if (queued.length > 0) return Promise.resolve(queued.shift() as T);
+            return new Promise<T>((resolve, reject) => {
+                const waiter = (arrived: T) => {
+                    clearTimeout(timer);
+                    resolve(arrived);
+                };
+                const timer = setTimeout(() => {
+                    waiting.splice(waiting.indexOf(waiter), 1);
+                    reject(new Error(`Nothing arrived for ${label}: the subscriber is still waiting`));
+                }, 5_000);
+                waiting.push(waiter);
+            });
+        }
+    };
+}
+
 describe("Mongo realtime: a failed subscription fetch reaches the subscriber", () => {
     let mongo: MongoMemoryServer;
     let client: MongoClient;
     let db: Db;
     let realtime: MongoRealtimeService;
+    let driver: MongoDriver;
     let server: Server;
     let port: number;
     let seq = 0;
     const sockets: NodeWebSocket[] = [];
+    const unsubscribes: (() => void)[] = [];
     const previousNodeEnv = process.env.NODE_ENV;
 
-    /**
-     * One subscription on its own socket. `next()` resolves with the frames
-     * addressed to it, in order, and rejects when none arrives — which is what
-     * a subscriber left loading looks like from outside.
-     */
+    /** One subscription on its own socket, with the frames addressed to it. */
     async function subscribe(
         type: "subscribe_collection" | "subscribe_one",
         payload: Record<string, unknown>
     ): Promise<{ subscriptionId: string; next: () => Promise<Frame> }> {
         const subscriptionId = `sub-${++seq}`;
+        const frames = inbox<Frame>(subscriptionId);
         const ws = new NodeWebSocket(`ws://localhost:${port}`);
         sockets.push(ws);
-        const queued: Frame[] = [];
-        const waiting: ((frame: Frame) => void)[] = [];
         ws.on("message", (data) => {
             const frame = JSON.parse(String(data)) as Frame;
-            if (frame.subscriptionId !== subscriptionId) return;
-            const waiter = waiting.shift();
-            if (waiter) waiter(frame);
-            else queued.push(frame);
+            if (frame.subscriptionId === subscriptionId) frames.push(frame);
         });
         await new Promise<void>((resolve, reject) => {
             ws.once("open", () => resolve());
             ws.once("error", reject);
         });
         ws.send(JSON.stringify({ type, payload: { ...payload, subscriptionId } }));
+        return { subscriptionId, next: frames.next };
+    }
 
-        const next = () => {
-            const frame = queued.shift();
-            if (frame) return Promise.resolve(frame);
-            return new Promise<Frame>((resolve, reject) => {
-                const waiter = (arrived: Frame) => {
-                    clearTimeout(timer);
-                    resolve(arrived);
-                };
-                const timer = setTimeout(() => {
-                    waiting.splice(waiting.indexOf(waiter), 1);
-                    reject(new Error(`No frame for ${subscriptionId}: the subscriber is still loading`));
-                }, 5_000);
-                waiting.push(waiter);
-            });
-        };
-        return { subscriptionId, next };
+    /** An in-process collection listener, as server code registers one. */
+    function listenCollection(on: DataDriver, path: string) {
+        if (!on.listenCollection) throw new Error("This driver cannot listen");
+        const heard = inbox<Heard>(`the in-process listener on ${path}`);
+        unsubscribes.push(on.listenCollection({
+            path,
+            onUpdate: (rows) => heard.push({ rows }),
+            onError: (error) => heard.push({ error })
+        }));
+        return heard;
+    }
+
+    function listenOne(path: string, id: string) {
+        const heard = inbox<Heard>(`the in-process listener on ${path}/${id}`);
+        unsubscribes.push(driver.listenOne({
+            path,
+            id,
+            onUpdate: (row) => heard.push({ rows: row }),
+            onError: (error) => heard.push({ error })
+        }));
+        return heard;
     }
 
     async function insert(path: string, title: string): Promise<string> {
@@ -159,7 +208,7 @@ describe("Mongo realtime: a failed subscription fetch reaches the subscriber", (
         registry.register(invoices);
         registry.register(contracts);
         realtime = new MongoRealtimeService(db);
-        const driver = new MongoDriver(db, realtime, undefined, registry);
+        driver = new MongoDriver(db, realtime, undefined, registry);
 
         server = createServer();
         createMongoWebSocket(server, realtime, driver, { requireAuth: false });
@@ -171,6 +220,7 @@ describe("Mongo realtime: a failed subscription fetch reaches the subscriber", (
 
     afterAll(async () => {
         process.env.NODE_ENV = previousNodeEnv;
+        for (const unsubscribe of unsubscribes) unsubscribe();
         for (const ws of sockets) ws.close();
         await realtime?.closeAll();
         await new Promise<void>(resolve => (server ? server.close(() => resolve()) : resolve()));
@@ -263,6 +313,58 @@ describe("Mongo realtime: a failed subscription fetch reaches the subscriber", (
             subscriptionId,
             payload: { error: { message: "This contract is sealed.", code: "FORBIDDEN" } },
             error: "This contract is sealed."
+        });
+    });
+
+    describe("in-process listeners", () => {
+        it("hands a collection listener the refusal as thrown", async () => {
+            await insert("dossiers", "Operation Merlin");
+
+            const heard = listenCollection(driver, "dossiers");
+
+            expect(errorIn(await heard.next())).toBe(officersOnly);
+        });
+
+        it("hands a row listener a fault unmasked", async () => {
+            const id = await insert("ledgers", "Q4");
+
+            const heard = listenOne("ledgers", id);
+
+            // The instance itself, so trusted code reads the real diagnosis
+            // the socket masks.
+            expect(errorIn(await heard.next())).toBe(poolExhausted);
+        });
+
+        it("tells a listener on a scoped driver too", async () => {
+            await insert("dossiers", "Operation Plover");
+            const officer: User = {
+                uid: "officer-7",
+                displayName: null,
+                email: null,
+                photoURL: null,
+                providerId: "password",
+                isAnonymous: false,
+                roles: []
+            };
+
+            const heard = listenCollection(await driver.withAuth(officer), "dossiers");
+
+            expect(errorIn(await heard.next())).toBe(officersOnly);
+        });
+
+        it("tells a listener a re-fetch failed after it loaded", async () => {
+            const id = await insert("contracts", "Framework agreement");
+            sealed = false;
+
+            const heard = listenCollection(driver, "contracts");
+            expect(await heard.next()).toEqual({
+                rows: expect.arrayContaining([expect.objectContaining({ title: "Framework agreement" })])
+            });
+
+            sealed = true;
+            await realtime.notifyUpdate("contracts", id, { id, title: "Framework agreement" });
+
+            expect(errorIn(await heard.next())).toBe(contractSealed);
         });
     });
 });

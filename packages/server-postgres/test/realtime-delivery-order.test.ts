@@ -32,12 +32,13 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * so it claims a slot the ordinary way.
  */
 
-type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
+type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void };
 
 const defer = <T>(): Deferred<T> => {
     let resolve!: (value: T) => void;
-    const promise = new Promise<T>(r => { resolve = r; });
-    return { promise, resolve };
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
 };
 
 describe("Postgres realtime delivery order", () => {
@@ -361,5 +362,89 @@ title: "older" }]);
 
         expect(seen).toEqual([[{ id: "n1",
 title: "newer" }]]);
+    });
+
+    // A failed refetch for an in-process listener used to be logged and
+    // dropped: the listener kept its last rows as if they were current. It is
+    // now reported, through the same slot rows take, as the error thrown.
+    describe("a DataDriver listener's failed refetch", () => {
+        const failure = new Error("the refetch failed");
+
+        const registerDriverListener = (
+            type: "collection" | "single",
+            seen: unknown[],
+            errors: unknown[]
+        ) => {
+            service.registerDataDriverSubscription("drv-1", {
+                clientId: "driver",
+                type,
+                path: "notes",
+                ...(type === "collection" ? { collectionRequest: {} } : { id: "n1" }),
+                onError: error => errors.push(error)
+            });
+            service.addSubscriptionCallback("drv-1", data => seen.push(data));
+        };
+
+        it("reaches a collection listener as thrown", async () => {
+            const errors: unknown[] = [];
+            registerDriverListener("collection", [], errors);
+
+            await notify();
+            await runDebounce();
+            collectionFetches[0].reject(failure);
+            await settle();
+
+            expect(errors).toHaveLength(1);
+            expect(errors[0]).toBe(failure);
+        });
+
+        it("reaches a row listener as thrown", async () => {
+            const errors: unknown[] = [];
+            registerDriverListener("single", [], errors);
+
+            await notify();
+            await runDebounce();
+            expect(entityFetches).toHaveLength(1);
+            entityFetches[0].reject(failure);
+            await settle();
+
+            expect(errors).toHaveLength(1);
+            expect(errors[0]).toBe(failure);
+        });
+
+        it("is not reported over a newer delivery", async () => {
+            const seen: unknown[] = [];
+            const errors: unknown[] = [];
+            registerDriverListener("collection", seen, errors);
+
+            await notify();
+            await runDebounce();
+            await notify();
+            await runDebounce();
+            expect(collectionFetches).toHaveLength(2);
+
+            collectionFetches[1].resolve([{ id: "n1",
+title: "newer" }]);
+            await settle();
+            collectionFetches[0].reject(failure);
+            await settle();
+
+            expect(seen).toEqual([[{ id: "n1",
+title: "newer" }]]);
+            expect(errors).toEqual([]);
+        });
+
+        it("is not reported to a listener cancelled while it ran", async () => {
+            const errors: unknown[] = [];
+            registerDriverListener("collection", [], errors);
+
+            await notify();
+            await runDebounce();
+            service.unsubscribe("drv-1");
+            collectionFetches[0].reject(failure);
+            await settle();
+
+            expect(errors).toEqual([]);
+        });
     });
 });

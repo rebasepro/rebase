@@ -44,6 +44,17 @@ describe("createRoutedRealtimeService", () => {
         expect(mongo.handleClientMessage).not.toHaveBeenCalled();
     });
 
+    it("forwards an in-process subscription whole, onError included", () => {
+        const onUpdate = jest.fn();
+        const onError = jest.fn();
+
+        routed.subscribeToCollection("s1", { clientId: "driver", path: "events" }, onUpdate, onError);
+        routed.subscribeToOne("s2", { clientId: "driver", path: "products", id: "p1" }, onUpdate, onError);
+
+        expect(mongo.subscribeToCollection).toHaveBeenCalledWith("s1", { clientId: "driver", path: "events" }, onUpdate, onError);
+        expect(pg.subscribeToOne).toHaveBeenCalledWith("s2", { clientId: "driver", path: "products", id: "p1" }, onUpdate, onError);
+    });
+
     it("forwards unsubscribe to all providers (owner acts, others no-op)", async () => {
         await routed.handleClientMessage("c1", { type: "unsubscribe", subscriptionId: "s1" });
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);

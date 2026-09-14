@@ -330,21 +330,30 @@ export interface RealtimeChannelsConfig {
  */
 export interface RealtimeProvider {
     /**
-     * Subscribe to collection changes
+     * Subscribe to collection changes.
+     *
+     * `onError` is called when a fetch behind the subscription fails, a
+     * refetch after a change included, with the error as it was thrown. It is
+     * not called for a fetch that newer rows have already overtaken, or after
+     * the subscription is gone. Without it, a subscriber whose fetch failed
+     * was told nothing and kept waiting for rows.
      */
     subscribeToCollection(
         subscriptionId: string,
         config: CollectionSubscriptionConfig,
-        callback?: (rows: Record<string, unknown>[]) => void
+        callback?: (rows: Record<string, unknown>[]) => void,
+        onError?: (error: unknown) => void
     ): void;
 
     /**
-     * Subscribe to single entity changes
+     * Subscribe to single entity changes. `onError` as for
+     * {@link RealtimeProvider.subscribeToCollection}.
      */
     subscribeToOne(
         subscriptionId: string,
         config: SingleSubscriptionConfig,
-        callback?: (row: Record<string, unknown> | null) => void
+        callback?: (row: Record<string, unknown> | null) => void,
+        onError?: (error: unknown) => void
     ): void;
 
     /**

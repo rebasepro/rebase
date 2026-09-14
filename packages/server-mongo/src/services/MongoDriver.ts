@@ -61,6 +61,19 @@ function callContext(
 }
 
 /**
+ * A listener's `onError`, in the shape the realtime service calls it with.
+ *
+ * Without it a failed fetch behind an in-process subscription was logged, and
+ * the listener heard nothing and kept waiting for rows. The error arrives as
+ * thrown, not masked the way a socket frame is: this is trusted server code,
+ * so an `afterRead` refusal reaches it as the `RebaseApiError` it is.
+ */
+function fetchErrorListener(onError: ((error: Error) => void) | undefined): ((error: unknown) => void) | undefined {
+    if (!onError) return undefined;
+    return (error) => onError(error instanceof Error ? error : new Error(String(error)));
+}
+
+/**
  * MongoDB DataDriver Delegate
  *
  * Implements the DataDriver interface for Rebase.
@@ -226,7 +239,8 @@ propertyCallbacks: undefined };
         this.realtimeService.subscribeToCollection(
             subscriptionId,
             { clientId: "driver", ...query, authContext },
-            callback
+            callback,
+            fetchErrorListener(onError)
         );
 
         // Return unsubscribe function
@@ -312,7 +326,8 @@ propertyCallbacks: undefined };
                 id,
                 authContext
             },
-            callback
+            callback,
+            fetchErrorListener(onError)
         );
 
         // Return unsubscribe function

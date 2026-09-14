@@ -144,12 +144,15 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
             await fallback().handleClientMessage(clientId, message, authContext);
         },
 
-        subscribeToCollection(subscriptionId, config, callback) {
-            forPath((config as { path?: string }).path).subscribeToCollection(subscriptionId, config, callback);
+        // Forwarded whole rather than re-listed. The list here named three
+        // arguments, and would have dropped `onError`, the fourth, for every
+        // routed subscription while both engines honour it.
+        subscribeToCollection(...args) {
+            forPath(args[1].path).subscribeToCollection(...args);
         },
 
-        subscribeToOne(subscriptionId, config, callback) {
-            forPath((config as { path?: string }).path).subscribeToOne(subscriptionId, config, callback);
+        subscribeToOne(...args) {
+            forPath(args[1].path).subscribeToOne(...args);
         },
 
         unsubscribe(subscriptionId) {

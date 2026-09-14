@@ -206,6 +206,12 @@ type Subscription = {
     // Auth context for RLS — when set, refetches run in a transaction
     // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
     authContext?: SubscriptionAuthContext;
+    /**
+     * An in-process listener's error callback, called when a refetch fails.
+     * Kept on the subscription so it goes wherever the subscription goes: a
+     * replaced or cancelled one takes its listener with it.
+     */
+    onError?: (error: unknown) => void;
     /** How many deliveries have been started for this subscription. */
     started: number;
     /** The highest started-sequence that has already reached the subscriber. */
@@ -427,6 +433,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         id?: string | number;
         collectionRequest?: StoredCollectionRequest;
         authContext?: SubscriptionAuthContext;
+        onError?: (error: unknown) => void;
     }) {
         this.debugLog("📋 [RealtimeService] Registering DataDriver subscription:", subscriptionId, subscription.authContext ? "(with auth)" : "(no auth)");
         this._subscriptions.set(subscriptionId, { ...subscription, started: 0, delivered: 0 });
@@ -453,7 +460,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     subscribeToCollection(
         subscriptionId: string,
         config: CollectionSubscriptionConfig,
-        callback?: (rows: Record<string, unknown>[]) => void
+        callback?: (rows: Record<string, unknown>[]) => void,
+        onError?: (error: unknown) => void
     ): void {
         this._subscriptions.set(subscriptionId, {
             clientId: config.clientId,
@@ -469,6 +477,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 searchString: config.searchString,
                 searchExplain: config.searchExplain
             },
+            onError,
             started: 0,
             delivered: 0
         });
@@ -484,13 +493,15 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     subscribeToOne(
         subscriptionId: string,
         config: SingleSubscriptionConfig,
-        callback?: (row: Record<string, unknown> | null) => void
+        callback?: (row: Record<string, unknown> | null) => void,
+        onError?: (error: unknown) => void
     ): void {
         this._subscriptions.set(subscriptionId, {
             clientId: config.clientId,
             type: "single",
             path: config.path,
             id: config.id,
+            onError,
             started: 0,
             delivered: 0
         });
@@ -1024,8 +1035,36 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 // one the SDK uses — carries `meta`.
             } catch (error) {
                 logger.error(`❌ [RealtimeService] Error in debounced driver refetch for ${subscriptionId}`, { error: error });
+                this.reportDriverFetchFailure(subscriptionId, subscription, canDeliver, error);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
+    }
+
+    /**
+     * Tell an in-process listener its refetch failed, through the slot the
+     * rows would have used.
+     *
+     * The two driver-refetch `catch` blocks used to log and stop, so the
+     * listener heard nothing and kept its last rows as if they were current.
+     * The error goes to it as thrown: this is trusted server code, and the
+     * masking on the socket path is for clients. The slot keeps a failed
+     * straggler from reporting over newer rows, and keeps a failure away from
+     * a subscription that was cancelled or replaced while it ran.
+     */
+    private reportDriverFetchFailure(
+        subscriptionId: string,
+        subscription: Subscription,
+        canDeliver: () => boolean,
+        error: unknown
+    ) {
+        if (!subscription.onError || !canDeliver()) return;
+        try {
+            subscription.onError(error);
+        } catch (listenerError) {
+            // Contained: this runs in a timer, where a throw would be an
+            // unhandled rejection.
+            logger.error(`❌ [RealtimeService] onError threw for DataDriver subscription ${subscriptionId}`, { error: listenerError });
+        }
     }
 
     /**
@@ -1302,6 +1341,7 @@ roles: ["anon"] };
                 if (canDeliver()) callback(row || null);
             } catch (error) {
                 logger.error(`❌ [RealtimeService] Error in debounced row driver refetch for ${subscriptionId}`, { error: error });
+                this.reportDriverFetchFailure(subscriptionId, subscription, canDeliver, error);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }

@@ -151,6 +151,19 @@ function assertActingUserForAutoValues(
     }
 }
 
+/**
+ * A listener's `onError`, in the shape the realtime service calls it with.
+ *
+ * Registered with the subscription so a failed refetch reaches it. Before, only
+ * the initial fetch did: a refetch after a change failed into a log line, and
+ * the listener kept its last rows as if they were current. The error arrives as
+ * thrown, not masked the way a socket frame is: this is trusted server code.
+ */
+function fetchErrorListener(onError: ((error: Error) => void) | undefined): ((error: unknown) => void) | undefined {
+    if (!onError) return undefined;
+    return (error) => onError(error instanceof Error ? error : new Error(String(error)));
+}
+
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
@@ -616,6 +629,7 @@ export class PostgresBackendDriver implements DataDriver {
                                                         }: ListenCollectionProps<M>): () => void {
 
         const subscriptionId = this.generateSubscriptionId();
+        const reportError = fetchErrorListener(onError);
 
         // Type-adapter wrapper: RealtimeService expects a union callback signature
         const callbackWrapper = (rows: Record<string, unknown>[]) => {
@@ -636,7 +650,8 @@ export class PostgresBackendDriver implements DataDriver {
                 startAfter: startAfter as Record<string, unknown> | undefined,
                 databaseId: collection?.databaseId,
                 searchString
-            }
+            },
+            onError: reportError
         });
 
         // Store the callback for this subscription
@@ -656,7 +671,7 @@ export class PostgresBackendDriver implements DataDriver {
         }).then(rows => {
             callbackWrapper(rows);
         }).catch(error => {
-            if (onError) onError(error);
+            reportError?.(error);
         });
 
         return () => {
@@ -731,6 +746,7 @@ export class PostgresBackendDriver implements DataDriver {
                                                     }: ListenOneProps<M>): () => void {
 
         const subscriptionId = this.generateSubscriptionId();
+        const reportError = fetchErrorListener(onError);
         const callbackWrapper = (row: Record<string, unknown> | null) => {
             if (row)
                 onUpdate(row);
@@ -741,7 +757,8 @@ export class PostgresBackendDriver implements DataDriver {
             clientId: "driver",
             type: "single" as const,
             path,
-            id
+            id,
+            onError: reportError
         });
 
         // Store the callback for this subscription
@@ -757,7 +774,7 @@ export class PostgresBackendDriver implements DataDriver {
                 if (row) onUpdate(row);
             })
             .catch(error => {
-                if (onError) onError(error as Error);
+                reportError?.(error);
             });
 
         // Return the unsubscribe function

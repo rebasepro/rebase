@@ -13,6 +13,19 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ### Fixed
 
+- **An in-process realtime listener hears when a read fails.** Server code
+  that listens with `listenCollection({ onUpdate, onError })` or `listenOne`
+  was not told when the read behind the subscription failed. On MongoDB,
+  neither the first load nor any refresh after a change reached `onError`. On
+  Postgres the first load did, but a failed refresh was only logged, so the
+  listener kept its last rows as if they were current. Both now call `onError`
+  with the error as it was thrown: an `afterRead` that throws a
+  `RebaseApiError` arrives as that `RebaseApiError`, not masked the way a
+  WebSocket frame is. A failure is not reported once newer rows have arrived,
+  or after you unsubscribe. `RealtimeProvider.subscribeToCollection` and
+  `subscribeToOne` take the same optional `onError`, and the router used when
+  a project has several data sources passes it on.
+
 - **A realtime subscription on MongoDB reports a failed read.** When the fetch
   behind a WebSocket subscription failed, the Mongo server logged the error and
   sent nothing. That happened on the first load and on every refresh after a
