@@ -33,8 +33,8 @@ import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const CONTENT = "website/src/content/docs";
-const LOCALES = ["es", "de", "fr", "it", "pt"];
+export const CONTENT = "website/src/content/docs";
+export const LOCALES = ["es", "de", "fr", "it", "pt"];
 
 /**
  * Mirrors EXCLUDED_DIRS / EXCLUDED_FILES in website/scripts/translate_docs.mjs:
@@ -56,16 +56,29 @@ const NOT_TRANSLATED = [/^docs\/ui\//, /^docs\/CHANGELOG\.md$/];
  */
 const UNSTAMPED_BUDGET = 0;
 
-/** Same digest as the translator's `sourceHash`; keep the two in step. */
-function sourceHash(content) {
+/**
+ * Same digest as `sourceHash` in `website/scripts/translate_docs.mjs` and
+ * `backfill_source_hashes.mjs`; keep the three in step.
+ */
+export function sourceHash(content) {
     return crypto.createHash("sha256").update(content, "utf8").digest("hex").slice(0, 16);
 }
 
-function readSourceHash(text) {
+export function readSourceHash(text) {
     const frontmatter = text.match(/^---\n([\s\S]*?)\n---/);
     if (!frontmatter) return null;
     const line = frontmatter[1].match(/^sourceHash:\s*([0-9a-f]+)\s*$/m);
     return line ? line[1] : null;
+}
+
+/**
+ * Writes (or replaces) the `sourceHash` line in a file's frontmatter — the same
+ * edit the translator and the backfill make. Null when there is no frontmatter.
+ */
+export function stampSourceHash(text, hash) {
+    const stripped = text.replace(/^(---\n[\s\S]*?)^sourceHash:.*\n([\s\S]*?^---\n)/m, "$1$2");
+    if (!/^---\n/.test(stripped)) return null;
+    return stripped.replace(/^---\n/, `---\nsourceHash: ${hash}\n`);
 }
 
 export function checkTranslationFreshness(root, { strict = false } = {}) {

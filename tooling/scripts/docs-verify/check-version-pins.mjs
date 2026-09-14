@@ -45,9 +45,13 @@
  * the user's numbers and must not move. Anchored patterns keep working after
  * 1.0; revisit the bare rule then.
  */
-import { readFileSync, writeFileSync, globSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import {
+    CONTENT, LOCALES, sourceHash, readSourceHash, stampSourceHash
+} from "./check-translation-freshness.mjs";
 
 /**
  * Everything a reader could copy a version out of. Locales included: they are
@@ -281,6 +285,9 @@ expected: current };
  * Only the versions the check flagged are touched, on the lines it flagged
  * them — prose, comments and thresholds are never rewritten.
  *
+ * Translations it keeps in step keep their freshness stamp too — see
+ * {@link carryTranslationStamps}.
+ *
  * @param {string} root repo root
  * @param {string} [expected]
  */
@@ -294,34 +301,121 @@ export function writeVersionPins(root, expected) {
     }
 
     const written = [];
+    /** @type {Map<string, {before: string, after: string, swaps: Map<string, number>}>} */
+    const edits = new Map();
     for (const [rel, hits] of byFile) {
         const abs = path.join(root, rel);
-        const lines = readFileSync(abs, "utf8").split("\n");
+        const before = readFileSync(abs, "utf8");
+        const lines = before.split("\n");
+        const swaps = new Map(); // version replaced → occurrences replaced
         for (const hit of hits) {
             const i = hit.line - 1;
-            lines[i] = lines[i].split(hit.found).join(current);
+            const parts = lines[i].split(hit.found);
+            swaps.set(hit.found, (swaps.get(hit.found) ?? 0) + parts.length - 1);
+            lines[i] = parts.join(current);
         }
-        writeFileSync(abs, lines.join("\n"));
+        const after = lines.join("\n");
+        writeFileSync(abs, after);
+        edits.set(rel, { before,
+after,
+swaps });
         written.push({ file: rel,
 count: hits.length });
     }
 
     return { written,
 expected: current,
-total: findings.length };
+total: findings.length,
+...carryTranslationStamps(root, edits) };
+}
+
+/**
+ * Keep a translation as fresh as it was when this write moved its pins along
+ * with the English page's.
+ *
+ * The locales are in GLOBS, so a release rewrites a pin in English and in all
+ * five translations in the same pass. But a translation's `sourceHash` is the
+ * hash of the English page byte for byte, and the English page just changed —
+ * so every translation of every page with a pin read as stale the moment the
+ * release committed. 0.21.0 did exactly that: ten pages, fifty
+ * `verify:docs --strict` findings on the next push, and not one translation
+ * that said anything the English did not. The bump commit is `[skip ci]`, so
+ * nobody saw it until an unrelated push failed on it.
+ *
+ * A stamp is carried only when it is provably still true:
+ *
+ *   - the translation matched the English page as it was immediately before
+ *     this write — one that was already stale is not this write's to vouch for;
+ *   - and this write made the same substitutions in it as in English: the same
+ *     versions, the same number of times. A translation whose pins moved
+ *     differently has drifted in a way somebody should read, so it keeps its old
+ *     stamp and stays a finding.
+ *
+ * @param {string} root repo root
+ * @param {Map<string, {before: string, after: string, swaps: Map<string, number>}>} edits
+ * @returns {{ restamped: string[], leftStale: string[] }}
+ */
+function carryTranslationStamps(root, edits) {
+    const restamped = [];
+    const leftStale = [];
+    const english = `${CONTENT}/docs/`;
+
+    for (const [rel, edit] of edits) {
+        if (!rel.startsWith(english)) continue;
+        const page = rel.slice(CONTENT.length + 1); // docs/…
+        const was = sourceHash(edit.before);
+        const now = sourceHash(edit.after);
+
+        for (const locale of LOCALES) {
+            const localeRel = `${CONTENT}/${locale}/${page}`;
+            const abs = path.join(root, localeRel);
+            if (!existsSync(abs)) continue;
+            const text = readFileSync(abs, "utf8");
+            if (readSourceHash(text) !== was) continue;
+            if (!sameSwaps(edit.swaps, edits.get(localeRel)?.swaps)) {
+                leftStale.push(localeRel);
+                continue;
+            }
+            writeFileSync(abs, stampSourceHash(text, now));
+            restamped.push(localeRel);
+        }
+    }
+
+    return { restamped,
+leftStale };
+}
+
+/** @param {Map<string, number>} a @param {Map<string, number> | undefined} b */
+function sameSwaps(a, b) {
+    if (!b || a.size !== b.size) return false;
+    for (const [version, count] of a) {
+        if (b.get(version) !== count) return false;
+    }
+    return true;
 }
 
 // `node tooling/scripts/docs-verify/check-version-pins.mjs [--write]`
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
     if (process.argv.includes("--write")) {
-        const { written, expected, total } = writeVersionPins(root);
+        const { written, expected, total, restamped, leftStale } = writeVersionPins(root);
         for (const w of written) console.log(`  ${w.file} (${w.count})`);
         console.log(
             total
                 ? `Rewrote ${total} pin(s) to ${expected} across ${written.length} file(s).`
                 : `Every version pin already names ${expected}.`
         );
+        if (restamped.length) {
+            console.log(`Kept ${restamped.length} translation(s) fresh: their pins moved with the English page's.`);
+        }
+        if (leftStale.length) {
+            console.log(
+                `${leftStale.length} translation(s) were fresh, but their pins did not move the way ` +
+                "the English page's did, so they now read as stale. Replay the English change by " +
+                "hand and run `node scripts/backfill_source_hashes.mjs --only <page>` in website/:"
+            );
+            for (const f of leftStale) console.log(`  ${f}`);
+        }
     } else {
         const { findings, expected } = checkVersionPins(root);
         for (const f of findings) {

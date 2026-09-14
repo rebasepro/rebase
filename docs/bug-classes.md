@@ -3404,3 +3404,47 @@ Gate: `test/e2e/delete-reads-stored-row-e2e.test.ts` sends the forged frame over
 real socket to a real Postgres with RLS and the history table. Four mutations —
 callbacks handed `{}`, history handed `{}`, the 404 skipped, the frame's
 `collection` forwarded again — each turn a case red.
+
+## 64. A mechanical rewrite of a file another tool fingerprints
+
+The release runs `check-version-pins.mjs --write`, which moves every
+`rebasepro/server:0.20.0` a reader could copy to the new version, in English and
+in the five translations in the same pass. It covers the locales on purpose,
+because they used to sit a release behind. Each translation records `sourceHash`,
+the hash of the English page it was made from, and `check-translation-freshness`
+reads that stamp back. Both are correct on their own. Together, the writer changed
+ten English pages and their stamps went on naming pages that no longer existed.
+The 0.21.0 cut left fifty translations reading as stale when all fifty had
+received the same edit as their source. The bump commit is `[skip ci]`, so the
+first run to see it was an unrelated push, failing on findings none of its own.
+
+The tell is a writer built to be exhaustive (every pin, every mirror, every
+generated page) whose output is the input to a hash, checkpoint or snapshot kept
+somewhere else. The writer knows nothing about the stamp, and the stamp knows
+nothing about the writer, so a correct run of one invalidates the other.
+
+The writer is where this gets fixed, because it is the only party that knows
+what it changed. `writeVersionPins` now carries a translation's stamp when the
+stamp was true just before the write and the translation received the same
+substitutions as English: the same versions, the same number of times. The other
+option was a gate that hashes a pin-normalised page. That changes the digest
+three writers share, re-stamps all 515 pages, and stops the gate from seeing an
+English pin edited by hand that never reached a locale.
+
+**Sweep (2026-09-14):** every writer the release or the build runs over tracked
+content, against every stamp or copy computed from that content.
+
+| checked | result |
+|---|---|
+| `check-version-pins --write` → translation `sourceHash` | **BUG**, fixed. Replaying the 0.21.0 bump on its parent (8af1f7813): 50 stale before, 0 after, and every page byte-identical to the real bump apart from the stamp line. |
+| the same writer → `llms.txt`, `llms-full.txt`, `sitemap.md` | clean. `publish.yml` and `release.sh` run `generate-all` straight after it, and `check:generated` diffs the copies. |
+| the bump's changelog stamp → the website `CHANGELOG.md` copies | clean. They are mirrored on every build and `NOT_TRANSLATED`. |
+| the UI reference generator → `docs/ui/**` | clean. Regenerated wholesale, and `NOT_TRANSLATED`. |
+| landing-page fingerprints (`src/i18n/.translation-checkpoint.json`) | clean. The pin writer does not glob `src/i18n/`, and `en.ts` holds no pin. |
+| the same cut → `Since 0.21` badges, `NOT_NEW`, the upgrade guide | not this class. Each needs a person's call, and each gate fired correctly. **OPEN:** what hid them for a push was `[skip ci]`. Nothing runs `verify:docs` on the bump commit itself. |
+
+Gate: `tooling/scripts/test/version-pins.test.mjs` (in `test:gates`) builds a
+one-page docs tree, runs the writer and asks the freshness gate. It kills five
+mutations: the carry removed, the fresh-before check dropped, the
+same-substitutions check dropped, substitution counts ignored, and the old hash
+stamped.

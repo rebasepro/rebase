@@ -84,6 +84,16 @@ examples (`tag: "1.4.0"`, `acme/api:1.4.0`) stay theirs. Anchored patterns keep
 working after 1.0; revisit the bare rule then. A line that must show an old
 release carries `version-pin: ignore`.
 
+`--write` is what the release runs, and it rewrites the five locales in the same
+pass as English. It also carries their `sourceHash` stamps, because the
+translation-freshness stage hashes the English page byte for byte: the 0.21.0
+bump moved one pin in ten pages and left all fifty of their translations
+reading as stale, with nothing wrong in any of them. A stamp is carried only
+when the translation was fresh just before the write *and* received the same
+substitutions as English (same versions, same counts). One that was already
+stale, or whose pins moved differently, keeps its old stamp and stays a finding;
+`--write` lists the second kind.
+
 ## What is globbed
 
 `website/`, `tooling/rebase-agent-skills/`, `examples/*/`, `packages/*/README.md`,
