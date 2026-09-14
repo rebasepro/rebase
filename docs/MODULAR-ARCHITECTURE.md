@@ -20,8 +20,10 @@ subsystem is independently gated by config.
 That second level was missing for a long time and the gap was invisible: every React
 import in `@rebasepro/types` is erased at build, so the runtime guard passed while 13
 shipped `.d.ts` files began with `import React from "react"` and `@types/react` was a
-devDependency only. A BaaS install had nothing to resolve them against. See
-`PLAN-2026-07-25-BAAS-ADMIN-SPLIT.md`.
+devDependency only. A BaaS install had nothing to resolve them against. The split
+moved the React half into `@rebasepro/cms-types`, and `check:types-headless` (under
+*What enforces this*) is the guard that now catches a React mention in a core
+package.
 
 ---
 
@@ -179,8 +181,11 @@ could never reach the database, while reading exactly like an authorization sett
 Because the Node backend imports these files, **collection files must never import a
 UI package.** They may import:
 
-- `@rebasepro/types` — the contract, and `AdminCollectionConfig` **as a type only**
-- `@rebasepro/common` (`defineCollection`)
+- `@rebasepro/types` — the contract
+- `@rebasepro/common` — `defineCollection`, in a project with no panel
+- `@rebasepro/cms-types` — the same `defineCollection` with the `admin` block
+  type-checked, in a project with the panel. It is the type surface, not the panel:
+  nothing in it reaches React at runtime, and `check:headless` loads it to prove so
 - local, non-UI helpers
 
 Custom components are referenced with a **lazy import thunk**, which TypeScript checks
@@ -192,8 +197,9 @@ admin: { Field: () => import("../../frontend/src/BodyPartsField") }
 
 A wrong path is a compile error, go-to-definition works, and editors follow the
 specifier on a file move. The bare-string form (`Field: "../../frontend/src/X"`) still
-works and is what the visual collection editor writes, since ts-morph can emit a string
-literal but not a thunk — prefer the thunk when authoring by hand.
+works: the Vite plugin rewrites a relative string on `Field`, `Preview`, `Builder` or
+`Filter` into the same lazy import for the browser, and on the backend the string is
+inert. Prefer the thunk when authoring by hand.
 
 `@rebasepro/types` declares **no `admin` field** — not on a collection, not on a
 property. In a BaaS project, writing one is a type error. `@rebasepro/cms-types` adds
@@ -228,15 +234,16 @@ authoring type.
 This works only because `BaseProperty`, the ten concrete property types and
 `BaseCollectionConfig` are `interface`s. Interfaces merge; `type` aliases do not.
 
-Custom React components are referenced **by string path** (`Field: "./MyField"`), not
-by import. The Vite plugin rewrites those strings into lazy dynamic imports for the
-browser, so the backend never evaluates React. Anything the admin UI needs to inject
-into a collection (for example the reset-password entity action on auth collections)
-is injected **frontend-side** by `@rebasepro/cms`, not imported into config.
+Whichever form a component reference takes, a collection file never imports a React
+component by value: the backend never calls the thunk, and a string stays inert until
+the Vite plugin rewrites it for the browser. Anything the admin UI needs to inject into a collection (for example the
+reset-password entity action on auth collections) is injected **frontend-side** by
+`@rebasepro/cms`, not imported into config.
 
 This rule is enforced in CI by `pnpm run check:headless`, which imports every
 collection file and every server package under a Node loader hook that throws if the
-module graph reaches `react`, `react-dom`, or any `@rebasepro/{admin,ui,app,studio,forms}`.
+module graph reaches `react`, `react-dom`, `react-router` (or `react-router-dom`), or
+any `@rebasepro/{cms,cms-common,ui,app,studio,forms}`.
 
 ## 3. Full mode — Studio
 
@@ -263,38 +270,42 @@ Shared kernel   types → utils → common → client        (isomorphic, no UI,
                                                       (and no React, in any position)
 
 BaaS            server → client, common, types, utils
-                server-postgres / server-mongo → server
-                cli → client, codegen, server, server-postgres, types
-                codegen → client, common, types
+                server-postgres → codegen, common, server, types, utils
+                server-mongo → common, types, utils   (server: optional peer)
+                cli → agent-skills, client, codegen, server, server-postgres, types
+                codegen → common                      (types: peer)
                 mcp → client
-                inference (leaf)
+                inference → types, utils
+                rls-check (leaf)                      (audits any Postgres, Rebase or not)
 
 CMS             ui, forms (leaves)
-                admin-types → types                   (the React half of the types)
-                client-postgres → client, types       (a React hook: a frontend driver)
-                app → admin-types, common, forms, types, ui, utils
-                admin → admin-types, app, common, forms, inference, types, ui, utils
-                firebase → admin, admin-types, app, common, types, ui, utils
+                cms-types → types                     (the React half of the types)
+                app → cms-types, common, forms, types, ui, utils
+                cms → app, cms-types, common, forms, inference, types, ui, utils
+                firebase → app, cms, cms-types, common, types, ui, utils
 
-Full            studio → client, common, app, types, ui, utils
-                        (admin: optional peer)
-                plugin-insights, plugin-ai
+Full            studio → app, client, cms-types, common, types, ui, utils
+                        (cms: optional peer)
+                plugin-insights → app, cms-types, types, ui
+                plugin-ai → app, cms, cms-types, common, types, ui, utils
 ```
 
-Names describe **role**, not position or framework. `server` pairs with `client`;
-`app` is the runtime that `admin`, `studio` and the plugins register into. React is a
-peer dependency of the frontend tier, not an identity — `admin`, `admin` and `studio` are
-every bit as React as `app`, so none of them carry it in the name.
+`agent-skills` is the one published package outside `packages/`: it lives in
+`tooling/rebase-agent-skills/` and holds the skills `rebase skills install` copies.
 
-`firebase` sits in the CMS tier rather than beside `client`, which is where its old
-name (`client-firebase`) filed it: it depends on `admin`, `app` and `admin`, so it is a
-UI integration, not a client SDK. `client-postgres` is the one that really is an
-adapter over `client`.
+Names describe **role**, not position or framework. `server` pairs with `client`;
+`app` is the runtime that `cms`, `studio` and the plugins register into. React is a
+peer dependency of the frontend tier, not an identity — `cms`, `studio` and the
+plugins are every bit as React as `app`, so none of them carry it in the name.
+
+`firebase` sits in the CMS tier rather than beside `client`, where its old `client-`
+prefix filed it: it depends on `app`, `cms` and `cms-types`, so it is a UI
+integration, not a client SDK.
 
 The React auth controller (`useRebaseAuthController`) lives in `app`, beside the
-`RebaseAuth` and `LoginView` components it is used with. It was once its own
-`@rebasepro/auth` package, which turned out to be one hook whose only dependency was
-`types`. The auth *system* is in `client` (`client.auth`) and `server`.
+`RebaseAuth` and `LoginView` components it is used with. It was once a package of
+its own, which turned out to be one hook whose only dependency was `types`. The auth
+*system* is in `client` (`client.auth`) and `server`.
 
 `serveSPA` (`packages/server/src/serve-spa.ts`) is the only place the backend
 touches the admin bundle, and it is called from the *application* entry point, never
@@ -321,7 +332,7 @@ Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a m
   their manifests, for any mention of React or an admin package. Catches
   `import type React`, which a `/^import React/` scan misses, and a stray
   `@types/react` devDependency, which is what let the leak sit unnoticed.
-- `pnpm run check:baas-types` (`e2e/baas-typecheck/`) — typechecks a real BaaS project
+- `pnpm run check:baas-types` (`tests/e2e/baas-typecheck/`) — typechecks a real BaaS project
   (backend, a collection file with schema/validation/relations/RLS/callbacks, SDK reads
   and writes) with `react` mapped onto a stub that stands in for its absence. Catches a
   React type reached through an alias, which a text scan cannot see. The two are
@@ -333,13 +344,15 @@ Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a m
   init e2e, inside a Docker build about fifteen minutes in. These are the first files
   every new project runs, so they should fail in seconds.
 - `pnpm run check:headless` — imports every collection file and every server package
-  under a Node loader hook that throws on `react`, `react-dom`, or any
-  `@rebasepro/{admin,ui,app,studio,forms}`. Runs in CI before the build, reads
+  under a Node loader hook that throws on `react`, `react-dom`, `react-router` (or
+  `react-router-dom`), or any `@rebasepro/{cms,cms-common,ui,app,studio,forms}`
+  (the list is `FORBIDDEN_PACKAGES` in `tooling/scripts/headless-guard/forbid-ui-hook.mjs`).
+  Runs in CI before the build, reads
   source directly, needs no build step. Add new server packages to
   `SERVER_PACKAGES` in `tooling/scripts/headless-guard/check.mjs`.
   Imports that TypeScript elides because they are unused do not trip it, which
   matches runtime: backends run this same TS through tsx.
-- `e2e/tests/cli-init-baas-e2e.ts` — scaffolds `--headless`, installs it from real
+- `tests/e2e/tests/cli-init-baas-e2e.ts` — scaffolds `--headless`, installs it from real
   tarballs, creates tables the project was never told about, and checks the API serves
   them. This is the only place a scaffolded project is installed and booted
   (`workspace:*` deps resolve nowhere else), so it's what proves the template rather

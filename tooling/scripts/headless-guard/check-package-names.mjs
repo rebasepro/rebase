@@ -102,11 +102,17 @@ function patternsFor(old) {
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "pnpm-store"]);
 // Changelogs record what shipped under the old names; the upgrade guide has to
-// print the old→new rename table to be of any use; the architecture doc
-// explains why `auth` is gone; the publish summary is a generated record. The
-// two scripts below have to name the old packages to do their job — this one to
-// find them, the other to deprecate them on npm — so they are the exceptions
-// that make the rule enforceable.
+// print the old→new rename table to be of any use; the publish summary is a
+// generated record. The two scripts below have to name the old packages to do
+// their job — this one to find them, the other to deprecate them on npm — so
+// they are the exceptions that make the rule enforceable.
+//
+// `docs/MODULAR-ARCHITECTURE.md` was exempt too, on the grounds that it
+// explained why `auth` was gone. The exemption covered the whole file, so its
+// package map rotted under it: three packages listed by names that no longer
+// existed, one that had been deleted, and a sentence reading "`admin`, `admin`
+// and `studio`". The history it told needs no old names to tell, so it is
+// scanned like any other doc.
 //
 // `llms.txt` is generated: `website/scripts/generate_llms_txt.js` concatenates
 // every sidebar page, `upgrading.mdx` and its rename table included. Exempting
@@ -146,7 +152,6 @@ const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "upgrading.mdx",
     "pnpm-lock.yaml",
-    "docs/MODULAR-ARCHITECTURE.md",
     "website/public/llms.txt",
     "website/public/llms-full.txt",
     "tooling/scripts/headless-guard/check-package-names.mjs",
