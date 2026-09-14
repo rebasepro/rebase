@@ -115,7 +115,10 @@ it, so write that page before the cut under the release's name:
 `upgrading/<from>-to-<minor>.mdx`, not `-to-next`. `check-upgrade-coverage`
 takes a hop page named for an unreleased version as the destination for
 `[Unreleased]`, so main stays green until the cut. If the page is still named
-`-to-next` at the cut, the finding says which one to rename.
+`-to-next` at the cut, the finding says which one to rename. That holds even when
+the page's prose names the release: an `[Unreleased]` with no `### Breaking` may
+not have a page with sections, and a second `-to-next` page beside the one it goes
+to is a finding too.
 
 ## What is globbed
 

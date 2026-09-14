@@ -3677,3 +3677,19 @@ twelve mutations. The badge writer: space handling, blank-line handling, the
 fence guard, the locales skipped, the removals not counted, every badge treated
 as released. The `NOT_NEW` pruner, the pending-page rule, the rename hint, the
 release skipping badges or `NOT_NEW`, and the stamp carry ignoring counts.
+
+**One the sweep missed:** the upgrade guide's day-after answer was "nothing".
+Its one rule for `[Unreleased]`'s page, one `## ` section per Breaking bullet,
+only ran while `[Unreleased]` had a `### Breaking`, and straight after a cut it
+has none. So a page left as `-to-next` was judged only by "names the version",
+which one sentence of prose satisfies. On a simulated 0.22.0 cut of main, a
+`0-21-to-next.mdx` that said "this ships as 0.22" went through the release's own
+`verify:docs:strict` still opening "Nothing here is released yet". The count now
+holds at zero: an empty `[Unreleased]` may not have a page with sections, and the
+finding names the release that shipped them and the name to rename it to. A
+second `-to-next` page beside the one `[Unreleased]` goes to, which is what a
+rename by copy leaves, is a finding too. The replayed 0.22.0 cut, prepared, still
+passes on both sides. Gate: two more cases in `release-docs.test.mjs` kill six
+mutations: the zero-count rule off, applied with bullets too, said twice beside the
+rename hint, naming no release, and the stray check off or counting the page
+`[Unreleased]` goes to.

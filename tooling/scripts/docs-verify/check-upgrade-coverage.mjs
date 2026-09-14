@@ -29,9 +29,17 @@
  * every week, and "names the version" is satisfied forever by the first section
  * anybody wrote. Counting is the cheapest thing that keeps it growing with them.
  *
+ * The count holds at zero too. An `[Unreleased]` with no `### Breaking` has no
+ * page with sections, and the moment that matters is straight after a cut: a page
+ * left as `-to-next` still opens "Nothing here is released yet" over changes that
+ * shipped, and "names the version" passes it the moment its prose says "this
+ * ships as 0.22". Replayed on a simulated 0.22.0 cut, that page went through the
+ * release's own `verify:docs:strict`. So does a second `-to-next` page beside the
+ * one `[Unreleased]` goes to, which is what a rename by copy leaves.
+ *
  * Run: node tooling/scripts/docs-verify/check-upgrade-coverage.mjs
  */
-import { readFileSync, globSync } from "node:fs";
+import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -140,6 +148,8 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
 
     /** @type {{version: string, entries: number, reason?: string}[]} */
     const findings = [];
+    /** `-to-next` pages a finding already says to rename, so the zero-count rule below does not say it twice. */
+    const toRename = new Set();
     for (const { version, entries, bullets } of breaking) {
         if (version === UNRELEASED) {
             const NEXT_PAGE = nextPage(root, released);
@@ -172,6 +182,7 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
             // Straight after a cut, the page that covers it is usually still
             // named for the section it was written under. Say which.
             const toNext = globSync(GUIDE_PAGES, { cwd: root }).find(f => f.endsWith("-to-next.mdx"));
+            if (toNext) toRename.add(toNext);
             findings.push(toNext
                 ? {
                     version, entries,
@@ -182,6 +193,45 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
                         "unreleased version is where [Unreleased] goes, so main stays green until the cut."
                 }
                 : { version, entries });
+        }
+    }
+
+    // The rule for `[Unreleased]`'s page when `[Unreleased]` declares nothing,
+    // and the `-to-next` pages that are not its page. See the header.
+    const hops = globSync(GUIDE_PAGES, { cwd: root });
+    if (hops.some(f => /^\d+-\d+-to-\d+-\d+\.mdx$/.test(path.basename(f)))) {
+        const NEXT_PAGE = nextPage(root, released);
+        if (!breaking.some(b => b.version === UNRELEASED) && existsSync(path.join(root, NEXT_PAGE))) {
+            const sections = [...readFileSync(path.join(root, NEXT_PAGE), "utf8").matchAll(/^## /gm)].length;
+            if (sections > 0 && !toRename.has(NEXT_PAGE)) {
+                // The release that carried them, when there is one: the newest
+                // breaking release past the hop's own starting minor.
+                const from = path.basename(NEXT_PAGE).match(/^(\d+)-(\d+)-to-next\.mdx$/);
+                const shipped = from && breaking.find(({ version }) => {
+                    if (version === UNRELEASED) return false;
+                    const [major, minor] = parse(version);
+                    return major > Number(from[1]) || (major === Number(from[1]) && minor > Number(from[2]));
+                });
+                const [major, minor] = shipped ? parse(shipped.version) : [];
+                findings.push({
+                    version: UNRELEASED, entries: 0,
+                    reason:
+                        `${NEXT_PAGE} has ${sections} \`## \` section(s), and [Unreleased] declares no ` +
+                        "`### Breaking` — one section per bullet, and there are none. " +
+                        (shipped
+                            ? `${shipped.version} shipped them, so the page still opens as unreleased: rename it and ` +
+                              `its translations to …-to-${major}-${minor}.mdx.`
+                            : "Add the Breaking bullets it describes.")
+                });
+            }
+        }
+        for (const stray of hops.filter(f => f.endsWith("-to-next.mdx") && f !== NEXT_PAGE)) {
+            findings.push({
+                version: UNRELEASED, entries: 0,
+                reason:
+                    `${stray} is named -to-next, but [Unreleased] goes to ${NEXT_PAGE}. A rename by copy ` +
+                    "leaves the old page behind: delete it, with its translations."
+            });
         }
     }
 
