@@ -768,7 +768,7 @@ This reads all collection files from the configured collections directory (e.g.,
 pnpm run dev
 ```
 
-This starts both frontend and backend. The Studio is accessible at `http://localhost:5173` (Vite default).
+This starts both frontend and backend. The Studio is at the frontend URL `rebase dev` prints — a port derived from the project's path, in 5173–5372, not a fixed 5173.
 
 ## Key Packages
 

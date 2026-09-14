@@ -4,8 +4,9 @@
 This file gives the *compositions*: whole views, ready to copy and fill in.
 
 Every pattern here is derived from the live UI reference that ships with Rebase
-(`UIReferenceView`, route `/debug/ui`). When a pattern here and the reference
-disagree, **the reference wins** — see "Ground truth" in `SKILL.md`.
+(`UIReferenceView`, from `@rebasepro/app/debug`). When a pattern here and the
+reference disagree, **the reference wins** — see "Ground truth" in `SKILL.md`
+for where to read it and how to mount it at `/debug/ui`.
 
 Pick the skeleton that matches what you were asked to build, copy it whole, then
 replace the data. Do not start from a blank file.
@@ -376,4 +377,4 @@ and never use an `Alert` for a transient result — that is a toast.
 4. Only `primary` blue as an accent, used sparingly. No second accent colour.
 5. Loading states are `Skeleton`s sized like the real content.
 6. Check it in dark mode. Surfaces need an explicit `dark:` variant.
-7. Compare against `/debug/ui` in the running app before calling it done.
+7. Compare against the UI reference in the running app (mounted at `/debug/ui` — see "Ground truth" in `SKILL.md`) before calling it done.
