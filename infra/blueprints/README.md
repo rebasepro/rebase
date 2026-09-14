@@ -26,8 +26,8 @@ worth declaring there is infrastructure the platform would otherwise own for you
 
 ## What every one of them has to get right
 
-The same five things, in every platform's own dialect. Each is a real boot
-failure or an open door, not a preference.
+The same five things, in every platform's own dialect. Each is a real failure,
+not a preference.
 
 **`DATABASE_URL` needs `pgvector` if you declare a vector property.** A
 `{ type: "vector" }` column compiles to `VECTOR(n)`, and a stock Postgres
@@ -36,31 +36,47 @@ and DigitalOcean all ship the extension; you still have to `CREATE EXTENSION`
 it, which Rebase does at boot when the extension is available.
 
 **`JWT_SECRET` and `REBASE_SERVICE_KEY` must be generated, never defaulted.**
-Every file below marks them as platform-generated secrets. A blueprint that
-ships a literal value is a blueprint that puts that value in production.
+A blueprint that ships a working literal value is a blueprint that puts that
+value in production. Only Render can generate them: `render.yaml` marks both
+`generateValue`. `fly.toml` sets them with `fly secrets set` in its header.
+`do-app.yaml` carries `CHANGE_ME_…` placeholders, because App Platform has no
+generator: replace them with `openssl rand -hex 32` before the first deploy
+(unedited, they are under 32 characters and the runtime refuses to boot).
+`railway.json` declares no environment at all, so on Railway every variable in
+this section is set in the dashboard.
 
 **`CORS_ORIGINS` must name the deployment's own public URL.** The backend
 refuses to boot in production without an allowed origin — deliberately, because
-the alternative is a permissive default nobody revisits. Each file wires the
-platform's own URL variable in where one exists.
+the alternative is a permissive default nobody revisits. `render.yaml` and
+`do-app.yaml` wire in the platform's own URL variable; `fly.toml` sets it with
+`fly secrets set` in its header.
 
-**The first account must be named, not raced for.** A fresh Rebase database has
-no users, and the registration policy admits the first registration and promotes
-it to admin — otherwise an empty database is a dead end, because bootstrapping
-an admin needs a caller who is already signed in. Every platform here publishes
-the deployment's URL the moment it is live, so on these that rule is a window
-between "the app is reachable" and "the operator has signed up", and whoever
-arrives first owns it. So each file sets `DISABLE_SELF_REGISTRATION=true` and
-names `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` (min 12 characters); the
-runtime creates that account once, while the user table is still empty, and
-does nothing on every deploy after that. To run an open sign-up instead, clear
-all three — knowing what the first visitor gets.
+**The first admin must be named before the first deploy.** `fly.toml`,
+`render.yaml` and `do-app.yaml` set `NODE_ENV=production` (on Railway, set it
+yourself), and in production the first account to register is **not** promoted
+to admin: every platform here publishes the deployment's URL the moment it is
+live, so a first-come-first-admin rule would hand the deployment to whoever
+arrived first. The way in is `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` (an
+address the login route accepts, and at least 12 characters): the runtime
+creates that admin once, at boot, while the user table is still empty, and does
+nothing on every deploy after that. Leave them unset and
+the deployment comes up with no administrator until you set them and redeploy,
+or assign the role with the service key. `render.yaml` and `do-app.yaml` declare
+both, `fly.toml` sets them with `fly secrets set` in its header, and all three
+also set `DISABLE_SELF_REGISTRATION=true`. Clearing that does not give the first
+visitor the deployment — sign-up opens only with `ALLOW_REGISTRATION=true`, and
+an account made that way is an ordinary one. See
+[Your first admin](https://rebase.pro/docs/getting-started/deployment/#your-first-admin).
 
-**Storage hard-fails in production if it is left local.** The container
-filesystem is destroyed on every restart, so a `local` storage backend in
-production is silent data loss; the runtime refuses rather than pretending. Set
-S3-compatible storage, or set `FORCE_LOCAL_STORAGE=true` if the project stores
-no uploads at all. Both options are in each file, commented.
+**Local storage is switched off in production.** The container filesystem is
+destroyed on every restart, so a `local` storage backend in production would be
+silent data loss; the runtime does not register one, and every upload answers
+501 `STORAGE_NOT_CONFIGURED` while the rest of the app keeps serving. Set
+S3-compatible storage to accept uploads. `FORCE_LOCAL_STORAGE=true` turns local
+storage back on, which only keeps files on a durable volume at the storage path.
+`render.yaml` carries the S3 variables and `FORCE_LOCAL_STORAGE`, commented;
+`fly.toml` carries `FORCE_LOCAL_STORAGE`, commented, and leaves S3 to secrets;
+`do-app.yaml` carries only a commented `STORAGE_TYPE: s3`.
 
 ## The schema
 

@@ -11,6 +11,7 @@ module "rebase" {
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
   ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
+  admin_email     = "you@example.com"
 
   bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
 
@@ -70,6 +71,19 @@ Set the A record to that address, then run a full `terraform apply`. Because the
 address is a primary IP it survives replacing the server, so this is a one-time
 step rather than something to redo on every rebuild.
 
+## Name the first admin
+
+`admin_email` is how this deployment gets an administrator at all. The runtime
+image runs with `NODE_ENV=production`, where the first account to register is
+**not** promoted to admin, and this module turns self-registration off. So the
+runtime creates the `admin_email` account at first boot, while the user table is
+empty. Leave `admin_password` unset and it is generated into state: read it with
+`terraform output -raw admin_password`, sign in, and change it.
+
+Nothing enforces `admin_email` at plan time. Leave it out and the host comes up
+with nobody able to sign in, until you set it and apply again — the account is
+created on any boot that finds the user table empty.
+
 ## The volume is the thing worth protecting
 
 Postgres data, Caddy's certificates and the bundle cache all live on an attached
@@ -89,12 +103,12 @@ Two things it does not protect against, both of which need
 
 ## Storage is a required decision
 
-The runtime hard-fails at production boot when storage is left local, because
-the container filesystem is destroyed on every restart and a `local` backend in
-production is silent data loss. This module makes you choose at plan time rather
-than discovering it in a crash loop after `apply` reported success: set
-`s3_bucket` (with endpoint and credentials), or set `force_local_storage = true`
-if the project stores no uploads at all.
+The runtime switches local storage off in production, because the container
+filesystem is destroyed on every restart and a `local` backend there is silent
+data loss: the API serves, and every upload answers 501. This module makes you
+choose at plan time rather than discovering that after `apply` reported
+success: set `s3_bucket` (with endpoint and credentials), or set
+`force_local_storage = true` if the project stores no uploads at all.
 
 Hetzner Object Storage is S3-compatible and lives in the same datacenters —
 `https://fsn1.your-objectstorage.com` and friends, which is the default endpoint
@@ -168,6 +182,9 @@ Validated against hcloud provider 1.68.0 — `hcloud_primary_ip` only accepts
 | `domain` | `string` | **required** | Domain Caddy serves the API on, and requests a Let's Encrypt certificate for. |
 | `ssh_public_keys` | `list(string)` | **required** | SSH public keys granted root access, as OpenSSH-format strings. Required — a host with no key is a host you cannot debug. |
 | `acme_email` | `string` | `null` | Contact address for Let's Encrypt expiry notices. Optional but worth setting. |
+| `admin_email` | `string` | `null` | Email of the first admin account, created at first boot while the user table is empty. Set it: the runtime runs in production, where the first account to register is not promoted to admin, so without this the deployment has no administrator. Not enforced at plan time. |
+| `admin_password` | `string` | `null` | Password for the first admin account, min 12 chars. Generated if unset and admin_email is set; read with `terraform output -raw admin_password`. Change it after the first sign-in. |
+| `allow_self_registration` | `bool` | `false` | Drop DISABLE_SELF_REGISTRATION, the kill switch on public sign-up. It does not open sign-up by itself (that is ALLOW_REGISTRATION=true in `extra_env`), and in production nobody who registers becomes an administrator, so it is no substitute for `admin_email`. |
 | `bundle_token` | `string` | `null` | Bearer token for `bundle_url`, if it is not public (REBASE_BUNDLE_TOKEN). Does not expire. |
 | `bundle_url` | `string` | `null` | HTTPS URL the runtime fetches its bundle from on every start (REBASE_BUNDLE_URL). |
 | `data_volume_size` | `number` | `20` | Size in GB of the attached volume holding Postgres data, Caddy's certificates and the unpacked bundle. |
@@ -209,6 +226,8 @@ Validated against hcloud provider 1.68.0 — `hcloud_primary_ip` only accepts
 | `jwt_secret` | JWT_SECRET in effect. Read with `terraform output -raw jwt_secret`. *(sensitive)* |
 | `service_key` | REBASE_SERVICE_KEY in effect. This bypasses row-level security — treat it as a superuser credential. *(sensitive)* |
 | `postgres_password` | Password for the `rebase` Postgres role. *(sensitive)* |
+| `admin_email` | Email of the seeded first admin account, or null when self-registration was left open. |
+| `admin_password` | Password for the seeded first admin account. Read with `terraform output -raw admin_password`, sign in, and change it. *(sensitive)* |
 
 <!-- END_TABLES -->
 
