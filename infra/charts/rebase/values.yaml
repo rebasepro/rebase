@@ -314,8 +314,14 @@ ingress:
     clusterIssuer: letsencrypt-prod
   # nginx defaults this to 1m and answers anything larger with its own HTML 413,
   # before the request reaches the runtime — where a useful JSON error lives.
-  # Deliberately above the runtime's own REBASE_MAX_BODY_SIZE.
-  maxBodySize: 12m
+  # Deliberately above the larger of the runtime's two limits:
+  #   - maxBodySize (REBASE_MAX_BODY_SIZE), 10 MB by default, on every route;
+  #   - storage maxFileSize, 50 MB by default, on POST /storage/upload alone,
+  #     which is exempt from the first. The admin panel uploads through it.
+  # Below 50m, uploads the runtime would accept get nginx's HTML 413 instead.
+  # Raise this with either limit. `pnpm check:chart` refuses a default at or
+  # below the runtime's.
+  maxBodySize: 64m
 
 service:
   type: ClusterIP

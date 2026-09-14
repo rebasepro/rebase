@@ -29,8 +29,9 @@ metadata:
     {{/* nginx defaults proxy-body-size to 1m and answers anything larger with
          its own HTML 413 — before the request ever reaches the runtime, whose
          own limit answers JSON naming the size and the code. Set deliberately
-         ABOVE the runtime's so the limit anyone actually hits is the one with a
-         useful error behind it. */}}
+         ABOVE the runtime's largest (the storage upload route's, not the
+         global one: see `ingress.maxBodySize` in values.yaml) so the limit
+         anyone actually hits is the one with a useful error behind it. */}}
     nginx.ingress.kubernetes.io/proxy-body-size: {{ .Values.ingress.maxBodySize | quote }}
     {{- if and .Values.ingress.tls.enabled .Values.ingress.tls.clusterIssuer (not .Values.ingress.tls.secretName) }}
     cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}

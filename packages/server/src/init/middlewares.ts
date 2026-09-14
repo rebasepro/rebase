@@ -8,6 +8,7 @@ import { requestLogger } from "../utils/request-logger";
 import { logger } from "../utils/logger";
 import { logMiddleware } from "../api/logs-routes";
 import { ApiError, errorHandler } from "../api/errors";
+import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../deploy/pod-contract";
 
 interface MiddlewareConfig {
     maxBodySize?: number;
@@ -70,7 +71,7 @@ export function configureMiddlewares(
     // Request Body Size Limit. It is registered here, before any router is
     // mounted, so the exemption set is read per request: the routes that
     // carry their own limit are mounted later and add themselves to it then.
-    const maxBodySize = config.maxBodySize ?? 10 * 1024 * 1024; // 10MB default
+    const maxBodySize = config.maxBodySize ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
     if (maxBodySize > 0) {
         const limitBody = bodyLimit({
             maxSize: maxBodySize,

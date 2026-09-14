@@ -336,9 +336,9 @@ if (noIngress.ok) {
 const contractSrc = fs.readFileSync(
     path.join(ROOT, "packages/server/src/deploy/pod-contract.ts"), "utf-8");
 
-/** Read a `export const NAME = "value"` / `= 5` out of the contract. */
-function contractValue(name) {
-    const m = contractSrc.match(new RegExp(`export const ${name}\\s*=\\s*([^;\n]+)`));
+/** Read a `export const NAME = "value"` / `= 5` out of the contract, or out of `src`. */
+function contractValue(name, src = contractSrc) {
+    const m = src.match(new RegExp(`export const ${name}\\s*=\\s*([^;\n]+)`));
     return m ? m[1].trim().replace(/^["']|["']$/g, "") : undefined;
 }
 
@@ -454,6 +454,60 @@ check("contract", notRefused.length === 0,
     "it a topology variable — so an operator can set it and the chart will not stop them");
 check("contract", refusedForNothing.length === 0,
     `_validate.tpl refuses ${refusedForNothing.join(", ")}, which pod-contract.ts no longer lists`);
+
+// ── 2f2. the ingress lets through every body the runtime accepts ─────────────
+/**
+ * nginx answers a body over `proxy-body-size` with its own HTML 413, before
+ * the runtime sees it. So the chart's ingress has to allow more than the
+ * largest body the runtime accepts by default, or the runtime's JSON 413 is
+ * never the one anyone gets.
+ *
+ * The largest is not the global limit. `POST /storage/upload` is exempt from
+ * it and meets `DEFAULT_MAX_FILE_SIZE` instead. The default here was 12m, set
+ * above the global 10 MB, and it stayed there when the upload route got its
+ * own 50 MB limit. Uploads between 12 and 50 MB then failed at nginx on every
+ * chart deployment, the admin panel's included.
+ *
+ * Both numbers are read from the source the runtime enforces them from, so
+ * raising either one fails this until the chart follows.
+ */
+const storageTypesSrc = fs.readFileSync(
+    path.join(ROOT, "packages/server/src/storage/types.ts"), "utf-8");
+
+/** A size written as `N` or `N * N * …`, in bytes. Anything else is undefined. */
+function bytesOf(expression) {
+    if (!expression || !/^\d+(\s*\*\s*\d+)*$/.test(expression)) return undefined;
+    return expression.split("*").reduce((product, factor) => product * Number(factor.trim()), 1);
+}
+
+/** An nginx size (`64m`, `1g`, `512k`, or plain bytes), in bytes. */
+function nginxBytes(size) {
+    const m = /^(\d+)([kmg]?)$/i.exec(String(size ?? "").trim());
+    if (!m) return undefined;
+    return Number(m[1]) * { "": 1, k: 1024, m: 1024 ** 2, g: 1024 ** 3 }[m[2].toLowerCase()];
+}
+
+const globalBodyLimit = bytesOf(contractValue("RUNTIME_DEFAULT_MAX_BODY_SIZE"));
+const uploadBodyLimit = bytesOf(contractValue("DEFAULT_MAX_FILE_SIZE", storageTypesSrc));
+check("ingress", globalBodyLimit !== undefined && uploadBodyLimit !== undefined,
+    "could not read RUNTIME_DEFAULT_MAX_BODY_SIZE (pod-contract.ts) and DEFAULT_MAX_FILE_SIZE " +
+    "(storage/types.ts) as byte counts — this check is vacuous until it parses, so it fails " +
+    "rather than passing empty");
+
+if (single.ok && globalBodyLimit !== undefined && uploadBodyLimit !== undefined) {
+    const ingressDoc = single.out.split(/^---$/m).find(d => /^kind:\s*Ingress\s*$/m.test(d)) ?? "";
+    const size = ingressDoc.match(/nginx\.ingress\.kubernetes\.io\/proxy-body-size:\s*"?([^"\n]*)"?/)?.[1];
+    const allowed = nginxBytes(size);
+    const largest = Math.max(globalBodyLimit, uploadBodyLimit);
+    const mb = (bytes) => `${Math.round(bytes / 1024 / 1024)} MB`;
+    check("ingress", allowed !== undefined && allowed > largest,
+        `the ingress's proxy-body-size is ${size ?? "(not set)"}, which is not above the largest ` +
+        `body the runtime accepts by default: ${mb(uploadBodyLimit)} on POST /storage/upload ` +
+        `(DEFAULT_MAX_FILE_SIZE), beside ${mb(globalBodyLimit)} everywhere else ` +
+        "(RUNTIME_DEFAULT_MAX_BODY_SIZE). nginx would refuse uploads the runtime accepts, with an " +
+        "HTML page instead of the runtime's JSON 413. Raise ingress.maxBodySize in values.yaml. " +
+        "0, nginx's \"no limit\", is refused as well: the chart keeps a cap on purpose.");
+}
 
 // ── 2g. the install command the documentation prints ─────────────────────────
 //

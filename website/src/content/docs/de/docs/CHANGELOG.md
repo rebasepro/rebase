@@ -24,8 +24,22 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   `maxBodySize`. Every other route keeps the global limit, the rest of
   `/storage` included. TUS is unchanged: each `PATCH` chunk is still capped by
   `maxBodySize`, and the whole file by `maxFileSize`. A proxy in front of the
-  runtime has its own limit, which still applies. The Helm chart's ingress
-  defaults to `12m`.
+  runtime has its own limit, which still applies. For the Helm chart's, see the
+  next entry.
+
+- **The Helm chart's ingress lets 50 MB uploads through.** nginx refuses a
+  body over `proxy-body-size` with its own HTML 413, before the runtime sees
+  it, so the chart sets `ingress.maxBodySize` above the runtime's limit. It was
+  `12m`: above the global `maxBodySize` (10 MB), but not above the 50 MB
+  `maxFileSize` that `POST /storage/upload` now meets (see the entry above). So
+  on chart deployments, uploads between 12 and 50 MB still failed, admin-panel
+  uploads included, and the error was nginx's page instead of the runtime's
+  JSON. The default is now `64m`. `pnpm check:chart` now refuses a default
+  that is not above the larger of the two runtime limits. It reads them from
+  `DEFAULT_MAX_FILE_SIZE` and from the new `RUNTIME_DEFAULT_MAX_BODY_SIZE`,
+  which `@rebasepro/server` exports with the rest of the pod contract. A
+  release that sets `ingress.maxBodySize` itself keeps its value. If yours is
+  below `50m`, raise it.
 
 - **Scheduled backups include your users again, and can be restored.**
   `createBackupCron` left the `rebase` schema out of every dump unless told

@@ -119,6 +119,7 @@ import {
     BackendStorageConfig,
     createStorageRoutes,
     createUploadConstraintResolver,
+    DEFAULT_MAX_FILE_SIZE,
     DEFAULT_STORAGE_ID,
     StorageController,
     StorageRegistry
@@ -2392,7 +2393,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             config.storage && typeof config.storage === "object" && "type" in config.storage
                 ? (config.storage as BackendStorageConfig).maxFileSize
                 : undefined
-        ) ?? 50 * 1024 * 1024;
+        ) ?? DEFAULT_MAX_FILE_SIZE;
 
         // Storage is not under RLS and its keys share one flat namespace, so an
         // allow-all default is a cross-user read/write/delete hole. Refuse to

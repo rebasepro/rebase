@@ -461,6 +461,7 @@ export {
     RUNTIME_PRESTOP_DRAIN_SECONDS,
     RUNTIME_STARTUP_BUDGET_SECONDS,
     RUNTIME_MIN_TERMINATION_GRACE_SECONDS,
-    RUNTIME_BUNDLE_MOUNT
+    RUNTIME_BUNDLE_MOUNT,
+    RUNTIME_DEFAULT_MAX_BODY_SIZE
 } from "./deploy/pod-contract";
 export type { TopologyEnvVar } from "./deploy/pod-contract";

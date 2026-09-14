@@ -6,6 +6,8 @@ import { Hono } from "hono";
 import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../src/deploy/pod-contract";
+import { DEFAULT_MAX_FILE_SIZE } from "../src/storage/types";
 
 /**
  * Which body limit an upload meets.
@@ -209,5 +211,39 @@ describe("every other route keeps the global limit", () => {
 
         expect(res.status).toBe(413);
         expect((await errorOf(res)).message).toBe(GLOBAL_MESSAGE);
+    });
+});
+
+describe("the defaults are the ones the pod contract states", () => {
+    // `pnpm check:chart` holds the Helm chart's ingress above these two
+    // constants. That is only worth something if they are the limits the
+    // runtime actually enforces, not a copy of them. Each limit is probed at
+    // its edge by the declared length alone, which is what `bodyLimit` reads,
+    // so no test here has to allocate 50 MB.
+    const declaring = (method: string, length: number) => ({
+        method,
+        body: "x",
+        headers: { "content-length": String(length) }
+    });
+
+    it("caps every route at RUNTIME_DEFAULT_MAX_BODY_SIZE", async () => {
+        const app = await boot();
+
+        const at = await app.request("/api/anything", declaring("POST", RUNTIME_DEFAULT_MAX_BODY_SIZE));
+        const over = await app.request("/api/anything", declaring("POST", RUNTIME_DEFAULT_MAX_BODY_SIZE + 1));
+
+        expect(at.status).not.toBe(413);
+        expect(over.status).toBe(413);
+    });
+
+    it("caps the upload route at DEFAULT_MAX_FILE_SIZE", async () => {
+        const app = await boot();
+
+        const at = await app.request("/api/storage/upload", declaring("POST", DEFAULT_MAX_FILE_SIZE));
+        const over = await app.request("/api/storage/upload", declaring("POST", DEFAULT_MAX_FILE_SIZE + 1));
+
+        expect(at.status).not.toBe(413);
+        expect(over.status).toBe(413);
+        expect((await errorOf(over)).message).toMatch(/^File too large\./);
     });
 });

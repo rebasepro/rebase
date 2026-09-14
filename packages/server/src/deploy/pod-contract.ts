@@ -167,3 +167,18 @@ export const RUNTIME_STARTUP_BUDGET_SECONDS = 300;
 
 /** Where a bundle is mounted, and what the runtime is told to read. */
 export const RUNTIME_BUNDLE_MOUNT = "/bundle";
+
+/**
+ * The request-body limit every API route has by default (`maxBodySize`,
+ * `REBASE_MAX_BODY_SIZE`), in bytes.
+ *
+ * It is not the largest body the runtime accepts. `POST /storage/upload` is
+ * exempt from it and meets the storage config's `maxFileSize` instead, whose
+ * default is `DEFAULT_MAX_FILE_SIZE` (`storage/types.ts`), 50 MB. A proxy in
+ * front of the runtime has to allow more than the larger of the two. Otherwise
+ * it refuses uploads the runtime would accept, with its own error page in
+ * place of the runtime's JSON 413. The chart's ingress was left at 12m after
+ * the upload route got its own limit, and admin-panel uploads between 12 and
+ * 50 MB failed that way.
+ */
+export const RUNTIME_DEFAULT_MAX_BODY_SIZE = 10 * 1024 * 1024;
