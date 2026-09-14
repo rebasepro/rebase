@@ -1,21 +1,21 @@
 ---
 sourceHash: 90e2137462c112d2
-title: Authentifizierung & Login
-sidebar_label: Authentifizierung & Login
+title: Authentifizierung & Anmeldung
+sidebar_label: Authentifizierung & Anmeldung
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
 ---
 
-## Überblick
+## Übersicht
 
 Rebase bietet einsatzbereite React-Komponenten und Hooks für die Authentifizierung:
 
-- **`useRebaseAuthController`** — Verwaltet den Auth-Zustand, Tokens und die Sitzungspersistenz
-- **`LoginView`** — Vorgefertigtes Login-/Registrierungsformular mit OAuth-Unterstützung
+- **`useRebaseAuthController`** —孔Verwaltet den Auth-Status, Tokens und die Persistenz von Sitzungen
+- **`LoginView`** — Vorgefertigtes Anmelde-/Registrierungsformular mit OAuth-Unterstützung
 - **Rollensimulation** — Testen Sie verschiedene Rollen, ohne sich abzumelden
 
 ## Auth-Controller
 
-Der Hook `useRebaseAuthController` ist der Kern der Frontend-Authentifizierung. Er verwaltet den aktuellen Benutzer, Tokens und die Sitzung:
+Der Hook `useRebaseAuthController` ist das Kernstück der Frontend-Authentifizierung. Er verwaltet den aktuellen Benutzer, Tokens und die Sitzung:
 
 ```typescript
 import { useRebaseAuthController } from "@rebasepro/app";
@@ -35,36 +35,39 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Übergeben Sie den `authController` an den Rebase-Navigations-Controller, um das gesamte Admin-Panel hinter der Authentifizierung abzusichern.
+Übergeben Sie den `authController` an den Rebase-Navigations-Controller, um das gesamte Admin-Panel durch eine Authentifizierung zu schützen.
 
 ## Login-Ansicht
 
-Die Komponente `LoginView` bietet ein vollständiges Login- und Registrierungsformular:
+Die Komponente `LoginView` stellt ein vollständiges Formular für Anmeldung und Registrierung bereit:
 
 ```tsx
 import { LoginView } from "@rebasepro/app";
 
-if (!authController.user) {
-    return (
-        <LoginView
-            authController={authController}
-            googleClientId={GOOGLE_CLIENT_ID}
-        />
-    );
+function App() {
+    if (!authController.user) {
+        return (
+            <LoginView
+                authController={authController}
+                googleClientId={GOOGLE_CLIENT_ID}
+            />
+        );
+    }
+    return <MyApp />;
 }
 ```
 
 Die Login-Ansicht übernimmt:
-- Login und Registrierung per E-Mail/Passwort
-- Anmeldung über Google, GitHub und LinkedIn (wenn konfiguriert)
-- Passwort-Zurücksetzungs-Flow
+- E-Mail/Passwort-Anmeldung und -Registrierung
+- Google-, GitHub- und LinkedIn-OAuth-Anmeldung (sofern konfiguriert)
+- Ablauf zum Zurücksetzen des Passworts
 - Formularvalidierung und Fehlerzustände
 
 ## Rollenmodell
 
-Rollen werden als `text[]`-Array-Spalte direkt auf der Tabelle `rebase.users` gespeichert. Sie definieren die verfügbaren Rollen als Enum in Ihrer Users-Collection-Definition:
+Rollen werden als `text[]`-Array-Spalte direkt in der Tabelle `rebase.users` gespeichert. Sie definieren verfügbare Rollen als Enum in der Definition Ihrer Users-Collection:
 
-```typescript title="config/collections/users.ts"
+```typescript title="config/collections/users.ts" no-verify
 roles: {
     name: "Roles",
     type: "array",
@@ -86,7 +89,7 @@ roles: {
 
 Um Rollenoptionen hinzuzufügen oder zu entfernen, aktualisieren Sie die `enum`-Map in Ihrer Users-Collection und generieren Sie das Schema neu.
 
-## Rollensimulation (Entwicklungsmodus)
+## Rollensimulation (Dev-Modus)
 
 Im Entwicklermodus können Sie verschiedene Rollen simulieren, ohne sich abzumelden. Dies ist nützlich zum Testen von RLS-Richtlinien:
 
@@ -102,5 +105,5 @@ effectiveRoleController.setEffectiveRole("editor");
 ## Nächste Schritte
 
 - **[Backend-Authentifizierung](/docs/backend/authentication)** — JWT, OAuth-Anbieter, SMTP-Konfiguration
-- **[Sicherheitsregeln (RLS)](/docs/collections/security-rules)** — Zugriffssteuerung auf Zeilenebene pro Collection
-- **[Client-SDK-Authentifizierung](/docs/sdk/authentication)** — Programmatische Auth-Methoden
+- **[Sicherheitsregeln (RLS)](/docs/collections/security-rules)** — Zugriffskontrolle auf Zeilenebene (Row-Level Security) pro Collection
+- **[Client-SDK-Authentifizierung](/docs/sdk/authentication)** — Programmatische Authentifizierungsmethoden

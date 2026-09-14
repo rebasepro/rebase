@@ -7,15 +7,15 @@ description: Configurez le contrôleur d'authentification, la vue de connexion e
 
 ## Vue d'ensemble
 
-Rebase fournit des composants et hooks React prêts à l'emploi pour l'authentification :
+Rebase fournit des composants React et des hooks prêts à l'emploi pour l'authentification :
 
-- **`useRebaseAuthController`** — Gère l'état d'authentification, les tokens et la persistance de session
-- **`LoginView`** — Formulaire de connexion/inscription préfabriqué avec prise en charge OAuth
+- **`useRebaseAuthController`** — Gère l'état d'authentification, les jetons et la persistance de session
+- **`LoginView`** — Formulaire de connexion/inscription préconçu avec prise en charge d'OAuth
 - **Simulation de rôles** — Testez différents rôles sans vous déconnecter
 
 ## Contrôleur d'authentification
 
-Le hook `useRebaseAuthController` est le cœur de l'authentification frontend. Il gère l'utilisateur actuel, les tokens et la session :
+Le hook `useRebaseAuthController` est le cœur de l'authentification côté frontend. Il gère l'utilisateur actuel, les jetons et la session :
 
 ```typescript
 import { useRebaseAuthController } from "@rebasepro/app";
@@ -35,7 +35,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Passez le `authController` au contrôleur de navigation Rebase pour protéger l'intégralité du panneau d'administration derrière l'authentification.
+Passez l'`authController` au contrôleur de navigation Rebase pour restreindre l'accès à l'ensemble du panneau d'administration derrière une authentification.
 
 ## Vue de connexion
 
@@ -44,27 +44,30 @@ Le composant `LoginView` fournit un formulaire complet de connexion et d'inscrip
 ```tsx
 import { LoginView } from "@rebasepro/app";
 
-if (!authController.user) {
-    return (
-        <LoginView
-            authController={authController}
-            googleClientId={GOOGLE_CLIENT_ID}
-        />
-    );
+function App() {
+    if (!authController.user) {
+        return (
+            <LoginView
+                authController={authController}
+                googleClientId={GOOGLE_CLIENT_ID}
+            />
+        );
+    }
+    return <MyApp />;
 }
 ```
 
-La vue de connexion gère :
-- Connexion et inscription par e-mail/mot de passe
-- Connexion Google, GitHub et LinkedIn (lorsqu'elle est configurée)
-- Flux de réinitialisation de mot de passe
-- Validation de formulaire et états d'erreur
+La vue de connexion prend en charge :
+- La connexion et l'inscription par e-mail/mot de passe
+- La connexion OAuth via Google, GitHub et LinkedIn (lorsqu'elle est configurée)
+- Le flux de réinitialisation de mot de passe
+- La validation des formulaires et la gestion des états d'erreur
 
 ## Modèle de rôles
 
-Les rôles sont stockés sous forme de colonne de tableau `text[]` directement sur la table `rebase.users`. Vous définissez les rôles disponibles sous forme d'enum dans la définition de votre collection d'utilisateurs :
+Les rôles sont stockés directement sous forme d'une colonne de tableau `text[]` dans la table `rebase.users`. Vous définissez les rôles disponibles sous forme d'enum dans la définition de votre collection d'utilisateurs :
 
-```typescript title="config/collections/users.ts"
+```typescript title="config/collections/users.ts" no-verify
 roles: {
     name: "Roles",
     type: "array",
@@ -84,11 +87,11 @@ roles: {
 }
 ```
 
-Pour ajouter ou supprimer des options de rôle, mettez à jour la map `enum` dans votre collection d'utilisateurs et régénérez le schéma.
+Pour ajouter ou supprimer des options de rôles, mettez à jour la structure `enum` dans votre collection d'utilisateurs et régénérez le schéma.
 
-## Simulation de rôles (mode développement)
+## Simulation de rôles (Mode Dev)
 
-En mode développeur, vous pouvez simuler différents rôles sans vous déconnecter. C'est utile pour tester les politiques RLS :
+En mode développeur, vous pouvez simuler différents rôles sans avoir à vous déconnecter. Cela s'avère particulièrement utile pour tester les politiques RLS :
 
 ```typescript
 import { useBuildEffectiveRoleController } from "@rebasepro/app";
@@ -99,8 +102,8 @@ const effectiveRoleController = useBuildEffectiveRoleController();
 effectiveRoleController.setEffectiveRole("editor");
 ```
 
-## Étapes suivantes
+## Prochaines étapes
 
 - **[Authentification backend](/docs/backend/authentication)** — JWT, fournisseurs OAuth, configuration SMTP
-- **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — Contrôle d'accès au niveau des lignes par collection
-- **[Authentification du SDK client](/docs/sdk/authentication)** — Méthodes d'authentification programmatiques
+- **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — Contrôle d'accès au niveau des lignes (row-level) par collection
+- **[Authentification du SDK Client](/docs/sdk/authentication)** — Méthodes d'authentification programmatiques

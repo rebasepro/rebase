@@ -2,39 +2,32 @@
 sourceHash: 04421ade309db1ce
 title: Recherche
 sidebar_label: Recherche
-description: Comment se comporte .search() par défaut, et comment configurer une collection Postgres pour utiliser la recherche plein texte classée sur les champs que vous nommez — y compris le contenu JSONB et tableau.
+description: Comment .search() se comporte par défaut, et comment activer la recherche en texte intégral classée sur une collection Postgres sur les champs de votre choix — y compris le contenu JSONB et les tableaux.
 ---
 
-`.search("term")` fonctionne sur chaque collection sans configuration. Ce en quoi il
-se compile dépend de si la collection a demandé quelque chose de plus.
+`.search("term")` fonctionne sur chaque collection sans configuration. Ce en quoi il se compile dépend du fait que la collection ait demandé ou non des fonctionnalités supplémentaires.
 
 ## Le comportement par défaut
 
-Sans configuration, `.search()` est une **correspondance de sous-chaîne insensible à la casse**,
-combinée avec un OU (OR) sur les propriétés `string` de premier niveau de la collection :
+Sans aucune configuration, `.search()` est une **correspondance de sous-chaîne insensible à la casse**, combinée avec des OR sur les propriétés `string` de premier niveau de la collection :
 
 ```sql
 WHERE name ILIKE '%term%' OR description ILIKE '%term%'
 ```
 
-Cela suffit pour une petite collection dont le texte se trouve dans des colonnes simples. Cela
-présente trois limites qu'aucun paramètre interne ne peut résoudre :
+Cela suffit pour une petite collection dont le texte se trouve dans des colonnes ordinaires. Cela comporte trois limites qu'aucun réglage interne ne peut corriger :
 
-- **Il ne peut pas voir à l'intérieur des propriétés `map` ou `array`.** Une collection qui
-  conserve son contenu recherchable dans du JSONB — tags, certifications, un questionnaire — a
-  une zone de recherche qui ne renvoie silencieusement rien.
-- **Il n'a aucune pertinence.** Les lignes sont renvoyées dans l'ordre du `orderBy`, la meilleure
-  correspondance peut donc se trouver à la page sept.
-- **Il ne peut pas utiliser d'index.** Un `%` au début empêche l'utilisation d'un B-tree, donc
-  chaque recherche est un balayage séquentiel (sequential scan). C'est acceptable à mille lignes ;
-  désastreux à un million.
+- **Il ne peut pas inspecter l'intérieur des propriétés `map` ou `array`.** Une collection qui stocke son contenu interrogeable dans du JSONB — tags, certifications, questionnaire — possède une barre de recherche qui, silencieusement, ne trouvera rien.
+- **Il n'y a aucune notion de pertinence.** Les lignes sont renvoyées selon l'ordre `orderBy`, de sorte que la meilleure correspondance peut se trouver en page sept.
+- **Il ne peut pas utiliser d'index.** Un `%` en début de chaîne empêche l'utilisation d'un B-tree, ce qui fait de chaque recherche un parcours séquentiel (sequential scan). Parfait à mille lignes ; catastrophique à un million.
 
-Le comportement par défaut ne change pas, et une collection qui ne l'a pas activé se
-compile exactement vers le même SQL qu'auparavant.
+Le terme fait l'objet d'une correspondance **littérale** : `%` et `_` sont des métacaractères LIKE, et ils sont échappés avant la construction du motif, ainsi la recherche de `50%` cherche réellement `50%` au lieu de renvoyer toutes les lignes. Si vous souhaitez des caractères génériques (wildcards), l'opérateur de filtre `like` accepte un motif (`.where("title", "like", "post-%")`) ; `.search()` ne le fait pas.
 
-## Activer la recherche avancée
+Le comportement par défaut ne change pas, et une collection qui n'a pas activé cette option compile exactement le même SQL qu'auparavant.
 
-Déclarez un bloc `search` sur une collection Postgres, en nommant les champs que vous souhaitez indexer :
+## Activer la fonctionnalité
+
+Déclarez un bloc `search` sur une collection Postgres, en spécifiant les champs que vous souhaitez indexer :
 
 ```typescript
 import type { PostgresCollectionConfig } from "@rebasepro/types";
@@ -63,13 +56,9 @@ const talents: PostgresCollectionConfig = {
 };
 ```
 
-Rien n'est déduit. Un champ est recherché si et seulement si vous le nommez, et un chemin
-qui ne peut pas être résolu échoue au démarrage au lieu d'être ignoré silencieusement — un champ de
-recherche que vous pensez actif mais qui ne l'est pas est exactement le genre de défaillance que ce bloc
-vise à éviter.
+Rien n'est déduit implicitement. Un champ est recherché si et seulement si vous le nommez, et un chemin qui ne peut pas être résolu provoque une erreur au démarrage plutôt que d'être discrètement ignoré — un champ de recherche que vous croyez actif alors qu'il ne l'est pas est exactement le problème que ce bloc vise à éviter.
 
-`.search()` se compile alors en une recherche plein texte classée, et les lignes sont renvoyées
-avec un `_score` :
+`.search()` se compile alors en une correspondance full-text classée, et les lignes retournées contiennent un `_score` :
 
 ```typescript
 const { data } = await client.data.talents
@@ -78,71 +67,54 @@ const { data } = await client.data.talents
     .find();
 ```
 
-### Ce que sa déclaration crée
+### Ce que cette déclaration crée
 
-Une colonne `tsvector`, `GENERATED ALWAYS AS … STORED`, et un index GIN sur celle-ci.
-Postgres recalcule la colonne à chaque écriture d'un champ source et refuse toute
-tentative d'écriture directe, afin que l'index ne s'écarte jamais de la ligne. La colonne
-n'est jamais renvoyée par l'API.
+Une colonne `tsvector`, `GENERATED ALWAYS AS … STORED`, ainsi qu'un index GIN sur celle-ci. Postgres recalcule la colonne à chaque écriture d'un champ source et refuse toute tentative d'écriture directe, de sorte que l'index ne peut pas diverger de la ligne. La colonne n'est jamais renvoyée par l'API.
 
-Ils sont générés dans `drizzle/search.sql`, à côté de `schema.sql` et
-`policies.sql`, et `rebase db push` les applique pour vous — rien d'autre à exécuter.
-Ils bénéficient de leur propre fichier car une colonne `tsvector` générée a besoin d'une
-fonction auxiliaire `IMMUTABLE` pour exister (`unaccent` est seulement `STABLE`, et
-l'aplatissement d'un document `jsonb` nécessite une fonction renvoyant un ensemble), et Atlas — le
-moteur derrière `db push` — ne peut pas gérer les fonctions dans son offre gratuite.
+Ils sont générés dans `drizzle/search.sql`, aux côtés de `schema.sql` et `policies.sql`, et `rebase db push` les applique pour vous — rien d'autre à exécuter. Ils disposent de leur propre fichier car une colonne `tsvector` générée nécessite au préalable l'existence d'une fonction d'aide `IMMUTABLE` (`unaccent` n'étant que `STABLE`, et l'aplatissement d'un document `jsonb` nécessitant une fonction renvoyant un ensemble), et Atlas — le moteur derrière `db push` — ne peut pas gérer les fonctions dans son offre gratuite.
 
-Une conséquence à connaître si vous déployez par migration plutôt que par push :
-l'ajout d'un bloc `search` seul ne produit aucune migration, car le schéma
-comparé par Atlas n'a pas changé. `rebase db generate` l'indique lorsque cela se produit.
-Le bloc est toujours appliqué par `rebase db push` et par la vérification du schéma
-au démarrage ; pour l'inclure explicitement dans une migration, ajoutez `drizzle/search.sql` à l'une d'entre elles.
+Une conséquence à connaître si vous déployez par migration plutôt que par push : l'ajout d'un bloc `search` seul ne produit aucune migration, car le schéma comparé par Atlas n'a pas changé. `rebase db generate` vous en avertit lorsque cela se produit. Le bloc est toujours appliqué par `rebase db push` et par la vérification du schéma au démarrage ; pour l'inclure explicitement dans une migration, ajoutez `drizzle/search.sql` à celle-ci.
 
-## Ce que vous pouvez nommer dans `fields`
+### Modifier le bloc ultérieurement
 
-| Chemin | Résolu en | Exemple |
-|--------|-----------|---------|
+Une colonne générée porte son expression, et Postgres ne peut pas modifier cette expression sur place — ainsi, ajouter un champ, modifier un poids, changer la langue ou activer `unaccent` n'est **pas** quelque chose que `ADD COLUMN IF NOT EXISTS` peut appliquer à une colonne existante.
+
+Rebase enregistre une empreinte numérique (fingerprint) de l'expression sur la colonne lors de sa création, et la compare à chaque démarrage et à chaque `db push`. Toute modification est refusée explicitement, accompagnée des deux instructions nécessaires à son application — un `DROP COLUMN` et un `ADD COLUMN`, qui réécrivent la table et reconstruisent l'index GIN. Exécutez-les au moment de votre choix ; rien ne réécrit une table en production à votre insu. (L'activation de `fuzzy` est additive — une deuxième colonne — et s'applique sans tout cela.)
+
+Le démarrage refuse de servir l'application plutôt que d'ignorer le problème, car l'alternative est précisément ce que cette vérification remplace : une colonne qui continue d'indexer l'ancien ensemble de champs, et une recherche qui ne renvoie rien pour un contenu pourtant présent dans la ligne.
+
+## Ce que vous pouvez indiquer dans `fields`
+
+| Chemin | Résout vers | Exemple |
+|------|-------------|---------|
 | Une propriété `string` | la colonne | `"full_name"` |
 | Une propriété `string[]` | chaque élément | `"interests"` |
-| Une propriété `map` | chaque valeur de chaîne dans le document | `"questionnaire"` |
-| Un chemin à l'intérieur d'un `map` | chaque valeur de chaîne à ou sous ce niveau | `"questionnaire.certifications"` |
+| Une propriété `map` | chaque valeur chaîne du document | `"questionnaire"` |
+| Un chemin à l'intérieur d'un `map` | chaque valeur chaîne à cet endroit ou en dessous | `"questionnaire.certifications"` |
 
-Un chemin vers une carte (map) indexe les **valeurs de chaîne à n'importe quelle profondeur** en
-dessous de celui-ci — tableaux de chaînes, objets imbriqués, tableaux d'objets. Les *clés* JSON ne
-sont jamais indexées, seules les valeurs le sont, ainsi un nom de champ commun à chaque ligne ne devient pas un terme qui correspond à chaque ligne.
+Un chemin menant dans un map indexe les **valeurs de type chaîne à n'importe quelle profondeur** sous ce chemin — tableaux de chaînes, objets imbriqués, tableaux d'objets. Les *clés* JSON ne sont jamais indexées, seules les valeurs le sont, de sorte qu'un nom de champ commun à chaque ligne ne devient pas un terme correspondant à toutes les lignes.
 
-Nommer un enum, un UUID, une colonne `json` (plutôt que `jsonb`), ou un tableau de nombres produit
-une erreur au démarrage expliquant pourquoi. Les enums en particulier constituent un vocabulaire
-fixe : filtrez-les avec `where`, ce qui est exact et utilise un index.
+Indiquer un enum, un UUID, une colonne `json` (plutôt que `jsonb`), ou un tableau de nombres produit une erreur au démarrage expliquant la raison. Les enums en particulier constituent un vocabulaire fixe : filtrez-les avec `where`, qui est exact et utilise un index.
 
 ## Options
 
 ### `language`
 
-La configuration de recherche de texte Postgres, qui détermine la racinisation (stemming) et les mots vides (stopwords).
-`"spanish"` racinise `auditores` en `auditor` et supprime `de` ; la valeur par défaut,
-`"simple"`, ne fait ni l'un ni l'autre.
+La configuration de recherche textuelle de Postgres, qui régit la racinisation (stemming) et les mots vides (stopwords). `"spanish"` ramène `auditores` à sa racine `auditor` et supprime `de` ; la valeur par défaut, `"simple"`, ne fait ni l'un ni l'autre.
 
-`"simple"` est l'option par défaut car c'est le seul choix qui n'est jamais erroné — un
-racinisateur (stemmer) appliqué à la mauvaise langue déforme silencieusement les lexèmes.
-Définissez-le sur la langue de votre contenu pour bénéficier de la racinisation.
+`"simple"` est la valeur par défaut car c'est le seul choix qui n'est jamais incorrect — un outil de racinisation appliqué à la mauvaise langue déforme silencieusement les lexèmes. Définissez-le sur la langue de votre contenu pour activer la racinisation.
 
 ### `unaccent`
 
-Supprime/rabat les accents avant l'indexation, ainsi `auditoria` correspond à `auditoría`.
+Supprime les accents avant l'indexation, de sorte que `auditoria` corresponde à `auditoría`.
 
-Ce n'est pas cosmétique dans une langue accentuée. Postgres racinise les deux orthographes
-en **lexèmes différents** — `to_tsvector('spanish', 'auditoría')` produit
-`auditor` tandis que `'auditoria'` produit `auditori` — donc sans cela, une requête saisie
-sans accent manque toutes les lignes qui en comportent, ce qui correspond à la plupart des
-requêtes saisies par la plupart des utilisateurs.
+Ce n'est pas un détail cosmétique dans une langue accentuée. Postgres racinise les deux orthographes en **lexèmes différents** — `to_tsvector('spanish', 'auditoría')` produit `auditor` tandis que `'auditoria'` produit `auditori` — ainsi, sans cela, une requête saisie sans accents manquera chaque ligne qui en comporte, ce qui correspond à la majorité des requêtes saisies par les utilisateurs.
 
 Nécessite l'extension `unaccent`.
 
 ### `fuzzy`
 
-Effectue également une correspondance sur la similitude des trigrammes, afin que les correspondances approximatives soient tout de même classées : `iso14000` atteignant
-`ISO 14001`, ce qu'aucune racinisation ne permettra de faire car il s'agit simplement de lexèmes différents.
+Fait également correspondre selon la similarité des trigrammes, afin que les correspondances approximatives soient tout de même classées : `iso14000` pouvant trouver `ISO 14001`, ce qu'aucun algorithme de racinisation ne fera car il s'agit simplement de lexèmes différents.
 
 ```typescript
 search: {
@@ -152,43 +124,27 @@ search: {
 }
 ```
 
-Ajoute une seconde colonne générée et un index trigramme, et nécessite `pg_trgm`.
-Cela coûte du temps d'écriture et de l'espace disque ; mais résout la classe la plus courante d'échecs de recherche.
+Ajoute une seconde colonne générée et un index trigramme, et nécessite `pg_trgm`. Cela coûte du temps d'écriture et de l'espace disque, mais résout la classe d'échecs de recherche la plus fréquente.
 
 ### `weight`
 
-Chaque champ porte l'une des quatre classes de poids de Postgres, de `A` (la plus forte)
-à `D`. `ts_rank` évalue une correspondance `A` bien au-dessus d'une correspondance `D`, c'est ainsi
-qu'un nom l'emporte sur une simple mention dans une longue description. Les champs prennent la valeur `B` par défaut.
+Chaque champ porte l'une des quatre classes de poids de Postgres, de `A` (la plus forte) à `D`. `ts_rank` attribue à une correspondance `A` un score bien supérieur à une correspondance `D`, ce qui permet à un nom de prévaloir sur une simple mention dans une longue description. Les champs prennent la valeur par défaut `B`.
 
 ### `column`
 
-La colonne générée est nommée `search_vector`. Ne la modifiez que si elle entre en collision
-avec une colonne existante — elle fait partie de votre schéma une fois créée, et
-la renommer plus tard nécessite une suppression et une recréation, ce qui réécrit la table.
+La colonne générée est nommée `search_vector`. Ne la modifiez que si ce nom entre en conflit avec une colonne existante — elle fait partie intégrante de votre schéma une fois créée, et la renommer ultérieurement nécessite une suppression et une recréation, ce qui réécrit la table.
 
 ## Classement
 
-`_score` est `ts_rank` exécuté par rapport à la même requête que celle avec laquelle les lignes ont été mises en correspondance, et n'est
-présent que si la collection a activé la recherche *et* que la requête contenait une chaîne de recherche.
+`_score` est le `ts_rank` calculé sur la même requête que celle utilisée pour faire correspondre les lignes, et n'est présent que si la collection a activé la recherche *et* que la requête contenait une chaîne de recherche.
 
-Lorsque `fuzzy` est activé, la similitude des trigrammes est **ajoutée** à ce rang. Ce n'est pas un
-affinement — c'est ce qui fait que `fuzzy` offre un classement. Une faute de frappe ne correspond à rien
-sur le chemin exact, de sorte que chaque ligne trouvée a un `ts_rank` d'exactement zéro ; ordonner par rang seul renverrait la meilleure correspondance dans n'importe quel ordre arbitraire de la table.
-Les deux termes sont additionnés plutôt que pondérés, de sorte qu'une ligne correspondant exactement contribue
-aux deux et l'emporte sur une ligne simplement similaire sans avoir besoin d'un coefficient
-pour l'indiquer. En dehors de ces deux conditions, `orderBy: "_score"` est un champ inconnu et
-renvoie une erreur 400 au lieu de renvoyer silencieusement des lignes non triées.
+Lorsque `fuzzy` est activé, la similarité trigramme est **ajoutée** à ce rang. Il ne s'agit pas d'un simple ajustement — c'est ce qui permet à `fuzzy` de constituer un véritable classement. Une faute de frappe ne correspond à rien sur le chemin exact, de sorte que chaque ligne trouvée a un `ts_rank` exactement égal à zéro ; ordonner uniquement par rang renverrait la meilleure correspondance dans n'importe quel ordre arbitraire de la table. Les deux termes sont additionnés plutôt que pondérés, ainsi une ligne qui correspond exactement cumule les deux scores et surpasse une ligne simplement similaire, sans avoir besoin d'un coefficient pour l'indiquer. En dehors de ces deux conditions, `orderBy: "_score"` est un champ inconnu et renvoie une erreur 400 au lieu de renvoyer silencieusement des lignes non triées.
 
-`_score` ne peut pas être combiné avec la pagination par curseur (`startAfter`). La pertinence est
-calculée par requête plutôt que stockée, il n'y a donc pas de valeur sur la ligne du curseur à
-laquelle comparer la page suivante, et deux requêtes avec des chaînes de recherche différentes produisent
-des scores qui ne sont pas sur la même échelle. Utilisez `limit`/`offset` pour les pages ordonnées par pertinence.
+`_score` ne peut pas être combiné avec la pagination par curseur (`startAfter`). La pertinence est calculée par requête plutôt que stockée, il n'y a donc aucune valeur sur la ligne du curseur à laquelle comparer la page suivante, et deux requêtes avec des chaînes de recherche différentes produisent des scores qui ne sont pas sur la même échelle. Utilisez `limit`/`offset` pour les pages ordonnées par pertinence.
 
 ## Pourquoi cette ligne a-t-elle correspondu ?
 
-Une liste classée vous indique *quelles* lignes, jamais *pourquoi* une ligne est présente. Demandez à chaque ligne de
-s'expliquer :
+Une liste classée vous indique *quelles* lignes correspondent, mais jamais *pourquoi* une ligne est présente. Demandez à chaque ligne de s'expliquer :
 
 ```typescript
 const { data } = await client.data.talents
@@ -201,33 +157,24 @@ data[0]._matches;
 //    snippet: "<mark>ISO</mark> <mark>14001</mark> Lead Auditor" }]
 ```
 
-`field` est le chemin exact tel qu'il a été déclaré dans `fields`, ce qui vous permet de l'associer à
-une étiquette pour l'affichage. Les champs sont renvoyés dans l'ordre dans lequel vous les avez déclarés.
+`field` est le chemin exactement tel que déclaré dans `fields`, ce qui vous permet de le faire correspondre à un libellé pour l'affichage. Les champs sont renvoyés dans l'ordre où vous les avez déclarés.
 
-Cela s'applique par requête, pas par collection, car le coût est par requête : un `ts_headline`
-par champ déclaré et par ligne renvoyée, et `ts_headline` re-analyse le document au lieu de
-lire l'index. C'est adapté pour une page de résultats, mais pas pour une exportation.
+Cela s'applique par requête et non par collection, car le coût est par requête : un `ts_headline` par champ déclaré pour chaque ligne renvoyée, et `ts_headline` réanalyse le document plutôt que de lire l'index. Idéal pour une page de résultats, inadapté pour un export.
 
-**Le extrait (snippet) contient du balisage par construction** — chaque correspondance est entourée de
-`<mark>`. Affichez-le sous forme d'HTML ou nettoyez les balises, mais ne le traitez pas comme du texte
-brut, et ne faites pas confiance au texte environnant : il s'agit de ce que l'utilisateur a saisi.
-Découper sur `<mark>` et afficher les parties est plus sûr que d'utiliser `dangerouslySetInnerHTML`.
+**L'extrait (snippet) contient du balisage par conception** — chaque occurrence est enveloppée dans `<mark>`. Affichez-le en tant que HTML ou supprimez les balises, mais ne le traitez pas comme du texte brut, et ne faites pas confiance au texte environnant : il s'agit de ce que l'utilisateur a saisi. Découper la chaîne selon `<mark>` et en afficher les parties est plus sûr que d'utiliser `dangerouslySetInnerHTML`.
 
-Lorsque `unaccent` est activé, les extraits s'affichent avec les accents retirés — `Auditoria`, et non
-`Auditoría`. `ts_headline` sur le texte original ne peut pas trouver une correspondance produite par
-une requête sans accent, et renverrait donc le texte sans rien surligner du tout ; un extrait lisible
-qui surligne est préférable à un extrait plus joli qui ne surligne rien sans rien dire.
+Lorsque `unaccent` est activé, les extraits apparaissent sans les accents — `Auditoria`, et non `Auditoría`. Un `ts_headline` sur le texte d'origine ne peut pas trouver une correspondance produite par une requête sans accent, ce qui renverrait le texte sans aucune mise en surbrillance ; un extrait lisible qui surligne les correspondances vaut mieux qu'un extrait plus élégant qui, silencieusement, ne surligne rien.
 
 ## Ajouter le bloc à une collection en production
 
-La colonne générée est ajoutée par la vérification du schéma au démarrage (boot-time schema ensure), comme
-n'importe quelle autre colonne, et son index est construit avec `CREATE INDEX CONCURRENTLY`
-pour ne pas bloquer les écritures. L'ajout d'une colonne générée *stockée* (stored) réécrit la table ; sur une grande table, planifiez cela comme n'importe quelle autre réécriture.
+La colonne générée est ajoutée par la vérification du schéma au démarrage, comme toute autre colonne, et son index est construit avec `CREATE INDEX CONCURRENTLY` afin que les écritures ne soient pas bloquées. L'ajout d'une colonne générée *stockée* (stored) réécrit la table ; sur une table volumineuse, planifiez donc cette opération comme n'importe quelle autre réécriture.
 
-## Moteurs pris en charge
+## Moteurs compatibles
 
-Le bloc `search` est réservé à Postgres, et est rejeté au démarrage sur les autres moteurs
-plutôt d'être ignoré en silence. Les collections MongoDB conservent leur correspondance basée
-sur les expressions régulières ; les collections Firestore utilisent le contrôleur de recherche de texte externe.
+Le bloc `search` est réservé à Postgres et est rejeté au démarrage sur les autres moteurs plutôt que d'être ignoré silencieusement. Les collections MongoDB conservent leur correspondance basée sur les regex ; les collections Firestore utilisent le contrôleur de recherche de texte externe.
 
----
+## Voir aussi
+
+- [API REST](/docs/backend/api/) — les paramètres de requête sous lesquels une recherche parvient au serveur
+- [Index](/docs/backend/indexes/) — ce que le bloc search crée, et ce qu'il coûte
+- [Interroger les données](/docs/sdk/querying/) — effectuer des recherches depuis le SDK client

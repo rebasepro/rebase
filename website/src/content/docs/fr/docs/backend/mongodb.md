@@ -2,28 +2,25 @@
 sourceHash: 239a291d53ade1fd
 title: MongoDB
 sidebar_label: MongoDB
-description: "@rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security."
+description:"\"@rebasepro/server-mongo fait fonctionner Rebase sur MongoDB : un pilote de données complet, du temps réel via change streams et un historique par instantanés — sans sécurité au niveau des lignes.\""
 ---
 
-:::note[Cette page n'est disponible qu'en anglais]
-La traduction est à venir. Le contenu ci-dessous est en anglais.
-:::
+`@rebasepro/server-mongo` implémente le `BackendBootstrapper` de Rebase pour
+MongoDB. L'API REST, le SDK généré, le panneau d'administration et la surface
+d'authentification fonctionnent tous avec.
 
-`@rebasepro/server-mongo` implements Rebase's `BackendBootstrapper` against
-MongoDB. The REST API, the generated SDK, the admin panel and the auth surface
-all work over it.
+:::caution[Expérimental, et sans sécurité au niveau des lignes]
+Lisez cette section avant de faire votre choix. MongoDB n'a pas d'équivalent à la
+sécurité au niveau des lignes de PostgreSQL, donc **le modèle d'isolation sur lequel
+repose le reste de Rebase ne s'applique pas ici**. Les `securityRules` sur une
+collection ne sont pas appliquées par la base de données ; l'autorisation se
+limite à ce que votre propre code vérifie.
 
-:::caution[Experimental, and it does not have row-level security]
-Read this section before choosing it. MongoDB has no equivalent of PostgreSQL's
-row-level security, so **the isolation model the rest of Rebase rests on does not
-apply here**. `securityRules` on a collection are not enforced by the database;
-authorization is whatever your own code checks.
-
-That is not a gap waiting to be filled — it is a property of the engine. If
-per-row authorization enforced below the application is why you are looking at
-Rebase, use the PostgreSQL driver — [Backend Setup](/docs/backend/) is where it
-is configured, and [Security Rules](/docs/collections/security-rules/) is what it
-buys you.
+Il ne s'agit pas d'une lacune en attente d'être comblée — c'est une caractéristique
+du moteur. Si l'autorisation par ligne appliquée sous la couche applicative est la
+raison pour laquelle vous vous intéressez à Rebase, utilisez le pilote PostgreSQL —
+[Backend Setup](/docs/backend/) explique comment le configurer, et
+[Security Rules](/docs/collections/security-rules/) détaille ce qu'il vous apporte.
 :::
 
 ## Installation
@@ -41,34 +38,35 @@ rebase({
 });
 ```
 
-Set `DATABASE_URL` to a MongoDB connection string
-(`mongodb://…` or `mongodb+srv://…`).
+Définissez `DATABASE_URL` avec une chaîne de connexion MongoDB
+(`mongodb://…` ou `mongodb+srv://…`).
 
-## What works
+## Ce qui fonctionne
 
 | | |
 |---|---|
-| **Data API** | The full REST surface: list, get, create, update, delete, filters, ordering, pagination |
-| **Generated SDK** | The same typed client as on Postgres |
-| **Realtime** | Change streams. This needs a replica set — a standalone `mongod` has no oplog to tail, so realtime is silently unavailable there |
-| **History** | Snapshot-based, the same shape as on Postgres |
-| **Auth** | The full auth surface, with its repositories stored in MongoDB |
-| **Admin panel** | Collections, forms, relations in the UI, storage fields |
+| **API de données** | L'ensemble de la surface REST : list, get, create, update, delete, filtres, tri, pagination |
+| **SDK généré** | Le même client typé que sur Postgres |
+| **Temps réel** | Change streams. Cela nécessite un replica set — une instance `mongod` autonome (standalone) n'a pas d'oplog à suivre, le temps réel y est donc silencieusement indisponible |
+| **Historique** | Basé sur des instantanés (snapshots), sous la même forme que sur Postgres |
+| **Authentification** | Toute la surface d'authentification, avec ses dépôts stockés dans MongoDB |
+| **Panneau d'administration** | Collections, formulaires, relations dans l'interface, champs de stockage |
 
-## What is different
+## Ce qui est différent
 
-- **No row-level security.** See the warning above. This is the important one.
-- **No SQL surface.** Studio's SQL editor, the RLS policy editor and
-  `pnpm rls:check` are Postgres features and are not available.
-- **No relational integrity.** A relation is a stored reference the application
-  resolves; there is no foreign key, so nothing at the database level stops a
-  dangling one.
-- **No `rebase db push` / `generate` / `migrate`.** MongoDB has no schema to
-  migrate. Collections appear as documents are written.
+- **Pas de sécurité au niveau des lignes (row-level security).** Voir l'avertissement ci-dessus. C'est le point essentiel.
+- **Pas de surface SQL.** L'éditeur SQL de Studio, l'éditeur de règles RLS et
+  `pnpm rls:check` sont des fonctionnalités Postgres et ne sont pas disponibles.
+- **Pas d'intégrité relationnelle.** Une relation est une référence stockée que
+  l'application résout ; il n'y a pas de clé étrangère, rien au niveau de la base
+  de données n'empêche donc les références orphelines.
+- **Pas de `rebase db push` / `generate` / `migrate`.** MongoDB n'a pas de schéma
+  à migrer. Les collections sont créées au fur et à mesure de l'écriture des documents.
 
-## Choosing between the two
+## Choisir entre les deux
 
-Take MongoDB when the data is genuinely document-shaped and the authorization
-model lives in your application anyway. Take PostgreSQL when you want the
-database itself to be the thing enforcing who sees which row — which is the
-argument Rebase makes everywhere else on this site.
+Choisissez MongoDB lorsque les données ont véritablement la forme de documents et
+que le modèle d'autorisation réside de toute façon dans votre application. Choisissez
+PostgreSQL lorsque vous souhaitez que la base de données elle-même soit l'élément
+qui applique qui peut voir quelle ligne — ce qui est l'argument que Rebase défend
+partout ailleurs sur ce site.
