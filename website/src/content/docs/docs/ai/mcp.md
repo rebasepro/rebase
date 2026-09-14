@@ -15,6 +15,10 @@ caller to authenticate. That is the safe part. The interesting questions are all
 about what it does *once* it is running, and this page answers them before it
 shows you the config block.
 
+A deployed backend can also serve MCP itself, over HTTP, to the people who use
+your application. That is a different thing with a different credential model:
+see [The remote endpoint](#the-remote-endpoint).
+
 ## Connecting a client
 
 The server is published to npm and needs no install step; `npx` fetches it.
@@ -485,6 +489,49 @@ project directory, and reads `src/schema.generated.ts` from whichever it finds â
 so both the scaffolded layout and this monorepo's work, and a project laid out a
 third way, or one that has not run `rebase schema generate` yet, simply will not
 see the resource offered.
+
+## The remote endpoint
+
+Everything above is a developer tool: it runs on your machine and holds a service
+key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
+the people who use your application. An assistant one of them connects reads and
+writes the project **as that person**, and every call runs under their own
+row-level security.
+
+It is off unless you turn it on, and both variables are required:
+
+```bash
+REBASE_MCP_ENABLED=true
+REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
+```
+
+Without `REBASE_PUBLIC_URL`, a JWT secret, or a data driver that can scope a query
+to one user, the endpoint declines to mount and says why in the boot log. No
+`REBASE_ROLE` turns it on.
+
+- **OAuth, with a consent screen.** A client finds the authorization server
+  through `/.well-known/oauth-protected-resource`, registers itself (dynamic
+  registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
+  to clients you register), and sends the person to a consent screen that signs
+  them in through your existing `/auth/login`.
+- **Six tools, two scopes.** `mcp:read` offers `list_collections`,
+  `query_collection` and `get_document`; `mcp:write` adds `create_document`,
+  `update_document` and `delete_document`. A scope decides which tools are
+  offered, not which rows: an empty list can be RLS working, and `mcp:write` still
+  cannot write a row the person could not.
+- **A token for this endpoint only.** An MCP access token is refused by
+  `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
+  hand it a session.
+
+Two limits. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
+person's own session) revokes its refresh tokens at once, but an access token
+already issued keeps working until it expires, within the hour. And the roles a
+grant carries are the ones the person had at consent. A role change does not
+reach it: a client that keeps refreshing keeps those roles until the person
+disconnects it.
+
+The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
+variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
 
 ## Recommended setup
 

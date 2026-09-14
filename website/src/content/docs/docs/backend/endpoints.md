@@ -206,8 +206,8 @@ before it holds any token.
 | `GET` | `/.well-known/oauth-protected-resource` | none | RFC 9728 metadata naming this resource and its authorization server. Served at the path-suffixed form as well |
 | `GET` | `/.well-known/oauth-authorization-server` | none | RFC 8414 metadata: the endpoints, grant types and PKCE methods this deployment supports |
 | `POST` | `/mcp` | OAuth bearer | The MCP protocol endpoint. Acts **as the signed-in user**, so every read and write is subject to the same RLS |
-| `GET` | `/mcp` | OAuth bearer | The server-sent-events stream for a session |
-| `DELETE` | `/mcp` | OAuth bearer | Ends a session |
+| `GET` | `/mcp` | OAuth bearer | Answers `405` with `Allow: POST, DELETE`: this server opens no server-initiated stream. The token is checked first, so a missing or stale one gets the `401` challenge instead |
+| `DELETE` | `/mcp` | none | Answers `204`. The endpoint keeps no session, so there is nothing to end |
 | `POST` | `/api/oauth/register` | rate-limited | RFC 7591 dynamic client registration. Refused when `REBASE_MCP_OPEN_REGISTRATION=false` |
 | `GET` | `/api/oauth/authorize` | session | The consent screen a client is redirected to |
 | `POST` | `/api/oauth/authorize/decision` | session | The person's answer to it — approve or deny |
