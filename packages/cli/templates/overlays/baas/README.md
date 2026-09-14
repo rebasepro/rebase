@@ -9,9 +9,11 @@ the endpoints change with it.
 
 ## Serving a table
 
-A table is served once it has an authorization model: row-level security enabled
-plus at least one policy. Until then the server skips it — deliberately, so a new
-table is never exposed just by existing — and logs each table it skipped and why.
+A table is served once it has an authorization model: row-level security
+enabled. Until then the server skips it — deliberately, so a new table is never
+exposed just by existing — and logs each table it skipped and why. A table with
+row-level security on but no policy yet is served and returns no rows (the boot
+log names it); a policy is what opens it:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
