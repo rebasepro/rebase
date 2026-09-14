@@ -37,6 +37,47 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   file** when there is none. The listing carries the sidecar's key as
   `globalsKey`, and `/download` serves it.
 
+- **`FORCE_LOCAL_STORAGE=false` switched the production storage guard off.** In
+  production a `local` storage backend is dropped unless `FORCE_LOCAL_STORAGE`
+  says a durable volume is mounted, because a container's filesystem is erased
+  on the next restart or redeploy. The guard tested whether the variable was
+  *set*, not whether it was *true*, so `=false` — the natural way to say "there
+  is no volume here" — registered the local backend, and uploads succeeded into
+  a disk the next redeploy wiped. `rebase status` read it the same way and
+  called that storage ready. Only a spelled yes forces it now, and the guard and
+  `rebase status` share one reader.
+
+  A deployment that set `FORCE_LOCAL_STORAGE=false` while storing uploads on
+  local disk was losing them at every redeploy; its uploads now answer `501
+  STORAGE_NOT_CONFIGURED` until a bucket is configured, or until
+  `FORCE_LOCAL_STORAGE=true` says a durable volume really is mounted.
+
+- **`REBASE_MCP_OPEN_REGISTRATION=0` left OAuth client registration open.** The
+  switch that turns off dynamic client registration on the MCP authorization
+  server compared against the literal `"false"`, so `0`, `no` and `off` left
+  `/oauth/register` issuing a client ID to anyone who asked. Any spelling of no
+  closes it now.
+
+- **`rebase db backup` addressed a MinIO bucket as a hostname.** The backup,
+  restore and `backups list` commands passed `forcePathStyle: false` whenever
+  `S3_FORCE_PATH_STYLE` was unset, overriding the default the runtime's own
+  storage gets: path-style for a custom endpoint. Unset now leaves that choice
+  to the endpoint in both, and `S3_FORCE_PATH_STYLE__<KEY>=1` is no longer read
+  as `false`.
+
+- **Boolean environment variables accept one set of spellings.** `true`, `1`,
+  `yes` and `on` mean yes; `false`, `0`, `no` and `off` mean no, in any case;
+  anything else leaves the variable at its default. Seven readers had spelled
+  this seven ways, so `DISABLE_DB_ROLE_SWITCHING=1` and
+  `REBASE_EXIT_ON_UNHANDLED_REJECTION=true` did nothing, `REBASE_DEBUG=0` turned
+  debug output on in one command and off in another, and `CI=0` read as a CI
+  run. `DO_NOT_TRACK=false` now reads as a no instead of a refusal; telemetry
+  still sends nothing without your explicit opt-in. The variables `loadEnv`
+  validates still accept only `true`, `false` or empty and refuse anything else
+  at boot, as before. The parser is exported from `@rebasepro/types` as
+  `parseEnvBoolean`, and `verify:docs` now refuses a boolean read that goes
+  around it.
+
 ### Security
 
 - **A delete over the WebSocket wrote its own audit record, and could get past

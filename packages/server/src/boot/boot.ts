@@ -6,6 +6,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
+    parseEnvBoolean,
     type CollectionConfig,
     type DataSourceDefinition,
     type InitializedDriver,
@@ -643,7 +644,7 @@ async function bootStaticApp(
     const isProduction = process.env.NODE_ENV === "production";
     const requestedPort = Number(process.env.PORT ?? "3001") || 3001;
     const basePath = process.env.REBASE_BASE_PATH || "/api";
-    const metricsEnabled = process.env.REBASE_METRICS === "true";
+    const metricsEnabled = parseEnvBoolean(process.env.REBASE_METRICS) === true;
     const metricsToken = process.env.REBASE_METRICS_TOKEN;
 
     const app = new Hono<HonoEnv>();

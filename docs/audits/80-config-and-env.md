@@ -190,6 +190,14 @@ nothing warns about it.
 **1. `FORCE_LOCAL_STORAGE=false` switches the production storage guard OFF.
 (class 10, class 27)**
 
+> **Status, 2026-09-14.** Fixed. There was a second raw reader this finding did
+> not name: the `bucket` resolver behind `rebase status`
+> (`boot/resource-resolvers.ts`) tested `!env.FORCE_LOCAL_STORAGE` on an
+> `EnvBag`, the raw string, so it agreed with the guard and was wrong with it.
+> Both now call `localStorageForced` (`init/storage.ts`), which reads through
+> `parseEnvBoolean`. `init-storage.test.ts` holds both to one table of
+> spellings. See `docs/bug-classes.md` §10.
+
 `packages/server/src/init/storage.ts:36`
 
 ```ts
@@ -391,6 +399,15 @@ would be explicitly overriding it to `false`. Fix: `.transform(v => v === undefi
 or delete the comment.
 
 **8. Six boolean parsers, one concept.**
+
+> **Status, 2026-09-14.** Fixed as the fix direction below says:
+> `parseEnvBoolean` in `@rebasepro/types`, which reads `true|1|yes|on` and
+> `false|0|no|off` and leaves anything else to the caller's default, is used
+> everywhere that is not a zod enum. The zod enums stay strict. `verify:docs`
+> runs `check-env-booleans.mjs`, which refuses a spelled comparison or a raw
+> read of a boolean. Two readers were left alone: `packages/mcp` has no
+> dependency to reach the parser, and the logger is inlined into the portable
+> functions entry. `docs/bug-classes.md` §10 has the sweep.
 
 | Spelling | Site |
 |---|---|

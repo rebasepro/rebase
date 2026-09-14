@@ -33,7 +33,8 @@ import {
     TableJunctionInfo,
     TableMetadata,
     TablePolicyInfo,
-    User
+    User,
+    parseEnvBoolean
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
@@ -59,13 +60,12 @@ import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-t
  * them. It is the only sanctioned way a statement that named a role runs
  * without it — every other route now refuses.
  *
- * Exact `"true"` on purpose, matching the check this replaced. `=1` and `=yes`
- * silently do nothing, which `docs/audits/80-config-and-env.md` already records
- * as a finding across the env surface; fixing it here alone would make this one
- * variable disagree with the rest.
+ * Any spelling of yes, through the platform's one parser. It was an exact
+ * `"true"` until that parser existed, deliberately, so that this variable would
+ * not be fixed alone and left disagreeing with the rest.
  */
 export function isRoleSwitchingOptedOut(): boolean {
-    return process.env.DISABLE_DB_ROLE_SWITCHING === "true";
+    return parseEnvBoolean(process.env.DISABLE_DB_ROLE_SWITCHING) === true;
 }
 
 /**

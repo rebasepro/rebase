@@ -6,8 +6,28 @@ import {
     StorageController,
     StorageRegistry
 } from "../storage";
-import { resourceEnvSuffix } from "@rebasepro/types";
+import { parseEnvBoolean, resourceEnvSuffix } from "@rebasepro/types";
 import { logger } from "../utils/logger";
+
+/**
+ * Whether `FORCE_LOCAL_STORAGE` says a durable volume is mounted, so a `local`
+ * backend may serve in production.
+ *
+ * The one reader of the variable: this guard and the `bucket` resolver that
+ * `rebase status` asks both call it, so status cannot promise a backend boot
+ * is about to drop. It used to be `!process.env.FORCE_LOCAL_STORAGE` in both,
+ * which is a test for "set", not for "true" — `FORCE_LOCAL_STORAGE=false` and
+ * `=0` read as forced, and the guard stood down for the operator who had just
+ * said there was no volume.
+ *
+ * Only an explicit yes forces. `loadEnv` parses the variable to the same
+ * boolean and refuses a value outside `true`/`false`/blank before storage is
+ * initialised; this reads the raw environment because a backend assembled
+ * without `loadEnv` still has to get the same answer.
+ */
+export function localStorageForced(env: Record<string, string | undefined> = process.env): boolean {
+    return parseEnvBoolean(env.FORCE_LOCAL_STORAGE) === true;
+}
 
 export async function initializeStorage(
     storageConfig: BackendStorageConfig | StorageController | Record<string, BackendStorageConfig | StorageController> | undefined,
@@ -34,7 +54,7 @@ export async function initializeStorage(
         // succeeding into a filesystem that is about to be wiped. Dropping the
         // backend rather than throwing keeps the rest of the app — data, auth,
         // realtime — serving, which a crash-looping rollout would not.
-        if (isProduction && conf.type === "local" && !process.env.FORCE_LOCAL_STORAGE) {
+        if (isProduction && conf.type === "local" && !localStorageForced()) {
             logger.error(
                 `Storage backend "${label}" is set to "local" in production — DISABLED. Local ` +
                 "storage is the container filesystem, so uploaded files would be destroyed on the " +

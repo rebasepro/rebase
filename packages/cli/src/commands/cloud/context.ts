@@ -25,6 +25,7 @@ import { findProjectRoot } from "../../utils/project";
 import { parseCommandArgs } from "../../utils/args";
 import { cliUserAgent } from "../../utils/version";
 import { summarizeError, wantsRawError } from "./errors";
+import { parseEnvBoolean } from "@rebasepro/types";
 
 /* ═══════════════════════════════════════════════════════════════
    Constants & paths
@@ -672,10 +673,10 @@ permissive: true });
     // who ran `rebase cloud env --help | less` and got a JSON object. There was
     // no way to say so — `--json` could only turn the mode ON, and `REBASE_JSON`
     // was tested against "1" alone, so any other value including "0" fell
-    // through to the TTY test and set it anyway.
+    // through to the TTY test and set it anyway. Any spelling of yes or no now
+    // decides; only an unset or unrecognised value leaves it to the TTY.
     if (parsed["--json"]) JSON_MODE = true;
-    else if (process.env.REBASE_JSON === "0") JSON_MODE = false;
-    else JSON_MODE = process.env.REBASE_JSON === "1" || process.stdout.isTTY !== true;
+    else JSON_MODE = parseEnvBoolean(process.env.REBASE_JSON) ?? process.stdout.isTTY !== true;
     return JSON_MODE;
 }
 

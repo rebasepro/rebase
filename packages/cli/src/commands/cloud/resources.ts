@@ -31,6 +31,7 @@ import {
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
+import { wantsRawError } from "./errors";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
 
@@ -1451,7 +1452,7 @@ permissive: true });
             // control plane without the quote endpoint" is what made a
             // permanent 404 look like an expected condition for this command's
             // whole life.
-            if (process.env.REBASE_DEBUG) {
+            if (wantsRawError()) {
                 console.error(`  (no price: ${err instanceof Error ? err.message : String(err)})`);
             }
         }
@@ -1617,7 +1618,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
             // No quote — the dials below are still the answer to the question
             // asked. Visible under REBASE_DEBUG, so a permanent failure cannot
             // masquerade as a control plane that simply does not price.
-            if (process.env.REBASE_DEBUG) {
+            if (wantsRawError()) {
                 console.error(`  (no price: ${err instanceof Error ? err.message : String(err)})`);
             }
         }

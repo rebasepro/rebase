@@ -327,6 +327,61 @@ honoured on its own; when there is no credential to enforce it with, refuse
 everyone and log at boot. Refusing is visible and gets reported; admitting is
 not, and does not.
 
+### One layer down: `"false"` is a truthy string — 2026-09-14
+
+The production storage guard was
+`if (isProduction && conf.type === "local" && !process.env.FORCE_LOCAL_STORAGE)`.
+That tests whether the variable is *set*, not whether it is *true*, and every
+non-empty string is truthy — so `FORCE_LOCAL_STORAGE=false`, written to say "there
+is no durable volume here", stood the guard down, registered the local backend,
+and sent uploads to a container filesystem the next redeploy erased. `=0`, `=no`
+and `=off` did the same. `app/.env.example` shipped the trap commented out,
+`# FORCE_LOCAL_STORAGE=false`. The boot schema parsed the same variable correctly
+(`optionalBoolString`); the reader that decided never asked it.
+
+It had a twin. The `bucket` resolver behind `rebase status` read
+`!env.FORCE_LOCAL_STORAGE` from an `EnvBag` — also the raw string, not the parsed
+value — so status and the guard agreed with each other and both were wrong.
+
+This is also §2: seven readers spelled "is this true" seven ways (`=== "true"`,
+`=== "1"`, `!== "false"`, `!== "0"`, `1|true|yes`, `1|true|yes|on`, bare
+truthiness), no two agreeing on `0`, `yes` or `TRUE`.
+
+**Fix shape:** `parseEnvBoolean` in `@rebasepro/types` — `true|1|yes|on` is
+true, `false|0|no|off` is false, anything else is `undefined` so the caller's
+default decides. Default-off flags read `=== true`, default-on flags `!== false`.
+The boot schemas stay strict (`true|false|""`, anything else refuses the boot)
+and agree with it on that set. `FORCE_LOCAL_STORAGE` has one reader,
+`localStorageForced`, called by both the guard and the resolver.
+
+**Gate:** `check-env-booleans.mjs`, a `verify:docs` stage. It flags any env read
+compared with a spelled boolean, and any `process.env.NAME` read of a variable a
+boot schema declares as boolean, or that any reader parses as one, outside
+`parseEnvBoolean(…)`. Against the pre-fix tree it reports 21 findings, the guard
+among them. It cannot see an injected bag tested for truthiness (`env.NAME` is as
+often the parsed object) — the resolver's shape — so `init-storage.test.ts` holds
+both readers of `FORCE_LOCAL_STORAGE` to one table of twelve spellings. Each
+reader, reverted on its own, fails six rows.
+
+**Sweep:** grep for `process.env.X` or `env.X` tested with `!`, `!!`,
+`Boolean()`, `if ()`, `&&`, `?`, or compared with a spelled boolean; for each
+flag, ask what `=false` and `=0` do.
+
+| checked | result |
+|---|---|
+| `FORCE_LOCAL_STORAGE` — `init/storage.ts`, `boot/resource-resolvers.ts` | **fixed** — both read raw; one reader now |
+| `REBASE_MCP_OPEN_REGISTRATION` — `init.ts` | **fixed** — `!== "false"`: `=0` left OAuth client registration open |
+| `S3_FORCE_PATH_STYLE` — `backup-cli.ts`, `boot/sources.ts` | **fixed** — `=== "true"` turned unset (backup) and `=1` (a suffixed source) into an explicit `false` that overrode the endpoint-derived default, so MinIO was addressed host-style |
+| `REBASE_DEBUG` — `bin/rebase.js`, `cloud/errors.ts`, `cloud/resources.ts` | **fixed** — `=== "1"` beside bare truthiness: `=true` hid the stack, `=0` printed the fallback |
+| `DISABLE_DB_ROLE_SWITCHING`, `REBASE_EXIT_ON_UNHANDLED_REJECTION`, `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY`, `REBASE_METRICS` (static path), `REBASE_CRON_ALWAYS_ON`, `REBASE_JSON`, `REBASE_DEV_NO_DB`, `REBASE_AUTO_GENERATE`, `REBASE_GENERATE`, `REBASE_E2E`, `REBASE_DEV_PORT_EXPLICIT`, `VERCEL`, `REBASE_STRICT_COLLECTION_CONFIG` | **routed** — spelling only; each failed closed |
+| `DO_NOT_TRACK`, `REBASE_TELEMETRY_DISABLED`, `CI` — `telemetry/index.ts` | **routed**, presence kept — set to anything but a spelled no refuses; `CI=0` read as a runner |
+| the two zod boot schemas | clean — strict, refuse any other value before serving; deliberately not widened |
+| `NO_COLOR`, `FORCE_COLOR` (`bin/rebase.js`, `rls-check`) | left — external conventions (presence by spec; colour levels 0–3) |
+| `REBASE_LOG_RAW_QUERIES` — `utils/logger.ts` | left, exempted in the gate — inlined into the portable functions entry, where importing `@rebasepro/types` would inline its kind registry; `=== "true"` fails closed |
+| `REBASE_MCP_ALLOW_REMOTE_WRITES` — `packages/mcp` | left — no dependency on `@rebasepro/types`, and a new edge is a lockfile change; `/^(1\|true\|yes)$/i` fails closed, lacks only `on` |
+| `CORPUS_SKIP_SKEW` — `verify-bundle-corpus.mts` | left — `=0` would skip the skew pass, but CI never sets it and the skip is printed; `ci-static.mjs`'s `Boolean(process.env.CI)` errs strict |
+| string-valued reads tested for truthiness (`CORS_ORIGINS`, `MFA_ENCRYPTION_KEY`, `PORT`, `REBASE_BUNDLE`, …) | clean — values, not flags |
+
 ---
 
 ## 11. Two interfaces for one call, disagreeing

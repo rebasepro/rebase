@@ -22,6 +22,8 @@
  * So this classifies before it summarises, and says whose problem it is.
  */
 
+import { parseEnvBoolean } from "@rebasepro/types";
+
 /** What a Kubernetes API refusal carries, once it is found. */
 export interface KubernetesStatus {
     message?: string;
@@ -203,7 +205,12 @@ function truncate(text: string): string {
  * `--debug` is already what `bin/rebase.js` prints after every failure as the
  * thing to add, so the raw payload hangs off the flag people are told to reach
  * for rather than off one invented here.
+ *
+ * The one reader of `REBASE_DEBUG` in the commands, spelled as the bin spells
+ * it. It used to be `=== "1"` here while the quote fallbacks in `resources.ts`
+ * tested the raw string for truthiness, so `=true` hid the body and `=0`
+ * printed the fallback.
  */
 export function wantsRawError(argv: readonly string[] = process.argv): boolean {
-    return argv.includes("--debug") || process.env.REBASE_DEBUG === "1";
+    return argv.includes("--debug") || parseEnvBoolean(process.env.REBASE_DEBUG) === true;
 }

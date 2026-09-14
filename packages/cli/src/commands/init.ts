@@ -15,6 +15,7 @@ import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
 import { promptForConsent } from "../telemetry/consent";
 import { durationBucket, recordEvent } from "../telemetry";
+import { parseEnvBoolean } from "@rebasepro/types";
 
 const access = promisify(fs.access);
 
@@ -1050,7 +1051,7 @@ async function replacePlaceholders(options: InitOptions) {
 
     // `latest` means this CLI could not read its own manifest — there is no
     // version to confirm, and nothing to gain from asking.
-    const skipProbe = process.env.REBASE_E2E === "true" || version === "unknown";
+    const skipProbe = parseEnvBoolean(process.env.REBASE_E2E) === true || version === "unknown";
     const probe: ReleaseProbe = skipProbe ? { kind: "published" } : await probeRelease(version);
 
     if (probe.kind === "gap") {

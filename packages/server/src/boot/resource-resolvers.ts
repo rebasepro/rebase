@@ -33,6 +33,7 @@ import {
     type ResourceDeclaration,
     type ResourceGraph
 } from "@rebasepro/types";
+import { localStorageForced } from "../init/storage.js";
 import { BundleError } from "./bundle.js";
 import {
     ACCOUNT_SCOPED_STORAGE_BASES,
@@ -205,7 +206,8 @@ const bucketResolver: ResourceResolver = {
             };
         }
         if (config.type === "local") {
-            return context.production && !env.FORCE_LOCAL_STORAGE
+            // The guard's own reader, so this verdict is the one boot reaches.
+            return context.production && !localStorageForced(env)
                 ? {
                     state: "unbound",
                     detail: "local storage is dropped in production — a container's filesystem is erased " +

@@ -22,6 +22,8 @@
  *    Kubernetes also sets `K_SERVICE`, so a pod is never warned about.
  */
 
+import { parseEnvBoolean } from "@rebasepro/types";
+
 /** Environment variable that permanently silences the scale-to-zero warning. */
 export const CRON_ALWAYS_ON_ENV = "REBASE_CRON_ALWAYS_ON";
 
@@ -44,13 +46,6 @@ export interface WarnableJob {
 export interface ScaleToZeroWarning {
     message: string;
     data: Record<string, unknown>;
-}
-
-/** Accepts the usual truthy spellings; anything else (including "") is false. */
-function isTruthy(value: string | undefined): boolean {
-    if (!value) return false;
-    const normalised = value.trim().toLowerCase();
-    return normalised === "1" || normalised === "true" || normalised === "yes" || normalised === "on";
 }
 
 /**
@@ -79,7 +74,7 @@ export function detectFreezableRuntime(env: EnvLike = process.env): FreezableRun
         return { platform: "AWS Lambda", signals: ["AWS_LAMBDA_FUNCTION_NAME"] };
     }
 
-    if (env.VERCEL === "1") {
+    if (parseEnvBoolean(env.VERCEL) === true) {
         return { platform: "Vercel", signals: ["VERCEL"] };
     }
 
@@ -103,7 +98,7 @@ export function buildScaleToZeroWarning(
     env: EnvLike = process.env
 ): ScaleToZeroWarning | undefined {
     if (env.NODE_ENV !== "production") return undefined;
-    if (isTruthy(env[CRON_ALWAYS_ON_ENV])) return undefined;
+    if (parseEnvBoolean(env[CRON_ALWAYS_ON_ENV]) === true) return undefined;
 
     const enabled = jobs.filter((job) => job.enabled).map((job) => job.id);
     if (enabled.length === 0) return undefined;

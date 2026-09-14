@@ -498,6 +498,7 @@ function isValidEngine
 function nestAdminCollectionKeys
 function nestAdminKeysOf
 function nestAdminPropertyKeys
+function parseEnvBoolean
 function parseRelationAggregateSort
 function queue
 function registerDataSourceCapabilities

@@ -2,6 +2,7 @@ import {
     DEFAULT_DATA_SOURCE_KEY,
     DEFAULT_STORAGE_SOURCE_KEY,
     findStorageSuffixCollision,
+    parseEnvBoolean,
     storageEnvSuffix,
     type DataSourceDefinition,
     type StorageSourceDefinition
@@ -106,21 +107,21 @@ function readAccountVar(
     return readVar(env, base, accountSuffix);
 }
 
+/**
+ * A boolean binding, spelled the way every other variable is.
+ *
+ * `undefined` when unset or unrecognised, which the S3 controller reads as
+ * "decide from the endpoint". An exact `=== "true"` used to turn `=1` into an
+ * explicit `false`, switching path-style off for a MinIO endpoint whose
+ * default would have switched it on.
+ */
 function readAccountBool(
     env: EnvBag,
     base: string,
     suffix: string,
     accountSuffix: string | undefined
 ): boolean | undefined {
-    const raw = readAccountVar(env, base, suffix, accountSuffix);
-    if (raw === undefined) return undefined;
-    return raw === "true";
-}
-
-function readBool(env: EnvBag, base: string, suffix: string): boolean | undefined {
-    const raw = readVar(env, base, suffix);
-    if (raw === undefined) return undefined;
-    return raw === "true";
+    return parseEnvBoolean(readAccountVar(env, base, suffix, accountSuffix));
 }
 
 /**
