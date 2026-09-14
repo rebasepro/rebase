@@ -9,8 +9,8 @@ pnpm add @rebasepro/mcp
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 Or run directly:
 
@@ -39,7 +39,7 @@ One precedence, in this order:
 
 A `default` derived from 1 or 2 is never written back to the registry: it is recomputed at every start, and persisting it would put one project's directory, backend URL and dev service key in the file every other project on the machine reads.
 
-Auto-discovery fills gaps in all three cases and **never overrules** a value one of them supplied — not the token and not the `baseUrl`. Discovery reads the dev server's *service key*, which is an unscoped admin secret, so a narrow `rk_live_*` key you registered is what gets used even while `rebase dev` is running; likewise a project registered against `https://staging.example.com` stays there rather than being silently redirected to the local dev port. A disagreement between the two is reported on stderr.
+Auto-discovery fills gaps in all three cases and **never overrules** a value one of them supplied — not the token and not the `baseUrl`. Discovery reads the dev server's *service key*, which is an unscoped admin secret, so a narrow `rk_live_*` key you registered is what gets used even while `rebase dev` is running; likewise a project registered against `https://staging.example.com` stays there rather than being silently redirected to the local dev port. A `baseUrl` disagreement between the two is reported on stderr. Filling a gap is not: with no token registered, the SDK tools run on the discovered service key — full admin — and nothing says so.
 
 `rebase init` writes `"env": { "REBASE_PROJECT_DIR": "." }` into the scaffolded `.mcp.json` — relative to the client's working directory, which for a project-level config file is the project.
 
@@ -62,8 +62,8 @@ The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_P
 
 **Every tool that changes the target environment is refused unless that target is on the loopback interface.** The gate is a list of what is *not* gated, so a newly added tool is protected by default:
 
-- **Not gated — reads:** `rebase_schema_introspect`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`.
-- **Not gated — local only:** `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, the dev-server tools, and the project-registry tools. These write local files or local state and have no remote target to check.
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`.
+- **Not gated — local only:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, the dev-server tools, and the project-registry tools. These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** every other CLI tool — `rebase_db_push`, `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
 - **Gated against the project `baseUrl`:** every other SDK tool — `create_document`, `update_document`, `delete_document`, `create_user`, `update_user`, `delete_user`, `rebase_auth_reset_password`, `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`, `invoke_function`.
 
@@ -71,9 +71,11 @@ The two targets are not interchangeable: CLI tools never see `baseUrl`, so a loc
 
 The `DATABASE_URL` the gate checks is resolved the way the spawned CLI resolves it — ambient environment first, then `<root>/.env`, `<root>/backend/.env`, `DOTENV_CONFIG_PATH` and the parent directory, including the `ADMIN_CONNECTION_STRING` fallback the branch commands accept. **If no connection string can be resolved at all, the DB tools are refused**: an unverifiable target is not a safe one, and the child does its own resolution from files this process may not see.
 
-Only loopback (`localhost`, `127.0.0.0/8`, `::1`) counts as local — private ranges like `10.x` and `192.168.x` do not, since those are as likely to be a shared staging cluster as a laptop.
+Only loopback (`localhost` and `*.localhost`, `127.0.0.0/8`, `::1`, `0.0.0.0`) counts as local — private ranges like `10.x` and `192.168.x` do not, since those are as likely to be a shared staging cluster as a laptop.
 
 Set `REBASE_MCP_ALLOW_REMOTE_WRITES=true` to opt out.
+
+The branch tools (`rebase_db_branch_*`) also require an admin, checked through `GET /auth/me` — which answers a signed-in user's access token only, so with a service key (including the one discovery supplies) or an `rk_live_*` API key every branch tool fails with "Admin authorization failed".
 
 ## Untrusted Data Marking
 

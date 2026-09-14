@@ -1,6 +1,6 @@
 # @rebasepro/studio
 
-Developer tools layer for Rebase — provides 9 lazy-loaded tools (SQL Console, JS Console, RLS Editor, Storage, Cron Jobs, Schema Visualizer, Branches, API Explorer, Logs Explorer) plus a customizable home page.
+Developer tools layer for Rebase — provides 11 lazy-loaded tools (SQL Console, JS Console, RLS Editor, Storage, Cron Jobs, Schema Visualizer, Branches, Backups, API Explorer, Logs Explorer, API Keys) plus a customizable home page.
 
 ## Installation
 
@@ -9,13 +9,13 @@ pnpm add @rebasepro/studio
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ### Peer Dependencies
 
-- `react` >= 19.0.0
-- `react-dom` >= 19.0.0
+- `react` ^19.2.7
+- `react-dom` ^19.2.7
 - `react-router` ^8.3.0
 - `@rebasepro/cms` (optional)
 
@@ -34,10 +34,12 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 | `cron` | Cron Jobs | Compute | Monitor scheduled tasks |
 | `schema-visualizer` | Schema Visualizer | Database | Interactive database ERD |
 | `branches` | Branches | Database | Create and manage database branches |
+| `backups` | Backups | Database | Download database backups |
 | `api` | API Explorer | API | Interactive API docs and testing |
 | `logs` | Logs Explorer | Database | Real-time system and query logs |
+| `api-keys` | API Keys | Access Control | Create and manage scoped API keys |
 
-All 9 tools are enabled by default. The `schema` tool (collection editor) is auto-injected by the CMS when `collectionEditor` is enabled — it is **not** registered here.
+All 11 tools are enabled by default. The `schema` tool (collection editor) is auto-injected by the CMS when `collectionEditor` is enabled — it is **not** registered here.
 
 ## Key Exports
 
@@ -48,7 +50,7 @@ All 9 tools are enabled by default. The `schema` tool (collection editor) is aut
 | `StudioBridgeProvider` | Component | Re-exported from `@rebasepro/app` |
 | `StudioBridgeContext` | Context | Re-exported from `@rebasepro/app` |
 | `useStudioCollectionRegistry` | Hook | Access the collection registry |
-| `useStudioSidePanelController` | Hook | Control the side snapshot panel |
+| `useStudioSidePanelController` | Hook | Control the side entity panel |
 | `useStudioUrlController` | Hook | URL state management |
 | `useStudioNavigationState` | Hook | Navigation state |
 | `useStudioBreadcrumbs` | Hook | Breadcrumb management |
@@ -71,7 +73,7 @@ beside them, pass an `AppView` to `<RebaseStudio devViews>`.
 ```tsx
 import { RebaseStudio } from "@rebasepro/studio";
 
-// Inside your Rebase app — enable all 9 tools (default)
+// Inside your Rebase app — enable all 11 tools (default)
 <RebaseStudio />
 
 // Or pick specific tools

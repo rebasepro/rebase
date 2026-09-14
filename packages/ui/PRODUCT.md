@@ -51,15 +51,16 @@ one system decides, not each view).
 - Surface spans roughly 60 components, plus hooks, icons, style mixins, and
   higher-level views. `VirtualTable` (react-window) is the load-bearing component
   for the panel's spreadsheet.
-- Ships `src` alongside `dist`, so consumers can read the implementation.
+- Ships `dist` only; the implementation is readable in the public repository,
+  not in `node_modules`.
 
 ## Capabilities and Constraints
 
 - **Public, supported API.** Exports, prop shapes, and the token names are a
   contract with third-party developers. Renaming or removing an export is a
   breaking change and needs a deprecation path, not a refactor. Currently on the
-  `0.13.x` line, MIT.
-- Peer deps: React `>=19.0.0`, `react-dom >=19.0.0`. Node `>=20`.
+  `0.21.x` line, MIT.
+- Peer deps: `react` and `react-dom` `^19.2.7`. Node `>=22.22.0`.
 - The token file (`src/theme.css`) is the single source of fonts, type scale,
   tracking tiers, control heights, and colour for *every* Rebase surface —
   including ones outside this repo. Tokens are a published API surface; add
@@ -79,11 +80,12 @@ decision.
 
 ## Evidence on Hand
 
-- Public gallery at `rebase.pro/ui`, reachable from `/admin` and `/developers`.
+- Public gallery at `rebase.pro/ui`, reachable from `/cms` and `/developers`.
 - The package README enumerates the actual exports and is current.
 - Every consumer in this monorepo is a live integration test of the API surface.
-- **Absences:** no per-component usage docs beyond the README table, no visual
-  regression suite, no adoption numbers. Do not cite any.
+- Per-component reference: 85 generated pages under
+  `website/src/content/docs/docs/ui/components`.
+- **Absences:** no visual regression suite, no adoption numbers. Do not cite any.
 
 ## Product Principles
 

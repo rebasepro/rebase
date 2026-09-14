@@ -9,10 +9,10 @@ pnpm add @rebasepro/firebase
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
-**Peer dependencies:** `firebase ^10.12.2 || ^11.0.0 || ^12.0.0`, `react >= 19.0.0`, `react-dom >= 19.0.0`, `typesense ^1.8.0` (optional)
+**Peer dependencies:** `firebase ^10.12.2 || ^11.0.0 || ^12.0.0`, `react ^19.2.7`, `react-dom ^19.2.7`, `typesense ^1.8.0` (optional)
 
 ## What This Package Does
 
@@ -45,18 +45,18 @@ This package provides the full Firebase integration layer for Rebase. It include
 | `useRecaptcha` | reCAPTCHA integration for App Check |
 | `useBuildUserManagement` | Builds a user/role management delegate from Firestore |
 | `useFirebaseAccessGate` | Evaluates whether the current user can access the admin panel |
-| `useFirebaseRealTimeDBDelegate` | Realtime Database integration |
+| `useFirebaseRTDBDelegate` | Realtime Database integration — a `DataDriver` over RTDB |
 
 ### Utils
 
 | Export | Description |
 |---|---|
-| `buildAlgoliaSearchController` | Algolia text search adapter |
+| `performAlgoliaTextSearch` | Algolia text search — returns the ids of the matching entities |
 | `buildPineconeSearchController` | Pinecone text search adapter |
 | `buildRebaseSearchController` | Rebase-hosted search adapter |
-| `buildLocalTextSearchController` | Client-side fuzzy search (Fuse.js) |
-| `buildTextSearchController` | Generic text search adapter builder |
-| `buildCollectionsFromFirestore` | Auto-generate collection configs by introspecting Firestore data |
+| `localSearchControllerBuilder` | Client-side fuzzy search (Fuse.js) |
+| `buildExternalSearchController` | Generic adapter over any external index that returns entity ids |
+| `docsToCollectionTree` / `docToCollection` | Rebuild collection configs stored as Firestore documents, subcollections nested |
 
 ### Types
 

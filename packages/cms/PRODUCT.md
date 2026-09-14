@@ -48,31 +48,34 @@ being confined to pre-built widgets.
   collection view, not on separate pages, so the operator keeps their place.
 - A block editor (ProseMirror), kanban boards with fractional-index ordering, and
   import/export in CSV, JSON, and Excel are part of daily work.
-- The panel ships two modes — content and admin (`AdminModeSyncer`) — plus a
-  visual collection/schema editor for changing the model from the UI.
-- Runs at `:5173` in development against the API on `:3001`; auth-gated by
-  `RebaseAuthGate`, laid out as drawer + app bar + scaffold.
+- The panel ships two modes — CMS and Studio (`"cms" | "studio"`, kept in step
+  with the route by `AdminModeSyncer`) — plus a visual collection/schema editor
+  for changing the model from the UI.
+- In development `rebase dev` derives both ports from the project's path — the
+  frontend in 5173–5372, the API in 3001–3999 — so two projects do not collide;
+  auth-gated by `RebaseAuthGate`, laid out as drawer + app bar + scaffold.
 
 ## Capabilities and Constraints
 
 - Sits on `@rebasepro/app` (runtime hooks and providers) and `@rebasepro/ui`
   (design system). It does not own primitives — see the UI coherency rule below.
-- Peer deps: React `>=19.2.7`, `react-dom`, `react-router` `^8`. Published MIT at
-  `0.13.x`; the package ships `src` as well as `dist`.
+- Peer deps: `react` and `react-dom` `^19.2.7`, `react-router` `^8.3.0`; Node
+  `>=22.22.0`. Published MIT on the `0.21.x` line; the package ships `dist` only.
 - **Everything the panel shows is already filtered by Postgres RLS.** The panel
   is not an authorization layer and must never present itself as one; an empty
   view can mean "no rows visible to you", and that distinction is the operator's
   problem to understand.
-- **UI coherency is an enforced project rule** (root `AGENT.md`): new views use
-  `@rebasepro/ui` components rather than raw HTML or ad-hoc classes, and are
-  built against an existing reference view for spacing, typography, and patterns.
+- **UI coherency is an enforced project rule**
+  (`.agent/workflows/ui-components.md`): new views use `@rebasepro/ui`
+  components rather than raw HTML or ad-hoc classes, and are built against an
+  existing reference view for spacing, typography, and patterns.
 - Product UI must not use type below `text-xs` (12px). The sub-`xs` tier in the
   token file is marketing-only.
 - Extensibility is a headline promise: "if you can build it in React, you can
   build it in Rebase". Custom fields, custom collection views, and custom actions
   are first-class, so panel chrome must not assume it owns the content area.
-- Terminology: *collection*, *snapshot* (a record), *side dialog*, *content mode*
-  / *admin mode*.
+- Terminology: *collection*, *entity* (a record), *side dialog*, *CMS mode* /
+  *Studio mode*.
 
 ## Brand Commitments
 

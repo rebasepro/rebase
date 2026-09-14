@@ -9,8 +9,8 @@ pnpm add @rebasepro/client
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
@@ -20,7 +20,7 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 - **Authentication** — email/password, Google, 10+ OAuth providers, session management, password reset
 - **Admin** — user CRUD for admins
 - **Storage** — file upload, download, delete, list
-- **Realtime** — WebSocket subscriptions for collection and snapshot changes
+- **Realtime** — WebSocket subscriptions for collection and row changes
 - **Offline / local-first sync** (opt-in) — a local row database, writes that apply instantly offline and replay when the connection returns, and live queries
 - **Cron** — list, trigger, and manage cron jobs
 - **Custom functions** — invoke server-side Hono route functions
@@ -32,8 +32,8 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 
 | Export | Description |
 |---|---|
-| `createRebaseClient<DB>(options)` | Create a `RebaseClient` instance. Generic `DB` parameter enables type-safe `client.data.*` access. |
-| `RebaseClient<DB>` | The client type — includes `auth`, `admin`, `cron`, `functions`, `storage`, `ws`, `data`, `call`, and token management methods. |
+| `createRebaseClient<DB>(options)` | Create a client instance. Generic `DB` parameter enables type-safe `client.data.*` access. |
+| `CreateRebaseClientResult<DB>` | The client type it returns (`RebaseClient<DB>` from `@rebasepro/types`, narrowed) — includes `auth`, `admin`, `cron`, `functions`, `storage`, `ws`, `data`, `call`, and token management methods. |
 | `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with `auth`, `admin`, and `cron` sub-configs. |
 
 ### Config
@@ -56,19 +56,19 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 
 | Method | Description |
 |---|---|
-| `find(params?)` | Query with pagination. Returns `FindResponse<M>` (`{ data, meta }`) |
-| `findById(id)` | Fetch a single snapshot. Returns `Snapshot<M> \| undefined` |
-| `create(data, id?)` | Create snapshot. Returns `Snapshot<M>` |
-| `update(id, data)` | Update snapshot. Returns `Snapshot<M>` |
-| `delete(id)` | Delete snapshot |
-| `count(params?)` | Count matching snapshots |
+| `find(params?)` | Query with pagination. Returns `FindResult<M>` (`{ data, meta }`, flat rows) |
+| `findById(id)` | Fetch a single row. Returns `M \| undefined` |
+| `create(data, id?)` | Create a row. Returns `M` |
+| `update(id, data)` | Update a row. Returns `M` |
+| `delete(id)` | Delete a row |
+| `count(params?)` | Count matching rows |
 | `where(col, op, val)` | Start a fluent query — returns `QueryBuilder` |
 | `orderBy(col, dir?)` | Order results — returns `QueryBuilder` |
 | `limit(n)` / `offset(n)` | Pagination — returns `QueryBuilder` |
 | `search(str)` | Full-text search — returns `QueryBuilder` |
-| `include(...rels)` | Include related snapshots — returns `QueryBuilder` |
+| `include(...rels)` | Include related rows — returns `QueryBuilder` |
 | `listen(params, onUpdate, onError?)` | Realtime subscription (requires WebSocket) |
-| `listenById(id, onUpdate, onError?)` | Realtime single-snapshot subscription |
+| `listenById(id, onUpdate, onError?)` | Realtime single-row subscription |
 | `observe(params, onResult, onError?, options?)` | Live query — local-first when `offline` is on, otherwise fetch + `listen` |
 | `observeById(id, onResult, onError?, options?)` | Live query for a single row |
 
@@ -131,13 +131,16 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 | `createCookieStorage(options?)` | Cookie-based auth storage adapter |
 | `createMemoryStorage()` | In-memory auth storage adapter |
 | `QueryBuilder` | Fluent query builder (also re-exported from `@rebasepro/common`) |
-| `Snapshot`, `FindResponse` | Re-exported from `@rebasepro/types` |
+| `FindResult`, `FindParams`, `User`, … | Re-exported from `@rebasepro/types` |
 
 ## Quick Start
 
 ```ts
 import { createRebaseClient } from "@rebasepro/client";
 
+// Without a type argument every row is `Record<string, unknown>`. Pass the
+// `Database` type `rebase generate-sdk` writes — `createRebaseClient<Database>(…)`
+// — and every row, filter and sort below is checked.
 const client = createRebaseClient({
     baseUrl: "http://localhost:3001",
 });
@@ -148,8 +151,8 @@ await client.auth.signInWithEmail("user@example.com", "password");
 // CRUD
 const { data: products } = await client.data.products.find({ limit: 10 });
 const product = await client.data.products.create({ name: "Camera", price: 299 });
-await client.data.products.update(product.id, { price: 249 });
-await client.data.products.delete(product.id);
+await client.data.products.update(42, { price: 249 });
+await client.data.products.delete(42);
 
 // Fluent queries
 const { data: expensive } = await client.data.products
@@ -171,6 +174,6 @@ const unsubscribe = client.data.products.listen(
 ## Related Packages
 
 - [`@rebasepro/common`](../common) — `QueryBuilder`, `buildRebaseData`, shared utilities
-- [`@rebasepro/types`](../types) — `Snapshot`, `FindResponse`, `CollectionAccessor`, etc.
+- [`@rebasepro/types`](../types) — `Entity`, `FindResult`, `CollectionAccessor`, etc.
 - [`@rebasepro/utils`](../utils) — `toSnakeCase` and other helpers
-- [`@rebasepro/app`](../auth) — React hook adapter that wraps `client.auth` for CMS integration
+- [`@rebasepro/app`](../app) — React hook adapter that wraps `client.auth` for CMS integration

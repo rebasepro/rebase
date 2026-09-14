@@ -9,31 +9,31 @@ pnpm add @rebasepro/types
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. This is a **types-only** package with no runtime dependencies. Every other `@rebasepro/*` package depends on it.
+Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. It has no runtime dependencies, but it is not types-only: it also exports the constants and small runtime helpers those packages share (`ADMIN_PROPERTY_KEYS`, `GeoPoint`, `declaredDataSources`, …). Every other `@rebasepro/*` package depends on it.
 
 ## Key Exports
 
-### Collection & Snapshot Types
+### Collection & Entity Types
 
 | Export | Description |
 |--------|-------------|
 | `CollectionConfig` | Full collection definition (name, slug, properties, callbacks, security rules, views) |
 | `Property` | Union type for all property configurations (text, number, date, reference, array, map, etc.) |
-| `Snapshot` | Generic snapshot record type |
-| `CollectionCallbacks` | Lifecycle hooks (`onPreSave`, `onSaveSuccess`, `onDelete`, etc.) |
-| `SnapshotValues` | Record of property values for a snapshot |
+| `Entity` | Generic entity record type |
+| `CollectionCallbacks` | Lifecycle hooks (`afterRead`, `beforeSave`, `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete`) |
+| `EntityValues` | Record of property values for an entity |
 | `SecurityRule` | RLS-style access control rule for a collection |
 
 ### Backend & Driver Interfaces
 
 | Export | Description |
 |--------|-------------|
-| `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `saveSnapshot`, `deleteSnapshot`, etc.) |
+| `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `fetchOne`, `save`, `delete`, etc.) |
 | `DatabaseAdapter` | Pluggable database adapter interface (used by `server`) |
 | `BackendBootstrapper` | Lifecycle interface for initializing database drivers, auth, history, and realtime |
 | `DatabaseAdmin` | Admin operations interface (SQL execution, collection stats, table metadata) |
@@ -48,29 +48,26 @@ Provides the canonical type definitions used across all Rebase packages — both
 | Export | Description |
 |--------|-------------|
 | `AuthAdapter` | Pluggable auth adapter interface (for Clerk, Auth0, custom auth) |
-| `AuthController` | Client-side auth controller interface |
-| `RebaseUser` | User record type |
-| `Role` | Role definition type |
+| `User` | User record type |
 
 ### Controller Interfaces
 
 | Export | Description |
 |--------|-------------|
 | `RebaseClient` | Top-level client interface (data, auth, storage, email) |
-| `DataSourceDelegate` | Data operations interface for client-side data sources |
+| `RebaseServerClient` | The server-side `rebase` singleton: `RebaseClient` without `data`, plus `dataAsAdmin` |
 | `StorageSource` | File storage interface |
 | `CollectionRegistryInterface` | Collection lookup and registration |
-| `NavigationController` | App navigation interface |
 
 ### Other
 
 | Export | Description |
 |--------|-------------|
 | `CronJobDefinition` | Cron job configuration type |
-| `CollectionCallbacks` | Lifecycle callbacks for snapshot CRUD operations |
-| `PluginConfig` | Plugin system types |
+| `CollectionCallbacks` | Lifecycle callbacks for entity CRUD operations |
 | `WebSocketMessage` | WebSocket protocol message types |
-| `Locale` | Localization types |
+
+The admin panel's own types — `AuthController`, the plugin type `RebasePlugin`, `Locale` — live in `@rebasepro/cms-types`.
 
 ## Quick Start
 
@@ -79,7 +76,7 @@ import type {
   CollectionConfig,
   DataDriver,
   DatabaseAdapter,
-  RebaseUser,
+  User,
   Property,
 } from "@rebasepro/types";
 ```
@@ -93,5 +90,5 @@ Every `@rebasepro/*` package depends on this one. Key consumers:
 | `@rebasepro/server` | `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
 | `@rebasepro/server-postgres` | `BackendBootstrapper`, `InitializedDriver`, `RealtimeProvider` |
 | `@rebasepro/server-mongo` | `BackendBootstrapper`, `DataDriver`, `CollectionConfig` |
-| `@rebasepro/client` | `RebaseClient`, `DataSourceDelegate`, `StorageSource` |
-| `@rebasepro/cms` | `CollectionConfig`, `Property`, `PluginConfig`, controller interfaces |
+| `@rebasepro/client` | `RebaseClient`, `StorageSource` |
+| `@rebasepro/cms` | `CollectionConfig`, `Property`, controller interfaces |

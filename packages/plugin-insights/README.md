@@ -9,10 +9,10 @@ pnpm add @rebasepro/plugin-insights
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
-**Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`
+**Peer dependencies:** `react ^19.2.7`, `react-dom ^19.2.7`
 
 ## What This Package Does
 
@@ -68,6 +68,8 @@ Collection-level insights are the single source of truth: define once under `col
 ## Quick Start
 
 ```tsx
+import { Rebase } from "@rebasepro/app";
+import { RebaseShell } from "@rebasepro/cms";
 import { useInsightsPlugin } from "@rebasepro/plugin-insights";
 
 const insightsPlugin = useInsightsPlugin({
@@ -109,11 +111,13 @@ const insightsPlugin = useInsightsPlugin({
 });
 
 // Pass to your Rebase app:
-<RebaseFirebaseApp plugins={[insightsPlugin]} />
+<Rebase client={rebaseClient} plugins={[insightsPlugin]}>
+    <RebaseShell />
+</Rebase>
 ```
 
 ## Related Packages
 
 - `@rebasepro/app` — Core framework providing the plugin system
-- `@rebasepro/types` — Shared types (`RebasePlugin`, `SlotContribution`)
+- `@rebasepro/cms-types` — Shared types (`RebasePlugin`, `SlotContribution`)
 - `@rebasepro/ui` — UI components used by insight widgets

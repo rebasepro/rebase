@@ -9,8 +9,9 @@ pnpm add @rebasepro/server-postgres
 ```
 
 This package is ESM-only (`"type": "module"`, no CommonJS build), so it is
-loaded with `import`. `require()` of it from a CJS file works only on Node
-22.12+, which supports `require(esm)`.
+loaded with `import`. It needs Node `>=22.22.0` (its `engines` floor), where
+`require()` of it from a CJS file works too: Node has supported `require(esm)`
+since 22.12.
 
 ### Allow `@ariga/atlas` to run its install script
 
@@ -41,7 +42,7 @@ not installed, installed with its script blocked, and on disk with only the
 
 ## What This Package Does
 
-Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for PostgreSQL. It provides connection pooling, a Drizzle-based data driver, Postgres LISTEN/NOTIFY realtime, auth table management, snapshot history, schema generation, branching, read replicas, and WebSocket support. Plug it into `@rebasepro/server` via `createPostgresAdapter()` or `createPostgresBootstrapper()`.
+Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for PostgreSQL. It provides connection pooling, a Drizzle-based data driver, Postgres LISTEN/NOTIFY realtime, auth table management, entity history, schema generation, branching, read replicas, and WebSocket support. Plug it into `@rebasepro/server` via `createPostgresAdapter()` or `createPostgresBootstrapper()`.
 
 ## Key Exports
 
@@ -57,8 +58,8 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 | `DatabasePoolManager` | Per-branch/per-tenant dynamic pool management (used with `ADMIN_CONNECTION_STRING`). |
 | `PostgresCollectionRegistry` | Collection → Drizzle table registry with enum and relation tracking. |
 | `BranchService` | Database branching (schema-level isolation). |
-| `generateDrizzleSchema(collections)` | Generates Drizzle schema code from collection definitions. |
-| `createAuthSchema(schemaName?)` | Generates Drizzle tables for the auth system (`users`, `roles`, `user_roles`). |
+| `generateSchema(collections, options?)` | Generates Drizzle schema code from collection definitions. |
+| `createAuthSchema(schemaName?)` | Drizzle tables for the auth system, in schema `rebase` by default: `users` (with `roles` as a `text[]` column), `refresh_tokens`, `password_reset_tokens`, `user_identities`, `mfa_factors`, `mfa_challenges`, `recovery_codes`, `magic_link_tokens`, `app_config`. |
 
 ## Quick Start
 
@@ -66,19 +67,20 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { initializeRebaseBackend } from "@rebasepro/server";
-import * as schema from "./generated/schema";
+// Written by `rebase schema generate`.
+import { enums, relations, tables } from "./schema.generated";
+
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) throw new Error("DATABASE_URL is not set");
 
 // Create connection
-const { db, pool } = createPostgresDatabaseConnection(
-  process.env.DATABASE_URL,
-  schema
-);
+const { db, pool } = createPostgresDatabaseConnection(connectionString);
 
 // Create adapter and pass to server
 const database = createPostgresAdapter({
   connection: db,
-  connectionString: process.env.DATABASE_URL,
-  schema: { tables: schema },
+  connectionString,
+  schema: { tables, enums, relations },
 });
 
 const backend = await initializeRebaseBackend({
@@ -103,7 +105,7 @@ process.on("SIGTERM", async () => {
 | `max` | 20 |
 | `idleTimeoutMillis` | 30,000 |
 | `connectionTimeoutMillis` | 10,000 |
-| `queryTimeout` | 30,000 |
+| `queryTimeout` | 60,000 |
 | `statementTimeout` | 30,000 |
 | `keepAlive` | true |
 
