@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fbdafd20900a251
+sourceHash: b080a3a794af60eb
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para la inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDKs.
@@ -352,7 +352,7 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-`db connect` abre un puerto local que *es* la base de datos gestionada (sin endpoint público) hasta presionar Ctrl-C; `--reveal` añade la contraseña. Solo para propietario o administrador.
+<span class="since-badge" data-since="0.21">Since 0.21</span> `db connect` abre un puerto local que *es* la base de datos gestionada (sin endpoint público) hasta presionar Ctrl-C; `--reveal` añade la contraseña. Solo para propietario o administrador.
 
 #### Resources
 

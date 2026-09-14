@@ -1,5 +1,5 @@
 ---
-sourceHash: 11eb4597bacc7658
+sourceHash: 20203510271ee99a
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für dich betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -227,7 +227,7 @@ Klar und deutlich formuliert, denn es später herauszufinden ist ärgerlicher:
   gestufte PITR-Workflow lautet `rebase cloud db pitr`.
 - **Kein öffentlicher Datenbank-Endpunkt.** Eine verwaltete Datenbank ist nicht für das Internet
   freigegeben; der Host, den die Konsole anzeigt, ist die interne Adresse deines Backends und
-  löst auf deinem lokalen Rechner ins Leere auf. `rebase cloud db connect` öffnet einen lokalen Port
+  löst auf deinem lokalen Rechner ins Leere auf. <span class="since-badge" data-since="0.21">Since 0.21</span> `rebase cloud db connect` öffnet einen lokalen Port
   zu dieser Datenbank, getunnelt über die Control Plane, solange der Befehl aktiv bleibt – es gibt
   jedoch keinen permanenten Hostnamen, zu dem sich ein Drittanbieter-Dienst verbinden kann. Dieser Tunnel
   sowie das Passwort hinter `rebase cloud db info --reveal` erfordern beide die Owner- oder Admin-Rolle

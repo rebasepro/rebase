@@ -1,5 +1,5 @@
 ---
-sourceHash: c7cd1dd8eea181bf
+sourceHash: 26043eb4173f3b5a
 title: Index des endpoints
 sidebar_label: Index des endpoints
 description: Chaque route HTTP qu'un backend Rebase monte — données, authentification, stockage, administration, méta — avec la restriction d'accès de chacune et la page qui l'explique.
@@ -189,6 +189,8 @@ Les connexions WebSocket arrivent sous la forme d'une mise à niveau HTTP (upgra
 un chemin dédié — voir [Temps réel](/docs/backend/realtime/).
 
 ## Surface MCP
+
+<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Monté uniquement lorsque `REBASE_MCP_ENABLED=true`, ce qui nécessite également
 `REBASE_PUBLIC_URL` — voir

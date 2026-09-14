@@ -1,5 +1,5 @@
 ---
-sourceHash: c7cd1dd8eea181bf
+sourceHash: 26043eb4173f3b5a
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Tutte le route HTTP montate da un backend Rebase — dati, autenticazione, storage, amministrazione, meta — con il rispettivo gate di accesso e la pagina esplicativa.
@@ -193,6 +193,8 @@ Le connessioni WebSocket arrivano come un aggiornamento HTTP sullo stesso server
 anziché su un percorso dedicato — vedi [Realtime](/docs/backend/realtime/).
 
 ## Superficie MCP
+
+<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Montata solo quando `REBASE_MCP_ENABLED=true`, il che richiede anche
 `REBASE_PUBLIC_URL` — vedi

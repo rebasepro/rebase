@@ -1,5 +1,5 @@
 ---
-sourceHash: a6ecab532bd0be01
+sourceHash: 86482a8c4246735c
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -263,6 +263,8 @@ Kombinationen den Start verweigern –, finden Sie unter
 | `REBASE_FUNCTIONS_UPSTREAM` | Wohin der API-Prozess eine Funktionsanfrage weiterleitet, die er nicht selbst bedient. | — |
 
 ### MCP-Oberfläche
+
+<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Ein optionaler Model Context Protocol (MCP)-Endpunkt unter `/mcp`, damit ein KI-Client dieses Projekt
 **als der angemeldete Benutzer** lesen und schreiben kann. Deaktiviert, sofern nicht gesetzt, und –

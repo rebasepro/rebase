@@ -1,35 +1,22 @@
 ---
-sourceHash: fc1823b20f5de5c5
+sourceHash: 4194c691d1968c26
 slug: fr/docs/upgrading/0-18-to-next
-title: Migrer de 0.18 vers la prochaine version
+title: Mise à niveau de 0.18 vers la prochaine version
 sidebar_label: 0.18 → next
-description: Les ruptures déjà fusionnées sur main et décrites dans cette documentation, avant que la version qui les porte n'existe.
+description: Les changements cassants déjà fusionnés sur main et présents dans cette documentation, avant que la version qui les intègre n'existe.
 ---
 
-# Migrer 0.18 → next
+# Mise à niveau 0.18 → next
 
-**Rien de tout cela n'est publié.** Ce sont les entrées `### Breaking` de la
-section [`[Unreleased]`](/fr/docs/changelog/) du changelog : elles sont sur `main`,
-et ce site de documentation publie depuis `main` — donc avant que la version qui
-les porte n'existe. Si vous avez installé depuis npm, vous êtes en 0.20 et rien
-de tout cela ne vous a encore atteint. 0.19 et 0.20 ne déclarent aucune rupture :
-c'est donc un seul saut depuis 0.18.
+**Rien de tout cela n'est encore publié.** Il s'agit des entrées `### Breaking` de la section [`[Unreleased]`](/docs/changelog/) du changelog : elles sont sur `main`, et ce site de documentation étant publié à partir de `main`, elles sont donc décrites ici avant que la version qui les intègre n'existe sur npm. Si vous avez installé depuis npm, vous êtes sur la 0.20 et rien de tout cela ne vous concerne pour l'instant — lisez ceci pour savoir ce qui arrive, et revenez lors de votre migration. Les versions 0.19 et 0.20 ne déclarent aucun changement cassant, il s'agit donc d'un saut direct depuis la 0.18.
 
 ---
 
 ## 31. `context.client.data` ne compile plus dans un callback de collection
 
-`RebaseCallContext["client"]` est désormais `RebaseCallbackClient` : `RebaseClient`
-sans `data`. Côté serveur, ce client est le singleton `rebase`, qui n'a plus de
-`data` depuis la 0.18 — `context.client.data.collection(…)` compilait donc, puis
-levait `Cannot read properties of undefined (reading 'collection')` à chaque
-appel. C'est désormais une erreur de compilation.
+`RebaseCallContext["client"]` est désormais `RebaseCallbackClient` : `RebaseClient` sans `data`. Côté serveur, ce client est le singleton `rebase`, qui n'a plus de `data` depuis la version 0.18, donc `context.client.data.collection(…)` compilait puis levait `Cannot read properties of undefined (reading 'collection')` à chaque appel. C'est désormais une erreur de compilation.
 
-**À changer :** interrogez les données via `context.data`, l'accesseur que les
-requêtes d'un callback auraient toujours dû utiliser. Il s'exécute avec le
-privilège de ce qui a déclenché le callback, dans la transaction même de
-l'écriture. Le [guide des callbacks](/fr/docs/collections/callbacks/) décrit ce
-que chaque accesseur du contexte peut atteindre.
+**Ce qu'il faut changer :** effectuez vos requêtes via `context.data`, l'accesseur que les requêtes d'un callback ont toujours été censées utiliser. Il s'exécute avec les privilèges de l'élément ayant déclenché le callback, sur la transaction d'écriture elle-même. Le [guide des callbacks](/docs/collections/callbacks/) détaille ce à quoi chaque accesseur du contexte peut accéder.
 
 ```diff lang="ts"
  afterSave: async ({ context }) => {
@@ -42,8 +29,35 @@ que chaque accesseur du contexte peut atteindre.
 grep -rn "client\.data\b" config
 ```
 
-`context.client.dataAsAdmin` reste disponible pour un callback qui doit voir ce
-qu'un administrateur peut voir. `admin.browserCallbacks` change aussi : l'ancienne
-écriture y fonctionnait, car le client du panneau a un `data`, et elle cesse
-pourtant de compiler. `useRebaseContext().client` dans un composant React garde
-son `data`.
+`context.client.dataAsAdmin` est toujours disponible pour un callback qui doit voir ce qu'un administrateur peut voir. `admin.browserCallbacks` change également : l'ancienne syntaxe fonctionnait ici car le client du panneau transporte `data`, et cela cesse également de compiler. `useRebaseContext().client` dans un composant React conserve son `data`.
+
+## 32. `selectedEntities` a disparu : une sélection correspond à des lignes ou à une requête
+
+Une vue de collection peut désormais sélectionner chaque ligne correspondant à son filtre, et pas seulement les lignes qu'elle a chargées ; `SelectionController` ne renvoie donc plus un `Entity[]`. `selectionController.selection` est une union `EntitySelection` : `{ type: "entities", entities }` pour les lignes cochées manuellement, ou `{ type: "query", query, excluded, count? }` pour chaque ligne correspondant à une requête, dont la plupart n'ont été lues par personne.
+
+**Ce qu'il faut changer :** une action personnalisée qui lit la sélection la transforme en lignes à l'aide de `resolveSelection` de `@rebasepro/cms`. Elle retourne immédiatement les lignes cochées et lit une sélection de requête page par page — avec un callback de progression facultatif — en levant une erreur plutôt qu'en retournant un préfixe lorsque la requête correspond à plus de 20 000 lignes.
+
+```diff lang="tsx"
+ const handlePublish = async () => {
+-    for (const entity of selectionController.selectedEntities) {
++    const selected = await resolveSelection({
++        selection: selectionController.selection,
++        accessor: data.collection(path)
++    });
++    for (const entity of selected) {
+         await data.collection(entity.path).update(entity.id, { status: "published" });
+     }
+ };
+```
+
+```bash
+grep -rn "selectedEntities" config frontend
+```
+
+Trois ajustements mineurs l'accompagnent :
+
+- `selectionController.selectedEntities.length` → `selectionController.selectedCount`. Il vaut `undefined`, jamais 0, lorsque chaque ligne correspondant à une requête est sélectionnée et que la collection ne peut pas être comptée — gérez ce cas au rendu, ne lui attribuez pas de valeur par défaut.
+- `setSelectedEntities(prev => …)` → `setSelection(prev => …)`, qui reçoit et retourne une `EntitySelection`. `setSelectedEntities(rows)` avec un tableau fonctionne toujours.
+- La vérification pour savoir si « quelque chose est sélectionné » se fait via `selectionController.hasSelection`.
+
+`isEntitySelected` et `toggleEntitySelection` restent inchangés et sont ce qu'une case à cocher par ligne doit continuer d'utiliser. L'[exemple d'actions de collection](/docs/frontend/entity-actions/#collection-actions) illustre l'ensemble du modèle.

@@ -1,5 +1,5 @@
 ---
-sourceHash: a6ecab532bd0be01
+sourceHash: 86482a8c4246735c
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -262,6 +262,8 @@ combinaisons refusent de démarrer — se trouve sur
 | `REBASE_FUNCTIONS_UPSTREAM` | Où le processus API transfère une requête de fonction qu'il ne sert pas lui-même. | — |
 
 ### Surface MCP
+
+<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Un endpoint Model Context Protocol optionnel à `/mcp`, afin qu'un client IA puisse lire
 et écrire dans ce projet **en tant qu'utilisateur connecté**. Désactivé sauf indication contraire, et —

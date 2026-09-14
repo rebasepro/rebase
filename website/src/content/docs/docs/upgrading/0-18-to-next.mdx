@@ -46,3 +46,50 @@ grep -rn "client\.data\b" config
 admin may see. `admin.browserCallbacks` changes too: the old spelling ran there,
 because the panel's client carries `data`, and it stops compiling all the same.
 `useRebaseContext().client` in a React component keeps its `data`.
+
+## 32. `selectedEntities` is gone: a selection is rows or a query
+
+A collection view can now select every row that matches its filter, not only
+the rows it has loaded, so `SelectionController` no longer hands out an
+`Entity[]`. `selectionController.selection` is an `EntitySelection` union:
+`{ type: "entities", entities }` for rows ticked by hand, or
+`{ type: "query", query, excluded, count? }` for every row matching a query,
+most of which nobody has read.
+
+**What to change:** a custom action that reads the selection turns it into rows
+with `resolveSelection` from `@rebasepro/cms`. It returns the ticked rows at
+once, and reads a query selection a page at a time — with an optional progress
+callback — throwing rather than returning a prefix when the query matches more
+than 20,000 rows.
+
+```diff lang="tsx"
+ const handlePublish = async () => {
+-    for (const entity of selectionController.selectedEntities) {
++    const selected = await resolveSelection({
++        selection: selectionController.selection,
++        accessor: data.collection(path)
++    });
++    for (const entity of selected) {
+         await data.collection(entity.path).update(entity.id, { status: "published" });
+     }
+ };
+```
+
+```bash
+grep -rn "selectedEntities" config frontend
+```
+
+Three smaller moves come with it:
+
+- `selectionController.selectedEntities.length` → `selectionController.selectedCount`.
+  It is `undefined`, never 0, when every row matching a query is selected and
+  the collection cannot be counted — render that case, do not default it.
+- `setSelectedEntities(prev => …)` → `setSelection(prev => …)`, which receives
+  and returns an `EntitySelection`. `setSelectedEntities(rows)` with an array
+  still works.
+- A check for "is anything selected" is `selectionController.hasSelection`.
+
+`isEntitySelected` and `toggleEntitySelection` are unchanged, and are what a
+per-row checkbox should keep using. The
+[collection actions example](/docs/frontend/entity-actions/#collection-actions)
+shows the whole pattern.

@@ -1,5 +1,5 @@
 ---
-sourceHash: c7cd1dd8eea181bf
+sourceHash: 26043eb4173f3b5a
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -189,6 +189,8 @@ WebSocket-Verbindungen erfolgen als HTTP-Upgrade auf demselben Server und nicht 
 einen eigenen Pfad – siehe [Realtime](/docs/backend/realtime/).
 
 ## MCP-Schnittstelle
+
+<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Wird nur bereitgestellt, wenn `REBASE_MCP_ENABLED=true`, was auch
 `REBASE_PUBLIC_URL` voraussetzt – siehe

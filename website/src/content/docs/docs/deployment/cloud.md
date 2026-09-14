@@ -225,7 +225,7 @@ Stated plainly, because finding out later is worse:
   PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the
   internet, so the host the console shows is your backend's address for it and
-  resolves to nothing on your machine. `rebase cloud db connect` opens a local
+  resolves to nothing on your machine. <span class="since-badge" data-since="0.21">Since 0.21</span> `rebase cloud db connect` opens a local
   port that is that database, tunnelled through the control plane, for as long
   as you leave it running — but there is no permanent hostname a third-party
   service can connect to. That tunnel, and the password behind

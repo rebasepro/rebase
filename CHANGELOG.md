@@ -37,6 +37,38 @@
   `initializeRebaseBackend`, or one it missed — now refuses a callback's read of
   `context.client` with a 500 that says so, instead of handing it `undefined`.
 
+- **`SelectionController.selectedEntities` is gone: a selection is either rows
+  or a query.** A collection with more rows than a view holds can now be
+  selected in full, and a selection that stands for rows nobody has loaded
+  cannot be an `Entity[]`. `selectionController.selection` is an
+  `EntitySelection` union — `{ type: "entities", entities }` for rows ticked by
+  hand, `{ type: "query", query, excluded, count? }` for every row matching the
+  filter — and `resolveSelection()` from `@rebasepro/cms` is the one way to turn
+  either into rows: a page at a time, with a progress callback and a 20,000-row
+  ceiling that throws rather than handing back a prefix.
+
+  ```diff ts
+   const handlePublish = async () => {
+  -    for (const entity of selectionController.selectedEntities) {
+  +    const selected = await resolveSelection({
+  +        selection: selectionController.selection,
+  +        accessor: data.collection(path)
+  +    });
+  +    for (const entity of selected) {
+           await data.collection(entity.path).update(entity.id, { status: "published" });
+       }
+   };
+  ```
+
+  Keeping `selectedEntities` beside the new field was the dangerous option: in
+  query mode it would have answered with whatever the view had scrolled — 50
+  rows of 12,480 — and a bulk action written against it would have acted on 50
+  and reported success. `selectedCount` replaces `selectedEntities.length`, and
+  is `undefined` rather than 0 for a full selection against an accessor that
+  cannot count. `setSelectedEntities` keeps its array form; the updater-function
+  form moved to `setSelection`. `isEntitySelected` and `toggleEntitySelection`
+  are unchanged.
+
 ### Added
 
 - **`cms` — say where your admin panel is, and Rebase Cloud will link to it.**
@@ -56,6 +88,114 @@
   it follows a custom domain the moment one verifies. Frontends folded into a
   managed backend bundle get their address recorded on deploy too — those rows
   previously stayed at "registered, never deployed" for the life of the project.
+
+- **A remote MCP endpoint that acts as the signed-in user, opt-in with
+  `REBASE_MCP_ENABLED`.** The MCP server Rebase already ships is a developer
+  tool: stdio, on a laptop, authenticated with a service key — admin-scoped.
+  This one is for the people who use what you built. `/mcp` is an OAuth 2.1
+  resource server and `/api/oauth` the authorization server that issues its
+  tokens, so a person connects an AI client to your app by signing in with
+  their own account and approving it on a consent screen. Every database call
+  the tools make runs as that person, under the same RLS as their own requests:
+  the tools do not filter, the database does.
+
+  It is off unless `REBASE_MCP_ENABLED=true`, and it needs `REBASE_PUBLIC_URL`,
+  because the issuer and the token audience cannot be taken from a `Host`
+  header the caller controls. No `REBASE_ROLE` turns it on, and a managed
+  project cannot switch it on from its own environment. The Helm chart gains
+  `mcp.enabled`, `mcp.publicUrl` and `mcp.openRegistration`. Dynamic client
+  registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` turns it
+  off. A person can list and withdraw the applications they connected
+  (`GET` and `DELETE /api/oauth/grants`): a withdrawn grant's refresh tokens
+  stop working at once, and an access token already issued expires within the
+  hour. See [the MCP surface](/docs/backend/endpoints/#mcp-surface).
+
+- **`rebase cloud db connect` — a local port that is your cloud database.** A
+  managed database has no public endpoint, and the console and CLI used to
+  answer that with a `kubectl port-forward` command nobody outside the platform
+  could run: no route has ever issued a customer credentials for the cluster.
+  `db connect` opens a listener on `127.0.0.1` and carries each connection over
+  a WebSocket through the control plane, which holds the only credentials for
+  the cluster. Postgres still asks for its password, so the tunnel is a network
+  path and not a credential. It runs until Ctrl-C, and `--reveal` puts the
+  password in the printed URL.
+
+  `db info` and `debug db` print the tunnel instead of `kubectl`, and say why
+  the host they list does not resolve on your machine; in `db info`'s output
+  `portForward` is replaced by `directAccess`, which carries a `kubectl` recipe
+  only when the cluster is your own. The tunnel and `db info --reveal` need the
+  organization's owner or admin role — the same one Studio's SQL editor asks
+  for, because all three end at a session on production data.
+
+- **Select every row that matches, not just the rows on screen.** A collection
+  view holds a few hundred rows of what may be hundreds of thousands, and there
+  was no select-all anywhere, so acting on a thousand rows meant ticking a
+  thousand checkboxes. The toolbar's checkbox now opens a menu — *All on this
+  page*, *All 12,480 products*, *None* — and a full selection is a query rather
+  than a list of rows: unticking one adds an exclusion, and moving the filter
+  drops the selection, because it was a promise about one specific query. The
+  count sits beside the checkbox, and nothing moves when the first row is
+  ticked. The Breaking entry above covers what this changes for a custom
+  action.
+
+  The CSV export follows the selection, or the current view — it used to read
+  the whole collection with no filter at all, so a filtered table of 40 rows
+  exported everything — and says which it is about to download. A bulk delete
+  runs eight requests at a time, can be cancelled, and runs every one before
+  reporting a failure, so it cannot half-apply silently.
+
+- **Write the columns one many-to-many link carries.**
+  `PATCH <collection>/<id>/<relation>/<targetId>` with a `_pivot` body sets the
+  junction row's own columns — the `role` on one membership — without
+  re-sending the whole membership array, which is the lost update the
+  membership diff exists to avoid. The payload is validated against the
+  relation's `through.properties` the way a row's values are, so `required`,
+  `enum`, `min`/`max` and per-field `access.write` mean the same there. A body
+  carrying both `_pivot` and the target's own columns is refused rather than
+  ordered.
+
+- **A bundle deploy records the commit it was built from.** The CLI builds and
+  uploads a tarball, so nothing near the control plane had a repository to ask,
+  and almost every deployment in the console's list showed no commit. The CLI
+  is the one party standing in the repository: it reads `git log -1` there,
+  subject included, and sends nothing when there is no repository or no commit
+  yet — never an empty string, and never an identifier invented for a dirty
+  tree.
+
+### Changed
+
+- **The usage-sharing question is six lines, and its default is now yes.**
+  `rebase init`'s prompt used to print the entire JSON payload inline —
+  twenty-five lines in the middle of a flow meant to be quick — and default to
+  no. It is still a question: nothing is sent until it is answered, `n` is one
+  keystroke, and both the prompt and the answer name the command that turns it
+  off. `rebase telemetry show` now prints a specimen payload while sharing is
+  off, instead of refusing until it is on, so the person deciding can read
+  exactly what would be sent. `DO_NOT_TRACK`, `REBASE_TELEMETRY_DISABLED`, `CI`
+  and a project's `"telemetry": false` still suppress the prompt and every event
+  outright.
+
+  A reported failure now says what kind it was. `cli.error` carried the error's
+  class name, which is `Error` for a refused connection, a missing file and a
+  permission denial alike; it carries the error's code — `ECONNREFUSED`,
+  `ENOENT`, `EACCES` — now, and still never its message.
+
+- **Request metrics count the tenant's traffic, not the platform reading it.**
+  The metrics middleware was installed before `/metrics` was mounted, so every
+  scrape counted itself as a request — and a control plane scraping every few
+  seconds made those most of the traffic, the 0.0% error rate and the fast mean
+  latency. `/metrics`, `/health`, `/livez` and `/readyz` are no longer counted,
+  by exact path, so an app's own `/healthy-snacks` still is. Requests outside
+  the API base path are labelled `app` instead of `other`, and `other` keeps
+  only paths under the API base that this backend does not serve — a number
+  that means something when it is not zero. A dashboard grouped by that label
+  will see the split.
+
+- **The panel downloads 85 kB less before the login screen paints.** The record
+  inspector imported the JSON preview statically, which pulled a syntax
+  highlighter into the eager bundle for a tab nobody can open until they have
+  signed in and opened a record. It loads on demand now, like the history view
+  beside it.
 
 ### Removed
 
@@ -80,6 +220,12 @@
   dialable — `--db-cpu`, `--db-memory`, `--db-instances` and `--storage` —
   and `rebase cloud db create --type byodb` still points a project at a
   PostgreSQL the platform does not run.
+
+- **The `rebase eject infra` tombstone.** The command and `rebase.infra.json`
+  went in 0.17.0; what survived was a branch that printed a sentence saying so,
+  still there two minor versions later. Asking for it now reports that
+  `rebase.json` declares no app named `infra` — which is true, and is the same
+  answer every other unknown name gets.
 
 ### Fixed
 
@@ -160,6 +306,172 @@
   rendering, and dropped `additionalFields` from the default one, a frame after
   they appeared.
 
+- **A collection created from the panel's editor no longer stops the project
+  from booting.** The schema editor moved a *collection's* presentation keys
+  into its `admin` block when it wrote a file, and left a *property's* —
+  `markdown`, `multiline`, `previewAsTag` — exactly where the panel put them,
+  at the top level of the property. The boot validator treats a key that moved
+  in 0.11 as fatal, and the loader imports every collection in the directory,
+  so one file written this way stopped `rebase dev` from starting at all:
+  "Could not regenerate the database schema", then a backend that never came
+  up. `saveProperty` had been fixed for this; `saveCollection` had not, and
+  creating a collection is a `saveCollection`.
+
+  Two things made it certain rather than likely. The walk that nests a
+  property's keys did not know about `oneOf` — the container the block-based
+  templates are built out of — so it skipped every block inside them. And all
+  four of the editor's starter templates were written in the pre-0.11 flat
+  shape behind an `as unknown as AdminCollection` cast, which is the only check
+  they had. The cast is gone: they are `satisfies AdminCollection` now, so a key
+  in the wrong place is a compile error. The templates also had `url: "image"`
+  on a boolean flag — the renderer is `admin.urlPreview`.
+
+  What the schema editor writes is now asserted against the boot validator
+  itself, for both entry points, rather than against a copy of its rules.
+
+- **The Markdown field's "Paste behavior" panel is gone.** Its two switches
+  wrote `markdown.html` and `markdown.transformPastedText` at the top level of
+  the property — the fatal shape above — clobbering the `admin.markdown` flag
+  that makes the field a markdown field at all. Nothing ever read either one:
+  the editor's `markdownConfig` prop was destructured and never used, and no
+  caller passed it. Removed rather than wired, so the panel stops promising
+  behaviour that was never implemented.
+
+- **The agent skills are inside the example gate now.** `check:doc-examples`
+  read the docs and not `tooling/rebase-agent-skills`, which is the surface an
+  agent copies from verbatim. Two of its examples wrote a property key at the
+  top level — one of them directly beside a correct `admin: { readOnly: true }`
+  in the same literal. The gate now validates 123 collections instead of 87.
+
+- **A tenancy rule over a `belongsTo` relation compares the foreign-key
+  column.** `tenant: { field: "org" }` over a relation compiled to a comparison
+  against a column called `org`. The column is `org_id` — the relation's local
+  key — so `CREATE POLICY` failed, and a table with RLS enabled and no policy
+  denies every row. The rule read exactly right, which is what made it quiet.
+  Only `belongsTo` has a column on the table itself, and that column is the one
+  compared now.
+
+- **Callbacks on a collection in a second `database(...)` source get their
+  client.** The server client was attached to the default source's
+  driver only, so a callback on any other source read `context.client` as
+  `undefined`. Every source's driver gets it now.
+
+- **A property that declares `url: true` renders as a link.** `url: true` is
+  the data statement — the string is a URI, and the OpenAPI contract is
+  generated from it — but the panel's preview and form field keyed off
+  `admin.urlPreview` alone, so a property that had declared itself a URL
+  rendered as plain text in the table, the list and the form. The declaration
+  is enough now, and the form field gets `inputType="url"`, so a phone offers
+  the right keyboard. `urlPreview` keeps its own job — rendering what the link
+  points at, an image, a video or a file card — and accepts `true` again: it
+  was always honoured at runtime and missing from the type, so the one value
+  meaning "just a link" did not compile.
+
+- **A resized column stays resized.** Column widths, column order and the view
+  mode a collection was left in are per-user state kept in localStorage — but
+  `<Rebase>` only provided the store it was handed, and the apps the CLI
+  scaffolds hand it none. A drag widened the column until the next re-render
+  rebuilt it from the unchanged collection, and favourites and recently-visited
+  never appeared on the home page. The local store is the default now, and a
+  write to it re-renders the view that reads it.
+
+- **An `additionalFields` Builder gets the documented context in every view.**
+  `AdditionalFieldDelegateProps.context` is a `RebaseContext`, and the table
+  view passed one. The entity form and the entity view passed their own form
+  context through a cast, so a Builder reading the documented context worked in
+  the table and read `undefined` in the form — and in the entity view it was
+  also the context from the first render, never updated. Both pass the live
+  `RebaseContext` now.
+
+- **An explicit disconnect stops the subscription watchdogs.** The realtime
+  client's `disconnect()` cleared the socket's handlers, including the
+  `onclose` that suspends them, so it was the one close that left them armed
+  for up to 30 seconds. After a sign-out — which disconnects but keeps the
+  subscriptions to resume later — a watchdog firing in between failed one, and
+  signing back in left it dead. After `close()`, the timer held a Node process
+  open on its own.
+
+- **The runtime retries a bundle fetch it was asked to wait on.** A
+  `429 Too Many Requests` on the bundle download was treated like a 404 —
+  permanent — so the six-attempt retry loop was skipped for the one status that
+  needed it, and a managed deployment could fail to start and roll back over a
+  limit that would have cleared in seconds. 429 and 408 are transient now,
+  `Retry-After` is honoured in both forms RFC 9110 allows, and the wait is
+  capped at 30 seconds.
+
+- **A healthy process no longer announces itself as partial.** Every boot
+  logged "Partial runtime surface — some routes are not served by this
+  process", because the MCP surface is off by default and off was read as
+  trimmed. That line is how a deliberately trimmed process is told apart from a
+  broken one, so it now fires only when somebody actually turned a surface off.
+
+- **`rebase build` prints a docker command that builds.** For an app whose
+  Dockerfile copies the workspace's root lockfile — the normal shape in a pnpm,
+  turbo or nx monorepo — the printed `docker build -f backend/Dockerfile .` died
+  on its first `COPY`, because the build context has to be the repository root.
+  An app's `context` in `rebase.json` may now point above the project, and only
+  `context`: every other path names something Rebase reads, which a bundle has
+  to carry. `rebase build` prints the command from where it must run —
+  `cd .. && docker build -f app/backend/Dockerfile .` — and prints nothing when
+  the Dockerfile sits outside its own context, rather than a command that fails
+  on a line the reader did not write.
+
+- **`rebase cloud billing` finds the organization's billing account.** Both
+  readers in the CLI looked for `billing_account_id` and `billingAccount`, and
+  the API sends `billingAccountId`, so every organization reported
+  `account: null` and the deploy pre-check never saw an internal plan.
+
+- **Studio's Policies screen files your tables as yours.** Rebase creates a
+  project's collection tables in the `rebase` schema, beside its own plumbing,
+  and the screen treated that whole schema as platform-internal: a project's
+  own tables — RLS on, policies written — sat dimmed and collapsed under
+  "Rebase Internal" beside `refresh_tokens`, and "Schema Collections" rendered
+  empty. A table the project maps to a collection is the customer's wherever it
+  lives, and inside `rebase` the table's name decides, against the list the
+  privilege revoke already uses.
+
+- **Studio's API explorer explains a failed load.** An expired console session
+  rendered the string "401" in a red box, with no title and no way out. It says
+  what happened now, tells a refused session from a spec it cannot parse, and
+  offers a retry, with the raw status kept underneath for a bug report.
+
+- **Smaller panel fixes.** A missing image fills the box it would have occupied,
+  with a centred icon, instead of an error block in the corner of it; the
+  drawer's icons no longer shift 2px sideways when the collapsed rail opens
+  under the pointer; and fifteen colour utilities that named theme tokens the
+  theme never defined — among them the list row's hover colour and the selected
+  row's highlight — now render.
+
+- **The callbacks guide described the wrong transaction.** It said an
+  `afterSave`'s `context.data` writes open separate transactions and that a
+  failing `afterSave` does not roll the save back. On Postgres the opposite is
+  true, and always was: `beforeSave`, the write and `afterSave` run in one
+  transaction, and a throw rolls back the write with everything the callbacks
+  wrote. The guide, the `afterSave` reference and the agent skills say so now,
+  and that MongoDB has no transaction.
+
+### Security
+
+- **A realtime `afterRead` read through the owner connection, past RLS.** On
+  Postgres, the `afterRead` hooks that run on a subscription frame were handed a
+  context assembled by hand, and its `context.data` was the realtime service's
+  own driver: the base driver, on the owner connection, outside the user-scoped
+  transaction the frame's rows had been read in. The rows in the frame were
+  filtered correctly. What a hook then read through `context.data` to enrich
+  them was not — a hook that joined in related rows saw every tenant's on each
+  `.listen()` frame, and whatever it attached reached the subscriber. The REST
+  read of the same rows runs the same hook on the caller's transaction and saw
+  only what RLS allowed.
+
+  A subscription's hooks now get the context the REST path builds, bound to the
+  frame's own transaction, and it refuses rather than falling back to the
+  unscoped one. The hand-built context also lacked `client` and
+  `storageSource`, so a hook that signed a URL or invoked a function worked over
+  REST and failed on every subscription; both are there now.
+
+  If a collection has an `afterRead` that reads other rows through
+  `context.data`, and anything subscribes to it, upgrade.
+
 ## [0.20.0] - 2026-09-10
 
 ### Added
@@ -238,52 +550,7 @@
 - **Scaffolding asks for the project name** when one is not given, defaulting
   to `my-app`.
 
-### Removed
-
-- **The `rebase eject infra` tombstone.** The command and `rebase.infra.json`
-  went in 0.17.0; what survived was a branch that printed a sentence saying so,
-  still there two minor versions later. Asking for it now reports that
-  `rebase.json` declares no app named `infra` — which is true, and is the same
-  answer every other unknown name gets.
-
 ### Fixed
-
-- **A collection created from the panel's editor no longer stops the project
-  from booting.** The schema editor moved a *collection's* presentation keys
-  into its `admin` block when it wrote a file, and left a *property's* —
-  `markdown`, `multiline`, `previewAsTag` — exactly where the panel put them,
-  at the top level of the property. The boot validator treats a key that moved
-  in 0.11 as fatal, and the loader imports every collection in the directory,
-  so one file written this way stopped `rebase dev` from starting at all:
-  "Could not regenerate the database schema", then a backend that never came
-  up. `saveProperty` had been fixed for this; `saveCollection` had not, and
-  creating a collection is a `saveCollection`.
-
-  Two things made it certain rather than likely. The walk that nests a
-  property's keys did not know about `oneOf` — the container the block-based
-  templates are built out of — so it skipped every block inside them. And all
-  four of the editor's starter templates were written in the pre-0.11 flat
-  shape behind an `as unknown as AdminCollection` cast, which is the only check
-  they had. The cast is gone: they are `satisfies AdminCollection` now, so a key
-  in the wrong place is a compile error. The templates also had `url: "image"`
-  on a boolean flag — the renderer is `admin.urlPreview`.
-
-  What the schema editor writes is now asserted against the boot validator
-  itself, for both entry points, rather than against a copy of its rules.
-
-- **The Markdown field's "Paste behavior" panel is gone.** Its two switches
-  wrote `markdown.html` and `markdown.transformPastedText` at the top level of
-  the property — the fatal shape above — clobbering the `admin.markdown` flag
-  that makes the field a markdown field at all. Nothing ever read either one:
-  the editor's `markdownConfig` prop was destructured and never used, and no
-  caller passed it. Removed rather than wired, so the panel stops promising
-  behaviour that was never implemented.
-
-- **The agent skills are inside the example gate now.** `check:doc-examples`
-  read the docs and not `tooling/rebase-agent-skills`, which is the surface an
-  agent copies from verbatim. Two of its examples wrote a property key at the
-  top level — one of them directly beside a correct `admin: { readOnly: true }`
-  in the same literal. The gate now validates 123 collections instead of 87.
 
 - **A generated column no longer wedges every push behind it.** PostgreSQL
   refuses `ALTER COLUMN … TYPE` on a column a `GENERATED ALWAYS AS … STORED`
