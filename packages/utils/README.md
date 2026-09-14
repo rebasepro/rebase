@@ -9,14 +9,14 @@ pnpm add @rebasepro/utils
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
 A zero-dependency\* collection of pure utility functions for string manipulation, deep object operations, pluralization, hashing, and more. Used internally by most Rebase packages.
 
-\*Runtime dependency: `object-hash` (for `getHashValue`). Peer dependency: `@rebasepro/types`.
+\*Runtime dependencies: `object-hash` (for `getHashValue`) and `@rebasepro/types`.
 
 ## Key Exports
 

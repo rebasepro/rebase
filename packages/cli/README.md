@@ -9,8 +9,8 @@ pnpm add -g @rebasepro/cli
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 The CLI is also bundled with every Rebase project as a local dependency.
 
@@ -20,19 +20,29 @@ The CLI is also bundled with every Rebase project as a local dependency.
 |---------|-------------|
 | `rebase init` | Scaffold a new Rebase project |
 | `rebase dev` | Start the development server (backend + frontend) |
-| `rebase build` | Build all workspace packages |
+| `rebase build` | Build the apps declared in `rebase.json` into a bundle |
+| `rebase normalize-imports` | Complete compiled output's relative imports for Node ESM |
 | `rebase start` | Start the backend server (production) |
+| `rebase apps list` | Show the apps this repository declares |
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
 | `rebase schema introspect` | Introspect an existing database → Rebase collections |
+| `rebase schema stale` | Report generated schema files the collections have moved past |
 | `rebase db push` | Apply schema directly to database (dev). Previews the plan and refuses destructive changes (e.g. dropped columns) unless confirmed interactively or run with `--allow-destructive`. |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
+| `rebase db pull` | Copy another database into local development |
+| `rebase db branch` | Create, list, switch and delete database branches |
+| `rebase db stop` | Stop the managed development database (data is kept) |
+| `rebase db reset` | Delete the managed development database and start over |
 | `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
 | `rebase auth reset-password` | Reset a user's password |
+| `rebase api-keys list \| create \| revoke` | Manage scoped service API keys |
 | `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
 | `rebase status` | Show every resource this project declares and whether its variables are set |
 | `rebase resources` | List the databases, buckets and topics this project declares |
+| `rebase eject` | Own the server process and the image (one-way) |
 | `rebase skills install` | Install Rebase agent skills for your AI coding assistant |
+| `rebase telemetry` | Anonymous usage sharing (opt-in, off by default) |
 | `rebase cloud <command>` | Manage your apps on Rebase Cloud (auth, deploy, databases, …) |
 
 Run `rebase --help` or `rebase <command> --help` for detailed usage.

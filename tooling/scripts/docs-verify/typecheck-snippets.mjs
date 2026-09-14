@@ -263,7 +263,9 @@ function isStubbable(specifier, root, where) {
                 path.join(root, "packages/app"),
                 path.join(root, "packages/ui"),
                 path.join(root, "packages/server"),
-                path.join(root, "packages/cms")
+                path.join(root, "packages/cms"),
+                // `mongodb`, which the server-mongo README imports.
+                path.join(root, "packages/server-mongo")
             ]
         });
         // Key on the package name, never the full specifier: mapping
@@ -471,7 +473,11 @@ export async function typecheckSnippets(root, opts = {}) {
         "    readonly PROD: boolean;",
         "    readonly SSR: boolean;",
         "}",
-        "interface ImportMeta { readonly env: ImportMetaEnv }"
+        "interface ImportMeta { readonly env: ImportMetaEnv }",
+        // Vite's `declare module '*.css' {}`, for the same reason: without it
+        // `import "@rebasepro/ui/index.css"` — the first line of a frontend
+        // entry, and exported by that package — reports TS2882.
+        "declare module \"*.css\" {}"
     ].join("\n");
     writeFileSync(
         path.join(scratch, "stubs.d.ts"),

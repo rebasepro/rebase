@@ -7,8 +7,8 @@ npx @rebasepro/rls-check
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build. It is a command, so that
-matters only if you import it — `require()` of it resolves on Node 22.12+,
-which supports `require(esm)`.
+matters only if you import it — and on Node `>=22.22.0`, the floor it declares,
+`require()` of it resolves too: Node has supported `require(esm)` from 22.12.
 
 Run it in your project directory and it finds the database itself: `DATABASE_URL`, then `POSTGRES_URL`, then a `.env` beside you. Point it somewhere else with `DATABASE_URL="postgresql://user:password@host:5432/database" npx @rebasepro/rls-check`.
 
@@ -364,7 +364,7 @@ if (exceedsThreshold(result.findings, "high")) {
 
 ## Requirements
 
-Node 20 or newer, and a PostgreSQL server the machine can reach. The only runtime dependency is [`pg`](https://www.npmjs.com/package/pg) — deliberately, because this package gets pointed at production databases by people who have never heard of us, and the install should be small enough to read in full before running it.
+Node 22.22.0 or newer (`engines: >=22.22.0`), and a PostgreSQL server the machine can reach. The only runtime dependency is [`pg`](https://www.npmjs.com/package/pg) — deliberately, because this package gets pointed at production databases by people who have never heard of us, and the install should be small enough to read in full before running it.
 
 Tested against PostgreSQL 12 through 18. On servers older than 15 the `security_invoker` view option does not exist, and `view-bypasses-rls` reports as a heuristic rather than a certainty.
 

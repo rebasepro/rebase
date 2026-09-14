@@ -44,9 +44,10 @@ last one is the class the export surface cannot catch: `@rebasepro/server` and
 page whose readers silently lose portability.
 
 **2. `snippets` — English + skills, deep.** Compiles each fenced ts/js block
-against workspace *source*. English only, because the other five locales are
-generated from it by `website/scripts/translate_docs.mjs`; stage 1 is the net
-for locale-only drift.
+against workspace *source* — the English docs, the skills, the example and
+package READMEs, and the agent instructions. English only, because the other
+five locales are generated from it by `website/scripts/translate_docs.mjs`;
+stage 1 is the net for locale-only drift.
 
 ## Version pins
 
@@ -95,6 +96,12 @@ The package READMEs joined late, and paid for themselves on the first run:
 this package's *binary* name and an unrelated third party's package on npm.
 That is the npm landing page for the server, and the check that catches the
 mistake had existed for months — it had just never been pointed at the file.
+
+That was the shell-command check alone. The name, prose-type and snippet stages
+followed at 0.21.0 (`PACKAGE_README_GLOBS` in `extract.mjs`), and their first
+run reported 27 findings in ten of the twenty-one READMEs — `<Rebase collections
+dataSource>`, `buildSnapshotPropertiesFromData`, `RebaseUser`: names renamed or
+deleted months before, on the page npm shows for the package.
 
 `check-mcp-tool-tables.mjs` covers the other half of that README. Its eight tool
 tables are generated from `ALL_TOOLS` by `pnpm generate:mcp-readme` and diffed

@@ -9,26 +9,26 @@ pnpm add @rebasepro/server-mongo
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-Implements the Rebase `BackendBootstrapper` and backend interfaces for MongoDB. Provides a complete data driver, change-stream-based realtime, snapshot history, auth repositories, and WebSocket support. Plug it into `@rebasepro/server` via `createMongoBootstrapper()`, or use the standalone `createMongoBackend()` factory for direct access.
+Implements the Rebase `BackendBootstrapper` and backend interfaces for MongoDB. Provides a complete data driver, change-stream-based realtime, entity history, auth repositories, and WebSocket support. Plug it into `@rebasepro/server` via `createMongoBootstrapper()`, or use the standalone `createMongoBackend()` factory for direct access.
 
 ## Key Exports
 
 | Export | Description |
 |--------|-------------|
 | `createMongoBootstrapper(config)` | Creates a `BackendBootstrapper` for use with `initializeRebaseBackend({ bootstrappers: [...] })`. |
-| `createMongoBackend(config)` | Standalone factory — returns a `MongoBackendInstance` with driver, snapshot service, realtime, admin, and lifecycle methods. |
+| `createMongoBackend(config)` | Standalone factory — returns a `MongoBackendInstance` with driver, data service, realtime, admin, and lifecycle methods. |
 | `createMongoDelegate(db)` | Convenience factory for just the `MongoDriver` (DataDriver). |
 | `createMongoRealtimeService(db)` | Creates a MongoDB change-stream-based realtime provider. |
-| `createMongoSnapshotRepository(db)` | Creates an `SnapshotRepository` for direct CRUD. |
+| `createMongoEntityRepository(db)` | Creates a `DataRepository` for direct CRUD. |
 | `createMongoDBConnection(url, dbName)` | Connects to MongoDB and returns a `MongoDBConnection` wrapper. |
 | `MongoDBConnection` | `DatabaseConnection` implementation wrapping `MongoClient` + `Db`. |
 | `MongoDriver` | The `DataDriver` implementation for MongoDB. |
-| `MongoSnapshotService` | Low-level snapshot CRUD service. |
+| `MongoDataService` | Low-level entity CRUD service (the `DataRepository` implementation). |
 | `MongoRealtimeService` | Change-stream-based `RealtimeProvider`. |
 | `MongoCollectionRegistry` | In-memory collection registry. |
 | `isMongoBackendConfig(config)` | Type guard for `MongoBackendConfig`. |
@@ -74,11 +74,11 @@ const backend = createMongoBackend({
 });
 
 // Use directly
-const health = await backend.healthCheck();
-const snapshots = await backend.snapshotService.fetchCollection("users", {});
+const health = await backend.healthCheck?.();
+const users = await backend.dataService.fetchCollection("users", {});
 
 // Cleanup
-await backend.destroy();
+await backend.destroy?.();
 ```
 
 ## Related Packages

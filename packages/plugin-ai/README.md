@@ -9,10 +9,10 @@ pnpm add @rebasepro/plugin-ai
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
-**Peer dependencies:** `react >= 19.2.7`, `react-dom >= 19.2.7`, `react-router ^8`
+**Peer dependencies:** `react ^19.2.7`, `react-dom ^19.2.7`, `react-router ^8.3.0`
 
 ## What This Package Does
 
@@ -53,8 +53,8 @@ Two consequences worth knowing:
   it is filling. Values of properties marked `admin: { readOnly: true }` or
   `admin: { disabled: true }` are the exception — they are neither filled nor sent.
   If the rest is not acceptable for your data, set `endpoint` and run the
-  service yourself — the reference implementation is `saas/backend/functions/ai.ts`
-  in the Rebase repository, and the wire format is documented in `src/api.ts`.
+  service yourself — [Self-hosting the service](#self-hosting-the-service) lists
+  the four routes it has to answer.
 
 The plugin renders nothing until the service's `GET /status` reports itself
 available, so an unreachable host or an exhausted daily quota means no Autofill
@@ -99,7 +99,18 @@ const dataEnhancementPlugin = useDataEnhancementPlugin({
 ```
 
 Your endpoint needs to answer `GET /status`, `POST /autofill` (SSE), `POST /autocomplete`
-(SSE) and `POST /prompts`.
+(SSE) and `POST /prompts`. No credential is sent to any of them, and every request
+body is JSON:
+
+| Route | Receives | Answers |
+|---|---|---|
+| `GET /status` | — | `{ available, model?, features? }`. Anything but a 2xx with `available: true` hides the Autofill button for the session |
+| `POST /autofill` | `{ entityName, entityDescription?, values, properties, propertyKey?, propertyInstructions?, instructions? }` | SSE: `suggestion_delta` (`{ key, text }`) while a field is being written, `suggestion` (`{ key, value }`) once it is complete, then one `done` (`{ suggestions, usage? }`) — or `error` (`{ message }`). A stream that ends without `done` is reported as truncated |
+| `POST /autocomplete` | `{ textBefore, textAfter }` | SSE: `delta` (`{ text }`) records, or `error` (`{ message }`) |
+| `POST /prompts` | `{ entityName, entityDescription?, input? }` | `{ prompts: string[] }`. A failure falls back to the built-in prompts |
+
+A non-2xx answer to `/autofill` or `/autocomplete` carries its message as
+`{ error: { message } }`.
 
 ### Editor AI Autocomplete
 
@@ -130,4 +141,5 @@ token.
 
 - `@rebasepro/cms` — The admin panel this plugin extends
 - `@rebasepro/app` — Core framework providing the plugin system
-- `@rebasepro/types` — Shared types (`RebasePlugin`, `CollectionConfig`, etc.)
+- `@rebasepro/cms-types` — `RebasePlugin` and the rest of the admin types
+- `@rebasepro/types` — Shared types (`CollectionConfig`, etc.)

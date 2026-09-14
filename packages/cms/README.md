@@ -9,14 +9,14 @@ pnpm add @rebasepro/cms
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
-**Peer dependencies:** `react >= 19.2.7`, `react-dom >= 19.2.7`, `react-router ^8`
+**Peer dependencies:** `react ^19.2.7`, `react-dom ^19.2.7`, `react-router ^8.3.0`
 
 ## What This Package Does
 
-`@rebasepro/cms` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, snapshot editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
+`@rebasepro/cms` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, entity editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
 
 ## Key Exports
 
@@ -24,8 +24,8 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 
 | Export | Description |
 |---|---|
-| `RebaseCMS` | Top-level CMS component — wires routing, auth, and layout together |
-| `RebaseShell` | Outer shell (providers + chrome) without opinionated routing |
+| `RebaseCMS` | Declares the CMS into the registry: `collections`, `views`, `homePage`, `entityViews`, `collectionViews`, `entityActions`, `collectionEditor`, `navigationGroupMappings`, `basePath`. Renders nothing; it sits inside `<Rebase>` |
+| `RebaseShell` | Composes `RebaseAuthGate`, `RebaseNavigation`, `RebaseRouteDefs` and `RebaseLayout` with sensible defaults |
 | `RebaseAuthGate` | Auth-gated wrapper — shows login or the CMS based on session state |
 | `RebaseNavigation` | Renders the sidebar navigation from resolved collections/views |
 | `RebaseLayout` | Main content layout (header + body area) |
@@ -35,34 +35,34 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 | `Drawer` / `DefaultDrawer` | Sidebar drawer components |
 | `DrawerFooterActions` | Footer action buttons inside the drawer |
 | `SideDialogs` | Stacked side-panel dialog system |
-| `AdminModeSyncer` | Syncs admin/content mode state |
+| `AdminModeSyncer` | Syncs the admin mode (`"cms"` \| `"studio"`) with the current route |
 | `CollectionPanel` | Standalone collection browser panel |
 
-### Snapshot & Collection Views
+### Entity & Collection Views
 
 | Export | Description |
 |---|---|
-| `SnapshotCustomView` | Full snapshot detail/edit view |
-| `DataCollectionView` | Primary collection list view (table + toolbar) |
-| `DataCollectionTable` | Virtualized spreadsheet table for a collection |
-| `SnapshotCollectionCardView` | Card/grid layout for a collection |
-| `SnapshotCard` | Individual snapshot card |
-| `DataCollectionViewActions` | Toolbar actions (filters, search, create) |
-| `SnapshotCollectionRowActions` | Per-row action buttons |
-| `SnapshotSelectionTable` | Table for multi-snapshot selection dialogs |
+| `EntityViewBinding` | Full entity detail/edit view |
+| `CollectionViewBinding` | Primary collection list view (table + toolbar) |
+| `CollectionTableBinding` | Virtualized spreadsheet table for a collection |
+| `CollectionCardViewBinding` | Card/grid layout for a collection |
+| `EntityCardBinding` | Individual entity card |
+| `CollectionViewActions` | Toolbar actions (filters, search, create) |
+| `CollectionRowActions` | Per-row action buttons |
+| `SelectionTableBinding` | Table for multi-entity selection dialogs |
 | `SelectableTable` | Generic selectable table component |
-| `SnapshotPreview` | Compact snapshot preview widget |
+| `EntityPreviewBinding` | Compact entity preview widget |
 | `VirtualTableInput` | Inline-edit input rendered inside the virtual table |
 | `ArrayContainer` | Renders array/repeated property fields |
 | `ReferenceWidget` | Reference (foreign key) picker widget |
 
-### Snapshot Actions
+### Entity Actions
 
 | Export | Description |
 |---|---|
-| `editSnapshotAction` | Built-in action to open a snapshot for editing |
-| `copySnapshotAction` | Built-in action to duplicate a snapshot |
-| `deleteSnapshotAction` | Built-in action to delete a snapshot |
+| `editEntityAction` | Built-in action to open an entity for editing |
+| `copyEntityAction` | Built-in action to duplicate an entity |
+| `deleteEntityAction` | Built-in action to delete an entity |
 | `resetPasswordAction` | Action to reset a user's password |
 
 ### Hooks
@@ -70,10 +70,10 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 | Export | Description |
 |---|---|
 | `useApp` | Access the app-level context (navigation, mode, config) |
-| `useSidePanelController` | Open/close snapshot side panels programmatically |
-| `useSelectionDialog` | Launch a multi-snapshot selection dialog |
+| `useSidePanel` | Open/close entity side panels programmatically |
+| `useSelectionDialog` | Launch a multi-entity selection dialog |
 | `useSelectionController` | Row selection state for tables |
-| `useHistory` | Snapshot change history and version revert |
+| `useHistory` | Entity change history and version revert |
 | `useBreadcrumbsController` | Breadcrumb navigation state |
 | `useAdminContext` | Access the admin-level context |
 | `useResolvedNavigationFrom` | Resolve navigation tree from collection configs |
@@ -89,7 +89,7 @@ All exports from `./collection_editor` — the visual schema editor UI for creat
 Also available as a separate entry point:
 
 ```ts
-import { ... } from "@rebasepro/cms/collection_editor_ui";
+import { CollectionEditorDialog, PropertyForm } from "@rebasepro/cms/collection_editor_ui";
 ```
 
 ### Rich Text Editor (`RichTextEditor`)
@@ -102,8 +102,6 @@ Type exports only from the main entry point (`RichTextEditorProps`, `JSONContent
 import { RichTextEditor } from "@rebasepro/cms/editor";
 ```
 
-> **Note:** The previous name `RebaseEditor` still works but is deprecated.
-
 ### Utilities
 
 | Export | Description |
@@ -112,23 +110,27 @@ import { RichTextEditor } from "@rebasepro/cms/editor";
 | `getIconForWidget` / `getIconForProperty` | Get the display icon for a property or widget |
 | `getPropertyInPath` / `getResolvedPropertyInPath` | Navigate nested property paths |
 | `getPropertiesWithPropertiesOrder` | Apply display ordering to properties |
-| `getSnapshotPreviewKeys` / `getSnapshotTitlePropertyKey` | Determine preview/title fields |
+| `getEntityPreviewKeys` / `getEntityTitlePropertyKey` | Determine preview/title fields |
 | `isReferenceProperty` / `isRelationProperty` | Property type guards |
-| `mergeSnapshotActions` / `resolveSnapshotAction` / `resolveSnapshotView` | Action & view resolution |
+| `mergeEntityActions` / `resolveEntityAction` / `resolveEntityView` | Action & view resolution |
 | Path helpers | `addInitialSlash`, `removeInitialSlash`, `removeTrailingSlash`, etc. |
 
 ## Quick Start
 
+`<RebaseCMS>` renders nothing on its own: it declares the CMS to the `<Rebase>`
+it sits inside, and `<RebaseShell>` renders it.
+
 ```tsx
-import { RebaseCMS } from "@rebasepro/cms";
+import { Rebase, RebaseAuth } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 
 function App() {
     return (
-        <RebaseCMS
-            collections={[/* your collection configs */]}
-            authController={authController}
-            dataSource={dataSource}
-        />
+        <Rebase client={client} authController={authController}>
+            <RebaseAuth />
+            <RebaseCMS collections={[/* your collection configs */]} />
+            <RebaseShell title="Rebase" />
+        </Rebase>
     );
 }
 ```

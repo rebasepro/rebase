@@ -117,6 +117,24 @@ export const AGENT_INSTRUCTION_GLOBS = [
     ".agent/workflows/*.md"
 ];
 
+/**
+ * The package READMEs — the page npm renders for every `@rebasepro/*` package,
+ * shipped with every release whatever the package's `files` says.
+ *
+ * Past two single-package checks (`mcp`'s tool tables, `rls-check`'s count and
+ * flags), only `check-doc-commands.mjs` read them, so their shell commands were
+ * held to the CLI and their TypeScript was held to nothing. The first run of
+ * the name, prose-type and snippet stages against them, at 0.21.0, reported 27
+ * findings in ten of the twenty-one — names renamed or deleted months earlier:
+ * `<Rebase collections dataSource>` for a component that takes neither,
+ * `buildSnapshotPropertiesFromData`, `RebaseUser`, `CollectionConfig`.
+ *
+ * `*` rather than `**` on purpose: `packages/cli/templates/` holds the READMEs
+ * a scaffold copies into the reader's project, which name the reader's files,
+ * not ours.
+ */
+export const PACKAGE_README_GLOBS = ["packages/*/README.md"];
+
 /** Default doc + skill sources, relative to the monorepo root. */
 export const DEFAULT_GLOBS = [
     // English only: the other five locales are machine-translated from these by
@@ -128,6 +146,7 @@ export const DEFAULT_GLOBS = [
     // One level deep: every example has its own `node_modules` here, and a
     // `**` glob would walk into it.
     "examples/*/*.md",
+    ...PACKAGE_README_GLOBS,
     ...AGENT_INSTRUCTION_GLOBS
 ];
 

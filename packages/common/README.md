@@ -9,17 +9,17 @@ pnpm add @rebasepro/common
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
 `@rebasepro/common` is the lowest-level shared logic layer in the Rebase frontend stack. It provides:
 
-- **Collection utilities** — collection registry, default collection definitions, path resolution, navigation helpers
+- **Collection utilities** — collection registry, default collection definitions, path resolution
 - **Data driver adapter** — `buildRebaseData()` bridges any `DataDriver` implementation into a `RebaseData` proxy with typed collection accessors
 - **Query builder** — fluent `QueryBuilder` class plus `or()`, `and()`, `cond()` helpers for composing complex queries
-- **Snapshot/property utilities** — snapshot resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
+- **Entity/property utilities** — entity resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
 
 This package has no React dependency — it's pure TypeScript and can be used in both client and server contexts.
 
@@ -48,20 +48,16 @@ This package has no React dependency — it's pure TypeScript and can be used in
 |---|---|
 | `collections` | Collection config helpers |
 | `common` | General-purpose utilities |
-| `snapshots` | Snapshot value resolution |
+| `entities` | Entity value resolution |
 | `enums` | Enum type helpers |
 | `paths` | Path parsing and manipulation |
 | `resolutions` | Property and collection resolution |
 | `permissions` | Permission evaluation |
-| `references` | Reference property helpers |
 | `relations` | Relation property helpers |
-| `navigation_from_path` | Build navigation tree from a path |
-| `parent_references_from_path` | Extract parent references |
 | `builders` | Collection/property builder utilities |
 | `storage` | Storage path utilities |
 | `callbacks` | Callback composition utilities |
 | `conditions` | Conditional logic helpers |
-| `navigation_utils` | Navigation tree utilities |
 
 ## Quick Start
 
@@ -73,7 +69,7 @@ const data = buildRebaseData(myDriver);
 
 // Access collections by name (camelCase auto-converts to snake_case)
 const { data: products } = await data.products.find({ limit: 10 });
-const snapshot = await data.products.findById("abc-123");
+const entity = await data.products.findById("abc-123");
 
 // Fluent query builder
 const { data: results } = await data.products
@@ -93,7 +89,7 @@ const { data: filtered } = await data.products
 
 ## Related Packages
 
-- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Snapshot`, `FindResponse`, etc.
+- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Entity`, `FindResponse`, etc.
 - [`@rebasepro/utils`](../utils) — Low-level utilities (`toSnakeCase`, etc.)
-- [`@rebasepro/app`](../core) — Runtime layer that consumes `@rebasepro/common`
+- [`@rebasepro/app`](../app) — Runtime layer that consumes `@rebasepro/common`
 - [`@rebasepro/client`](../client) — HTTP client that re-exports and extends the `QueryBuilder`

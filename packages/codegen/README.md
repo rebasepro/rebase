@@ -9,8 +9,8 @@ pnpm add @rebasepro/codegen
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ### Dependencies
 
@@ -45,13 +45,14 @@ This is typically invoked via the CLI (`pnpm rebase generate-sdk`) rather than c
    *accessor* (`my-notes` → `myNotes`, the property name on `client.data`),
    alongside a `collectionsDictionary` const mapping each accessor back to the
    slug the wire uses. Each entry contains:
-   - `Row` — what a read serves. Column names are the **real** ones, unchanged:
-     a `created_at` column is `row.created_at`. Nullable columns are `T | null`,
+   - `Row` — what a read serves, keyed by each field's **wire** name: a property
+     keyed `createdAt` is `row.createdAt` whatever its `columnName` says, and a
+     `belongsTo` named `author` gives `row.authorId`. Nullable columns are `T | null`,
      the primary key is always present, relations appear only when `include`
      names them, and `excludeFromApi` columns are absent.
    - `Insert` — what `create()` accepts. Server-assigned ids are optional; a
      `belongsTo` target may be named either way (`{ author: 5 }` or
-     `{ author_id: 5 }`); `excludeFromApi` columns are absent here too.
+     `{ authorId: 5 }`); `excludeFromApi` columns are absent here too.
    - `Update` — what `update()` accepts. Everything optional, primary key
      omitted, `excludeFromApi` columns absent.
 
@@ -65,10 +66,11 @@ hash as something to read, filter or send.
 
 ### Names
 
-Only the collection accessor is transformed. Column names are emitted verbatim,
-quoted when they are not valid identifiers (`"user id"?: string | null`), because
-`where` and `orderBy` are keyed off `Row` — a renamed column makes the correct
-filter fail to compile and the wrong one fail at runtime.
+A property key you wrote is emitted verbatim, quoted when it is not a valid
+identifier (`"user id"?: string | null`), because `where` and `orderBy` are keyed
+off `Row` — a renamed key makes the correct filter fail to compile and the wrong
+one fail at runtime. Only the two derived names are transformed, both to
+camelCase: the collection accessor, and a foreign key that comes from a relation.
 
 Generation **fails** rather than emitting a broken file when two slugs would
 produce the same accessor: the interface would not compile, and

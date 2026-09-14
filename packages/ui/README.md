@@ -9,13 +9,13 @@ pnpm add @rebasepro/ui
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ### Peer Dependencies
 
-- `react` >= 19.0.0
-- `react-dom` >= 19.0.0
+- `react` ^19.2.7
+- `react-dom` ^19.2.7
 
 ## What This Package Does
 
@@ -100,8 +100,7 @@ Tailwind class-string constants for consistent styling:
 |---|---|
 | `cls(...)` | Class name merge utility (wraps `clsx`) |
 | `debounce` | Debounce function |
-| `chipColors` | Color palette for chips |
-| `keyToIconComponent` | Map icon string key to lucide component |
+| `CHIP_COLORS` | Color schemes for chips |
 
 ### Hooks
 
@@ -112,11 +111,11 @@ Tailwind class-string constants for consistent styling:
 | `useDebouncedCallback` | Debounced callback hook |
 | `useDebounceCallback` | Callback debounce variant |
 | `useDebounceValue` | Debounced value hook |
-| `PortalContainerContext` | Context for portal target container |
+| `PortalContainerProvider` / `usePortalContainer` | Set, and read, the container portals render into |
 
 ### Icons
 
-Re-exports ~100 individual lucide-react icon components (e.g. `ArrowRightIcon`, `SearchIcon`, `PlusIcon`), the `Icon` component, `GitHubIcon`, `HandleIcon`, `iconKeys`, and `coolIconKeys`.
+Exports 139 icon components — 137 re-exported from lucide-react (e.g. `ArrowRightIcon`, `SearchIcon`, `PlusIcon`), plus `GitHubIcon` and `HandleIcon` — along with `iconKeys` and `coolIconKeys`.
 
 To render an icon whose name is only known at runtime, use `<LucideIconByName name="ShoppingCart" />` (or `loadLucideIcons()` / `useLucideIcons()` for the map itself). The full `icons` map is still re-exported as `lucideIcons`, but reach for it last: it holds a reference to every icon in the library, so importing it pulls the whole 822 kB set into whatever chunk you import it from, and no tree-shaking helps. Nothing in this package imports it, so it costs nothing unless you ask for it.
 

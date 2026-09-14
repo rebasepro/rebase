@@ -9,8 +9,8 @@ pnpm add @rebasepro/inference
 ```
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
-`import`. `require()` of it resolves only on Node 22.12+, which supports
-`require(esm)`.
+`import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
+of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
@@ -22,7 +22,7 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 
 | Export | Type | Description |
 |---|---|---|
-| `buildSnapshotPropertiesFromData` | `(data: object[], getType: InferenceTypeBuilder) => Promise<Properties>` | Main entry — infer full property schema from data |
+| `buildEntityPropertiesFromData` | `(data: object[], getType: InferenceTypeBuilder) => Promise<Properties>` | Main entry — infer full property schema from data |
 | `buildPropertyFromData` | `(data: unknown[], property: Property, getType: InferenceTypeBuilder) => Property` | Refine an existing property with new sample data |
 | `buildPropertiesOrder` | `(properties: Properties, propertiesOrder?: string[], priorityKeys?: string[]) => string[]` | Sort property keys (title/name first, then images, then alphabetical) |
 | `inferTypeFromValue` | `(value: unknown) => DataType` | Default type inference: string, number, boolean, array, map, vector |
@@ -32,7 +32,7 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 
 | Export | Description |
 |---|---|
-| `parseReferenceString` | Parse `"path/snapshotId"` or `"db:::path/snapshotId"` format |
+| `parseReferenceString` | Parse `"path/entityId"` or `"db:::path/entityId"` format |
 | `looksLikeReference` | Check if a string looks like a document reference |
 | `findCommonInitialStringInPath` | Find shared collection path prefix in sample values |
 | `removeInitialAndTrailingSlashes` | Path cleanup |
@@ -52,7 +52,7 @@ ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 
 ```typescript
 import {
-    buildSnapshotPropertiesFromData,
+    buildEntityPropertiesFromData,
     inferTypeFromValue
 } from "@rebasepro/inference";
 
@@ -62,7 +62,7 @@ const sampleData = [
     { name: "Carol", age: 28, active: true, role: "admin" },
 ];
 
-const properties = await buildSnapshotPropertiesFromData(
+const properties = await buildEntityPropertiesFromData(
     sampleData,
     inferTypeFromValue
 );
