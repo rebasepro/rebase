@@ -2566,6 +2566,64 @@ let a caller send an empty properties map and choose to be unvalidated. The
 collection has to come from the registry, by path. There is a test for it,
 because the mistake is invisible: everything works, and nothing is enforced.
 
+### The same door, one rung lower: the path itself — 2026-09-14
+
+The write-validation above resolves the collection from the registry by path and
+then trusts the door to only ever be handed a *registered* path. The Mongo
+realtime socket was the door that wasn't. It forwarded `FETCH_COLLECTION`,
+`FETCH_ONE`, `SAVE`, `DELETE`, `COUNT`, `CHECK_UNIQUE_FIELD` and the
+`subscribe_*` frames to the driver with the client's `path` unexamined, and on
+MongoDB there is nothing behind the driver to catch an unregistered one:
+`MongoDataService.getCollection` maps any path to a physical collection by name,
+and `AuthenticatedMongoDriver` short-circuits **open** when the registry does not
+resolve the path — `authorize(undefined)` returns `true`, and
+`buildMongoFilterFromSecurityRules(undefined)` returns "match all". So a signed-in
+non-admin — or an anonymous client where `requireAuth` is off — could name the
+auth store as the path and read `rebase_users` (password hashes), write
+`rebase_user_roles` to make itself an admin, overwrite a password hash, or delete
+refresh tokens.
+
+This is class 42 with the check one rung lower than last time: not "does this
+payload validate" but "is this path a collection this backend serves at all." The
+REST door answers it *structurally* — it mounts a route per registered slug and
+404s the rest (`createUnmatchedRoute`), and a nested path cannot underscore-
+collapse onto a two-segment auth-table name — so nothing about REST had to be
+fixed. Postgres does not have the hole because the database is the backstop the
+Mongo driver lacks: an unregistered table name is queried under `rebase_user`,
+and RLS on the auth tables refuses. Mongo has no such floor, which is why the
+socket has to be the one — the same reasoning `securityRuleFilter.ts` already
+gives for enforcing rules in-process at all. The fix is one `assertRegisteredPath`
+at the socket boundary, refusing fail-closed with `NOT_FOUND` on every data verb
+and both subscribe types; it is the family member of `securityRuleFilter`'s "a
+request that cannot be authorized is not served."
+
+Root cause is also class 10's shape (*a missing prerequisite grants instead of
+refusing*): the prerequisite here is "a resolvable collection," and its absence
+opened the check rather than closing it. Fixing the socket door is the reachable
+fix; the `if (!collection) return true` in `authorize` and the `MATCH_ALL` for an
+undefined collection remain fail-open by construction, now unreachable from the
+socket because no unregistered path gets past it, and unreachable from REST and
+in-process because those only ever pass a resolved collection.
+
+**Sweep (2026-09-14):**
+
+| checked | result |
+|---|---|
+| Mongo socket `FETCH_COLLECTION` / `FETCH_ONE` / `COUNT` / `CHECK_UNIQUE_FIELD` | **BUG** — unregistered path read the auth store; `authorize(undefined)`/`MATCH_ALL` opened. Fixed: `assertRegisteredPath`. |
+| Mongo socket `SAVE` / `DELETE` | **BUG** — same, for writes: self-grant admin, overwrite a hash, delete tokens. Fixed. |
+| Mongo socket `subscribe_collection` / `subscribe_one` | **BUG** — a subscription is a read that re-runs on every write; leaked the same rows. Fixed (refused with the subscription id). |
+| REST single, nested, `_batch` on Mongo | clean — routes mount per registered slug; unknown top-level 404s, and a nested path cannot collapse onto a 2-segment table name. |
+| in-process SDK / functions on Mongo | clean — trusted server code, and it only ever addresses registered collections; the registry is filled with all of them at boot. |
+| Postgres socket, same frames | clean — an unregistered table is queried as `rebase_user`; RLS on the auth tables refuses. The database is the backstop Mongo lacks. |
+| `authorize(undefined)` / `MATCH_ALL` fail-open itself | **OPEN by construction, now unreachable** — left as-is because a resolved collection with no `securityRules` is a legitimate "allow", and every door now resolves the collection or refuses before the driver sees it. |
+
+Gate: `packages/server-mongo/test/websocket-unregistered-path-e2e.test.ts` seeds
+the auth store through `MongoUserService`, registers only an unrelated `notes`
+collection, and sends the frames an attacker would over a real `ws` client to a
+real HTTP server against `mongodb-memory-server`. Five mutations — drop the guard
+on each of `FETCH_COLLECTION`, `FETCH_ONE`, `SAVE`, `DELETE`, and the subscribe
+frames — each turn exactly one case red.
+
 ---
 
 ## 43. Acquired, then lost before anything could release it
