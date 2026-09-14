@@ -38,9 +38,9 @@ publication.
 
 ## Readiness by subsystem
 
-**Dated 2 September 2026, against 0.17.3.** Re-read it at each minor; a rating
-that has not moved in three releases is either settled or forgotten, and this
-note is here so the difference gets checked.
+**Last revised 14 September 2026, against 0.21.0.** Re-read it at each minor; a
+rating that has not moved in three releases is either settled or forgotten, and
+this note is here so the difference gets checked.
 
 The three ratings mean:
 
@@ -62,17 +62,17 @@ The three ratings mean:
 | Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
 | Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
-| Vector search (pgvector) | Beta | Exact search is stable. ANN indexes are not yet declarable, so large collections scan |
+| Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per property through `VectorIndexConfig` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
-| MCP server + agent skills | Beta | Thirty-odd tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. stdio transport only — there is no remote/HTTP transport yet |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: forty-two tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, six data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) do not work there and say so |
 | Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
-| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations |
-| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over |
+| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations. Change streams need a replica set: on a standalone `mongod` nothing replaces them, so a subscription sees writes made through that Rebase process and misses every other. No MFA: enrolment answers 501, and the checks answer "no factor", so sign-in never asks for one. The admin aggregate cannot target a collection — it reads the name from a `$from` stage MongoDB does not have — so it returns nothing |
+| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over. The Firestore driver ignores `or(...)`/`and(...)` filter groups, so a query that uses one reads every row its plain filters allow |
 | Rebase Cloud | **Private beta** | Live, running real tenants, opened in batches. Not self-serve |
 
 Two entries above are the honest cost of publishing this table at all: the
@@ -85,10 +85,10 @@ subset required for 1.0 marked.
 
 ## The 0.x promise
 
-Rebase is `0.x` — 0.17 at the time of writing. This section is written to hold
-for every 0.x release rather than for one of them, so it does not go stale on
-each cut. **Breaking changes to the authored TypeScript API are still allowed in
-a minor**, and the changelog is where they are announced. What is
+Rebase is `0.x`. This section is written to hold for every 0.x release rather
+than for one of them, so it does not go stale on each cut. **Breaking changes to
+the authored TypeScript API are still allowed in a minor**, and the changelog is
+where they are announced. What is
 *not* allowed to break silently is the set of versioned contracts below: each
 one is stamped into an artifact or a database, each is checked at boot or at
 intake, and each fails **loudly and specifically** rather than degrading.
@@ -314,21 +314,44 @@ None of the above is a convention — each has a test that fails when it breaks:
 
 | Gate | What it pins |
 |---|---|
-| `pnpm verify:corpus` | every bundle shape ever shipped, booted on today's runtime. Fixtures in `fixtures/bundles/` are **hand-authored and frozen** — a fixture the builder regenerates moves whenever the builder moves |
+| `pnpm verify:corpus` | every bundle shape ever shipped, booted on today's runtime. Fixtures in `tests/fixtures/bundles/` are **hand-authored and frozen** — a fixture the builder regenerates moves whenever the builder moves |
 | `pnpm verify:selfhost` | a real bundle built, folded, booted and fetched as a browser would |
 | `upgrade-e2e.test.ts` | old database schemas (`schema-snapshots/`) met by the current runtime |
-| `e2e/tests/cli-init-e2e.ts` | a scaffolded project installed from **real tarballs**, not workspace links |
-| `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
+| `tests/e2e/tests/cli-init-e2e.ts` | a scaffolded project installed from **real tarballs**, not workspace links |
+| `tests/e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
 | `pnpm check:api-surface` | every export, and its members, of the five packages the image supplies — `@rebasepro/server`, `types`, `client`, `common`, `utils` — plus the `@rebasepro/server/functions` entry point, against the six sections of `contracts/server.api.txt`. These are the packages `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copies, so removing an export from one is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
-| `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
+| `pnpm test:gates` | the gates' own tests, over fixtures — eleven files, `check:api-surface` and the release-bump check below among them — so a gate that stops seeing what it guards fails here. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 
 **Record a bundle fixture and a schema snapshot once per release.** The value of
 both corpora is entirely in how far back the oldest one goes, and neither can be
 backfilled after the fact.
+
+### Not yet gated
+
+The table above is what holds. These are the parts of the policy nothing holds
+yet, listed so that nobody reads a promise into them:
+
+- **No deprecation or support window.** While Rebase is `0.x` there is no written
+  rule for how long a deprecated export survives before removal, or how long an
+  older minor receives fixes. Security fixes land on the latest minor only.
+- **The HTTP wire format has no gate.** No `check:*` script diffs request and
+  response shapes against a baseline the way `check:api-surface` diffs exports; a
+  changed response shape is caught only by an e2e suite that happens to read it.
+- **CLI flags have no compatibility baseline.** The docs verifier fails when a
+  flag the skills, the examples or the marketing site use disappears; nothing
+  notices any other flag going, or a flag changing meaning.
+- **A CI release records neither corpus.** The publish workflow records no bundle
+  fixture and no schema snapshot; only the local release script tries, and it
+  warns rather than stops when it cannot. 0.18 through 0.21 have no recorded
+  project snapshot.
+- **The export surface is a gate, not a contract.** Whether the runtime-provided
+  packages' public exports become a seventh numbered contract — declared as the
+  `check:api-surface` baseline, compatible additively within a contract major —
+  is an open decision.
 
 ## Changing a contract
 
@@ -337,8 +360,8 @@ backfilled after the fact.
    `@rebasepro/server`, or a member of one, is none of the six and is the single
    most dangerous change in the repository, because the code it breaks is already
    built and will not be recompiled. `pnpm check:api-surface` is what holds that
-   line; whether it becomes a seventh numbered contract is an open decision
-   (`docs/audits/81-compat-policy.md`).
+   line; whether it becomes a seventh numbered contract is an open decision (see
+   *Not yet gated*, above).
 2. Add a fixture or snapshot for the **old** shape first, and watch it pass.
 3. Make the change and bump the constant.
 4. Confirm the old fixture still passes, or that it now fails *with the message
