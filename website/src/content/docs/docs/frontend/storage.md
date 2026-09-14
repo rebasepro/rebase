@@ -16,73 +16,10 @@ Rebase provides built-in file upload support in collection forms:
 
 ## File Upload Fields
 
-To add file uploads to a collection, use the `storage` config on a string property:
-
-```typescript
-properties: {
-    image: {
-        type: "string",
-        name: "Product Image",
-        storage: {
-            storagePath: "products",       // Subdirectory in storage
-            acceptedFiles: ["image/*"],    // MIME type filter
-            maxSize: 5 * 1024 * 1024,      // 5MB max
-            fileName: (context) => {        // Custom filename
-                return context.entityId + "_" + context.file.name;
-            }
-        }
-    }
-}
-```
-
-### Storage Config Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `storagePath` | `string` | Subdirectory within the storage backend |
-| `storageSource` | `string` | Named storage source — routes uploads to a specific backend (e.g., `"firebase"`, `"media"`). See [Multi-Backend Storage](#multi-backend-storage). |
-| `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist and hotlink). Defaults to `false` (private files use short-lived signed URLs). |
-| `acceptedFiles` | `string[]` | Allowed MIME types (e.g., `["image/*"]`, `["application/pdf"]`) |
-| `maxSize` | `number` | Maximum file size in bytes |
-| `fileName` | `function` | Custom filename generator |
-| `metadata` | `object` | Additional metadata to store with the file |
-| `storeUrl` | `boolean` | Store the full URL instead of the relative path |
-
-## Multiple File Uploads
-
-Wrap the storage property in an array for multiple file uploads:
-
-```typescript
-photos: {
-    type: "array",
-    name: "Photos",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "photos",
-            acceptedFiles: ["image/*"]
-        }
-    }
-}
-```
-
-## Document Uploads
-
-Upload non-image files like PDFs:
-
-```typescript
-documents: {
-    type: "array",
-    name: "Documents",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "documents",
-            acceptedFiles: ["application/pdf", "image/*"]
-        }
-    }
-}
-```
+A file field is a string property with a `storage` block, or an array of them
+for several files. [File upload fields](/docs/collections/file-uploads/) covers
+declaring one: every `storage` option, and which of them the server enforces
+rather than only the panel's uploader.
 
 ## Multi-Backend Storage
 

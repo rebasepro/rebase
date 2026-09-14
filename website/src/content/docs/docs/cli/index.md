@@ -169,7 +169,7 @@ Applies all unapplied migrations to the database.
 
 ```bash
 rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
-rebase db backups                       # list what is stored
+rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
