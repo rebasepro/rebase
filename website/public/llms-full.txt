@@ -16,7 +16,7 @@
 Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL**:
 
 - **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
-- **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
+- **Instant Admin Panel** — A beautiful, fast React-based panel with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
 - **Integrated Backend** — Authentication (passwords, magic links, one-time codes, MFA, API keys and twelve OAuth/OIDC providers), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
 
@@ -43,7 +43,7 @@ collection files, and a full project can serve tables it has no collection for.
 ┌──────────────────────────────────────────────────────┐
 │                 Client Applications                  │
 │  ┌──────────────┐  ┌───────────────────────────────┐ │
-│  │   Your App   │  │   Rebase Admin UI             │ │
+│  │   Your App   │  │   Rebase CMS + Studio         │ │
 │  │  (Any Tech)  │  │   Tables / Lists / Kanban     │ │
 │  └──────┬───────┘  └──────────────┬────────────────┘ │
 └─────────┼──────────────────────────┼─────────────────┘
@@ -177,7 +177,7 @@ creates the tables at boot — including the example `posts`, `authors` and `tag
 It starts both halves together:
 
 - **Backend** — REST API, auth, storage, WebSocket
-- **Frontend** — the Rebase admin panel
+- **Frontend** — the panel: Rebase CMS and Rebase Studio
 - **Hot reload** for both
 
 Both ports are **derived from this project's path** rather than fixed, so several
@@ -801,8 +801,6 @@ combinations refuse to boot — is on
 
 #### MCP surface
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 An opt-in Model Context Protocol endpoint at `/mcp`, so an AI client can read
 and write this project **as the signed-in user**. Off unless set, and — unlike
 every other surface — no `REBASE_ROLE` turns it on: the others describe a
@@ -1003,7 +1001,7 @@ function Widget() {
 
 #### SQL Editor Permission Denied (`permission denied for table <name>`)
 
-* **Symptoms:** Custom queries executed in the Rebase Studio SQL Editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
+* **Symptoms:** Custom queries executed in Rebase Studio's SQL editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
 * **Cause:** By default, Rebase attempts to execute SQL Editor queries by temporarily switching database roles to match the active user's application role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom authentication where roles exist only in database tables rather than actual PostgreSQL roles, the role switch fails or database privileges are missing. The CMS spreadsheet view executes under the default connection owner user and bypasses this.
 * **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner).
 
@@ -2419,9 +2417,9 @@ publication.
 
 ### Readiness by subsystem
 
-**Dated 2 September 2026, against 0.17.3.** Re-read it at each minor; a rating
-that has not moved in three releases is either settled or forgotten, and this
-note is here so the difference gets checked.
+**Last revised 14 September 2026, against 0.21.0.** Re-read it at each minor; a
+rating that has not moved in three releases is either settled or forgotten, and
+this note is here so the difference gets checked.
 
 The three ratings mean:
 
@@ -2443,17 +2441,17 @@ The three ratings mean:
 | Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
 | Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
-| Vector search (pgvector) | Beta | Exact search is stable. ANN indexes are not yet declarable, so large collections scan |
+| Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per property through `VectorIndexConfig` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
-| MCP server + agent skills | Beta | Thirty-odd tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. stdio transport only — there is no remote/HTTP transport yet |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: forty-two tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, six data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) do not work there and say so |
 | Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
-| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations |
-| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over |
+| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations. Change streams need a replica set: on a standalone `mongod` nothing replaces them, so a subscription sees writes made through that Rebase process and misses every other. No MFA: enrolment answers 501, and the checks answer "no factor", so sign-in never asks for one. The admin aggregate cannot target a collection — it reads the name from a `$from` stage MongoDB does not have — so it returns nothing |
+| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over. The Firestore driver ignores `or(...)`/`and(...)` filter groups, so a query that uses one reads every row its plain filters allow |
 | Rebase Cloud | **Private beta** | Live, running real tenants, opened in batches. Not self-serve |
 
 Two entries above are the honest cost of publishing this table at all: the
@@ -2466,10 +2464,10 @@ subset required for 1.0 marked.
 
 ### The 0.x promise
 
-Rebase is `0.x` — 0.17 at the time of writing. This section is written to hold
-for every 0.x release rather than for one of them, so it does not go stale on
-each cut. **Breaking changes to the authored TypeScript API are still allowed in
-a minor**, and the changelog is where they are announced. What is
+Rebase is `0.x`. This section is written to hold for every 0.x release rather
+than for one of them, so it does not go stale on each cut. **Breaking changes to
+the authored TypeScript API are still allowed in a minor**, and the changelog is
+where they are announced. What is
 *not* allowed to break silently is the set of versioned contracts below: each
 one is stamped into an artifact or a database, each is checked at boot or at
 intake, and each fails **loudly and specifically** rather than degrading.
@@ -2694,21 +2692,44 @@ None of the above is a convention — each has a test that fails when it breaks:
 
 | Gate | What it pins |
 |---|---|
-| `pnpm verify:corpus` | every bundle shape ever shipped, booted on today's runtime. Fixtures in `fixtures/bundles/` are **hand-authored and frozen** — a fixture the builder regenerates moves whenever the builder moves |
+| `pnpm verify:corpus` | every bundle shape ever shipped, booted on today's runtime. Fixtures in `tests/fixtures/bundles/` are **hand-authored and frozen** — a fixture the builder regenerates moves whenever the builder moves |
 | `pnpm verify:selfhost` | a real bundle built, folded, booted and fetched as a browser would |
 | `upgrade-e2e.test.ts` | old database schemas (`schema-snapshots/`) met by the current runtime |
-| `e2e/tests/cli-init-e2e.ts` | a scaffolded project installed from **real tarballs**, not workspace links |
-| `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
+| `tests/e2e/tests/cli-init-e2e.ts` | a scaffolded project installed from **real tarballs**, not workspace links |
+| `tests/e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
 | `pnpm check:api-surface` | every export, and its members, of the five packages the image supplies — `@rebasepro/server`, `types`, `client`, `common`, `utils` — plus the `@rebasepro/server/functions` entry point, against the six sections of `contracts/server.api.txt`. These are the packages `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copies, so removing an export from one is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
-| `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
+| `pnpm test:gates` | the gates' own tests, over fixtures — eleven files, `check:api-surface` and the release-bump check below among them — so a gate that stops seeing what it guards fails here. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 
 **Record a bundle fixture and a schema snapshot once per release.** The value of
 both corpora is entirely in how far back the oldest one goes, and neither can be
 backfilled after the fact.
+
+#### Not yet gated
+
+The table above is what holds. These are the parts of the policy nothing holds
+yet, listed so that nobody reads a promise into them:
+
+- **No deprecation or support window.** While Rebase is `0.x` there is no written
+  rule for how long a deprecated export survives before removal, or how long an
+  older minor receives fixes. Security fixes land on the latest minor only.
+- **The HTTP wire format has no gate.** No `check:*` script diffs request and
+  response shapes against a baseline the way `check:api-surface` diffs exports; a
+  changed response shape is caught only by an e2e suite that happens to read it.
+- **CLI flags have no compatibility baseline.** The docs verifier fails when a
+  flag the skills, the examples or the marketing site use disappears; nothing
+  notices any other flag going, or a flag changing meaning.
+- **A CI release records neither corpus.** The publish workflow records no bundle
+  fixture and no schema snapshot; only the local release script tries, and it
+  warns rather than stops when it cannot. 0.18 through 0.21 have no recorded
+  project snapshot.
+- **The export surface is a gate, not a contract.** Whether the runtime-provided
+  packages' public exports become a seventh numbered contract — declared as the
+  `check:api-surface` baseline, compatible additively within a contract major —
+  is an open decision.
 
 ### Changing a contract
 
@@ -2717,8 +2738,8 @@ backfilled after the fact.
    `@rebasepro/server`, or a member of one, is none of the six and is the single
    most dangerous change in the repository, because the code it breaks is already
    built and will not be recompiled. `pnpm check:api-surface` is what holds that
-   line; whether it becomes a seventh numbered contract is an open decision
-   (`docs/audits/81-compat-policy.md`).
+   line; whether it becomes a seventh numbered contract is an open decision (see
+   *Not yet gated*, above).
 2. Add a fixture or snapshot for the **old** shape first, and watch it pass.
 3. Make the change and bump the constant.
 4. Confirm the old fixture still passes, or that it now fails *with the message
@@ -9854,10 +9875,14 @@ need a column no administrator reads through the API, that is `read: []`.
 
 #### Why the trusted plane passes
 
-An in-process `rebase.data` call in a hook, a migration, or the auth adapter
-verifying a password has no request and no roles behind it. Those are server
-code, and a role list does not apply to them. `[]` still does: that is a
-statement about the API surface rather than about who is calling.
+Server code with no request behind it — a migration, or the auth adapter
+verifying a password — reads with no roles at all, and a role list does not
+apply to it. `[]` still does: that is a statement about the API surface rather
+than about who is calling.
+
+A callback's `context.data` is not that plane. Inside a request it reads with the
+caller's roles, so the field rules apply to what it reads exactly as they apply
+to the request.
 
 ### `excludeFromApi` is the same mechanism
 
@@ -9998,10 +10023,10 @@ posts and never reads back appears in the request body and not in the row.
 
 ### In-process writes
 
-`rebase.data` and `rebase.dataAsAdmin` in a hook, a function or a cron job do not
-pass through the write check. That is the same exemption `excludeFromApi` has
-always had, and it is what makes the rule enforceable at all: something has to be
-able to store the password hash.
+In-process writes — `context.data` in a callback, `rebase.dataAsAdmin` in a
+callback, a function or a cron job — do not pass through the write check. That
+is the same exemption `excludeFromApi` has always had, and it is what makes the
+rule enforceable at all: something has to be able to store the password hash.
 
 Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
 hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
@@ -10032,13 +10057,13 @@ is the safe direction to fail.
 
 ### What is a Collection?
 
-A **collection** is a TypeScript object that describes a database table and how it should appear in the admin UI. It defines:
+A **collection** is a TypeScript object that describes a database table and how it should appear in Rebase CMS. It defines:
 
 - **Schema** — Properties (columns), their types, and validation rules
 - **Relations** — Foreign keys, junction tables, and join paths
 - **Security** — Row Level Security policies
 - **Lifecycle hooks** — Callbacks for create, update, delete operations
-- **Admin UI behavior** — View modes, inline editing, entity views, actions — all under `admin`
+- **CMS behavior** — View modes, inline editing, entity views, actions — all under `admin`
 
 ### Declaring one: `defineCollection`
 
@@ -10688,7 +10713,7 @@ Every option inside `storage`, and the multi-file form of the same field, are on
 
 #### Select (enum)
 
-Set `enum` to render a select dropdown. See the [Enum Values](#enum-values) section for details.
+Set `enum` to render a select dropdown. See [Enum Values](/docs/collections/validation-and-conditions/#enum-values) for details.
 
 ```typescript no-verify
 category: {
@@ -12506,8 +12531,6 @@ Other cross-collection patterns:
 
 ### Full Context Reference
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 Every callback receives a `context` object of type `RebaseCallContext`:
 
 ```typescript
@@ -13042,10 +13065,14 @@ need a column no administrator reads through the API, that is `read: []`.
 
 #### Why the trusted plane passes
 
-An in-process `rebase.data` call in a hook, a migration, or the auth adapter
-verifying a password has no request and no roles behind it. Those are server
-code, and a role list does not apply to them. `[]` still does: that is a
-statement about the API surface rather than about who is calling.
+Server code with no request behind it — a migration, or the auth adapter
+verifying a password — reads with no roles at all, and a role list does not
+apply to it. `[]` still does: that is a statement about the API surface rather
+than about who is calling.
+
+A callback's `context.data` is not that plane. Inside a request it reads with the
+caller's roles, so the field rules apply to what it reads exactly as they apply
+to the request.
 
 ### `excludeFromApi` is the same mechanism
 
@@ -13186,10 +13213,10 @@ posts and never reads back appears in the request body and not in the row.
 
 ### In-process writes
 
-`rebase.data` and `rebase.dataAsAdmin` in a hook, a function or a cron job do not
-pass through the write check. That is the same exemption `excludeFromApi` has
-always had, and it is what makes the rule enforceable at all: something has to be
-able to store the password hash.
+In-process writes — `context.data` in a callback, `rebase.dataAsAdmin` in a
+callback, a function or a cron job — do not pass through the write check. That
+is the same exemption `excludeFromApi` has always had, and it is what makes the
+rule enforceable at all: something has to be able to store the password hash.
 
 Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
 hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
@@ -13306,7 +13333,7 @@ only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
 `storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
-`history` in its object form (`{ maxEntries, ttlDays }`)
+`history` in its object form (`{ retention }`)
 
 `schemaEditor` is forced off in a built bundle: the editor rewrites collection
 *source* files, and a bundle holds compiled output.
@@ -15039,8 +15066,6 @@ a path of their own — see [Realtime](/docs/backend/realtime/).
 
 ### MCP surface
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 Mounted only when `REBASE_MCP_ENABLED=true`, which also requires
 `REBASE_PUBLIC_URL` — see
 [Configuration](/docs/getting-started/configuration/#mcp-surface). Off by
@@ -15056,8 +15081,8 @@ before it holds any token.
 | `GET` | `/.well-known/oauth-protected-resource` | none | RFC 9728 metadata naming this resource and its authorization server. Served at the path-suffixed form as well |
 | `GET` | `/.well-known/oauth-authorization-server` | none | RFC 8414 metadata: the endpoints, grant types and PKCE methods this deployment supports |
 | `POST` | `/mcp` | OAuth bearer | The MCP protocol endpoint. Acts **as the signed-in user**, so every read and write is subject to the same RLS |
-| `GET` | `/mcp` | OAuth bearer | The server-sent-events stream for a session |
-| `DELETE` | `/mcp` | OAuth bearer | Ends a session |
+| `GET` | `/mcp` | OAuth bearer | Answers `405` with `Allow: POST, DELETE`: this server opens no server-initiated stream. The token is checked first, so a missing or stale one gets the `401` challenge instead |
+| `DELETE` | `/mcp` | none | Answers `204`. The endpoint keeps no session, so there is nothing to end |
 | `POST` | `/api/oauth/register` | rate-limited | RFC 7591 dynamic client registration. Refused when `REBASE_MCP_OPEN_REGISTRATION=false` |
 | `GET` | `/api/oauth/authorize` | session | The consent screen a client is redirected to |
 | `POST` | `/api/oauth/authorize/decision` | session | The person's answer to it — approve or deny |
@@ -15544,6 +15569,11 @@ callback on the auth (users) collection will **not** run for these paths. For
 side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
+
+OAuth runs fewer of them than registration does. A provider sign-in fires
+`afterUserCreate` when it creates the account, and no other lifecycle hook:
+`beforeUserCreate`, `beforeLogin` and `onAuthenticated` do not run on the OAuth
+route, so a check or an audit trail hung on them never sees an OAuth user.
 :::
 
 #### Bot protection
@@ -16292,7 +16322,7 @@ export interface AuthAdapter {
    */
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
 
-  /** Optional user management operations (CRUD) for the Admin Dashboard panel */
+  /** Optional user management operations (CRUD) for the panel */
   userManagement?: UserManagementAdapter;
 
   /** Optional: Mount adapter-specific custom public routes (e.g. callback paths) */
@@ -16301,7 +16331,7 @@ export interface AuthAdapter {
   /** Optional: Mount adapter-specific admin-only routes */
   createAdminRoutes?(): Hono<any, any, any> | undefined;
 
-  /** Advertise supported capabilities (to customize Admin Dashboard UI visibility) */
+  /** Advertise supported capabilities (to customize what the panel shows) */
   getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
 
   /** Lifecycle hooks called during backend start and graceful shutdown */
@@ -16449,7 +16479,7 @@ const backend = await initializeRebaseBackend({
 
 ---
 
-#### Mounting Auth Routes and Admin UI Actions
+#### Mounting Auth Routes and Panel Actions
 
 If your custom auth provider requires mounting redirect endpoints (like OAuth callback routes or SAML login loops), implement the `createAuthRoutes` method on your adapter:
 
@@ -16491,7 +16521,7 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-If you wish to allow user CRUD operations directly inside the Rebase Admin Dashboard, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `createUser`, `updateUser`, and `deleteUser`.
+If you wish to allow user CRUD operations directly inside the panel, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `createUser`, `updateUser`, and `deleteUser`.
 
 ### Next Steps
 
@@ -17910,9 +17940,9 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. If a token expires during an active session, the client automatically re-authenticates and re-subscribes.
+3. The token is verified once, when the socket authenticates, and the server does not check it again for the life of the connection. An access token that expires, a session that is revoked or a role that is taken away does not change what an open socket may read until it re-authenticates or reconnects. The SDK re-authenticates its socket each time it refreshes its token, and disconnects it on sign-out; a client speaking the protocol directly keeps the identity it opened with until it reconnects.
 
-This means each user only receives updates for records they have permission to see.
+This means each socket only receives updates for records its authenticated identity may see.
 
 Running more than one instance — the LISTEN/NOTIFY bus, what presence does
 across processes, and writing your own transport — has a page of its own:
@@ -17997,7 +18027,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Past the channel frame budget above |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
-| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 With no handler attached, these are logged as a warning. They used to be
 discarded entirely: there was no promise to reject and no channel to deliver to,
@@ -19198,7 +19228,7 @@ and that is a pattern you can only see if the skips are recorded.
   `Error: Cron job "<id>" timed out after <N>ms`
   The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
 - **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
-- **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from the Rebase Studio UI.
+- **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from Rebase Studio.
 
 ---
 
@@ -20292,7 +20322,7 @@ Entity history records a snapshot of entity values on every create, update, and 
 :::note[Where this goes]
 **Managed runtime** — on by default. `REBASE_HISTORY=false` in `.env` turns it off.
 
-**Ejected** — `history: true` in `initializeRebaseBackend({ … })`. The object form below — `{ maxEntries, ttlDays }` — is ejected-only; the environment variable is a boolean.
+**Ejected** — `history: true` in `initializeRebaseBackend({ … })`. The object form below — `{ retention }` — is ejected-only; the environment variable is a boolean.
 
 The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
 :::
@@ -20313,12 +20343,11 @@ await initializeRebaseBackend({
 });
 ```
 
-Or with custom retention settings:
+Or with a custom retention period:
 
 ```typescript
 history: {
-    maxEntries: 200,     // Per entity, oldest pruned first (default: 200)
-    ttlDays: 90          // Entries older than this are pruned (default: 90)
+    retention: 30        // Days. Entries older than this are pruned (default: 90)
 }
 ```
 
@@ -20341,10 +20370,10 @@ const ordersCollection = defineCollection({
 
 1. The backend creates a `rebase.entity_history` table automatically.
 2. On every create, update, or delete, a snapshot is recorded with:
-   - Entity ID, collection slug, and table name
+   - Entity ID, and the collection slug (in `table_name`)
    - The full entity values (before and after)
    - Timestamp and user ID
-   - Operation type (`create`, `update`, `delete`)
+   - The action (`create`, `update`, `delete`)
    - An array of `changed_fields` showing which columns were modified
 
 #### Diff Tracking & Structural Deep Equality
@@ -20358,7 +20387,7 @@ To avoid recording redundant logs where fields are saved but no values change, t
 
 Unlike traditional systems that rely entirely on slow periodic batch scripts, Rebase enforces your retention policies continuously:
 - Right after an entity is saved or deleted, the server schedules an **inline asynchronous sweep** in a non-blocking, fire-and-forget promise.
-- This sweep immediately checks retention limits for that specific entity ID and prunes older entries exceeding `maxEntries` or `ttlDays`.
+- This sweep immediately checks retention limits for that specific entity ID and prunes entries beyond the newest 200, or older than the retention period.
 
 ### REST Endpoint
 
@@ -20372,16 +20401,18 @@ Returns a list of history entries for a specific entity, ordered by most recent 
 {
     "data": [
         {
-            "id": 42,
+            "id": "5b0e7c2e-…",
+            "table_name": "orders",
             "entity_id": "123",
-            "collection_slug": "orders",
-            "operation": "update",
+            "action": "update",
+            "changed_fields": ["status"],
             "values": { "status": "shipped", "total": 99.99 },
             "previous_values": { "status": "pending", "total": 99.99 },
-            "user_id": "admin-user-id",
-            "created_at": "2025-01-15T10:30:00Z"
+            "updated_by": "admin-user-id",
+            "updated_at": "2025-01-15T10:30:00Z"
         }
-    ]
+    ],
+    "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
 
@@ -20389,13 +20420,19 @@ Returns a list of history entries for a specific entity, ordered by most recent 
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `maxEntries` | 200 | Maximum entries retained per individual entity ID. Oldest entries are deleted. |
-| `ttlDays` | 90 | Entries older than this duration (in days) are deleted. |
+| `retention` | 90 | Entries older than this many days are deleted. |
+
+Each entity also keeps at most its newest **200** entries. That cap is fixed; it
+has no setting.
 
 #### Pruning Lifecycle Mechanics
 
-1. **Inline Pruning (Continuous)**: Executed asynchronously immediately after any CRUD operation. It prunes entries for the active entity using a sub-select query with an `OFFSET` equivalent to your `maxEntries` setting, deleting everything beyond that threshold.
-2. **Global Pruning (Periodic)**: A background cleanup cron sweep (`pruneExpired`) runs every **6 hours** to evaluate global `ttlDays` thresholds and clean up orphaned logs across all collections.
+Pruning is inline only. It runs asynchronously right after each recorded change,
+for the entity that changed: entries older than the retention period go, then
+everything beyond the newest 200. There is no periodic sweep, so the history of
+an entity that is never written again is not pruned — its old entries stay until
+the next change to that entity, or until you delete them from
+`rebase.entity_history` yourself.
 
 ### Next Steps
 
@@ -21928,73 +21965,10 @@ Rebase provides built-in file upload support in collection forms:
 
 ### File Upload Fields
 
-To add file uploads to a collection, use the `storage` config on a string property:
-
-```typescript
-properties: {
-    image: {
-        type: "string",
-        name: "Product Image",
-        storage: {
-            storagePath: "products",       // Subdirectory in storage
-            acceptedFiles: ["image/*"],    // MIME type filter
-            maxSize: 5 * 1024 * 1024,      // 5MB max
-            fileName: (context) => {        // Custom filename
-                return context.entityId + "_" + context.file.name;
-            }
-        }
-    }
-}
-```
-
-#### Storage Config Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `storagePath` | `string` | Subdirectory within the storage backend |
-| `storageSource` | `string` | Named storage source — routes uploads to a specific backend (e.g., `"firebase"`, `"media"`). See [Multi-Backend Storage](#multi-backend-storage). |
-| `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist and hotlink). Defaults to `false` (private files use short-lived signed URLs). |
-| `acceptedFiles` | `string[]` | Allowed MIME types (e.g., `["image/*"]`, `["application/pdf"]`) |
-| `maxSize` | `number` | Maximum file size in bytes |
-| `fileName` | `function` | Custom filename generator |
-| `metadata` | `object` | Additional metadata to store with the file |
-| `storeUrl` | `boolean` | Store the full URL instead of the relative path |
-
-### Multiple File Uploads
-
-Wrap the storage property in an array for multiple file uploads:
-
-```typescript
-photos: {
-    type: "array",
-    name: "Photos",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "photos",
-            acceptedFiles: ["image/*"]
-        }
-    }
-}
-```
-
-### Document Uploads
-
-Upload non-image files like PDFs:
-
-```typescript
-documents: {
-    type: "array",
-    name: "Documents",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "documents",
-            acceptedFiles: ["application/pdf", "image/*"]
-        }
-    }
-}
-```
+A file field is a string property with a `storage` block, or an array of them
+for several files. [File upload fields](/docs/collections/file-uploads/) covers
+declaring one: every `storage` option, and which of them the server enforces
+rather than only the panel's uploader.
 
 ### Multi-Backend Storage
 
@@ -22276,7 +22250,7 @@ const articlesCollection = defineCollection({
 
 ## Firebase
 
-`@rebasepro/firebase` points the Rebase admin panel at Firebase. Your
+`@rebasepro/firebase` points Rebase CMS at Firebase. Your
 collections describe Firestore documents, and the panel reads and writes them
 through the Firebase SDK.
 
@@ -23094,7 +23068,7 @@ Each props type provides access to the context relevant to the slot's location �
 
 Rebase includes built-in data import and export tools accessible directly from the admin panel. Import supports CSV, JSON, and Excel files with a column-mapping wizard. Export supports CSV and JSON with optional computed fields.
 
-Both features are enabled by default on all collections and can be configured or disabled per collection.
+Both are available on every collection. Export can be configured per collection with computed fields; neither can be switched off per collection.
 
 ### Importing Data
 
@@ -23134,18 +23108,8 @@ Before importing, the wizard validates all rows against your collection's proper
 
 #### Import Configuration
 
-Import is enabled by default. To disable it on a specific collection, use the `admin` sub-object:
-
-```typescript
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    // Import is enabled by default
-});
-```
+Import is available on every collection. There is no per-collection setting
+that turns it off.
 
 ### Exporting Data
 
@@ -23173,37 +23137,9 @@ Any active filters in the collection view are applied to the export. This lets y
 
 #### Export Configuration
 
-Export is enabled by default. You can configure it with additional computed fields:
-
-```typescript
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: true            // Enable (default: true)
-    }
-});
-
-```
-
-To disable export:
-
-```typescript
-
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: false
-    }
-});
-
-```
+Export is available on every collection. `admin.exportable` configures it: give it
+an `ExportConfig` to add computed columns, below. The type also accepts a boolean,
+but nothing reads it — `exportable: false` does not remove the **Export** button.
 
 #### Adding Computed Fields
 
@@ -32151,7 +32087,7 @@ problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
-| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 41 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
+| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 42 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 21 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
@@ -32249,6 +32185,10 @@ process is exactly as trusted as whatever spawned it, and there is no remote
 caller to authenticate. That is the safe part. The interesting questions are all
 about what it does *once* it is running, and this page answers them before it
 shows you the config block.
+
+A deployed backend can also serve MCP itself, over HTTP, to the people who use
+your application. That is a different thing with a different credential model:
+see [The remote endpoint](#the-remote-endpoint).
 
 ### Connecting a client
 
@@ -32720,6 +32660,49 @@ so both the scaffolded layout and this monorepo's work, and a project laid out a
 third way, or one that has not run `rebase schema generate` yet, simply will not
 see the resource offered.
 
+### The remote endpoint
+
+Everything above is a developer tool: it runs on your machine and holds a service
+key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
+the people who use your application. An assistant one of them connects reads and
+writes the project **as that person**, and every call runs under their own
+row-level security.
+
+It is off unless you turn it on, and both variables are required:
+
+```bash
+REBASE_MCP_ENABLED=true
+REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
+```
+
+Without `REBASE_PUBLIC_URL`, a JWT secret, or a data driver that can scope a query
+to one user, the endpoint declines to mount and says why in the boot log. No
+`REBASE_ROLE` turns it on.
+
+- **OAuth, with a consent screen.** A client finds the authorization server
+  through `/.well-known/oauth-protected-resource`, registers itself (dynamic
+  registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
+  to clients you register), and sends the person to a consent screen that signs
+  them in through your existing `/auth/login`.
+- **Six tools, two scopes.** `mcp:read` offers `list_collections`,
+  `query_collection` and `get_document`; `mcp:write` adds `create_document`,
+  `update_document` and `delete_document`. A scope decides which tools are
+  offered, not which rows: an empty list can be RLS working, and `mcp:write` still
+  cannot write a row the person could not.
+- **A token for this endpoint only.** An MCP access token is refused by
+  `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
+  hand it a session.
+
+Two limits. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
+person's own session) revokes its refresh tokens at once, but an access token
+already issued keeps working until it expires, within the hour. And the roles a
+grant carries are the ones the person had at consent. A role change does not
+reach it: a client that keeps refreshing keeps those roles until the person
+disconnects it.
+
+The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
+variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
+
 ### Recommended setup
 
 - Point the server at a **local** project and leave `REBASE_MCP_ALLOW_REMOTE_WRITES`
@@ -33160,7 +33143,7 @@ Applies all unapplied migrations to the database.
 
 ```bash
 rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
-rebase db backups                       # list what is stored
+rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
@@ -33410,7 +33393,7 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-<span class="since-badge" data-since="0.21">Since 0.21</span> `db connect` opens a local port that *is* the managed database (no public
+`db connect` opens a local port that *is* the managed database (no public
 endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 ##### Resources
@@ -34406,7 +34389,7 @@ Rebase is a full-stack platform with four layers:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend Layer                           │
-│  React Admin UI  •  Custom Views  •  Plugins  •  Your App      │
+│  Rebase CMS + Studio  •  Custom Views  •  Plugins  •  Your App │
 │  @rebasepro/app  •  @rebasepro/ui  •  @rebasepro/studio       │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP + WebSocket
@@ -34483,7 +34466,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 ### Data Flow
 
 #### Read Flow
-1. User opens a collection in the admin UI
+1. User opens a collection in Rebase CMS
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
 3. Backend queries PostgreSQL via Drizzle ORM
 4. Data transformer deserializes database records into entity format
@@ -35683,7 +35666,7 @@ Stated plainly, because finding out later is worse:
   PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the
   internet, so the host the console shows is your backend's address for it and
-  resolves to nothing on your machine. <span class="since-badge" data-since="0.21">Since 0.21</span> `rebase cloud db connect` opens a local
+  resolves to nothing on your machine. `rebase cloud db connect` opens a local
   port that is that database, tunnelled through the control plane, for as long
   as you leave it running — but there is no permanent hostname a third-party
   service can connect to. That tunnel, and the password behind

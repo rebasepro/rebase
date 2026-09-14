@@ -1,5 +1,5 @@
 ---
-sourceHash: da074057e497c0e3
+sourceHash: 6c59cbcf5c1ee91f
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und Anpassen des Panels — Rebase CMS und Rebase Studio — mit React: Controller, Scaffold, Routing und Views."

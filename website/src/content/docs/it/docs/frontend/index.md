@@ -1,5 +1,5 @@
 ---
-sourceHash: da074057e497c0e3
+sourceHash: 6c59cbcf5c1ee91f
 title: Panoramica del Frontend
 sidebar_label: Frontend
 description: "Crea e personalizza il pannello — Rebase CMS e Rebase Studio — con React: controller, scaffold, routing e viste."

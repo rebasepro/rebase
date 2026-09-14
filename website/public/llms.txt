@@ -86,7 +86,7 @@
 - [Entity History](https://rebase.pro/docs/backend/history): Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after entity.
 - [Database Branching](https://rebase.pro/docs/backend/branching): Create isolated database branches for development, staging, and testing using PostgreSQL's CREATE DATABASE ... TEMPLATE — instant, full-fidelity copies with zero downtime.
 - [Custom Server Integration](https://rebase.pro/docs/backend/custom-server): How to embed Rebase Database and Realtime services into your own custom Node.js backend without using Hono or the Rebase coordinator.
-- [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the Rebase admin panel with React — controllers, scaffold, routing, and views.
+- [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the panel — Rebase CMS and Rebase Studio — with React: controllers, scaffold, routing, and views.
 - [Extending Rebase](https://rebase.pro/docs/frontend/extending): A decision guide for choosing the right extension mechanism — plugins, slots, component overrides, entity views, actions, and more.
 - [Styling Custom UI](https://rebase.pro/docs/frontend/styling): Build custom views, home pages and actions out of the same components and theme tokens as the rest of the admin, so they look native and follow the theme.
 - [Translations](https://rebase.pro/docs/frontend/i18n): Change any string in the Rebase admin, add a language, or read the current locale from your own components.
@@ -94,7 +94,7 @@
 - [Authentication & Login](https://rebase.pro/docs/frontend/authentication): Set up the auth controller, login view, and role simulation in your Rebase React frontend.
 - [Storage & File Uploads](https://rebase.pro/docs/frontend/storage): Add file upload fields to your collections, manage files programmatically, and route uploads to different storage backends.
 - [View Modes](https://rebase.pro/docs/frontend/view-modes): Configure table, cards, and Kanban board views for your collections.
-- [Firebase](https://rebase.pro/docs/frontend/firebase): @rebasepro/firebase runs the Rebase admin panel against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved.
+- [Firebase](https://rebase.pro/docs/frontend/firebase): @rebasepro/firebase runs Rebase CMS against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved.
 - [Custom Fields](https://rebase.pro/docs/frontend/custom-fields): Build custom form fields for entity editing with full access to the form context, entity values, and Rebase hooks.
 - [Form Layout](https://rebase.pro/docs/frontend/form-layout): Control how the entity form is arranged — column spans, sections, and the metadata rail.
 - [Entity Views](https://rebase.pro/docs/frontend/entity-views): Add custom tabs and views to entity detail pages for previews, analytics, related data, or custom UI.
@@ -105,105 +105,105 @@
 - [Plugin System](https://rebase.pro/docs/plugins): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
 - [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
-- [Components](https://rebase.pro/docs/ui/components): Components in @rebasepro/ui — the component library the Rebase admin panel is built from.
-- [Alert](https://rebase.pro/docs/ui/components/alert): Alert — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Autocomplete](https://rebase.pro/docs/ui/components/autocomplete): Autocomplete — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [AutocompleteItem](https://rebase.pro/docs/ui/components/autocompleteitem): AutocompleteItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Avatar](https://rebase.pro/docs/ui/components/avatar): Avatar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Badge](https://rebase.pro/docs/ui/components/badge): Badge — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [BooleanSwitch](https://rebase.pro/docs/ui/components/booleanswitch): BooleanSwitch — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [BooleanSwitchWithLabel](https://rebase.pro/docs/ui/components/booleanswitchwithlabel): BooleanSwitchWithLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Button](https://rebase.pro/docs/ui/components/button): Button — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Card](https://rebase.pro/docs/ui/components/card): Card — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [CenteredView](https://rebase.pro/docs/ui/components/centeredview): CenteredView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Checkbox](https://rebase.pro/docs/ui/components/checkbox): Checkbox — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Chip](https://rebase.pro/docs/ui/components/chip): Chip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [CircularProgress](https://rebase.pro/docs/ui/components/circularprogress): CircularProgress — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [CircularProgressCenter](https://rebase.pro/docs/ui/components/circularprogresscenter): CircularProgressCenter — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Collapse](https://rebase.pro/docs/ui/components/collapse): Collapse — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [ColorPicker](https://rebase.pro/docs/ui/components/colorpicker): ColorPicker — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Container](https://rebase.pro/docs/ui/components/container): Container — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [DateTimeField](https://rebase.pro/docs/ui/components/datetimefield): DateTimeField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [DebouncedTextField](https://rebase.pro/docs/ui/components/debouncedtextfield): DebouncedTextField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Dialog](https://rebase.pro/docs/ui/components/dialog): Dialog — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [DialogActions](https://rebase.pro/docs/ui/components/dialogactions): DialogActions — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [DialogContent](https://rebase.pro/docs/ui/components/dialogcontent): DialogContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [DialogTitle](https://rebase.pro/docs/ui/components/dialogtitle): DialogTitle — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [ErrorBoundary](https://rebase.pro/docs/ui/components/errorboundary): ErrorBoundary — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [ExpandablePanel](https://rebase.pro/docs/ui/components/expandablepanel): ExpandablePanel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [FileUpload](https://rebase.pro/docs/ui/components/fileupload): FileUpload — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [FilterChip](https://rebase.pro/docs/ui/components/filterchip): FilterChip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [IconButton](https://rebase.pro/docs/ui/components/iconbutton): IconButton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [InfoLabel](https://rebase.pro/docs/ui/components/infolabel): InfoLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [InputLabel](https://rebase.pro/docs/ui/components/inputlabel): InputLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Label](https://rebase.pro/docs/ui/components/label): Label — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [LoadingButton](https://rebase.pro/docs/ui/components/loadingbutton): LoadingButton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Markdown](https://rebase.pro/docs/ui/components/markdown): Markdown — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Menu](https://rebase.pro/docs/ui/components/menu): Menu — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Menubar](https://rebase.pro/docs/ui/components/menubar): Menubar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarCheckboxItem](https://rebase.pro/docs/ui/components/menubarcheckboxitem): MenubarCheckboxItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarContent](https://rebase.pro/docs/ui/components/menubarcontent): MenubarContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarItem](https://rebase.pro/docs/ui/components/menubaritem): MenubarItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarItemIndicator](https://rebase.pro/docs/ui/components/menubaritemindicator): MenubarItemIndicator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarMenu](https://rebase.pro/docs/ui/components/menubarmenu): MenubarMenu — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarPortal](https://rebase.pro/docs/ui/components/menubarportal): MenubarPortal — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarRadioGroup](https://rebase.pro/docs/ui/components/menubarradiogroup): MenubarRadioGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarRadioItem](https://rebase.pro/docs/ui/components/menubarradioitem): MenubarRadioItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarSeparator](https://rebase.pro/docs/ui/components/menubarseparator): MenubarSeparator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarShortcut](https://rebase.pro/docs/ui/components/menubarshortcut): MenubarShortcut — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarSub](https://rebase.pro/docs/ui/components/menubarsub): MenubarSub — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarSubContent](https://rebase.pro/docs/ui/components/menubarsubcontent): MenubarSubContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarSubTrigger](https://rebase.pro/docs/ui/components/menubarsubtrigger): MenubarSubTrigger — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarSubTriggerIndicator](https://rebase.pro/docs/ui/components/menubarsubtriggerindicator): MenubarSubTriggerIndicator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenubarTrigger](https://rebase.pro/docs/ui/components/menubartrigger): MenubarTrigger — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MenuItem](https://rebase.pro/docs/ui/components/menuitem): MenuItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MultiSelect](https://rebase.pro/docs/ui/components/multiselect): MultiSelect — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [MultiSelectItem](https://rebase.pro/docs/ui/components/multiselectitem): MultiSelectItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Paper](https://rebase.pro/docs/ui/components/paper): Paper — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Popover](https://rebase.pro/docs/ui/components/popover): Popover — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [PopoverPrimitive](https://rebase.pro/docs/ui/components/popoverprimitive): PopoverPrimitive — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Portal](https://rebase.pro/docs/ui/components/portal): Portal — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [PortalContainerProvider](https://rebase.pro/docs/ui/components/portalcontainerprovider): PortalContainerProvider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [RadioGroup](https://rebase.pro/docs/ui/components/radiogroup): RadioGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [RadioGroupItem](https://rebase.pro/docs/ui/components/radiogroupitem): RadioGroupItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [ResizablePanels](https://rebase.pro/docs/ui/components/resizablepanels): ResizablePanels — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [SearchBar](https://rebase.pro/docs/ui/components/searchbar): SearchBar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Select](https://rebase.pro/docs/ui/components/select): Select — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [SelectGroup](https://rebase.pro/docs/ui/components/selectgroup): SelectGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [SelectItem](https://rebase.pro/docs/ui/components/selectitem): SelectItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Separator](https://rebase.pro/docs/ui/components/separator): Separator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Sheet](https://rebase.pro/docs/ui/components/sheet): Sheet — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Skeleton](https://rebase.pro/docs/ui/components/skeleton): Skeleton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Slider](https://rebase.pro/docs/ui/components/slider): Slider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Slot](https://rebase.pro/docs/ui/components/slot): Slot — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Tab](https://rebase.pro/docs/ui/components/tab): Tab — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Table](https://rebase.pro/docs/ui/components/table): Table — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [TableBody](https://rebase.pro/docs/ui/components/tablebody): TableBody — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [TableCell](https://rebase.pro/docs/ui/components/tablecell): TableCell — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [TableHeader](https://rebase.pro/docs/ui/components/tableheader): TableHeader — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [TableRow](https://rebase.pro/docs/ui/components/tablerow): TableRow — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Tabs](https://rebase.pro/docs/ui/components/tabs): Tabs — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [TextareaAutosize](https://rebase.pro/docs/ui/components/textareaautosize): TextareaAutosize — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [TextField](https://rebase.pro/docs/ui/components/textfield): TextField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [ToggleButtonGroup](https://rebase.pro/docs/ui/components/togglebuttongroup): ToggleButtonGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Tooltip](https://rebase.pro/docs/ui/components/tooltip): Tooltip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Typography](https://rebase.pro/docs/ui/components/typography): Typography — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [VirtualTable](https://rebase.pro/docs/ui/components/virtualtable): VirtualTable — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [VirtualTableSelectionProvider](https://rebase.pro/docs/ui/components/virtualtableselectionprovider): VirtualTableSelectionProvider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Data views](https://rebase.pro/docs/ui/data-views): Data views in @rebasepro/ui — the component library the Rebase admin panel is built from.
-- [CardView](https://rebase.pro/docs/ui/data-views/cardview): CardView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [CollectionView](https://rebase.pro/docs/ui/data-views/collectionview): CollectionView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [KanbanView](https://rebase.pro/docs/ui/data-views/kanbanview): KanbanView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [ListView](https://rebase.pro/docs/ui/data-views/listview): ListView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Table field editors](https://rebase.pro/docs/ui/field-editors): Table field editors in @rebasepro/ui — the component library the Rebase admin panel is built from.
-- [VirtualTableDateField](https://rebase.pro/docs/ui/field-editors/virtualtabledatefield): VirtualTableDateField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [VirtualTableInput](https://rebase.pro/docs/ui/field-editors/virtualtableinput): VirtualTableInput — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [VirtualTableNumberInput](https://rebase.pro/docs/ui/field-editors/virtualtablenumberinput): VirtualTableNumberInput — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [VirtualTableSelect](https://rebase.pro/docs/ui/field-editors/virtualtableselect): VirtualTableSelect — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [VirtualTableSwitch](https://rebase.pro/docs/ui/field-editors/virtualtableswitch): VirtualTableSwitch — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [Icons](https://rebase.pro/docs/ui/icons): Icons in @rebasepro/ui — the component library the Rebase admin panel is built from.
-- [GitHubIcon](https://rebase.pro/docs/ui/icons/githubicon): GitHubIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
-- [HandleIcon](https://rebase.pro/docs/ui/icons/handleicon): HandleIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Components](https://rebase.pro/docs/ui/components): Components in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
+- [Alert](https://rebase.pro/docs/ui/components/alert): Alert — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Autocomplete](https://rebase.pro/docs/ui/components/autocomplete): Autocomplete — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [AutocompleteItem](https://rebase.pro/docs/ui/components/autocompleteitem): AutocompleteItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Avatar](https://rebase.pro/docs/ui/components/avatar): Avatar — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Badge](https://rebase.pro/docs/ui/components/badge): Badge — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [BooleanSwitch](https://rebase.pro/docs/ui/components/booleanswitch): BooleanSwitch — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [BooleanSwitchWithLabel](https://rebase.pro/docs/ui/components/booleanswitchwithlabel): BooleanSwitchWithLabel — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Button](https://rebase.pro/docs/ui/components/button): Button — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Card](https://rebase.pro/docs/ui/components/card): Card — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [CenteredView](https://rebase.pro/docs/ui/components/centeredview): CenteredView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Checkbox](https://rebase.pro/docs/ui/components/checkbox): Checkbox — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Chip](https://rebase.pro/docs/ui/components/chip): Chip — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [CircularProgress](https://rebase.pro/docs/ui/components/circularprogress): CircularProgress — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [CircularProgressCenter](https://rebase.pro/docs/ui/components/circularprogresscenter): CircularProgressCenter — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Collapse](https://rebase.pro/docs/ui/components/collapse): Collapse — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [ColorPicker](https://rebase.pro/docs/ui/components/colorpicker): ColorPicker — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Container](https://rebase.pro/docs/ui/components/container): Container — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [DateTimeField](https://rebase.pro/docs/ui/components/datetimefield): DateTimeField — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [DebouncedTextField](https://rebase.pro/docs/ui/components/debouncedtextfield): DebouncedTextField — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Dialog](https://rebase.pro/docs/ui/components/dialog): Dialog — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [DialogActions](https://rebase.pro/docs/ui/components/dialogactions): DialogActions — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [DialogContent](https://rebase.pro/docs/ui/components/dialogcontent): DialogContent — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [DialogTitle](https://rebase.pro/docs/ui/components/dialogtitle): DialogTitle — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [ErrorBoundary](https://rebase.pro/docs/ui/components/errorboundary): ErrorBoundary — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [ExpandablePanel](https://rebase.pro/docs/ui/components/expandablepanel): ExpandablePanel — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [FileUpload](https://rebase.pro/docs/ui/components/fileupload): FileUpload — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [FilterChip](https://rebase.pro/docs/ui/components/filterchip): FilterChip — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [IconButton](https://rebase.pro/docs/ui/components/iconbutton): IconButton — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [InfoLabel](https://rebase.pro/docs/ui/components/infolabel): InfoLabel — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [InputLabel](https://rebase.pro/docs/ui/components/inputlabel): InputLabel — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Label](https://rebase.pro/docs/ui/components/label): Label — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [LoadingButton](https://rebase.pro/docs/ui/components/loadingbutton): LoadingButton — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Markdown](https://rebase.pro/docs/ui/components/markdown): Markdown — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Menu](https://rebase.pro/docs/ui/components/menu): Menu — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Menubar](https://rebase.pro/docs/ui/components/menubar): Menubar — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarCheckboxItem](https://rebase.pro/docs/ui/components/menubarcheckboxitem): MenubarCheckboxItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarContent](https://rebase.pro/docs/ui/components/menubarcontent): MenubarContent — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarItem](https://rebase.pro/docs/ui/components/menubaritem): MenubarItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarItemIndicator](https://rebase.pro/docs/ui/components/menubaritemindicator): MenubarItemIndicator — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarMenu](https://rebase.pro/docs/ui/components/menubarmenu): MenubarMenu — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarPortal](https://rebase.pro/docs/ui/components/menubarportal): MenubarPortal — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarRadioGroup](https://rebase.pro/docs/ui/components/menubarradiogroup): MenubarRadioGroup — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarRadioItem](https://rebase.pro/docs/ui/components/menubarradioitem): MenubarRadioItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarSeparator](https://rebase.pro/docs/ui/components/menubarseparator): MenubarSeparator — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarShortcut](https://rebase.pro/docs/ui/components/menubarshortcut): MenubarShortcut — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarSub](https://rebase.pro/docs/ui/components/menubarsub): MenubarSub — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarSubContent](https://rebase.pro/docs/ui/components/menubarsubcontent): MenubarSubContent — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarSubTrigger](https://rebase.pro/docs/ui/components/menubarsubtrigger): MenubarSubTrigger — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarSubTriggerIndicator](https://rebase.pro/docs/ui/components/menubarsubtriggerindicator): MenubarSubTriggerIndicator — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenubarTrigger](https://rebase.pro/docs/ui/components/menubartrigger): MenubarTrigger — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MenuItem](https://rebase.pro/docs/ui/components/menuitem): MenuItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MultiSelect](https://rebase.pro/docs/ui/components/multiselect): MultiSelect — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [MultiSelectItem](https://rebase.pro/docs/ui/components/multiselectitem): MultiSelectItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Paper](https://rebase.pro/docs/ui/components/paper): Paper — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Popover](https://rebase.pro/docs/ui/components/popover): Popover — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [PopoverPrimitive](https://rebase.pro/docs/ui/components/popoverprimitive): PopoverPrimitive — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Portal](https://rebase.pro/docs/ui/components/portal): Portal — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [PortalContainerProvider](https://rebase.pro/docs/ui/components/portalcontainerprovider): PortalContainerProvider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [RadioGroup](https://rebase.pro/docs/ui/components/radiogroup): RadioGroup — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [RadioGroupItem](https://rebase.pro/docs/ui/components/radiogroupitem): RadioGroupItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [ResizablePanels](https://rebase.pro/docs/ui/components/resizablepanels): ResizablePanels — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [SearchBar](https://rebase.pro/docs/ui/components/searchbar): SearchBar — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Select](https://rebase.pro/docs/ui/components/select): Select — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [SelectGroup](https://rebase.pro/docs/ui/components/selectgroup): SelectGroup — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [SelectItem](https://rebase.pro/docs/ui/components/selectitem): SelectItem — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Separator](https://rebase.pro/docs/ui/components/separator): Separator — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Sheet](https://rebase.pro/docs/ui/components/sheet): Sheet — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Skeleton](https://rebase.pro/docs/ui/components/skeleton): Skeleton — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Slider](https://rebase.pro/docs/ui/components/slider): Slider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Slot](https://rebase.pro/docs/ui/components/slot): Slot — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Tab](https://rebase.pro/docs/ui/components/tab): Tab — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Table](https://rebase.pro/docs/ui/components/table): Table — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TableBody](https://rebase.pro/docs/ui/components/tablebody): TableBody — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TableCell](https://rebase.pro/docs/ui/components/tablecell): TableCell — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TableHeader](https://rebase.pro/docs/ui/components/tableheader): TableHeader — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TableRow](https://rebase.pro/docs/ui/components/tablerow): TableRow — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Tabs](https://rebase.pro/docs/ui/components/tabs): Tabs — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TextareaAutosize](https://rebase.pro/docs/ui/components/textareaautosize): TextareaAutosize — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TextField](https://rebase.pro/docs/ui/components/textfield): TextField — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [ToggleButtonGroup](https://rebase.pro/docs/ui/components/togglebuttongroup): ToggleButtonGroup — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Tooltip](https://rebase.pro/docs/ui/components/tooltip): Tooltip — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Typography](https://rebase.pro/docs/ui/components/typography): Typography — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [VirtualTable](https://rebase.pro/docs/ui/components/virtualtable): VirtualTable — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [VirtualTableSelectionProvider](https://rebase.pro/docs/ui/components/virtualtableselectionprovider): VirtualTableSelectionProvider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Data views](https://rebase.pro/docs/ui/data-views): Data views in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
+- [CardView](https://rebase.pro/docs/ui/data-views/cardview): CardView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [CollectionView](https://rebase.pro/docs/ui/data-views/collectionview): CollectionView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [KanbanView](https://rebase.pro/docs/ui/data-views/kanbanview): KanbanView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [ListView](https://rebase.pro/docs/ui/data-views/listview): ListView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Table field editors](https://rebase.pro/docs/ui/field-editors): Table field editors in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
+- [VirtualTableDateField](https://rebase.pro/docs/ui/field-editors/virtualtabledatefield): VirtualTableDateField — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [VirtualTableInput](https://rebase.pro/docs/ui/field-editors/virtualtableinput): VirtualTableInput — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [VirtualTableNumberInput](https://rebase.pro/docs/ui/field-editors/virtualtablenumberinput): VirtualTableNumberInput — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [VirtualTableSelect](https://rebase.pro/docs/ui/field-editors/virtualtableselect): VirtualTableSelect — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [VirtualTableSwitch](https://rebase.pro/docs/ui/field-editors/virtualtableswitch): VirtualTableSwitch — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [Icons](https://rebase.pro/docs/ui/icons): Icons in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
+- [GitHubIcon](https://rebase.pro/docs/ui/icons/githubicon): GitHubIcon — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [HandleIcon](https://rebase.pro/docs/ui/icons/handleicon): HandleIcon — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, sorting, column selection and aggregates with the Rebase Client SDK.
 - [Pagination](https://rebase.pro/docs/sdk/pagination): Page a collection with limit/offset, page numbers, or a keyset cursor — and when each one stops being correct.
