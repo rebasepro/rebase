@@ -166,13 +166,13 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string             (validated, required)
 ```
 
-The `extend` schema is merged with the base `rebaseEnvSchema` using Zod's `.merge()`. All base variables remain available alongside your custom ones.
+The `extend` schema and the base `rebaseEnvSchema` are each parsed on their own and the results merged (not with Zod's `.merge()`, so a schema built by your own copy of zod works). All base variables remain available alongside your custom ones.
 
 ### `loadEnv()` Function Signature
 
 ```typescript no-verify
 function loadEnv(): RebaseEnv;
-function loadEnv<E extends z.AnyZodObject>(options: { extend: E }): RebaseEnv & z.infer<E>;
+function loadEnv<E extends z.ZodObject<z.ZodRawShape>>(options: { extend: E }): RebaseEnv & z.infer<E>;
 ```
 
 ### Complete Environment Variable Reference
