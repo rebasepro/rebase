@@ -238,7 +238,8 @@ fi
 echo ""
 echo -e "${BOLD}Ready to release ${GREEN}v${NEW_VERSION}${RESET}${BOLD}. This will:${RESET}"
 echo "  1. Stamp CHANGELOG (promote [Unreleased] → [$NEW_VERSION]) + sync docs mirror"
-echo "  2. Bump versions in every publishable package (derived from the workspace)"
+echo "  2. Bump versions in every publishable package (derived from the workspace),"
+echo "     make the release's docs edits, and stop unless verify:docs:strict passes"
 echo "  3. Record the project upgrade snapshot (needs Docker)"
 echo "  4. Commit, tag v$NEW_VERSION, and push to origin"
 echo "  5. Publish all packages to npm"
@@ -302,24 +303,33 @@ node -e "
 "
 ok "Bumped the Helm chart to $NEW_VERSION"
 
-# Same failure, one surface over. Docs, the marketing site and the Terraform
-# module name the runtime tag as a literal — `FROM rebasepro/server:0.14.1` —
-# because prose has no variable to interpolate. Nothing used to move them, so
-# the self-hosting guide told readers to deploy 0.14.1 for three minors, and the
-# five machine-translated locales were a release behind that. `verify:docs`
-# fails on a stale pin now; this is what keeps the release from being the thing
-# that breaks it.
-node tooling/scripts/docs-verify/check-version-pins.mjs --write \
-  || err "Could not rewrite version pins."
-ok "Rewrote documented version pins to $NEW_VERSION"
+# Same failure, one surface over. Stamping the changelog changes what is true
+# about the docs: every copyable runtime pin (`FROM rebasepro/server:0.14.1` sat
+# three minors stale, and the five locales a release behind that), every "Since"
+# badge naming this version, every `NOT_NEW` exemption, and the freshness stamp
+# of every translation of a page those touch. `verify:docs` fails on all of them;
+# this makes those edits, and the gate below proves they were enough.
+node tooling/scripts/release-docs.mjs \
+  || { err "Could not make the release's docs edits."; exit 1; }
+ok "Released the docs to $NEW_VERSION"
 
 # The website's `llms.txt`, `llms-full.txt` and `sitemap.md` are committed copies
 # of the docs, and the docs just changed twice — the stamped changelog above and
-# the pins above that. `check:generated` diffs those copies against a fresh
+# the edits above that. `check:generated` diffs those copies against a fresh
 # render on every PR, so regenerating here is what keeps the release commit from
 # failing its own gate. Before the commit at the end, so it lands in it.
-pnpm -C website run generate-all >/dev/null || err "Could not regenerate the website mirrors."
+pnpm -C website run generate-all >/dev/null \
+  || { err "Could not regenerate the website mirrors."; exit 1; }
 ok "Regenerated the website mirrors"
+
+# The docs gate on the tree about to be committed, before the commit, the tag,
+# the push and the publish. 0.21.0 left `verify:docs:strict` red with 57
+# findings from the cut alone, and nothing saw them until an unrelated push.
+# A release that declares `### Breaking` needs its upgrade page written first,
+# under this release's name; the finding says which page.
+pnpm run verify:docs:strict \
+  || { err "The released docs fail verify:docs. Nothing is committed; \`git checkout .\` resets the tree."; exit 1; }
+ok "The released docs pass verify:docs"
 
 # ── Build & Test ────────────────────────────────────────────
 step "Building all packages"

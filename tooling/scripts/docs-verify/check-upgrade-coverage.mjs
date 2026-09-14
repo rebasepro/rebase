@@ -45,22 +45,39 @@ const GUIDE = "website/src/content/docs/docs/upgrading.mdx";
 const GUIDE_PAGES = "website/src/content/docs/docs/upgrading/*.mdx";
 /**
  * Where an `## [Unreleased]` breaking change has to land: `<X>-to-next.mdx`,
- * where X is the release the newest released hop ends at.
+ * where X is the release the newest released hop ends at — or a hop page
+ * already named for the release being prepared, `<X>-to-<Y>.mdx` with no `Y`
+ * released yet.
  *
  * Derived, because it was a constant — `0-17-to-next.mdx` — and the 0.18.0
  * release renamed that page to `0-17-to-0-18.mdx` without touching it. The
  * next Breaking bullet was then sent to a page that would have been a second
  * hop from 0.17. Read from the hop pages, the destination moves with the
  * rename that releases it.
+ *
+ * The pending name is accepted because the rename cannot wait for the cut. The
+ * release runs `verify:docs` on the tree it is about to commit, and there a
+ * released version needs a page that names it. Before this, a page could only
+ * be named for its release after that release existed, so the tree before the
+ * bump and the tree after it could not both pass.
+ *
+ * @param {string} root
+ * @param {string[]} released every `x.y.z` the changelog has a section for
  */
-function nextPage(root) {
+function nextPage(root, released) {
     let newest = null;
+    let pending = null;
     for (const file of globSync(GUIDE_PAGES, { cwd: root })) {
         const m = path.basename(file).match(/^\d+-\d+-to-(\d+)-(\d+)\.mdx$/);
         if (!m) continue;
         const to = [Number(m[1]), Number(m[2]), 0];
+        if (!released.some(v => parse(v)[0] === to[0] && parse(v)[1] === to[1])) {
+            if (!pending || isOlder(pending.to, to)) pending = { to, file };
+            continue;
+        }
         if (!newest || isOlder(newest, to)) newest = to;
     }
+    if (pending) return pending.file;
     if (!newest) throw new Error(`No released hop matches ${GUIDE_PAGES} — nothing to derive the next page from.`);
     return `website/src/content/docs/docs/upgrading/${newest[0]}-${newest[1]}-to-next.mdx`;
 }
@@ -106,6 +123,7 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
     // on the live docs site the day they merge, months before a version stamps
     // them.
     const headings = [...changelog.matchAll(/^## \[(\d+\.\d+\.\d+|Unreleased)\]/gm)];
+    const released = headings.map(h => h[1]).filter(v => v !== UNRELEASED);
     const breaking = [];
     for (let i = 0; i < headings.length; i++) {
         const version = headings[i][1];
@@ -124,7 +142,7 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
     const findings = [];
     for (const { version, entries, bullets } of breaking) {
         if (version === UNRELEASED) {
-            const NEXT_PAGE = nextPage(root);
+            const NEXT_PAGE = nextPage(root, released);
             let page;
             try {
                 page = readFileSync(path.join(root, NEXT_PAGE), "utf8");
@@ -151,7 +169,19 @@ export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
         // "Part N" line or a prose mention all count as covered.
         const [major, minor] = parse(version);
         if (!guide.includes(version) && !guide.includes(`${major}.${minor}`)) {
-            findings.push({ version, entries });
+            // Straight after a cut, the page that covers it is usually still
+            // named for the section it was written under. Say which.
+            const toNext = globSync(GUIDE_PAGES, { cwd: root }).find(f => f.endsWith("-to-next.mdx"));
+            findings.push(toNext
+                ? {
+                    version, entries,
+                    reason:
+                        `declares \`### Breaking\` (${entries}) and no upgrade page names ${major}.${minor}. ` +
+                        `If its changes are on ${toNext}, rename that page and its translations to ` +
+                        `…-to-${major}-${minor}.mdx before cutting ${major}.${minor}: a hop page named for an ` +
+                        "unreleased version is where [Unreleased] goes, so main stays green until the cut."
+                }
+                : { version, entries });
         }
     }
 

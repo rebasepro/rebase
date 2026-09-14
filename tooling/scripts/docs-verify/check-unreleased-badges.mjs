@@ -32,9 +32,11 @@
  * most docs pages are plain `.md`, which cannot import a component, so they
  * write the same span by hand.
  */
-import { readFileSync, existsSync, globSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { CONTENT, LOCALES, carryStamps } from "./check-translation-freshness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(HERE, "..", "..", "..");
@@ -130,10 +132,23 @@ export function importedIdentifiers(text) {
 
 /**
  * Tokens the "absent from every released section" rule calls new and that are
- * not. Each needs a reason, and the reason has to be that the *surface* is old
- * even though this spelling of it never appeared in a release note.
+ * not, as `{ "token": "reason" }`. Each needs a reason, and the reason has to be
+ * that the *surface* is old even though this spelling of it never appeared in a
+ * release note.
+ *
+ * A file rather than a literal here because a release has to edit it. Every
+ * entry exempts a token under `## [Unreleased]`, and a release moves that whole
+ * section under its version, so every entry is dead weight the moment the
+ * changelog is stamped. The 0.21.0 cut left `formView` behind as a finding on the
+ * next push. {@link pruneNotNew} is what the release runs instead.
  */
-const NOT_NEW = new Map();
+const NOT_NEW_FILE = "tooling/scripts/docs-verify/not-new.json";
+
+function readNotNew(root) {
+    const file = path.join(root, NOT_NEW_FILE);
+    if (!existsSync(file)) return new Map();
+    return new Map(Object.entries(JSON.parse(readFileSync(file, "utf8"))));
+}
 
 /**
  * Tokens that name two different things, with the page pattern that means the
@@ -208,14 +223,28 @@ function releasedVersions(released) {
     return [...released.matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map(m => m[1]);
 }
 
+/** Whether a badge's version (`0.21`, or `0.21.0`) is one of `versions`. */
+function isReleased(version, versions) {
+    return versions.some(v => v === version || v.startsWith(`${version}.`));
+}
+
+/** The English pages this check reads, and so the pages whose badges it judges. */
+function badgedPages(root) {
+    return [...new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))]
+        .filter(f => !EXCLUDED.includes(f))
+        .filter(f => !EXCLUDED_PREFIXES.some(p => f.startsWith(p)))
+        .sort();
+}
+
 export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
     const findings = [];
     const changelogPath = path.join(root, "CHANGELOG.md");
-    if (!existsSync(changelogPath)) return { findings, tokens: [], scanned: 0 };
+    if (!existsSync(changelogPath)) return { findings, tokens: [], scanned: 0, deadNotNew: [] };
 
     const split = splitChangelog(readFileSync(changelogPath, "utf8"));
-    if (!split) return { findings, tokens: [], scanned: 0 };
+    if (!split) return { findings, tokens: [], scanned: 0, deadNotNew: [] };
     const { unreleased, released } = split;
+    const NOT_NEW = readNotNew(root);
 
     // ── 1 + 2: the tokens that are new ────────────────────────────────────
     const tokens = new Set();
@@ -259,10 +288,12 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
     // rather than "a released section quotes it": under a Breaking heading a
     // released quote no longer filters the token, so that test would call a
     // live exemption dead.
+    const deadNotNew = [];
     for (const [t, why] of NOT_NEW) {
         if (!suppressed.has(t)) {
+            deadNotNew.push(t);
             findings.push({
-                file: "tooling/scripts/docs-verify/check-unreleased-badges.mjs",
+                file: NOT_NEW_FILE,
                 line: 0,
                 message:
                     `NOT_NEW exempts \`${t}\` (${why}) and nothing under ## [Unreleased] ` +
@@ -273,10 +304,7 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
 
     // ── 3: every section mentioning one of them carries a badge ───────────
     const versions = releasedVersions(released);
-    const files = [...new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))]
-        .filter(f => !EXCLUDED.includes(f))
-        .filter(f => !EXCLUDED_PREFIXES.some(p => f.startsWith(p)))
-        .sort();
+    const files = badgedPages(root);
 
     for (const file of files) {
         const lines = readFileSync(path.join(root, file), "utf8").split("\n");
@@ -329,7 +357,7 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
             for (const version of badged) {
                 // A badge for something already out is worse than none: the
                 // reader trusts it and skips a feature they have.
-                if (versions.some(v => v === version || v.startsWith(`${version}.`))) {
+                if (isReleased(version, versions)) {
                     findings.push({
                         file,
                         line: start + 1,
@@ -376,7 +404,107 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
         }
     }
 
-    return { findings, tokens: [...tokens].sort(), scanned: files.length };
+    return { findings, tokens: [...tokens].sort(), scanned: files.length, deadNotNew };
+}
+
+/** A whole badge element: the hand-written span `.md` pages use, or `<Since v="…" />`. */
+const BADGE_ELEMENT = /<span\b[^>]*\bclass="since-badge"[^>]*>[^<]*<\/span>|<Since\b[^>]*\/>/g;
+
+/**
+ * `text` without the badges whose version `released` accepts, and how many of
+ * each it took out (`"badge 0.21" → 2`).
+ *
+ * A badge goes with one space beside it, so `machine. <span…>Since 0.21</span>
+ * \`db connect\`` reads `machine. \`db connect\``. A badge on a line of its
+ * own goes with the line, and with one of the blank lines around it when it sat
+ * between two, so the heading above it keeps the spacing it had. Fenced code is
+ * left alone: a badge there is an example of the markup, not a claim.
+ */
+export function removeBadges(text, released) {
+    const lines = text.split("\n");
+    const out = [];
+    const removed = new Map();
+    let inFence = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (/^\s*(?:`{3,}|~{3,})/.test(line)) inFence = !inFence;
+        let next = line;
+        if (!inFence) {
+            for (const el of line.match(BADGE_ELEMENT) ?? []) {
+                const version = el.match(/data-since="([^"]+)"|\bv=["']([^"']+)["']/)?.slice(1).find(Boolean);
+                if (!version || !released(version)) continue;
+                next = next.includes(`${el} `) ? next.replace(`${el} `, "")
+                    : next.includes(` ${el}`) ? next.replace(` ${el}`, "")
+                        : next.replace(el, "");
+                removed.set(`badge ${version}`, (removed.get(`badge ${version}`) ?? 0) + 1);
+            }
+        }
+        if (next === line) { out.push(line); continue; }
+        if (next.trim() === "") {
+            if (out.at(-1)?.trim() === "" && lines[i + 1]?.trim() === "") i++;
+            continue;
+        }
+        out.push(next);
+    }
+    return { text: out.join("\n"), removed };
+}
+
+/**
+ * Drop every badge that names a released version: the edit a release makes true
+ * the moment it stamps the changelog.
+ *
+ * Before the cut the check above demands "Since 0.21" on every section teaching a
+ * 0.21 feature; after it, it forbids the same badge. So the tree before the bump
+ * and the tree after it cannot both pass by hand, and 0.21.0 committed five
+ * stale badges (thirty spans, across six locales) that the next push failed on.
+ * The release runs this instead, over the English pages this check reads and
+ * their translations. Translations that lose the same badges keep their
+ * freshness stamp; see `carryStamps`.
+ *
+ * @returns {{ dropped: {file: string, count: number}[], restamped: string[], leftStale: string[] }}
+ */
+export function dropReleasedBadges(root = DEFAULT_ROOT) {
+    const changelogPath = path.join(root, "CHANGELOG.md");
+    const split = existsSync(changelogPath) ? splitChangelog(readFileSync(changelogPath, "utf8")) : null;
+    if (!split) return { dropped: [], restamped: [], leftStale: [] };
+    const versions = releasedVersions(split.released);
+
+    const english = `${CONTENT}/docs/`;
+    const files = badgedPages(root)
+        .flatMap(rel => [rel, ...LOCALES.map(locale => `${CONTENT}/${locale}/docs/${rel.slice(english.length)}`)])
+        .filter(rel => existsSync(path.join(root, rel)));
+
+    /** @type {Map<string, {before: string, after: string, swaps: Map<string, number>}>} */
+    const edits = new Map();
+    const dropped = [];
+    for (const rel of files) {
+        const before = readFileSync(path.join(root, rel), "utf8");
+        const { text: after, removed } = removeBadges(before, version => isReleased(version, versions));
+        if (after === before) continue;
+        writeFileSync(path.join(root, rel), after);
+        edits.set(rel, { before,
+after,
+swaps: removed });
+        dropped.push({ file: rel,
+count: [...removed.values()].reduce((a, b) => a + b, 0) });
+    }
+
+    return { dropped,
+...carryStamps(root, edits) };
+}
+
+/**
+ * Delete every `NOT_NEW` entry that exempts nothing under `## [Unreleased]` —
+ * after a cut, all of them. The same finding the check reports, acted on.
+ *
+ * @returns {{ pruned: string[] }}
+ */
+export function pruneNotNew(root = DEFAULT_ROOT) {
+    const { deadNotNew } = checkUnreleasedBadges(root);
+    if (!deadNotNew.length) return { pruned: [] };
+    const kept = [...readNotNew(root)].filter(([token]) => !deadNotNew.includes(token));
+    writeFileSync(path.join(root, NOT_NEW_FILE), `${JSON.stringify(Object.fromEntries(kept), null, 2)}\n`);
+    return { pruned: deadNotNew };
 }
 
 // `verify:docs` runs this as one stage of many; running the file on its own is

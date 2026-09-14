@@ -45,13 +45,11 @@
  * the user's numbers and must not move. Anchored patterns keep working after
  * 1.0; revisit the bare rule then.
  */
-import { readFileSync, writeFileSync, existsSync, globSync } from "node:fs";
+import { readFileSync, writeFileSync, globSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-    CONTENT, LOCALES, sourceHash, readSourceHash, stampSourceHash
-} from "./check-translation-freshness.mjs";
+import { carryStamps } from "./check-translation-freshness.mjs";
 
 /**
  * Everything a reader could copy a version out of. Locales included: they are
@@ -286,7 +284,7 @@ expected: current };
  * them — prose, comments and thresholds are never rewritten.
  *
  * Translations it keeps in step keep their freshness stamp too — see
- * {@link carryTranslationStamps}.
+ * `carryStamps` in `check-translation-freshness.mjs`.
  *
  * @param {string} root repo root
  * @param {string} [expected]
@@ -326,72 +324,7 @@ count: hits.length });
     return { written,
 expected: current,
 total: findings.length,
-...carryTranslationStamps(root, edits) };
-}
-
-/**
- * Keep a translation as fresh as it was when this write moved its pins along
- * with the English page's.
- *
- * The locales are in GLOBS, so a release rewrites a pin in English and in all
- * five translations in the same pass. But a translation's `sourceHash` is the
- * hash of the English page byte for byte, and the English page just changed —
- * so every translation of every page with a pin read as stale the moment the
- * release committed. 0.21.0 did exactly that: ten pages, fifty
- * `verify:docs --strict` findings on the next push, and not one translation
- * that said anything the English did not. The bump commit is `[skip ci]`, so
- * nobody saw it until an unrelated push failed on it.
- *
- * A stamp is carried only when it is provably still true:
- *
- *   - the translation matched the English page as it was immediately before
- *     this write — one that was already stale is not this write's to vouch for;
- *   - and this write made the same substitutions in it as in English: the same
- *     versions, the same number of times. A translation whose pins moved
- *     differently has drifted in a way somebody should read, so it keeps its old
- *     stamp and stays a finding.
- *
- * @param {string} root repo root
- * @param {Map<string, {before: string, after: string, swaps: Map<string, number>}>} edits
- * @returns {{ restamped: string[], leftStale: string[] }}
- */
-function carryTranslationStamps(root, edits) {
-    const restamped = [];
-    const leftStale = [];
-    const english = `${CONTENT}/docs/`;
-
-    for (const [rel, edit] of edits) {
-        if (!rel.startsWith(english)) continue;
-        const page = rel.slice(CONTENT.length + 1); // docs/…
-        const was = sourceHash(edit.before);
-        const now = sourceHash(edit.after);
-
-        for (const locale of LOCALES) {
-            const localeRel = `${CONTENT}/${locale}/${page}`;
-            const abs = path.join(root, localeRel);
-            if (!existsSync(abs)) continue;
-            const text = readFileSync(abs, "utf8");
-            if (readSourceHash(text) !== was) continue;
-            if (!sameSwaps(edit.swaps, edits.get(localeRel)?.swaps)) {
-                leftStale.push(localeRel);
-                continue;
-            }
-            writeFileSync(abs, stampSourceHash(text, now));
-            restamped.push(localeRel);
-        }
-    }
-
-    return { restamped,
-leftStale };
-}
-
-/** @param {Map<string, number>} a @param {Map<string, number> | undefined} b */
-function sameSwaps(a, b) {
-    if (!b || a.size !== b.size) return false;
-    for (const [version, count] of a) {
-        if (b.get(version) !== count) return false;
-    }
-    return true;
+...carryStamps(root, edits) };
 }
 
 // `node tooling/scripts/docs-verify/check-version-pins.mjs [--write]`

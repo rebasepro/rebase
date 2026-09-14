@@ -84,15 +84,38 @@ examples (`tag: "1.4.0"`, `acme/api:1.4.0`) stay theirs. Anchored patterns keep
 working after 1.0; revisit the bare rule then. A line that must show an old
 release carries `version-pin: ignore`.
 
-`--write` is what the release runs, and it rewrites the five locales in the same
-pass as English. It also carries their `sourceHash` stamps, because the
-translation-freshness stage hashes the English page byte for byte: the 0.21.0
-bump moved one pin in ten pages and left all fifty of their translations
-reading as stale, with nothing wrong in any of them. A stamp is carried only
-when the translation was fresh just before the write *and* received the same
-substitutions as English (same versions, same counts). One that was already
-stale, or whose pins moved differently, keeps its old stamp and stays a finding;
-`--write` lists the second kind.
+`--write` rewrites the five locales in the same pass as English. It also
+carries their `sourceHash` stamps, because the translation-freshness stage
+hashes the English page byte for byte: the 0.21.0 bump moved one pin in ten
+pages and left all fifty of their translations reading as stale, with nothing
+wrong in any of them. A stamp is carried only when the translation was fresh
+just before the write *and* received the same substitutions as English (same
+versions, same counts). One that was already stale, or whose pins moved
+differently, keeps its old stamp and stays a finding; `--write` lists the second
+kind.
+
+## What a release does to these checks
+
+Stamping `## [Unreleased]` as a version flips four stages at once. Pins name the
+old runtime. "Since" badges for the new version are now wrong. `NOT_NEW`
+exemptions (in `not-new.json`) exempt tokens that have left `[Unreleased]`. And
+every translation of a page that changed reads as stale. 0.21.0 committed all
+four, 57 findings, and nothing saw them until an unrelated push, because the
+bump commit is `[skip ci]`.
+
+So the release makes those edits itself. `tooling/scripts/release-docs.mjs` runs
+the pin writer, drops every badge naming a released version, prunes `NOT_NEW`,
+and carries the stamps of translations that received the same edits. Then the
+release runs `verify:docs:strict` on the tree it is about to commit, before npm.
+Replayed on the 0.21.0 cut, that is 57 findings down to 1.
+
+The one left is the upgrade guide. It is prose in six languages, so no script
+writes it. A release that declares `### Breaking` needs a hop page that names
+it, so write that page before the cut under the release's name:
+`upgrading/<from>-to-<minor>.mdx`, not `-to-next`. `check-upgrade-coverage`
+takes a hop page named for an unreleased version as the destination for
+`[Unreleased]`, so main stays green until the cut. If the page is still named
+`-to-next` at the cut, the finding says which one to rename.
 
 ## What is globbed
 
@@ -212,7 +235,9 @@ block that is wrong — that is the bug this exists to find.
 
 <!-- gates:start -->
 `pnpm ci:static` runs `verify:docs:strict` (`tooling/scripts/ci-static.mjs`), so a
-finding fails the build.
+finding fails the build. A stable release runs the same `verify:docs:strict`
+on the tree it is about to commit, after its own docs edits and before it
+publishes (`publish.yml`, `release.sh`), so a finding there stops the release.
 
 The local quality sweep runs that same command for its static section, so a
 local run is strict too — there is no warn-only path left in either.

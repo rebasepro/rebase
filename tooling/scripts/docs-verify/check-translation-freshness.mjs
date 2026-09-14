@@ -29,7 +29,7 @@
  * today — a gap in coverage, not a break, and closing it needs an API key this
  * check does not have.
  */
-import { readFileSync, existsSync, globSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
@@ -79,6 +79,71 @@ export function stampSourceHash(text, hash) {
     const stripped = text.replace(/^(---\n[\s\S]*?)^sourceHash:.*\n([\s\S]*?^---\n)/m, "$1$2");
     if (!/^---\n/.test(stripped)) return null;
     return stripped.replace(/^---\n/, `---\nsourceHash: ${hash}\n`);
+}
+
+/**
+ * Keep a translation as fresh as it was, across a mechanical edit a writer made
+ * to the English page and to the translation alike.
+ *
+ * A release edits its own docs: `check-version-pins --write` moves every pin,
+ * and `release-docs.mjs` drops the "Since" badges the release just made true.
+ * Both reach the five locales in the same pass. But a translation's `sourceHash`
+ * is the hash of the English page byte for byte, so every translation of every
+ * page they touched would read as stale the moment the release commits. 0.21.0
+ * did exactly that: fifty `verify:docs --strict` findings on the next push, and
+ * not one translation that said anything the English did not.
+ *
+ * `edits` maps each file a writer changed to its text before and after, and to
+ * `swaps`: what the writer did to it, counted (`"0.20.0" → 2`, `"badge 0.21" →
+ * 1`). A stamp is carried only when it is provably still true:
+ *
+ *   - the translation matched the English page as it was immediately before the
+ *     edit — one that was already stale is not the writer's to vouch for;
+ *   - and the translation received the same edit, the same number of times. One
+ *     that moved differently has drifted in a way somebody should read, so it
+ *     keeps its old stamp, stays a finding, and is named in `leftStale`.
+ *
+ * @param {string} root repo root
+ * @param {Map<string, {before: string, after: string, swaps: Map<string, number>}>} edits
+ * @returns {{ restamped: string[], leftStale: string[] }}
+ */
+export function carryStamps(root, edits) {
+    const restamped = [];
+    const leftStale = [];
+    const english = `${CONTENT}/docs/`;
+
+    for (const [rel, edit] of edits) {
+        if (!rel.startsWith(english)) continue;
+        const page = rel.slice(CONTENT.length + 1); // docs/…
+        const was = sourceHash(edit.before);
+        const now = sourceHash(edit.after);
+
+        for (const locale of LOCALES) {
+            const localeRel = `${CONTENT}/${locale}/${page}`;
+            const abs = path.join(root, localeRel);
+            if (!existsSync(abs)) continue;
+            const text = readFileSync(abs, "utf8");
+            if (readSourceHash(text) !== was) continue;
+            if (!sameSwaps(edit.swaps, edits.get(localeRel)?.swaps)) {
+                leftStale.push(localeRel);
+                continue;
+            }
+            writeFileSync(abs, stampSourceHash(text, now));
+            restamped.push(localeRel);
+        }
+    }
+
+    return { restamped,
+leftStale };
+}
+
+/** @param {Map<string, number>} a @param {Map<string, number> | undefined} b */
+function sameSwaps(a, b) {
+    if (!b || a.size !== b.size) return false;
+    for (const [what, count] of a) {
+        if (b.get(what) !== count) return false;
+    }
+    return true;
 }
 
 export function checkTranslationFreshness(root, { strict = false } = {}) {

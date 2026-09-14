@@ -3469,10 +3469,52 @@ content, against every stamp or copy computed from that content.
 | the bump's changelog stamp → the website `CHANGELOG.md` copies | clean. They are mirrored on every build and `NOT_TRANSLATED`. |
 | the UI reference generator → `docs/ui/**` | clean. Regenerated wholesale, and `NOT_TRANSLATED`. |
 | landing-page fingerprints (`src/i18n/.translation-checkpoint.json`) | clean. The pin writer does not glob `src/i18n/`, and `en.ts` holds no pin. |
-| the same cut → `Since 0.21` badges, `NOT_NEW`, the upgrade guide | not this class. Each needs a person's call, and each gate fired correctly. **OPEN:** what hid them for a push was `[skip ci]`. Nothing runs `verify:docs` on the bump commit itself. |
+| the same cut → `Since 0.21` badges, `NOT_NEW`, the upgrade guide | first logged here as needing a person's call. Wrong for two of the three, and the three were a sibling problem; see below. |
 
 Gate: `tooling/scripts/test/version-pins.test.mjs` (in `test:gates`) builds a
 one-page docs tree, runs the writer and asks the freshness gate. It kills five
 mutations: the carry removed, the fresh-before check dropped, the
 same-substitutions check dropped, substitution counts ignored, and the old hash
 stamped.
+
+### The other three: a gate whose two states straddle an ungated event — 2026-09-14
+
+The badges, `NOT_NEW` and the upgrade guide are not a writer breaking a stamp.
+They are rules that require one state before the cut and the opposite state
+after it. "Since 0.21" is required on a 0.21 feature until 0.21 ships, and a
+finding the moment it does. The upgrade page for `[Unreleased]` had to be named
+`-to-next`, and a released 0.21 needed a page naming 0.21. So the pre-bump tree
+and the post-bump tree could not both pass, whatever anyone edited by hand. And
+the bump commit is `[skip ci]`, so the one tree where the flip had to happen was
+the one tree no gate ever read. Adding `verify:docs` to the bump would not have
+been enough on its own. It would have failed every release with a badge in it,
+and the only fix on main (dropping the badges early) turns `verify-stable` red
+instead. That is a deadlock.
+
+What it takes: the event performs every flip that is mechanical, the gate then
+runs on the event's own output, and a flip that is not mechanical gets a state
+that is valid on both sides. `tooling/scripts/release-docs.mjs` drops the
+released badges (matching b738e0f82's hand edits line for line) and prunes
+`NOT_NEW`, which moved to `not-new.json` so a script can write it. Then
+`publish.yml` and `release.sh` run `verify:docs:strict` before anything is
+published. The upgrade page can be named for its release before the cut, and
+`check-upgrade-coverage` accepts that as `[Unreleased]`'s destination. Replayed
+on 8af1f7813, the 0.21.0 cut goes from 57 findings to 1, and that 1 names the
+page to rename. With that page renamed first, the pre-bump and post-bump trees
+both pass, where the old checker failed the pre-bump tree.
+
+**Sweep:** for every check that reads `[Unreleased]`, the current version or a
+released-versions list, ask what it demands the day before a release and the
+day after. If the answers differ, either the release makes the difference, or
+there has to be a state that satisfies both. Swept by running the replayed
+release commit (8af1f7813, prepared, through the new bump) against all 43
+`ci:static` gates. All pass, including every one that reads the version or
+`[Unreleased]`: `check:runtime-image`, `check:publishable-set`, and
+`check-changelog-sections`, which accepts the empty `[Unreleased]` the stamp
+leaves. `check:release-bump` runs inside the release, before the stamp.
+
+Gate: `tooling/scripts/test/release-docs.test.mjs` (in `test:gates`) kills
+twelve mutations. The badge writer: space handling, blank-line handling, the
+fence guard, the locales skipped, the removals not counted, every badge treated
+as released. The `NOT_NEW` pruner, the pending-page rule, the rename hint, the
+release skipping badges or `NOT_NEW`, and the stamp carry ignoring counts.

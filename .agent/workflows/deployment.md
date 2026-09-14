@@ -70,7 +70,8 @@ Unless asked for that exact release, never run:
 - the version-bump scripts
 - anything that pushes an image to a registry under `rebasepro/`
 
-Pushing to `main` also publishes a canary of every package.
+Pushing to `main` runs CI only. Canaries are published by
+`gh workflow run publish.yml -f channel=canary`, like any other release.
 
 The reason it is absolute: a published npm version cannot be unpublished, a pushed
 tag is already on the branch, and every scaffolded project pulls
@@ -79,6 +80,14 @@ tag is already on the branch, and every scaffolded project pulls
 **What to do instead:** prepare everything up to the irreversible step. Write the
 CHANGELOG, run the gates, get the tree green. Then stop, report what is ready,
 and name the exact command that would publish it.
+
+If `[Unreleased]` has a `### Breaking` section, preparing includes the upgrade
+page. Rename `upgrading/<from>-to-next.mdx` and its five translations to
+`<from>-to-<minor being cut>.mdx`, and write them as that release's page. The
+release makes its other docs edits itself (`tooling/scripts/release-docs.mjs`:
+pins, "Since" badges, `NOT_NEW`, translation stamps), then runs
+`verify:docs:strict` before it publishes. An upgrade page still named
+`-to-next` stops the release there.
 
 ## Summary
 
