@@ -60,7 +60,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 Per una distribuzione in produzione reale, è preferibile una delle due modalità che non richiedono la copia manuale dei file sul server:
 
-- **Integrarlo in un'immagine (bake-in)** — `FROM rebasepro/server:0.20.0`, poi `COPY dist-bundle /bundle`, ed eseguire il deploy modificando un tag.
+- **Integrarlo in un'immagine (bake-in)** — `FROM rebasepro/server:0.21.0`, poi `COPY dist-bundle /bundle`, ed eseguire il deploy modificando un tag.
 - **Distribuirlo via HTTP** — imposta `REBASE_BUNDLE_URL` e il runtime scaricherà ed estrarrà il bundle a ogni avvio. Questo è quanto fa il modulo Terraform descritto sopra, ed è lo stesso meccanismo utilizzato dall'Helm chart.
 
 ## 4. Configurare ed eseguire

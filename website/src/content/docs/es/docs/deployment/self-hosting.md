@@ -129,7 +129,7 @@ Para un despliegue real, es preferible empaquetar ambos en una imagen, lo que ad
 lo que se ejecuta:
 
 ```dockerfile
-FROM rebasepro/server:0.20.0
+FROM rebasepro/server:0.21.0
 COPY dist-bundle /bundle
 ```
 
@@ -230,7 +230,7 @@ contenedores servirá. Hay dos cosas que debes configurar correctamente en todas
 
 ```toml
 [build]
-  image = "rebasepro/server:0.20.0"
+  image = "rebasepro/server:0.21.0"
 
 [http_service]
   internal_port = 8080
@@ -379,7 +379,7 @@ Consulta [Procesos divididos](/docs/deployment/split-processes/).
 ## Actualización
 
 ```yaml
-image: rebasepro/server:0.20.0
+image: rebasepro/server:0.21.0
 ```
 
 Reinicia. Tu bundle permanece intacto. Dentro de una misma versión mayor del contrato del runtime, un bundle

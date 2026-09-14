@@ -160,7 +160,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.20.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.21.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Di solito vale la pena bloccare solo il tag: il repository è ereditato, quindi si tratta dello stesso progetto e della stessa immagine con una sola unità aggiornata. `bundleUrl` svolge la stessa funzione quando è impostato `bundle.mode: url`.

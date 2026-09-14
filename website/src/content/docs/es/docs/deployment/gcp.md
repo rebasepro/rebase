@@ -34,7 +34,7 @@ rebase build
 Cloud Run descarga imágenes desde un registro, por lo que debes empaquetar el bundle dentro de una imagen derivada. Tres líneas bastan y fijan exactamente lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.20.0
+FROM rebasepro/server:0.21.0
 COPY dist-bundle /bundle
 ```
 

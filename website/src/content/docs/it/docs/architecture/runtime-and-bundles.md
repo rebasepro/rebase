@@ -58,7 +58,7 @@ di acconsentire all'avvio:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.20.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.21.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -113,7 +113,7 @@ Questo è il motivo per cui l'aggiornamento di Rebase in un deployment self-host
 richiede solo il cambio di un tag:
 
 ```yaml
-image: rebasepro/server:0.20.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.21.0   # a newer tag — your bundle is untouched
 ```
 
 ## Lo sviluppo utilizza lo stesso percorso

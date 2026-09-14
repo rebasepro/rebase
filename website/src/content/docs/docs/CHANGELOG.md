@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-14
+
 ### Breaking
 
 - **`context.client.data` no longer compiles in a collection callback.** A

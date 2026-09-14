@@ -34,7 +34,7 @@ rebase build
 Serverless Containers télécharge depuis un registre (registry), intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui s'exécute :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.20.0
+FROM rebasepro/server:0.21.0
 COPY dist-bundle /bundle
 ```
 

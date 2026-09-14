@@ -11,6 +11,8 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-14
+
 ### Breaking
 
 - **`context.client.data` no longer compiles in a collection callback.** A

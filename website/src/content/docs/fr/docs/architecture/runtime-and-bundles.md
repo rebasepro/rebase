@@ -58,7 +58,7 @@ d'accepter de démarrer :
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.20.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.21.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -115,7 +115,7 @@ C'est pourquoi la mise à niveau de Rebase dans un déploiement auto-hébergé s
 résume à un changement de tag :
 
 ```yaml
-image: rebasepro/server:0.20.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.21.0   # a newer tag — your bundle is untouched
 ```
 
 ## Le développement utilise le même chemin
