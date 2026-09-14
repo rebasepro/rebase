@@ -133,6 +133,7 @@ An incredibly fast, windowed spreadsheet view to manage your database with inlin
 - **Spreadsheet table** — Inline editing, column reordering, drag-and-drop
 - **Card grid** — Visual overview with image previews
 - **List view** — Compact, scannable layout
+- **Kanban board** — Cards grouped into columns by a property, dragged between them
 - **Custom views** — Build any React component as a collection view
 
 ### 🔒 Typed Schema & Database Migrations
@@ -155,8 +156,11 @@ See **[docs/backups.md](docs/backups.md)** for the full guide, including securit
 Built-in authentication with multiple providers:
 
 - **Email/Password** — With password reset flow
-- **Google OAuth** — One-click sign-in
-- **Anonymous** — For guest access
+- **OAuth** — Google, Apple, GitHub, GitLab, Bitbucket, Microsoft, Facebook, LinkedIn, Discord, Slack, Spotify and X
+- **Magic link and one-time codes** — Passwordless sign-in by email
+- **MFA** — TOTP second factor with recovery codes
+- **Anonymous** — For guest access, opt-in
+- **Captcha and API keys** — Bot protection on sign-up and the routes that send mail; scoped keys for scripts and agents
 
 Granular **role-based access control (RBAC)** with customizable permissions per collection, field, and action.
 
@@ -171,17 +175,7 @@ Native S3-compatible file storage with:
 
 ### 🛠️ Studio — Developer Toolbox
 
-A full developer environment built into the admin panel:
-
-| Tool | Description |
-|---|---|
-| **SQL Editor** | Write and execute SQL queries directly against your database with schema-aware autocomplete |
-| **RLS Policy Editor** | Visual editor for PostgreSQL Row-Level Security policies |
-| **Schema Visualizer** | Interactive ER diagram of your database with relationship mapping |
-| **JS/TS Editor** | In-browser code editor for scripts and functions |
-| **API Explorer** | Browse and test your auto-generated REST API endpoints |
-| **Cron Jobs** | Schedule and monitor recurring tasks |
-| **Storage Browser** | Browse and manage files in your S3-compatible storage |
+A full developer environment built into the admin panel — SQL and JS editors, RLS policies, a schema visualizer, database branches, backups, request logs, cron jobs, a storage browser, an API explorer and API keys. **[What each tool does →](https://rebase.pro/docs/studio)**
 
 ### 🔌 Realtime Engine
 
@@ -252,7 +246,7 @@ Built entirely on modern, battle-tested web standards:
 
 | Technology | What we use it for |
 |---|---|
-| 💙 **TypeScript 5.x** | End-to-end type safety |
+| 💙 **TypeScript 6** | End-to-end type safety |
 | ⚛️ **React 19** | Component-driven UI |
 | 🌊 **Tailwind CSS v4** | Utility-first styling |
 | 🔌 **WebSockets** | Real-time synchronization |
@@ -340,11 +334,11 @@ Explore a live interactive sandbox with all features — data resets periodicall
 
 Rebase is designed from the ground up to be **AI-agent ready**. When developing a Rebase project using AI coding assistants (like Cursor, Windsurf, or Copilot):
 
-### 1. Built-in Agent Guidelines (`.cursorrules`)
-Every new project scaffolded with `rebase init` automatically includes a pre-configured `.cursorrules` file at the root. This instructs your AI agent on:
-- Using the **Rebase SDK** instead of raw SQL / direct Drizzle queries (which ensures data validation, RLS, and lifecycle callbacks run correctly).
-- The two-step schema migration workflow (`rebase schema generate` -> `rebase db push`).
-- Structuring custom functions and cron jobs.
+### 1. Built-in Agent Guidelines (`ai-instructions.md`)
+Every project scaffolded with `rebase init` carries its agent rules in `ai-instructions.md`, plus a short pointer file for each assistant that reads its own — `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules` and `.github/copilot-instructions.md`. Each pointer names `ai-instructions.md` and the `rebase skills install --agent <name>` command for that assistant. The rules cover:
+- Using the **Rebase SDK** instead of raw SQL / direct Drizzle queries against application tables (which skip validation, hooks and row-level security).
+- Applying a collection change: while `pnpm dev` runs, saving the collection file is the whole step; `db:push` is for what boot leaves alone, and production uses `db:generate` then `db:migrate`.
+- Guarding custom functions, and what an agent must never do — deploy, edit `.env`, or hand-edit generated files.
 
 ### 2. Built-in MCP Server
 `rebase init` writes `.mcp.json`, so Claude Code, Cursor and any other MCP client can drive the project the moment it is scaffolded:
@@ -354,7 +348,10 @@ Every new project scaffolded with `rebase init` automatically includes a pre-con
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -376,8 +373,8 @@ If your AI coding agent or database role permissions cause a `permission denied 
 Bug fixes, features and documentation are all welcome.
 **[CONTRIBUTING.md](CONTRIBUTING.md)** is the whole path: clone, install, start
 the database, run the app, and the one command — `pnpm ci:static` — that runs
-what CI runs. It also covers the commit format, the changelog rule, and how to
-run one package's tests.
+what CI runs. It also covers commits and the changelog rule, and how to run one
+package's tests.
 
 Two more worth knowing before a first pull request:
 
