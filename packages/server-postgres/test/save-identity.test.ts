@@ -227,13 +227,12 @@ label: "Widget" });
         // fabricated an `id` field for tables that have no such column.
         const beforeDelete = jest.fn();
         setup({});
+        // The stored row: a `sku`-keyed table, so no `id` column.
+        jest.spyOn(driver.dataService, "fetchOne").mockResolvedValue({ sku: "ABC-1", label: "Widget" });
         jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as never);
 
         await driver.delete({
-            row: { id: "ABC-1",
-path: "sku_items",
-values: { sku: "ABC-1",
-label: "Widget" } },
+            row: { id: "ABC-1", path: "sku_items" },
             collection: { ...skuItemsCollection,
 callbacks: { beforeDelete } } as CollectionConfig
         });

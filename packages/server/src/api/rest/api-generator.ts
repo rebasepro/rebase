@@ -1356,10 +1356,9 @@ values: entity as Record<string, unknown> },
                         // back off the row: a row is only its columns, so
                         // `existingEntity.id` is undefined for any table not
                         // keyed on `id` — and the delete went looking for a row
-                        // called "undefined".
+                        // called "undefined". The row itself the driver reads.
                         id: String(id),
-                        path: getCollectionDataPath(collection),
-                        values: existingEntity
+                        path: getCollectionDataPath(collection)
                     },
                     collection: resolvedCollection
                 });
@@ -1648,8 +1647,7 @@ id: parsed.id });
                     // The address from the path, for the same reason as the
                     // collection-level delete above: a row carries no id.
                     id: parsed.id,
-                    path: parsed.collectionPath,
-                    values: existingEntity
+                    path: parsed.collectionPath
                 }
             });
 

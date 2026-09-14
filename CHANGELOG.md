@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+### Security
+
+- **A delete over the WebSocket wrote its own audit record, and could get past
+  a `beforeDelete` veto.** `DeleteProps` carried `row.values`, and both server
+  drivers took them as the row being deleted: they were what `beforeDelete` and
+  `afterDelete` received and what history recorded as the row's final state.
+  The REST routes filled them from a read of their own. The WebSocket `DELETE`
+  handler forwarded the client's frame, so a caller allowed to delete a row
+  could record anything as its final state — and could get past a
+  `beforeDelete` that refuses on a column, such as the callbacks guide's
+  `if (row.status === "published") throw`, by sending `values: {}`. The
+  in-process SDK sent `{}` on every `delete(id)`, so every delete from a
+  function, a cron job or a callback recorded an empty row and gave
+  `beforeDelete` nothing to judge. The MCP `delete_document` tool did the same.
+
+  Both drivers now read the row themselves before any callback runs, under the
+  caller's own scope — on Postgres, inside the delete's transaction, as the
+  caller's role — and that read is what the callbacks receive and what history
+  records. It is the read the REST route already made, so a delete over HTTP
+  sees what it saw before. A row that is not there, or that the caller cannot
+  read, is a 404 before any callback runs, on every path; over the socket and
+  the SDK the callbacks used to run first. `DeleteProps.row` is `{ id, path }`
+  now: `values` is gone from the type and ignored on the wire, so a published
+  client that still sends it keeps working.
+
+  The socket's `DELETE` also stopped forwarding the frame's `collection`. The
+  driver merges a caller's collection under the registry's, so a key the
+  registry does not declare survived, and `softDelete: { field: "title" }`
+  turned a delete into an update of `title` that no `beforeSave` and no write
+  validator saw.
+
+  One more change came with dropping `deleteMany`'s own pre-read: a hard
+  `deleteMany` now purges rows that are already in the trash, as a hard
+  single-row delete does. Its old read hid them and answered 404.
+
+  If a collection has `history: true`, or a `beforeDelete` that refuses on the
+  row's contents, and anything deletes through the socket or the SDK, upgrade.
+
 ## [0.21.0] - 2026-09-14
 
 ### Breaking

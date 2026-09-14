@@ -57,9 +57,12 @@ const articles = (callbacks: Record<string, unknown>) => ({
 } as unknown as CollectionConfig);
 
 const deleteProps = (collection: CollectionConfig) => ({
-    row: { id: "a1", path: "articles", values: { title: "Ada", status: "published" } },
+    row: { id: "a1", path: "articles" },
     collection
 });
+
+/** The row as stored — what the driver reads, and what the callbacks judge. */
+const STORED = { id: "a1", title: "Ada", status: "published" };
 
 describe("beforeDelete returning false", () => {
     let deleteSpy: ReturnType<typeof jest.spyOn>;
@@ -68,6 +71,7 @@ describe("beforeDelete returning false", () => {
         jest.restoreAllMocks();
         jest.clearAllMocks();
         deleteSpy = jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined as never);
+        jest.spyOn(DataService.prototype, "fetchOne").mockResolvedValue(STORED as never);
     });
 
     it("leaves the row alone — the delete is never issued", async () => {
@@ -126,6 +130,39 @@ describe("beforeDelete returning false", () => {
         await driver.delete(deleteProps(collection) as never);
 
         expect(deleteSpy).toHaveBeenCalled();
+    });
+
+    it("judges the stored row, whatever the props say about it", async () => {
+        // A caller that still sends `values` — every published client's socket
+        // DELETE does — describing the row as a draft. The row is published,
+        // and the veto is on that.
+        const beforeDelete = jest.fn(({ row }: { row: Record<string, unknown> }) => row.status !== "published");
+        const collection = articles({ beforeDelete });
+        const driver = buildDriver(collection);
+
+        const error = await driver.delete({
+            row: { id: "a1", path: "articles", values: { title: "Ada", status: "draft" } },
+            collection
+        } as never).then(() => undefined, (e: CallbackError) => e);
+
+        expect(error?.code).toBe("CALLBACK_REJECTED");
+        expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({ row: STORED }));
+        expect(deleteSpy).not.toHaveBeenCalled();
+    });
+
+    it("answers 404 for a row that is not there, before any callback runs", async () => {
+        jest.spyOn(DataService.prototype, "fetchOne").mockResolvedValue(undefined as never);
+        const beforeDelete = jest.fn();
+        const collection = articles({ beforeDelete });
+        const driver = buildDriver(collection);
+
+        const error = await driver.delete(deleteProps(collection) as never)
+            .then(() => undefined, (e: CallbackError) => e);
+
+        expect(error?.status ?? error?.statusCode).toBe(404);
+        expect(error?.code).toBe("NOT_FOUND");
+        expect(beforeDelete).not.toHaveBeenCalled();
+        expect(deleteSpy).not.toHaveBeenCalled();
     });
 
     it("keeps a thrown RebaseApiError's own status rather than forcing 403", async () => {

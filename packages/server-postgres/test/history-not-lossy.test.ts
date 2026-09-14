@@ -93,6 +93,8 @@ describe("history is not lossy", () => {
             );
             jest.spyOn(driver.dataService, "save")
                 .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);
+            // The row a delete reads before it deletes.
+            jest.spyOn(driver.dataService, "fetchOne").mockResolvedValue({ id: 1, title: "Hi" });
             jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as any);
             return driver;
         };
@@ -124,10 +126,19 @@ describe("history is not lossy", () => {
             const recordHistory = jest.fn().mockRejectedValue(new Error("history insert failed"));
             await expect(
                 stand(recordHistory).delete({
-                    row: { id: "1", path: "posts", values: { title: "Hi" } },
+                    row: { id: "1", path: "posts" },
                     collection: posts
                 })
             ).rejects.toThrow(/history insert failed/);
+        });
+
+        it("records the row it read as the deleted row", async () => {
+            const recordHistory = jest.fn().mockResolvedValue(undefined);
+            await stand(recordHistory).delete({ row: { id: "1", path: "posts" }, collection: posts });
+            expect(recordHistory).toHaveBeenCalledWith(expect.objectContaining({
+                action: "delete",
+                values: { id: 1, title: "Hi" }
+            }));
         });
     });
 });

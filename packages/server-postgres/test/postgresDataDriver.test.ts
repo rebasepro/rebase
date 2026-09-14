@@ -923,12 +923,11 @@ values: { name: "test" } } as any
                 }
             } as any;
 
+            jest.spyOn(delegate.dataService, "fetchOne").mockResolvedValueOnce({ id: "e1" });
             jest.spyOn(delegate.dataService, "delete").mockResolvedValueOnce();
 
             await delegate.delete({
-                row: { id: "e1",
-path: "test_coll",
-values: {} } as any,
+                row: { id: "e1", path: "test_coll" },
                 collection: mockCollectionWithCallback
             });
 

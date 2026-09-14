@@ -307,6 +307,46 @@ email: "test@example.com" },
             });
             expect(fetched).toBeUndefined();
         });
+
+        /**
+         * `beforeDelete` judges the stored document. It used to be handed
+         * `row.values` from the props, which over the WebSocket was the
+         * client's frame — so a veto on a field was bypassed by describing the
+         * document as something else.
+         */
+        const legalHold: CollectionConfig = {
+            slug: "contracts",
+            name: "Contracts",
+            engine: "mongodb",
+            properties: { name: { name: "Name", type: "string" }, locked: { name: "Locked", type: "boolean" } },
+            callbacks: {
+                beforeDelete: ({ row }) => {
+                    if (row.locked === true) throw new Error("This contract is under legal hold.");
+                }
+            }
+        };
+
+        it("vetoes on the stored document, whatever the props say about it", async () => {
+            const entity = await delegate.save({
+                path: "contracts", values: { name: "Held", locked: true }, collection: legalHold, status: "new"
+            });
+
+            await expect(delegate.delete({
+                row: { id: rowId(entity), path: "contracts", values: { locked: false } },
+                collection: legalHold
+            } as never)).rejects.toMatchObject({ code: "CALLBACK_REJECTED" });
+
+            expect(await delegate.fetchOne({ path: "contracts", id: rowId(entity), collection: legalHold })).toBeDefined();
+        });
+
+        it("answers 404 for a document that is not there, before any callback runs", async () => {
+            const beforeDelete = jest.fn();
+            await expect(delegate.delete({
+                row: { id: "000000000000000000000000", path: "contracts" },
+                collection: { ...legalHold, callbacks: { beforeDelete } }
+            })).rejects.toMatchObject({ statusCode: 404 });
+            expect(beforeDelete).not.toHaveBeenCalled();
+        });
     });
 
     describe("count", () => {
@@ -499,12 +539,14 @@ type: "string" }
 
             // 3. Test delete
             await delegate.delete({
-                row: { id: fetched!.id as string, path: "hooked_users", values: fetched! },
+                row: { id: fetched!.id as string, path: "hooked_users" },
                 collection: collectionWithHooks
             });
 
             expect(beforeDeleteSpy).toHaveBeenCalled();
             expect(beforeDeleteSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
+            // The document the driver read, not one the caller handed it.
+            expect(beforeDeleteSpy.mock.calls[0][0].row).toMatchObject({ name: "John" });
             expect(afterDeleteSpy).toHaveBeenCalled();
             expect(afterDeleteSpy.mock.calls[0][0].context.storageSource).toBe(mockStorage);
         });

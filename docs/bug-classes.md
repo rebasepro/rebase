@@ -3290,3 +3290,61 @@ channel broadcast from inside a hook goes out at once; the hooks guide already
 says to publish after the write returns. Test with a real pool
 (`write-transaction-scope-e2e.test.ts`): "another connection sees it early" cannot
 be asked of PGlite or of a mock.
+
+## 63. Trusting the client's copy of server state
+
+A request type that carries a copy of something the server can read for itself
+lets the caller supply the copy. `DeleteProps` carried `row.values`, and the
+driver took them as the row being deleted: they were what `beforeDelete` and
+`afterDelete` judged and what history recorded as the row's final state. The
+REST routes filled them from a read of their own, so over HTTP they were true.
+The WebSocket `DELETE` forwarded the client's frame, so over the socket the
+caller wrote the audit record of their own deletion, and got past a
+`beforeDelete` that refused on a column — the callbacks guide's own example — by
+sending `values: {}`. The in-process SDK sent `{}` on every delete, so nothing
+had to be forged there: every `rebase.data.x.delete(id)` recorded an empty row.
+
+It hides because the correct callers are the ones you read first. The REST route
+reads the row, passes it on, and looks like the contract. The field is optional,
+so a door that fills it with nothing type-checks as well as one that fills it
+with the truth, and one that fills it with the client's guess type-checks too.
+
+The save path was the correct sibling the whole time. `SaveProps` also declares
+`previousValues`, and both drivers ignore it and read the previous row
+themselves — which is why nobody ever forged a save's history.
+
+**Fix the shape, not the door.** The props carry the address and the caller's
+*intent*; anything the server can look up, it looks up. `DeleteProps.row` is
+`{ id, path }` now, the driver reads the row under the caller's own scope, and a
+row that is not there, or not there for this caller, is a 404 before any
+callback runs. Taking the field out of the type is the guard: a door that tries
+to pass a copy no longer compiles. The wire can still carry it — published
+clients do — and it is ignored.
+
+**Watch for:** a copy of *configuration* is the same class. The socket also
+forwarded the frame's `collection`, and the driver merges a caller's collection
+*under* the registry's — so a key the registry does not declare survives.
+`softDelete: { field: "title" }` turned a DELETE into an UPDATE of `title` that no
+`beforeSave` and no write validator saw.
+
+**Sweep (2026-09-14):**
+
+| checked | result |
+|---|---|
+| WebSocket `DELETE`, Postgres | **BUG** — the client's `row.values` judged by `beforeDelete`, recorded by history. Fixed: the driver reads the row. |
+| WebSocket `DELETE`, Mongo | **BUG** — same shape; authorized against a read, then called the hooks with the client's copy. Fixed. |
+| in-process SDK `delete(id)` | **BUG** — sent `values: {}`: an empty history record, nothing for `beforeDelete` to judge. Fixed. |
+| MCP `delete_document` | **BUG** — sent no values; same result as the SDK. Fixed by the driver change alone. |
+| REST single and nested `DELETE`, `deleteMany`, `batchWrite` | clean — each read the row first. The bulk reads are gone (the driver's read replaces them); REST keeps its read for `If-Match` and its own 404. |
+| `deleteMany` with `hard` | **BUG**, found on the way — its read hid rows in the trash, so a hard bulk delete of the trash was a 404. The driver's read carries `withDeleted`. Fixed. |
+| WebSocket `DELETE`'s `collection` | **BUG** — merged under the registry's; `softDelete` made the delete an UPDATE. Fixed: the socket forwards the address and `hard` only. |
+| `SaveProps.previousValues` | clean — both drivers ignore it and read the previous row. |
+| WebSocket `SAVE`'s `collection` | **OPEN** — the same merge. The validators use the registry's collection, the driver the merged one. Reach, read from the driver and not yet tested: a client can turn `history` on for a collection that did not declare it; tenancy only ever narrows. |
+| Mongo rules through the same merge | clean for widening — the registry wins where it declares `securityRules`, and no rules already means allow. |
+| history revert | clean — restores values stored server-side, and checks `entity_id`/`table_name` against the URL. |
+| `If-Match` | clean — the caller's tag is compared with one computed from a server read. |
+
+Gate: `test/e2e/delete-reads-stored-row-e2e.test.ts` sends the forged frame over a
+real socket to a real Postgres with RLS and the history table. Four mutations —
+callbacks handed `{}`, history handed `{}`, the 404 skipped, the frame's
+`collection` forwarded again — each turn a case red.

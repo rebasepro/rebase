@@ -504,11 +504,10 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         },
 
         async delete(id: string | number): Promise<void> {
-            return driver.delete({
-                row: { id,
-path: slug,
-values: {} as Record<string, unknown> }
-            });
+            // The address only. A server driver reads the row it deletes; the
+            // `values: {}` this used to send was recorded by history as the
+            // deleted row, and was all a `beforeDelete` had to judge.
+            return driver.delete({ row: { id, path: slug } });
         },
 
         // Present only when the driver is: exposing these unconditionally and

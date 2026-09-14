@@ -355,7 +355,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("reports an UNLINK the junction's policy refused as denied, not as done", async () => {
         const a = await userDriver("user-a");
         await expect(a.delete({
-            row: { id: "tp-1", path: "notices/n-1/topics", values: {} },
+            row: { id: "tp-1", path: "notices/n-1/topics" },
             collection: topicsCollection
         } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         expect(await rawCount("notice_topics", "WHERE notice_id = 'n-1'")).toBe(1);

@@ -325,7 +325,17 @@ export interface UpdateManyProps<M extends Record<string, unknown> = Record<stri
  * @internal
  */
 export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
-    row: { id: string | number; path: string; values?: Partial<EntityValues<M>> };
+    /**
+     * The row's address, and nothing about its contents.
+     *
+     * The driver reads the row itself, under the caller's own scope, and that
+     * read is what `beforeDelete` and `afterDelete` receive and what history
+     * records. This used to carry `values`, and the driver took them as the
+     * row — so over the WebSocket, which forwarded the client's frame, the
+     * caller wrote the audit record of their own deletion and could get past a
+     * `beforeDelete` that refused on a column by sending `values: {}`.
+     */
+    row: { id: string | number; path: string };
     collection?: CollectionConfig<M>;
     /**
      * Issue a real `DELETE` on a collection that declares
