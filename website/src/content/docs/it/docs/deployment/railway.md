@@ -1,5 +1,5 @@
 ---
-sourceHash: 10ade706e21556d1
+sourceHash: 1a4842113508b8e2
 title: Deploy di Rebase su Railway
 description: Esegui il deploy di Rebase su Railway dall'immagine di runtime pubblicata e dal bundle del tuo progetto. Mantieni la conformità con l'UE.
 sidebar_label: Railway

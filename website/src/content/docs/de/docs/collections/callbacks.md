@@ -1,5 +1,5 @@
 ---
-sourceHash: f10be03939ad9c7f
+sourceHash: 13eea3897cdb7bee
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Verwenden Sie Lebenszyklus-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data API für sammlungsübergreifende Operationen.
@@ -461,8 +461,6 @@ Andere sammlungsübergreifende Muster:
 - **Zähler**: Verwenden Sie `afterSave` / `afterDelete`, um Zählerfelder in verknüpften Entitäten zu aktualisieren
 
 ## Vollständige Kontextreferenz
-
-<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Jeder Callback erhält ein `context`-Objekt vom Typ `RebaseCallContext`:
 

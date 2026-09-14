@@ -1,5 +1,5 @@
 ---
-sourceHash: f10be03939ad9c7f
+sourceHash: 13eea3897cdb7bee
 title: Rappels d'entité
 sidebar_label: Rappels
 description: Utilisez les rappels de cycle de vie pour exécuter une logique personnalisée lors de la création, la mise à jour, la lecture ou la suppression d'entités. Inclut l'API context.data pour les opérations inter-collections.
@@ -460,8 +460,6 @@ Autres modèles inter-collections :
 - **Compteurs** : Utilisez `afterSave` / `afterDelete` pour mettre à jour les champs de compte sur les entités liées
 
 ## Référence Complète du Contexte
-
-<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Chaque rappel reçoit un objet `context` de type `RebaseCallContext` :
 

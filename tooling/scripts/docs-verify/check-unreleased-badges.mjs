@@ -133,18 +133,7 @@ export function importedIdentifiers(text) {
  * not. Each needs a reason, and the reason has to be that the *surface* is old
  * even though this spelling of it never appeared in a release note.
  */
-const NOT_NEW = new Map([
-    // Widening the grammar turned these from prose into tokens. Each is an old
-    // surface that the release notes happened never to quote in backticks.
-    // One-word names of surfaces the product has had for releases. The wide
-    // grammar turns each of them into a token, and each of them appears on
-    // dozens of pages that are describing the released behaviour.
-    // Surfaces the 0.18 notes name because they were FIXED or REMOVED, not
-    // introduced. A note about an old surface is not a new feature, and badging
-    // the pages that describe it would tell a reader on 0.17 that something they
-    // already have is unavailable to them.
-    ["formView", "a collection's form override, released before 0.13, whose notes quote it only as `formView.Builder`; the Unreleased note is a fix"]
-]);
+const NOT_NEW = new Map();
 
 /**
  * Tokens that name two different things, with the page pattern that means the

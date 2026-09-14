@@ -1,5 +1,5 @@
 ---
-sourceHash: 02ee62af305e1df6
+sourceHash: 2535b00e3193eca2
 slug: pt/docs/upgrading
 title: Atualizando
 description: O que quebra quando você move um aplicativo existente para a versão atual e o que fazer em relação a cada ponto.
@@ -9,7 +9,7 @@ description: O que quebra quando você move um aplicativo existente para a vers�
 
 Já está em 0.17? O salto para 0.18 já foi publicado e está descrito aqui: [0.17 → 0.18](/pt/docs/upgrading/0-17-to-0-18/).
 
-Está na 0.18 ou posterior? O que já foi mesclado na `main` mas ainda não foi publicado está descrito aqui: [0.18 → next](/pt/docs/upgrading/0-18-to-next/).
+Está na 0.18, 0.19 ou 0.20? O salto para a 0.21 foi lançado e está descrito aqui: [0.18 → 0.21](/pt/docs/upgrading/0-18-to-0-21/).
 
 Esta versão remove o schema `auth`, renomeia pacotes, altera o significado de `id`, descontinua CJS, move o painel de administração para o react-router 8 e — mais importante — **corrige três maneiras pelas quais o acesso poderia ser concedido sem você ter solicitado**: uma regra de segurança que era silenciosamente permissiva e duas no socket em tempo real. Leia as três primeiras seções antes de qualquer outra coisa. A Seção 0 é a que altera o SQL que você pode ter escrito à mão; as seções 1 e 2 alteram quem pode ler seus dados e nenhuma delas se anuncia.
 

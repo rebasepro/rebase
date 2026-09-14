@@ -1,5 +1,5 @@
 ---
-sourceHash: 1268d4bf9843a74b
+sourceHash: a0e8bb4006af2399
 title: In mehrere Prozesse aufteilen
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere kooperierende Prozesse aus – eine API, eine Functions-Ebene, einen Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.

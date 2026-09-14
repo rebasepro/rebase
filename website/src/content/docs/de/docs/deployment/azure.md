@@ -1,5 +1,5 @@
 ---
-sourceHash: b2acba62de849f55
+sourceHash: 509568aa9395a6f7
 title: Bereitstellung von Rebase auf Microsoft Azure
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Azure bereit – mit Azure Database for PostgreSQL und Azure Container Apps.
 sidebar_label: Azure

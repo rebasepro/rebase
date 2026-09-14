@@ -1,5 +1,5 @@
 ---
-sourceHash: 0633ef5ec34074cf
+sourceHash: bfd17423672137c9
 title: Deploy do Rebase no Google Cloud Platform
 description: Implante sua instância do Rebase com segurança no GCP usando Cloud SQL e Cloud Run, com foco em regiões de data center da UE.
 sidebar_label: Google Cloud

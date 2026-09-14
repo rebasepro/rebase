@@ -1,5 +1,5 @@
 ---
-sourceHash: 1268d4bf9843a74b
+sourceHash: a0e8bb4006af2399
 title: Fractionnement en plusieurs processus
 sidebar_label: Processus fractionnés
 description: Exécutez un même bundle sous la forme de plusieurs processus coopératifs — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne concurrence plus l'API de données.

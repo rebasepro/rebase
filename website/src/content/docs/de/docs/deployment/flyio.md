@@ -1,5 +1,5 @@
 ---
-sourceHash: 263c0ae6a0fac44f
+sourceHash: 18f4807a48b6aed2
 title: Bereitstellung von Rebase auf Fly.io
 description: Erfahren Sie, wie Sie Rebase global bereitstellen oder mithilfe von Fly.io auf europäische Rechenzentren beschränken.
 sidebar_label: Fly.io

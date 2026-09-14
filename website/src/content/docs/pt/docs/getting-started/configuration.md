@@ -1,5 +1,5 @@
 ---
-sourceHash: 86482a8c4246735c
+sourceHash: a6ecab532bd0be01
 title: Ambiente & Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -263,8 +263,6 @@ recusam inicializar — está em
 | `REBASE_FUNCTIONS_UPSTREAM` | Para onde o processo da API encaminha uma requisição de função que ele próprio não atende. | — |
 
 ### Superfície MCP
-
-<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Um endpoint opcional (opt-in) do Model Context Protocol em `/mcp`, para que um cliente de IA possa ler
 e gravar neste projeto **como o usuário autenticado**. Desativado a menos que configurado e — ao contrário de

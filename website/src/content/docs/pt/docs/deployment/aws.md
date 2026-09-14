@@ -1,5 +1,5 @@
 ---
-sourceHash: d1312f112637705d
+sourceHash: 52e547096e56dc7e
 title: Implantando o Rebase na AWS
 description: Implante sua instância do Rebase com segurança na Amazon Web Services utilizando RDS e AWS App Runner com um forte foco europeu.
 sidebar_label: AWS

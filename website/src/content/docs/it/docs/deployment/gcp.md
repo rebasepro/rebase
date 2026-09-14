@@ -1,5 +1,5 @@
 ---
-sourceHash: 0633ef5ec34074cf
+sourceHash: bfd17423672137c9
 title: Distribuzione di Rebase su Google Cloud Platform
 description: Distribuisci la tua istanza Rebase in modo sicuro su GCP utilizzando Cloud SQL e Cloud Run, con un focus sulle regioni dei data center nell'UE.
 sidebar_label: Google Cloud

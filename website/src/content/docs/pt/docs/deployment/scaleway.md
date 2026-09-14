@@ -1,5 +1,5 @@
 ---
-sourceHash: 8065b392b2b6690b
+sourceHash: 5a7b8d3dde3754f5
 title: Implantando o Rebase na Scaleway
 description: Aprenda como implantar o Rebase na Scaleway para uma infraestrutura em nuvem segura e baseada na França usando Serverless Containers.
 sidebar_label: Scaleway

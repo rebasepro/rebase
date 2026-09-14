@@ -1,5 +1,5 @@
 ---
-sourceHash: 39e0a58a37e930cb
+sourceHash: 93d4b39a9822643d
 title: Deploy di Rebase su Hetzner Cloud
 description: Esegui il deploy di Rebase su Hetzner Cloud con Terraform o Docker Compose, per prestazioni eccellenti basate nell'UE e sovranità dei dati.
 sidebar_label: Hetzner Cloud

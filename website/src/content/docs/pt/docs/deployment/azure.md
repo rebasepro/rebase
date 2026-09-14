@@ -1,5 +1,5 @@
 ---
-sourceHash: b2acba62de849f55
+sourceHash: 509568aa9395a6f7
 title: Implantando o Rebase no Microsoft Azure
 description: Implante sua instância do Rebase com segurança no Azure usando o Azure Database for PostgreSQL e o Azure Container Apps.
 sidebar_label: Azure

@@ -801,8 +801,6 @@ combinations refuse to boot — is on
 
 #### MCP surface
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 An opt-in Model Context Protocol endpoint at `/mcp`, so an AI client can read
 and write this project **as the signed-in user**. Off unless set, and — unlike
 every other surface — no `REBASE_ROLE` turns it on: the others describe a
@@ -1255,7 +1253,7 @@ downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
-| **0.18 – 0.20** | [0.18 → next](/docs/upgrading/0-18-to-next/) | Not released yet: what is merged on `main` and already described in these docs. `context.client.data` stops compiling in a collection callback — query through `context.data`. 0.19 and 0.20 declare no breaking change, so this is one hop from 0.18. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` stops compiling in a collection callback — query through `context.data` — and `selectedEntities` gives way to a selection that can stand for rows nobody has loaded. 0.19 and 0.20 declare no breaking change, so this is one hop from 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Eleven breaking changes, most of them compile errors rather than silent behaviour changes. `rebase.data` disappears at runtime, peer ranges narrow to carets, and the Node floor moves to 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | The admin packages are renamed, resources are declared rather than configured, and a bundle built before it will not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop from 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Every wire key is camelCase, and anonymous sign-in is opt-in. |
@@ -1326,17 +1324,18 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
 
-## Upgrading 0.18 to the next release
+## Upgrading 0.18 to 0.21
 
-## Upgrading 0.18 → next
+## Upgrading 0.18 → 0.21
 
-**Nothing here is released yet.** These are the `#### Breaking` entries of the
-changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
-this documentation site publishes from `main`, so they are described here before
-the version that carries them exists on npm. If you installed from npm you are
-on 0.20 and none of this has reached you — read it to know what is coming, and
-come back when you move. 0.19 and 0.20 declare no breaking change, so this is
-one hop from 0.18.
+**0.21.0 is released.** These are the `#### Breaking` entries of its
+[changelog section](/docs/changelog/), one at a time, with what each one asks you
+to change. 0.19 and 0.20 declare no breaking change, so this is one hop from
+0.18 — read it before you move to 0.21, not after.
+
+Both are compile errors rather than silent changes of behaviour: the build points
+at every line that needs editing, and the grep under each section finds them
+before the build does.
 
 ---
 
@@ -12611,8 +12610,6 @@ Other cross-collection patterns:
 
 ### Full Context Reference
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 Every callback receives a `context` object of type `RebaseCallContext`:
 
 ```typescript
@@ -15143,8 +15140,6 @@ WebSocket connections arrive as an HTTP upgrade on the same server rather than a
 a path of their own — see [Realtime](/docs/backend/realtime/).
 
 ### MCP surface
-
-<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Mounted only when `REBASE_MCP_ENABLED=true`, which also requires
 `REBASE_PUBLIC_URL` — see
@@ -33515,7 +33510,7 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-<span class="since-badge" data-since="0.21">Since 0.21</span> `db connect` opens a local port that *is* the managed database (no public
+`db connect` opens a local port that *is* the managed database (no public
 endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 ##### Resources
@@ -35788,7 +35783,7 @@ Stated plainly, because finding out later is worse:
   PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the
   internet, so the host the console shows is your backend's address for it and
-  resolves to nothing on your machine. <span class="since-badge" data-since="0.21">Since 0.21</span> `rebase cloud db connect` opens a local
+  resolves to nothing on your machine. `rebase cloud db connect` opens a local
   port that is that database, tunnelled through the control plane, for as long
   as you leave it running — but there is no permanent hostname a third-party
   service can connect to. That tunnel, and the password behind

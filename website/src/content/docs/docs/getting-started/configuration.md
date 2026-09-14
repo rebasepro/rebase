@@ -263,8 +263,6 @@ combinations refuse to boot — is on
 
 ### MCP surface
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 An opt-in Model Context Protocol endpoint at `/mcp`, so an AI client can read
 and write this project **as the signed-in user**. Off unless set, and — unlike
 every other surface — no `REBASE_ROLE` turns it on: the others describe a

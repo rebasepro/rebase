@@ -1,5 +1,5 @@
 ---
-sourceHash: f10be03939ad9c7f
+sourceHash: 13eea3897cdb7bee
 title: Callbacks de Entidade
 sidebar_label: Callbacks
 description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades são criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
@@ -459,8 +459,6 @@ Outros padrões entre coleções:
 - **Contadores**: Use `afterSave` / `afterDelete` para atualizar campos de contagem em entidades relacionadas
 
 ## Referência Completa do Contexto
-
-<span class="since-badge" data-since="0.21">Since 0.21</span>
 
 Todo callback recebe um objeto `context` do tipo `RebaseCallContext`:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 20203510271ee99a
+sourceHash: 11eb4597bacc7658
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, opéré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -157,7 +157,7 @@ Dans un pipe, `--help` répond en JSON : la même ligne d'utilisation, les flags
 - **Pas de déploiements de prévisualisation ou de branches**, et pas d'application GitHub officielle. Les hooks de déploiement — des URL secrètes vers lesquelles vous pointez un webhook de dépôt — constituent l'automatisation prise en charge.
 - **La CI nécessite les identifiants d'un humain.** Il n'existe pas encore de jeton machine ; `rebase cloud login` requiert un e-mail et un mot de passe. Transmettez-les via `REBASE_CLOUD_EMAIL` et `REBASE_CLOUD_PASSWORD` depuis un gestionnaire de secrets — `--password` place le mot de passe dans l'historique de votre shell et dans la table des processus, et vous en avertit avant de vous connecter.
 - **La récupération à un instant précis (point-in-time recovery) se fait uniquement via la CLI.** La console affiche les sauvegardes ; le workflow PITR par étapes s'effectue avec `rebase cloud db pitr`.
-- **Pas de point de terminaison de base de données public.** Une base de données managée n'est pas exposée à Internet, l'hôte affiché dans la console est donc l'adresse utilisée par votre backend et ne résout rien depuis votre machine. <span class="since-badge" data-since="0.21">Since 0.21</span> `rebase cloud db connect` ouvre un port local correspondant à cette base de données, tunnelisé via le plan de contrôle, aussi longtemps que vous le laissez tourner — mais il n'existe aucun nom d'hôte permanent auquel un service tiers puisse se connecter. Ce tunnel, ainsi que le mot de passe révélé par `rebase cloud db info --reveal`, nécessitent tous deux le rôle de propriétaire (owner) ou d'administrateur (admin) de l'organisation : le même que requiert l'éditeur SQL de Studio, car les trois débouchent sur une session active sur vos données de production.
+- **Pas de point de terminaison de base de données public.** Une base de données managée n'est pas exposée à Internet, l'hôte affiché dans la console est donc l'adresse utilisée par votre backend et ne résout rien depuis votre machine. `rebase cloud db connect` ouvre un port local correspondant à cette base de données, tunnelisé via le plan de contrôle, aussi longtemps que vous le laissez tourner — mais il n'existe aucun nom d'hôte permanent auquel un service tiers puisse se connecter. Ce tunnel, ainsi que le mot de passe révélé par `rebase cloud db info --reveal`, nécessitent tous deux le rôle de propriétaire (owner) ou d'administrateur (admin) de l'organisation : le même que requiert l'éditeur SQL de Studio, car les trois débouchent sur une session active sur vos données de production.
 
 ## S'auto-héberger à la place
 

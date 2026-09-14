@@ -1,5 +1,5 @@
 ---
-sourceHash: d1312f112637705d
+sourceHash: 52e547096e56dc7e
 title: Distribuzione di Rebase su AWS
 description: Distribuisci la tua istanza Rebase in modo sicuro su Amazon Web Services utilizzando RDS e AWS App Runner con una forte attenzione ai requisiti europei.
 sidebar_label: AWS
