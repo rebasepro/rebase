@@ -27,14 +27,20 @@ pnpm add @rebasepro/ui
 
 ## Package Exports
 
-The package exports five modules:
+The entry point re-exports four modules whole, and utilities and hooks by name:
 
 ```ts
 export * from "./components";  // All UI components
+export * from "./views";       // ListView, CardView, KanbanView, the headless CollectionView family
+export * from "./icons";       // Icon, iconSize, LucideIconByName, iconKeys, coolIconKeys, lucide icons
 export * from "./styles";      // Tailwind style mixin strings
-export * from "./util";        // cls(), debounce(), chip_colors, keyToIconComponent
-export * from "./icons";       // Icon component, iconSize, LucideIconByName, iconKeys, cool_icon_keys
-export * from "./hooks";       // React hooks
+
+// By name only:
+//   cls, debounce, lazyChunk, loadChunk, isChunkLoadError,
+//   CHIP_COLORS, CHIP_HUES, CHIP_SEED_KEYS, getColorSchemeForKey, getColorSchemeForSeed,
+//   useOutsideAlerter, useDebouncedCallback, useDebounceCallback, useDebounceValue,
+//   useIsDarkMode, useInjectStyles, PortalContainerProvider, usePortalContainer
+// Not exported: keyToIconComponent. (hashString comes from @rebasepro/utils.)
 ```
 
 ---
@@ -1192,10 +1198,10 @@ getLoadedLucideIcons();                  // the map if already fetched, else und
 Inside React, `useLucideIcons()` returns the map once it has landed and
 `undefined` before that.
 
-### `iconKeys` and `cool_icon_keys`
+### `iconKeys` and `coolIconKeys`
 
 - **`iconKeys`** — Array of ~1900+ all available Lucide icon name strings.
-- **`cool_icon_keys`** — Curated subset of ~50 visually distinctive icon names for icon pickers.
+- **`coolIconKeys`** — Curated subset of ~50 visually distinctive icon names for icon pickers.
 
 ```tsx
 import { iconKeys, coolIconKeys, LucideIconByName } from "@rebasepro/ui";
