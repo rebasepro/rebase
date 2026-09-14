@@ -1,8 +1,8 @@
 import { chromium } from "playwright";
-import { pathToFileURL } from "url";
+import { fileURLToPath } from "url";
 const b = await chromium.launch();
 const p = await b.newPage({ viewport:{width:520,height:200}, deviceScaleFactor:3 });
-await p.goto(pathToFileURL("/Users/francesco/rebase/.design-sync/audit/switch.html").href);
+await p.goto(new URL("switch.html", import.meta.url).href);
 await p.waitForTimeout(900);
 const r = await p.evaluate(()=>window.__sw());
 r.forEach(x=>console.log(
@@ -10,5 +10,5 @@ r.forEach(x=>console.log(
   "gaps L/R/T", (x.leftGap+"/"+x.rightGap+"/"+x.topGap).padEnd(10),
   (x.leftGap===x.topGap && (x.k.endsWith("off")? x.leftGap>0 : x.rightGap>0)) ? "ok" : "CHECK",
   "| transition:", x.transition));
-await p.screenshot({ path:"/Users/francesco/rebase/.design-sync/audit/switch.png", clip:{x:0,y:0,width:460,height:150} });
+await p.screenshot({ path:fileURLToPath(new URL("switch.png", import.meta.url)), clip:{x:0,y:0,width:460,height:150} });
 await b.close();

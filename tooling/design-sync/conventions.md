@@ -11,8 +11,10 @@ RLS editors, API keys, users.
 container — do not add it by default.)
 
 **Dark mode is class-based, not `prefers-color-scheme`.** Put `class="dark"` on an
-ancestor (normally `<html>`) and every `dark:` utility flips. Always author both
-themes: the DS pairs a light and dark value on essentially every surface.
+ancestor (normally `<html>`): the surface and hairline tokens below switch on their
+own, and every `dark:` utility flips. Always author both themes — backgrounds and
+borders through those tokens, which need no `dark:` pair, and everything else as a
+light value beside its `dark:` one.
 
 ## Styling idiom
 
@@ -21,14 +23,17 @@ tokens, not guesses:
 
 | Family | Scale | Use for |
 |---|---|---|
-| `surface-*` | 50 100 200 300 400 500 600 700 800 900 950 | page and panel backgrounds, borders |
-| `surface-accent-*` | 50 → 950 | field fills, subtle hover/selected tints |
+| `surface-frame` `-sheet` `-card` `-raised` `-lifted` `-field` `-well` `-scrim` | one per role; light and dark built in | every background, by role: frame (drawer, app bar, the page around the sheet) → sheet (the content area) → card (cards, dialogs, menus) → raised (neutral buttons, chips, tiles inside a card); `field` for inputs, `well` for an inset code block |
+| `surface-hover` `-active` `-card-hover` `-raised-hover` `-field-hover` | one per role | hover and selected fills: `hover:bg-surface-hover` on transparent things, a solid surface's own `-hover` on that surface |
+| `hairline` `hairline-strong` | light and dark built in | borders: `border-hairline` on cards and fields, `border-hairline-strong` on menus, popovers and dialogs |
+| `surface-*` `surface-accent-*` | 50 → 950 | the palette under the roles — glyphs and text (`text-surface-accent-500`), not backgrounds |
 | `text-primary` `text-secondary` `text-disabled` | + `-dark` variants | body copy, via `text-text-primary`, `dark:text-text-primary-dark` |
-| `primary` `secondary` | + `-light` `-dark` `-bg` | brand blue `#0070F4`, accent pink `#FF5B79` |
+| `primary` `secondary` | + `-light` `-dark` `-bg` | brand blue `#0070F4`; `secondary` is rose `#E11D48` |
 
-So: `bg-surface-50 dark:bg-surface-900`, `border-surface-200`,
-`text-text-secondary dark:text-text-secondary-dark`, `bg-primary`, `text-primary`,
-`bg-primary-bg` (a 10%-alpha primary wash for selected rows).
+So: `bg-surface-sheet` for the page, `bg-surface-card border border-hairline` for a
+card (`cardMixin` is that plus the radius), `text-text-secondary dark:text-text-secondary-dark`,
+`bg-primary`, `text-primary`, `bg-primary-bg` (a 10%-alpha primary wash for
+selected rows).
 
 Type: `font-sans` (Inter) is the default; `font-headers` (Instrument Sans) is for
 headings; `font-mono` (JetBrains Mono) for code and identifiers. Pair headings with
@@ -118,7 +123,7 @@ authoritative; this file is a summary.
 ## Idiomatic example
 
 ```tsx
-<div className="p-6 bg-surface-50 dark:bg-surface-900 min-h-full">
+<div className="p-6 bg-surface-sheet min-h-full">
   <div className="flex items-center gap-4 mb-6">
     <Typography variant="h4" className="grow">Users</Typography>
     <SearchBar placeholder="Search users…" />

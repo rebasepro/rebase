@@ -1,8 +1,7 @@
 import { chromium } from "playwright";
-import { pathToFileURL } from "url";
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
-await p.goto(pathToFileURL("/Users/francesco/rebase/.design-sync/audit/color-audit.html").href);
+await p.goto(new URL("color-audit.html", import.meta.url).href);
 await p.waitForTimeout(1500);
 const rows = await p.evaluate(() => window.__colors());
 await b.close();
