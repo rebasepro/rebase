@@ -587,7 +587,7 @@ unsubscribe();
 const unsubscribe = rebase.data.posts.listen(
     { where: { status: ['==', 'published'] }, limit: 50 },
     (response) => {
-        // response: FindResponse with updated data
+        // response: FindResult — `data` is flat rows, `meta` the pagination
         console.log('Updated posts:', response.data);
     },
     (error) => {
@@ -601,9 +601,9 @@ const unsubscribe = rebase.data.posts.listen(
 ```typescript
 const unsubscribe = rebase.data.posts.listenById(
     'post-123',
-    (entity) => {
-        // entity: Entity | undefined
-        console.log('Post updated:', entity);
+    (row) => {
+        // row: the flat row, or undefined once it is deleted
+        console.log('Post updated:', row);
     },
     (error) => {
         console.error('Error:', error);
