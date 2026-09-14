@@ -45,7 +45,7 @@ export const uiReference: AppView = {
 };
 ```
 
-Then open `/debug/ui` on the frontend URL `rebase dev` prints. Use it to check spacing and dark mode before you call a view done.
+Then open `/debug/ui` on the frontend URL `rebase dev` prints. Use it to check spacing and dark mode before you call a view done. It is a development aid, a quarter of a megabyte of demo UI: drop it before shipping, or load it with `React.lazy` as the Rebase app does.
 
 ### What to read for what you're building
 

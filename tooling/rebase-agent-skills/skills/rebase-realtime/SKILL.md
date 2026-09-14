@@ -203,9 +203,9 @@ listen(
 
 ## Update Delivery: Instant Patch + Correctness Refetch
 
-Every update a subscriber receives is a **debounced refetch under the subscriber's own scope**. When a row changes, the server waits out a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), re-runs the subscription's query with its original filters and sort order *as that subscriber* (so RLS and `afterRead` apply to the reader, not the writer), and sends the result as `collection_update` (or `single_update` for a `listenById`).
+Every update a subscriber receives is a **debounced refetch under the subscriber's own scope**. When a row changes, the server waits out a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), re-runs the subscription's query with its original filters and sort order *as that subscriber* (so RLS binds the reader, not the writer), and sends the result as `collection_update` (or `single_update` for a `listenById`). Multiple rapid mutations within the 300ms window are coalesced into a single database query.
 
-There used to be an instant row patch (`collection_patch`) ahead of the refetch. Nothing sends it any more: it carried the row as the *writer* had read it, which a subscriber the row's RLS hides could see. The type is still declared; do not wait for the frame. Multiple rapid mutations within the 300ms window are coalesced into a single database query.
+There used to be an instant row patch (`collection_patch`) ahead of the refetch. Nothing sends it any more: it carried the row as the *writer* had read it, which a subscriber the row's RLS hides could see. The type is still declared; do not wait for the frame.
 
 ## Subscription Deduplication and Caching
 
