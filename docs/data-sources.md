@@ -9,7 +9,7 @@ A collection's storage has three orthogonal properties:
 
 | Axis | Meaning | Field |
 |------|---------|-------|
-| **Engine** | `postgres` / `mongodb` / `firestore` / custom — drives editor capabilities (relations vs subcollections, RLS, column types) | `DataSourceDefinition.engine` (or the deprecated `collection.driver`) |
+| **Engine** | `postgres` / `mongodb` / `firestore` / custom — drives editor capabilities (relations vs subcollections, RLS, column types) | `DataSourceDefinition.engine`, or `collection.engine` where no definition is registered |
 | **Instance** | which physical DB / schema / Firestore database within the engine | `collection.databaseId` (defaults from the data source) |
 | **Transport** | how the *frontend* reaches it | `DataSourceDefinition.transport` |
 
@@ -32,9 +32,11 @@ Transport values:
 { slug: "events", dataSource: "analytics", properties: { /* … */ } }
 ```
 
-`collection.dataSource` is the routing key (default `"(default)"`). The legacy
-`collection.driver` still works — when `dataSource` is omitted it doubles as the
-key, and it always provides the engine hint.
+`collection.dataSource` is the routing key (default `"(default)"`);
+`defineCollection` also accepts the handle `database("analytics")` returned and
+records its key. `collection.engine` is the engine hint: a registered definition's
+`engine` wins over it, and build-time tooling, which has no registry, reads it
+directly (see below).
 
 ## Frontend
 
@@ -54,20 +56,35 @@ key, and it always provides the engine hint.
   and programmatic `context.data`, with no per-collection wiring. Routing
   follows the *target* path, so a reference from a Firestore form to a Postgres
   collection is still served by Postgres.
-- The deprecated `drivers={{ key: driver }}` map is a shorthand for
-  `dataSources: [{ key, engine: key, transport: "direct", driver }]`.
+- `transport` may be left out on the frontend: an entry with a `driver` is
+  `direct`, one without is `server`.
 
 ## Backend
 
+The backend takes no list of data sources. They are declared once, with
+`database()` in `config/resources.ts`, and every consumer reads the declarations:
+
 ```ts
-initializeRebaseBackend({
-  // …
-  dataSources: [
-    { key: "analytics", engine: "firestore", transport: "direct" }, // client-only
-  ],
-});
+// config/resources.ts
+import { database } from "@rebasepro/types";
+
+export const main      = database();                                // (default) — DATABASE_URL
+export const events    = database("events", { engine: "mongodb" }); // DATABASE_URL__EVENTS
+export const analytics = database("analytics", { engine: "firestore", transport: "direct" }); // client-only
 ```
 
+Run `rebase resources --write` after changing them, so `rebase.resources.json` —
+the copy a host reads without running code — follows. The managed runtime reads
+the declarations at boot; an ejected backend reads them with
+`declaredDataSources()`, resolves connections with `resolveDataSources()`, opens
+them with `initializeDataSources()` and hands the resulting bootstrappers to
+`initializeRebaseBackend`, which is what the ejected template does. A
+`dataSources` key on the backend config is refused at boot rather than ignored.
+
+- Every server-transport source needs its own connection, `DATABASE_URL__<KEY>`.
+  A declared source without one is a boot error, not a silent fall-back to the
+  default database. The driver package follows from the engine;
+  `REBASE_DRIVER__<KEY>` overrides it.
 - The backend resolves each collection's engine and transport from the same
   definitions.
 - Collections on a `direct`/`custom` transport are **client-only**: the backend
@@ -79,23 +96,21 @@ initializeRebaseBackend({
 
 ### Multiple engines in one instance (Postgres + MongoDB)
 
-Register one bootstrapper per engine; mark one as the default:
+Declare the second database with its engine, as `events` above, and point the
+collections that live there at its key:
 
 ```ts
-initializeRebaseBackend({
-  bootstrappers: [pgBootstrapper /* isDefault */, mongoBootstrapper],
-  collections: [
-    { slug: "products", /* … */ },                 // → Postgres (default)
-    { slug: "events", driver: "mongodb", /* … */ } // → MongoDB
-  ],
-});
+{ slug: "products", /* … */ }                     // → Postgres (default)
+{ slug: "events", dataSource: "events", /* … */ } // → MongoDB
 ```
 
+One bootstrapper is initialized per declared server-transport source, each
+registered under the source's key, and the `(default)` one is the default.
 Each request is routed to the right delegate by the collection's resolved
-data-source key (which matches the bootstrapper id/type, e.g. `"mongodb"`). The
-auth middleware scopes the chosen delegate into the request context — applying
-Postgres RLS where supported, and no-op scoping for engines without
-`withAuth()`. Single-engine backends are unaffected (no per-request lookup).
+data-source key, which is that bootstrapper's id. The auth middleware scopes the
+chosen delegate into the request context — applying Postgres RLS where
+supported, and no-op scoping for engines without `withAuth()`. Single-engine
+backends are unaffected (no per-request lookup).
 
 **Realtime** is routed too: the single WebSocket server is driven by a composite
 that sends each `subscribe_collection`/`subscribe_entity` to the realtime
@@ -106,8 +121,8 @@ never reaches the backend.
 
 If a server-transport collection names a data-source key with no registered
 driver, the backend logs a warning at boot (the collection would otherwise
-silently fall back to the default driver — i.e. the wrong database). Register a
-bootstrapper with that id, or mark the source `direct`/`custom`.
+silently fall back to the default driver — i.e. the wrong database). Declare the
+source with `database("<key>")`, or mark it `direct`/`custom`.
 
 > **Note:** entity **history** is served by the default engine's history
 > service; the revert action routes through the per-request delegate. Per-engine
@@ -194,9 +209,13 @@ At runtime the same question has an exact answer, because boot knows the
 initialized sources: it hands each bootstrapper only the collections its engine
 stores, and logs the ones it routed elsewhere.
 
-## Back-compat
+## What is gone
 
-- `<Rebase client>` / `driver` / `data` are unchanged; a plain app needs no
-  `dataSources`.
-- `collection.driver` and `collection.databaseId` keep working.
-- `drivers={{…}}` keeps working as a deprecated alias.
+- A plain app needs no `dataSources`: `<Rebase client>` alone serves every
+  collection through the backend. The frontend's only two data props are
+  `client` and `dataSources`; the old top-level `driver`, `data` and
+  `drivers={{…}}` props no longer exist.
+- On a collection, `dataSource`, `engine` and `databaseId` are the fields.
+  There is no `collection.driver`.
+- On the backend, a `dataSources` option is refused at boot, with the
+  `database()` declaration named as its replacement.

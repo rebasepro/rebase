@@ -121,7 +121,8 @@ It is the most important-looking file in a new project, and editing it does
 nothing. Worse, `synthesizeManifest` treats its presence as evidence of an
 ejected backend and infers `type: "custom"` (`packages/cli/src/manifest.ts:283`),
 so a project predating the manifest lands on the custom runtime by default, with
-all of its costs (`docs/cloud-deploy-workspace-vendoring.md`).
+all of its costs: a container image built from source on every deploy, in a build
+where a framework package linked to a local checkout does not resolve at all.
 
 ### 2.4 The consequential choice is never authored
 
@@ -704,7 +705,7 @@ reader that ignored it is unaffected, and there was no reader that did not.
 
 ### 4.10 What `rebase init` scaffolds for self-hosting
 
-Self-hosting is the *first* thing that has to be right — for a while it is the
+Self-hosting is the *first* thing that has to be right — for a while it was the
 only option — and the scaffold was contradicting the manifest it wrote.
 
 A new project declared `runtime: "managed"` and shipped a `docker-compose.yml`
@@ -721,9 +722,14 @@ The scaffolded compose runs the managed shape instead — Postgres, plus
 ```
 rebase build              # produces ./dist-bundle
 docker compose up -d db
-rebase db push            # create the collection tables, once
-docker compose up
+docker compose up         # boot creates the tables it is missing
 ```
+
+Boot provisions the collection tables itself (`REBASE_MIGRATE_ON_BOOT=ensure`,
+additive only); `rebase db push` remains the step for what it deliberately
+leaves alone — junction-table RLS, and any change that is not purely additive.
+The scaffold has no `backend/src/index.ts`: `backend/` holds the functions and the
+generated schema, and an entrypoint exists only once `rebase eject` writes one.
 
 One container, serving the API at `/api` and the admin at `/`. Same origin, so
 there is no CORS between them and no second web server. No application image is
