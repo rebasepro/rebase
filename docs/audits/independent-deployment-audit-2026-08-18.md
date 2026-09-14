@@ -87,13 +87,12 @@ Every backend unit renders `image: {{ include "rebase.image" $root }}`
 - `REBASE_FUNCTIONS_ONLY` selects at **boot**, from a bundle that carries every
   function's compiled tree anyway.
 
-This is by design and it is written down — `docs/runtime-roles-plan-2026-08.md`
-§6 puts per-function content hashing and per-function declared resources in
+This is by design and it was written down — the runtime-roles plan put
+per-function content hashing and per-function declared resources in
 Phase 2, explicitly "after somebody has run a split deployment". Somebody now has.
 
-**What shipped** (2026-08-18, same day as this audit): option A of
-[independent-release-options-g1.md](../plans/independent-release-options-g1.md), in two
-steps. The guard first — the provisioning process stamps the collections schema
+**What shipped** (2026-08-18, same day as this audit): option A of the five
+options weighed at the time, in two steps. The guard first — the provisioning process stamps the collections schema
 version it applied into `rebase.schema_meta`, and every other process computes
 its own and compares, warning by default and refusing under
 `REBASE_REQUIRE_SCHEMA_MATCH`. Then the pins: `functions.image.tag`,
@@ -122,8 +121,8 @@ different `schemaVersion`s, against one database. That is the same version-skew
 axis the previous audit flagged for BYOC, arriving early. Decide it deliberately;
 do not let a values-file field decide it.
 
-The five ways to answer it, what each costs and what it forecloses, are written
-up in [independent-release-options-g1.md](../plans/independent-release-options-g1.md).
+Five ways to answer it were weighed; option A (per-unit pins behind a
+schema-version stamp) is what shipped, as described above.
 
 ### G2 — The chart's default image tag does not exist — **FIXED**
 

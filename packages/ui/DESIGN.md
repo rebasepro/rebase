@@ -9,9 +9,8 @@ to this document. Product truth is in `PRODUCT.md`.
 
 ## Surfaces
 
-Added September 2026. Plan and measurements:
-[`docs/plans/surface-system-2026-09.md`](../../docs/plans/surface-system-2026-09.md);
-reference: [`docs/design/instatic-distilled.html`](../../docs/design/instatic-distilled.html).
+Added September 2026. Reference, with the measurements behind the ladder:
+[`docs/design/instatic-distilled.html`](../../docs/design/instatic-distilled.html).
 
 A surface is named by **role**, never by a numbered pair. `bg-white
 dark:bg-surface-900` is the pattern this system exists to retire: 180 files

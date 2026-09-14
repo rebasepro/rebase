@@ -9,4 +9,4 @@ are what the product follows.
   against Rebase, and the dark-mode surfaces measured on demo.rebase.pro. Open
   the file in a browser; it is self-contained. Also published at
   https://claude.ai/code/artifact/9675dafd-61dd-4382-8ff2-9120d75fd9ed.
-  It is the source for `docs/plans/surface-system-2026-09.md`.
+  It is the source for the surface system in `packages/ui/DESIGN.md`.

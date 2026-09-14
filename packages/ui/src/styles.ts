@@ -131,8 +131,8 @@ export const defaultBorderMixin = "border-hairline";
 // ---------------------------------------------------------------------------
 // Surfaces are named by ROLE (see theme.css) and the theme decides the value.
 // Every nested surface is one step lifted from the surface it sits on, on both
-// themes. The reasoning and the measurements behind the ladder are in
-// docs/plans/surface-system-2026-09.md.
+// themes. The rules are in packages/ui/DESIGN.md (Surfaces); the measurements
+// behind the ladder are in docs/design/instatic-distilled.html.
 //
 // Two kinds of card, and the difference is what the border is for.
 //

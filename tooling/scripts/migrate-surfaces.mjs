@@ -10,7 +10,7 @@
  * Pairs that need a per-file decision (frame vs. card, track vs. field) are
  * deliberately not in the table; the script lists the files that still carry
  * them under "ambiguous" so they can be edited by hand.
- * See docs/plans/surface-system-2026-09.md for the mapping rationale.
+ * See packages/ui/DESIGN.md (Surfaces) for the role each pair maps to.
  */
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";

@@ -235,8 +235,8 @@
  * background REPLACES it — white at 6% over the sheet is darker than the card
  * it was meant to lift.
  *
- * The full reasoning, with the measurements, is in
- * docs/plans/surface-system-2026-09.md and docs/design/instatic-distilled.html.
+ * The rules are in packages/ui/DESIGN.md (Surfaces); the measurements behind
+ * them are in docs/design/instatic-distilled.html.
  * ------------------------------------------------------------------------- */
 /* No `.light` class here on purpose: nothing in the app sets one, and third-party
    widgets (React Flow) stamp `light` on their own root, which re-lit every token

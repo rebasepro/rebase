@@ -121,7 +121,6 @@ packages/forms/.yarn/
 !/README.md
 !/CHANGELOG.md
 !/CONTRIBUTING.md
-!/PUBLISHING.md
 !/LICENSE
 yarn.lock
 package-lock.json
@@ -215,9 +214,8 @@ dist-bundle-acceptance/
 .claude/harness/
 .ds-sync/
 ds-bundle/
-.design-sync/.cache/
-.design-sync/learnings/
-.design-sync/node_modules
+tooling/design-sync/.cache/
+tooling/design-sync/learnings/
 packages/ui/dist/_design-sync-compiled.css
 
 # Generated coverage reports.
