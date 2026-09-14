@@ -9,7 +9,7 @@ means agreeing to our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Prerequisites
 
-- **Node.js** ≥ 22.22 (CI runs 22.x; `packages/app` and `packages/cms` declare this floor)
+- **Node.js** ≥ 22.22 (CI runs 22.x; every published package declares `node >=22.22.0`)
 - **pnpm** ≥ 11 (`corepack enable` to activate)
 - **Docker** (for the local PostgreSQL database)
 
@@ -160,27 +160,22 @@ it too; it is not a document written *for* agents and optional for people.
 
 ## Commits and the Changelog
 
-Commit messages are [Conventional Commits](https://www.conventionalcommits.org/),
-because the release script reads them: `tooling/scripts/release.sh` groups the
-commits since the last tag by prefix to build the release notes. A message that
-matches no prefix lands under "Other".
-
-```
-feat(scope): lowercase sentence describing the change
-```
-
-- One of `feat` / `fix` / `refactor` / `docs` / `chore`, plus `feat!` for a
-  breaking change. `.github/internal/PUBLISHING.md` has the full table.
-- The scope is the package or area (`cli`, `server`, `website`, `gates`).
-- The subject is a lowercase sentence, no trailing period. It is read as a
-  changelog line, so write what changed, not what you did.
+Nothing parses commit messages. The release notes are the `## [Unreleased]`
+section of `CHANGELOG.md`, written by hand in the pull request that makes the
+change, and a release publishes them as written: `release.sh` and the publish
+workflow both run `tooling/scripts/prepare-changelog.mjs`, which promotes that
+section to the new version, and both refuse to release without notes. So a
+change a user would notice needs its line there, and a commit subject is written
+for the person reading `git log` — one sentence saying what changed, or what was
+wrong.
 
 **Only ever edit `## [Unreleased]` in `CHANGELOG.md`.** The version headings
-below it are history. `release.sh` promotes `[Unreleased]` to the new version,
+below it are history. The release promotes `[Unreleased]` to the new version,
 dates it, and opens a fresh empty one — so a note written under a version
 heading is either overwritten or silently left out of the release it belonged
-to. `pnpm check:release-bump` reads that section to decide whether the bump you
-asked for matches what the notes say changed.
+to. A release whose contract baselines show a break must carry a `### Breaking`
+heading in that section: `pnpm check:release-bump` refuses it otherwise, and
+asks for at least a minor.
 
 After editing `CHANGELOG.md` or anything under `docs/`, regenerate the website's
 mirrors and commit them with the change:
