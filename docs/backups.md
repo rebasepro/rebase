@@ -183,6 +183,20 @@ export default resolved.config
     });
 ```
 
+A scheduled backup captures the same database `rebase db backup` does: all of
+it, including the `rebase` schema. That schema holds every user account and the
+rest of auth, API keys, record history, the job queue and cron logs, and the
+functions your RLS policies and CDC triggers call. `createBackupCron` accepts
+`excludeSchemas` to leave schemas out, but never leave out `rebase`. The dump
+would lose those rows, and `pg_restore` could not load it into an empty database
+at all, because the tables it does contain have policies and triggers that call
+functions it does not.
+
+> **Up to and including 0.21.0, the scheduled job left `rebase` out by
+> default.** Its dumps have no users and cannot be restored into an empty
+> database. Take a fresh backup after upgrading rather than relying on one it
+> made.
+
 ### Configuration (env)
 
 | Variable | Meaning |
@@ -203,6 +217,13 @@ timestamp, and a per-row **Download** button. It reads from the admin route
 `GET /api/admin/backups` (admin-guarded) and streams downloads through
 `GET /api/admin/backups/download?key=…`, so downloads work for both local and
 object-storage destinations without exposing the bucket publicly.
+
+Each row also has a **Roles file** button for the backup's `.globals.sql`
+sidecar (the listing carries its key as `globalsKey`). Download both files and
+keep them in one directory: `rebase db restore` looks for the sidecar next to
+the `.dump`, and without it a restore into a new Postgres stops at the first
+`GRANT` to a role that does not exist there. A row marked **No roles file** has
+no sidecar, so recreate its roles by hand before restoring it anywhere new.
 
 The panel is enabled by default. To customise the visible tools, pass the
 `tools` array to `<RebaseStudio tools={[…, "backups"]}/>`. When

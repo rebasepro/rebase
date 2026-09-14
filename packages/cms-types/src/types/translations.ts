@@ -1165,6 +1165,10 @@ export interface RebaseTranslations {
     studio_backups_denied_hint?: string;
     studio_backups_read_failed?: string;
     studio_backups_downloading?: string;
+    studio_backups_roles_file?: string;
+    studio_backups_roles_file_hint?: string;
+    studio_backups_no_roles_file?: string;
+    studio_backups_no_roles_file_hint?: string;
     studio_cron_denied_title?: string;
     studio_cron_denied_hint?: string;
     studio_cron_read_failed?: string;

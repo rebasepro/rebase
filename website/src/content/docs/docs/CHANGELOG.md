@@ -7,6 +7,32 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Fixed
+
+- **Scheduled backups include your users again, and can be restored.**
+  `createBackupCron` left the `rebase` schema out of every dump unless told
+  otherwise. The aim was to skip Atlas's revision table, but that schema also
+  holds every user account and the rest of auth, API keys, record history, the
+  job queue and cron logs, and the functions every generated RLS policy and CDC
+  trigger calls. So each scheduled dump was missing all of that. It also could
+  not be restored into an empty database: every collection's generated policies
+  call `rebase.uid()` and `rebase.roles()`, so `pg_restore` stopped with
+  `schema "rebase" does not exist`. `rebase db backup` excludes nothing, so the
+  manual and the scheduled backup captured different databases.
+
+  The scheduled backup now excludes nothing either, and `excludeSchemas` still
+  narrows it when you pass one. A scheduled dump made by an earlier version
+  cannot be trusted, so take a fresh backup after upgrading.
+
+- **The Studio Backups panel downloads a backup's roles file.** A backup is a
+  `.dump` plus a `.globals.sql` sidecar holding the database roles its grants
+  and RLS policies refer to, and `rebase db restore` needs both. The panel, and
+  the `/api/admin/backups` routes behind it, only knew about the `.dump`, so a
+  backup downloaded from Studio stopped at its first `GRANT` when restored into
+  a new Postgres. Each row now has a **Roles file** button, or says **No roles
+  file** when there is none. The listing carries the sidecar's key as
+  `globalsKey`, and `/download` serves it.
+
 ## [0.21.0] - 2026-09-14
 
 ### Breaking

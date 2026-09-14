@@ -112,6 +112,16 @@ enforced or written down, which is the standard this codebase sets elsewhere.
 
 #### H1 — every scheduled backup silently omits API keys, record history, cron logs, channel history, branches, idempotency keys and the CDC trigger function
 
+> **Fixed 2026-09-14.** `createBackupCron` now excludes nothing by default, the
+> same as `rebase db backup`; `excludeSchemas` remains the override. The gap was
+> wider than listed below: auth moved into `rebase` since this audit, so the
+> dump also lost every user account. The restore-abort scenario is now
+> confirmed by execution. `test/e2e/scheduled-backup-e2e.test.ts` runs the
+> cron's handler, then restores its dump into an empty database. With the old
+> default, `pg_restore --exit-on-error` stopped at
+> `CREATE TRIGGER rebase_cdc_trigger … EXECUTE FUNCTION rebase.rebase_cdc_notify()`
+> with `schema "rebase" does not exist`.
+
 `packages/server-postgres/src/backup/backup-cron.ts:118`
 
 ```ts
@@ -168,6 +178,13 @@ stays, it needs a boot-time or run-time warning naming what is being dropped, an
 a test that dumps a database with a CDC trigger and restores it.
 
 #### H2 — the Studio can download the dump but not the sidecar that makes it restorable
+
+> **Fixed 2026-09-14.** The listing attaches each dump's sidecar as
+> `BackupInfo.globalsKey` rather than listing it as its own entry, and
+> `readBackupBytes` serves `.dump` and `.globals.sql` in both branches. The
+> panel shows a **Roles file** button per row, or a **No roles file** chip when
+> a dump has none. It is still two downloads, not one archive. M4 (no prefix
+> containment on the object branch) is untouched.
 
 `packages/server/src/backup/backup-common.ts:60, 83, 114, 122`
 
@@ -678,6 +695,8 @@ These cannot be settled by reading files, and none was executed.
    trigger function's schema, and the trigger belongs to a `public` table — but
    the only way to know is to dump a CDC-enabled database and read the TOC.
    `pg_restore --list` on such a dump answers it in one command.
+   **Answered 2026-09-14: yes.** The trigger is dumped with its table, and the
+   restore aborts on it (see H1).
 2. **Has any scheduled backup in any deployment ever been restored?** No test
    does it, no doc records it, and `createBackupCron` has no caller anywhere in
    the repository — the scaffold ships no `crons/` directory, so every user of

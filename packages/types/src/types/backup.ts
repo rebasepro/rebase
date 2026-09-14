@@ -23,4 +23,12 @@ export interface BackupInfo {
 
     /** The kind of destination this backup was read from. */
     destinationKind: BackupDestinationKind;
+
+    /**
+     * Key of the `.globals.sql` sidecar written beside this dump, when there is
+     * one. It holds the database roles the dump's GRANTs and RLS policies name,
+     * and `rebase db restore` looks for it next to the `.dump` — so a copy of the
+     * backup needs both files. Absent when the dump was taken without it.
+     */
+    globalsKey?: string;
 }
