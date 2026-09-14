@@ -866,7 +866,7 @@ on it:
 | `onAdminResetPassword` → `temporaryPassword` | **BUG** — the same shape. This hook *could* write through `authRepo`; nothing held it to that. Same fix. |
 | `invitationSent`, on both reset hooks | clean — a report of what the hook did, passed through |
 | `AuthCollectionCreateResult.temporaryPassword`, `onAdminCreateUser` | clean — the hook writes `values.passwordHash` itself, as its doc requires. Nothing checks the two agree. |
-| `hookHandledEmail` / `invitationSent` from a create hook | **OPEN** (class 42) — the REST data path (`api-generator.ts`) honours them. `POST /admin/users` reads neither, so with email configured it sends its own invitation after the hook's, and drops the hook's `temporaryPassword` from the response. |
+| `hookHandledEmail` / `invitationSent` from a create hook | **BUG** (class 42) — the REST data path (`api-generator.ts`) honoured them. `POST /admin/users` read neither, so with email configured it sent its own invitation after the hook's and dropped the hook's `temporaryPassword` from the response. Fixed in 8c5a265d8: both create doors call `completeUserCreation`. See class 42's 2026-09-14 entry. |
 
 ---
 
