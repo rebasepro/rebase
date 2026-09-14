@@ -189,8 +189,6 @@ a path of their own — see [Realtime](/docs/backend/realtime/).
 
 ## MCP surface
 
-<span class="since-badge" data-since="0.21">Since 0.21</span>
-
 Mounted only when `REBASE_MCP_ENABLED=true`, which also requires
 `REBASE_PUBLIC_URL` — see
 [Configuration](/docs/getting-started/configuration/#mcp-surface). Off by
