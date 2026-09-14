@@ -192,8 +192,10 @@ logs rather than discovering them when it is gone.
 
 ## The audit
 
-Taken from the mounted surfaces in `init.ts`. "Gate" is what stands in front of
-the router.
+Taken from the mounted surfaces in `init.ts`, plus the probes `boot/boot.ts`
+mounts outside it. "Gate" is what stands in front of the router. Paths are
+relative to `basePath` unless they start at `/.well-known`, `/mcp`, `/livez`,
+`/health` or `/metrics`, which sit at the root.
 
 ### Admin — under `/api/admin`
 
@@ -207,6 +209,7 @@ the router.
 | `/admin/logs` | admin | **moved** from `/api/logs`; aliased |
 | `/admin/schema-editor` | admin | **moved** from `/api/schema-editor`; aliased |
 | `/admin/schema` | admin | new — live schema editing |
+| `/admin/dev/emails` | admin | the development mailbox; `501 DEV_MAILBOX_UNAVAILABLE` unless mail is being captured (no `SMTP_HOST`, not production) |
 
 ### Data plane
 
@@ -222,14 +225,29 @@ the router.
 |---|---|
 | `/auth/**` | ✓ |
 | `/.well-known/jwks.json` | ✓ |
-| `/meta/schema-version` | ✓ — see §6 |
+| `/meta/schema-version` | ✓ — see §7 |
 | `/livez` | ✓ — not under `basePath`, because a probe should not depend on it |
+| `/health` | ✓ — also answered at `/api/health`. It touches the database, so it is the readiness probe; in production the reason for a `degraded` verdict is logged, not returned |
+
+### MCP — only when the `mcp` surface is on (`REBASE_MCP_ENABLED=true`) and `REBASE_PUBLIC_URL` is set
+
+| Path | Gate | Notes |
+|---|---|---|
+| `/mcp` | an OAuth access token minted for this resource | not under `basePath`. `POST` is JSON-RPC; `GET` answers 405, since the server opens no streams |
+| `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server` | none | discovery documents, public by the RFCs that define them (9728, 8414); the protected-resource one is also served at its path-suffixed form |
+| `/oauth/register` | none | dynamic client registration; `REBASE_MCP_OPEN_REGISTRATION=false` turns it off |
+| `/oauth/authorize`, `/oauth/authorize/decision` | a signed-in person's consent | PKCE (`S256`) is mandatory |
+| `/oauth/token`, `/oauth/revoke` | the client: its code and PKCE verifier, or its refresh token | ✓ |
+| `/oauth/grants` | the signed-in person | lists and withdraws their own connected applications |
 
 ### Mixed
 
 | Path | Notes |
 |---|---|
-| `/meta/contract` | admin-gated inside an ungated router — see §6 |
+| `/meta/contract` | admin-gated inside an ungated router — see §7 |
+| `/docs` | the OpenAPI document. Public unless `enableSwagger` is `false` — the production default when `REBASE_ENABLE_SWAGGER` is unset — and then admin-gated. With no collections served it answers `404 NO_COLLECTIONS` |
+| `/swagger` | Swagger UI over `/docs`. Not mounted in production |
+| `/metrics` | Prometheus text, only when `REBASE_METRICS=true`. Bearer `REBASE_METRICS_TOKEN` when that is set; readable by anyone who can reach the port when it is not, which boot warns about |
 
 ### Known drift, not yet fixed
 
