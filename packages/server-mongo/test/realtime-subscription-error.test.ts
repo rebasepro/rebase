@@ -77,6 +77,20 @@ const invoices: CollectionConfig = {
     }
 };
 
+/**
+ * Reads fine, but hands back a value no JSON frame can carry, so the rows
+ * frame fails to serialise after the delivery has claimed its slot.
+ */
+const gauges: CollectionConfig = {
+    slug: "gauges",
+    name: "Gauges",
+    engine: "mongodb",
+    properties: { title: { name: "Title", type: "string" } },
+    callbacks: {
+        afterRead: ({ row }) => ({ ...row, reading: BigInt(7) })
+    }
+};
+
 /** Readable until sealed, so the initial fetch succeeds and a re-fetch fails. */
 let sealed = false;
 const contracts: CollectionConfig = {
@@ -206,6 +220,7 @@ describe("Mongo realtime: a failed subscription fetch reaches the subscriber", (
         registry.register(dossiers);
         registry.register(ledgers);
         registry.register(invoices);
+        registry.register(gauges);
         registry.register(contracts);
         realtime = new MongoRealtimeService(db);
         driver = new MongoDriver(db, realtime, undefined, registry);
@@ -290,6 +305,23 @@ describe("Mongo realtime: a failed subscription fetch reaches the subscriber", (
                 code: "INTERNAL_ERROR"
             } },
             error: "Could not load data for \"invoices\". Check server logs for details."
+        });
+    });
+
+    it("answers a subscription whose rows cannot be sent", async () => {
+        await insert("gauges", "Boiler 2");
+
+        const { subscriptionId, next } = await subscribe("subscribe_collection", { path: "gauges" });
+
+        // Nothing else reached the client, so this is its only answer.
+        expect(await next()).toEqual({
+            type: "ERROR",
+            subscriptionId,
+            payload: { error: {
+                message: "Could not load data for \"gauges\". Check server logs for details.",
+                code: "INTERNAL_ERROR"
+            } },
+            error: "Could not load data for \"gauges\". Check server logs for details."
         });
     });
 

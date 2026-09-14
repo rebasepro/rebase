@@ -489,6 +489,191 @@ title: "too late" }]);
         });
     });
 
+    // A failed fetch answers a socket subscriber with an error frame, and the
+    // frame now takes the slot its rows would have. Every failure used to send
+    // one, whatever had been delivered since. The client routes errors by
+    // `subscriptionId`, so it called `onError` for a view already showing newer
+    // rows, or for the subscription that replaced the one that failed.
+    describe("a socket subscriber's failed fetch", () => {
+        const failure = new Error("the fetch failed");
+        const errorFrames = () => messagesOfType("error");
+        /** The one frame a failure should produce, masked as every fault is. */
+        const failureFrame = expect.objectContaining({
+            subscriptionId: "sub-1",
+            error: "Could not load data for \"notes\". Check server logs for details."
+        });
+
+        it("still sends its frame when nothing newer has arrived", async () => {
+            void subscribeCollection();
+            await settle();
+            collectionFetches[0].reject(failure);
+            await settle();
+
+            expect(errorFrames()).toEqual([failureFrame]);
+            expect(collectionUpdates()).toEqual([]);
+        });
+
+        it("still sends it for a refetch that fails after the subscription loaded", async () => {
+            void subscribeCollection();
+            await settle();
+            collectionFetches[0].resolve([{ id: "n1",
+title: "initial" }]);
+            await settle();
+
+            await notify();
+            await runDebounce();
+            collectionFetches[1].reject(failure);
+            await settle();
+
+            expect(errorFrames()).toEqual([failureFrame]);
+        });
+
+        it("still sends it when the rows themselves cannot be sent", async () => {
+            // The check passes and claims the slot, then serialising the frame
+            // throws. Nothing reached the subscriber, so the failure is its
+            // answer, and the claimed slot must not silence it.
+            void subscribeCollection();
+            await settle();
+            collectionFetches[0].resolve([{ id: "n1",
+size: BigInt(10) }]);
+            await settle();
+
+            expect(collectionUpdates()).toEqual([]);
+            expect(errorFrames()).toEqual([failureFrame]);
+        });
+
+        it("still answers a subscribe that fails before its fetch starts", async () => {
+            // No slot yet: the request itself failed, synchronously, and nothing
+            // else can have answered it.
+            jest.spyOn(registry, "getCollectionByPath").mockImplementationOnce(() => {
+                throw failure;
+            });
+
+            await subscribeCollection();
+            await settle();
+
+            expect(collectionFetches).toHaveLength(0);
+            expect(errorFrames()).toEqual([failureFrame]);
+        });
+
+        it("is not sent for a first fetch that a newer refetch overtook", async () => {
+            void subscribeCollection();
+            await settle();
+            await notify();
+            await runDebounce();
+            expect(collectionFetches).toHaveLength(2);
+
+            collectionFetches[1].resolve([{ id: "n1",
+title: "after the change" }]);
+            await settle();
+            collectionFetches[0].reject(failure);
+            await settle();
+
+            expect(collectionUpdates()).toHaveLength(1);
+            expect(errorFrames()).toEqual([]);
+        });
+
+        it("is not sent for a refetch that a newer one overtook", async () => {
+            void subscribeCollection();
+            await settle();
+            collectionFetches[0].resolve([{ id: "n1",
+title: "initial" }]);
+            await settle();
+
+            await notify();
+            await runDebounce();
+            await notify();
+            await runDebounce();
+            expect(collectionFetches).toHaveLength(3);
+
+            collectionFetches[2].resolve([{ id: "n1",
+title: "B, the newer" }]);
+            await settle();
+            collectionFetches[1].reject(failure);
+            await settle();
+
+            expect(errorFrames()).toEqual([]);
+        });
+
+        it("is not sent over newer rows for a row subscription's first fetch", async () => {
+            void subscribeOne();
+            await settle();
+            await notify();
+            await runDebounce();
+            expect(entityFetches).toHaveLength(2);
+
+            entityFetches[1].resolve({ id: "n1",
+title: "after the change" });
+            await settle();
+            entityFetches[0].reject(failure);
+            await settle();
+
+            expect(lastSingleRow()).toEqual({ id: "n1",
+title: "after the change" });
+            expect(errorFrames()).toEqual([]);
+        });
+
+        it("is not sent over newer rows for a row subscription's refetch", async () => {
+            void subscribeOne();
+            await settle();
+            entityFetches[0].resolve({ id: "n1",
+title: "initial" });
+            await settle();
+
+            await notify();
+            await runDebounce();
+            await notify();
+            await runDebounce();
+            expect(entityFetches).toHaveLength(3);
+
+            entityFetches[2].resolve({ id: "n1",
+title: "B, the newer" });
+            await settle();
+            entityFetches[1].reject(failure);
+            await settle();
+
+            expect(lastSingleRow()).toEqual({ id: "n1",
+title: "B, the newer" });
+            expect(errorFrames()).toEqual([]);
+        });
+
+        it("is not sent after unsubscribe", async () => {
+            void subscribeCollection();
+            await settle();
+            collectionFetches[0].resolve([{ id: "n1",
+title: "initial" }]);
+            await settle();
+
+            await notify();
+            await runDebounce();
+            await service.handleClientMessage("client-1", {
+                type: "unsubscribe",
+                subscriptionId: "sub-1"
+            } as never);
+            collectionFetches[1].reject(failure);
+            await settle();
+
+            expect(errorFrames()).toEqual([]);
+        });
+
+        it("is not sent to a subscription that replaced it under the same id", async () => {
+            void subscribeCollection("sub-1", { done: ["==", false] });
+            await settle();
+            void subscribeCollection("sub-1", { done: ["==", true] });
+            await settle();
+            expect(collectionFetches).toHaveLength(2);
+
+            collectionFetches[0].reject(failure);
+            await settle();
+            expect(errorFrames()).toEqual([]);
+
+            collectionFetches[1].resolve([{ id: "n2",
+title: "matched the new filter" }]);
+            await settle();
+            expect(collectionUpdates()).toHaveLength(1);
+        });
+    });
+
     // A failed refetch for an in-process listener used to be logged and
     // dropped: the listener kept its last rows as if they were current. It is
     // now reported, through the same slot rows take, as the error thrown.

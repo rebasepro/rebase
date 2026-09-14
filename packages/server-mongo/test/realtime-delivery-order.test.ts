@@ -212,6 +212,22 @@ describe("MongoDB realtime delivery order", () => {
         expect(secondErrors).toEqual([own]);
     });
 
+    it("still reports a delivery whose send failed after it claimed the slot", async () => {
+        // The socket's callback serialises the frame. When that throws, the
+        // check has already claimed the slot and nothing reached the client,
+        // so the failure is the only answer it gets.
+        const { service, collectionFetches } = setup();
+        const errors: unknown[] = [];
+        const unsendable = new Error("the frame would not serialise");
+
+        service.subscribeToCollection("s1", { path: "notes" } as any, () => { throw unsendable; }, e => errors.push(e));
+        await settle();
+        collectionFetches[0].resolve([{ title: "unsendable" }]);
+        await settle();
+
+        expect(errors).toEqual([unsendable]);
+    });
+
     it("still delivers the ordinary case", async () => {
         const { service, changeStream, collectionFetches } = setup();
         const seen: unknown[] = [];

@@ -47,6 +47,18 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
     collection callback, had its refreshes read as the anonymous user too. It
     now reads as that request's user throughout.
 
+- **A late subscription error no longer overrides newer data.** On Postgres, a
+  realtime subscription's failed fetch always sent its error, even when a
+  newer fetch had already delivered fresh rows. Two fetches for one
+  subscription can overlap, for example the first load and a refresh after a
+  quick write, and the slower one can finish last. So the client's `onError`
+  fired, and the admin panel showed an error, for a view that was up to date.
+  A failure from a subscription that had been cancelled, or replaced under the
+  same id, could also reach the new one. An error is now sent only when
+  nothing newer has reached the subscriber, the same rule its rows follow. A
+  subscription whose rows cannot be sent at all, such as a row holding a value
+  that will not serialise, still gets an error, on both databases.
+
 - **An in-process realtime listener hears when a read fails.** Server code
   that listens with `listenCollection({ onUpdate, onError })` or `listenOne`
   was not told when the read behind the subscription failed. On MongoDB,

@@ -124,6 +124,12 @@ interface Subscription {
 }
 
 /**
+ * What `beginDelivery` returns. Called, it claims the slot for a delivery;
+ * `mayReportFailure()` asks whether this delivery's failure may be reported.
+ */
+type DeliveryCheck = (() => boolean) & { mayReportFailure: () => boolean };
+
+/**
  * MongoDB Realtime Service
  *
  * Implements real-time subscriptions using MongoDB Change Streams.
@@ -165,15 +171,25 @@ export class MongoRealtimeService implements RealtimeProvider {
      * fetch behind it is the newest thing known about the row, so it must also
      * be the thing that closes the door on an older fetch still in flight —
      * otherwise the deleted row reappears a moment after it vanished.
+     *
+     * `mayReportFailure()` is the same check for reporting this delivery's
+     * failure, except that it also answers yes to the delivery that already
+     * claimed the slot. That is the send itself failing (the socket closure's
+     * `JSON.stringify` on a row that will not serialise) after the check passed
+     * and before anything reached the subscriber. Same rule as the Postgres
+     * service's `beginDelivery`.
      */
-    private beginDelivery(subscriptionId: string, subscription: Subscription): () => boolean {
+    private beginDelivery(subscriptionId: string, subscription: Subscription): DeliveryCheck {
         const seq = ++subscription.started;
-        return () => {
+        const canDeliver = () => {
             if (this.subscriptions.get(subscriptionId) !== subscription) return false;
             if (seq <= subscription.delivered) return false;
             subscription.delivered = seq;
             return true;
         };
+        const mayReportFailure = () =>
+            canDeliver() || (this.subscriptions.get(subscriptionId) === subscription && subscription.delivered === seq);
+        return Object.assign(canDeliver, { mayReportFailure });
     }
 
     /**
@@ -188,7 +204,7 @@ export class MongoRealtimeService implements RealtimeProvider {
     private reportFetchFailure(
         subscriptionId: string,
         subscription: Subscription,
-        canDeliver: () => boolean,
+        canDeliver: DeliveryCheck,
         error: unknown
     ): void {
         const target = subscription.type === "single" ? "row" : "collection";
@@ -203,7 +219,7 @@ export class MongoRealtimeService implements RealtimeProvider {
             logger.error(`Error fetching ${target} for subscription ${subscriptionId}`, { error: error });
         }
 
-        if (!subscription.onError || !canDeliver()) return;
+        if (!subscription.onError || !canDeliver.mayReportFailure()) return;
         try {
             subscription.onError(error);
         } catch (reportError) {
