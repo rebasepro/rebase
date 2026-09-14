@@ -114,21 +114,27 @@ would mean a typo'd key silently signs with another source's credentials.
 ```ts
 {
   name: "Cover",
-  dataType: "string",
+  type: "string",
   storage: { storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
-Omitting `storageSource` means `(default)`.
+Omitting `storageSource` means `(default)`. The handle works in place of the key:
+`storageSource: media`, imported from `config/resources.ts`.
 
 ## Declared is not configured
 
-A source declared with nothing set for it in the environment is
-**skipped**, not fatal. Requests routed to it answer
-`501 STORAGE_SOURCE_NOT_CONFIGURED` — distinct from the `STORAGE_NOT_CONFIGURED`
-the whole `/storage` router answers when the deployment has no storage at all,
-because "this one bucket is not wired up" and "file storage is off" have
-different fixes.
+In **development**, a declared object-store source with nothing set for it in
+the environment stands in as local disk: an `uploads__<key>` directory beside the
+default source's `uploads` (or `STORAGE_PATH__<KEY>`, when set), which the source
+reports as standing in for its engine. The first upload works before anyone has
+attached a bucket.
+
+In **production** the same source is **skipped**, not fatal. Requests routed to
+it answer `501 STORAGE_SOURCE_NOT_CONFIGURED` — distinct from the
+`STORAGE_NOT_CONFIGURED` the whole `/storage` router answers when the deployment
+has no storage at all, because "this one bucket is not wired up" and "file
+storage is off" have different fixes.
 
 A `storageId` that was never declared at all is a `400 UNKNOWN_STORAGE_SOURCE`
 naming the sources that do exist; it is a caller mistake, usually a typo.
@@ -186,6 +192,25 @@ source. The server refuses to boot in production without one, unless
 `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` states the intent
 deliberately. On Rebase Cloud the deploy is rejected before the pod starts, with
 the reason.
+
+## Known limits
+
+- **Downloads buffer the whole file.** From local disk, a full read loads the
+  file into memory (`fsp.readFile`) — only a `Range` request reads just its
+  slice. From S3 or GCS every read buffers the whole object, a ranged one
+  included, because a `StorageController` has no ranged read and the S3
+  controller collects the body stream into one `Buffer`. A large file costs its
+  size in memory per concurrent download.
+- **A raw `%` in a key is a 500.** The download, metadata and delete routes run
+  `decodeURIComponent` over the path with no `URIError` guard. The SDK encodes
+  every key segment (`encodeStorageKey`), so this reaches only a caller that
+  builds the URL itself and leaves a `%` unencoded — which should get a 400.
+- **Non-TUS uploads stop at 10 MB by default, whatever the storage limit says.**
+  The global `bodyLimit` (`maxBodySize`, `REBASE_MAX_BODY_SIZE`, 10 MB by
+  default) is registered on `${basePath}/*` before the storage router is
+  mounted, so it runs first and answers `413` before the upload route's own,
+  larger limit (`maxFileSize`, 50 MB by default) is consulted. Raise the global
+  limit as well, or upload over TUS in chunks smaller than it.
 
 ## Where the code lives
 
