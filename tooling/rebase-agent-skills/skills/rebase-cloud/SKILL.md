@@ -115,9 +115,9 @@ rebase cloud status --json
 ## The managed database
 
 Managed PostgreSQL is **CloudNativePG running in-cluster**, not Cloud SQL or
-RDS. By default a project's database is a database on a **shared HA pool** that
-other tenants also live on. Three consequences follow, and each one changes what
-you should do.
+RDS. Every managed database is a CloudNativePG cluster of the project's own, in
+the project's own namespace — no other tenant shares it (the shared pool tier is
+retired). Three consequences follow, and each one changes what you should do.
 
 ### 1. It does not exist until the first deploy
 
@@ -252,8 +252,10 @@ Which kind of deploy runs is decided by the repository, not by you:
 
 > **IMPORTANT FOR AGENTS:** `--source` on a managed project is **refused**,
 > because a source build rewrites the project onto a container image and off the
-> platform runtime. `--force` overrides that refusal. Never pass `--force` to
+> platform runtime. `--eject` overrides that refusal. Never pass `--eject` to
 > get past this error — it is a one-way change to how the user's project runs.
+> (It was spelled `--force` before 0.18.0, and no alias was kept: `--force` on
+> `deploy` is now an unknown option.)
 
 ---
 
@@ -506,9 +508,9 @@ the current conversation.** That includes `deploy`, `projects create`,
 
 | Flag | What it actually does |
 |---|---|
-| `--force` on `deploy` | Moves the project off the managed runtime onto a container image. One-way. |
+| `--eject` on `deploy` | Moves the project off the managed runtime onto a container image. One-way. |
 | `--force` on `env set` | Stores a build-time variable that will silently never reach the bundle |
-| `--yes` on `extensions enable/disable` | Restarts a database shared with other tenants |
+| `--yes` on `extensions enable/disable` | Restarts the project's database — a write outage while it comes back |
 | `--yes` on `projects delete` | Deletes the project |
 
 **Never retry or "fix" a `platform_permission_denied`.** Report it.
