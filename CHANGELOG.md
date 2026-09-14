@@ -154,6 +154,17 @@
   harmless. The example now generates the password with `randomBytes` instead
   of `Math.random`.
 
+- **A release whose smoke test fails still gets its GitHub Release.** The
+  release job created the GitHub Release, and published to the MCP Registry,
+  only when every step before it had passed, including a smoke test that
+  installs the just-published CLI. 0.21.0's smoke test ran six seconds after
+  the npm publish, before `@rebasepro/server-postgres@0.21.0` was visible on
+  npm, so the packages and the tag went out without a GitHub Release. Both
+  steps now run whenever the packages and the tag did. The smoke test now
+  waits for every package at the new version rather than only the CLI, and
+  fails if they never appear. The 0.21.0 GitHub Release has since been created
+  by hand.
+
 ### Security
 
 - **The MongoDB realtime socket could read and write the auth store.** MongoDB

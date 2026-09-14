@@ -9,6 +9,14 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+- **Date and read-only fields in the entity form match the other fields.**
+  Since 0.20.0 the form draws its controls at `small` (32px, 14px text). Two
+  field types kept the old size. A date field drew at 48px, because its binding
+  never passed the form's `size` on. A read-only field had a fixed 48px box and
+  printed its value in 16px text. So a column that mixed text, date and
+  read-only fields showed three heights and two text sizes. Both now follow the
+  form's `size`, and a read-only value is printed at the inputs' 14px.
+
 - **`POST /admin/users` leaves delivery to a create hook, and shows the admin
   the hook's temporary password.** A collection's `auth.onCreateUser` or a
   backend's `AuthHooks.onAdminCreateUser` replaces Rebase's own delivery: the
@@ -150,6 +158,17 @@ description: Every released change to Rebase — new features, fixes, and the br
   as well; one that already does gets it written a second time, which is
   harmless. The example now generates the password with `randomBytes` instead
   of `Math.random`.
+
+- **A release whose smoke test fails still gets its GitHub Release.** The
+  release job created the GitHub Release, and published to the MCP Registry,
+  only when every step before it had passed, including a smoke test that
+  installs the just-published CLI. 0.21.0's smoke test ran six seconds after
+  the npm publish, before `@rebasepro/server-postgres@0.21.0` was visible on
+  npm, so the packages and the tag went out without a GitHub Release. Both
+  steps now run whenever the packages and the tag did. The smoke test now
+  waits for every package at the new version rather than only the CLI, and
+  fails if they never appear. The 0.21.0 GitHub Release has since been created
+  by hand.
 
 ### Security
 
