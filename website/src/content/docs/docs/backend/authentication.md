@@ -481,6 +481,7 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
 
 ```typescript
+import { randomBytes } from "node:crypto";
 import { defineCollection } from "@rebasepro/cms-types";
 
 const membersCollection = defineCollection({
@@ -501,9 +502,9 @@ const membersCollection = defineCollection({
 
     // Customize what happens when an admin resets a user's password in the admin panel
     onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      const tempPassword = randomBytes(12).toString("base64url");
       return {
-        temporaryPassword: tempPassword,
+        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
         invitationSent: false
       };
     },
@@ -516,6 +517,8 @@ const membersCollection = defineCollection({
   properties: { ... }
 });
 ```
+
+A `temporaryPassword` returned from `onResetPassword` becomes the account's password. Rebase hashes it with the configured algorithm, saves it, signs the user out of every existing session, and shows it to the admin to pass on. The hook does not store it, and has no way to. Return no `temporaryPassword` when the hook emails its own reset link instead: the password then stays as it is until the user sets a new one, though their sessions still end.
 
 When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
 - `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).

@@ -24,7 +24,11 @@ accessExpiresIn: "1h" });
             // having done anything.
             getUserRoleIds: jest.fn(async (id: string) => (id.startsWith("editor") ? ["editor"] : ["admin"])),
             updatePassword: jest.fn().mockResolvedValue(undefined),
-            createPasswordResetToken: jest.fn().mockResolvedValue(undefined)
+            createPasswordResetToken: jest.fn().mockResolvedValue(undefined),
+            // Every branch ends the target's sessions; what that does to a
+            // real session is `password-change-revokes-sessions.test.ts`.
+            deleteAllRefreshTokensForUser: jest.fn().mockResolvedValue(undefined),
+            setTokensValidAfter: jest.fn().mockResolvedValue(undefined)
         } as unknown as jest.Mocked<AuthRepository>;
 
         mockEmailService = {

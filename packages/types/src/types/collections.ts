@@ -775,6 +775,12 @@ export interface AuthCollectionConfig {
      *
      * Default: generate reset token → send email (or generate + return temp password).
      * Override for custom reset flows.
+     *
+     * Return a `temporaryPassword` to set one: Rebase hashes it with the
+     * configured algorithm, saves it as the account's password and shows it to
+     * the admin. The hook does not write it — its context has no way to. Return
+     * none when the hook sends its own link instead. Either way, the account's
+     * existing sessions are signed out.
      */
     onResetPassword?: (
         uid: string,
@@ -845,7 +851,11 @@ export interface AuthCollectionCreateResult {
  * @group Models
  */
 export interface AuthCollectionResetResult {
-    /** If set, shown to the admin. */
+    /**
+     * The account's new password. Rebase hashes and saves it, then shows it to
+     * the admin; leave it unset when the account keeps its password for now
+     * (for example, because the hook emailed a link).
+     */
     temporaryPassword?: string;
     /** Whether a reset email was sent. */
     invitationSent?: boolean;

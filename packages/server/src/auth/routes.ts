@@ -9,6 +9,7 @@ import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefresh
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { createRequireAuth, requireAuth } from "./middleware";
+import { replaceUserPassword } from "./token-revocation";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
@@ -929,20 +930,15 @@ displayName: user.displayName }, appName, logoUrl);
             throw ApiError.badRequest("Invalid or expired reset token", "INVALID_TOKEN");
         }
 
-        // Update password
+        // Update the password and log out every session. The whole point of a
+        // reset is that someone else may be holding a token and actively
+        // refreshing it; see `replaceUserPassword` for why deleting the rows
+        // alone does not catch them.
         const passwordHash = await ops.hashPassword(password);
-        await authRepo.updatePassword(storedToken.uid, passwordHash);
+        await replaceUserPassword(authRepo, storedToken.uid, passwordHash);
 
         // Mark token as used
         await authRepo.markPasswordResetTokenUsed(tokenHash);
-
-        // Invalidate all refresh tokens (security: log out all sessions).
-        // The watermark is what makes this airtight: deleting rows only
-        // catches the sessions that exist at this instant, and the whole
-        // point of a reset is that someone else may be holding a token and
-        // actively refreshing it.
-        await authRepo.deleteAllRefreshTokensForUser(storedToken.uid);
-        await authRepo.setTokensValidAfter?.(storedToken.uid, new Date()).catch(() => undefined);
 
         // Fire onPasswordReset hook (fire-and-forget)
         if (ops.onPasswordReset) {
@@ -985,13 +981,9 @@ message: "Password has been reset successfully" });
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
 
-        // Update password
+        // Update the password and log out every session, this one included
         const passwordHash = await ops.hashPassword(newPassword);
-        await authRepo.updatePassword(user.id, passwordHash);
-
-        // Invalidate all refresh tokens (security: log out all sessions)
-        await authRepo.deleteAllRefreshTokensForUser(user.id);
-        await authRepo.setTokensValidAfter?.(user.id, new Date()).catch(() => undefined);
+        await replaceUserPassword(authRepo, user.id, passwordHash);
 
         return c.json({ success: true,
 message: "Password has been changed successfully" });

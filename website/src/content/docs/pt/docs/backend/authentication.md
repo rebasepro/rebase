@@ -1,5 +1,5 @@
 ---
-sourceHash: 099cfa22ee1f8493
+sourceHash: cd5be95034e39df6
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -535,6 +535,7 @@ personalizada `members.ts`) como a coleção de autenticação. Isso é configur
 através da propriedade `auth` na própria coleção:
 
 ```typescript
+import { randomBytes } from "node:crypto";
 import { defineCollection } from "@rebasepro/cms-types";
 
 const membersCollection = defineCollection({
@@ -555,9 +556,9 @@ const membersCollection = defineCollection({
 
     // Customize what happens when an admin resets a user's password in the admin panel
     onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      const tempPassword = randomBytes(12).toString("base64url");
       return {
-        temporaryPassword: tempPassword,
+        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
         invitationSent: false
       };
     },
@@ -570,6 +571,8 @@ const membersCollection = defineCollection({
   properties: { ... }
 });
 ```
+
+Um `temporaryPassword` retornado por `onResetPassword` se torna a senha da conta. O Rebase gera o hash dele com o algoritmo configurado, o salva, desconecta o usuário de todas as sessões existentes e o exibe ao administrador para que ele o repasse. O hook não o armazena, nem tem como fazer isso. Não retorne nenhum `temporaryPassword` quando o hook enviar, em vez disso, seu próprio link de redefinição por e-mail: nesse caso, a senha continua a mesma até que o usuário defina uma nova, embora as sessões dele sejam encerradas mesmo assim.
 
 Quando hooks personalizados (`onCreateUser`, `onResetPassword`) são chamados,
 eles recebem uma fachada `AuthCollectionContext` contendo:

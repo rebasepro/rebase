@@ -1,5 +1,5 @@
 ---
-sourceHash: 099cfa22ee1f8493
+sourceHash: cd5be95034e39df6
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -492,6 +492,7 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 Anstatt sich ausschließlich auf die standardmäßigen Datenbank-Auth-Regeln zu verlassen, können Sie jede Postgres-Collection (wie `users.ts` oder eine benutzerdefinierte `members.ts`-Collection) als Authentifizierungs-Collection deklarieren. Dies wird über die Eigenschaft `auth` direkt an der Collection konfiguriert:
 
 ```typescript
+import { randomBytes } from "node:crypto";
 import { defineCollection } from "@rebasepro/cms-types";
 
 const membersCollection = defineCollection({
@@ -512,9 +513,9 @@ const membersCollection = defineCollection({
 
     // Customize what happens when an admin resets a user's password in the admin panel
     onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      const tempPassword = randomBytes(12).toString("base64url");
       return {
-        temporaryPassword: tempPassword,
+        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
         invitationSent: false
       };
     },
@@ -527,6 +528,8 @@ const membersCollection = defineCollection({
   properties: { ... }
 });
 ```
+
+Ein von `onResetPassword` zurückgegebenes `temporaryPassword` wird zum Passwort des Kontos. Rebase hasht es mit dem konfigurierten Algorithmus, speichert es, meldet den Benutzer von allen bestehenden Sitzungen ab und zeigt es dem Admin zur Weitergabe an. Der Hook speichert es nicht selbst und hat auch keine Möglichkeit dazu. Geben Sie kein `temporaryPassword` zurück, wenn der Hook stattdessen einen eigenen Link zum Zurücksetzen per E-Mail versendet: Das Passwort bleibt dann unverändert, bis der Benutzer ein neues festlegt – seine Sitzungen enden trotzdem.
 
 Wenn benutzerdefinierte Hooks (`onCreateUser`, `onResetPassword`) aufgerufen werden, erhalten sie eine `AuthCollectionContext`-Fassade, die Folgendes enthält:
 - `hashPassword(password: string): Promise<string>` — Hasht das Passwort mit dem konfigurierten Hashing-Algorithmus (z. B. scrypt).
