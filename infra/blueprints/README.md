@@ -59,13 +59,13 @@ live, so a first-come-first-admin rule would hand the deployment to whoever
 arrived first. The way in is `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` (an
 address the login route accepts, and at least 12 characters): the runtime
 creates that admin once, at boot, while the user table is still empty, and does
-nothing on every deploy after that. Leave them unset and
-the deployment comes up with no administrator until you set them and redeploy,
-or assign the role with the service key. `render.yaml` and `do-app.yaml` declare
-both, `fly.toml` sets them with `fly secrets set` in its header, and all three
-also set `DISABLE_SELF_REGISTRATION=true`. Clearing that does not give the first
-visitor the deployment — sign-up opens only with `ALLOW_REGISTRATION=true`, and
-an account made that way is an ordinary one. See
+nothing on every deploy after that. Leave them unset and the deployment comes up
+with no administrator until you set them and redeploy, or assign the role with
+the service key. `render.yaml` and `do-app.yaml` declare both, `fly.toml` sets
+them with `fly secrets set` in its header, and all three also set
+`DISABLE_SELF_REGISTRATION=true`. Clearing that does not give the first visitor
+the deployment — sign-up opens only with `ALLOW_REGISTRATION=true`, and an
+account made that way is an ordinary one. See
 [Your first admin](https://rebase.pro/docs/getting-started/deployment/#your-first-admin).
 
 **Local storage is switched off in production.** The container filesystem is
