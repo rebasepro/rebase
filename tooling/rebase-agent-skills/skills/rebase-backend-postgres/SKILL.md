@@ -65,7 +65,7 @@ rebase db migrate
 | `rebase db backup` | Write a backup of the current database | Before a risky change |
 | `rebase db backups` | List the backups taken so far | Picking one to restore |
 | `rebase db restore` | Restore the database from a backup | Recovery |
-| `rebase db pull` | Introspect the live database back into collections | Adopting an existing DB |
+| `rebase db pull` | Copy another database into local dev (`--from <url>`, `--anonymize`); never writes to the source | Working against real data locally |
 | `rebase db url` | Print the connection string this project uses | Piping into `psql` |
 | `rebase db stop` | Stop the managed local database | Freeing the port |
 | `rebase db reset` | Delete and recreate the managed local database | A clean slate in dev |
