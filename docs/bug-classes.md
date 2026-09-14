@@ -691,7 +691,7 @@ object after building it. Mutation-tested: each half removed turns ten cases red
 | self-service reset, change-password, `DELETE /auth/sessions` | clean — now call the helper |
 | `POST /auth/anonymous/link` (`updateUser` with `passwordHash`) | clean — the first credential on a guest account, and the route re-mints the caller's session. The guard allowlists it. |
 | MongoDB driver | **OPEN** — no watermark, so an access token outlives any revocation until it expires. |
-| collection `onResetPassword` returning `temporaryPassword` | **OPEN** — the route never writes it and the hook's context cannot, so the documented example shows the admin a password that does not work. |
+| collection `onResetPassword` returning `temporaryPassword` | **BUG** — the route never wrote it and the hook's context cannot, so the documented example showed the admin a password that did not work. Fixed the same day; see class 21's 2026-09-14 entry. |
 | `isAccessTokenRevoked`, same-second token | **OPEN** (class 55) — the comment and the test's title say a token from the watermark's own second is revoked; the code (`<`) and the test's assertion let it through. |
 
 ---
@@ -840,6 +840,33 @@ implemented one fails until it is removed. Without the second direction the list
 keeps warning about something that has started working, which teaches people to
 ignore it. And assert the scan found a plausible number of entries, or a broken
 parse passes by comparing two empty lists.
+
+### A hook result delivered as a claim — 2026-09-14
+
+`AuthCollectionResetResult.temporaryPassword` was declared, documented ("If set,
+shown to the admin") and read: the reset route put it in the response. What
+nothing did was *act* on it. That is this class with a twist, because the value
+was not ignored. It was delivered as a claim — "this is the password" — that
+nothing had made true. The collection hook's context can hash a password and
+cannot store one, so no correct hook could be written, and the documented
+example returned one. An admin resetting through it handed out a dead password
+and left the old one working.
+
+The fix makes the claim true where it is made: a returned `temporaryPassword`
+is hashed and written through `replaceUserPassword` by the route, for both reset
+hooks. `password-change-revokes-sessions.test.ts` has one case per hook, and
+both fail on the old route with the original hash still stored.
+
+Swept by enumerating every field of every auth hook result and asking who acts
+on it:
+
+| declared | result |
+|---|---|
+| `AuthCollectionResetResult.temporaryPassword` | **BUG** — shown, never written. Fixed. |
+| `onAdminResetPassword` → `temporaryPassword` | **BUG** — the same shape. This hook *could* write through `authRepo`; nothing held it to that. Same fix. |
+| `invitationSent`, on both reset hooks | clean — a report of what the hook did, passed through |
+| `AuthCollectionCreateResult.temporaryPassword`, `onAdminCreateUser` | clean — the hook writes `values.passwordHash` itself, as its doc requires. Nothing checks the two agree. |
+| `hookHandledEmail` / `invitationSent` from a create hook | **OPEN** (class 42) — the REST data path (`api-generator.ts`) honours them. `POST /admin/users` reads neither, so with email configured it sends its own invitation after the hook's, and drops the hook's `temporaryPassword` from the response. |
 
 ---
 

@@ -260,6 +260,10 @@ export interface AuthHooks {
     /**
      * Optional hook to customize or override the default password reset flow via the admin panel.
      * When provided, this replaces the built-in password reset token generation, hashing, and email logic.
+     *
+     * A `temporaryPassword` it returns becomes the account's password: the route hashes and writes
+     * it (the same contract as a collection's `auth.onResetPassword`), so the hook need not write it
+     * through `authRepo`. The account's existing sessions end whatever the hook returns.
      */
     onAdminResetPassword?(
         uid: string,

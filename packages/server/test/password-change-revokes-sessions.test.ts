@@ -44,6 +44,12 @@ const BYSTANDER = "bystander-1";
 const ADMIN = "admin-1";
 const ORIGINAL_PASSWORD = "Original-Passw0rd";
 const NEW_PASSWORD = "Chosen-N3w-Passw0rd";
+/**
+ * The shape the documented `onResetPassword` example produces. It fails the
+ * default strength rules, deliberately: those judge what an admin types, and a
+ * hook is the developer's own server code choosing on their behalf.
+ */
+const HOOK_PASSWORD = "reset_k3j9x2";
 
 /** A readable, instant stand-in for scrypt, so a test can say which password is stored. */
 const hash = (password: string) => `hashed:${password}`;
@@ -285,8 +291,8 @@ interface Case {
     config?: () => Partial<BuiltinAuthAdapterConfig>;
     /**
      * Set the victim's password by this route. Resolves with the password it
-     * set, or `undefined` when it sets none (an emailed link, a hook) — in
-     * which case the stored one must be left exactly as it was.
+     * set, or `undefined` when it sets none (an emailed link, a hook that sends
+     * its own) — in which case the stored one must be left exactly as it was.
      */
     act: (world: World) => Promise<string | undefined>;
 }
@@ -338,7 +344,7 @@ const CASES: Case[] = [
         }
     },
     {
-        name: "admin reset, through a collection onResetPassword hook",
+        name: "admin reset, a collection onResetPassword hook that sends its own link",
         config: () => ({
             collectionAuthConfig: {
                 enabled: true,
@@ -351,11 +357,41 @@ const CASES: Case[] = [
         }
     },
     {
-        name: "admin reset, through an onAdminResetPassword hook",
+        // The documented example's shape. Its context has `hashPassword` and
+        // no way to store anything, so the route is the only thing that can
+        // make the password it shows the admin a real one.
+        name: "admin reset, a collection onResetPassword hook returning a temporary password",
+        config: () => ({
+            collectionAuthConfig: {
+                enabled: true,
+                onResetPassword: async () => ({ temporaryPassword: HOOK_PASSWORD, invitationSent: false })
+            } satisfies AuthCollectionConfig
+        }),
+        act: async (world) => {
+            expect(await adminReset()(world)).toBe(HOOK_PASSWORD);
+            return HOOK_PASSWORD;
+        }
+    },
+    {
+        name: "admin reset, an onAdminResetPassword hook that sends its own link",
         config: () => ({ authHooks: { ...HOOKS, onAdminResetPassword: async () => ({ invitationSent: true }) } }),
         act: async (world) => {
             await adminReset()(world);
             return undefined;
+        }
+    },
+    {
+        // This hook is handed `authRepo` and could write the password itself;
+        // it is held to the same contract as the collection hook, so whether it
+        // remembered to is not the difference between a working password and
+        // a dead one.
+        name: "admin reset, an onAdminResetPassword hook returning a temporary password",
+        config: () => ({
+            authHooks: { ...HOOKS, onAdminResetPassword: async () => ({ temporaryPassword: HOOK_PASSWORD, invitationSent: false }) }
+        }),
+        act: async (world) => {
+            expect(await adminReset()(world)).toBe(HOOK_PASSWORD);
+            return HOOK_PASSWORD;
         }
     },
     {

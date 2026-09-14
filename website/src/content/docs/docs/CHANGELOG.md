@@ -74,6 +74,19 @@ description: Every released change to Rebase — new features, fixes, and the br
   `parseEnvBoolean`, and `verify:docs` now refuses a boolean read that goes
   around it.
 
+- **A collection's `onResetPassword` hook could not actually reset a
+  password.** The admin panel showed the `temporaryPassword` the hook returned,
+  and nothing saved it: the hook's context can hash a password but not store
+  one, and the route only passed the value on. The documented example did
+  exactly this, so every reset through it handed the user a password that did
+  not work, and left the old one working. A returned `temporaryPassword` is now
+  the account's new password: Rebase hashes it, saves it and signs the user out
+  everywhere before showing it to the admin. `onAdminResetPassword` follows the
+  same rule, so its hook no longer has to write the password through `authRepo`
+  as well; one that already does gets it written a second time, which is
+  harmless. The example now generates the password with `randomBytes` instead
+  of `Math.random`.
+
 ### Security
 
 - **A delete over the WebSocket wrote its own audit record, and could get past

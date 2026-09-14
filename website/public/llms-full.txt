@@ -2807,6 +2807,19 @@ backfilled after the fact.
   `parseEnvBoolean`, and `verify:docs` now refuses a boolean read that goes
   around it.
 
+- **A collection's `onResetPassword` hook could not actually reset a
+  password.** The admin panel showed the `temporaryPassword` the hook returned,
+  and nothing saved it: the hook's context can hash a password but not store
+  one, and the route only passed the value on. The documented example did
+  exactly this, so every reset through it handed the user a password that did
+  not work, and left the old one working. A returned `temporaryPassword` is now
+  the account's new password: Rebase hashes it, saves it and signs the user out
+  everywhere before showing it to the admin. `onAdminResetPassword` follows the
+  same rule, so its hook no longer has to write the password through `authRepo`
+  as well; one that already does gets it written a second time, which is
+  harmless. The example now generates the password with `randomBytes` instead
+  of `Math.random`.
+
 #### Security
 
 - **A delete over the WebSocket wrote its own audit record, and could get past
@@ -16023,9 +16036,9 @@ const membersCollection = defineCollection({
 
     // Customize what happens when an admin resets a user's password in the admin panel
     onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      const tempPassword = randomBytes(12).toString("base64url");
       return {
-        temporaryPassword: tempPassword,
+        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
         invitationSent: false
       };
     },
@@ -16038,6 +16051,8 @@ const membersCollection = defineCollection({
   properties: { ... }
 });
 ```
+
+A `temporaryPassword` returned from `onResetPassword` becomes the account's password. Rebase hashes it with the configured algorithm, saves it, signs the user out of every existing session, and shows it to the admin to pass on. The hook does not store it, and has no way to. Return no `temporaryPassword` when the hook emails its own reset link instead: the password then stays as it is until the user sets a new one, though their sessions still end.
 
 When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
 - `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).

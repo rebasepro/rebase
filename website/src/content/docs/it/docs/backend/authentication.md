@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f3f6e8bcd4db79e
+sourceHash: bc7ed4818b668f50
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, l'email SMTP, gli hook di autenticazione e gli adattatori di autenticazione personalizzati sul backend.
@@ -357,6 +357,7 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 Invece di affidarti esclusivamente alle regole di autenticazione predefinite del database, puoi contrassegnare qualsiasi collezione Postgres (come `users.ts` o una collezione personalizzata `members.ts`) come collezione di autenticazione. Questo viene configurato tramite la proprietà `auth` sulla collezione stessa:
 
 ```typescript
+import { randomBytes } from "node:crypto";
 import { defineCollection } from "@rebasepro/cms-types";
 
 const membersCollection = defineCollection({
@@ -377,9 +378,9 @@ const membersCollection = defineCollection({
 
     // Customize what happens when an admin resets a user's password in the admin panel
     onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      const tempPassword = randomBytes(12).toString("base64url");
       return {
-        temporaryPassword: tempPassword,
+        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
         invitationSent: false
       };
     },
@@ -393,9 +394,11 @@ const membersCollection = defineCollection({
 });
 ```
 
+Un `temporaryPassword` restituito da `onResetPassword` diventa la password dell'account. Rebase ne esegue l'hash con l'algoritmo configurato, lo salva, disconnette l'utente da tutte le sessioni esistenti e lo mostra all'amministratore perché lo comunichi. L'hook non lo memorizza, né ha modo di farlo. Non restituire alcun `temporaryPassword` quando l'hook invia invece un proprio link di reimpostazione via email: la password resta allora invariata finché l'utente non ne imposta una nuova, anche se le sue sessioni terminano comunque.
+
 Quando vengono chiamati gli hook personalizzati (`onCreateUser`, `onResetPassword`), ricevono una facciata `AuthCollectionContext` contenente:
 - `hashPassword(password: string): Promise<string>` — Esegue l'hash della password usando l'algoritmo di hashing configurato (ad es. scrypt).
-- `sendEmail?: (options) => Promise<void>` — Invia un'email (disponibile solo quando il servizio email è configurato).
+- `sendEmail?: (options) => Promise<EmailSendResult>` — Invia un'email (disponibile solo quando il servizio email è configurato). Si risolve con ciò che il provider ha riportato — `messageId`, `accepted`, `rejected` — così un hook può salvare l'id e in seguito collegare una risposta a quel messaggio.
 - `emailConfigured: boolean` — Se il servizio email è configurato.
 - `appName: string` — Il nome dell'app dalla configurazione email.
 - `resetPasswordUrl: string` — L'URL di base del link di reimpostazione password.
