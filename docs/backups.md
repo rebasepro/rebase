@@ -4,6 +4,10 @@ Rebase ships first-class database backups for self-hosted PostgreSQL, built on
 `pg_dump` / `pg_restore`. You get manual CLI backups, scheduled uploads to your
 existing storage backend, and a safe, confirmation-gated restore path.
 
+A backup holds the database and nothing else: uploaded files live in your storage
+backend, not in Postgres, so back up the bucket or the uploads directory
+separately.
+
 > **PITR is out of scope for OSS.** Continuous point-in-time recovery via WAL
 > archiving is not part of the open-source distribution — see
 > [Point-in-time recovery](#point-in-time-recovery-pitr) below. The commands
@@ -159,29 +163,56 @@ binary with `PG_DUMP_PATH` / `PG_RESTORE_PATH` / `PG_DUMPALL_PATH`.
 ## Scheduled backups
 
 Scheduled backups plug into the built-in [cron system](../packages/server/src/cron).
-Drop a cron file into your backend's `crons/` directory that default-exports a
-backup job. The job dumps the database, uploads it via your **already-configured
-storage backend**, and prunes old backups by retention policy.
+Drop a cron file into `backend/crons/` — a scaffolded project has no such
+directory until its first job, and the runtime picks it up once it exists — that
+default-exports a backup job. The job dumps the database, uploads it to
+`BACKUP_DESTINATION`, and prunes old backups by retention policy.
+
+A local destination needs nothing else. An `s3://` or `gs://` one needs a storage
+controller for that bucket, and a scaffolded project has no module exporting the
+backend's, so the job builds its own from the same `S3_*` variables — which is
+what `rebase db backup --out s3://…` does too:
 
 ```ts
 // backend/crons/backup.ts
+import { GCSStorageController, S3StorageController, type StorageController } from "@rebasepro/server";
 import { createBackupCron, backupCronConfigFromEnv } from "@rebasepro/server-postgres";
-import { storage } from "../src/storage"; // your configured StorageController
 
 const resolved = backupCronConfigFromEnv(process.env);
 if (resolved.error) throw new Error(resolved.error);
 
+function backupStorage(): StorageController | undefined {
+    const destination = resolved.config?.destination;
+    if (destination?.kind === "gcs") {
+        return new GCSStorageController({ type: "gcs", bucket: destination.bucket });
+    }
+    if (destination?.kind !== "s3") return undefined; // local: written to disk directly
+    return new S3StorageController({
+        type: "s3",
+        bucket: destination.bucket,
+        region: process.env.S3_REGION || "auto",
+        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
+        endpoint: process.env.S3_ENDPOINT,
+        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true"
+    });
+}
+
 // `resolved.disabled` is true when BACKUP_SCHEDULE is unset — export a disabled
 // no-op job in that case so discovery doesn't fail.
 export default resolved.config
-    ? createBackupCron({ ...resolved.config, storage })
+    ? createBackupCron({ ...resolved.config, storage: backupStorage() })
     : createBackupCron({
         schedule: "0 3 * * *",
-        connectionString: process.env.DATABASE_URL!,
+        connectionString: process.env.DATABASE_URL ?? "",
         destination: { kind: "local", path: "./backups" },
         enabled: false
     });
 ```
+
+`createBackupCron` takes the storage controller up front rather than from the
+cron's context: a handler's context carries `rebase`, whose `storage` is the
+client-side storage API, not a `StorageController`.
 
 ### Configuration (env)
 
