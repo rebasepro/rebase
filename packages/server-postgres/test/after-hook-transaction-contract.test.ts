@@ -86,6 +86,8 @@ const SAVED_ROW = { id: "a1", title: "Ada" };
 function stubDataService() {
     jest.spyOn(DataService.prototype, "save").mockResolvedValue(SAVED_ROW as never);
     jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined as never);
+    // What a delete reads before deleting.
+    jest.spyOn(DataService.prototype, "fetchOne").mockResolvedValue(SAVED_ROW as never);
 }
 
 const articles = (callbacks: Record<string, unknown>) => ({
@@ -266,7 +268,7 @@ describe("afterDelete throws", () => {
         const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
 
         const error = await authed.delete({
-            row: { id: "a1", path: "articles", values: { title: "Ada" } },
+            row: { id: "a1", path: "articles" },
             collection
         } as never).then(() => undefined, (e: CallbackError) => e);
 

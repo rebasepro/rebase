@@ -1,3 +1,4 @@
+import { parseEnvBoolean } from "@rebasepro/types";
 import { logger } from "../utils/logger";
 
 /**
@@ -37,7 +38,7 @@ type GlobalWithHandler = typeof globalThis & {
  * was installed.
  */
 export function installUnhandledRejectionHandler(): (() => void) | undefined {
-    if (process.env.REBASE_EXIT_ON_UNHANDLED_REJECTION === "1") return undefined;
+    if (parseEnvBoolean(process.env.REBASE_EXIT_ON_UNHANDLED_REJECTION) === true) return undefined;
 
     const slot = globalThis as GlobalWithHandler;
     if (slot[HANDLER_SLOT]) return undefined;

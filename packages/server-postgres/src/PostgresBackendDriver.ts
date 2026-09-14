@@ -33,7 +33,8 @@ import {
     TableJunctionInfo,
     TableMetadata,
     TablePolicyInfo,
-    User
+    User,
+    parseEnvBoolean
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
@@ -59,13 +60,12 @@ import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-t
  * them. It is the only sanctioned way a statement that named a role runs
  * without it — every other route now refuses.
  *
- * Exact `"true"` on purpose, matching the check this replaced. `=1` and `=yes`
- * silently do nothing — a known finding across the whole env surface, which has
- * no shared boolean parser yet; fixing it here alone would make this one
- * variable disagree with the rest.
+ * Any spelling of yes, through the platform's one parser. It was an exact
+ * `"true"` until that parser existed, deliberately, so that this variable would
+ * not be fixed alone and left disagreeing with the rest.
  */
 export function isRoleSwitchingOptedOut(): boolean {
-    return process.env.DISABLE_DB_ROLE_SWITCHING === "true";
+    return parseEnvBoolean(process.env.DISABLE_DB_ROLE_SWITCHING) === true;
 }
 
 /**
@@ -1421,27 +1421,11 @@ export class PostgresBackendDriver implements DataDriver {
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
                 try {
-                    const existing = await txDriver.fetchOne({
-                        path,
-                        id: String(id),
-                        collection: collection as CollectionConfig
-                    });
-                    if (!existing) {
-                        throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
-                            statusCode: 404,
-                            code: "NOT_FOUND"
-                        });
-                    }
-
+                    // No read first: `delete` reads the row itself, and an id
+                    // that matches nothing is its 404, which rolls the batch
+                    // back like any other failure.
                     await txDriver.delete<M>({
-                        row: {
-                            // The address from the caller, not read back off the
-                            // row: a row is only its columns, so `existing.id` is
-                            // undefined for any table not keyed on `id`.
-                            id: String(id),
-                            path,
-                            values: existing as Partial<EntityValues<M>>
-                        },
+                        row: { id: String(id), path },
                         collection,
                         hard
                     });
@@ -1541,29 +1525,14 @@ export class PostgresBackendDriver implements DataDriver {
                             });
                             break;
                         }
-                        case "delete": {
-                            const existing = await txDriver.fetchOne({
-                                path: operation.path,
-                                id: id!,
-                                collection: operation.collection as CollectionConfig
-                            });
-                            if (!existing) {
-                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
-                                    statusCode: 404,
-                                    code: "NOT_FOUND"
-                                });
-                            }
+                        case "delete":
+                            // `delete` reads the row itself and 404s on a miss.
                             await txDriver.delete<M>({
-                                row: {
-                                    id: id!,
-                                    path: operation.path,
-                                    values: existing as Partial<EntityValues<M>>
-                                },
+                                row: { id: id!, path: operation.path },
                                 collection: operation.collection
                             });
                             row = null;
                             break;
-                        }
                     }
 
                     if (operation.ref && row) named.set(operation.ref, row);
@@ -1598,10 +1567,6 @@ export class PostgresBackendDriver implements DataDriver {
                                                           }: DeleteProps<M>): Promise<void> {
 
         const targetPath = row.path;
-        // The callbacks' `row` is the row: its columns, nothing else. The address
-        // travels beside it as `id`, so merging it in here only ever invented an
-        // `id` field for tables that have no such column.
-        const targetRow: Record<string, unknown> = { ...(row.values ?? {}) };
 
         // Resolve from backend registry to restore callbacks lost during WebSocket serialization
         const {
@@ -1610,6 +1575,35 @@ export class PostgresBackendDriver implements DataDriver {
             globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, targetPath);
+
+        // The row being deleted is read here, from the database, by this
+        // driver — which on a user request is bound to that user's
+        // transaction, so the read sees what their policies let them see. It
+        // is what the callbacks judge and what history records. It used to
+        // come in on the props, and over the WebSocket the props were the
+        // client's frame: the caller wrote the audit record of their own
+        // deletion, and a `beforeDelete` refusing on a column was bypassed by
+        // sending `values: {}`. The in-process SDK sent `{}` on every delete.
+        //
+        // The same read the REST route makes, `withDeleted` included: a hard
+        // delete of a row already in the trash is how the trash is emptied.
+        const stored = await this.fetchOne<M>({
+            path: targetPath,
+            id: row.id,
+            collection: resolvedCollection,
+            withDeleted: hard ? true : undefined
+        });
+        // Not found is answered before any callback runs: a callback handed a
+        // row that is not there — or not there for this caller — would be
+        // judging something it cannot see.
+        if (!stored) {
+            throw ApiError.notFound(`No row "${row.id}" in "${targetPath}" to delete.`);
+        }
+        // The callbacks' `row` is the row: its columns, nothing else. The address
+        // travels beside it as `id`, so merging it in here only ever invented an
+        // `id` field for tables that have no such column. A copy, so a callback
+        // that edits it does not edit what history records.
+        const targetRow: Record<string, unknown> = { ...stored };
 
         const contextForCallback = this.buildCallContext();
 
@@ -1743,7 +1737,7 @@ export class PostgresBackendDriver implements DataDriver {
                 tableName: targetPath,
                 id: row.id.toString(),
                 action: "delete",
-                values: row.values as Record<string, unknown> ?? {},
+                values: stored,
                 updatedBy: this.user?.uid
             });
         }

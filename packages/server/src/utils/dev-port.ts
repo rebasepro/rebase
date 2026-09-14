@@ -15,6 +15,7 @@ import type { Server } from "http";
 import net, { type AddressInfo } from "net";
 import path from "path";
 import fs from "fs";
+import { parseEnvBoolean } from "@rebasepro/types";
 
 import { logger } from "./logger";
 
@@ -115,7 +116,7 @@ export function listenWithPortRetry(
     const host = options?.host ?? "0.0.0.0";
     const maxAttempts = options?.maxAttempts ?? MAX_PORT_ATTEMPTS;
     const portFileDir = options?.portFileDir;
-    const explicit = options?.explicit ?? process.env.REBASE_DEV_PORT_EXPLICIT === "true";
+    const explicit = options?.explicit ?? parseEnvBoolean(process.env.REBASE_DEV_PORT_EXPLICIT) === true;
 
     const isProd = process.env.NODE_ENV === "production";
     if (isProd) {

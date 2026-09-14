@@ -168,11 +168,17 @@ describe("effectiveSqlRole", () => {
         expect(effectiveSqlRole(undefined)).toBe(CONNECTION_OWNER);
     });
 
-    it("only honours the exact string \"true\"", () => {
-        // `=1` doing nothing is a known finding across the whole env surface
-        // (no shared boolean env parser yet); pinned here so this variable is
-        // not quietly fixed alone and left disagreeing with the rest.
-        process.env.DISABLE_DB_ROLE_SWITCHING = "1";
+    it.each(["true", "1", "yes", "on", "TRUE"])("opts out on %p, as every boolean variable spells yes", (value) => {
+        // `=1` used to do nothing, pinned here until the whole env surface
+        // shared one parser rather than fixed for this variable alone.
+        process.env.DISABLE_DB_ROLE_SWITCHING = value;
+        expect(isRoleSwitchingOptedOut()).toBe(true);
+    });
+
+    it.each(["false", "0", "no", "off", "", "maybe"])("keeps switching on %p", (value) => {
+        // The side that has to hold: this variable turns off a boundary, so
+        // nothing short of a spelled yes may turn it off.
+        process.env.DISABLE_DB_ROLE_SWITCHING = value;
         expect(isRoleSwitchingOptedOut()).toBe(false);
     });
 });

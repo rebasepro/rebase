@@ -213,14 +213,14 @@ describe("Nested path writes (E2E)", () => {
 
     it("refuses to delete a row that is not under the parent in the path", async () => {
         await expect(driver.delete({
-            row: { id: "p-2", path: "authors/a-1/posts", values: {} }
+            row: { id: "p-2", path: "authors/a-1/posts" }
         } as never)).rejects.toThrow(/No row "p-2" in "authors\/a-1\/posts"/);
 
         expect(await one("SELECT * FROM public.posts WHERE id = 'p-2'")).toBeDefined();
     });
 
     it("still deletes a row that IS under the parent", async () => {
-        await driver.delete({ row: { id: "p-1", path: "authors/a-1/posts", values: {} } } as never);
+        await driver.delete({ row: { id: "p-1", path: "authors/a-1/posts" } } as never);
         expect(await one("SELECT * FROM public.posts WHERE id = 'p-1'")).toBeUndefined();
     });
 
@@ -266,7 +266,7 @@ describe("Nested path writes (E2E)", () => {
     // ── 3. Many-to-many: the path addresses the link, not the shared row ─────
 
     it("unlinks a many-to-many target instead of deleting it", async () => {
-        await driver.delete({ row: { id: "t-1", path: "posts/p-1/tags", values: {} } } as never);
+        await driver.delete({ row: { id: "t-1", path: "posts/p-1/tags" } } as never);
 
         // the link from p-1 is gone …
         expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1'")).toHaveLength(0);
@@ -278,7 +278,7 @@ describe("Nested path writes (E2E)", () => {
 
     it("refuses to unlink a many-to-many target the parent is not linked to", async () => {
         await expect(driver.delete({
-            row: { id: "t-2", path: "posts/p-1/tags", values: {} }
+            row: { id: "t-2", path: "posts/p-1/tags" }
         } as never)).rejects.toThrow(/No row "t-2" in "posts\/p-1\/tags"/);
 
         expect(await one("SELECT * FROM public.tags WHERE id = 't-2'")).toBeDefined();

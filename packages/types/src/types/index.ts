@@ -22,6 +22,7 @@ export * from "./data_source";
 export * from "./resources";
 export * from "./resource_kinds";
 export * from "./storage_source";
+export * from "./env_boolean";
 export * from "./cron";
 export * from "./backup";
 export * from "./component_ref";

@@ -13,6 +13,7 @@ import chalk from "chalk";
 // backup destination).
 import { out as print, outWarn, outError } from "../cli-output";
 import type { StorageController } from "@rebasepro/server";
+import { parseEnvBoolean } from "@rebasepro/types";
 import {
     BackupDestination,
     globalsFileForDump,
@@ -69,7 +70,10 @@ async function resolveStorageForDestination(
         accessKeyId: env.S3_ACCESS_KEY_ID,
         secretAccessKey: env.S3_SECRET_ACCESS_KEY,
         endpoint: env.S3_ENDPOINT,
-        forcePathStyle: env.S3_FORCE_PATH_STYLE === "true"
+        // Unset stays unset, so the controller decides from the endpoint the
+        // way it does for the runtime's own storage. `=== "true"` made it an
+        // explicit `false`, and a MinIO backup addressed the bucket as a host.
+        forcePathStyle: parseEnvBoolean(env.S3_FORCE_PATH_STYLE)
     });
 }
 

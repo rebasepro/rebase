@@ -211,6 +211,30 @@ describe("when it does mount", () => {
         expect((await res.json() as { client_id: string }).client_id).toMatch(/^mcp_/);
     });
 
+    it.each(["false", "0", "no", "off"])("closes registration on REBASE_MCP_OPEN_REGISTRATION=%s", async (value) => {
+        // Any spelling of no. The check was `!== "false"`, so `=0` — the way
+        // most people write "off" — left an authorization server handing out
+        // client IDs to anyone who asked.
+        const previous = process.env.REBASE_MCP_OPEN_REGISTRATION;
+        process.env.REBASE_MCP_OPEN_REGISTRATION = value;
+        try {
+            const app = await boot({ mcp: true, publicUrl: PUBLIC_URL });
+            const res = await app.request("/api/oauth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    client_name: "Claude",
+                    redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
+                    token_endpoint_auth_method: "none"
+                })
+            });
+            expect(res.status).toBe(403);
+        } finally {
+            if (previous === undefined) delete process.env.REBASE_MCP_OPEN_REGISTRATION;
+            else process.env.REBASE_MCP_OPEN_REGISTRATION = previous;
+        }
+    });
+
     it("changes nothing about any other path", async () => {
         // `/mcp` and the two `.well-known` documents mount at the ROOT, beside
         // the JWKS, so a greedy mount would swallow paths belonging to other

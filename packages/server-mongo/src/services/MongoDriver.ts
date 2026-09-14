@@ -534,7 +534,14 @@ propertyCallbacks: undefined };
     }: DeleteProps<M>): Promise<void> {
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, row.path);
 
-        const callbackRow: Record<string, unknown> = { id: row.id, ...(row.values ?? {}) };
+        // The row is read here rather than taken from the props, which over
+        // the WebSocket were the client's frame — see the Postgres driver's
+        // `delete`. A miss is answered before any callback runs.
+        const stored = await this.fetchOne<M>({ path: row.path, id: row.id, collection: resolvedCollection });
+        if (!stored) {
+            throw ApiError.notFound(`No row "${row.id}" in "${row.path}" to delete.`);
+        }
+        const callbackRow: Record<string, unknown> = { id: row.id, ...stored };
 
         const contextForCallback = callContext(this, this.user, this.data, this.client);
 
@@ -628,7 +635,7 @@ propertyCallbacks: undefined };
                 action: "delete",
                 id: String(row.id),
                 tableName: row.path,
-                previousValues: row.values,
+                previousValues: stored,
                 updatedBy: this.user?.uid
             }).catch(err => {
                 logger.error(`Failed to record history for ${row.path}/${row.id}`, { error: err });

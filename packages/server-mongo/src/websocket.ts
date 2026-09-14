@@ -282,7 +282,13 @@ requestId }));
                     case "DELETE": {
                         const request: DeleteProps = payload;
                         const delegate = await getScopedDelegate();
-                        await delegate.delete(request);
+                        // The address, and nothing else the frame says: the
+                        // driver reads the row and resolves the collection by
+                        // path — see the Postgres socket's DELETE.
+                        await delegate.delete({
+                            row: { id: request.row.id, path: request.row.path },
+                            hard: request.hard
+                        });
                         ws.send(JSON.stringify({ type: "DELETE_SUCCESS",
 payload: { success: true },
 requestId }));

@@ -167,13 +167,11 @@ name: "Alice" } as any;
             const res = await app.request("/api/users/123", { method: "DELETE" });
 
             expect(res.status).toBe(204);
+            // The address only: the driver reads the row it deletes, so a
+            // copy handed to it is one a caller could have written.
             expect(mockDriver.delete).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    row: expect.objectContaining({
-                        id: "123",
-                        path: "users",
-                        values: existingEntity
-                    })
+                    row: { id: "123", path: "users" }
                 })
             );
         });
@@ -280,11 +278,7 @@ title: "Hello" } as any;
             expect(res.status).toBe(204);
             expect(mockDriver.delete).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    row: expect.objectContaining({
-                        id: "456",
-                        path: "authors/123/posts",
-                        values: existingEntity
-                    })
+                    row: { id: "456", path: "authors/123/posts" }
                 })
             );
         });

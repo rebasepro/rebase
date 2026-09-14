@@ -171,6 +171,18 @@ describe("initOutputMode", () => {
         process.env.REBASE_JSON = "1";
         expect(initOutputMode(["node", "rebase", "cloud", "env"])).toBe(true);
     });
+
+    it.each(["false", "no", "off", "FALSE"])("honours REBASE_JSON=%s against a pipe, as it does 0", (value) => {
+        // The same gap one spelling over: only "0" was a no, so `=false` fell
+        // through to the TTY test and a piped help page came back as JSON.
+        process.env.REBASE_JSON = value;
+        expect(initOutputMode(["node", "rebase", "cloud", "env", "--help"])).toBe(false);
+    });
+
+    it.each(["true", "yes", "on"])("takes REBASE_JSON=%s as it takes 1", (value) => {
+        process.env.REBASE_JSON = value;
+        expect(initOutputMode(["node", "rebase", "cloud", "env"])).toBe(true);
+    });
 });
 
 /**

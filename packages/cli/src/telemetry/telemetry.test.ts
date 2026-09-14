@@ -112,6 +112,35 @@ describe("consent gate", () => {
         expect(telemetry.isEnabled()).toBe(false);
     });
 
+    it.each(["please", "yes", "TRUE"])("reads DO_NOT_TRACK=%s as an answer, not only 1", async (value) => {
+        // Presence is the convention's signal, so a value the parser does not
+        // recognise still refuses.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        process.env.DO_NOT_TRACK = value;
+        expect(telemetry.suppressionReason()).toBe("do_not_track");
+    });
+
+    it.each(["0", "false", "no", "off"])("lets a spelled no withdraw DO_NOT_TRACK=%s", async (value) => {
+        // Only "0" counted as a no before; `=false` read as a refusal. Consent
+        // still decides after this — the user here said yes explicitly.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        process.env.DO_NOT_TRACK = value;
+        expect(telemetry.suppressionReason()).not.toBe("do_not_track");
+    });
+
+    it("counts any CI value as a runner except a spelled no", async () => {
+        // `CI=woodpecker` is how one CI system says it; `CI=0` read as a
+        // runner, because the only no this check knew was "false".
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        process.env.CI = "woodpecker";
+        expect(telemetry.suppressionReason()).toBe("ci");
+        process.env.CI = "0";
+        expect(telemetry.suppressionReason()).not.toBe("ci");
+    });
+
     it("honours REBASE_TELEMETRY_DISABLED", async () => {
         const telemetry = await load();
         telemetry.setConsent(true);

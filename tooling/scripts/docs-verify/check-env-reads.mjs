@@ -119,7 +119,7 @@ const NOT_OURS = new Map([
  * each can contain the others' delimiters. Regex detection uses the usual
  * heuristic: a `/` opens a literal only where a value cannot already have ended.
  */
-function stripComments(source) {
+export function stripComments(source) {
     let out = "";
     let i = 0;
     let prev = "";                       // last significant character emitted
@@ -178,10 +178,18 @@ function stripComments(source) {
 
 const NAME = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/;
 
-export function checkEnvReads(root = DEFAULT_ROOT) {
-    const files = [...new Set(GLOBS.flatMap(g => globSync(g, { cwd: root })))]
+/**
+ * Every shipped source file the env gates read, tests excluded. Shared with
+ * `check-env-booleans.mjs`, which judges how the same reads are parsed.
+ */
+export function shippedSourceFiles(root = DEFAULT_ROOT) {
+    return [...new Set(GLOBS.flatMap(g => globSync(g, { cwd: root })))]
         .filter(f => !/\.test\.tsx?$|(^|\/)test\//.test(f))
         .sort();
+}
+
+export function checkEnvReads(root = DEFAULT_ROOT) {
+    const files = shippedSourceFiles(root);
 
     /** @type {Map<string, Set<string>>} */
     const reads = new Map();

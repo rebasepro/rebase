@@ -17,6 +17,7 @@ import {
     SecurityRule,
     buildResourceGraph,
     computeSchemaVersion,
+    parseEnvBoolean,
     resourceKeyOf
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules } from "@rebasepro/common";
@@ -1967,8 +1968,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         // Open registration is what makes the Claude connector flow
                         // work at all — there is nobody to hand a client ID to in
                         // advance. A deployment that would rather pre-register can
-                        // switch it off and issue IDs itself.
-                        allowDynamicRegistration: process.env.REBASE_MCP_OPEN_REGISTRATION !== "false"
+                        // switch it off and issue IDs itself — with any spelling
+                        // of no; `!== "false"` left it open on `=0`.
+                        allowDynamicRegistration: parseEnvBoolean(process.env.REBASE_MCP_OPEN_REGISTRATION) !== false
                     }));
 
                     logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
@@ -2238,7 +2240,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // be sitting in a CI environment variable.
                 policy: {
                     allowMachineApply: config.liveSchema?.allowMachineApply
-                        ?? process.env.REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY === "true"
+                        ?? parseEnvBoolean(process.env.REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY) === true
                 },
                 getCollections: () => collectionRegistry.getRawCollections(),
                 getAdmin: () => defaultDriver.admin,

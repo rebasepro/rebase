@@ -11,6 +11,111 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Scheduled backups include your users again, and can be restored.**
+  `createBackupCron` left the `rebase` schema out of every dump unless told
+  otherwise. The aim was to skip Atlas's revision table, but that schema also
+  holds every user account and the rest of auth, API keys, record history, the
+  job queue and cron logs, and the functions every generated RLS policy and CDC
+  trigger calls. So each scheduled dump was missing all of that. It also could
+  not be restored into an empty database: every collection's generated policies
+  call `rebase.uid()` and `rebase.roles()`, so `pg_restore` stopped with
+  `schema "rebase" does not exist`. `rebase db backup` excludes nothing, so the
+  manual and the scheduled backup captured different databases.
+
+  The scheduled backup now excludes nothing either, and `excludeSchemas` still
+  narrows it when you pass one. A scheduled dump made by an earlier version
+  cannot be trusted, so take a fresh backup after upgrading.
+
+- **The Studio Backups panel downloads a backup's roles file.** A backup is a
+  `.dump` plus a `.globals.sql` sidecar holding the database roles its grants
+  and RLS policies refer to, and `rebase db restore` needs both. The panel, and
+  the `/api/admin/backups` routes behind it, only knew about the `.dump`, so a
+  backup downloaded from Studio stopped at its first `GRANT` when restored into
+  a new Postgres. Each row now has a **Roles file** button, or says **No roles
+  file** when there is none. The listing carries the sidecar's key as
+  `globalsKey`, and `/download` serves it.
+
+- **`FORCE_LOCAL_STORAGE=false` switched the production storage guard off.** In
+  production a `local` storage backend is dropped unless `FORCE_LOCAL_STORAGE`
+  says a durable volume is mounted, because a container's filesystem is erased
+  on the next restart or redeploy. The guard tested whether the variable was
+  *set*, not whether it was *true*, so `=false` — the natural way to say "there
+  is no volume here" — registered the local backend, and uploads succeeded into
+  a disk the next redeploy wiped. `rebase status` read it the same way and
+  called that storage ready. Only a spelled yes forces it now, and the guard and
+  `rebase status` share one reader.
+
+  A deployment that set `FORCE_LOCAL_STORAGE=false` while storing uploads on
+  local disk was losing them at every redeploy; its uploads now answer `501
+  STORAGE_NOT_CONFIGURED` until a bucket is configured, or until
+  `FORCE_LOCAL_STORAGE=true` says a durable volume really is mounted.
+
+- **`REBASE_MCP_OPEN_REGISTRATION=0` left OAuth client registration open.** The
+  switch that turns off dynamic client registration on the MCP authorization
+  server compared against the literal `"false"`, so `0`, `no` and `off` left
+  `/oauth/register` issuing a client ID to anyone who asked. Any spelling of no
+  closes it now.
+
+- **`rebase db backup` addressed a MinIO bucket as a hostname.** The backup,
+  restore and `backups list` commands passed `forcePathStyle: false` whenever
+  `S3_FORCE_PATH_STYLE` was unset, overriding the default the runtime's own
+  storage gets: path-style for a custom endpoint. Unset now leaves that choice
+  to the endpoint in both, and `S3_FORCE_PATH_STYLE__<KEY>=1` is no longer read
+  as `false`.
+
+- **Boolean environment variables accept one set of spellings.** `true`, `1`,
+  `yes` and `on` mean yes; `false`, `0`, `no` and `off` mean no, in any case;
+  anything else leaves the variable at its default. Seven readers had spelled
+  this seven ways, so `DISABLE_DB_ROLE_SWITCHING=1` and
+  `REBASE_EXIT_ON_UNHANDLED_REJECTION=true` did nothing, `REBASE_DEBUG=0` turned
+  debug output on in one command and off in another, and `CI=0` read as a CI
+  run. `DO_NOT_TRACK=false` now reads as a no instead of a refusal; telemetry
+  still sends nothing without your explicit opt-in. The variables `loadEnv`
+  validates still accept only `true`, `false` or empty and refuse anything else
+  at boot, as before. The parser is exported from `@rebasepro/types` as
+  `parseEnvBoolean`, and `verify:docs` now refuses a boolean read that goes
+  around it.
+
+### Security
+
+- **A delete over the WebSocket wrote its own audit record, and could get past
+  a `beforeDelete` veto.** `DeleteProps` carried `row.values`, and both server
+  drivers took them as the row being deleted: they were what `beforeDelete` and
+  `afterDelete` received and what history recorded as the row's final state.
+  The REST routes filled them from a read of their own. The WebSocket `DELETE`
+  handler forwarded the client's frame, so a caller allowed to delete a row
+  could record anything as its final state — and could get past a
+  `beforeDelete` that refuses on a column, such as the callbacks guide's
+  `if (row.status === "published") throw`, by sending `values: {}`. The
+  in-process SDK sent `{}` on every `delete(id)`, so every delete from a
+  function, a cron job or a callback recorded an empty row and gave
+  `beforeDelete` nothing to judge. The MCP `delete_document` tool did the same.
+
+  Both drivers now read the row themselves before any callback runs, under the
+  caller's own scope — on Postgres, inside the delete's transaction, as the
+  caller's role — and that read is what the callbacks receive and what history
+  records. It is the read the REST route already made, so a delete over HTTP
+  sees what it saw before. A row that is not there, or that the caller cannot
+  read, is a 404 before any callback runs, on every path; over the socket and
+  the SDK the callbacks used to run first. `DeleteProps.row` is `{ id, path }`
+  now: `values` is gone from the type and ignored on the wire, so a published
+  client that still sends it keeps working.
+
+  The socket's `DELETE` also stopped forwarding the frame's `collection`. The
+  driver merges a caller's collection under the registry's, so a key the
+  registry does not declare survived, and `softDelete: { field: "title" }`
+  turned a delete into an update of `title` that no `beforeSave` and no write
+  validator saw.
+
+  One more change came with dropping `deleteMany`'s own pre-read: a hard
+  `deleteMany` now purges rows that are already in the trash, as a hard
+  single-row delete does. Its old read hid them and answered 404.
+
+  If a collection has `history: true`, or a `beforeDelete` that refuses on the
+  row's contents, and anything deletes through the socket or the SDK, upgrade.
+
 ## [0.21.0] - 2026-09-14
 
 ### Breaking

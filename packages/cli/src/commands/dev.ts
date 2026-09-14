@@ -15,7 +15,7 @@
  * root path, so multiple Rebase instances never collide.
  */
 import chalk from "chalk";
-import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
+import { DEFAULT_RESOURCE_KEY, parseEnvBoolean } from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
 import {
@@ -721,8 +721,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * gating only the preflight left the managed PGlite starting anyway, which
      * is the one database a scaffolded project would otherwise get.
      */
-    const noDb = Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1";
-    const shouldGenerate = args["--generate"] || process.env.REBASE_AUTO_GENERATE === "true" || process.env.REBASE_GENERATE === "true";
+    const noDb = Boolean(args["--no-db"]) || parseEnvBoolean(process.env.REBASE_DEV_NO_DB) === true;
+    const shouldGenerate = args["--generate"]
+        || parseEnvBoolean(process.env.REBASE_AUTO_GENERATE) === true
+        || parseEnvBoolean(process.env.REBASE_GENERATE) === true;
 
     // Resolve the ports ONCE, before starting anything. Both, because the
     // backend is told where the frontend will be and cannot be told later: its

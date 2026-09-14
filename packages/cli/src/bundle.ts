@@ -24,6 +24,7 @@ import {
     RUNTIME_CONTRACT_VERSION,
     computeSchemaVersion,
     findStorageSuffixCollision,
+    parseEnvBoolean,
     type CollectionConfig,
     type ResourceGraph,
     type NativeDependency,
@@ -705,7 +706,7 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
             // Dockerfile both carry, and then builds and boots the result. The
             // flag is the same one `init` reads to skip its release probe; it
             // is set by that harness and by nothing a user runs.
-            if (protocol && process.env.REBASE_E2E === "true" && protocol === "file:") {
+            if (protocol && parseEnvBoolean(process.env.REBASE_E2E) === true && protocol === "file:") {
                 declared[name] = version;
                 continue;
             }

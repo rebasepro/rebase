@@ -188,7 +188,10 @@ const { entry } = await import("../dist/index.es.js");
  * `utils/args.ts` marks those with `isUsageError` rather than a class, because
  * this file imports the bundle and `instanceof` cannot reach across it.
  */
-const wantsStack = process.argv.includes("--debug") || process.env.REBASE_DEBUG === "1";
+// After the bundle, which already imports this package, and spelled as the
+// commands spell it: `wantsRawError` in `commands/cloud/errors.ts`.
+const { parseEnvBoolean } = await import("@rebasepro/types");
+const wantsStack = process.argv.includes("--debug") || parseEnvBoolean(process.env.REBASE_DEBUG) === true;
 
 entry(process.argv).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);

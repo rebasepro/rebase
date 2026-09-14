@@ -1,6 +1,7 @@
 import { ensureMachineId, ensureProjectId, readConfig, writeConfig } from "./identity";
 import { buildEvent, TelemetryEvent, TelemetryEventName } from "./payload";
 import { readProjectPolicy } from "./project";
+import { parseEnvBoolean } from "@rebasepro/types";
 
 export { TELEMETRY_SCHEMA_VERSION, bucket, durationBucket, errorClass, buildEvent, sanitize } from "./payload";
 export type { TelemetryEvent, TelemetryEventName, TelemetryValue } from "./payload";
@@ -17,6 +18,19 @@ export const DEFAULT_TELEMETRY_ENDPOINT = "https://app.rebase.pro/api/functions/
 
 export function endpoint(): string {
     return process.env.REBASE_TELEMETRY_ENDPOINT?.trim() || DEFAULT_TELEMETRY_ENDPOINT;
+}
+
+/**
+ * Set to anything but a spelled no.
+ *
+ * The conventions behind these variables make presence the signal —
+ * `CI=woodpecker` is a CI run, `DO_NOT_TRACK=please` is an answer — so a value
+ * the parser does not recognise still counts, and the refusal holds. Only the
+ * platform's spellings of no turn one off. It was `!== "0"` for two of them and
+ * `!== "false"` for `CI`, so `CI=0` read as a runner.
+ */
+function setAndNotNo(value: string | undefined): boolean {
+    return value !== undefined && value.trim() !== "" && parseEnvBoolean(value) !== false;
 }
 
 /** Why nothing would be sent right now, or `null` when it would. */
@@ -51,9 +65,9 @@ export function suppressionReason(
     env: NodeJS.ProcessEnv = process.env,
     cwd: string = process.cwd()
 ): SuppressionReason | null {
-    if (env.DO_NOT_TRACK && env.DO_NOT_TRACK !== "0") return "do_not_track";
-    if (env.REBASE_TELEMETRY_DISABLED && env.REBASE_TELEMETRY_DISABLED !== "0") return "rebase_telemetry_disabled";
-    if (env.CI && env.CI !== "false") return "ci";
+    if (setAndNotNo(env.DO_NOT_TRACK)) return "do_not_track";
+    if (setAndNotNo(env.REBASE_TELEMETRY_DISABLED)) return "rebase_telemetry_disabled";
+    if (setAndNotNo(env.CI)) return "ci";
     if (readProjectPolicy(cwd) === "opt_out") return "project_opt_out";
 
     const config = readConfig();

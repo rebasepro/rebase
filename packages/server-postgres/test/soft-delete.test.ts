@@ -173,6 +173,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
     let driver: PostgresBackendDriver;
     let saveSpy: jest.SpyInstance;
     let deleteSpy: jest.SpyInstance;
+    let fetchOneSpy: jest.SpyInstance;
     let notifyUpdate: jest.Mock;
 
     const stand = () => {
@@ -188,6 +189,8 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         saveSpy = jest.spyOn(driver.dataService, "save")
             .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);
         deleteSpy = jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as any);
+        // The row the delete reads before it deletes.
+        fetchOneSpy = jest.spyOn(driver.dataService, "fetchOne").mockResolvedValue({ id: 7, title: "Hi" });
         return driver;
     };
 
@@ -197,7 +200,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
 
     it("stamps the field instead of issuing a DELETE", async () => {
         await stand().delete({
-            row: { id: "7", path: "posts", values: { title: "Hi" } },
+            row: { id: "7", path: "posts" },
             collection: posts
         });
         expect(deleteSpy).not.toHaveBeenCalled();
@@ -212,7 +215,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         // From the application's point of view it *was* deleted. How the table
         // records that is the flag's business, not the subscriber's.
         await stand().delete({
-            row: { id: "7", path: "posts", values: {} },
+            row: { id: "7", path: "posts" },
             collection: posts
         });
         expect(notifyUpdate).toHaveBeenCalledWith("posts", "7", null, undefined);
@@ -221,7 +224,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
     it("still runs beforeDelete, and a veto still blocks it", async () => {
         const beforeDelete = jest.fn().mockResolvedValue(false);
         await expect(stand().delete({
-            row: { id: "7", path: "posts", values: {} },
+            row: { id: "7", path: "posts" },
             collection: { ...posts, callbacks: { beforeDelete } } as CollectionConfig
         })).rejects.toThrow();
         expect(beforeDelete).toHaveBeenCalled();
@@ -231,7 +234,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
     it("still runs afterDelete", async () => {
         const afterDelete = jest.fn().mockResolvedValue(undefined);
         await stand().delete({
-            row: { id: "7", path: "posts", values: {} },
+            row: { id: "7", path: "posts" },
             collection: { ...posts, callbacks: { afterDelete } } as CollectionConfig
         });
         expect(afterDelete).toHaveBeenCalled();
@@ -239,7 +242,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
 
     it("issues a real DELETE when asked for a hard one", async () => {
         await stand().delete({
-            row: { id: "7", path: "posts", values: {} },
+            row: { id: "7", path: "posts" },
             collection: posts,
             hard: true
         });
@@ -247,9 +250,20 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         expect(saveSpy).not.toHaveBeenCalled();
     });
 
+    it("reads the trash too when the delete is hard, and only then", async () => {
+        // A hard delete of a row that is already stamped is how the trash is
+        // emptied; the read that hides stamped rows would answer 404 for it.
+        await stand().delete({ row: { id: "7", path: "posts" }, collection: posts, hard: true });
+        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, true);
+
+        // A soft delete of a stamped row is a delete of nothing.
+        await stand().delete({ row: { id: "7", path: "posts" }, collection: posts });
+        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, undefined);
+    });
+
     it("is a real DELETE on a collection that does not soft-delete", async () => {
         await stand().delete({
-            row: { id: "7", path: "notes", values: {} },
+            row: { id: "7", path: "notes" },
             collection: plain
         });
         expect(deleteSpy).toHaveBeenCalledTimes(1);

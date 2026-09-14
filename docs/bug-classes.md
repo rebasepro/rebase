@@ -327,6 +327,61 @@ honoured on its own; when there is no credential to enforce it with, refuse
 everyone and log at boot. Refusing is visible and gets reported; admitting is
 not, and does not.
 
+### One layer down: `"false"` is a truthy string — 2026-09-14
+
+The production storage guard was
+`if (isProduction && conf.type === "local" && !process.env.FORCE_LOCAL_STORAGE)`.
+That tests whether the variable is *set*, not whether it is *true*, and every
+non-empty string is truthy — so `FORCE_LOCAL_STORAGE=false`, written to say "there
+is no durable volume here", stood the guard down, registered the local backend,
+and sent uploads to a container filesystem the next redeploy erased. `=0`, `=no`
+and `=off` did the same. `app/.env.example` shipped the trap commented out,
+`# FORCE_LOCAL_STORAGE=false`. The boot schema parsed the same variable correctly
+(`optionalBoolString`); the reader that decided never asked it.
+
+It had a twin. The `bucket` resolver behind `rebase status` read
+`!env.FORCE_LOCAL_STORAGE` from an `EnvBag` — also the raw string, not the parsed
+value — so status and the guard agreed with each other and both were wrong.
+
+This is also §2: seven readers spelled "is this true" seven ways (`=== "true"`,
+`=== "1"`, `!== "false"`, `!== "0"`, `1|true|yes`, `1|true|yes|on`, bare
+truthiness), no two agreeing on `0`, `yes` or `TRUE`.
+
+**Fix shape:** `parseEnvBoolean` in `@rebasepro/types` — `true|1|yes|on` is
+true, `false|0|no|off` is false, anything else is `undefined` so the caller's
+default decides. Default-off flags read `=== true`, default-on flags `!== false`.
+The boot schemas stay strict (`true|false|""`, anything else refuses the boot)
+and agree with it on that set. `FORCE_LOCAL_STORAGE` has one reader,
+`localStorageForced`, called by both the guard and the resolver.
+
+**Gate:** `check-env-booleans.mjs`, a `verify:docs` stage. It flags any env read
+compared with a spelled boolean, and any `process.env.NAME` read of a variable a
+boot schema declares as boolean, or that any reader parses as one, outside
+`parseEnvBoolean(…)`. Against the pre-fix tree it reports 21 findings, the guard
+among them. It cannot see an injected bag tested for truthiness (`env.NAME` is as
+often the parsed object) — the resolver's shape — so `init-storage.test.ts` holds
+both readers of `FORCE_LOCAL_STORAGE` to one table of twelve spellings. Each
+reader, reverted on its own, fails six rows.
+
+**Sweep:** grep for `process.env.X` or `env.X` tested with `!`, `!!`,
+`Boolean()`, `if ()`, `&&`, `?`, or compared with a spelled boolean; for each
+flag, ask what `=false` and `=0` do.
+
+| checked | result |
+|---|---|
+| `FORCE_LOCAL_STORAGE` — `init/storage.ts`, `boot/resource-resolvers.ts` | **fixed** — both read raw; one reader now |
+| `REBASE_MCP_OPEN_REGISTRATION` — `init.ts` | **fixed** — `!== "false"`: `=0` left OAuth client registration open |
+| `S3_FORCE_PATH_STYLE` — `backup-cli.ts`, `boot/sources.ts` | **fixed** — `=== "true"` turned unset (backup) and `=1` (a suffixed source) into an explicit `false` that overrode the endpoint-derived default, so MinIO was addressed host-style |
+| `REBASE_DEBUG` — `bin/rebase.js`, `cloud/errors.ts`, `cloud/resources.ts` | **fixed** — `=== "1"` beside bare truthiness: `=true` hid the stack, `=0` printed the fallback |
+| `DISABLE_DB_ROLE_SWITCHING`, `REBASE_EXIT_ON_UNHANDLED_REJECTION`, `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY`, `REBASE_METRICS` (static path), `REBASE_CRON_ALWAYS_ON`, `REBASE_JSON`, `REBASE_DEV_NO_DB`, `REBASE_AUTO_GENERATE`, `REBASE_GENERATE`, `REBASE_E2E`, `REBASE_DEV_PORT_EXPLICIT`, `VERCEL`, `REBASE_STRICT_COLLECTION_CONFIG` | **routed** — spelling only; each failed closed |
+| `DO_NOT_TRACK`, `REBASE_TELEMETRY_DISABLED`, `CI` — `telemetry/index.ts` | **routed**, presence kept — set to anything but a spelled no refuses; `CI=0` read as a runner |
+| the two zod boot schemas | clean — strict, refuse any other value before serving; deliberately not widened |
+| `NO_COLOR`, `FORCE_COLOR` (`bin/rebase.js`, `rls-check`) | left — external conventions (presence by spec; colour levels 0–3) |
+| `REBASE_LOG_RAW_QUERIES` — `utils/logger.ts` | left, exempted in the gate — inlined into the portable functions entry, where importing `@rebasepro/types` would inline its kind registry; `=== "true"` fails closed |
+| `REBASE_MCP_ALLOW_REMOTE_WRITES` — `packages/mcp` | left — no dependency on `@rebasepro/types`, and a new edge is a lockfile change; `/^(1\|true\|yes)$/i` fails closed, lacks only `on` |
+| `CORPUS_SKIP_SKEW` — `verify-bundle-corpus.mts` | left — `=0` would skip the skew pass, but CI never sets it and the skip is printed; `ci-static.mjs`'s `Boolean(process.env.CI)` errs strict |
+| string-valued reads tested for truthiness (`CORS_ORIGINS`, `MFA_ENCRYPTION_KEY`, `PORT`, `REBASE_BUNDLE`, …) | clean — values, not flags |
+
 ---
 
 ## 11. Two interfaces for one call, disagreeing
@@ -3291,3 +3346,61 @@ channel broadcast from inside a hook goes out at once; the hooks guide already
 says to publish after the write returns. Test with a real pool
 (`write-transaction-scope-e2e.test.ts`): "another connection sees it early" cannot
 be asked of PGlite or of a mock.
+
+## 63. Trusting the client's copy of server state
+
+A request type that carries a copy of something the server can read for itself
+lets the caller supply the copy. `DeleteProps` carried `row.values`, and the
+driver took them as the row being deleted: they were what `beforeDelete` and
+`afterDelete` judged and what history recorded as the row's final state. The
+REST routes filled them from a read of their own, so over HTTP they were true.
+The WebSocket `DELETE` forwarded the client's frame, so over the socket the
+caller wrote the audit record of their own deletion, and got past a
+`beforeDelete` that refused on a column — the callbacks guide's own example — by
+sending `values: {}`. The in-process SDK sent `{}` on every delete, so nothing
+had to be forged there: every `rebase.data.x.delete(id)` recorded an empty row.
+
+It hides because the correct callers are the ones you read first. The REST route
+reads the row, passes it on, and looks like the contract. The field is optional,
+so a door that fills it with nothing type-checks as well as one that fills it
+with the truth, and one that fills it with the client's guess type-checks too.
+
+The save path was the correct sibling the whole time. `SaveProps` also declares
+`previousValues`, and both drivers ignore it and read the previous row
+themselves — which is why nobody ever forged a save's history.
+
+**Fix the shape, not the door.** The props carry the address and the caller's
+*intent*; anything the server can look up, it looks up. `DeleteProps.row` is
+`{ id, path }` now, the driver reads the row under the caller's own scope, and a
+row that is not there, or not there for this caller, is a 404 before any
+callback runs. Taking the field out of the type is the guard: a door that tries
+to pass a copy no longer compiles. The wire can still carry it — published
+clients do — and it is ignored.
+
+**Watch for:** a copy of *configuration* is the same class. The socket also
+forwarded the frame's `collection`, and the driver merges a caller's collection
+*under* the registry's — so a key the registry does not declare survives.
+`softDelete: { field: "title" }` turned a DELETE into an UPDATE of `title` that no
+`beforeSave` and no write validator saw.
+
+**Sweep (2026-09-14):**
+
+| checked | result |
+|---|---|
+| WebSocket `DELETE`, Postgres | **BUG** — the client's `row.values` judged by `beforeDelete`, recorded by history. Fixed: the driver reads the row. |
+| WebSocket `DELETE`, Mongo | **BUG** — same shape; authorized against a read, then called the hooks with the client's copy. Fixed. |
+| in-process SDK `delete(id)` | **BUG** — sent `values: {}`: an empty history record, nothing for `beforeDelete` to judge. Fixed. |
+| MCP `delete_document` | **BUG** — sent no values; same result as the SDK. Fixed by the driver change alone. |
+| REST single and nested `DELETE`, `deleteMany`, `batchWrite` | clean — each read the row first. The bulk reads are gone (the driver's read replaces them); REST keeps its read for `If-Match` and its own 404. |
+| `deleteMany` with `hard` | **BUG**, found on the way — its read hid rows in the trash, so a hard bulk delete of the trash was a 404. The driver's read carries `withDeleted`. Fixed. |
+| WebSocket `DELETE`'s `collection` | **BUG** — merged under the registry's; `softDelete` made the delete an UPDATE. Fixed: the socket forwards the address and `hard` only. |
+| `SaveProps.previousValues` | clean — both drivers ignore it and read the previous row. |
+| WebSocket `SAVE`'s `collection` | **OPEN** — the same merge. The validators use the registry's collection, the driver the merged one. Reach, read from the driver and not yet tested: a client can turn `history` on for a collection that did not declare it; tenancy only ever narrows. |
+| Mongo rules through the same merge | clean for widening — the registry wins where it declares `securityRules`, and no rules already means allow. |
+| history revert | clean — restores values stored server-side, and checks `entity_id`/`table_name` against the URL. |
+| `If-Match` | clean — the caller's tag is compared with one computed from a server read. |
+
+Gate: `test/e2e/delete-reads-stored-row-e2e.test.ts` sends the forged frame over a
+real socket to a real Postgres with RLS and the history table. Four mutations —
+callbacks handed `{}`, history handed `{}`, the 404 skipped, the frame's
+`collection` forwarded again — each turn a case red.

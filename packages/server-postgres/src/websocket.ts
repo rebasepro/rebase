@@ -547,7 +547,18 @@ colors: true }));
                         const request: DeleteProps = payload;
                         wsDebug("🗑️ [WebSocket Server] Deleting row:", request.row);
                         const delegate = await getScopedDelegate();
-                        await delegate.delete(request);
+                        // The address and `hard`, and nothing else the frame
+                        // says. The driver reads the row itself, and resolves
+                        // the collection from the registry by path — a
+                        // `collection` passed along was merged under the
+                        // registry's, so a key the registry does not declare
+                        // survived: `softDelete: { field: "title" }` turned
+                        // this DELETE into an UPDATE of `title` that no
+                        // `beforeSave` and no write validator saw.
+                        await delegate.delete({
+                            row: { id: request.row.id, path: request.row.path },
+                            hard: request.hard
+                        });
                         wsDebug("🗑️ [WebSocket Server] DELETE_ENTITY completed successfully");
                         const response = {
                             type: "DELETE_SUCCESS",

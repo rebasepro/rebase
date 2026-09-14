@@ -3,7 +3,108 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { initializeStorage, assertStorageAccessControlConfigured } from "../src/init/storage";
+import { initializeStorage, assertStorageAccessControlConfigured, localStorageForced } from "../src/init/storage";
+import { DEFAULT_RESOURCE_KEY, type ResourceDeclaration } from "@rebasepro/types";
+import { resourceResolver } from "../src/boot/resource-resolvers";
+import { loadEnv } from "../src/env";
+
+/**
+ * What each way of writing `FORCE_LOCAL_STORAGE` must mean.
+ *
+ * Only an explicit yes forces. A no in any spelling, nothing at all, or a word
+ * that is neither keeps the guard up, because its job is to refuse a local
+ * backend in production until somebody has said a durable volume is mounted.
+ *
+ * The guard used to test the raw string for truthiness, so every row marked
+ * `false` below except the first two registered the backend — including
+ * `"false"`, the natural way to say "there is no volume here".
+ */
+const FORCE_SPELLINGS: [value: string | undefined, forced: boolean][] = [
+    [undefined, false],
+    ["", false],
+    ["false", false],
+    ["0", false],
+    ["no", false],
+    ["off", false],
+    ["FALSE", false],
+    ["maybe", false],
+    ["true", true],
+    ["1", true],
+    ["yes", true],
+    [" TRUE ", true]
+];
+
+/** The default bucket, as `rebase status` sees a project that declared none. */
+const DEFAULT_BUCKET: ResourceDeclaration = {
+    kind: "bucket",
+    key: DEFAULT_RESOURCE_KEY,
+    engine: "local",
+    transport: "server",
+    options: Object.freeze({})
+};
+
+describe("FORCE_LOCAL_STORAGE", () => {
+    let tempDir: string;
+    const originalForce = process.env.FORCE_LOCAL_STORAGE;
+
+    beforeEach(async () => {
+        tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-force-local-"));
+    });
+
+    afterEach(async () => {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+        if (originalForce === undefined) delete process.env.FORCE_LOCAL_STORAGE;
+        else process.env.FORCE_LOCAL_STORAGE = originalForce;
+    });
+
+    it.each(FORCE_SPELLINGS)("=%p forces local storage in production: %p — and rebase status agrees", async (value, forced) => {
+        if (value === undefined) delete process.env.FORCE_LOCAL_STORAGE;
+        else process.env.FORCE_LOCAL_STORAGE = value;
+
+        // The runtime: does the backend get registered?
+        const { storageController } = await initializeStorage({ type: "local", basePath: tempDir }, true);
+        expect(storageController?.getType()).toBe(forced ? "local" : undefined);
+
+        // `rebase status`: does it promise the same thing? Two readers of one
+        // decision, held to one row, so neither can be fixed without the other.
+        const verdict = resourceResolver("bucket")!.resolve(
+            DEFAULT_BUCKET,
+            value === undefined ? {} : { FORCE_LOCAL_STORAGE: value },
+            { production: true, defaultBasePath: tempDir }
+        );
+        expect(verdict.state).toBe(forced ? "ready" : "unbound");
+    });
+
+    describe("against loadEnv's schema", () => {
+        const originalEnv = { ...process.env };
+
+        beforeEach(() => {
+            process.env = {
+                DATABASE_URL: "postgresql://db.example.com:5432/rebase",
+                JWT_SECRET: "a-test-secret-that-is-long-enough-for-the-schema"
+            };
+        });
+
+        afterEach(() => {
+            process.env = { ...originalEnv };
+        });
+
+        it.each(["true", "false", "", undefined])("reads %p to the same boolean the schema parses", (value) => {
+            // Every value the schema accepts, read both ways. A backend booted
+            // through `loadEnv` and one assembled without it get one answer.
+            if (value !== undefined) process.env.FORCE_LOCAL_STORAGE = value;
+            expect(localStorageForced()).toBe(loadEnv().FORCE_LOCAL_STORAGE);
+        });
+
+        it("refuses the boot on \"0\" before storage is ever initialised", () => {
+            // The schema's set is strict, so a spelling outside it never reaches
+            // the guard on the boot path — and where it does, the row above
+            // keeps the guard up.
+            process.env.FORCE_LOCAL_STORAGE = "0";
+            expect(() => loadEnv()).toThrow(/FORCE_LOCAL_STORAGE/);
+        });
+    });
+});
 
 describe("initializeStorage", () => {
     let tempDir: string;

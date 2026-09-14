@@ -1,4 +1,4 @@
-import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
+import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, parseEnvBoolean } from "@rebasepro/types";
 import type { AnyCollectionConfig, CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
 
 import { getEffectiveSecurityRules, getTableName, isRelationalCollection, securityRuleToConditions } from "@rebasepro/common";
@@ -106,16 +106,21 @@ export interface ValidateCollectionConfigOptions {
 /**
  * Read the unknown-key policy from the environment.
  *
- * `REBASE_STRICT_COLLECTION_CONFIG` accepts `error`/`strict`/`1`/`true` to
- * escalate, `off`/`0`/`false` to silence, and anything else warns.
+ * `REBASE_STRICT_COLLECTION_CONFIG` accepts `error`/`strict` or any spelling of
+ * yes to escalate, `none` or any spelling of no to silence, and anything else
+ * warns. Yes and no are {@link parseEnvBoolean}'s, the same as every other
+ * variable's.
  */
 export function unknownKeyPolicyFromEnv(
     env: Record<string, string | undefined> = process.env
 ): UnknownKeyPolicy {
     const raw = env.REBASE_STRICT_COLLECTION_CONFIG?.trim().toLowerCase();
     if (!raw) return "warn";
-    if (["error", "strict", "1", "true", "yes"].includes(raw)) return "error";
-    if (["off", "0", "false", "no", "none"].includes(raw)) return "off";
+    if (raw === "error" || raw === "strict") return "error";
+    if (raw === "none") return "off";
+    const flag = parseEnvBoolean(raw);
+    if (flag === true) return "error";
+    if (flag === false) return "off";
     return "warn";
 }
 

@@ -498,6 +498,7 @@ function isValidEngine
 function nestAdminCollectionKeys
 function nestAdminKeysOf
 function nestAdminPropertyKeys
+function parseEnvBoolean
 function parseRelationAggregateSort
 function queue
 function registerDataSourceCapabilities
@@ -562,7 +563,7 @@ interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackendLifecycle { destroy, healthCheck, initialize }
-interface BackupInfo { createdAt, destinationKind, key, name, sizeBytes }
+interface BackupInfo { createdAt, destinationKind, globalsKey, key, name, sizeBytes }
 interface BackupsAPI { download, list }
 interface BaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, properties, securityRules, singularName, slug, strictWrites }
 interface BaseProperty { access, callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }

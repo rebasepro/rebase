@@ -45,6 +45,7 @@ import { checkPortableImports } from "./docs-verify/check-portable-imports.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
+import { checkEnvBooleans } from "./docs-verify/check-env-booleans.mjs";
 import { checkEndpointIndex } from "./docs-verify/check-endpoint-index.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
@@ -91,6 +92,7 @@ if (asJson) {
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
         out.envReads = checkEnvReads(ROOT).findings;
+        out.envBooleans = checkEnvBooleans(ROOT).findings;
         out.endpointIndex = checkEndpointIndex(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.errorCodes = checkErrorCodes(ROOT).findings;
@@ -378,6 +380,26 @@ if (only === "both" || only === "names") {
         }
         for (const name of dead) {
             console.log(`  ${RED}${name}${NC} ${DIM}is exempted in NOT_OURS but nothing reads it — delete the entry.${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Boolean environment variables ━━━${NC}`);
+    const { findings: bad, dead, booleans, files } = checkEnvBooleans(ROOT);
+    console.log(`${DIM}Held ${booleans} boolean variable(s) to parseEnvBoolean across ${files} source file(s).${NC}`);
+    if (!bad.length && !dead.length) {
+        console.log(`${GREEN}✓ Every boolean variable is read through parseEnvBoolean, and none is compared with a spelling.${NC}`);
+    } else {
+        findings += bad.length + dead.length;
+        if (bad.length) {
+            console.log(`${RED}✗ ${bad.length} boolean read(s) that bypass parseEnvBoolean:${NC}`);
+            for (const b of bad) {
+                console.log(`  ${RED}${b.file}:${b.line}${NC} ${b.kind === "raw" ? "raw read of" : "hand-spelled"} ${b.name} ${DIM}${b.text}${NC}`);
+            }
+        }
+        for (const key of dead) {
+            console.log(`  ${RED}${key}${NC} ${DIM}is exempted in check-env-booleans.mjs but nothing reads it that way — delete the entry.${NC}`);
         }
     }
 }

@@ -12,7 +12,7 @@
  * The fixtures are the shapes actually observed: a `Status` object embedded in
  * a wrapper sentence, with the client's header dump appended.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { extractKubernetesStatus, summarizeError, wantsRawError } from "./errors";
 
 /** The refusal that motivated all of this, near enough verbatim. */
@@ -122,8 +122,28 @@ message: "Project not found" }, "Failed to load status");
 });
 
 describe("wantsRawError", () => {
+    const before = process.env.REBASE_DEBUG;
+    afterEach(() => {
+        if (before === undefined) delete process.env.REBASE_DEBUG;
+        else process.env.REBASE_DEBUG = before;
+    });
+
     it("is off by default and on with --debug", () => {
+        delete process.env.REBASE_DEBUG;
         expect(wantsRawError(["node", "rebase", "cloud", "deploy"])).toBe(false);
         expect(wantsRawError(["node", "rebase", "cloud", "deploy", "--debug"])).toBe(true);
+    });
+
+    it.each(["1", "true", "yes"])("is on with REBASE_DEBUG=%s", (value) => {
+        // `=true` used to do nothing here while the quote fallbacks in
+        // resources.ts, which tested the raw string, printed on it.
+        process.env.REBASE_DEBUG = value;
+        expect(wantsRawError(["node", "rebase", "cloud", "deploy"])).toBe(true);
+    });
+
+    it.each(["0", "false", "off", ""])("is off with REBASE_DEBUG=%p", (value) => {
+        // And `=0` was the reverse: set, so truthy, so the fallbacks printed.
+        process.env.REBASE_DEBUG = value;
+        expect(wantsRawError(["node", "rebase", "cloud", "deploy"])).toBe(false);
     });
 });
