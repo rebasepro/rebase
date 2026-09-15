@@ -316,6 +316,28 @@ export function staleVerdict(input: {
     generatedExists: boolean;
     /** The legacy foreign-key names found in it, if it was read. */
     stale: LegacyForeignKeyName[];
+    /**
+     * How the file differs from what the current collections generate.
+     *
+     * The check this command's own summary promises — "generated schema files
+     * that no longer match the collections" — and for a long time the one it did
+     * not make. Staleness was computed from {@link findLegacyForeignKeyNames}
+     * alone, which finds one specific historical defect: a junction column named
+     * the way a previous release derived it. Every other way a file can fall
+     * behind its collections — a table added, a column retyped, an enum label
+     * dropped from the offer — left the command printing "Nothing stale" about a
+     * file that regenerating visibly changes.
+     *
+     * `projects_database_mode` is the one that found this. The shared database
+     * tier was retired, the label came off the collection, and `schema stale`
+     * called the file a match for weeks while every `pnpm run build` silently
+     * rewrote it.
+     *
+     * Optional so a caller that has not loaded the collections — the only way to
+     * know what they would generate — reports what it does know rather than
+     * claiming a clean bill it never checked.
+     */
+    differences?: DeclarationDifference[];
     /** Why the comparison could not be made, when it could not. */
     unreadable?: string;
     /** Whether `--fix` was given. */
@@ -347,7 +369,27 @@ export function staleVerdict(input: {
         };
     }
 
-    if (input.stale.length === 0) {
+    // Both checks, and both reported. They answer different questions and a file
+    // can fail either: `stale` names a specific historical defect with a
+    // specific remedy, `differences` says the file is simply not what the
+    // collections now generate. Reporting only the first is what let this
+    // command pass a file that had visibly moved.
+    const problems: string[] = [];
+    if (input.stale.length > 0) {
+        problems.push(
+            `  ⚠️  ${input.outputPath} names ${input.stale.length} foreign key(s) the way an earlier release did:`,
+            describeLegacyForeignKeyNames(input.stale)
+        );
+    }
+    const differences = input.differences ?? [];
+    if (differences.length > 0) {
+        problems.push(
+            `  ⚠️  ${input.outputPath} is not what the current collections generate.`,
+            `      Differs in: ${describeDeclarationDifferences(differences)}.`
+        );
+    }
+
+    if (problems.length === 0) {
         return {
             lines: quiet([`  ✓ Nothing stale — 1 generated file matches (${input.outputPath}).`]),
             exitCode: 0,
@@ -355,12 +397,7 @@ export function staleVerdict(input: {
         };
     }
 
-    const found = [
-        "",
-        `  ⚠️  ${input.outputPath} names ${input.stale.length} foreign key(s) the way an earlier release did:`,
-        describeLegacyForeignKeyNames(input.stale),
-        ""
-    ];
+    const found = ["", ...problems, ""];
 
     if (input.fix) {
         return { lines: [...found, "  Regenerating the Drizzle schema so it matches..."], exitCode: 0, regenerate: true };
@@ -375,9 +412,17 @@ export function staleVerdict(input: {
             // file still decides is everything around the server: Atlas plans
             // migrations from it, `db push` diffs it, `eject` writes it out, and
             // user code imports it.
-            "  The database column has already been renamed at boot. The server reads the database, "
-            + "so it will still start — but `db push`, Atlas, `eject` and any code importing this "
-            + "file are all reading a description that no longer matches.",
+            //
+            // The first sentence is the renamed-column one and belongs only to
+            // the legacy foreign-key finding. Printed unconditionally it told a
+            // reader whose enum label had simply moved that a column had been
+            // renamed at boot, which sends them looking for a rename that never
+            // happened. The consequence below is the same either way.
+            ...(input.stale.length > 0
+                ? ["  The database column has already been renamed at boot."]
+                : []),
+            "  The server reads the database, so it will still start — but `db push`, Atlas, `eject` "
+            + "and any code importing this file are all reading a description that no longer matches.",
             "  Run `rebase schema generate` to regenerate it."
         ],
         exitCode: 1,

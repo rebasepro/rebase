@@ -1609,15 +1609,29 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     const generatedExists = fs.existsSync(schemaFile);
 
     const { loadCollections } = await import("./schema/doctor");
-    const { findLegacyForeignKeyNames, staleVerdict } =
+    const { findLegacyForeignKeyNames, compareGeneratedDeclarations, staleVerdict } =
         await import("./schema/generated-schema-staleness");
+    const { generateSchema } = await import("./schema/generate-drizzle-schema-logic");
+    const { relationalCollections } = await import("@rebasepro/common");
 
     let stale: ReturnType<typeof findLegacyForeignKeyNames> = [];
+    let differences: ReturnType<typeof compareGeneratedDeclarations> = [];
     let unreadable: string | undefined;
     if (generatedExists) {
         try {
             const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-            stale = findLegacyForeignKeyNames(fs.readFileSync(schemaFile, "utf8"), collections);
+            const onDisk = fs.readFileSync(schemaFile, "utf8");
+            stale = findLegacyForeignKeyNames(onDisk, collections);
+            // The check the command's own summary promises, and the one it did
+            // not make: render what these collections generate and compare it,
+            // declaration by declaration, with the file on disk. Without this
+            // the verdict rested entirely on `findLegacyForeignKeyNames`, which
+            // looks for one historical naming defect — so a file the generator
+            // visibly rewrites was reported as a match.
+            const postgresCollections = relationalCollections(collections);
+            if (postgresCollections.length > 0) {
+                differences = compareGeneratedDeclarations(generateSchema(postgresCollections), onDisk);
+            }
         } catch (err) {
             // Best-effort by design: a collections directory that will not load
             // is a real error, but it is one the boot reports far better than
@@ -1631,7 +1645,7 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     // The decision lives in `generated-schema-staleness.ts` so it can be tested:
     // this file uses `import.meta`, which the driver's jest suite cannot load,
     // and three of this command's four paths were silent because of it.
-    const verdict = staleVerdict({ outputPath, generatedExists, stale, unreadable, fix });
+    const verdict = staleVerdict({ outputPath, generatedExists, stale, differences, unreadable, fix });
 
     for (const line of verdict.lines) {
         if (!line) out("");

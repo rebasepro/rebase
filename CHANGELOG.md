@@ -62,6 +62,15 @@
 
 ### Fixed
 
+- **`rebase schema stale` reports a generated schema the collections have moved
+  past.** It looked for one thing only: foreign keys named the way an earlier
+  release derived them. A file missing a table, with a retyped column or with an
+  enum label the collection had dropped was reported as "Nothing stale", while
+  every `rebase build` rewrote it. It now compares the file, declaration by
+  declaration, with what the collections generate, as `rebase doctor` already
+  did. It names what differs, exits non-zero, and regenerates the file under
+  `--fix`. When both problems apply, it reports both.
+
 - **A realtime listener on Postgres gets its first delivery in order, hears a
   deleted row, and keeps its whole query.** `listenCollection` and `listenOne`
   fetched their first delivery themselves, outside the realtime service that

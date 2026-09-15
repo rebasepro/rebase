@@ -311,6 +311,69 @@ describe("the verdict schema stale prints", () => {
         expect(printed).toContain("rebase schema generate");
     });
 
+    it("reports a file the collections have moved past, not only a renamed key", () => {
+        // The regression this exists for. Staleness was computed from
+        // `findLegacyForeignKeyNames` alone — one historical naming defect — so
+        // every other way a file falls behind reported "Nothing stale" about a
+        // file the generator visibly rewrites. `projectsDatabaseMode` is the one
+        // that found it: the shared database tier was retired, the label came
+        // off the collection, and this command called the file a match.
+        const verdict = staleVerdict({
+            ...clean,
+            differences: [{ name: "projectsDatabaseMode", kind: "changed" }]
+        });
+        const printed = verdict.lines.join("\n");
+
+        expect(verdict.exitCode).toBe(1);
+        expect(printed).toContain("not what the current collections generate");
+        expect(printed).toContain("projectsDatabaseMode");
+        expect(printed).toContain("rebase schema generate");
+    });
+
+    it("does not claim a column was renamed when nothing was", () => {
+        // The closing advice used to print the legacy-rename sentence for every
+        // finding, which sends a reader whose enum label moved looking for a
+        // rename that never happened.
+        const renamed = said({ ...clean, stale: behind });
+        const moved = said({ ...clean, differences: [{ name: "articles", kind: "changed" }] });
+
+        expect(renamed).toContain("already been renamed at boot");
+        expect(moved).not.toContain("renamed at boot");
+        // The consequence holds either way, and both must still say it.
+        expect(renamed).toContain("db push");
+        expect(moved).toContain("db push");
+    });
+
+    it("regenerates under --fix for a difference, not only for a legacy name", () => {
+        const verdict = staleVerdict({
+            ...clean,
+            fix: true,
+            differences: [{ name: "projectsDatabaseMode", kind: "changed" }]
+        });
+
+        expect(verdict.regenerate).toBe(true);
+        expect(verdict.exitCode).toBe(0);
+    });
+
+    it("reports both findings when both apply", () => {
+        const printed = said({
+            ...clean,
+            stale: behind,
+            differences: [{ name: "projectsDatabaseMode", kind: "changed" }]
+        });
+
+        expect(printed).toContain("foreign key(s)");
+        expect(printed).toContain("not what the current collections generate");
+    });
+
+    it("stays quiet about differences it was never given", () => {
+        // A caller that could not load the collections passes no `differences`.
+        // Treating absent as "none found" is right; treating it as a clean bill
+        // is what this whole file is about, and `unreadable` covers that case.
+        expect(staleVerdict(clean).exitCode).toBe(0);
+        expect(staleVerdict({ ...clean, differences: [] }).exitCode).toBe(0);
+    });
+
     it("stays silent under --fix when there is nothing to fix", () => {
         // `rebase dev` runs `schema stale --fix` before every boot with
         // inherited stdio. "Nothing was wrong" is not news a hundred lines into
