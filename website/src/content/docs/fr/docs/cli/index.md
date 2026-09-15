@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a990240f0d07538
+sourceHash: 8060b4b8b622955b
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -23,7 +23,7 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Sortie lisible par machine
 
-`--json` est le paramètre d'activation, et en dehors de la famille `cloud`, c'est le seul : `rebase status`, `rebase resources` et `rebase apps list` placent alors une valeur JSON unique sur stdout — le résultat, ou une enveloppe `{"error": {"message", "code", "hint", "issues"}}` avec un code de sortie différent de zéro — à **chaque** sortie de la commande, afin qu'un appelant puisse analyser stdout de manière inconditionnelle. Sans cela, elles écrivent du texte lisible par un humain et les erreurs vont vers stderr. `rebase cloud` utilise la même enveloppe et constitue la seule exception à cette option : elle active également le JSON d'elle-même lorsque stdout n'est pas un TTY, ou lorsque `REBASE_JSON=1` est défini. Ainsi, `rebase cloud status | cat` produit du JSON tandis que `rebase status | cat` n'en produit pas — dans un script, passez explicitement `--json` plutôt que de vous fier à l'une ou l'autre règle.
+`--json` est le paramètre d'activation, et en dehors de la famille `cloud`, c'est le seul : `rebase status`, `rebase resources`, `rebase apps list` et <span class="since-badge" data-since="0.22">Since 0.22</span> `rebase upgrade` placent alors une valeur JSON unique sur stdout — le résultat, ou une enveloppe `{"error": {"message", "code", "hint", "issues"}}` avec un code de sortie différent de zéro — à **chaque** sortie de la commande, afin qu'un appelant puisse analyser stdout de manière inconditionnelle. Sans cela, elles écrivent du texte lisible par un humain et les erreurs vont vers stderr. `rebase cloud` utilise la même enveloppe et constitue la seule exception à cette option : elle active également le JSON d'elle-même lorsque stdout n'est pas un TTY, ou lorsque `REBASE_JSON=1` est défini. Ainsi, `rebase cloud status | cat` produit du JSON tandis que `rebase status | cat` n'en produit pas — dans un script, passez explicitement `--json` plutôt que de vous fier à l'une ou l'autre règle.
 
 ## Commandes
 
@@ -80,6 +80,21 @@ Le bundle est l'artefact que vous déployez — l'image du runtime le charge, il
 | `--no-static` | Ignorer la compilation du frontend |
 
 Les dépendances sont incluses (vendored) par défaut afin qu'un redémarrage de pod ne subisse pas une installation de 35 à 55 secondes. Une arborescence dépassant 200 Mo sur le disque est abandonnée à la place, car la limite de téléversement est de 100 Mo compressés — consultez le changelog pour en connaître la raison.
+
+### `rebase upgrade`
+
+<span class="since-badge" data-since="0.22">Since 0.22</span> Fait passer chaque paquet `@rebasepro/*` épinglé par le projet à une même
+version, puis installe avec le gestionnaire de paquets que désigne le fichier de
+verrouillage. `rebase upgrade` prend la plus récente ; `--to 0.21.0`, une version
+exacte, sans interroger le registre ; `--to canary`, un dist-tag. Chaque version
+épinglée dans `dependencies`, `devDependencies` et `optionalDependencies`, dans
+chaque `package.json` du projet, garde son `^` ou son `~`, et rien d'autre ne
+change dans le fichier. `peerDependencies` et les spécifications `workspace:`,
+`link:`, `file:`, git et de tag sont listées et laissées telles quelles. Les
+overrides de `pnpm-workspace.yaml` et de `package.json` suivent aussi, mais un
+override `link:` ou `file:` l'emporte sur toute version épinglée : il est signalé,
+et `--drop-local-overrides` le supprime. `--dry-run` n'écrit rien, `--no-install`
+saute l'installation et `--json` affiche un seul document.
 
 ### `rebase start`
 
@@ -327,7 +342,10 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` sans nom d'application déploie le backend.
+`deploy` sans nom d'application déploie le backend. <span class="since-badge" data-since="0.22">Since 0.22</span> Un déploiement de bundle
+backend téléverse aussi le code source du projet — ce que git suit, jamais un `.env` —
+pour qu'une mise à jour de la plateforme puisse le reconstruire ; `--no-source` l'évite.
+`--allow-downgrade` déploie un bundle construit sur une version plus ancienne que celle qu'exécute le projet.
 
 #### Configuration
 
@@ -484,25 +502,8 @@ rebase telemetry disable
 
 `status` affiche le paramètre actuel, `show` affiche exactement ce qui serait envoyé — que le partage soit activé ou non, afin que vous puissiez examiner le contenu (payload) avant de décider — et les deux autres le modifient. Si vous n'avez jamais exécuté `init`, rien n'a jamais été collecté.
 
-## Flux de travail de migration
-
-Le flux de travail typique pour les modifications de schéma :
-
-```bash
-# 1. Edit your collection in config/collections/
-# 2. Generate the Drizzle schema
-rebase schema generate
-
-# 3. Generate SQL migration
-rebase db generate
-
-# 4. Review the generated SQL in drizzle/
-
-# 5. Apply the migration
-rebase db migrate
-```
-
 ## Prochaines étapes
 
+- **[Génération de schéma](/docs/cli/schema/#production-workflow)** — Le flux de travail de migration, de la modification d'une collection à la production
 - **[Schema as Code](/docs/architecture/schema-as-code)** — Fonctionnement de la génération de schéma
 - **[Démarrage rapide](/docs/getting-started/quickstart)** — Pour commencer

@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase upgrade` moves every `@rebasepro/*` package to one release.** A
+  project pins the framework in several `package.json` files, and `rebase
+  build` could only warn that they were behind. `rebase upgrade` rewrites every
+  `@rebasepro/*` entry in `dependencies`, `devDependencies` and
+  `optionalDependencies`, in every `package.json` under the project, keeping
+  `^` and `~`, then installs with the package manager your lockfile names.
+  `--to` takes an exact version (`0.21.0`, no registry lookup) or a dist-tag
+  (`latest`, the default, or `canary`). `peerDependencies`, `workspace:`,
+  `link:`, `file:`, git and tag specs are left alone and listed with the
+  reason. Overrides in `pnpm-workspace.yaml` and `package.json` are bumped the
+  same way. A `link:` or `file:` override wins over every pin, so it is
+  reported, and `--drop-local-overrides` removes it. Only the version strings
+  change: indentation, key order and line endings stay as they were.
+  `--dry-run` writes nothing, `--no-install` skips the install, and `--json`
+  prints one document with every change. The build warning about old pins,
+  and `rebase doctor`'s version-skew fix, now name the command.
+
+- **A bundle deploy uploads the project's source, so a platform upgrade can
+  rebuild it.** `rebase cloud deploy` now packs the source beside every
+  backend bundle and names it in the deploy. In a git repository that is what
+  `git ls-files` lists from the repository's top level, so `.gitignore` is
+  honoured and a package the project links from elsewhere in the repository
+  goes too. `node_modules`, `dist-bundle*`, `.envrc` and every `.env` and
+  `.env.*` file are always left out, committed or not; `.env.example`,
+  `.env.sample` and `.env.template` are kept. The `VITE_*` values a production
+  build of your frontend reads travel with it, and no other variable does. If
+  the archive is over 100 MB or the upload fails, the deploy goes ahead without
+  it and says so. `--no-source` skips it. `--allow-downgrade` deploys a bundle
+  built on an older framework release than the project runs, which the control
+  plane otherwise refuses as `FRAMEWORK_DOWNGRADE`.
+
 ### Changed
 
 - **Entity form fields are 48px tall again.** 0.20.0 took them to 32px
@@ -249,6 +282,18 @@
   waits for every package at the new version rather than only the CLI, and
   fails if they never appear. The 0.21.0 GitHub Release has since been created
   by hand.
+
+- **A refused bundle deploy prints the control plane's reason and remedy.** On
+  the managed path every refusal went to the generic error report, so a bundle
+  refused at intake printed `Managed deploy failed to start (400)` and dropped
+  the hint. It now prints the message, the hint and the code, as a source
+  deploy already did. A `FRAMEWORK_DOWNGRADE` refusal also names the two ways
+  past it: `rebase upgrade`, or `--allow-downgrade`.
+
+- **A bundle deploy run from a subdirectory registers the project's apps.**
+  `rebase cloud deploy` read `rebase.json` from the working directory, so run
+  from `backend/` it found none there and told the platform the project
+  declared no apps. It reads the project root's.
 
 ### Security
 
