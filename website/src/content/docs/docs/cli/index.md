@@ -410,8 +410,8 @@ rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 
 `deploy` with no app name deploys the backend. <span class="since-badge" data-since="0.22">Since 0.22</span> A backend bundle
 deploy also uploads the project's source — what git tracks, never a `.env` — so a
-platform upgrade can rebuild it; `--no-source` skips that. `--allow-downgrade`
-deploys a bundle built on an older release than the project runs.
+platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
+--platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
 
 #### Config
 
@@ -419,7 +419,7 @@ deploys a bundle built on an older release than the project runs.
 rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add | verify | remove
 rebase cloud extensions list | enable | disable
-rebase cloud settings show | set        # name, branch, repo, subdomain
+rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
 
 #### Organizations

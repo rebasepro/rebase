@@ -414,7 +414,15 @@ async function uploadAndTrigger(opts: {
     // Best effort — see `prepareRebuildSource`, which warns and returns null
     // rather than fail a deploy over it.
     let rebuildSource: RebuildSource | null = null;
-    if (opts.uploadSource && manifest.kind !== "static") {
+    if (opts.uploadSource && manifest.kind !== "static" && await platformRebuildsOff(client, projectId)) {
+        // The owner turned platform rebuilds off: the platform keeps no copy
+        // of this app's source, so none leaves the machine. Asked before
+        // packing anything; the control plane refuses the upload regardless.
+        progress(chalk.gray(
+            "  Platform rebuilds are off for this project, so its source is not uploaded " +
+            "(turn them on with `rebase cloud settings set --platform-rebuilds on`)."
+        ));
+    } else if (opts.uploadSource && manifest.kind !== "static") {
         rebuildSource = await prepareRebuildSource({
             projectRoot,
             url,
@@ -1307,6 +1315,22 @@ deduplicated: true };
     if (refusal) fail(refusal.message, refusal.hint, refusal.code);
 
     reportError(e, "Failed to trigger deployment");
+}
+
+/**
+ * Whether the project's owner turned platform rebuilds off.
+ *
+ * Only an explicit `false` counts: a project row that predates the switch, or
+ * one that could not be read, is on — which is the default, and the control
+ * plane refuses an upload it should not have anyway.
+ */
+export async function platformRebuildsOff(client: CloudClient, projectId: string): Promise<boolean> {
+    try {
+        const row: unknown = await client.data.collection("projects").findById(projectId);
+        return typeof row === "object" && row !== null && "platformRebuilds" in row && row.platformRebuilds === false;
+    } catch {
+        return false;
+    }
 }
 
 /** The intake code for a bundle built on an older framework release than the project runs. */

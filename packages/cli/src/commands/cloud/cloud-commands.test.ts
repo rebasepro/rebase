@@ -16,7 +16,7 @@ import { setJsonModeForTest } from "./context";
 import { isRollbackable, deploymentDurationMs, deploymentView, triggerInfo, type DeploymentRow } from "./deployments";
 import { parseEnvAssignment } from "./env";
 import { resolveExtensionAlias } from "./extensions";
-import { buildSettingsPatch } from "./settings";
+import { buildSettingsPatch, parseOnOff } from "./settings";
 
 /* ── stdout capture ─────────────────────────────────────────────── */
 
@@ -158,6 +158,21 @@ subdomain: "acme" });
     });
     it("is empty when nothing is passed", () => {
         expect(buildSettingsPatch({})).toEqual({});
+    });
+    it("carries the platform-rebuilds switch as a boolean, off included", () => {
+        expect(buildSettingsPatch({ platformRebuilds: false })).toEqual({ platformRebuilds: false });
+        expect(buildSettingsPatch({ platformRebuilds: true })).toEqual({ platformRebuilds: true });
+    });
+});
+
+describe("parseOnOff", () => {
+    it("reads on/off and true/false, and nothing else", () => {
+        expect(parseOnOff("on")).toBe(true);
+        expect(parseOnOff("OFF")).toBe(false);
+        expect(parseOnOff("true")).toBe(true);
+        expect(parseOnOff("false")).toBe(false);
+        expect(parseOnOff("yes")).toBeNull();
+        expect(parseOnOff("")).toBeNull();
     });
 });
 

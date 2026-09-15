@@ -1,5 +1,5 @@
 ---
-sourceHash: 8060b4b8b622955b
+sourceHash: c8a8fbca59f68e48
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -344,7 +344,7 @@ rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 
 `deploy` sans nom d'application déploie le backend. <span class="since-badge" data-since="0.22">Since 0.22</span> Un déploiement de bundle
 backend téléverse aussi le code source du projet — ce que git suit, jamais un `.env` —
-pour qu'une mise à jour de la plateforme puisse le reconstruire ; `--no-source` l'évite.
+pour qu'une mise à jour de la plateforme puisse le reconstruire ; `--no-source` l'évite pour un déploiement. `rebase cloud settings set --platform-rebuilds off` désactive les reconstructions de la plateforme pour le projet : les mises à jour ne déplacent alors que le runtime, et la source conservée est supprimée.
 `--allow-downgrade` déploie un bundle construit sur une version plus ancienne que celle qu'exécute le projet.
 
 #### Configuration
@@ -353,7 +353,7 @@ pour qu'une mise à jour de la plateforme puisse le reconstruire ; `--no-source`
 rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add | verify | remove
 rebase cloud extensions list | enable | disable
-rebase cloud settings show | set        # name, branch, repo, subdomain
+rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
 
 #### Organisations

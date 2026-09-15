@@ -173,6 +173,27 @@ describe("a backend bundle deploy", () => {
         expect("rebuildSource" in triggered()).toBe(false);
     });
 
+    // The owner turned platform rebuilds off: the platform keeps no copy of
+    // the source, so none is even packed, let alone sent.
+    it("uploads no source for a project whose owner turned platform rebuilds off", async () => {
+        bundle("backend");
+        controlPlane();
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok" }) },
+                data: { collection: () => ({ findById: async () => ({ id: "proj_1", platformRebuilds: false }) }) },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+
+        await deploy();
+
+        expect(requests.some(url => url.includes("/deploy/source/upload"))).toBe(false);
+        expect("rebuildSource" in triggered()).toBe(false);
+        expect(said.join("\n")).toContain("Platform rebuilds are off for this project");
+    });
+
     it("asks for a downgrade only with --allow-downgrade", async () => {
         bundle("backend");
         controlPlane();

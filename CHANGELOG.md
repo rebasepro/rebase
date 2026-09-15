@@ -34,9 +34,14 @@
   `.env.sample` and `.env.template` are kept. The `VITE_*` values a production
   build of your frontend reads travel with it, and no other variable does. If
   the archive is over 100 MB or the upload fails, the deploy goes ahead without
-  it and says so. `--no-source` skips it. `--allow-downgrade` deploys a bundle
-  built on an older framework release than the project runs, which the control
-  plane otherwise refuses as `FRAMEWORK_DOWNGRADE`.
+  it and says so. `--no-source` skips it for one deploy. A project's owner can
+  turn platform rebuilds off for good — `rebase cloud settings set
+  --platform-rebuilds off`, or the project's settings in the console — and then
+  no source is uploaded, the platform deletes the copy it holds, and upgrades
+  move the runtime only; rebuilds are on until someone does.
+  `--allow-downgrade` deploys a bundle built on an older framework release than
+  the project runs, which the control plane otherwise refuses as
+  `FRAMEWORK_DOWNGRADE`.
 
 ### Changed
 
