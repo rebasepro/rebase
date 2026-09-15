@@ -26,7 +26,10 @@
   backend bundle and names it in the deploy. In a git repository that is what
   `git ls-files` lists from the repository's top level, so `.gitignore` is
   honoured and a package the project links from elsewhere in the repository
-  goes too. `node_modules`, `dist-bundle*`, `.envrc` and every `.env` and
+  goes too. A `link:` or `file:` dependency that reaches outside the project's
+  repository — a project that is its own repository, nested in another it
+  links packages from — brings the repository holding its target, and the
+  archive is rooted where they meet; `@rebasepro/*` links are never followed. `node_modules`, `dist-bundle*`, `.envrc` and every `.env` and
   `.env.*` file are always left out, committed or not; `.env.example`,
   `.env.sample` and `.env.template` are kept. The `VITE_*` values a production
   build of your frontend reads travel with it, and no other variable does. If
