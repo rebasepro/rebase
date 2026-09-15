@@ -11,6 +11,13 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Changed
+
+- **Entity form fields are 48px tall again.** 0.20.0 took them to 32px
+  (`small`). The form passes `large` again, and the field bindings default to
+  it, so a field nested in a map, an array or a table cell's popup editor is the
+  same height as the rest. The text stays at 14px.
+
 ### Removed
 
 - **`RealtimeService.registerDataDriverSubscription`, `addSubscriptionCallback`
@@ -85,13 +92,19 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   details.` with code `INTERNAL_ERROR`, and the error itself goes to the log.
   A refusal is logged as a warning, not an error.
 
-- **Date and read-only fields in the entity form match the other fields.**
-  Since 0.20.0 the form draws its controls at `small` (32px, 14px text). Two
-  field types kept the old size. A date field drew at 48px, because its binding
-  never passed the form's `size` on. A read-only field had a fixed 48px box and
-  printed its value in 16px text. So a column that mixed text, date and
-  read-only fields showed three heights and two text sizes. Both now follow the
-  form's `size`, and a read-only value is printed at the inputs' 14px.
+- **Date and read-only fields in the entity form match the other fields.** A
+  date field ignored the form's `size` and always drew at 48px. In 0.20.0 and
+  0.21.0, where the form was `small`, that put it 16px above the text fields
+  beside it. A read-only field had a fixed 48px box and printed its value in
+  16px text, a size above the 14px of every input. Both now follow the form's
+  `size`, and a read-only value is printed at 14px. See also Changed.
+
+- **A multi-select is as tall as the fields around it** (`@rebasepro/ui`).
+  `MultiSelect` stood 2px short of a `TextField` or `Select` of the same `size`
+  (48px against 50 at `large`), because the field's 1px border was drawn inside
+  its height rather than around it. A bordered `MultiSelect` is now the control
+  height plus the border, like the others. An `invisible` one, in a table cell,
+  is unchanged.
 
 - **`POST /admin/users` leaves delivery to a create hook, and shows the admin
   the hook's temporary password.** A collection's `auth.onCreateUser` or a
