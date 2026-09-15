@@ -90,6 +90,13 @@
   16px text, a size above the 14px of every input. Both now follow the form's
   `size`, and a read-only value is printed at 14px. See also Changed.
 
+- **A multi-select is as tall as the fields around it** (`@rebasepro/ui`).
+  `MultiSelect` stood 2px short of a `TextField` or `Select` of the same `size`
+  (48px against 50 at `large`), because the field's 1px border was drawn inside
+  its height rather than around it. A bordered `MultiSelect` is now the control
+  height plus the border, like the others. An `invisible` one, in a table cell,
+  is unchanged.
+
 - **`POST /admin/users` leaves delivery to a create hook, and shows the admin
   the hook's temporary password.** A collection's `auth.onCreateUser` or a
   backend's `AuthHooks.onAdminCreateUser` replaces Rebase's own delivery: the

@@ -235,12 +235,19 @@ export const MultiSelect = React.forwardRef<
                             aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
                             onClick={handleTogglePopover}
                             className={cls(
-                                {
-                                    "min-h-[28px]": size === "smallest",
-                                    "min-h-[32px]": size === "small",
-                                    "min-h-[40px]": size === "medium",
-                                    "min-h-[48px]": size === "large"
-                                },
+                                // The control height, plus the 1px hairline on
+                                // each side when the field has one. `TextField`,
+                                // `Select` and `DateTimeField` set the height on
+                                // an inner element and draw the border around
+                                // it, so a bordered field is N + 2. This button
+                                // is both the box and the border, and under
+                                // border-box sizing the border ate into N: a
+                                // multi-select stood 2px short of every field
+                                // beside it. An invisible one has no border and
+                                // stays N, like theirs.
+                                invisible
+                                    ? { smallest: "min-h-[28px]", small: "min-h-[32px]", medium: "min-h-[40px]", large: "min-h-[48px]" }[size]
+                                    : { smallest: "min-h-[30px]", small: "min-h-[34px]", medium: "min-h-[42px]", large: "min-h-[50px]" }[size],
                                 {
                                     // Kept tight so the min-height above governs:
                                     // py-2 plus a medium Chip overflowed it and made
