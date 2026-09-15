@@ -1,5 +1,5 @@
 ---
-sourceHash: 93d4b39a9822643d
+sourceHash: 4aa8f66e9039e583
 title: Fazendo deploy do Rebase na Hetzner Cloud
 description: Faça o deploy do Rebase na Hetzner Cloud com Terraform ou Docker Compose, para excelente desempenho baseado na UE e soberania de dados.
 sidebar_label: Hetzner Cloud
@@ -60,7 +60,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 Para um deploy real, prefira uma das duas abordagens que não envolvam copiar arquivos manualmente para o servidor:
 
-- **Embutir em uma imagem** — `FROM rebasepro/server:0.21.0` e depois `COPY dist-bundle /bundle`, e faça o deploy alterando uma tag.
+- **Embutir em uma imagem** — `FROM rebasepro/server:0.21.1` e depois `COPY dist-bundle /bundle`, e faça o deploy alterando uma tag.
 - **Servir via HTTP** — defina `REBASE_BUNDLE_URL` e o runtime baixa e descompacta o bundle a cada inicialização. Isso é o que o módulo Terraform acima faz e é o mesmo mecanismo usado pelo Helm chart.
 
 ## 4. Configurar e executar

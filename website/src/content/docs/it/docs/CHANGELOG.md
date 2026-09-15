@@ -11,6 +11,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-09-15
+
 ### Added
 
 - **`rebase upgrade` moves every `@rebasepro/*` package to one release.** A
