@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { spawn, execFileSync } from "child_process";
 import type { RebaseBundleManifest } from "@rebasepro/types";
+import type { RebuildSource } from "./rebuild-source";
 
 /** Read and shallow-validate a built bundle's manifest. */
 export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
@@ -136,6 +137,14 @@ export function bundleDeployBody(input: {
      * look" indistinguishable from "we looked and there was nothing".
      */
     commit?: BundleCommit | null;
+    /**
+     * The source this bundle was built from, uploaded so a platform upgrade can
+     * rebuild it on a newer release. Omitted when none was uploaded — `--no-source`,
+     * a static app, or an upload that failed — never sent empty.
+     */
+    rebuildSource?: RebuildSource | null;
+    /** `--allow-downgrade`: deploy a bundle built on an older release than the project runs. */
+    allowFrameworkDowngrade?: boolean;
 }): Record<string, unknown> {
     return {
         projectId: input.projectId,
@@ -148,7 +157,17 @@ export function bundleDeployBody(input: {
         ...(input.message ? { message: input.message } : {}),
         ...(input.commit
             ? { gitCommitHash: input.commit.hash, gitCommitMessage: input.commit.message }
-            : {})
+            : {}),
+        ...(input.rebuildSource
+            ? {
+                rebuildSource: {
+                    sourceId: input.rebuildSource.sourceId,
+                    projectPath: input.rebuildSource.projectPath,
+                    buildEnv: input.rebuildSource.buildEnv
+                }
+            }
+            : {}),
+        ...(input.allowFrameworkDowngrade ? { allowFrameworkDowngrade: true } : {})
     };
 }
 

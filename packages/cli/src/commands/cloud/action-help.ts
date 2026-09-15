@@ -190,6 +190,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--bundle-dir <path>", "Deploy a bundle that is already built"],
             ["--source <path>", "Upload this directory and build a container image from it"],
             ["--skip-type-check", "Compile without type checking, as `rebase build` does"],
+            ["--no-source", "Do not upload the project's source beside a backend bundle"],
+            ["--allow-downgrade", "Deploy a bundle built on an older framework release than the project runs"],
             ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
         ],
         examples: [
@@ -199,7 +201,12 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "A project whose rebase.json declares runtime: managed deploys a bundle without --bundle.",
-            "--source on a managed project is refused: it would swap the project onto a container image."
+            "--source on a managed project is refused: it would swap the project onto a container image.",
+            "A backend bundle deploy also uploads the project's source (what git tracks, never a .env), so a "
+                + "platform upgrade can rebuild it on a newer release. If it is over 100 MB or the upload fails, "
+                + "the deploy goes on without it and says so.",
+            "A bundle older than the release the project runs is refused as FRAMEWORK_DOWNGRADE. Run "
+                + "`rebase upgrade` and deploy again, or pass --allow-downgrade."
         ]
     },
 

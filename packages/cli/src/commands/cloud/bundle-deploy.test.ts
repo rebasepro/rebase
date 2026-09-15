@@ -212,3 +212,38 @@ describe("bundleDeployBody carries the commit only when there is one", () => {
         expect("gitCommitMessage" in body).toBe(false);
     });
 });
+
+/**
+ * The two fields a platform upgrade's rebuild depends on.
+ *
+ * Absent, not empty, when there is nothing to say: a control plane reading
+ * `rebuildSource: null` or `allowFrameworkDowngrade: false` would have to treat
+ * them as statements, and "no source was uploaded" is already what an absent
+ * field means.
+ */
+describe("bundleDeployBody carries the rebuild source and the downgrade opt-in only when there is one", () => {
+    const manifest = { app: "backend" } as unknown as RebaseBundleManifest;
+    const rebuildSource = {
+        sourceId: "0123456789abcdef0123456789abcdef",
+        projectPath: "app",
+        buildEnv: { VITE_TITLE: "Shop" }
+    };
+
+    it("sends the uploaded source as one object", () => {
+        const body = bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest, rebuildSource });
+        expect(body.rebuildSource).toEqual(rebuildSource);
+    });
+
+    it("omits it entirely when no source was uploaded", () => {
+        expect("rebuildSource" in bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest })).toBe(false);
+        expect("rebuildSource" in bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest, rebuildSource: null })).toBe(false);
+    });
+
+    it("says allowFrameworkDowngrade only when it was asked for", () => {
+        expect(bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest, allowFrameworkDowngrade: true }).allowFrameworkDowngrade)
+            .toBe(true);
+        expect("allowFrameworkDowngrade" in bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest, allowFrameworkDowngrade: false }))
+            .toBe(false);
+        expect("allowFrameworkDowngrade" in bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest })).toBe(false);
+    });
+});

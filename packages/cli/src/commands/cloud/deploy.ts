@@ -37,13 +37,14 @@ import {
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
 import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, bundleCommit, declaredAppsFrom } from "./bundle-deploy";
+import { MAX_SOURCE_UPLOAD_BYTES, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
 import { loadManifest, findBackendApp, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
-import type { RebaseAppConfig, RebaseBackendAppConfig } from "@rebasepro/types";
+import type { RebaseAppConfig, RebaseBackendAppConfig, RebaseProjectManifest } from "@rebasepro/types";
 
 interface Deployment {
     id: string | number;
@@ -67,12 +68,6 @@ interface BlockingDeployment {
 
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 15 * 60 * 1000; // 15 min hard stop
-
-// Keep in sync with the control plane's build-context cap (deploy/upload
-// MAX_BYTES and the backend's maxBodySize). Checked before uploading so an
-// oversized context fails in milliseconds with a hint, not after the upload
-// with a bare 413.
-const MAX_SOURCE_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 function sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
@@ -214,6 +209,10 @@ async function deployBundle(opts: {
     follow: boolean;
     /** Ceiling on the follow, in milliseconds. */
     timeoutMs: number;
+    /** Upload the project's source beside a backend bundle. Default on; `--no-source` off. */
+    uploadSource: boolean;
+    /** `--allow-downgrade`: deploy a bundle built on an older release than the project runs. */
+    allowDowngrade: boolean;
 }): Promise<void> {
     // Nothing here reads client/url/projectId/projectRef any more: everything
     // that needs them is reached through `uploadAndTrigger({ ...opts })`, which
@@ -261,6 +260,7 @@ async function deployBundle(opts: {
             }
             bundleDir = staticDir;
             await uploadAndTrigger({ ...opts,
+projectRoot,
 bundleDir,
 appName: target.name });
             return;
@@ -323,6 +323,7 @@ app: target.app as RebaseBackendAppConfig };
     }
 
     await uploadAndTrigger({ ...opts,
+projectRoot,
 bundleDir });
 }
 
@@ -341,13 +342,21 @@ async function uploadAndTrigger(opts: {
     url: string;
     projectId: string;
     projectRef: string;
+    /**
+     * The directory holding `rebase.json`. Everything about the project — its
+     * declared apps, its commit, its source — is read from here, never from
+     * the working directory, which may be `backend/` or anywhere else inside it.
+     */
+    projectRoot: string;
     bundleDir: string;
     message?: string;
     appName?: string;
     follow: boolean;
     timeoutMs: number;
+    uploadSource: boolean;
+    allowDowngrade: boolean;
 }): Promise<void> {
-    const { client, url, projectId, projectRef, bundleDir } = opts;
+    const { client, url, projectId, projectRef, projectRoot, bundleDir } = opts;
     const manifest = readBundleManifest(bundleDir);
 
     // Native modules cannot run on the managed runtime — the server rejects them
@@ -390,12 +399,31 @@ async function uploadAndTrigger(opts: {
     // Tell the platform about every app this repo declares, not only the one
     // whose bundle is being uploaded. A deploy ships one app; the Apps page is
     // meant to show the set, and without this it only ever knew about the backend.
-    let declaredApps: ReturnType<typeof declaredAppsFrom> = [];
+    let projectManifest: RebaseProjectManifest | undefined;
     try {
-        declaredApps = declaredAppsFrom(loadManifest(process.cwd()).manifest as never);
+        projectManifest = loadManifest(projectRoot).manifest;
     } catch {
         // A project with no readable rebase.json still deploys; it just cannot
         // describe its other apps.
+    }
+    const declaredApps = declaredAppsFrom(projectManifest);
+
+    // The source this bundle was built from, so a platform upgrade can rebuild
+    // it on a newer release. A backend only: a static app's bundle is its
+    // built files and nothing more, and has nothing to rebuild against.
+    // Best effort — see `prepareRebuildSource`, which warns and returns null
+    // rather than fail a deploy over it.
+    let rebuildSource: RebuildSource | null = null;
+    if (opts.uploadSource && manifest.kind !== "static") {
+        rebuildSource = await prepareRebuildSource({
+            projectRoot,
+            url,
+            token: token!,
+            projectId,
+            manifest: projectManifest,
+            progress: (line) => progress(chalk.gray(line)),
+            warn
+        });
     }
 
     const body = bundleDeployBody({
@@ -408,7 +436,9 @@ async function uploadAndTrigger(opts: {
         // Read here because here is the only place it exists: a bundle deploy
         // uploads a tarball, so nothing near the control plane has a repository
         // to ask. See `bundleCommit`.
-        commit: bundleCommit(process.cwd())
+        commit: bundleCommit(projectRoot),
+        rebuildSource,
+        allowFrameworkDowngrade: opts.allowDowngrade
     });
 
     let deploymentId: string;
@@ -423,6 +453,11 @@ async function uploadAndTrigger(opts: {
         deploymentId = String(res.deployment.id);
         managed = res.managed === true;
     } catch (e) {
+        // A refused bundle is a decision with a code and a remedy, not a
+        // transport failure — the same branch `resolveTriggerFailure` takes
+        // for a source build, which this path never reached.
+        const refusal = intakeRefusal(e);
+        if (refusal) fail(refusal.message, refusal.hint, refusal.code);
         reportError(e, "Managed deploy failed to start");
     }
 
@@ -447,6 +482,7 @@ async function uploadAndTrigger(opts: {
             { success: true,
 deploymentId,
 managed,
+sourceUploaded: rebuildSource !== null,
 following: false }
         );
         return;
@@ -467,6 +503,7 @@ following: false }
     emit(() => {}, { success: true,
 deploymentId,
 managed,
+sourceUploaded: rebuildSource !== null,
 following: true,
 status });
 }
@@ -932,6 +969,14 @@ export const DEPLOY_FLAGS = {
        spelling is an unknown option now, so a script carrying it stops rather
        than ejecting a project on a name it no longer means. */
     "--eject": Boolean,
+    /* Do not upload the project's source beside a backend bundle. The deploy
+       is the same; what it gives up is being rebuilt by a platform upgrade,
+       until a later deploy uploads the source. */
+    "--no-source": Boolean,
+    /* Deploy a bundle built on an older framework release than the project
+       runs. The control plane refuses that by default (FRAMEWORK_DOWNGRADE),
+       because it is usually a stale checkout, not a decision. */
+    "--allow-downgrade": Boolean,
     "-m": "--message"
 } as const;
 
@@ -1013,6 +1058,14 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             "usage"
         );
     }
+    if (args["--source"] && args["--no-source"]) {
+        fail(
+            "--source and --no-source ask for opposite things.",
+            "`--source <path>` builds a container image from a directory; `--no-source` skips uploading the source "
+                + "beside a managed bundle. Pass one.",
+            "usage"
+        );
+    }
 
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
@@ -1060,7 +1113,9 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             appName,
             skipTypeCheck: args["--skip-type-check"] === true,
             follow: args["--no-follow"] !== true,
-            timeoutMs: resolveDeployTimeout(args["--timeout"])
+            timeoutMs: resolveDeployTimeout(args["--timeout"]),
+            uploadSource: args["--no-source"] !== true,
+            allowDowngrade: args["--allow-downgrade"] === true
         });
         return;
     }
@@ -1215,7 +1270,7 @@ function resolveTriggerFailure(e: unknown): { deploymentId: string; deduplicated
         status?: number;
         message?: string;
         code?: string;
-        details?: { deployment?: BlockingDeployment; intakeCode?: string; hint?: string };
+        details?: { deployment?: BlockingDeployment };
     };
 
     if (err?.status === 409) {
@@ -1248,22 +1303,46 @@ deduplicated: true };
         );
     }
 
-    // An intake refusal, which is a decision about the bundle rather than a
-    // transport error. It carries a stable code and usually a remedy, and both
-    // used to be discarded here: the deploy printed
-    // `Failed to trigger deployment (400): …` and threw the hint away, which is
-    // a poor showing from a platform whose whole thesis is that silence is never
-    // an outcome. Same three-argument shape the 409 and 402 branches use, so
-    // `--json` carries the code and a human sees the fix.
-    if (err?.status === 400 && err.details?.intakeCode) {
-        fail(
-            err.message || "This bundle was refused.",
-            err.details.hint ?? "Run `rebase cloud compute` to see what this project reserves.",
-            err.details.intakeCode
-        );
-    }
+    const refusal = intakeRefusal(e);
+    if (refusal) fail(refusal.message, refusal.hint, refusal.code);
 
     reportError(e, "Failed to trigger deployment");
+}
+
+/** The intake code for a bundle built on an older framework release than the project runs. */
+export const FRAMEWORK_DOWNGRADE = "FRAMEWORK_DOWNGRADE";
+
+/**
+ * An intake refusal, which is a decision about what was deployed rather than a
+ * transport error — or undefined for anything else.
+ *
+ * It carries a stable code in `details.intakeCode` and usually a remedy in
+ * `details.hint`, and both used to be discarded: the deploy printed `Failed to
+ * trigger deployment (400): …` and threw the hint away. The managed path, where
+ * bundles are refused, never looked for either. Both paths answer through this
+ * now, in the three-argument shape `fail` takes, so `--json` carries the code
+ * and a person sees the fix.
+ *
+ * A downgrade gets one more line, because its two remedies are both in this
+ * CLI: move the project forward, or say the step back is meant.
+ */
+export function intakeRefusal(e: unknown): { message: string; hint: string; code: string } | undefined {
+    if (typeof e !== "object" || e === null) return undefined;
+    const status = "status" in e && typeof e.status === "number" ? e.status : undefined;
+    const details = "details" in e && typeof e.details === "object" && e.details !== null ? e.details : undefined;
+    const code = details && "intakeCode" in details && typeof details.intakeCode === "string" ? details.intakeCode : undefined;
+    if (status === undefined || status < 400 || status >= 500 || !code) return undefined;
+
+    const message = "message" in e && typeof e.message === "string" && e.message !== "" ? e.message : "This bundle was refused.";
+    const serverHint = details && "hint" in details && typeof details.hint === "string" && details.hint !== ""
+        ? details.hint
+        : undefined;
+    if (code === FRAMEWORK_DOWNGRADE) {
+        const remedy = "Run `rebase upgrade` to move this project's @rebasepro packages forward and deploy again, "
+            + "or pass `--allow-downgrade` to deploy the older release on purpose.";
+        return { message, hint: serverHint ? `${serverHint}\n  ${remedy}` : remedy, code };
+    }
+    return { message, hint: serverHint ?? "Run `rebase cloud compute` to see what this project reserves.", code };
 }
 
 /**

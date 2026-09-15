@@ -21,7 +21,9 @@ import {
     resolveDeployTimeout,
     billingBlocksDeploy,
     deployedUrl,
-    EJECTS_MANAGED_RUNTIME
+    EJECTS_MANAGED_RUNTIME,
+    FRAMEWORK_DOWNGRADE,
+    intakeRefusal
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
 
@@ -395,5 +397,52 @@ describe("deployedUrl", () => {
         // `logs` without a follow, and any caller that did not pass one: a
         // missing URL must never be a failed deploy.
         await expect(deployedUrl(client({ subdomain: "shop" }, "rebase.website"), {})).resolves.toBeUndefined();
+    });
+});
+
+/**
+ * A refused deploy is a decision with a code and a remedy, on both paths.
+ *
+ * The managed path — where bundles are refused — sent every refusal through the
+ * generic reporter and printed `Managed deploy failed to start (400): …` with
+ * the hint thrown away.
+ */
+describe("intakeRefusal", () => {
+    it("keeps the code and the control plane's hint", () => {
+        expect(intakeRefusal({
+            status: 400,
+            message: "This bundle needs 2 CPUs and the project reserves 1.",
+            details: { intakeCode: "COMPUTE_EXCEEDED", hint: "Raise it with `rebase cloud compute set --cpu 2`." }
+        })).toEqual({
+            message: "This bundle needs 2 CPUs and the project reserves 1.",
+            hint: "Raise it with `rebase cloud compute set --cpu 2`.",
+            code: "COMPUTE_EXCEEDED"
+        });
+    });
+
+    it("names both of a downgrade's remedies, after the control plane's own hint", () => {
+        const refusal = intakeRefusal({
+            status: 400,
+            message: "This bundle was built on 0.19.1; the project runs 0.21.0.",
+            details: { intakeCode: FRAMEWORK_DOWNGRADE, hint: "Rebuild on 0.21.0 or later." }
+        });
+        expect(refusal?.code).toBe("FRAMEWORK_DOWNGRADE");
+        expect(refusal?.hint).toContain("Rebuild on 0.21.0 or later.");
+        expect(refusal?.hint).toContain("rebase upgrade");
+        expect(refusal?.hint).toContain("--allow-downgrade");
+    });
+
+    it("still names them when the control plane sent no hint", () => {
+        const refusal = intakeRefusal({ status: 400, message: "", details: { intakeCode: FRAMEWORK_DOWNGRADE } });
+        expect(refusal?.message).toBe("This bundle was refused.");
+        expect(refusal?.hint).toContain("rebase upgrade");
+    });
+
+    it("is not an intake refusal without a code, or outside 4xx", () => {
+        expect(intakeRefusal({ status: 400, message: "bad request" })).toBeUndefined();
+        expect(intakeRefusal({ status: 500, details: { intakeCode: "X" } })).toBeUndefined();
+        expect(intakeRefusal(new Error("network down"))).toBeUndefined();
+        expect(intakeRefusal("string")).toBeUndefined();
+        expect(intakeRefusal(null)).toBeUndefined();
     });
 });
