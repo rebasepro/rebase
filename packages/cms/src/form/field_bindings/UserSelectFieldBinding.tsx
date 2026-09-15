@@ -31,7 +31,7 @@ export function UserSelectFieldBinding({
                                            property,
                                            includeDescription,
                                            hideLabel,
-                                           size = "small"
+                                           size = "large"
                                        }: UserSelectProps) {
 
     // Passed straight through. Mapping the form's `large` onto the selector's

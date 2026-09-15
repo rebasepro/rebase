@@ -37,7 +37,7 @@ export function TextFieldBinding<T extends string | number>({
                                                                 property,
                                                                 includeDescription,
                                                                 hideLabel,
-                                                                size = "small"
+                                                                size = "large"
                                                             }: FieldProps<StringProperty | NumberProperty>) {
 
     let multiline: boolean | undefined;

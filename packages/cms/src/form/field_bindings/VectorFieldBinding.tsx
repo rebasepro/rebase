@@ -38,7 +38,7 @@ export function VectorFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "small"
+    size = "large"
 }: FieldProps<VectorProperty>) {
     const isVectorObject = (val: unknown): val is { value: number[] } => {
         return typeof val === "object" && val !== null && "value" in val;

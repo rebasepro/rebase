@@ -29,7 +29,7 @@ export function ReadOnlyFieldBinding({
     includeDescription,
     hideLabel,
     context,
-    size = "small"
+    size = "large"
 }: FieldProps<Property>) {
 
     // if (!context.entityId)
@@ -65,10 +65,9 @@ export function ReadOnlyFieldBinding({
                             // hairline on each side — so a row holding one of
                             // each has its baselines and bottom edges agree. This
                             // was a fixed `min-h-12` (48px) with the page's 16px
-                            // text: once the form went to `small`, a read-only
-                            // field stood 14px taller than the text field beside
-                            // it and printed its value a size above every
-                            // input's `text-sm`.
+                            // text: 2px short of a `large` text field, 14px taller
+                            // than a `small` one, and a size above every input's
+                            // `text-sm` at either.
                             "min-h-[34px]": size === "small",
                             "min-h-[42px]": size === "medium",
                             "min-h-[50px]": size === "large"

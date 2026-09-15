@@ -32,7 +32,7 @@ export function SelectFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "small"
+    size = "large"
 }: FieldProps<StringProperty | NumberProperty>) {
 
     const enumValues = resolveEnumValues(property.enum ?? []);

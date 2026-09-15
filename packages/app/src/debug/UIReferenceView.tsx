@@ -852,13 +852,13 @@ selected: true }, { name: "Tags" }].map(c => (
                     <Typography variant="body2" color="secondary" className="mb-4 max-w-[68ch]">
                         Two ways to label a field. A record form puts the label <em>above</em> the control
                         (<code className="font-mono text-xs">FieldBlock</code>: 13px, primary ink, muted type icon) and the control is{" "}
-                        <code className="font-mono text-xs">small</code>, 32px. A dialog or a standalone control carries its label{" "}
+                        <code className="font-mono text-xs">large</code>, 48px. A dialog or a standalone control carries its label{" "}
                         <em>inside</em> as the floating <code className="font-mono text-xs">label</code> prop and is{" "}
                         <code className="font-mono text-xs">medium</code>, 40px. Every field has its hairline.
                     </Typography>
                     <div className="grid grid-cols-12 gap-4">
                         <div className="col-span-12 sm:col-span-6">
-                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">record form · size=&quot;small&quot;, label above</Typography>
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">record form · size=&quot;large&quot;, label above</Typography>
                             <div className="flex flex-col gap-5 mb-6">
                                 {([
                                     ["Product name", "Italian coffee maker", "Shown on the storefront and in receipts.", false, false],
@@ -871,7 +871,7 @@ selected: true }, { name: "Tags" }].map(c => (
                                             <span className="truncate">{label}</span>
                                             {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
                                         </div>
-                                        <TextField size="small" value={value} disabled={disabled} onChange={() => {}}/>
+                                        <TextField size="large" value={value} disabled={disabled} onChange={() => {}}/>
                                         {help && <Typography variant="caption" color="disabled" className="mt-1.5 ml-0.5 leading-snug">{help}</Typography>}
                                     </div>
                                 ))}
@@ -889,7 +889,7 @@ selected: true }, { name: "Tags" }].map(c => (
                                     this page rather than in a modal. */}
                                 <TextField size="small" label="Small" placeholder="Placeholder under the label"/>
                                 <TextField size="smallest" label="Smallest" value="Filled value" onChange={() => {}}/>
-                                <TextField size="large" label="Large" placeholder="The login screen only"/>
+                                <TextField size="large" label="Large" placeholder="The login screen"/>
                             </div>
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-4">

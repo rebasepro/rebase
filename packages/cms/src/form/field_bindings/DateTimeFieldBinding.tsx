@@ -33,7 +33,7 @@ export function DateTimeFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "small"
+    size = "large"
 }: DateTimeFieldProps) {
 
     const { locale } = useCustomizationController();
@@ -48,9 +48,10 @@ export function DateTimeFieldBinding({
     return (
         <>
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                {/* The form's `size`, like every other control. Dropped here,
-                    the kit's own default (`large`, 48px) put each date field
-                    16px taller than the 32px text fields beside it. */}
+                {/* The form's `size`, like every other control. It was dropped
+                    here, so a date field drew at the kit's own default whatever
+                    the form asked for: while the form was `small`, 16px taller
+                    than the 32px text fields beside it. */}
                 <DateTimeField
                     size={size}
                     value={internalValue}

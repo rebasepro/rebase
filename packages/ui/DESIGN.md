@@ -168,14 +168,18 @@ underline.
 
 Measured on the product form before this was written: inputs at 48px with 16px
 text, selects at 48px, no edge on any field. The reference sets its inputs at
-32px with 13px text and a 1px edge. The kit's answer, without inventing a new
-height: field bindings default to `small` (32px, the reference's own density),
-the input and textarea text is `text-sm` (14px, the body size), the field label
-is 13px medium in the primary ink with a muted 14px type icon, and
-`fieldBackgroundMixin` carries `border-hairline`, so a field is an object with
-an edge on both themes. `medium` (40px) is the toolbar and dialog control
-height; `large` (48px) remains on the scale for the login screen and other
-one-field moments.
+32px with 13px text and a 1px edge. Record-form fields are `large` (48px): the
+entity form passes it and the field bindings default to it, so a field nested
+in a map, an array or a table's popup editor is the same height as a top-level
+one. The input and textarea text is `text-sm` (14px, the body size) at every
+size, the field label is 13px medium in the primary ink with a muted 14px type
+icon, and `fieldBackgroundMixin` carries `border-hairline`, so a field is an
+object with an edge on both themes. `medium` (40px) is the toolbar and dialog
+control height; `small` (32px) is for controls inside dense chrome.
+
+0.20.0 took record forms to `small`, the reference's own height. It read as
+cramped against the 48px the forms had had, and they went back to `large`. The
+reference's density stayed where it fits: toolbars, tables, rows and pickers.
 
 ## Table and list density
 

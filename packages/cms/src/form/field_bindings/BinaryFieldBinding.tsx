@@ -53,7 +53,7 @@ export function BinaryFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "small"
+    size = "large"
 }: FieldProps<BinaryProperty>) {
 
     const stored = typeof value === "string" ? value : "";

@@ -25,7 +25,7 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                                                                   showError,
                                                                   autoFocus,
                                                                   disabled,
-                                                                  size = "small",
+                                                                  size = "large",
                                                                   property,
                                                                   includeDescription,
                                                                   hideLabel
