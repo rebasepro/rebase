@@ -439,6 +439,73 @@ function releaseCompileSlot() {
     setTimeout(() => { compiling = false; }, 0);
 }
 
+// Without a GPU, WebGL is rasterised on the CPU and the main thread waits on it
+// every frame. On SwiftShader the home hero became a long task per frame, back
+// to back for as long as the page stayed open (60ms a frame for one canvas,
+// 120-160ms for the control arm's two, under a 4x CPU throttle), and the first
+// frames alone — the texture bake — held the main thread for 300-600ms on an
+// M2 Pro. PageSpeed Insights' HeadlessChromium renders this way: it measured
+// the home page at 26,280ms of total blocking time, a 13.5s speed index and a
+// score of 60, all of it this animation. A still frame is no escape, since
+// building one is that same bake. So a software renderer gets no gradient —
+// the page a browser without WebGL already gets.
+//
+// `failIfMajorPerformanceCaveat` is the platform's own answer, but Chrome only
+// honours it when the GPU is disabled outright: a headless Chrome that picked
+// SwiftShader still hands back a context. The renderer string covers that.
+//
+// The probe runs in a worker, on an OffscreenCanvas, because asking is itself
+// the expensive part: the page's first WebGL context is where the GPU process
+// sets WebGL up, and on SwiftShader that one `getContext` call held the main
+// thread for 2.5-3s. On a GPU the same first call took up to 630ms cold, which
+// the probe now pays off the main thread before Neat asks for its own context.
+// A browser that cannot run the probe (no workers, or no WebGL on an
+// OffscreenCanvas inside one) answers "unknown", and the gradient is built as
+// before. Decided once per page.
+type RendererVerdict = "hardware" | "software" | "unknown";
+
+const RENDERER_PROBE = `
+const context = (type, options) => {
+    try { return new OffscreenCanvas(1, 1).getContext(type, options); } catch (e) { return null; }
+};
+const strict = { failIfMajorPerformanceCaveat: true };
+const fast = context("webgl2", strict) || context("webgl", strict);
+const gl = fast || context("webgl2") || context("webgl");
+let verdict = "unknown";
+if (gl) {
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    verdict = !fast || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer) ? "software" : "hardware";
+    const lose = gl.getExtension("WEBGL_lose_context");
+    if (lose) lose.loseContext();
+}
+postMessage(verdict);
+`;
+
+let rendererVerdict: RendererVerdict | "pending" | undefined;
+
+function probeRenderer(): RendererVerdict | "pending" {
+    if (rendererVerdict !== undefined) return rendererVerdict;
+    rendererVerdict = "pending";
+    try {
+        const url = URL.createObjectURL(new Blob([RENDERER_PROBE], { type: "text/javascript" }));
+        const worker = new Worker(url);
+        const settle = (verdict: RendererVerdict) => {
+            rendererVerdict = verdict;
+            worker.terminate();
+            URL.revokeObjectURL(url);
+        };
+        worker.onmessage = (event: MessageEvent<unknown>) => {
+            const verdict = event.data;
+            settle(verdict === "hardware" || verdict === "software" ? verdict : "unknown");
+        };
+        worker.onerror = () => settle("unknown");
+    } catch {
+        rendererVerdict = "unknown";
+    }
+    return rendererVerdict;
+}
+
 /**
  * Which register a hero is drawn in — see {@link HERO_TONES} — is declared on
  * the element that WRAPS the island, not as a prop:
@@ -725,6 +792,14 @@ export function NeatBackground({
         let settleTimer: ReturnType<typeof setTimeout> | undefined;
         const startWhenSettled = () => {
             if (cancelled) return;
+            // The verdict arrives from a worker; until it does, keep polling.
+            // A software renderer never builds a gradient at all.
+            const renderer = probeRenderer();
+            if (renderer === "pending") {
+                settleTimer = setTimeout(startWhenSettled, 50);
+                return;
+            }
+            if (renderer === "software") return;
             const quietFor = msSinceScroll();
             if (quietFor < SCROLL_QUIET_MS) {
                 settleTimer = setTimeout(startWhenSettled, SCROLL_QUIET_MS - quietFor);
@@ -751,6 +826,8 @@ export function NeatBackground({
         const scheduleGradient = () => {
             if (cancelled) return;
             watchScroll();
+            // Start the probe now, so it runs while this waits for an idle slot.
+            probeRenderer();
             if ("requestIdleCallback" in window) {
                 requestIdleCallback(startWhenSettled, { timeout: 2000 });
             } else {
