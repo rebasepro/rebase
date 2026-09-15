@@ -348,6 +348,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         telemetry: "telemetry.ts",
         resources: "resources.ts",
         status: "status.ts",
+        upgrade: "upgrade.ts",
         // The family's parse is `parseCloudArgs`, which lives here and wraps
         // `parseCommandArgs` with the global cloud flags merged in. Which of its
         // thirty dispatchers reach it is the sweep at the bottom of this file —

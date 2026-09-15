@@ -340,10 +340,12 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                     console.log(chalk.dim(`      ${dep.name}@${dep.range}  (${dep.file})`));
                 }
                 console.log(chalk.dim("      The image supplies the server, but your bundle supplies the database"));
-                console.log(chalk.dim("      driver — a newer runtime does not update it. Bump these and rebuild."));
+                console.log(chalk.dim("      driver — a newer runtime does not update it."));
+                console.log(chalk.dim(`      Run \`${upgradeToThisCli()}\`, then rebuild.`));
             } else if (drift.disagreeing.length > 0) {
                 console.log(chalk.yellow(`    ⚠ mixed @rebasepro versions declared: ${drift.disagreeing.join(", ")}`));
-                console.log(chalk.dim("      These are published together and expect to run together; pin them alike."));
+                console.log(chalk.dim("      These are published together and expect to run together."));
+                console.log(chalk.dim(`      Run \`${upgradeToThisCli()}\` to pin them alike, then rebuild.`));
             }
 
             /* Fold the project's static apps into the backend bundle, so ONE
@@ -468,6 +470,18 @@ export async function buildAssetApp(
         chalk.dim(` (${result.fileCount} file(s) → served at ${basePath})`)
     );
     return result.outDir;
+}
+
+/**
+ * The `rebase upgrade` line the drift warnings print.
+ *
+ * Aimed at this CLI's own version, because that is what the warning measured
+ * against: "older than this CLI" is answered by moving to exactly this CLI, not
+ * to whatever `latest` happens to be — which, on a canary, is older still.
+ */
+function upgradeToThisCli(): string {
+    const version = cliVersion();
+    return version === "unknown" ? "rebase upgrade" : `rebase upgrade --to ${version}`;
 }
 
 /** The pre-manifest behaviour: build every workspace package. */

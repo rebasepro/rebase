@@ -19,6 +19,7 @@ import { telemetryCommand } from "./commands/telemetry";
 import { errorClass, isEnabled, recordEvent } from "./telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
+import { upgradeCommand } from "./commands/upgrade";
 import { requireProjectRoot } from "./utils/project";
 import { parseCommandArgs } from "./utils/args";
 import { unknownCommand } from "./utils/unknown-command";
@@ -99,7 +100,7 @@ export async function entry(args: string[]) {
     const subcommand = words[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status"];
+    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -252,6 +253,10 @@ async function dispatch(
             await startCommand(args);
             break;
 
+        case "upgrade":
+            await upgradeCommand(args);
+            break;
+
         case "apps":
             await appsCommand(effectiveSubcommand, args);
             break;
@@ -315,6 +320,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("build")}                   Build the apps declared in rebase.json into a bundle
   ${chalk.blue.bold("normalize-imports")}       Complete compiled output's relative imports for Node ESM
   ${chalk.blue.bold("start")}                   Start the backend server ${chalk.gray("(production)")}
+  ${chalk.blue.bold("upgrade")}                 Move every @rebasepro package to one release, then install
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
 
 ${chalk.green.bold("Schema")}

@@ -330,7 +330,7 @@ export function checkVersionSkew(declared: DeclaredDependency[]): EnvironmentFin
             check: "versions",
             severity: "error",
             message: `${name} is pinned to different versions in this project: ${described}.`,
-            fix: "Pin one version everywhere and reinstall. Two copies of a Rebase package break `instanceof` between them, which fails as a type guard rejecting its own type."
+            fix: "Run `rebase upgrade` to pin every @rebasepro package to one release and reinstall. Two copies of a Rebase package break `instanceof` between them, which fails as a type guard rejecting its own type."
         });
     }
     return findings;

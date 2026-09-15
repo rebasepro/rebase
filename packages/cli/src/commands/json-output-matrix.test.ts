@@ -26,6 +26,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appsCommand } from "./apps";
 import { resourcesCommand } from "./resources";
 import { statusCommand } from "./status";
+import { upgradeCommand } from "./upgrade";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
@@ -136,8 +137,21 @@ const COMMANDS: Array<[name: string, command: Command]> = [
     ["apps list", {
         argv: ["node", "rebase", "apps", "list", "--json"],
         run: () => appsCommand("list", ["node", "rebase", "apps", "list", "--json"])
+    }],
+    // `--no-install` and an exact version, so a refusal that failed to happen
+    // could not reach the registry or an installer either.
+    ["upgrade", {
+        argv: ["node", "rebase", "upgrade", "--to", "0.21.0", "--no-install", "--json"],
+        run: () => upgradeCommand(["node", "rebase", "upgrade", "--to", "0.21.0", "--no-install", "--json"])
     }]
 ];
+
+/**
+ * Commands that never read the backend or its declarations, so the two cases
+ * about those have nothing to refuse. `upgrade` moves version strings in
+ * package.json files; a project with no backend has them too.
+ */
+const NO_BACKEND_NEEDED = new Set(["apps list", "upgrade"]);
 
 describe("--json on a failing command", () => {
     it.each(COMMANDS)("%s answers with an envelope outside a project", async (_name, command) => {
@@ -163,7 +177,7 @@ describe("--json on a failing command", () => {
         expect(parsed.error.issues.length).toBeGreaterThan(0);
     });
 
-    it.each(COMMANDS.filter(([name]) => name !== "apps list"))(
+    it.each(COMMANDS.filter(([name]) => !NO_BACKEND_NEEDED.has(name)))(
         "%s answers with an envelope for a manifest with no backend",
         async (_name, command) => {
             process.chdir(project("no-backend", {
@@ -175,7 +189,7 @@ describe("--json on a failing command", () => {
         }
     );
 
-    it.each(COMMANDS.filter(([name]) => name !== "apps list"))(
+    it.each(COMMANDS.filter(([name]) => !NO_BACKEND_NEEDED.has(name)))(
         "%s answers with an envelope when the declarations do not load",
         async (_name, command) => {
             // The sweep's repro: a config file that throws. This is the failure
