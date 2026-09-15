@@ -15,13 +15,16 @@
  *   pnpm ci:static --list     print the gate list, one script per line
  *
  * Two gates need something the repository cannot install: Docker (the runtime
- * image boot) and Helm (the chart render). On a laptop without them the gate is
- * skipped with a notice. Under CI — where `CI` is set and both are installed by
+ * image boot) and Helm (the chart render). On a laptop without them, or where
+ * one does not answer within `PROBE_TIMEOUT_MS`, the gate is skipped with a
+ * notice saying which. Under CI — where `CI` is set and both are installed by
  * the workflow — a missing prerequisite is a failure, because a gate that
  * silently skips itself in the pipeline is worse than no gate.
  */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+
+import { PROBE_TIMEOUT_MS, probeTool } from "./probe-tool.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const inCI = Boolean(process.env.CI);
@@ -455,14 +458,6 @@ if (process.argv.includes("--list")) {
     process.exit(0);
 }
 
-/** Is the external tool a gate needs on this machine? */
-function haveTool(tool) {
-    const probe = tool === "docker"
-        ? spawnSync("docker", ["info"], { stdio: "ignore" })
-        : spawnSync("helm", ["version"], { stdio: "ignore" });
-    return probe.status === 0;
-}
-
 const bold = (s) => `[1m${s}[0m`;
 const dim = (s) => `[2m${s}[0m`;
 const red = (s) => `[31m${s}[0m`;
@@ -474,16 +469,22 @@ const skipped = [];
 const started = Date.now();
 
 for (const gate of GATES) {
-    if (gate.needs && !haveTool(gate.needs)) {
-        if (inCI) {
-            console.error(red(`\n✗ ${gate.run} needs ${gate.needs}, which is not available.`));
-            console.error(dim(`  CI installs it; a pipeline that skips a gate is not running it.`));
-            failed.push(gate.run);
+    if (gate.needs) {
+        // Said before asking, so a slow answer is attributed to the tool rather
+        // than read as the previous gate still running.
+        console.log(`\n${dim(`· ${gate.run} needs ${gate.needs}; asking it (up to ${PROBE_TIMEOUT_MS / 1000}s)`)}`);
+        const tool = probeTool(gate.needs);
+        if (!tool.ok) {
+            if (inCI) {
+                console.error(red(`✗ ${gate.run} needs ${gate.needs}: ${tool.reason}.`));
+                console.error(dim(`  CI installs it; a pipeline that skips a gate is not running it.`));
+                failed.push(gate.run);
+                continue;
+            }
+            console.log(yellow(`⊘ ${gate.run} — skipped: ${tool.reason}.`));
+            skipped.push(gate.run);
             continue;
         }
-        console.log(yellow(`\n⊘ ${gate.run} — skipped, no ${gate.needs} on this machine.`));
-        skipped.push(gate.run);
-        continue;
     }
 
     console.log(`\n${bold(`━━━ ${gate.run} ━━━`)}`);

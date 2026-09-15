@@ -51,7 +51,8 @@ machine-readable form of the two tables below, and what `check:gates-doc`
 compares them against.
 
 `ci:static` skips the two gates needing a tool the repository cannot install
-(Docker, Helm) and says so. Under CI it refuses to skip. `ci:build-gates` reads
+(Docker, Helm) when the tool is missing or does not answer within 20 seconds,
+and says which. Under CI it refuses to skip. `ci:build-gates` reads
 build output, so it refuses to run at all when no `packages/*/dist` exists —
 several of its gates would otherwise find nothing to look at and pass.
 

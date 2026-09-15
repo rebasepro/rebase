@@ -30,6 +30,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { probeTool } from "./probe-tool.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CHART = path.join(ROOT, "infra/charts/rebase");
 
@@ -70,9 +72,10 @@ function render(extra = []) {
 }
 
 // ── 0. helm must exist ───────────────────────────────────────────────────────
-if (!helm(["version", "--short"]).ok) {
+const helmProbe = probeTool("helm");
+if (!helmProbe.ok) {
     console.error(
-        `${RED}✗ helm is not installed.${NC}\n` +
+        `${RED}✗ helm is not available: ${helmProbe.reason}.${NC}\n` +
         `  This check renders the chart; it cannot be done without helm.\n` +
         `  macOS: brew install helm   ·   CI: azure/setup-helm@v4\n`
     );

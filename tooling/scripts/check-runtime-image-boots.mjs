@@ -35,6 +35,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { probeTool } from "./probe-tool.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const RED = "\x1b[0;31m";
@@ -74,8 +76,9 @@ function waitFor(what, fn, timeoutMs = 120_000) {
 }
 
 // ── 0. Docker must exist ─────────────────────────────────────────────────────
-if (docker(["version", "--format", "{{.Server.Version}}"]).status !== 0) {
-    console.error(`${RED}docker is not available — this gate needs it.${NC}`);
+const dockerProbe = probeTool("docker");
+if (!dockerProbe.ok) {
+    console.error(`${RED}docker is not available — this gate needs it: ${dockerProbe.reason}.${NC}`);
     process.exit(2);
 }
 

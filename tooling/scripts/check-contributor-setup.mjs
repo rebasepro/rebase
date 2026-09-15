@@ -44,6 +44,8 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
+import { probeTool } from "./probe-tool.mjs";
+
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf-8");
 
@@ -209,9 +211,10 @@ const die = (headline, detail) => {
     process.exit(1);
 };
 
-if (spawnSync("docker", ["info"], { stdio: "ignore" }).status !== 0) {
+const docker = probeTool("docker");
+if (!docker.ok) {
     die(
-        "--live needs Docker, and `docker info` failed.",
+        `--live needs Docker: ${docker.reason}.`,
         "This mode exists to run where Docker is present (CI's e2e job). Without it,\n" +
         "`pnpm check:contributor-setup` on its own still checks the three files."
     );
