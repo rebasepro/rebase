@@ -100,19 +100,21 @@ function isRegularFile(absolute: string): boolean {
     }
 }
 
-/**
- * The files a source upload carries, and where they are rooted.
- *
- * Paths are resolved through `realpath` first: git reports its top level with
- * symlinks resolved (`/private/var/…` for a macOS temp directory), and a
- * project path computed against the unresolved one would climb out of the
- * archive with `../`.
- */
-export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): SourceListing {
-    const realRoot = fs.realpathSync(projectRoot);
+/** One tree the archive carries: a repository's files, or a walked directory's. */
+interface SourceUnit {
+    root: string;
+    /** Relative to `root`, POSIX. */
+    files: string[];
+    fromGit: boolean;
+}
 
+/**
+ * The files of the repository `dir` belongs to — tracked and unignored, the way
+ * git sees them — or, outside any repository, `dir` walked with fixed excludes.
+ */
+function listUnit(dir: string, git: GitRunner): SourceUnit {
     try {
-        const toplevel = git(realRoot, ["rev-parse", "--show-toplevel"]).trim();
+        const toplevel = git(dir, ["rev-parse", "--show-toplevel"]).trim();
         if (toplevel) {
             const root = fs.realpathSync(toplevel);
             const listed = git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
@@ -121,19 +123,18 @@ export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): S
             // the set and the disk check take care of both. Submodules and
             // symlinks are listed too, and are not regular files.
             const files = [...new Set(listed.split("\0").filter(Boolean))]
-                .filter(relative => !neverUploaded(relative) && isRegularFile(path.join(root, relative)))
-                .sort();
-            return { root, files, projectPath: toPosix(path.relative(root, realRoot)), fromGit: true };
+                .filter(relative => !neverUploaded(relative) && isRegularFile(path.join(root, relative)));
+            return { root, files, fromGit: true };
         }
     } catch {
         // Not a repository, no git, or git refusing the directory: the walk.
     }
 
     const files: string[] = [];
-    const walk = (dir: string, prefix: string): void => {
+    const walk = (current: string, prefix: string): void => {
         let entries: fs.Dirent[];
         try {
-            entries = fs.readdirSync(dir, { withFileTypes: true });
+            entries = fs.readdirSync(current, { withFileTypes: true });
         } catch {
             return;
         }
@@ -141,14 +142,115 @@ export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): S
             const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
             if (entry.isDirectory()) {
                 if (WALK_SKIP.has(entry.name) || entry.name.startsWith("dist")) continue;
-                walk(path.join(dir, entry.name), relative);
+                walk(path.join(current, entry.name), relative);
             } else if (entry.isFile() && !neverUploaded(relative)) {
                 files.push(relative);
             }
         }
     };
-    walk(realRoot, "");
-    return { root: realRoot, files: files.sort(), projectPath: "", fromGit: false };
+    walk(dir, "");
+    return { root: dir, files, fromGit: false };
+}
+
+/** Whether `candidate` is `dir` or inside it. */
+function isWithin(dir: string, candidate: string): boolean {
+    const relative = path.relative(dir, candidate);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+/** The deepest directory containing every path given. */
+function commonAncestor(paths: string[]): string {
+    let ancestor = paths[0];
+    for (const p of paths.slice(1)) {
+        while (!isWithin(ancestor, p)) ancestor = path.dirname(ancestor);
+    }
+    return ancestor;
+}
+
+const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependencies"] as const;
+
+/**
+ * Directories outside every unit that a unit's `package.json` files link to
+ * with `link:` or `file:`.
+ *
+ * `@rebasepro/*` links are not followed. They point at a local framework
+ * checkout, which is not the project's source and would drag a whole monorepo
+ * into the archive; a rebuild moves those packages to a published release
+ * anyway.
+ */
+function externalLinkTargets(units: SourceUnit[]): string[] {
+    const targets = new Set<string>();
+    for (const unit of units) {
+        for (const relative of unit.files) {
+            if (path.posix.basename(relative) !== "package.json") continue;
+            let manifest: unknown;
+            try {
+                manifest = JSON.parse(fs.readFileSync(path.join(unit.root, relative), "utf8"));
+            } catch {
+                continue;
+            }
+            if (typeof manifest !== "object" || manifest === null) continue;
+            for (const field of DEPENDENCY_FIELDS) {
+                const deps = (manifest as Record<string, unknown>)[field];
+                if (typeof deps !== "object" || deps === null) continue;
+                for (const [name, spec] of Object.entries(deps)) {
+                    if (name.startsWith("@rebasepro/") || typeof spec !== "string") continue;
+                    const match = /^(?:link|file):(.+)$/.exec(spec);
+                    if (!match) continue;
+                    const target = path.resolve(unit.root, path.posix.dirname(relative), match[1]);
+                    let real: string;
+                    try {
+                        real = fs.realpathSync(target);
+                        if (!fs.statSync(real).isDirectory()) continue;
+                    } catch {
+                        continue;
+                    }
+                    if (!units.some(u => isWithin(u.root, real))) targets.add(real);
+                }
+            }
+        }
+    }
+    return [...targets];
+}
+
+/**
+ * The files a source upload carries, and where they are rooted.
+ *
+ * The project's repository first — or the project walked, outside git. Then
+ * every repository a local `link:`/`file:` dependency reaches outside it, until
+ * nothing new is reached, rooted together at their deepest common directory.
+ * That is dadaki's shape: its Rebase project is a repository of its own, nested
+ * inside the editor's repository (which ignores it), and its frontend links
+ * `../../packages/editor` from there. A listing of the project's repository
+ * alone rebuilt into "Rollup failed to resolve import @dadaki/editor".
+ *
+ * Paths are resolved through `realpath` first: git reports its top level with
+ * symlinks resolved (`/private/var/…` for a macOS temp directory), and a
+ * project path computed against the unresolved one would climb out of the
+ * archive with `../`.
+ */
+export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): SourceListing {
+    const realRoot = fs.realpathSync(projectRoot);
+    const units: SourceUnit[] = [listUnit(realRoot, git)];
+    for (let reached = externalLinkTargets(units); reached.length > 0; reached = externalLinkTargets(units)) {
+        for (const target of reached) {
+            if (units.some(u => isWithin(u.root, target))) continue;
+            units.push(listUnit(target, git));
+        }
+    }
+
+    const root = commonAncestor(units.map(u => u.root));
+    const files = new Set<string>();
+    for (const unit of units) {
+        const prefix = toPosix(path.relative(root, unit.root));
+        for (const file of unit.files) files.add(prefix ? `${prefix}/${file}` : file);
+    }
+    return {
+        root,
+        files: [...files].sort(),
+        projectPath: toPosix(path.relative(root, realRoot)),
+        fromGit: units.every(u => u.fromGit)
+    };
 }
 
 /**

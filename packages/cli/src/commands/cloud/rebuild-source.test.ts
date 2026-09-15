@@ -187,6 +187,75 @@ describe("listSourceFiles in a repository", () => {
     });
 });
 
+/**
+ * dadaki's shape: the Rebase project is a repository of its own, nested inside
+ * the editor's repository — which ignores it — and its frontend links a package
+ * that lives in the outer one. A listing of the project's repository alone gave
+ * a rebuild with no `@dadaki/editor` to import.
+ */
+describe("listSourceFiles across a link out of the project's repository", () => {
+    beforeEach(() => {
+        git(scratch, "init", "-q");
+        write(".gitignore", "/cloud/\n");
+        write("package.json", JSON.stringify({ name: "editor-root", private: true }));
+        write("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
+        write("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+        write("packages/editor/package.json", JSON.stringify({ name: "@dadaki/editor", exports: { ".": "./src/index.ts" } }));
+        write("packages/editor/src/index.ts", "export const editor = 1;");
+        write("tests/fixture.svg", "<svg/>");
+        git(scratch, "add", "-A");
+
+        const cloud = path.join(scratch, "cloud");
+        fs.mkdirSync(cloud);
+        git(cloud, "init", "-q");
+        write("cloud/rebase.json", "{}");
+        write("cloud/.env.production", "VITE_X=1");
+        write("cloud/frontend/package.json", JSON.stringify({
+            name: "cloud-frontend",
+            dependencies: {
+                "@dadaki/editor": "link:../../packages/editor",
+                // A local framework checkout: never followed.
+                "@rebasepro/cms": "link:../../../rebase/packages/cms"
+            }
+        }));
+        write("cloud/frontend/src/App.tsx", "import '@dadaki/editor';");
+        git(cloud, "add", "-A");
+    });
+
+    it("carries the repository the link reaches, rooted where both meet", () => {
+        const listing = listSourceFiles(path.join(scratch, "cloud"));
+
+        expect(listing.root).toBe(scratch);
+        expect(listing.projectPath).toBe("cloud");
+        expect(listing.files).toContain("packages/editor/src/index.ts");
+        // The outer workspace's root travels with it, so its install works.
+        expect(listing.files).toContain("pnpm-lock.yaml");
+        expect(listing.files).toContain("cloud/frontend/src/App.tsx");
+        expect(listing.files).not.toContain("cloud/.env.production");
+    });
+
+    it("never follows a link to the framework itself", () => {
+        // The target exists, so only the rule keeps it out.
+        const framework = path.resolve(scratch, "..", "rebase", "packages", "cms");
+        fs.mkdirSync(framework, { recursive: true });
+        fs.writeFileSync(path.join(framework, "package.json"), "{}");
+        try {
+            const listing = listSourceFiles(path.join(scratch, "cloud"));
+            expect(listing.files.some(f => f.includes("rebase/packages/cms"))).toBe(false);
+            expect(listing.root).toBe(scratch);
+        } finally {
+            fs.rmSync(path.resolve(scratch, "..", "rebase"), { recursive: true, force: true });
+        }
+    });
+
+    it("stays within the project's repository when nothing links out of it", () => {
+        write("cloud/frontend/package.json", JSON.stringify({ name: "cloud-frontend", dependencies: { react: "^19.0.0" } }));
+        const listing = listSourceFiles(path.join(scratch, "cloud"));
+        expect(listing.root).toBe(path.join(scratch, "cloud"));
+        expect(listing.projectPath).toBe("");
+    });
+});
+
 describe("packSource", () => {
     it("packs exactly the listed files, with spaces in their names", async () => {
         write("src/index.ts", "export {};");
