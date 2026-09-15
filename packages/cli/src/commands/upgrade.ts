@@ -91,11 +91,35 @@ export interface UpgradeIo {
 const defaultIo: UpgradeIo = {
     // Run in the project, so its `.npmrc` — a private registry, a scope
     // mapping — answers the question rather than whatever the CLI was run from.
-    npmView: async (spec, cwd) => (await execa("npm", ["view", spec, "version"], { cwd })).stdout,
+    npmView: async (spec, cwd) => {
+        try {
+            return (await execa("npm", ["view", spec, "version"], { cwd })).stdout;
+        } catch (err) {
+            throw new Error(npmFailure(err));
+        }
+    },
     install: async ([bin, args], cwd, quietStdout) => {
         await execa(bin, args, { cwd, stdio: quietStdout ? ["ignore", 2, "inherit"] : "inherit" });
     }
 };
+
+/**
+ * The one line of a failed `npm view` worth printing.
+ *
+ * execa's own message is the command line that failed, which says nothing the
+ * reader does not know. npm's stderr says why — `404 No match found for version
+ * nosuchtag` — under an `npm error code E404` line that says less.
+ */
+export function npmFailure(err: unknown): string {
+    const stderr = typeof err === "object" && err !== null && "stderr" in err && typeof err.stderr === "string"
+        ? err.stderr
+        : "";
+    const reason = stderr
+        .split("\n")
+        .map(line => line.replace(/^npm (?:error|ERR!)\s*/, "").trim())
+        .find(line => line !== "" && !/^code\s/.test(line) && !/^\d{3}$/.test(line));
+    return reason ?? (err instanceof Error ? err.message : String(err));
+}
 
 export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultIo): Promise<void> {
     if (wantsHelp(rawArgs)) {

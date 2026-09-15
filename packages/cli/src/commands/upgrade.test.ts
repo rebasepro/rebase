@@ -10,7 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { upgradeCommand, type UpgradeIo } from "./upgrade";
+import { npmFailure, upgradeCommand, type UpgradeIo } from "./upgrade";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -248,5 +248,18 @@ describe("rebase upgrade, for a person", () => {
             expect(text).toContain(flag);
         }
         expect(fake.npmView).not.toHaveBeenCalled();
+    });
+});
+
+describe("npmFailure", () => {
+    it("prints npm's reason, not the command line that failed", () => {
+        const err = Object.assign(new Error("Command failed with exit code 1: npm view '@rebasepro/cli@nope' version"), {
+            stderr: "npm error code E404\nnpm error 404 No match found for version nope\nnpm error 404\nnpm error A complete log of this run can be found in: /x.log\n"
+        });
+        expect(npmFailure(err)).toBe("404 No match found for version nope");
+    });
+
+    it("falls back to the message when npm said nothing", () => {
+        expect(npmFailure(new Error("spawn npm ENOENT"))).toBe("spawn npm ENOENT");
     });
 });
