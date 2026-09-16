@@ -9,6 +9,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { execFileSync } from "child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     applyUpgradePlan,
@@ -31,6 +32,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
     fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -44,6 +47,14 @@ function write(relative: string, content: string): string {
 function read(relative: string): string {
     return fs.readFileSync(path.join(root, relative), "utf8");
 }
+
+function git(cwd: string, ...args: string[]): void {
+    execFileSync("git", ["-c", "init.defaultBranch=main", ...args], { cwd, stdio: "ignore" });
+}
+
+const notARepository = (): string => {
+    throw new Error("fatal: not a git repository");
+};
 
 describe("classifySpec", () => {
     it.each([
@@ -279,6 +290,120 @@ describe("finding the package.json files", () => {
     it("reports every path relative to the project root, with forward slashes", () => {
         write("frontend/package.json", JSON.stringify({ dependencies: { "@rebasepro/cms": "0.19.1" } }));
         expect(planUpgrade(root, "0.21.0").changed[0].file).toBe("frontend/package.json");
+    });
+});
+
+/**
+ * A repository's `.gitignore` says what is not the project: a stale copy of the
+ * build context under `scratch/`, a vendored package. Rewriting those changes
+ * files nobody committed, and a dry run that lists them is listing the wrong
+ * project.
+ */
+describe("finding the package.json files in a git repository", () => {
+    const pin = JSON.stringify({ dependencies: { "@rebasepro/server": "0.19.1" } }, null, 2) + "\n";
+    const workspace = "packages:\n  - backend\noverrides:\n  \"@rebasepro/types\": \"0.19.1\"\n";
+
+    beforeEach(() => {
+        git(root, "init", "-q");
+        write(".gitignore", "scratch/\nvendor/\n");
+        write("backend/package.json", pin);
+        write("pnpm-workspace.yaml", workspace);
+        git(root, "add", "-A");
+        // Untracked, and ignored by nothing: still the project's.
+        write("package.json", pin);
+        write("frontend/package.json", pin);
+        // Ignored: a copy of the build context, and a vendored package.
+        write("scratch/build-ctx/shop/package.json", pin);
+        write("scratch/build-ctx/shop/backend/package.json", pin);
+        write("scratch/build-ctx/shop/pnpm-workspace.yaml", workspace);
+        write("scratch/broken/package.json", "{ \"dependencies\": ");
+        write("vendor/lib/package.json", pin);
+        // Ignored by pattern, but tracked: git counts it, so the upgrade does too.
+        write("vendor/kept/package.json", pin);
+        git(root, "add", "-f", "vendor/kept/package.json");
+    });
+
+    it("leaves a gitignored package.json and pnpm-workspace.yaml alone, and never reads them", () => {
+        const readdir = vi.spyOn(fs, "readdirSync");
+
+        const plan = planUpgrade(root, "0.21.0");
+        applyUpgradePlan(plan);
+
+        expect(plan.changed.map(pin => pin.file)).toEqual([
+            "backend/package.json",
+            "frontend/package.json",
+            "package.json",
+            "vendor/kept/package.json"
+        ]);
+        expect(plan.overrides.map(o => o.file)).toEqual(["pnpm-workspace.yaml"]);
+        // An ignored manifest that does not parse is not the project's problem either.
+        expect(plan.unreadable).toEqual([]);
+        // The walk does not enter an ignored directory, however large it is.
+        const entered = readdir.mock.calls.map(([dir]) => path.relative(root, String(dir)).split(path.sep).join("/"));
+        expect(entered).toContain("vendor/kept");
+        expect(entered.filter(dir => dir.startsWith("scratch") || dir === "vendor/lib")).toEqual([]);
+
+        expect(read("scratch/build-ctx/shop/package.json")).toBe(pin);
+        expect(read("scratch/build-ctx/shop/backend/package.json")).toBe(pin);
+        expect(read("scratch/build-ctx/shop/pnpm-workspace.yaml")).toBe(workspace);
+        expect(read("vendor/lib/package.json")).toBe(pin);
+    });
+
+    it("still rewrites a package.json nobody has added to git yet", () => {
+        applyUpgradePlan(planUpgrade(root, "0.21.0"));
+
+        expect(read("package.json")).toBe(pin.replace("0.19.1", "0.21.0"));
+        expect(read("frontend/package.json")).toBe(pin.replace("0.19.1", "0.21.0"));
+        expect(read("vendor/kept/package.json")).toBe(pin.replace("0.19.1", "0.21.0"));
+    });
+
+    it("keeps skipping installs, build output and hidden directories that git does not ignore", () => {
+        write("node_modules/@rebasepro/server/package.json", pin);
+        write("dist-bundle/package.json", pin);
+        write(".claude/worktrees/copy/package.json", pin);
+
+        const found = discoverProjectFiles(root).packageJsons.map(f => path.relative(root, f).split(path.sep).join("/"));
+
+        expect(found).toEqual(["backend/package.json", "frontend/package.json", "package.json", "vendor/kept/package.json"]);
+    });
+
+    it("walks a project its repository ignores as a whole, when the upgrade is run in it", () => {
+        const copy = path.join(root, "scratch", "build-ctx", "shop");
+
+        const plan = planUpgrade(copy, "0.21.0");
+
+        expect(plan.changed.map(pin => pin.file)).toEqual(["backend/package.json", "package.json"]);
+        expect(plan.overrides.map(o => o.file)).toEqual(["pnpm-workspace.yaml"]);
+    });
+});
+
+describe("finding the package.json files outside a git repository", () => {
+    it("walks every directory, whatever a .gitignore says", () => {
+        const pin = JSON.stringify({ dependencies: { "@rebasepro/types": "0.19.1" } });
+        write(".gitignore", "scratch/\n");
+        for (const file of [
+            "package.json",
+            "scratch/copy/package.json",
+            // Never entered, repository or not:
+            "node_modules/@rebasepro/types/package.json",
+            "dist-bundle/package.json",
+            ".rebase/package.json"
+        ]) write(file, pin);
+
+        const found = discoverProjectFiles(root, notARepository).packageJsons
+            .map(f => path.relative(root, f).split(path.sep).join("/"));
+        expect(found).toEqual(["package.json", "scratch/copy/package.json"]);
+    });
+
+    it("rewrites what the walk finds when git answers that there is no repository", () => {
+        write("scratch/copy/package.json", JSON.stringify({ dependencies: { "@rebasepro/types": "0.19.1" } }));
+        write(".gitignore", "scratch/\n");
+        // The real git, kept from finding a repository above the temporary directory.
+        vi.stubEnv("GIT_CEILING_DIRECTORIES", path.dirname(root));
+
+        applyUpgradePlan(planUpgrade(root, "0.21.0"));
+
+        expect(read("scratch/copy/package.json")).toContain("0.21.0");
     });
 });
 

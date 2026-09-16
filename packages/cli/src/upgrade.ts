@@ -9,8 +9,9 @@
  * way every time; the control plane runs it too, when it rebuilds a managed
  * project on a newer release.
  *
- * Everything here is pure file work, so it can be tested against a temporary
- * directory: which specs move, the rewrite itself, and what overrides say. The
+ * Everything here is file work — git is asked only which files are the
+ * project's — so it can be tested against a temporary directory: which files
+ * are read, which specs move, the rewrite itself, and what overrides say. The
  * command in `commands/upgrade.ts` adds the registry lookup, the install and the
  * printing.
  *
@@ -26,6 +27,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 import { isDeepStrictEqual } from "util";
 import { getPMCommands } from "./utils/package-manager";
 
@@ -125,16 +127,70 @@ export interface ProjectFiles {
  * `dist-bundle`, `dist-bundle-admin`, …) and anything hidden (`.git`,
  * `.rebase`, an editor's worktrees). None of them hold a manifest anybody
  * authored for this project, and `dist-bundle/package.json` in particular is a
- * generated copy that `rebase build` rewrites anyway.
+ * generated copy that `rebase build` rewrites anyway. They are skipped whether
+ * or not git ignores them.
  */
 function skipDirectory(name: string): boolean {
     return name === "node_modules" || name.startsWith("dist") || name.startsWith(".");
 }
 
-/** Every `package.json` and `pnpm-workspace.yaml` under the project root. */
-export function discoverProjectFiles(projectRoot: string): ProjectFiles {
+/** `git -C <cwd> …`, returning stdout. Throws when git is missing or refuses. */
+export type GitRunner = (cwd: string, args: string[]) => string;
+
+const runGit: GitRunner = (cwd, args) => execFileSync("git", ["-C", cwd, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    // `ls-files` on a large monorepo is megabytes; the default 1 MiB buffer
+    // would kill it and silently fall back to the walk.
+    maxBuffer: 256 * 1024 * 1024
+});
+
+/**
+ * The files git counts as part of the project — tracked, or untracked and not
+ * ignored — relative to `projectRoot`, POSIX. Null when git has no say: no git,
+ * no repository, or a repository that lists nothing under the project root.
+ *
+ * Listing nothing means the repository ignores the project as a whole: a copy
+ * of it under a gitignored scratch directory, say. Running the upgrade in that
+ * copy is asking for the copy to move, and the repository's rules would leave
+ * nothing in it to move. Asked with `git ls-files` rather than
+ * `git check-ignore`, which answers differently across git versions for a
+ * directory and for a negated pattern.
+ */
+function gitProjectFiles(projectRoot: string, git: GitRunner): Set<string> | null {
+    let listed: string;
+    try {
+        listed = git(projectRoot, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+    } catch {
+        return null;
+    }
+    const files = new Set(listed.split("\0").filter(Boolean));
+    return files.size > 0 ? files : null;
+}
+
+/**
+ * Every `package.json` and `pnpm-workspace.yaml` under the project root that
+ * belongs to the project.
+ *
+ * In a git repository that means what git lists: a gitignored build context,
+ * scratch copy or vendored package is not the project's, and rewriting it
+ * would change files nobody committed. The walk enters only directories that
+ * hold a listed file, so an ignored tree is not read at all. Outside a
+ * repository every directory is walked. {@link skipDirectory} applies either
+ * way.
+ */
+export function discoverProjectFiles(projectRoot: string, git: GitRunner = runGit): ProjectFiles {
     const found: ProjectFiles = { packageJsons: [], workspaceYamls: [] };
-    const walk = (dir: string): void => {
+    const listed = gitProjectFiles(projectRoot, git);
+    /** Every directory a listed file sits in, at any depth. */
+    const listedDirectories = new Set<string>();
+    for (const file of listed ?? []) {
+        for (let dir = path.posix.dirname(file); dir !== "." && !listedDirectories.has(dir); dir = path.posix.dirname(dir)) {
+            listedDirectories.add(dir);
+        }
+    }
+
+    const walk = (dir: string, relativeDir: string): void => {
         let entries: fs.Dirent[];
         try {
             entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -144,17 +200,18 @@ export function discoverProjectFiles(projectRoot: string): ProjectFiles {
         entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
         for (const entry of entries) {
             const full = path.join(dir, entry.name);
+            const relative = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
             // `isDirectory()` is false for a symlink, so a linked workspace
             // package is not walked twice and a cycle cannot form.
             if (entry.isDirectory()) {
-                if (!skipDirectory(entry.name)) walk(full);
-            } else if (entry.isFile()) {
+                if (!skipDirectory(entry.name) && (!listed || listedDirectories.has(relative))) walk(full, relative);
+            } else if (entry.isFile() && (!listed || listed.has(relative))) {
                 if (entry.name === "package.json") found.packageJsons.push(full);
                 else if (entry.name === "pnpm-workspace.yaml") found.workspaceYamls.push(full);
             }
         }
     };
-    walk(projectRoot);
+    walk(projectRoot, "");
     return found;
 }
 

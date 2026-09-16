@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rebase upgrade` leaves files git ignores alone.** It read every
+  `package.json` and `pnpm-workspace.yaml` under the project, so a gitignored
+  copy — a stale build context under `scratch/`, a vendored package — was
+  listed by `--dry-run` and rewritten with the rest. In a git repository it now
+  reads only what `git ls-files` lists: tracked files, and untracked ones no
+  `.gitignore` excludes. `node_modules`, `dist*` and hidden directories are
+  skipped either way. Outside a repository, or run inside a copy its repository
+  ignores as a whole, it walks every directory.
+
 ## [0.21.1] - 2026-09-15
 
 ### Added

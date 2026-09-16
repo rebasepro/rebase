@@ -9,6 +9,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { execFileSync } from "child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { npmFailure, upgradeCommand, type UpgradeIo } from "./upgrade";
 
@@ -122,6 +123,30 @@ describe("rebase upgrade --json", () => {
         expect(read("backend/package.json")).toContain("\"@rebasepro/server\": \"^0.21.0\"");
         expect(fake.install).not.toHaveBeenCalled();
         expect(fake.npmView).not.toHaveBeenCalled();
+    });
+
+    it("leaves a gitignored copy of the project out of the document and on disk", async () => {
+        project();
+        // A real repository in place of the bare `.git/HEAD`, ignoring a stale
+        // copy of the build context that pins the same packages.
+        fs.rmSync(path.join(root, ".git"), { recursive: true, force: true });
+        execFileSync("git", ["-c", "init.defaultBranch=main", "init", "-q"], { cwd: root, stdio: "ignore" });
+        write(".gitignore", "scratch/\n");
+        const copy = ["package.json", "backend/package.json", "pnpm-workspace.yaml"].map(file => {
+            const target = `scratch/build-ctx/shop/${file}`;
+            write(target, read(file));
+            return [target, read(file)] as const;
+        });
+        const fake = io();
+
+        expect(await run(["--to", "0.21.0", "--no-install", "--json"], fake)).toBe(0);
+
+        const doc = JSON.parse(stdout.join("\n"));
+        expect(doc.changed.map((pin: { file: string }) => pin.file)).toEqual(["backend/package.json", "package.json"]);
+        expect(doc.skipped.map((skip: { file: string }) => skip.file)).toEqual(["backend/package.json"]);
+        expect(doc.overrides.map((override: { file: string }) => override.file)).toEqual(["pnpm-workspace.yaml"]);
+        expect(doc.unreadable).toEqual([]);
+        for (const [file, content] of copy) expect(read(file)).toBe(content);
     });
 
     it("writes nothing on a dry run, and says so", async () => {
