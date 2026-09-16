@@ -27,6 +27,11 @@ export function useChildViewSource(path: string | undefined): ChildViewSource | 
         const segments = path.split("/").filter(s => s && s !== "undefined");
         // `parent/id/child` is the shortest addressable child list.
         if (segments.length < 3) return undefined;
+        // ...but three segments are not always a child list: a slug may contain
+        // slashes, and `medico/v2.0.0/joints` is one root collection. Only the
+        // registry knows where a slug ends, so ask it whether anything sits
+        // above the collection this path addresses.
+        if (collectionRegistry.getParentCollectionSlugs(path).length === 0) return undefined;
 
         const childKey = segments[segments.length - 1];
         // Drop the child segment and the parent's id: what remains addresses the

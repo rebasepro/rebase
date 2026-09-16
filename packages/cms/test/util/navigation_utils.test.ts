@@ -113,10 +113,11 @@ describe("getLastSegment", () => {
 // getCollectionPathsCombinations
 // ---------------------------------------------------------------------------
 describe("getCollectionPathsCombinations", () => {
-    it("returns combinations from longest to shortest (odd)", () => {
-        // "sites/es/locales" => ["sites/es/locales", "sites"]
+    it("returns every whole-segment prefix, longest first", () => {
+        // Even lengths too: a slug may contain slashes, so `sites/es` is as
+        // much a candidate collection as `sites`.
         expect(getCollectionPathsCombinations(["sites", "es", "locales"]))
-            .toEqual(["sites/es/locales", "sites"]);
+            .toEqual(["sites/es/locales", "sites/es", "sites"]);
     });
     it("handles single-element array", () => {
         expect(getCollectionPathsCombinations(["products"]))
@@ -198,6 +199,14 @@ describe("resolveCollectionPathIds", () => {
         warnSpy.mockRestore();
     });
 
+    it("matches a slug against whole segments only", () => {
+        const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+        // `products` is a string prefix of `productsx`, not a segment of it. A
+        // bare `startsWith` read this as the record `x` of `products`.
+        expect(resolveCollectionPathIds("productsx/1", collections)).toBe("productsx/1");
+        warnSpy.mockRestore();
+    });
+
     it("falls back to original path when no collection matches", () => {
         const warnSpy = jest.spyOn(console, "warn").mockImplementation();
         const result = resolveCollectionPathIds("unknown_path", collections);
@@ -253,9 +262,27 @@ describe("getCollectionBySlugWithin", () => {
         expect(getCollectionBySlugWithin("unknown", collections)).toBeUndefined();
     });
 
-    it("throws on even-segment paths (invalid collection path)", () => {
+    it("finds a collection whose slug contains slashes, and a subcollection under it", () => {
+        const podcasts = {
+            name: "Podcasts",
+            slug: "content/podcasts",
+            properties: {},
+            childCollections: () => [{ name: "Episodes",
+slug: "episodes",
+properties: {} }]
+        } as unknown as CollectionConfig;
+
+        // Both paths have an even number of segments, which was refused
+        // before any collection was looked at.
+        expect(getCollectionBySlugWithin("content/podcasts", [podcasts])?.slug).toBe("content/podcasts");
+        expect(getCollectionBySlugWithin("content/podcasts/p1/episodes", [podcasts])?.slug).toBe("episodes");
+        expect(() => getCollectionBySlugWithin("content/podcasts/p1", [podcasts]))
+            .toThrow("Collection paths must end at a collection, not at a record");
+    });
+
+    it("throws on a path that ends at a record (invalid collection path)", () => {
         expect(() => getCollectionBySlugWithin("products/entity1", collections))
-            .toThrow("Collection paths must have an odd number of segments");
+            .toThrow("Collection paths must end at a collection, not at a record");
     });
 });
 

@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { renderHook } from "@testing-library/react";
+import { EntityReference } from "@rebasepro/types";
 
 /**
  * A filter URL written by something that is not this hook.
@@ -80,6 +81,17 @@ describe("useDataTableController — a hand-written filter URL", () => {
     it("applies a comparison, not just equality", () => {
         expect(filtersFrom("?status_op=%3D%3D&status_value=pending&due_date_op=%3C&due_date_value=2026-09-11"))
             .toEqual({ status: ["==", "pending"], due_date: ["<", "2026-09-11"] });
+    });
+
+    it("reads a reference back with the whole path, however many segments it has", () => {
+        // `ref::<path>/<id>`: the id is the last segment. Splitting on the first
+        // slash made this a reference to the record `de-DE` of `content`.
+        expect(filtersFrom(`?episode_op=%3D%3D&episode_value=${encodeURIComponent("ref::content/de-DE/podcasts/abc123")}`))
+            .toEqual({ episode: ["==", new EntityReference({ id: "abc123",
+path: "content/de-DE/podcasts" })] });
+        expect(filtersFrom(`?movement_op=%3D%3D&movement_value=${encodeURIComponent("ref::medico/v2.0.0/joints/j1/movements/m1")}`))
+            .toEqual({ movement: ["==", new EntityReference({ id: "m1",
+path: "medico/v2.0.0/joints/j1/movements" })] });
     });
 
     it("ignores a value with no operator beside it", () => {

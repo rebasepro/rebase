@@ -112,12 +112,20 @@ describe("getCollectionPathsCombinations", () => {
 
     it("generates combinations from a path with subcollections", () => {
         const result = getCollectionPathsCombinations(["sites", "es", "locales"]);
-        expect(result).toEqual(["sites/es/locales", "sites"]);
+        expect(result).toEqual(["sites/es/locales", "sites/es", "sites"]);
     });
 
     it("generates combinations from a deep path", () => {
         const result = getCollectionPathsCombinations(["a", "1", "b", "2", "c"]);
-        expect(result).toEqual(["a/1/b/2/c", "a/1/b", "a"]);
+        expect(result).toEqual(["a/1/b/2/c", "a/1/b/2", "a/1/b", "a/1", "a"]);
+    });
+
+    it("offers even-length prefixes, which a slug containing a slash can be", () => {
+        // `content/podcasts` is one collection, so `content/podcasts/abc123`
+        // starts with a two-segment candidate. Only odd lengths were offered,
+        // which never included it, and the route resolved to nothing.
+        expect(getCollectionPathsCombinations(["content", "podcasts", "abc123"]))
+            .toContain("content/podcasts");
     });
 
     it("handles empty array", () => {
