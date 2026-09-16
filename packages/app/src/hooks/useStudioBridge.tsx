@@ -90,6 +90,8 @@ export interface StudioCapabilities {
 const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
     getCollection: () => undefined,
     getRawCollection: () => undefined,
+    resolveDataPath: (path) => path,
+    resolveCollectionPath: (path) => path,
     getParentReferencesFromPath: () => [],
     getParentCollectionSlugs: () => [],
     getParentEntityIds: () => [],

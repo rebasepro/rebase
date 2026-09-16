@@ -3,7 +3,7 @@
 import type { FormContext } from "../types/fields";
 import type { EntityAction, EntityActionClickProps, SidePanelController, AdminCollection } from "@rebasepro/cms-types";
 import React, { useMemo } from "react";
-import { Entity, getCollectionDataPath } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "./common/default_entity_actions";
@@ -173,7 +173,10 @@ function buildBottomActions<M extends Record<string, unknown>>({
                 const props = {
                     view: "form",
                     entity,
-                    path: getCollectionDataPath(collection),
+                    // The slug, not the path a Firestore collection declares for
+                    // its store: actions route, copy and delete by `path`, and
+                    // the stored path can be another collection's slug.
+                    path: collection.slug,
                     collection: collection,
                     context,
                     sidePanelController,

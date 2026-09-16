@@ -15,6 +15,7 @@ import {
 } from "../../components/InlineEntityPreview";
 import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
+import { useReferencePaths } from "../../hooks/useReferencePaths";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 export type ReferencePreviewProps = {
@@ -64,8 +65,9 @@ function ReferencePreviewInternalInner({
     includeEntityLink = true,
     includeId = true,
     textOnly,
+    path,
     collection
-}: ReferencePreviewProps & { collection?: AdminCollection }) {
+}: ReferencePreviewProps & { path: string, collection?: AdminCollection }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
     const nested = useIsNestedEntityPreview();
 
@@ -91,6 +93,7 @@ function ReferencePreviewInternalInner({
 
     return <ReferencePreviewExisting
         reference={reference}
+        path={path}
         collection={collection}
         previewProperties={previewProperties}
         size={size}
@@ -104,11 +107,16 @@ function ReferencePreviewInternalInner({
 
 function ReferencePreviewInternal(props: ReferencePreviewProps) {
     const collectionRegistryController = useCollectionRegistryController();
-    const collection = collectionRegistryController.getCollection(props.reference.path);
+    // The reference carries the path its record is stored under; the
+    // collection is looked up, and the record fetched, by the admin's.
+    const { toCollectionPath } = useReferencePaths();
+    const path = toCollectionPath(props.reference.path, props.reference.driver);
+    const collection = collectionRegistryController.getCollection(path);
 
     const content = (
         <ReferencePreviewInternalInner
             {...props}
+            path={path}
             collection={collection}
         />
     );
@@ -125,6 +133,7 @@ function ReferencePreviewInternal(props: ReferencePreviewProps) {
 
 function ReferencePreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
     reference,
+    path,
     collection,
     previewProperties,
     size,
@@ -135,6 +144,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     hover,
     textOnly
 }: ReferencePreviewProps & {
+    path: string,
     collection: AdminCollection<M>
 }) {
 
@@ -152,7 +162,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         dataLoading,
         dataLoadingError
     } = useFetch({
-        path: reference.path,
+        path,
         entityId: reference.id,
         collection,
         useCache: true

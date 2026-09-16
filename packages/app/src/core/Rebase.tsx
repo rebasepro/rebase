@@ -9,7 +9,7 @@ import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, R
 import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
-import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver } from "../contexts";
+import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver, DataPathResolver } from "../contexts";
 import { useCustomizationController, useRebaseContext, useAuthSubscription } from "../hooks";
 import { ApiConfigProvider, useApiConfig } from "../hooks/ApiConfigContext";
 import { ErrorView } from "../components";
@@ -146,15 +146,20 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     }, [dataSourcesProp]);
 
     // Rows arrive as columns only; their address is derived from the
-    // collection's primary keys. The collections live below us (in RebaseCMS),
-    // so they register a resolver here and we read it lazily, per row. Headless
-    // apps register nothing and are unaffected.
+    // collection's primary keys. A direct driver is handed the path a
+    // collection declares for its store rather than its slug. The collections
+    // live below us (in RebaseCMS), so they register both resolvers here and we
+    // read them lazily, per call. Headless apps register nothing and are
+    // unaffected.
     const collectionResolverRef = useRef<CollectionResolver | undefined>(undefined);
-    const registerCollectionResolver = React.useCallback((resolver: CollectionResolver | undefined) => {
+    const dataPathResolverRef = useRef<DataPathResolver | undefined>(undefined);
+    const registerCollectionResolver = React.useCallback((resolver: CollectionResolver | undefined, resolveDataPath?: DataPathResolver) => {
         collectionResolverRef.current = resolver;
+        dataPathResolverRef.current = resolveDataPath;
     }, []);
     const entityDataOptions = useMemo(() => ({
-        resolveCollection: (slug: string) => collectionResolverRef.current?.(slug)
+        resolveCollection: (slug: string) => collectionResolverRef.current?.(slug),
+        resolveDataPath: (path: string) => dataPathResolverRef.current?.(path)
     }), []);
 
     // Build the data-source context: the declared registry plus a RebaseData

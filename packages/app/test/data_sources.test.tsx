@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useContext } from "react";
 import { render } from "@testing-library/react";
 import { Rebase } from "../src/core/Rebase";
+import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";
 import { useDataSources } from "../src/contexts/DataSourcesContext";
 import { useData } from "../src/hooks/data/useData";
 import type { DataDriver, RebaseClient, RebaseData } from "@rebasepro/types";
@@ -205,6 +206,33 @@ describe("<Rebase> data source wiring", () => {
         expect(seen.length).toBeGreaterThanOrEqual(2);
         // The sources map object must be the same instance across renders.
         expect(seen[seen.length - 1].sources).toBe(seen[0].sources);
+    });
+
+    it("hands a direct driver the path the layer owning the collections resolves", async () => {
+        // The collections live below <Rebase>, so the translation from the
+        // slug a collection is addressed by to the path its driver stores it
+        // under is registered from there, the same way the collection resolver is.
+        const fs = mockDriver("firestore");
+        const captured: { sources?: ReturnType<typeof useDataSources> } = {};
+        function Probe() {
+            captured.sources = useDataSources();
+            const register = useContext(CollectionResolverRegistrationContext);
+            register(undefined, (path) => (path === "fs_diagnosis" ? "diagnosis" : undefined));
+            return null;
+        }
+        render(
+            <Rebase
+                authController={mockAuthController}
+                client={mockClient}
+                storageSource={{} as any}
+                dataSources={[{ key: "firestore", engine: "firestore", transport: "direct", driver: fs }]}>
+                <Probe/>
+            </Rebase>
+        );
+
+        await captured.sources!.sources["firestore"].collection("fs_diagnosis").find();
+
+        expect(fs.fetchCollection).toHaveBeenCalledWith(expect.objectContaining({ path: "diagnosis" }));
     });
 
     it("throws when no data source of any kind is provided", () => {

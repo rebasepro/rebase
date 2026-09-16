@@ -319,6 +319,102 @@ path: "products" })
         });
     });
 
+    // ── Stored path ─────────────────────────────────────────
+    describe("a collection its driver stores under a declared path", () => {
+        // `slug: "fs_diagnosis", path: "diagnosis"`: the admin addresses the
+        // collection by the slug, the driver stores it at the path. Every
+        // driver call was handed the slug, so a Firestore collection declared
+        // this way listed, saved and deleted in a collection that did not exist.
+        const stored: Record<string, string> = {
+            "fs_diagnosis": "diagnosis",
+            "fs_diagnosis/abc/locales": "diagnosis/abc/locales"
+        };
+        const resolveDataPath = (path: string) => stored[path];
+
+        function createListeningDriver() {
+            return createMockDriver({
+                fetchCollection: jest.fn().mockResolvedValue([{ id: "abc", name: "Flu" }]),
+                fetchOne: jest.fn().mockResolvedValue({ id: "abc", name: "Flu" }),
+                listenCollection: jest.fn().mockReturnValue(() => undefined),
+                listenOne: jest.fn().mockReturnValue(() => undefined),
+                saveMany: jest.fn().mockResolvedValue([]),
+                updateMany: jest.fn().mockResolvedValue([]),
+                deleteMany: jest.fn().mockResolvedValue(undefined)
+            });
+        }
+
+        it("hands every driver call the stored path", async () => {
+            const driver = createListeningDriver();
+            const accessor = buildRebaseData(driver, { resolveDataPath }).collection("fs_diagnosis");
+
+            await accessor.find();
+            await accessor.findById("abc");
+            await accessor.create({ name: "Flu" });
+            await accessor.update("abc", { name: "Flu" });
+            await accessor.delete("abc");
+            await accessor.count!();
+            await accessor.createMany!([{ name: "Flu" }]);
+            await accessor.updateMany!([{ id: "abc", data: { name: "Flu" } }]);
+            await accessor.deleteMany!(["abc"]);
+            accessor.listen!(undefined, () => undefined);
+            accessor.listenById!("abc", () => undefined);
+
+            const pathsHanded = [
+                ...jest.mocked(driver.fetchCollection).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.fetchOne).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.save).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.delete).mock.calls.map(([props]) => props.row.path),
+                ...jest.mocked(driver.count!).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.saveMany!).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.updateMany!).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.deleteMany!).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.listenCollection!).mock.calls.map(([props]) => props.path),
+                ...jest.mocked(driver.listenOne!).mock.calls.map(([props]) => props.path)
+            ];
+            expect(pathsHanded.length).toBeGreaterThanOrEqual(11);
+            expect(new Set(pathsHanded)).toEqual(new Set(["diagnosis"]));
+        });
+
+        it("translates a subcollection path as a whole", async () => {
+            const driver = createListeningDriver();
+            await buildRebaseData(driver, { resolveDataPath }).collection("fs_diagnosis/abc/locales").find();
+
+            expect(driver.fetchCollection).toHaveBeenCalledWith(expect.objectContaining({ path: "diagnosis/abc/locales" }));
+        });
+
+        it("keeps the address the rows were asked for by", async () => {
+            // The admin resolves an entity's collection, routes to it and
+            // deletes it by `entity.path`; the stored path would name the
+            // Postgres collection called `diagnosis` instead.
+            const driver = createListeningDriver();
+            const accessor = buildRebaseData(driver, { resolveDataPath }).collection("fs_diagnosis");
+
+            const { data } = await accessor.find();
+            expect(data[0].path).toBe("fs_diagnosis");
+            expect((await accessor.findById("abc"))?.path).toBe("fs_diagnosis");
+        });
+
+        it("asks on every call, so a resolver registered after the accessor was built still applies", async () => {
+            const driver = createListeningDriver();
+            const options: { resolveDataPath?: (path: string) => string | undefined } = {};
+            const accessor = buildRebaseData(driver, options).collection("fs_diagnosis");
+
+            await accessor.find();
+            options.resolveDataPath = resolveDataPath;
+            await accessor.find();
+
+            expect(jest.mocked(driver.fetchCollection).mock.calls.map(([props]) => props.path))
+                .toEqual(["fs_diagnosis", "diagnosis"]);
+        });
+
+        it("hands over the slug where there is nothing to translate", async () => {
+            const driver = createListeningDriver();
+            await buildRebaseData(driver, { resolveDataPath }).collection("exercises").find();
+
+            expect(driver.fetchCollection).toHaveBeenCalledWith(expect.objectContaining({ path: "exercises" }));
+        });
+    });
+
     // ── Fluent Query Builder ────────────────────────────────
     describe("CollectionAccessor Fluent Queries", () => {
         it("supports fluent query building and translates to find calls", async () => {

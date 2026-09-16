@@ -3,7 +3,7 @@ import type { EntityCustomViewParams, FormViewConfig, AdminCollection } from "@r
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, EntityStatus, getCollectionDataPath } from "@rebasepro/types";
+import { Entity, EntityStatus } from "@rebasepro/types";
 import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
@@ -644,7 +644,9 @@ parentEntityIds,
 
     const subCollectionsViews = childViews && childViews.map(({ collection: subcollection }) => {
         const subcollectionId = subcollection.slug;
-        const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(getCollectionDataPath(subcollection))}` : undefined;
+        // By slug, like the path it extends: the data layer hands the driver
+        // the stored path, `path` included, for the whole of it at once.
+        const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(subcollection.slug)}` : undefined;
 
         if (activeTab !== subcollectionId) return null;
         return (

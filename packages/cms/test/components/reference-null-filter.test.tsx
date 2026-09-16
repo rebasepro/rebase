@@ -22,10 +22,15 @@ jest.mock("../../src/hooks/useSelectionDialog", () => ({
     useSelectionDialog: () => ({ open: () => undefined, close: () => undefined })
 }));
 jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => ({
-    useCollectionRegistryController: () => ({ getCollection: () => undefined })
+    useCollectionRegistryController: () => ({
+        getCollection: () => undefined,
+        resolveCollectionPath: (path: string) => path,
+        resolveDataPath: (path: string) => path
+    })
 }));
 jest.mock("@rebasepro/app", () => ({
-    useTranslation: () => ({ t: (key: string) => key })
+    useTranslation: () => ({ t: (key: string) => key }),
+    useCollectionScope: () => undefined
 }));
 
 import { ReferenceFilterField } from "../../src/components/SelectableTable/filters/ReferenceFilterField";

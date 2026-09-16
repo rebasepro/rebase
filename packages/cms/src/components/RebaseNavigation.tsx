@@ -118,11 +118,14 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // below us, and their effects run before ours, so an effect here would bind
     // after the first page had already been converted. The call only assigns a
     // ref, so repeating it per render is free.
+    //
+    // With it goes where each collection is stored: a direct driver has to be
+    // handed the `path` a Firestore collection declares, not its slug.
     const registerCollectionResolver = useContext(CollectionResolverRegistrationContext);
     const resolveCollection = useCallback(
         (slug: string) => getCollectionRef.current(slug),
         []);
-    registerCollectionResolver(resolveCollection);
+    registerCollectionResolver(resolveCollection, collectionRegistryController.resolveDataPath);
     const routedData = useMemo(() => buildRoutedRebaseData({
         defaultData,
         sources: dataSources.sources,

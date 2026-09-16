@@ -6,6 +6,8 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 export const CollectionRegistryContext = createContext<CollectionRegistryController>({
     getCollection: () => undefined,
     getRawCollection: () => undefined,
+    resolveDataPath: (path) => path,
+    resolveCollectionPath: (path) => path,
     getParentReferencesFromPath: () => [],
     getParentCollectionSlugs: () => [],
     getParentEntityIds: () => [],

@@ -4,10 +4,10 @@ import React, { useCallback, useMemo } from "react";
 
 import { Entity, EntityReference, FilterValues } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
-import { getReferenceFrom } from "@rebasepro/common";
 import { ReferencePreview } from "../preview";
 import { Button, cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import { useReferencePaths } from "../hooks/useReferencePaths";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
@@ -55,38 +55,40 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
 }: ReferenceWidgetProps<M>) {
 
     const collectionRegistryController = useCollectionRegistryController();
+    const { toCollectionPath, referenceTo } = useReferencePaths();
+    const collectionPath = toCollectionPath(path);
 
     const collection: AdminCollection | undefined = useMemo(() => {
-        return collectionRegistryController.getCollection(path);
-    }, [path, collectionRegistryController.getCollection]);
+        return collectionRegistryController.getCollection(collectionPath);
+    }, [collectionPath, collectionRegistryController.getCollection]);
 
     const onSingleEntitySelected = useCallback((entity: Entity<M> | null) => {
         if (disabled)
             return;
         if (onReferenceSelected) {
-            const reference = entity ? getReferenceFrom(entity) : null;
+            const reference = entity ? referenceTo(entity) : null;
             onReferenceSelected?.({
                 reference,
                 entity
             });
         }
-    }, [disabled, onReferenceSelected]);
+    }, [disabled, onReferenceSelected, referenceTo]);
 
     const onMultipleEntitiesSelected = useCallback((entities: Entity<M>[]) => {
         if (disabled)
             return;
         if (onMultipleReferenceSelected) {
-            const references = entities ? entities.map(e => getReferenceFrom(e)) : null;
+            const references = entities ? entities.map(e => referenceTo(e)) : null;
             onMultipleReferenceSelected({
                 references,
                 entities
             });
         }
-    }, [disabled, onReferenceSelected]);
+    }, [disabled, onReferenceSelected, referenceTo]);
 
     const referenceDialogController = useSelectionDialog({
         multiselect,
-        path,
+        path: collectionPath,
         collection,
         onSingleEntitySelected,
         onMultipleEntitiesSelected,

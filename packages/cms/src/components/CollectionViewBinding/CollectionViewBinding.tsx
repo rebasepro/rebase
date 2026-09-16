@@ -95,8 +95,11 @@ const EMPTY_ARRAY: never[] = [];
  */
 export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     /**
-     * Complete path where this collection is located.
-     * It defaults to the collection path if not provided.
+     * The path the collection is addressed by: its slug, or for a
+     * subcollection `parentSlug/{id}/slug`. Defaults to the collection's slug.
+     * Not the `path` a Firestore or MongoDB collection declares for its store:
+     * the data layer translates to that one, and another collection's slug may
+     * be spelled the same.
      */
     path?: string;
     /**
@@ -175,7 +178,7 @@ const CollectionViewBindingInner = React.memo(
         const context = useAdminContext();
         const collectionRegistry = useCollectionRegistryController();
         const urlController = useUrlController();
-        const path = pathProp ?? getCollectionDataPath(collectionProp);
+        const path = pathProp ?? collectionProp.slug;
         const dataClient = useData();
         const sidePanelController = useSidePanel();
         const authController = useAuthController();

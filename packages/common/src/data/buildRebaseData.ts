@@ -62,6 +62,22 @@ export interface EntityDataOptions {
      * registered on mount would otherwise arrive too late to be seen.
      */
     resolveCollection?: (slug: string) => { properties?: Record<string, unknown>; relations?: unknown[]; slug?: string } | undefined;
+
+    /**
+     * Translate the path a collection is addressed by into the path its driver
+     * stores it under.
+     *
+     * The admin addresses every collection by its slug, and a Firestore or
+     * MongoDB collection may declare a `path` of its own: `fs_diagnosis` stored
+     * at `diagnosis`, and `fs_diagnosis/abc/locales` at `diagnosis/abc/locales`.
+     * Only the driver is handed the stored path. Rows keep the address they
+     * were asked for by, because that is what the admin resolves their
+     * collection, routes and deletes by.
+     *
+     * Late-bound, like `resolveCollection`. Absent, or answering `undefined`,
+     * the address is the stored path.
+     */
+    resolveDataPath?: (path: string) => string | undefined;
 }
 
 function createPrimaryKeyResolver(options?: EntityDataOptions) {
@@ -315,7 +331,13 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
     driver: DataDriver,
     slug: string,
     getPks: () => PrimaryKeyInfo[] = () => [],
-    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>,
+    /**
+     * Where the driver stores `slug` — see `EntityDataOptions.resolveDataPath`.
+     * Asked on every call, not once: the collections it is derived from
+     * register after this accessor is built, and can change while it lives.
+     */
+    storedPath: () => string = () => slug
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
@@ -363,7 +385,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             const fetchService = driver.restFetchService;
             const fetched = fetchService
                 ? await fetchService.fetchCollectionForRest(
-                    slug,
+                    storedPath(),
                     {
                         filter,
                         // Without this the group was dropped and the read ran
@@ -385,7 +407,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     params?.include
                 )
                 : await driver.fetchCollection<M>({
-                    path: slug,
+                    path: storedPath(),
                     limit: probeLimit,
                     offset: startAfter ? undefined : driverOffset,
                     startAfter,
@@ -411,7 +433,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 // page, and `hasMore` is derived from it — so the list offered
                 // a next page that did not exist.
                 total = await driver.count({
-                    path: slug,
+                    path: storedPath(),
                     filter,
                     logical: params?.logical,
                     searchString: params?.searchString
@@ -429,7 +451,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // caller then pages by offset.
             const last = rows[rows.length - 1] as Record<string, unknown> | undefined;
             const nextCursor = (hasMore && last && driver.restFetchService?.cursorFor)
-                ? driver.restFetchService.cursorFor(slug, last, orderBy)
+                ? driver.restFetchService.cursorFor(storedPath(), last, orderBy)
                 : undefined;
 
             return {
@@ -443,8 +465,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // collection read is, so `find()[0]` and `findById()` agree.
             const fetchService = driver.restFetchService;
             const row = fetchService
-                ? await fetchService.fetchOneForRest(slug, id)
-                : await driver.fetchOne<M>({ path: slug, id: id });
+                ? await fetchService.fetchOneForRest(storedPath(), id)
+                : await driver.fetchOne<M>({ path: storedPath(), id: id });
             return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
         },
 
@@ -452,7 +474,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         // wrapper turns an absent one into a stub that names the capability.
         aggregate: driver.restFetchService?.aggregate
             ? async (params: AggregateParams<M>): Promise<AggregateRow[]> =>
-                driver.restFetchService!.aggregate!(slug, {
+                driver.restFetchService!.aggregate!(storedPath(), {
                     aggregates: params.select.map(toDriverAggregate),
                     groupBy: params.groupBy as string[] | undefined,
                     filter: params.where
@@ -466,7 +488,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
 
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
             const row = await driver.save<M>({
-                path: slug,
+                path: storedPath(),
                 values: data,
                 id: id,
                 status: "new"
@@ -480,7 +502,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 options?: { upsert?: boolean; onConflict?: readonly string[] }
             ): Promise<Entity<M>[]> => {
                 const rows = await driver.saveMany!<M>({
-                    path: slug,
+                    path: storedPath(),
                     rows: data,
                     upsert: options?.upsert,
                     // Dropped here, an `upsert` on a natural key silently
@@ -495,7 +517,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
 
         async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await driver.save<M>({
-                path: slug,
+                path: storedPath(),
                 values: data,
                 id: id,
                 status: "existing"
@@ -507,7 +529,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // The address only. A server driver reads the row it deletes; the
             // `values: {}` this used to send was recorded by history as the
             // deleted row, and was all a `beforeDelete` had to judge.
-            return driver.delete({ row: { id, path: slug } });
+            return driver.delete({ row: { id, path: storedPath() } });
         },
 
         // Present only when the driver is: exposing these unconditionally and
@@ -517,7 +539,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         updateMany: driver.updateMany
             ? async (updates: { id: string | number; data: Partial<EntityValues<M>> }[]): Promise<Entity<M>[]> => {
                 const rows = await driver.updateMany!<M>({
-                    path: slug,
+                    path: storedPath(),
                     updates: updates.map(u => ({ id: u.id,
 values: u.data })),
                 });
@@ -527,7 +549,7 @@ values: u.data })),
 
         deleteMany: driver.deleteMany
             ? async (ids: (string | number)[]): Promise<void> => {
-                await driver.deleteMany!<M>({ path: slug,
+                await driver.deleteMany!<M>({ path: storedPath(),
 ids });
             }
             : undefined,
@@ -539,7 +561,7 @@ ids });
                 // the count describes a different query than the one it is
                 // reported against.
                 return driver.count!({
-                    path: slug,
+                    path: storedPath(),
                     filter,
                     logical: params?.logical,
                     searchString: params?.searchString
@@ -557,7 +579,7 @@ ids });
                 // handing a developer two.
                 const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenCollection!<M>({
-                    path: slug,
+                    path: storedPath(),
                     limit,
                     offset: driverOffset,
                     filter: params?.where,
@@ -598,7 +620,7 @@ ids });
             ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
                 const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenOne!<M>({
-                    path: slug,
+                    path: storedPath(),
                     id: id,
                     onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(normalize(entity), slug, getPks(), toViewModel) : undefined),
                     onError
@@ -682,7 +704,13 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = createDriverAccessor(driver, slug, () => primaryKeysFor(slug), viewModelFor(slug));
+            accessor = createDriverAccessor(
+                driver,
+                slug,
+                () => primaryKeysFor(slug),
+                viewModelFor(slug),
+                () => options?.resolveDataPath?.(slug) ?? slug
+            );
             cache.set(slug, accessor);
         }
         return accessor;

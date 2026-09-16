@@ -30,6 +30,7 @@ jest.mock("@rebasepro/app", () => ({
     useCustomizationController: () => ({}),
     useComponentOverride: (_id: string, fallback: unknown) => fallback,
     CollectionScopeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useCollectionScope: () => undefined,
     ErrorView: ({ error }: { error: unknown }) => <div>{String(error)}</div>
 }));
 
@@ -58,7 +59,8 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
     useCollectionRegistryController: () => ({
         getCollection: () => ({ slug: "authors",
 name: "Authors",
-properties: {} })
+properties: {} }),
+        resolveCollectionPath: (path: string) => path
     })
 }));
 

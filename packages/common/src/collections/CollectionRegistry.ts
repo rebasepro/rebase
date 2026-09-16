@@ -3,6 +3,7 @@ import {
     CollectionCallbacks,
     EngineProperties,
     CollectionConfig,
+    getCollectionDataPath,
     getDataSourceCapabilities,
     getDeclaredSubcollections,
     NumberProperty,
@@ -59,6 +60,13 @@ export class CollectionRegistry {
     // Normalized runtime layer (used by Data Grid / UI)
     private collectionsByTableName = new Map<string, CollectionConfig>();
     private collectionsBySlug = new Map<string, CollectionConfig>();
+    /**
+     * Root collections whose driver stores them under a `path` other than
+     * their slug, by that path. A list, because the path is only unique within
+     * a data source: two collections in different databases may both be stored
+     * at `customer`.
+     */
+    private collectionsByDataPath = new Map<string, CollectionConfig[]>();
     private rootCollections: CollectionConfig[] = [];
     private cachedCollectionsList: CollectionConfig[] | null = null;
 
@@ -93,6 +101,7 @@ export class CollectionRegistry {
     reset() {
         this.collectionsByTableName.clear();
         this.collectionsBySlug.clear();
+        this.collectionsByDataPath.clear();
         this.rootCollections = [];
         this.cachedCollectionsList = null;
 
@@ -146,6 +155,7 @@ export class CollectionRegistry {
             if (normalized.slug) {
                 this.collectionsBySlug.set(normalized.slug, normalized);
             }
+            this.indexDataPath(normalized);
             if (raw.slug) {
                 this.rawCollectionsBySlug.set(raw.slug, raw);
             }
@@ -176,6 +186,23 @@ export class CollectionRegistry {
         this.rawRootCollections.push(raw);
 
         this._registerRecursively(collection, raw);
+
+        const registered = this.collectionsByTableName.get(getTableName(collection));
+        if (registered) this.indexDataPath(registered);
+    }
+
+    /**
+     * Index a root collection by the path its driver stores it under, when
+     * that is not its slug. Only roots: a subcollection's `path` is relative to
+     * the record it hangs off, so it names nothing on its own.
+     */
+    private indexDataPath(collection: CollectionConfig) {
+        const dataPath = getCollectionDataPath(collection);
+        if (!dataPath || dataPath === collection.slug) return;
+        const indexed = this.collectionsByDataPath.get(dataPath) ?? [];
+        if (!indexed.includes(collection)) {
+            this.collectionsByDataPath.set(dataPath, [...indexed, collection]);
+        }
     }
 
     private _registerRecursively(collection: CollectionConfig, rawCollection: CollectionConfig) {
@@ -321,7 +348,26 @@ export class CollectionRegistry {
         return newProperty;
     }
 
-    get(path: string): CollectionConfig | undefined {
+    /**
+     * The collection registered under `path`: by slug, by slug with hyphens
+     * for underscores, by table name, and last by the `path` a root Firestore
+     * or MongoDB collection declares for its driver.
+     *
+     * One string can name two collections. Declaring `slug: "fs_diagnosis",
+     * path: "diagnosis"` is how a Firestore collection sits beside a Postgres
+     * collection whose slug is `diagnosis` — and a reference read back from
+     * Firestore carries `diagnosis`. The order above settles it in favour of the
+     * slug unless `preferredDriver` is given: then the first collection whose
+     * data source or engine is `preferredDriver` wins. Pass a reference's
+     * `driver`, or the data source of the record the path was read from.
+     */
+    get(path: string, preferredDriver?: string): CollectionConfig | undefined {
+        if (preferredDriver) {
+            const preferred = this.candidatesFor(path)
+                .find(collection => collection.dataSource === preferredDriver || collection.engine === preferredDriver);
+            if (preferred) return preferred;
+        }
+
         // First try slug lookup
         const bySlug = this.collectionsBySlug.get(path);
         if (bySlug) return bySlug;
@@ -334,7 +380,102 @@ export class CollectionRegistry {
         }
 
         // Fallback to table name lookup
-        return this.collectionsByTableName.get(path);
+        const byTableName = this.collectionsByTableName.get(path);
+        if (byTableName) return byTableName;
+
+        // Last, the path a driver stores a root collection under
+        return this.collectionsByDataPath.get(path)?.[0];
+    }
+
+    /** Every collection {@link get} could answer `path` with, in its order. */
+    private candidatesFor(path: string): CollectionConfig[] {
+        const candidates = [
+            this.collectionsBySlug.get(path),
+            path.includes("-") ? this.collectionsBySlug.get(path.replace(/-/g, "_")) : undefined,
+            this.collectionsByTableName.get(path),
+            ...(this.collectionsByDataPath.get(path) ?? [])
+        ];
+        return candidates.filter((collection, index): collection is CollectionConfig =>
+            collection !== undefined && candidates.indexOf(collection) === index);
+    }
+
+    /**
+     * The path a collection's rows are stored under, for the path the admin
+     * addresses it by.
+     *
+     * The admin addresses a collection by its slug — in routes, in
+     * `data.collection(...)`, in the `path` of every entity it lists — because
+     * the slug is what is unique. A Firestore or MongoDB collection may declare
+     * a `path` of its own ({@link getCollectionDataPath}), and its driver has to
+     * be handed that one, under every record and subcollection too:
+     * `fs_diagnosis/abc/locales` is stored at `diagnosis/abc/locales`.
+     *
+     * A path that names no registered collection, or runs only through
+     * collections stored under their slugs, comes back unchanged.
+     */
+    resolveDataPath(path: string): string {
+        let resolved: { collections: CollectionConfig[], entityIds: (string | number)[] };
+        // The whole path first: a slug may contain slashes.
+        const exact = this.get(path);
+        if (exact) {
+            resolved = { collections: [exact], entityIds: [] };
+        } else {
+            try {
+                resolved = this.resolvePathToCollections(path);
+            } catch {
+                return path;
+            }
+        }
+
+        const { collections, entityIds } = resolved;
+        if (collections.every(collection => getCollectionDataPath(collection) === collection.slug)) {
+            return path;
+        }
+        return collections
+            .map((collection, index) => index < entityIds.length
+                ? `${getCollectionDataPath(collection)}/${entityIds[index]}`
+                : getCollectionDataPath(collection))
+            .join("/");
+    }
+
+    /**
+     * The path the admin addresses a collection by, for a path its rows are
+     * stored under: the inverse of {@link resolveDataPath}, for a reference
+     * read back from its driver.
+     *
+     * The root is the longest leading run of segments naming a collection, and
+     * becomes its slug when the run is where that collection is stored. Each
+     * subcollection after a record id is matched by where it is stored too. A
+     * path that already names its collections by slug comes back unchanged.
+     *
+     * `preferredDriver` decides between a collection stored at the path and one
+     * whose slug it is, as in {@link get}.
+     */
+    resolveCollectionPath(path: string, preferredDriver?: string): string {
+        const segments = path.split("/").filter(Boolean);
+        for (let length = segments.length; length > 0; length--) {
+            const prefix = segments.slice(0, length).join("/");
+            const root = this.get(prefix, preferredDriver);
+            if (!root) continue;
+
+            // Reached by its slug, its table name or an alias, a root keeps
+            // what it was called.
+            const translated = [getCollectionDataPath(root) === prefix ? root.slug : prefix];
+            let current: CollectionConfig = root;
+            let rest = segments.slice(length);
+            while (rest.length >= 2) {
+                const [entityId, storedAt, ...after] = rest;
+                const child = getSubcollections(current).find(subcollection => getCollectionDataPath(subcollection) === storedAt);
+                if (!child) break;
+                translated.push(entityId, child.slug);
+                current = child;
+                rest = after;
+            }
+
+            const collectionPath = [...translated, ...rest].join("/");
+            return collectionPath === segments.join("/") ? path : collectionPath;
+        }
+        return path;
     }
 
     /**

@@ -41,6 +41,25 @@ export type CollectionRegistryController<
     getRawCollection: (slugOrPath: string) => EC | undefined;
 
     /**
+     * The path a collection's rows are stored under, for the path the admin
+     * addresses it by. A Firestore or MongoDB collection may declare a `path`
+     * other than its slug — `slug: "fs_diagnosis", path: "diagnosis"` — and
+     * `fs_diagnosis/abc/locales` is then stored at `diagnosis/abc/locales`.
+     * This is what a reference to one of its records stores. Unchanged for a
+     * collection stored under its slug.
+     */
+    resolveDataPath: (path: string) => string;
+
+    /**
+     * The path the admin addresses a collection by, for a path its rows are
+     * stored under: the inverse of {@link resolveDataPath}, for a reference
+     * read back. `diagnosis` may be both where a Firestore collection is stored
+     * and the slug of a Postgres one; `preferredDriver` — the reference's
+     * `driver`, or the data source of the record it was read from — decides.
+     */
+    resolveCollectionPath: (path: string, preferredDriver?: string) => string;
+
+    /**
      * Retrieve all the related parent references for a given path
      * @param path
      */
