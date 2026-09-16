@@ -287,10 +287,17 @@ Non è presente alcuna chiave esterna. L'uid è una stringa, l'archivio utenti p
 database completamente separato e un utente eliminato non deve cancellare la traccia di audit —
 dichiara una [relazione](/docs/collections/relations) se desideri una join.
 
-:::note[Una sola chiave primaria per collection]
-`isId` può essere impostato esattamente su una proprietà. Un secondo utilizzo viene rifiutato al caricamento
-della configurazione invece di essere ignorato silenziosamente: le chiavi primarie composite non sono supportate,
-e una configurazione che ne dichiara due verrebbe interpretata come la richiesta di una struttura non supportata da Rebase. Se l'obiettivo era applicare un vincolo di unicità su più colonne, si deve utilizzare un [indice](/docs/backend/indexes) univoco.
+:::note[Chiavi primarie composite]
+Se imposti `isId` su più proprietà, queste formano una chiave composita: la tabella riceve
+un unico vincolo `PRIMARY KEY (a, b)`, e una riga viene indirizzata da tutti i suoi valori
+di chiave nell'ordine di dichiarazione, uniti da `:::` — `company_translation/1:::en_US`.
+Assegna a ogni colonna della chiave la strategia adatta: `isId: true` per un valore fornito
+dal chiamante, come la maggior parte delle colonne di una chiave composita, e mai
+`"increment"` su una chiave esterna o su una colonna di testo. Una chiave esterna è una
+singola colonna e non può puntare a una chiave composita, quindi una relazione o un
+riferimento *verso* una collection di questo tipo viene rifiutato durante la generazione
+dello schema. Se l'obiettivo era un vincolo di unicità su più colonne anziché l'identità
+della riga, si deve utilizzare un [indice](/docs/backend/indexes) univoco.
 :::
 
 ## Proprietà Number

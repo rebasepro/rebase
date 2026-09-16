@@ -12,7 +12,7 @@
  * imported would not be comparable with itself.
  *
  * It **throws** rather than guessing. A configuration no renderer can honour —
- * an empty enum, two `isId` properties, `isId: "cuid"`, an unknown
+ * an empty enum, `isId: "cuid"`, a foreign key into a composite key, an unknown
  * `columnType`, a relation to a collection that is not in the bundle, a
  * `search` block on a collection Postgres does not store — used to fail
  * differently in each of the three emitters, or not at all, and the failure
@@ -65,13 +65,13 @@ import {
     toSnakeCase
 } from "@rebasepro/utils";
 import {
-    assertSinglePrimaryKey,
     declaresEnumType,
     enumLabelsOf,
     getPrimaryKeyName,
     getPrimaryKeyProp,
     idColumnDefault,
     isIdProperty,
+    primaryKeyPropertyNames,
     resolveColumnName
 } from "../column-plan-helpers";
 import {
@@ -128,6 +128,10 @@ const bareTableName = (name: string): string => (name.includes(".") ? name.split
 const describe = (collection: CollectionConfig): string =>
     collection.slug ?? collection.name ?? "(unnamed)";
 
+/** A link, as a refusal names it: `relation "posts.author"`. */
+const linkLabel = (kind: string, collection: CollectionConfig, key: string): string =>
+    `${kind} "${describe(collection)}.${key}"`;
+
 /**
  * The `ON DELETE` a foreign key gets when the author did not say.
  *
@@ -175,9 +179,12 @@ const foreignKeyPlan = (
  * One function because it was three: the ladder was spelled inline in
  * `generatePostgresDdl`, again in `planJunctionTables` and a third time in the
  * Drizzle generator.
+ *
+ * @param via the link asking, named if the collection's key is composite and so
+ *   cannot be pointed at — see `getPrimaryKeyProp`.
  */
-export const primaryKeyPgType = (collection: CollectionConfig): PgType => {
-    const pk = getPrimaryKeyProp(collection);
+export const primaryKeyPgType = (collection: CollectionConfig, via: string): PgType => {
+    const pk = getPrimaryKeyProp(collection, via);
     if (pk.type === "number") return { kind: "integer" };
     return pk.isUuid ? { kind: "uuid" } : { kind: "text" };
 };
@@ -332,7 +339,7 @@ export const columnPgType = (
         case "relation":
         case "reference": {
             const target = linkTarget(propName, prop, collection, resolveCollection);
-            return target ? primaryKeyPgType(target) : { kind: "text" };
+            return target ? primaryKeyPgType(target, linkLabel(prop.type, collection, propName)) : { kind: "text" };
         }
         default:
             throw new Error(
@@ -502,7 +509,6 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // is not merely wasted output: `db push` would create it, and the doctor
     // would then report the store the collection actually reads from as drift.
     const collections = relationalCollections(allCollections);
-    collections.forEach(assertSinglePrimaryKey);
 
     const resolveCollection: ResolveCollection = (slug) =>
         collections.find(c => c.slug === slug || getTableName(c) === slug);
@@ -746,19 +752,7 @@ function planCollectionTable(
         }
     }
 
-    // A collection that declares no primary key gets an implicit `id TEXT
-    // PRIMARY KEY`, which is what `derivePrimaryKeys` reads back.
-    if (!columns.some(c => c.primaryKey)) {
-        columns.unshift({
-            key: "id",
-            column: "id",
-            type: { kind: "text" },
-            nullable: false,
-            primaryKey: true,
-            unique: false,
-            source: { kind: "implicit-id", slug: collection.slug }
-        });
-    }
+    const primaryKey = planPrimaryKey(collection, columns);
 
     const injected = new Set(getInjectedSecurityRules(collection).map(rule => rule.name));
     const policies = getEffectiveSecurityRules(collection).flatMap((rule, index) =>
@@ -774,7 +768,7 @@ function planCollectionTable(
     // The policy is already above — `getEffectiveSecurityRules` injects it, so
     // it compiles, names and renders like every other rule. What is left is the
     // half a rule cannot express: the column is NOT NULL, and it is indexed.
-    const tenantIndexes = applyTenantColumnEffects(collection, columns, schema, table);
+    const tenantIndexes = applyTenantColumnEffects(collection, columns, primaryKey, schema, table);
 
     return {
         schema,
@@ -785,7 +779,7 @@ function planCollectionTable(
         kind: "collection",
         slug: collection.slug,
         columns,
-        primaryKey: columns.filter(c => c.primaryKey).map(c => c.column),
+        primaryKey,
         indexes: [...buildCollectionIndexSpecs(collection, resolveColumnName), ...tenantIndexes],
         search,
         vector: buildVectorIndexPlan(collection, resolveColumnName),
@@ -794,6 +788,56 @@ function planCollectionTable(
         triggers,
         auth
     };
+}
+
+/**
+ * The table's primary key, as the column names {@link TablePlan.primaryKey}
+ * lists — and the columns adjusted to state it one way only.
+ *
+ * One `isId` property is a key column of its own, declared inline
+ * (`"id" INTEGER PRIMARY KEY`, `.primaryKey()`), which is how
+ * {@link planPropertyColumn} planned it. Several are one composite key, and a
+ * composite key cannot be said column by column: two inline `PRIMARY KEY`
+ * clauses are two primary keys, which Postgres refuses. So each member stops
+ * being a key of its own, keeps NOT NULL (the constraint implies it, and every
+ * emitter spells it on the column so the three read the same), and the table
+ * gets one `PRIMARY KEY (a, b)` over the list returned here — the shape a
+ * junction's key has always had.
+ *
+ * A collection that declares no key gets an implicit `id TEXT PRIMARY KEY`,
+ * which is what `getPrimaryKeys` reads back.
+ */
+function planPrimaryKey(collection: CollectionConfig, columns: ColumnPlan[]): string[] {
+    const keyNames = primaryKeyPropertyNames(collection);
+
+    if (keyNames.length > 1) {
+        return keyNames.map(name => {
+            const column = columns.find(c => c.source.propName === name && !c.columnOwnedByProperty);
+            if (!column) {
+                throw new Error(
+                    `Property "${name}" of collection "${describe(collection)}" is marked \`isId\`, and it puts ` +
+                    "no column on this table, so it cannot be part of the table's primary key. Mark the " +
+                    "property that holds the column instead."
+                );
+            }
+            column.primaryKey = false;
+            column.nullable = false;
+            return column.column;
+        });
+    }
+
+    if (!columns.some(c => c.primaryKey)) {
+        columns.unshift({
+            key: "id",
+            column: "id",
+            type: { kind: "text" },
+            nullable: false,
+            primaryKey: true,
+            unique: false,
+            source: { kind: "implicit-id", slug: collection.slug }
+        });
+    }
+    return columns.filter(c => c.primaryKey).map(c => c.column);
 }
 
 /** What {@link planPropertyColumn} needs about the table the column lands on. */
@@ -910,6 +954,7 @@ function planPropertyColumn(
 function applyTenantColumnEffects(
     collection: CollectionConfig,
     columns: ColumnPlan[],
+    primaryKey: string[],
     schema: string,
     table: string
 ): CollectionIndexSpec[] {
@@ -925,10 +970,12 @@ function applyTenantColumnEffects(
         );
     }
 
-    // A primary key is already NOT NULL and already indexed by `<table>_pkey`.
-    // Saying either again would make `db push` plan a constraint and an index
-    // the database has no reason to hold.
-    if (column.primaryKey) return [];
+    // The leading column of the primary key is already NOT NULL and already
+    // indexed by `<table>_pkey`. Saying either again would make `db push` plan
+    // a constraint and an index the database has no reason to hold. A later
+    // column of a composite key is NOT NULL too, but `<table>_pkey` cannot
+    // serve a lookup on it alone, so it still gets its index.
+    if (primaryKey[0] === column.column) return [];
 
     column.nullable = false;
 
@@ -1020,11 +1067,12 @@ function planRelationColumn(
     const relationName = prop.relation?.relationName ?? propName;
     const legacyKey = legacyForeignKeyName(relationName);
     const derived = relation.localKey === generateForeignKeyName(relationName);
+    const via = linkLabel("relation", collection, propName);
 
     return {
         key: fkFieldKey,
         column: relation.localKey,
-        type: primaryKeyPgType(target),
+        type: primaryKeyPgType(target, via),
         nullable: !required,
         primaryKey: false,
         // `validation.unique` on a link is a one-to-one, and all three emitters
@@ -1039,7 +1087,7 @@ function planRelationColumn(
             column: relation.localKey,
             targetSchema: schemaOf(target),
             targetTable: bareTableName(getTableName(target)),
-            targetColumn: getPrimaryKeyName(target),
+            targetColumn: getPrimaryKeyName(target, via),
             onDelete: relation.onDelete ?? defaultBelongsToOnDelete(required),
             onUpdate: relation.onUpdate
         }),
@@ -1062,13 +1110,14 @@ function planReferenceColumn(
     const target = prop.path ? resolveCollection(prop.path) : undefined;
     const column = resolveColumnName(propName, prop as Property);
     const required = prop.validation?.required === true;
+    const via = linkLabel("reference", collection, propName);
 
     return {
         key: propName,
         column,
         // A `reference` whose target is not in the bundle keeps its column (the
         // id is still a string) and gets no constraint.
-        type: target ? primaryKeyPgType(target) : { kind: "text" },
+        type: target ? primaryKeyPgType(target, via) : { kind: "text" },
         nullable: !required,
         primaryKey: false,
         unique: prop.validation?.unique === true,
@@ -1079,7 +1128,7 @@ function planReferenceColumn(
                 column,
                 targetSchema: schemaOf(target),
                 targetTable: bareTableName(getTableName(target)),
-                targetColumn: getPrimaryKeyName(target),
+                targetColumn: getPrimaryKeyName(target, via),
                 // The same rule as `belongsTo`, from the same function. A
                 // `reference` carries no `onDelete` of its own to override it.
                 onDelete: defaultBelongsToOnDelete(required)
@@ -1153,10 +1202,11 @@ function planJunctionTable(
         return column === generateForeignKeyName(slug) && legacy !== column ? legacy : undefined;
     };
 
+    const via = linkLabel("relation", source, relation.relationName);
     const endpoint = (collection: CollectionConfig, column: string): ColumnPlan => ({
         key: column,
         column,
-        type: primaryKeyPgType(collection),
+        type: primaryKeyPgType(collection, via),
         nullable: false,
         // Part of the composite key on {@link TablePlan.primaryKey}, not a
         // key of its own — an inline `PRIMARY KEY` here would be a second one.
@@ -1169,7 +1219,7 @@ function planJunctionTable(
             column,
             targetSchema: schemaOf(collection),
             targetTable: bareTableName(getTableName(collection)),
-            targetColumn: getPrimaryKeyName(collection),
+            targetColumn: getPrimaryKeyName(collection, via),
             onDelete
         }),
         source: { kind: "junction-key" }
@@ -1263,6 +1313,7 @@ function planRelations(
             const { relation, source } = entry.junction;
             if (!isManyToMany(relation)) continue;
             const target = relation.target();
+            const via = linkLabel("relation", source, relation.relationName);
             // The owning relation's name, shared with the source table's
             // `many(junction, { relationName })`.
             const owningRelationName = relation.relationName ?? toSnakeCase(getTableName(target));
@@ -1287,7 +1338,7 @@ function planRelations(
                 targetVar: getTableVarName(getTableName(source)),
                 relationName: owningRelationName,
                 fields: [relation.through.sourceColumn],
-                references: [getPrimaryKeyName(source)]
+                references: [getPrimaryKeyName(source, via)]
             });
             plans.push({
                 tableVar,
@@ -1296,7 +1347,7 @@ function planRelations(
                 targetVar: getTableVarName(getTableName(target)),
                 relationName: inverseRelationName ?? `${tableName}_${relation.through.targetColumn}`,
                 fields: [relation.through.targetColumn],
-                references: [getPrimaryKeyName(target)]
+                references: [getPrimaryKeyName(target, via)]
             });
             continue;
         }
@@ -1333,7 +1384,7 @@ function planRelations(
                         // and emitting the column produces a file that does not
                         // compile.
                         fields: [fieldKeyForColumn(collection, relation.localKey)],
-                        references: [getPrimaryKeyName(target)]
+                        references: [getPrimaryKeyName(target, linkLabel("relation", collection, key))]
                     });
                     break;
                 case "hasOne":
@@ -1395,7 +1446,7 @@ function planRelations(
                     // unless the link names another one with `sourceKey`.
                     references: [otherRel.sourceKey
                         ? fieldKeyForColumn(other, otherRel.sourceKey)
-                        : getPrimaryKeyName(other)]
+                        : getPrimaryKeyName(other, linkLabel("relation", other, otherRel.relationName))]
                 });
             }
         }

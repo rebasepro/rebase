@@ -1313,15 +1313,12 @@ function checkTenant(
 /**
  * The primary key, against what a SQL store can actually be given.
  *
- * Three claims a collection can make that no generator can honour, each of
- * which used to be discovered somewhere worse:
+ * Several `isId` properties are not a problem: they are one composite primary
+ * key, which every schema emitter writes as a single `PRIMARY KEY (a, b)`
+ * constraint and every read and write addresses by all of its columns (the
+ * address is `a:::b`). This checks the two strategies no generator honours as
+ * written, each of which used to be discovered somewhere worse:
  *
- * - **Two `isId` properties.** Rebase does not model a composite primary key,
- *   and the three emitters each invented a different wrong answer: two
- *   `.primaryKey()` columns in the generated Drizzle file, two inline
- *   `PRIMARY KEY` clauses in one `CREATE TABLE` (which Postgres refuses), and a
- *   boot-time ensure that created the table with the *first* id and silently
- *   never added the second column at all.
  * - **`isId: "cuid"`.** It has always emitted `DEFAULT cuid()` against a
  *   function Rebase has never created — not by a generator, not at boot, not in
  *   a migration — so the column has never had a working default on Postgres and
@@ -1346,17 +1343,6 @@ function checkPrimaryKeyStrategy(
     const ids = Object.entries(collection.properties)
         .filter(([, property]) => isPlainObject(property) && Boolean(property.isId))
         .map(([key, property]) => [key, property as Record<string, unknown>] as const);
-
-    if (ids.length > 1) {
-        collect.error(
-            `${at}.properties`,
-            `${ids.length} properties are marked \`isId\` (${ids.map(([key]) => `\`${key}\``).join(", ")}), ` +
-            "and composite primary keys are not supported: the generated table would carry two PRIMARY KEY " +
-            "clauses, which Postgres refuses, and the boot-time schema ensure would create the table without " +
-            "the second column. Give exactly one property `isId`, and express the second key with " +
-            "`indexes: [{ on: [...], unique: true, reason: \"…\" }]`."
-        );
-    }
 
     for (const [key, property] of ids) {
         if (property.isId === "cuid") {

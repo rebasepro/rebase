@@ -367,9 +367,8 @@ describe("enum ids and labels", () => {
 /**
  * A primary key a SQL store cannot be given.
  *
- * All three of these produced something rather than an error: a table Postgres
- * refuses (or, at boot, one silently missing a column), and a default calling a
- * function that does not exist.
+ * Each refusal here produced something rather than an error: a default calling
+ * a function that does not exist, or a column width nothing reads.
  */
 describe("primary keys a generator cannot honour", () => {
     const withIds = (properties: Record<string, unknown>) => {
@@ -377,16 +376,14 @@ describe("primary keys a generator cannot honour", () => {
         return { ...collection, properties: { ...collection.properties, ...properties } };
     };
 
-    it("errors on two `isId` properties, naming both", () => {
-        const [problem] = errors([withIds({
-            id: { name: "ID", type: "string", isId: true },
-            tenant: { name: "Tenant", type: "string", isId: true }
-        })]);
-
-        expect(problem?.path).toBe("posts.properties");
-        expect(problem?.message).toContain("composite primary keys are not supported");
-        expect(problem?.message).toContain("`id`");
-        expect(problem?.message).toContain("`tenant`");
+    it("accepts several `isId` properties as one composite key", () => {
+        // `company_translation (id integer, locale varchar, PRIMARY KEY (id,
+        // locale))`: every emitter writes one `PRIMARY KEY (id, locale)`, and
+        // rows are addressed as `1:::en_US`. A config that says so must boot.
+        expect(findCollectionConfigProblems([withIds({
+            id: { name: "ID", type: "number", isId: true },
+            locale: { name: "Locale", type: "string", isId: true }
+        })])).toEqual([]);
     });
 
     it("errors on `isId: \"cuid\"`, and says what to use instead", () => {

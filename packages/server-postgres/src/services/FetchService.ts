@@ -14,7 +14,10 @@ import {
     parseIdValues,
     idCanAddressTable,
     buildCompositeId,
-    COMPOSITE_ID_SEPARATOR
+    primaryKeyColumns,
+    rowAddressCondition,
+    COMPOSITE_ID_SEPARATOR,
+    type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer, normalizeDbValues } from "../data-transformer";
 import { RelationService } from "./RelationService";
@@ -341,15 +344,17 @@ target });
     }
 
     /**
-     * The full `ORDER BY`: the caller's keys, then the id.
+     * The full `ORDER BY`: the caller's keys, then the primary key.
      *
-     * The id is always last and always descending. It is not decoration — it is
+     * The key is always last and always descending — every column of it, for a
+     * composite key, because one column of a composite key is not unique and
+     * breaks no ties among the rows that share it. It is not decoration — it is
      * what makes the ordering *total*, and a cursor over a non-total order
      * repeats and skips rows among the ties. Every keyset comparison built by
-     * {@link buildCursorConditions} ends on the same `id DESC`, and the two have
-     * to agree: they did not, and an ascending sort paged with `id >` against an
-     * `ORDER BY … , id DESC`, so rows sharing a sort value were dropped from
-     * every page after the first.
+     * {@link buildCursorConditions} ends on the same key, descending, and the
+     * two have to agree: an ascending sort paged with `id >` against an
+     * `ORDER BY … , id DESC` drops rows sharing a sort value from every page
+     * after the first.
      *
      * Where the NULLs go is written out rather than inherited. Postgres already
      * defaults to `NULLS LAST` ascending and `NULLS FIRST` descending, so this
@@ -362,7 +367,7 @@ target });
      */
     private buildOrderExpressions(
         keys: ResolvedOrderKey[],
-        idField: AnyPgColumn,
+        keyColumns: AnyPgColumn[],
         /**
          * Append the primary key as a final tie-breaker.
          *
@@ -386,7 +391,7 @@ target });
             }
             return nullsLast ? sql`${key.target} DESC NULLS LAST` : sql`${key.target} DESC NULLS FIRST`;
         });
-        if (tieBreakOnId) expressions.push(desc(idField));
+        if (tieBreakOnId) expressions.push(...keyColumns.map(column => desc(column)));
         return expressions as SQL[];
     }
 
@@ -898,9 +903,12 @@ target });
             if (pks.length === 0) return undefined;
             const address = buildCompositeId(row, pks);
             if (!address || !address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) return undefined;
-            // The single-key value, not the composite token: the keyset
-            // comparison compares it against the id *column*.
-            return encodeCursor(orderBy, row, row[pks[0].fieldName]);
+            // A single key travels as its own value, typed as the column
+            // returned it, and is compared against that column as it is. A
+            // composite key travels as its address, which the keyset comparison
+            // parses back into every key column: the first column alone is
+            // shared by several rows, and a cursor on it skips all but one.
+            return encodeCursor(orderBy, row, pks.length === 1 ? row[pks[0].fieldName] : address);
         } catch {
             // A path with no registered collection — a nested or derived one.
             // No cursor is the honest answer; the listing pages by offset.
@@ -917,7 +925,8 @@ target });
         row: Record<string, unknown>,
         collection: CollectionConfig,
         collectionPath: string,
-        parsedId: string | number,
+        /** The row's address — every key column, which the relation service parses. */
+        id: string | number,
         _databaseId?: string
     ): Promise<void> {
         const resolvedRelations = resolveCollectionRelations(collection);
@@ -928,7 +937,7 @@ target });
                 try {
                     const relatedRows = await this.relationService.fetchRelatedEntities(
                         collectionPath,
-                        parsedId,
+                        id,
                         key,
                         { limit: relation.cardinality === "one" ? 1 : undefined }
                     );
@@ -961,20 +970,22 @@ target });
      * Extract cursor pagination conditions from startAfter options.
      *
      * "Every row that sorts after this one", written out as a comparison over
-     * the same keys the `ORDER BY` uses and ending on the same `id DESC`. With
-     * one key that is the familiar `k > v OR (k = v AND id < cursorId)`; with
-     * several it nests, each key's tie handing the decision to the next.
+     * the same keys the `ORDER BY` uses and ending on the same primary key,
+     * descending. With one sort key that is the familiar
+     * `k > v OR (k = v AND id < cursorId)`; with several it nests, each key's
+     * tie handing the decision to the next.
      */
     private buildCursorConditions(
         table: PgTable<any>,
-        idField: AnyPgColumn,
-        idInfo: { fieldName: string; type: "string" | "number" },
+        keyColumns: AnyPgColumn[],
+        primaryKeys: PrimaryKeyInfo[],
         options: { orderBy?: string | OrderByTuple[]; order?: "desc" | "asc"; startAfter?: Record<string, unknown> },
         collectionPath?: string
     ): SQL[] {
         if (!options.startAfter) return [];
         const cursor = options.startAfter;
         const keys = normalizeDriverOrderBy(options.orderBy, options.order);
+        const startAfterId = FetchService.cursorAddress(cursor, primaryKeys);
 
         if (keys) {
             // Relevance is computed per query, not stored, so there is no value
@@ -993,7 +1004,6 @@ target });
                 );
             }
             const collection = collectionPath ? getCollectionByPath(collectionPath, this.registry) : undefined;
-            const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
             const resolved = this.resolveOrderKeys(
                 table, keys, collection, undefined, collectionPath,
                 // A null id addresses no row, so pinning a subquery to it would
@@ -1021,23 +1031,66 @@ target });
                 // falls through to no cursor condition, which is what a single
                 // missing sort value has always done here.
                 if (values.every((value, i) => resolved[i].cursorTarget || value !== undefined)) {
-                    return [this.buildKeysetComparison(resolved, values, idField, startAfterId)];
+                    return [this.buildKeysetComparison(
+                        resolved, values, keyColumns, FetchService.cursorKey(startAfterId, primaryKeys)
+                    )];
                 }
             }
-        } else {
-            const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
-            if (startAfterId !== undefined && startAfterId !== null) {
-                const idInfoArray = [idInfo] as Array<{ fieldName: string; type: "string" | "number" }>;
-                const parsedStartAfterIdObj = parseIdValues(startAfterId as string | number, idInfoArray);
-                return [lt(idField, parsedStartAfterIdObj[idInfo.fieldName])];
-            }
+        } else if (startAfterId !== undefined && startAfterId !== null) {
+            return [FetchService.afterOnKey(keyColumns, FetchService.cursorKey(startAfterId, primaryKeys))];
         }
 
         return [];
     }
 
     /**
-     * "Sorts strictly after the cursor row", over `keys` and then the id.
+     * The address of the row a cursor continues after.
+     *
+     * `id` is how `cursorToStartAfter` hands it over: the key's value for a
+     * single key, the address for a composite one (see {@link cursorFor}). A
+     * `startAfter` that is the row itself carries its key columns instead.
+     */
+    private static cursorAddress(cursor: Record<string, unknown>, primaryKeys: PrimaryKeyInfo[]): unknown {
+        if (cursor.id !== undefined) return cursor.id;
+        if (primaryKeys.length === 1) return cursor[primaryKeys[0].fieldName];
+        const complete = primaryKeys.every(pk => cursor[pk.fieldName] !== undefined && cursor[pk.fieldName] !== null);
+        return complete ? buildCompositeId(cursor, primaryKeys) : undefined;
+    }
+
+    /** The cursor row's key values, in key order, each typed as its column. */
+    private static cursorKey(address: unknown, primaryKeys: PrimaryKeyInfo[]): unknown[] {
+        if (typeof address === "string" || typeof address === "number") {
+            const values = parseIdValues(address, primaryKeys);
+            return primaryKeys.map(pk => values[pk.fieldName]);
+        }
+        // A single key whose value is neither — a `Date`, which the cursor codec
+        // round-trips for a timestamp key — is compared as the cursor carried it.
+        if (primaryKeys.length === 1) return [address];
+        throw ApiError.badRequest(
+            "The `after` cursor names no row: a composite key travels as its address, and this cursor carries " +
+            "something else. Pass back the `meta.nextCursor` from the previous page unchanged.",
+            "INVALID_CURSOR"
+        );
+    }
+
+    /**
+     * "Sorts after the cursor row on the primary key", which the `ORDER BY`
+     * runs descending — so a smaller key.
+     *
+     * Over several columns it is the row comparison `(a, b) < (x, y)` written
+     * out: smaller on the first column, or equal there and smaller on the next.
+     * Key columns are NOT NULL and all run the same direction, so no NULL
+     * placement enters into it. One key column is `id < cursorId`.
+     */
+    private static afterOnKey(keyColumns: AnyPgColumn[], cursorKey: unknown[], index = 0): SQL {
+        const column = keyColumns[index];
+        const value = cursorKey[index];
+        if (index >= keyColumns.length - 1) return lt(column, value);
+        return or(lt(column, value), and(eq(column, value), FetchService.afterOnKey(keyColumns, cursorKey, index + 1)))!;
+    }
+
+    /**
+     * "Sorts strictly after the cursor row", over `keys` and then the primary key.
      *
      * Built by recursion rather than as a row-value comparison — `(a, b) > (x, y)`
      * would be shorter, but it is only correct when every key runs the same
@@ -1052,13 +1105,12 @@ target });
     private buildKeysetComparison(
         keys: ResolvedOrderKey[],
         values: unknown[],
-        idField: AnyPgColumn,
-        cursorId: unknown,
+        keyColumns: AnyPgColumn[],
+        cursorKey: unknown[],
         index = 0
     ): SQL {
-        // Past the last key, the id settles it. It is ordered `DESC`, so "after"
-        // the cursor row means a smaller id.
-        if (index >= keys.length) return lt(idField, cursorId);
+        // Past the last sort key, the primary key settles it.
+        if (index >= keys.length) return FetchService.afterOnKey(keyColumns, cursorKey);
 
         const { direction, cursorTarget } = keys[index];
         // Which end the NULLs sort at — the direction's convention unless the
@@ -1073,7 +1125,7 @@ target });
         // here rather than at the call site.
         const target = keys[index].target as AnyPgColumn;
         const value = values[index];
-        const rest = this.buildKeysetComparison(keys, values, idField, cursorId, index + 1);
+        const rest = this.buildKeysetComparison(keys, values, keyColumns, cursorKey, index + 1);
 
         // No stored value to compare against — the cursor row's is recomputed
         // by an expression instead, and whether it is NULL is a question only
@@ -1145,17 +1197,19 @@ target });
      */
     private buildRelationScope(hop: NestedPathHop): SQL {
         const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
-        const parentIdInfo = parentPks[0];
-        const parsedParentId = parseIdValues(hop.parentId, parentPks)[parentIdInfo.fieldName];
+        const parsedParent = parseIdValues(hop.parentId, parentPks);
+        // What a single-column link compares against. A link from a composite
+        // key has no such value, and `findRelationDefects` refuses one at boot.
+        const parsedParentId = parsedParent[parentPks[0].fieldName];
 
+        // The parent row by every key column, for the shapes that read it.
         const parent = () => {
             const table = getTableForCollection(hop.parentCollection, this.registry);
-            const idColumn = table[parentIdInfo.fieldName as keyof typeof table] as AnyPgColumn;
-            if (!idColumn) {
-                throw new Error(`ID field '${parentIdInfo.fieldName}' not found in table for collection '${hop.parentCollection.slug}'`);
-            }
-            return { table,
-idColumn };
+            const columns = primaryKeyColumns(table, parentPks, hop.parentCollection.slug);
+            return {
+                table,
+                key: columns.map((column, i) => ({ column, value: parsedParent[parentPks[i].fieldName] }))
+            };
         };
 
         const targetTable = getTableForCollection(hop.targetCollection, this.registry);
@@ -1206,20 +1260,14 @@ idColumn };
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
-
-        if (!idField) {
-            throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
-        }
 
         // An address the key columns cannot hold names no row — the same answer
         // as a well-formed id nobody has. Asking Postgres instead raises 22P02
         // and aborts the transaction around this read.
         if (!idCanAddressTable(id, table, idInfoArray)) return undefined;
 
-        const parsedIdObj = parseIdValues(id, idInfoArray);
-        const parsedId = parsedIdObj[idInfo.fieldName];
+        // Every key column, not the first: `1:::en_US` and `1:::de_DE` share it.
+        const rowCondition = rowAddressCondition(table, idInfoArray, id, collectionPath);
 
         // Primary path: use db.query.findFirst with relation loading
 
@@ -1236,7 +1284,7 @@ idColumn };
                     // Soft delete: a stamped row answers 404 like any other
                     // absent one, so `findById` and `find` agree about which
                     // rows exist.
-                    where: andSoftDelete(eq(idField, parsedId), collection, table, withDeleted),
+                    where: andSoftDelete(rowCondition, collection, table, withDeleted),
                     with: withConfig,
                     ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
@@ -1246,7 +1294,7 @@ idColumn };
                 const flatRow = toFlatRow(row, collection, this.registry);
 
                 // Post-fetch joinPath relations that Drizzle's `with` can't express
-                await this.resolveJoinPathRelations<M>(flatRow, collection, collectionPath, parsedId, databaseId);
+                await this.resolveJoinPathRelations<M>(flatRow, collection, collectionPath, id, databaseId);
 
                 return flatRow;
             } catch (e) {
@@ -1264,7 +1312,7 @@ idColumn };
         const result = await this.db
             .select(visibleOne as never)
             .from(table)
-            .where(andSoftDelete(eq(idField, parsedId), collection, table, withDeleted))
+            .where(andSoftDelete(rowCondition, collection, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return undefined;
@@ -1280,9 +1328,11 @@ idColumn };
             .filter(([key]) => propertyKeys.has(key))
             .map(async ([key, relation]) => {
                 if (relation.cardinality === "many") {
+                    // The row's address, which the relation service parses into
+                    // every key column itself.
                     const relatedRows = await this.relationService.fetchRelatedEntities(
                         collectionPath,
-                        parsedId,
+                        id,
                         key,
                         {}
                     );
@@ -1294,7 +1344,7 @@ idColumn };
                         try {
                             const relatedRows = await this.relationService.fetchRelatedEntities(
                                 collectionPath,
-                                parsedId,
+                                id,
                                 key,
                                 { limit: 1 }
                             );
@@ -1367,11 +1417,6 @@ idColumn };
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
-
-        if (!idField) {
-            throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
-        }
 
         // ONE read, then relations.
         //
@@ -1760,20 +1805,17 @@ relatedTo: hop });
 
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
         const field = table[fieldName as keyof typeof table] as AnyPgColumn;
 
         if (!field) return true;
 
-        const parsedExcludeId = excludeEntityId ? parseIdValues(excludeEntityId, idInfoArray)[idInfo.fieldName] : undefined;
-        const conditions = DrizzleConditionBuilder.buildUniqueFieldCondition(
-            field,
-            value,
-            idField,
-            parsedExcludeId
-        );
+        // The row being edited, by every key column: excluding it by the first
+        // one alone would also exclude every row that shares it, and a
+        // duplicate held by `1:::de_DE` would pass the check for `1:::en_US`.
+        const excludedRow = excludeEntityId
+            ? rowAddressCondition(table, requirePrimaryKeys(collection, this.registry), excludeEntityId, collectionPath)
+            : undefined;
+        const conditions = DrizzleConditionBuilder.buildUniqueFieldCondition(field, value, excludedRow);
 
         const result = await this.db
             .select({ count: count() })
@@ -1906,14 +1948,14 @@ relatedTo: hop }, include
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
         // See `fetchOne`: an unaddressable id is a 404, not a database error.
         if (!idCanAddressTable(id, table, idInfoArray)) return null;
 
-        const parsedIdObj = parseIdValues(id, idInfoArray);
-        const parsedId = parsedIdObj[idInfo.fieldName];
+        // Every key column. This is also the read-back a save answers with, so
+        // a condition on the first column alone would answer a write to
+        // `1:::en_US` with `1:::de_DE`.
+        const rowCondition = rowAddressCondition(table, idInfoArray, id, collectionPath);
 
         // Soft delete: a stamped row is a 404 through the REST read too, so
         // `GET /:id` and the listing agree about which rows exist.
@@ -1922,7 +1964,7 @@ relatedTo: hop }, include
         const result = await this.db
             .select(projection as never)
             .from(table)
-            .where(andSoftDelete(eq(idField, parsedId), collection, table, withDeleted))
+            .where(andSoftDelete(rowCondition, collection, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return null;
@@ -1977,8 +2019,7 @@ relatedTo: hop }, include
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
+        const keyColumns = primaryKeyColumns(table, idInfoArray, collectionPath);
 
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
@@ -2097,10 +2138,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
         // Vector search overrides ORDER BY with distance (ascending = closest first)
         const orderExpressions = vectorMeta
-            ? [asc(vectorMeta.orderBy), desc(idField)]
+            ? [asc(vectorMeta.orderBy), ...keyColumns.map(column => desc(column))]
             : this.buildOrderExpressions(
                 this.resolveOrderKeys(table, sortKeys, collection, options.searchString),
-                idField,
+                keyColumns,
                 !wantsDistinct
             );
         if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
@@ -2111,7 +2152,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             // `?after=` reached the driver and paged nothing: the cursor was
             // decoded, handed over, and dropped one function short of the
             // comparison built to consume it.
-            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
+            const cursorConditions = this.buildCursorConditions(table, keyColumns, idInfoArray, options, collectionPath);
             if (cursorConditions.length > 0) {
                 allConditions.push(...cursorConditions);
                 const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);

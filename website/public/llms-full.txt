@@ -11259,12 +11259,17 @@ There is no foreign key. The uid is a string, the user store may be another
 database entirely, and a deleted user must not take the audit trail with them —
 declare a [relation](/docs/collections/relations) if you want the join.
 
-:::note[One primary key per collection]
-`isId` may be claimed by exactly one property. A second is refused at config
-load rather than silently ignored: composite primary keys are not supported, and
-a config declaring two has to be read as asking for one Rebase cannot build. If
-what you wanted was a uniqueness constraint over several columns, that is a
-unique [index](/docs/backend/indexes).
+:::note[Composite primary keys]
+Mark several properties `isId` and they are one composite key: the table gets a
+single `PRIMARY KEY (a, b)` constraint, and a row is addressed by all of its key
+values in declaration order, joined with `:::` — `company_translation/1:::en_US`.
+Give each key column the strategy that fits it: `isId: true` for a value the
+caller supplies, which is every column of most composite keys, and never
+`"increment"` on a foreign key or a string column. A foreign key is one column and
+cannot point at a composite key, so a relation or reference *into* such a
+collection is refused when the schema is generated. If what you wanted was a
+uniqueness constraint over several columns rather than the row's identity, that
+is a unique [index](/docs/backend/indexes).
 :::
 
 ### Number Properties

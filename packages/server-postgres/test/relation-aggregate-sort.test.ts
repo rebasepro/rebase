@@ -274,8 +274,8 @@ describe("where the rows with nothing to aggregate land", () => {
     const orderExpressions = (
         keys: { field: string; direction: "asc" | "desc"; target: AnyPgColumn | SQL }[]
     ): SQL[] => (service as unknown as {
-        buildOrderExpressions(k: unknown[], idField: AnyPgColumn): SQL[]
-    }).buildOrderExpressions(keys, talentsTable.id);
+        buildOrderExpressions(k: unknown[], keyColumns: AnyPgColumn[]): SQL[]
+    }).buildOrderExpressions(keys, [talentsTable.id]);
 
     it("puts NULLs last ascending and first descending, explicitly", () => {
         // Postgres already defaults this way, so the clause changes no query —
@@ -322,13 +322,13 @@ describe("paging over an aggregate sort", () => {
         );
         return render((service as unknown as {
             buildKeysetComparison(
-                keys: unknown[], values: unknown[], idField: AnyPgColumn, cursorId: unknown
+                keys: unknown[], values: unknown[], keyColumns: AnyPgColumn[], cursorKey: unknown[]
             ): SQL
         }).buildKeysetComparison(
             [{ field: "min(applications.created_at)", direction, target, cursorTarget }],
             [null],
-            talentsTable.id,
-            42
+            [talentsTable.id],
+            [42]
         ));
     };
 

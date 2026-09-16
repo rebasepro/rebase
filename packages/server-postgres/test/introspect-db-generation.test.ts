@@ -160,6 +160,45 @@ udt_name: "int4" })
             expect(result).toContain("composite primary key");
             expect(result).toContain("user_id, game_id");
         });
+
+        it("marks every column of a composite key `isId: true`, a number and a string alike", () => {
+            // Unmarked, the admin resolves no address for the rows and the
+            // server warns at boot; marked with a generating strategy, the
+            // admin withholds the fields on create and the insert has no key.
+            const meta = makeSimpleTable("company_translation", [
+                mkCol("company_translation", "id", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" }),
+                mkCol("company_translation", "locale", { data_type: "character varying",
+udt_name: "varchar",
+is_nullable: "NO" }),
+                mkCol("company_translation", "name", { data_type: "text",
+udt_name: "text" })
+            ], ["id", "locale"]);
+            const result = generateCollectionFile(
+                "company_translation", meta, [], new Set(), new Map([["company_translation", meta]]), new Map()
+            );
+            expect(result.match(/isId: true,/g)).toHaveLength(2);
+            expect(result).not.toContain("isId: \"increment\"");
+            expect(result).not.toContain("isId: \"uuid\"");
+        });
+
+        it("marks none of a composite key's columns when one of them cannot carry `isId`", () => {
+            // pagila's `payment` is keyed on `(payment_id, payment_date)`. A date
+            // property has no `isId`, and marking `payment_id` alone would make
+            // it the whole key — so the key is left to the table's constraint.
+            const meta = makeSimpleTable("payment", [
+                mkCol("payment", "payment_id", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" }),
+                mkCol("payment", "payment_date", { data_type: "timestamp with time zone",
+udt_name: "timestamptz",
+is_nullable: "NO" })
+            ], ["payment_id", "payment_date"]);
+            const result = generateCollectionFile("payment", meta, [], new Set(), new Map([["payment", meta]]), new Map());
+            expect(result).toContain("composite primary key");
+            expect(result).not.toContain("isId");
+        });
     });
 
     describe("validation.required", () => {

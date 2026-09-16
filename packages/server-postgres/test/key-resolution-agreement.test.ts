@@ -1,3 +1,4 @@
+import { integer, pgTable, primaryKey, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { resolvePrimaryKeys } from "@rebasepro/common";
 import {
@@ -224,6 +225,124 @@ isId: true },
             expect(shadowedMessage).toContain("route wrong");
             expect(shadowedMessage).toContain("shadowed");
             expect(shadowedMessage).not.toContain("drizzle_only");
+        });
+
+        /**
+         * The strategy it suggests has to fit the column. `"increment"` and
+         * `"uuid"` tell the admin the database generates the value, so it
+         * withholds the field on create — on a column the database does not
+         * generate, the insert then fails on a NULL key. It used to suggest
+         * `"increment"` for every integer key, and the same strategy for every
+         * column of a composite key, so `company_translation (id, locale)` was
+         * told to mark a foreign key and a varchar as increment keys.
+         */
+        describe("the strategy it suggests for each column", () => {
+            const catalogue = new PostgresCollectionRegistry();
+            catalogue.registerTable(pgTable("companies", {
+                id: integer("id").primaryKey(),
+                name: varchar("name")
+            }), "companies");
+            catalogue.registerTable(pgTable("company_translation", {
+                id: integer("id").notNull(),
+                locale: varchar("locale").notNull(),
+                name: varchar("name")
+            }, table => [primaryKey({ columns: [table.id, table.locale] })]), "company_translation");
+            catalogue.registerTable(pgTable("company_details", {
+                companyId: integer("company_id").primaryKey(),
+                founded: integer("founded")
+            }), "company_details");
+            catalogue.registerTable(pgTable("counters", {
+                seq: integer("seq").primaryKey(),
+                label: varchar("label")
+            }), "counters");
+
+            const companies: CollectionConfig = {
+                slug: "companies", name: "Companies", table: "companies",
+                properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
+            };
+            const translations: CollectionConfig = {
+                slug: "company_translation", name: "Company translations", table: "company_translation",
+                properties: {
+                    id: { type: "number" },
+                    locale: { type: "string" },
+                    name: { type: "string" },
+                    company: {
+                        type: "relation",
+                        relation: { kind: "belongsTo", target: () => companies, relationName: "company", localKey: "id" }
+                    }
+                }
+            };
+            // Keyed by its foreign key: one row of details per company.
+            const details: CollectionConfig = {
+                slug: "company_details", name: "Company details", table: "company_details",
+                properties: {
+                    companyId: { type: "number", columnName: "company_id" },
+                    founded: { type: "number" },
+                    company: {
+                        type: "relation",
+                        relation: { kind: "belongsTo", target: () => companies, relationName: "company", localKey: "company_id" }
+                    }
+                }
+            };
+            const counters: CollectionConfig = {
+                slug: "counters", name: "Counters", table: "counters",
+                properties: { seq: { type: "number" }, label: { type: "string" } }
+            };
+
+            const warningsFor = (collections: CollectionConfig[]): string => {
+                const warn = jest.fn();
+                jest.spyOn(require("@rebasepro/server").logger, "warn").mockImplementation(warn);
+                warnOnKeysTheAdminCannotResolve(collections, catalogue);
+                return warn.mock.calls.map(call => call[0] as string).join("\n");
+            };
+
+            it("resolves a composite key from the table's constraint, in key order", () => {
+                expect(getPrimaryKeys(translations, catalogue).map(k => k.fieldName)).toEqual(["id", "locale"]);
+            });
+
+            it("marks every column of a composite key `isId: true`, and says how its rows are addressed", () => {
+                const message = warningsFor([translations]);
+
+                expect(message).toContain("company_translation: mark `id` and `locale` with `isId: true`");
+                expect(message).toContain("`<id>:::<locale>`");
+                expect(message).not.toContain("increment");
+            });
+
+            it("marks a foreign-key column `isId: true`, even when it is an integer", () => {
+                const message = warningsFor([details]);
+
+                expect(message).toContain("company_details: mark `companyId` with `isId: true`");
+                expect(message).not.toContain("increment");
+            });
+
+            it("does not suggest `isId` on a key column whose property cannot carry one", () => {
+                // pagila's `payment` is keyed on a timestamp too. `isId` on a
+                // `date` property does not typecheck, and marking the integer
+                // alone would make it the whole key.
+                catalogue.registerTable(pgTable("payment", {
+                    paymentId: integer("payment_id").notNull(),
+                    paymentDate: varchar("payment_date").notNull()
+                }, table => [primaryKey({ columns: [table.paymentId, table.paymentDate] })]), "payment");
+                const payment: CollectionConfig = {
+                    slug: "payment", name: "Payment", table: "payment",
+                    properties: {
+                        paymentId: { type: "number", columnName: "payment_id" },
+                        paymentDate: { type: "date", columnName: "payment_date" }
+                    }
+                };
+
+                // The constraint's columns resolve to the fields the table is
+                // keyed by, not to their SQL names.
+                expect(getPrimaryKeys(payment, catalogue).map(k => k.fieldName)).toEqual(["paymentId", "paymentDate"]);
+
+                const message = warningsFor([payment]);
+                expect(message).toContain("payment: its key includes `paymentDate` (a `date` property), which cannot carry `isId`");
+                expect(message).not.toContain("mark `paymentId`");
+            });
+
+            it("still suggests `\"increment\"` for a lone integer key that points at nothing", () => {
+                expect(warningsFor([counters])).toContain("counters: mark `seq` with `isId: \"increment\"`");
+            });
         });
     });
 });

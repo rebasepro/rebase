@@ -1,8 +1,8 @@
 import { PgTable, AnyPgColumn, getTableConfig } from "drizzle-orm/pg-core";
-import { getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns, type SQL } from "drizzle-orm";
 import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
+import { fieldKeyForColumn, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
 
 // Row identity is derived on both sides of the wire — the driver parses an
@@ -10,7 +10,7 @@ import { ApiError, logger } from "@rebasepro/server";
 // so the implementation lives in `common` and both agree by construction.
 export { buildCompositeId, parseIdValues, isAddressableId, COMPOSITE_ID_SEPARATOR } from "@rebasepro/common";
 export type { PrimaryKeyInfo } from "@rebasepro/common";
-import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys, isAddressableId } from "@rebasepro/common";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys, isAddressableId, parseIdValues } from "@rebasepro/common";
 import type { PrimaryKeyInfo } from "@rebasepro/common";
 
 /**
@@ -87,10 +87,20 @@ function compositePrimaryKeyColumns(table: PgTable): AnyPgColumn[] {
     }
 }
 
-/** The Drizzle key a column is registered under, falling back to its name. */
+/**
+ * The Drizzle key a column is registered under, falling back to its name.
+ *
+ * Matched on the SQL name, which is unique within a table, as well as on object
+ * identity: the columns a `primaryKey({ columns })` constraint holds are the
+ * copies drizzle builds for a table's extra config, never the objects
+ * `getTableColumns` returns, so identity alone never finds them. The fallback
+ * is not the field either on a table keyed by wire name — `payment_id` is
+ * served as `paymentId` — and a key resolved to a field the table does not
+ * have is a key no read or write can build a condition on.
+ */
 function columnFieldName(table: PgTable, column: AnyPgColumn): string {
     for (const [key, candidate] of Object.entries(getTableColumns(table))) {
-        if (candidate === column) return key;
+        if (candidate === column || candidate.name === column.name) return key;
     }
     return column.name;
 }
@@ -343,6 +353,57 @@ export function requirePrimaryKeys(collection: CollectionConfig, registry: Postg
 }
 
 /**
+ * The table's key columns, in key order.
+ *
+ * Throws when there are none, or when the table has no column for one of them:
+ * a WHERE built from fewer columns than the key matches every row that shares
+ * the columns it did find, so there is no partial answer worth returning.
+ *
+ * @param collectionPath named in the error.
+ */
+export function primaryKeyColumns(
+    table: PgTable,
+    primaryKeys: PrimaryKeyInfo[],
+    collectionPath: string
+): AnyPgColumn[] {
+    if (primaryKeys.length === 0) {
+        throw new Error(`Collection '${collectionPath}' has no primary key, so its rows cannot be addressed.`);
+    }
+    return primaryKeys.map(info => {
+        const column = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
+        if (!column) {
+            throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
+        }
+        return column;
+    });
+}
+
+/**
+ * The condition that matches the one row an address names: every key column
+ * equal to its part of the address.
+ *
+ * This is the WHERE of every read, update and delete of a row by its id. An
+ * address of a composite key is `1:::en_US`, and a condition on its first
+ * column alone matches `1:::de_DE` as readily as `1:::en_US` — a read then
+ * answers with whichever of them Postgres returns first, and nothing errors.
+ * A single key column is a plain `col = value`.
+ *
+ * Throws on an address with the wrong number of parts (see `parseIdValues`),
+ * and on a collection with no key (see {@link primaryKeyColumns}).
+ */
+export function rowAddressCondition(
+    table: PgTable,
+    primaryKeys: PrimaryKeyInfo[],
+    id: string | number,
+    collectionPath: string
+): SQL {
+    const columns = primaryKeyColumns(table, primaryKeys, collectionPath);
+    const values = parseIdValues(id, primaryKeys);
+    const conditions = columns.map((column, i) => eq(column, values[primaryKeys[i].fieldName]));
+    return conditions.length === 1 ? conditions[0] : and(...conditions)!;
+}
+
+/**
  * The column on the *source* table that a `hasOne`/`hasMany` link points at.
  *
  * `sourceKey` is authored when the two sides join on a natural key — an
@@ -442,6 +503,43 @@ export function findUnresolvableKeyCollections(
 }
 
 /**
+ * The `isId` to suggest for one key column, written as it goes in the config.
+ *
+ * `true` means the application supplies the value; `"increment"` and `"uuid"`
+ * mean the database generates it, so the admin withholds the field when a row
+ * is created. Suggesting a generating strategy for a column the database does
+ * not generate is therefore worse than suggesting none: the form sends no
+ * value, and the insert fails on a NULL key.
+ *
+ * The tables this server reads carry each column's type and whether it is part
+ * of the key, not its default, so a generating strategy is suggested only where
+ * the key's shape makes it near-certain — a lone `uuid` or integer column that
+ * points at nothing — and `true` everywhere else:
+ *
+ * - a column of a **composite** key holds part of the row's identity, which is
+ *   the caller's to give (`company_translation (id, locale)` is the id of a
+ *   company and a locale, neither of which this table invents);
+ * - a **foreign-key** column holds its parent's key;
+ * - a `text` or `varchar` column has no generating strategy at all.
+ */
+function suggestedIdStrategy(key: PrimaryKeyInfo, keys: PrimaryKeyInfo[], collection: CollectionConfig): string {
+    if (keys.length > 1) return "true";
+
+    const foreignKeyFields = new Set<string>();
+    for (const relation of Object.values(resolveCollectionRelations(collection))) {
+        if (relation.kind === "belongsTo") foreignKeyFields.add(fieldKeyForColumn(collection, relation.localKey));
+    }
+    for (const [name, property] of Object.entries(collection.properties ?? {})) {
+        if ((property as Property).type === "reference") foreignKeyFields.add(name);
+    }
+    if (foreignKeyFields.has(key.fieldName)) return "true";
+
+    if (key.isUUID) return "\"uuid\"";
+    if (key.type === "number") return "\"increment\"";
+    return "true";
+}
+
+/**
  * Report the collections from {@link findUnresolvableKeyCollections} at boot,
  * with the edit that fixes each one.
  *
@@ -455,9 +553,36 @@ export function warnOnKeysTheAdminCannotResolve(
     const findings = findUnresolvableKeyCollections(collections, registry);
     if (findings.length === 0) return;
 
-    const edit = (f: { collection: CollectionConfig; keys: PrimaryKeyInfo[] }) =>
-        `${f.collection.slug}: mark ${f.keys.map(k => `\`${k.fieldName}\``).join(" and ")} with ` +
-        `\`isId: ${f.keys[0].isUUID ? "\"uuid\"" : f.keys[0].type === "number" ? "\"increment\"" : "true"}\``;
+    const edit = (f: { collection: CollectionConfig; keys: PrimaryKeyInfo[] }): string => {
+        // `isId` is declared on string, number and reference properties only.
+        // A key column declared as anything else cannot be marked as it is, and
+        // marking the other columns alone would make them the whole key.
+        const unmarkable = f.keys.flatMap(key => {
+            const type = (f.collection.properties?.[key.fieldName] as Property | undefined)?.type;
+            return type !== undefined && type !== "string" && type !== "number" && type !== "reference"
+                ? [`\`${key.fieldName}\` (a \`${type}\` property)`]
+                : [];
+        });
+        if (unmarkable.length > 0) {
+            return `${f.collection.slug}: its key includes ${unmarkable.join(" and ")}, which cannot carry ` +
+                "`isId`. Declare that column as a `string` property, then mark every key column " +
+                `(${f.keys.map(key => `\`${key.fieldName}\``).join(", ")}) with \`isId: true\``;
+        }
+        const marks = f.keys.map(key => ({
+            field: `\`${key.fieldName}\``,
+            strategy: `\`isId: ${suggestedIdStrategy(key, f.keys, f.collection)}\``
+        }));
+        const same = marks.every(mark => mark.strategy === marks[0].strategy);
+        const what = same
+            ? `${marks.map(mark => mark.field).join(" and ")} with ${marks[0].strategy}`
+            : marks.map(mark => `${mark.field} with ${mark.strategy}`).join(" and ");
+        // Several columns are one key, and the admin addresses a row by all of
+        // them — saying how is what makes a link like `/1:::en_US` readable.
+        const composite = f.keys.length > 1
+            ? ` — one composite key, whose rows are addressed as \`${f.keys.map(key => `<${key.fieldName}>`).join(COMPOSITE_ID_SEPARATOR)}\``
+            : "";
+        return `${f.collection.slug}: mark ${what}${composite}`;
+    };
 
     const shadowed = findings.filter(f => f.shadowedByIdProperty);
     const silent = findings.filter(f => !f.shadowedByIdProperty);

@@ -162,6 +162,13 @@ export interface ColumnPlan {
     column: string;
     type: PgType;
     nullable: boolean;
+    /**
+     * This column alone is the table's primary key, declared inline on it.
+     *
+     * `false` for a column of a composite key: several inline `PRIMARY KEY`
+     * clauses would be several primary keys, so a composite key is one table
+     * constraint over {@link TablePlan.primaryKey} instead.
+     */
     primaryKey: boolean;
     unique: boolean;
     default?: ColumnDefault;
@@ -284,7 +291,13 @@ export interface TablePlan {
      */
     declaringSlugs?: string[];
     columns: ColumnPlan[];
-    /** Column names, in order. One entry for a collection, two for a junction. */
+    /**
+     * The primary key's column names, in key order.
+     *
+     * One entry is a key declared inline on its column ({@link ColumnPlan.primaryKey}).
+     * Several — a junction's two endpoints, or a collection marking several
+     * properties `isId` — are rendered as one `PRIMARY KEY (a, b)` constraint.
+     */
     primaryKey: string[];
     /** The declared `indexes:` block, with its frozen names. */
     indexes: CollectionIndexSpec[];

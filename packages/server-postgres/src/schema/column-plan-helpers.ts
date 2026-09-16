@@ -16,9 +16,9 @@
  * this is where they belong.
  *
  * Everything here is pure and synchronous, and it throws rather than guesses:
- * an enum with no values, a `cuid` id on Postgres and a second `isId` are all
- * configurations that produce a broken database in silence, so they are refused
- * where every path passes.
+ * an enum with no values, a `cuid` id on Postgres and a foreign key into a
+ * composite key are all configurations that produce a broken database in
+ * silence, so they are refused where every path passes.
  */
 import type {
     CollectionConfig,
@@ -48,39 +48,48 @@ const idPropertyEntries = (collection: CollectionConfig): [string, Property][] =
     ) as [string, Property][];
 
 /**
- * Refuse a collection that declares two primary keys.
+ * The properties marked `isId`, in declaration order.
  *
- * Postgres allows a composite primary key; Rebase does not model one, and the
- * three emitters each invented a different wrong answer for it. The Drizzle
- * generator appended `.primaryKey()` to both columns (two primary keys, which
- * drizzle-kit turns into an error at push time), the DDL generator wrote two
- * inline `PRIMARY KEY` clauses in one `CREATE TABLE` (Postgres: "multiple
- * primary keys for table are not allowed"), and boot-ensure created the table
- * with the *first* id column and silently never added the second — so a managed
- * tenant got a table missing a column its own collection reads.
- *
- * None of those is recoverable at runtime, and two of them fail long after the
- * config was written. Refused here instead, where the collection has a name.
+ * Several of them are one composite primary key: the table carries a single
+ * `PRIMARY KEY (a, b)` constraint over their columns, and a row's address lists
+ * the parts in this same order (`buildCompositeId`), which is the order the
+ * admin reads them in too.
  */
-export const assertSinglePrimaryKey = (collection: CollectionConfig): void => {
-    const ids = idPropertyEntries(collection);
-    if (ids.length < 2) return;
-    throw new Error(
-        `Collection "${collection.slug ?? collection.name ?? "(unnamed)"}" marks ${ids.length} properties ` +
-        `with \`isId\` (${ids.map(([name]) => `"${name}"`).join(", ")}). ` +
-        "Composite primary keys are not supported: give exactly one property `isId`, and express the " +
-        "second key with `indexes: [{ on: [...], unique: true, reason: \"…\" }]`."
-    );
-};
+export const primaryKeyPropertyNames = (collection: CollectionConfig): string[] =>
+    idPropertyEntries(collection).map(([name]) => name);
 
-export const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
-    if (collection.properties) {
-        const idPropEntry = idPropertyEntries(collection)[0];
-        if (idPropEntry) {
-            const prop = idPropEntry[1];
-            const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
-            return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
-        }
+/**
+ * The one column a foreign key into this collection points at.
+ *
+ * A foreign key column references a single column, and Postgres only accepts
+ * that column when it is unique on its own — `REFERENCES t (a)` against a
+ * composite key `(a, b)` fails with "there is no unique constraint matching
+ * given keys for referenced table". So a link into a collection whose key
+ * spans several columns has no column to point at, and it is refused here,
+ * naming the link, rather than emitted as a constraint `db push` or boot would
+ * then fail to create.
+ *
+ * @param via the link that needs the column, for the refusal: `relation "posts.author"`.
+ */
+export const getPrimaryKeyProp = (
+    collection: CollectionConfig,
+    via: string
+): { name: string, type: "string" | "number", isUuid: boolean } => {
+    const ids = idPropertyEntries(collection);
+    if (ids.length > 1) {
+        throw new Error(
+            `${via} points at collection "${collection.slug ?? collection.name ?? "(unnamed)"}", whose primary ` +
+            `key spans ${ids.length} columns (${ids.map(([name]) => `"${name}"`).join(", ")}). A foreign key is ` +
+            "one column and cannot reference a composite key. Point the link at a collection with a " +
+            "single-column key, or reach these rows with a `via` relation, whose `joinPath` compares every " +
+            "key column."
+        );
+    }
+    const idPropEntry = ids[0];
+    if (idPropEntry) {
+        const prop = idPropEntry[1];
+        const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
+        return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
     }
     // Fallback: a collection that declares no `isId` gets an implicit `id`.
     const idProp = collection.properties?.["id"] as Property | undefined;
@@ -91,8 +100,9 @@ export const getPrimaryKeyProp = (collection: CollectionConfig): { name: string,
     return { name: "id", type: "string", isUuid: isUuid ?? false };
 };
 
-export const getPrimaryKeyName = (collection: CollectionConfig): string =>
-    getPrimaryKeyProp(collection).name;
+/** The name of {@link getPrimaryKeyProp}'s column, refused on the same terms. */
+export const getPrimaryKeyName = (collection: CollectionConfig, via: string): string =>
+    getPrimaryKeyProp(collection, via).name;
 
 export const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;

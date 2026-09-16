@@ -5,6 +5,7 @@ import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
 import { PostgresCollectionRegistry } from "./PostgresCollectionRegistry";
+import { getPrimaryKeys } from "../services/collection-helpers";
 
 /**
  * Check every relation against the schema it actually runs on, at boot.
@@ -65,6 +66,53 @@ const quote = (xs: Iterable<string>) => Array.from(xs).map(s => `\`${s}\``).join
 
 /** `on.from` / `on.to` accept a single column or a composite tuple. */
 const asColumns = (value: string | string[]): string[] => Array.isArray(value) ? value : [value];
+
+/**
+ * A one-column link into a key of several columns, or `undefined`.
+ *
+ * A `localKey`, a `foreignKeyOnTarget` and a junction column are each one
+ * column, and one column cannot reference a composite key: Postgres refuses
+ * `REFERENCES t (a)` when `a` alone is not unique, and a lookup on `a` matches
+ * every row that shares it, so the related row served is whichever came first.
+ * The schema generators refuse to emit such a link; this refuses to serve one.
+ *
+ * `via` is exempt — its steps name every column they compare — and so is a
+ * `hasOne`/`hasMany` with a `sourceKey`, which names the one column it points
+ * at instead of the key.
+ */
+function compositeKeyDefect(
+    relation: ResolvedRelation,
+    source: CollectionConfig,
+    target: CollectionConfig,
+    registry: PostgresCollectionRegistry
+): Pick<RelationDefect, "problem" | "fix"> | undefined {
+    const viaFix = "or express the link as `kind: \"via\"`, whose `joinPath` compares every key column";
+    const refuse = (linkColumn: string, keyed: CollectionConfig, fix: string) => {
+        const keys = getPrimaryKeys(keyed, registry);
+        if (keys.length < 2) return undefined;
+        return {
+            problem: `${linkColumn} is one column, and \`${keyed.slug}\` is keyed on ` +
+                `${quote(keys.map(key => key.fieldName))} together — one column cannot reference a composite key`,
+            fix
+        };
+    };
+
+    switch (relation.kind) {
+        case "belongsTo":
+            return refuse(`\`localKey: "${relation.localKey}"\``, target,
+                `point the relation at a collection with a single-column key, ${viaFix}`);
+        case "hasOne":
+        case "hasMany":
+            if (relation.sourceKey) return undefined;
+            return refuse(`\`foreignKeyOnTarget: "${relation.foreignKeyOnTarget}"\``, source,
+                `give the relation a \`sourceKey\` naming a single unique column on \`${source.slug}\` to point at, ${viaFix}`);
+        case "manyToMany":
+            return refuse(`\`through.sourceColumn: "${relation.through.sourceColumn}"\``, source, `a junction column points at a single-column key; ${viaFix}`)
+                ?? refuse(`\`through.targetColumn: "${relation.through.targetColumn}"\``, target, `a junction column points at a single-column key; ${viaFix}`);
+        case "via":
+            return undefined;
+    }
+}
 
 /**
  * Distinguish "this column name is wrong" from "this database was never
@@ -182,6 +230,14 @@ kind: relation.kind };
                 continue;
             }
             const targetColumns = columnNames(targetTable);
+
+            // A single-column link into a composite key, whichever side the
+            // key is on.
+            const composite = compositeKeyDefect(relation, collection, targetCollection, registry);
+            if (composite) {
+                defects.push({ ...at, ...composite });
+                continue;
+            }
 
             switch (relation.kind) {
                 case "belongsTo": {

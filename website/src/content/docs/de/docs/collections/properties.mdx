@@ -291,12 +291,18 @@ Es gibt keinen Fremdschlüssel. Die UID ist ein String, der Benutzerspeicher kan
 andere Datenbank sein, und ein gelöschter Benutzer darf den Audit-Trail nicht mit sich reißen –
 deklarieren Sie eine [Relation](/docs/collections/relations), wenn Sie den Join wünschen.
 
-:::note[Ein Primärschlüssel pro Collection]
-`isId` darf von genau einer Eigenschaft beansprucht werden. Eine zweite wird beim Laden
-der Konfiguration abgelehnt und nicht stillschweigend ignoriert: Zusammengesetzte
-Primärschlüssel werden nicht unterstützt, und eine Konfiguration, die zwei deklariert,
-verlangt etwas, das Rebase nicht erstellen kann. Wenn Sie einen Eindeutigkeits-Constraint
-über mehrere Spalten hinweg wollten, ist das ein eindeutiger [Index](/docs/backend/indexes).
+:::note[Zusammengesetzte Primärschlüssel]
+Markieren Sie mehrere Eigenschaften mit `isId`, bilden sie einen zusammengesetzten
+Schlüssel: Die Tabelle erhält einen einzigen `PRIMARY KEY (a, b)`-Constraint, und eine
+Zeile wird über alle Schlüsselwerte in Deklarationsreihenfolge adressiert, verbunden mit
+`:::` – `company_translation/1:::en_US`. Geben Sie jeder Schlüsselspalte die passende
+Strategie: `isId: true` für einen Wert, den der Aufrufer liefert – das sind die meisten
+Spalten zusammengesetzter Schlüssel –, und niemals `"increment"` für einen Fremdschlüssel
+oder eine String-Spalte. Ein Fremdschlüssel ist eine einzelne Spalte und kann nicht auf
+einen zusammengesetzten Schlüssel verweisen; eine Relation oder Referenz *auf* eine solche
+Collection wird daher beim Generieren des Schemas abgelehnt. Wenn Sie statt der Identität
+der Zeile einen Eindeutigkeits-Constraint über mehrere Spalten wollten, ist das ein
+eindeutiger [Index](/docs/backend/indexes).
 :::
 
 ## Number-Eigenschaften

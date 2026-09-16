@@ -15,7 +15,14 @@
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-collection-tables";
-import { refused, strEnumRec, numEnumRec } from "./fixtures/property-matrix-collections";
+import {
+    companies,
+    companyTranslations,
+    linkIntoComposite,
+    refused,
+    strEnumRec,
+    numEnumRec
+} from "./fixtures/property-matrix-collections";
 import type { CollectionConfig } from "@rebasepro/types";
 
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
@@ -32,6 +39,28 @@ describe("a configuration with no correct column is refused by all three emitter
             expect(() => generateSchema([collection])).toThrow(collection.slug!);
         });
     }
+});
+
+describe("a foreign key into a composite primary key is refused by all three emitters", () => {
+    // A foreign key is one column; `REFERENCES company_translations (id)`
+    // against the key `(id, locale)` is refused by Postgres, because `id` alone
+    // is not unique. The composite key itself is fine — it is the link into it
+    // that has no column to point at.
+    const collections = [companies, companyTranslations, linkIntoComposite];
+    const because = /relation "link_into_composite\.translation" points at collection "company_translations", whose primary key spans 2 columns \("id", "locale"\)/;
+
+    it("naming the link and the key it cannot reference", () => {
+        expect(() => generateSchema(collections)).toThrow(because);
+        expect(() => generatePostgresDdl(collections)).toThrow(because);
+        expect(() => planCollectionSchemaEnsure(collections, emptyDb())).toThrow(because);
+    });
+
+    it("while the composite key without the link is emitted by all three", () => {
+        const accepted = [companies, companyTranslations];
+        expect(() => generateSchema(accepted)).not.toThrow();
+        expect(() => generatePostgresDdl(accepted)).not.toThrow();
+        expect(() => planCollectionSchemaEnsure(accepted, emptyDb())).not.toThrow();
+    });
 });
 
 describe("the record form of an enum is read, not thrown on", () => {

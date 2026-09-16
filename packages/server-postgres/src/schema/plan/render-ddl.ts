@@ -123,6 +123,14 @@ export const renderColumnDefinition = (column: ColumnPlan): string => {
     return definition;
 };
 
+/**
+ * `PRIMARY KEY ("a", "b")`, the clause a composite key takes inside a
+ * `CREATE TABLE`. Shared by `schema.sql` and boot-ensure's `CREATE TABLE`, so
+ * the two cannot list the columns differently.
+ */
+export const renderPrimaryKeyConstraint = (table: Pick<TablePlan, "primaryKey">): string =>
+    `PRIMARY KEY (${table.primaryKey.map(c => `"${c}"`).join(", ")})`;
+
 /** `"col" TYPE …`, as it appears inside a `CREATE TABLE`. */
 const renderColumn = (column: ColumnPlan): string =>
     `"${column.column}" ${renderColumnDefinition(column)}`;
@@ -245,8 +253,11 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
 
         ddl += `CREATE TABLE "${table.schema}"."${table.table}" (\n`;
         const lines = emitted.map(column => `  ${renderColumn(column)}`);
-        if (table.kind === "junction") {
-            lines.push(`  PRIMARY KEY (${table.primaryKey.map(c => `"${c}"`).join(", ")})`);
+        // A key over several columns — a junction's two endpoints, or a
+        // collection with several `isId` properties — is one table constraint;
+        // a single-column key is already inline on its column.
+        if (table.primaryKey.length > 1) {
+            lines.push(`  ${renderPrimaryKeyConstraint(table)}`);
         }
         ddl += lines.join(",\n");
         ddl += "\n);\n\n";

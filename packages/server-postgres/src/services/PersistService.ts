@@ -1,4 +1,4 @@
-import { eq, and, sql, SQL } from "drizzle-orm";
+import { sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
@@ -9,6 +9,8 @@ import {
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
+    requirePrimaryKeys,
+    rowAddressCondition,
     parseIdValues,
     buildCompositeId
 } from "./collection-helpers";
@@ -139,25 +141,16 @@ export class PersistService {
 
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
-
-        const parsedIdObj = parseIdValues(id, idInfoArray);
-
-        const conditions = [];
-        for (const info of idInfoArray) {
-            const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-            if (!field) {
-                throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
-            }
-            conditions.push(eq(field, parsedIdObj[info.fieldName]));
-        }
+        // `requirePrimaryKeys`: with no key there is no condition, and a DELETE
+        // without one empties the table.
+        const condition = rowAddressCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
 
         const result = await this.db
             .delete(table)
-            .where(and(...conditions));
+            .where(condition);
 
         if ((result.rowCount ?? 0) === 0) {
-            throw await this.explainZeroRowWrite(this.db, table, conditions, collectionPath, id, "delete");
+            throw await this.explainZeroRowWrite(this.db, table, [condition], collectionPath, id, "delete");
         }
     }
 
@@ -398,7 +391,6 @@ export class PersistService {
                 if (id && !options?.upsert) {
                     // Update existing row
                     currentId = id; // `id` is already the formatted composite or singular string
-                    const idValues = parseIdValues(id, idInfoArray);
 
                     // Apply joinPath one-to-one relation updates BEFORE the main UPDATE.
                     // This ensures parentSourceCol reads the pre-update FK value, preventing
@@ -426,19 +418,14 @@ export class PersistService {
                             ...(entityData as Record<string, unknown>),
                             ...(compiledOps ?? {})
                         });
-                        const conditions = [];
-                        for (const info of idInfoArray) {
-                            const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-                            conditions.push(eq(field, idValues[info.fieldName]));
-                        }
-
-                        const updateResult = await updateQuery.where(and(...conditions));
+                        const condition = rowAddressCondition(table, idInfoArray, id, effectiveCollectionPath);
+                        const updateResult = await updateQuery.where(condition);
 
                         // Throwing rolls the transaction back, so relation writes
                         // already applied above do not survive a rejected update.
                         if ((updateResult.rowCount ?? 0) === 0) {
                             throw await this.explainZeroRowWrite(
-                                tx, table, conditions, effectiveCollectionPath, currentId, "update"
+                                tx, table, [condition], effectiveCollectionPath, currentId, "update"
                             );
                         }
                     }

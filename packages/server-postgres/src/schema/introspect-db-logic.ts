@@ -829,6 +829,34 @@ export function generateCollectionFile(
     // Detect composite primary keys
     const isCompositePk = meta.pks.length > 1;
 
+    /**
+     * The property type a column is generated as, with what the data sample
+     * adds to it — read once per column, by the pass below and by the key check.
+     */
+    const propertyTypeOf = (col: TableColumn): { propType: string; finalPropType: string; inferenceExtra: string } => {
+        const isEnumColumn = col.data_type === "USER-DEFINED" && enumMap.get(col.udt_name) !== undefined;
+        const propType = isEnumColumn ? "string" : (col.udt_name === "vector" ? "vector" : mapPgType(col.data_type));
+        if (isEnumColumn || !sampleData || sampleData.length === 0) {
+            return { propType, finalPropType: propType, inferenceExtra: "" };
+        }
+        const values = sampleData.map(r => r[col.column_name]);
+        const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name), emitAdmin);
+        return { propType, finalPropType: inferred.propType || propType, inferenceExtra: inferred.extra || "" };
+    };
+
+    // A composite key is marked on every one of its columns or on none of them:
+    // marked on some, the marked columns would be read as the whole key and
+    // address the wrong rows. `isId` exists on string and number properties
+    // only, so a key with a column of another type — pagila's `payment` is keyed
+    // on a timestamp as well — stays unmarked, and the server reads it from the
+    // table's constraint instead.
+    const compositeKeyMarkable = isCompositePk && meta.pks.every(pk => {
+        const keyColumn = meta.columns.find(c => c.column_name === pk);
+        if (!keyColumn) return false;
+        const { finalPropType } = propertyTypeOf(keyColumn);
+        return finalPropType === "string" || finalPropType === "number";
+    });
+
     // Map columns
     for (const col of meta.columns) {
         // Skip foreign keys since we handle them as relations
@@ -857,23 +885,13 @@ export function generateCollectionFile(
         // Check if this column uses a PostgreSQL enum type
         const colEnumValues = enumMap.get(col.udt_name);
         const isEnumColumn = col.data_type === "USER-DEFINED" && colEnumValues !== undefined;
-        const isVectorColumn = col.udt_name === "vector";
 
-        const propType = isEnumColumn ? "string" : (isVectorColumn ? "vector" : mapPgType(col.data_type));
         let extra = "";
 
         const colNameLower = col.column_name.toLowerCase();
 
         // ── Data Inference Engine ────────────────────────────────────────────
-        let finalPropType = propType;
-        let inferenceExtra = "";
-
-        if (!isEnumColumn && sampleData && sampleData.length > 0) {
-            const values = sampleData.map(r => r[col.column_name]);
-            const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name), emitAdmin);
-            if (inferred.propType) finalPropType = inferred.propType;
-            if (inferred.extra) inferenceExtra = inferred.extra;
-        }
+        const { propType, finalPropType, inferenceExtra } = propertyTypeOf(col);
 
         const columnChecks = tableChecks?.get(col.column_name);
 
@@ -1018,7 +1036,12 @@ export function generateCollectionFile(
         // Identify IDs (unless already inferred as UUID/CUID by inferenceEngine)
         if (meta.pks.includes(col.column_name)) {
             if (isCompositePk) {
+                // Every column of the key is marked, so the collection addresses
+                // a row by all of them (`1:::en_US`) on the server and in the
+                // admin alike. `true`: a composite key's columns are the row's
+                // identity as given, not values the database generates.
                 extra += `\n            // Part of composite primary key (${commentText(meta.pks.join(", "))})`;
+                if (compositeKeyMarkable && !inferenceExtra.includes("isId:")) extra += "\n            isId: true,";
             } else if (finalPropType === "number" && !inferenceExtra.includes("isId:")) {
                 extra += "\n            isId: \"increment\",";
             } else if (col.data_type.toLowerCase() === "uuid" && !inferenceExtra.includes("isId:")) {

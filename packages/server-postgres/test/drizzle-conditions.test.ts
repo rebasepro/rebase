@@ -1197,7 +1197,7 @@ describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
     const build = () =>
         DrizzleConditionBuilder.buildRelationScopeCondition(
             resolveRelation(relation, { slug: "posts" } as unknown as CollectionConfig),
-            () => ({ table: mockPostsTable, idColumn: mockPostsTable.id }),
+            () => ({ table: mockPostsTable, key: [{ column: mockPostsTable.id, value: 1 }] }),
             1,
             mockTagsTable,
             mockTagsTable.id,

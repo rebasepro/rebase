@@ -394,18 +394,31 @@ export class DrizzleConditionBuilder {
          * foreign key are expressible from the parent's *id* alone, and
          * requiring the table for them would make a child listing fail on a
          * parent whose table isn't registered.
+         *
+         * `key` is the parent row's key, every column with its value: those
+         * three shapes find the parent row itself, and a lookup on the first
+         * column of a composite key finds every row that shares it.
          */
-        parent: () => { table: PgTable<any>; idColumn: AnyPgColumn },
+        parent: () => { table: PgTable<any>; key: { column: AnyPgColumn; value: string | number }[] },
+        /**
+         * The value a plain foreign key or a junction column holds for this
+         * parent. One column, so it reaches a single-column key only —
+         * `findRelationDefects` refuses those links into a composite one.
+         */
         parentId: string | number,
         targetTable: PgTable<any>,
         targetIdColumn: AnyPgColumn,
         registry: PostgresCollectionRegistry
     ): SQL {
+        // The parent row, inside a subquery that names its table unaliased.
+        const parentRow = (key: { column: AnyPgColumn; value: string | number }[]): SQL =>
+            sql.join(key.map(({ column, value }) => sql`${column} = ${value}`), sql` AND `);
+
         switch (relation.kind) {
             case "via": {
-                const { table, idColumn } = parent();
+                const { table, key } = parent();
                 return this.buildJoinPathScopeCondition(
-                    relation.joinPath, table, idColumn, parentId, targetTable, registry
+                    relation.joinPath, table, key, targetTable, registry
                 );
             }
 
@@ -462,14 +475,14 @@ export class DrizzleConditionBuilder {
                 // `belongsTo` below is — one statement sees one snapshot, and a
                 // scope condition that read the key separately could be built
                 // from a value the very next statement no longer agrees with.
-                const { table, idColumn } = parent();
-                return sql`${fkColumn} = (SELECT ${sql.identifier(relation.sourceKey)} FROM ${table} WHERE ${idColumn} = ${parentId})`;
+                const { table, key } = parent();
+                return sql`${fkColumn} = (SELECT ${sql.identifier(relation.sourceKey)} FROM ${table} WHERE ${parentRow(key)})`;
             }
 
             case "belongsTo": {
                 // The single target row the parent's foreign key points at.
-                const { table, idColumn } = parent();
-                return sql`${targetIdColumn} = (SELECT ${sql.identifier(relation.localKey)} FROM ${table} WHERE ${idColumn} = ${parentId})`;
+                const { table, key } = parent();
+                return sql`${targetIdColumn} = (SELECT ${sql.identifier(relation.localKey)} FROM ${table} WHERE ${parentRow(key)})`;
             }
 
             default: {
@@ -493,8 +506,8 @@ export class DrizzleConditionBuilder {
     private static buildJoinPathScopeCondition(
         joinPath: JoinStep[],
         parentTable: PgTable<any>,
-        parentIdColumn: AnyPgColumn,
-        parentId: string | number,
+        /** The parent row's key, every column with its value. */
+        parentKey: { column: AnyPgColumn; value: string | number }[],
         targetTable: PgTable<any>,
         registry: PostgresCollectionRegistry
     ): SQL {
@@ -552,7 +565,12 @@ export class DrizzleConditionBuilder {
 
         const joinsSql = joins.length > 0 ? sql` ${sql.join(joins, sql` `)}` : sql``;
 
-        return sql`EXISTS (SELECT 1 FROM ${parentTable} AS ${sql.identifier(sourceAlias)}${joinsSql} WHERE ${sql.identifier(sourceAlias)}.${sql.identifier(parentIdColumn.name)} = ${parentId} AND ${correlation})`;
+        const parentRow = sql.join(
+            parentKey.map(({ column, value }) => sql`${sql.identifier(sourceAlias)}.${sql.identifier(column.name)} = ${value}`),
+            sql` AND `
+        );
+
+        return sql`EXISTS (SELECT 1 FROM ${parentTable} AS ${sql.identifier(sourceAlias)}${joinsSql} WHERE ${parentRow} AND ${correlation})`;
     }
 
     /**
@@ -2439,18 +2457,23 @@ whereConditions };
     }
 
     /**
-     * Build a unique field check condition
+     * Build a unique field check condition: rows holding `value`, other than
+     * the row being edited.
+     *
+     * @param excludedRow the condition matching the row being edited, over every
+     *   key column (`rowAddressCondition`). Excluded as a whole — `NOT (a = 1 AND
+     *   b = 'en_US')` — because excluding each column on its own also excludes
+     *   every row that shares one of them.
      */
     static buildUniqueFieldCondition(
         fieldColumn: AnyPgColumn,
         value: unknown,
-        idColumn?: AnyPgColumn,
-        excludeId?: string | number
+        excludedRow?: SQL
     ): SQL[] {
         const conditions: SQL[] = [eq(fieldColumn, value)];
 
-        if (excludeId && idColumn) {
-            conditions.push(sql`${idColumn} != ${excludeId}`);
+        if (excludedRow) {
+            conditions.push(not(excludedRow));
         }
 
         return conditions;

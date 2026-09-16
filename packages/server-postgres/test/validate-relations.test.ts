@@ -1,4 +1,4 @@
-import { pgTable, text, integer } from "drizzle-orm/pg-core";
+import { pgTable, primaryKey, text, integer } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -310,6 +310,138 @@ foreignKeyOnTarget: "article_id" }
             expect(message).toContain("fix:");
             // Says why it is fatal rather than a warning.
             expect(message).toContain("return no rows at query time");
+        });
+    });
+
+    /**
+     * A composite key is a key like any other — to read, write and address. A
+     * link into one is not: every kind but `via` holds one column, and a lookup
+     * on one column of `(id, locale)` matches every locale of that id.
+     */
+    describe("a single-column link into a composite key", () => {
+        const companies = pgTable("companies", { id: integer("id").primaryKey() });
+        const translations = pgTable("company_translation", {
+            id: integer("id").notNull(),
+            locale: text("locale").notNull(),
+            summary_id: integer("summary_id")
+        }, table => [primaryKey({ columns: [table.id, table.locale] })]);
+        const reviews = pgTable("reviews", {
+            id: integer("id").primaryKey(),
+            translation_id: integer("translation_id"),
+            translation_locale: text("translation_locale")
+        });
+        const reviewsTranslations = pgTable("reviews_translations", {
+            review_id: integer("review_id"),
+            translation_id: integer("translation_id")
+        });
+
+        const companiesCollection = {
+            slug: "companies", name: "companies", table: "companies",
+            properties: { id: { type: "number", isId: "increment" } }
+        } as unknown as CollectionConfig;
+
+        const translationsWith = (relations: unknown[]): CollectionConfig => ({
+            slug: "company_translation", name: "company_translation", table: "company_translation",
+            properties: {
+                id: { type: "number", isId: true },
+                locale: { type: "string", isId: true }
+            },
+            relations
+        } as unknown as CollectionConfig);
+
+        const defectsWith = (collections: CollectionConfig[]) => {
+            const registry = new PostgresCollectionRegistry();
+            registry.registerMultiple(collections);
+            for (const [name, table] of Object.entries({
+                companies, company_translation: translations, reviews, reviews_translations: reviewsTranslations
+            })) {
+                registry.registerTable(table as never, name);
+            }
+            return findRelationDefects(collections, registry);
+        };
+
+        it("accepts a link *from* a composite-keyed collection to a single-column key", () => {
+            // `company_translation.id` is part of its own key and the foreign
+            // key to the company — the shape composite keys were reported on.
+            const translationsCollection = translationsWith([
+                { kind: "belongsTo", relationName: "company", target: () => companiesCollection, localKey: "id" }
+            ]);
+            expect(defectsWith([translationsCollection, companiesCollection])).toEqual([]);
+        });
+
+        it("refuses a belongsTo into it, naming the key", () => {
+            const translationsCollection = translationsWith([]);
+            const reviewsCollection = {
+                slug: "reviews", name: "reviews", table: "reviews",
+                properties: { id: { type: "number", isId: "increment" } },
+                relations: [
+                    { kind: "belongsTo", relationName: "translation", target: () => translationsCollection, localKey: "translation_id" }
+                ]
+            } as unknown as CollectionConfig;
+
+            const [defect] = defectsWith([reviewsCollection, translationsCollection]);
+            expect(defect).toMatchObject({ collection: "reviews", relationName: "translation", kind: "belongsTo" });
+            expect(defect.problem).toBe(
+                "`localKey: \"translation_id\"` is one column, and `company_translation` is keyed on `id`, `locale` " +
+                "together — one column cannot reference a composite key"
+            );
+            expect(defect.fix).toContain("`kind: \"via\"`");
+        });
+
+        it("refuses a hasMany out of it, unless a `sourceKey` names the one column it points at", () => {
+            const hasMany = (sourceKey?: string) => translationsWith([{
+                kind: "hasMany",
+                relationName: "summaries",
+                target: () => ({ slug: "reviews", name: "reviews", table: "reviews", properties: {} }),
+                foreignKeyOnTarget: "translation_id",
+                ...(sourceKey ? { sourceKey } : {})
+            }]);
+            const reviewsCollection = {
+                slug: "reviews", name: "reviews", table: "reviews", properties: { id: { type: "number", isId: true } }
+            } as unknown as CollectionConfig;
+
+            const [defect] = defectsWith([hasMany(), reviewsCollection]);
+            expect(defect.problem).toContain("`foreignKeyOnTarget: \"translation_id\"` is one column");
+            expect(defect.fix).toContain("`sourceKey`");
+
+            expect(defectsWith([hasMany("summary_id"), reviewsCollection])).toEqual([]);
+        });
+
+        it("refuses a manyToMany whose junction column would point at it", () => {
+            const translationsCollection = translationsWith([]);
+            const reviewsCollection = {
+                slug: "reviews", name: "reviews", table: "reviews",
+                properties: { id: { type: "number", isId: "increment" } },
+                relations: [{
+                    kind: "manyToMany",
+                    relationName: "translations",
+                    target: () => translationsCollection,
+                    through: { table: "reviews_translations", sourceColumn: "review_id", targetColumn: "translation_id" }
+                }]
+            } as unknown as CollectionConfig;
+
+            const [defect] = defectsWith([reviewsCollection, translationsCollection]);
+            expect(defect.problem).toContain("`through.targetColumn: \"translation_id\"` is one column");
+        });
+
+        it("accepts a `via` into it, whose steps compare every key column", () => {
+            const translationsCollection = translationsWith([]);
+            const reviewsCollection = {
+                slug: "reviews", name: "reviews", table: "reviews",
+                properties: { id: { type: "number", isId: "increment" } },
+                relations: [{
+                    kind: "via",
+                    relationName: "translation",
+                    cardinality: "one",
+                    target: () => translationsCollection,
+                    joinPath: [{
+                        table: "company_translation",
+                        on: { from: ["translation_id", "translation_locale"], to: ["id", "locale"] }
+                    }]
+                }]
+            } as unknown as CollectionConfig;
+
+            expect(defectsWith([reviewsCollection, translationsCollection])).toEqual([]);
         });
     });
 });
