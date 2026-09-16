@@ -24,6 +24,7 @@ import {
 } from "../util";
 import { deepClone, mergeDeep, removeFunctions } from "@rebasepro/utils";
 import { DataSourceRegistry, resolveDataSource } from "../data/resolveDataSource";
+import { authSecretsMissingExclusion } from "./auth-secrets";
 
 export class CollectionRegistry {
 
@@ -241,6 +242,16 @@ export class CollectionRegistry {
         // Stamp each relation property with its resolved relation.
         const properties: Properties = this.normalizeProperties(result.properties, result);
         result.properties = properties as EngineProperties;
+
+        // The user store's secret columns are excluded in every registry, not
+        // only in the config the server loaded. A redeclared `users` collection
+        // that omits `excludeFromApi` reaches the panel as written, and a form
+        // built from it submits `passwordHash: null` with every new user — a
+        // write the server refuses. The properties are this call's own copies,
+        // so setting the flag here leaves the caller's collection untouched.
+        for (const key of authSecretsMissingExclusion(result)) {
+            properties[key].excludeFromApi = true;
+        }
 
         // `childCollections` is deliberately NOT populated here.
         //

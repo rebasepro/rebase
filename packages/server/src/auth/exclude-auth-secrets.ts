@@ -1,4 +1,4 @@
-import { defaultUsersCollection } from "@rebasepro/common";
+import { authSecretsMissingExclusion, type AuthSecretCandidate } from "@rebasepro/common";
 import { logger } from "../utils/logger";
 
 /**
@@ -27,53 +27,19 @@ import { logger } from "../utils/logger";
  * So the framework restates it. Not by rejecting the collection — a boot failure
  * over a field a developer never thought about is a bad trade, and an existing
  * deployment would stop rather than start protecting itself — but by adding the
- * flag and saying so. Which columns count is not a second list to maintain: it
- * is read off {@link defaultUsersCollection}, so a secret added there is covered
- * here on the same commit.
+ * flag and saying so. Which columns count is decided once, by
+ * {@link authSecretsMissingExclusion} in `@rebasepro/common`, and every
+ * `CollectionRegistry` applies the same rule to the copies it makes — which is
+ * how the panel, building its registry from the project's file as written,
+ * agrees with the server.
  */
-
-/**
- * The column names the default users collection marks `excludeFromApi`.
- *
- * Keyed by *column*, not by property name, because the whole point is to match a
- * redeclaration that chose different property names — the control plane's copy
- * spelled them `password_hash` and `email_verification_token` where the default
- * says `passwordHash` and `emailVerificationToken`.
- */
-function defaultExcludedColumns(): Set<string> {
-    const properties = (defaultUsersCollection.properties ?? {}) as Record<
-        string,
-        { excludeFromApi?: boolean; columnName?: string } | undefined
-    >;
-    const columns = new Set<string>();
-    for (const [key, property] of Object.entries(properties)) {
-        if (!property?.excludeFromApi) continue;
-        columns.add(property.columnName ?? key);
-        columns.add(key);
-    }
-    return columns;
-}
-
-type MutableProperty = { excludeFromApi?: boolean; columnName?: string };
-type MutableCollection = {
-    slug?: string;
-    auth?: unknown;
-    properties?: Record<string, MutableProperty | undefined>;
-};
-
-/** Is this collection the one the auth subsystem stores users in? */
-function isAuthCollection(collection: MutableCollection): boolean {
-    const auth = collection.auth;
-    if (auth === true) return true;
-    return Boolean(auth && typeof auth === "object" && (auth as { enabled?: boolean }).enabled === true);
-}
 
 /**
  * Force `excludeFromApi` onto the auth collection's secret columns.
  *
- * Mutates in place and must therefore run BEFORE the collections are registered:
- * each registry re-normalizes what it is given, and a flag set afterwards
- * reaches whichever copy happened to be mutated and no others.
+ * Mutates in place, for what reads the collection configs directly rather than a
+ * registry's normalized copies. Run it before the collections are handed on, so
+ * those readers never see a config without the flag.
  *
  * @returns the columns it had to fix, per collection — for the caller to log and
  *          for tests to assert on.
@@ -81,20 +47,16 @@ function isAuthCollection(collection: MutableCollection): boolean {
 export function enforceAuthSecretExclusion(
     collections: readonly unknown[]
 ): Array<{ slug: string; columns: string[] }> {
-    const secrets = defaultExcludedColumns();
     const fixed: Array<{ slug: string; columns: string[] }> = [];
 
     for (const raw of collections) {
-        const collection = raw as MutableCollection;
-        if (!collection?.properties || !isAuthCollection(collection)) continue;
+        const collection = raw as (AuthSecretCandidate & { slug?: string }) | undefined;
+        if (!collection?.properties) continue;
 
-        const columns: string[] = [];
-        for (const [key, property] of Object.entries(collection.properties)) {
-            if (!property || property.excludeFromApi) continue;
-            const column = property.columnName ?? key;
-            if (!secrets.has(column) && !secrets.has(key)) continue;
-            property.excludeFromApi = true;
-            columns.push(key);
+        const columns = authSecretsMissingExclusion(collection);
+        for (const key of columns) {
+            const property = collection.properties[key];
+            if (property) property.excludeFromApi = true;
         }
 
         if (columns.length > 0) {
