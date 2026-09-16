@@ -64,6 +64,22 @@ function loadXlsxReader(): Promise<ReadXlsxFile> {
 }
 
 /**
+ * Put a date the reader left a millisecond short back on its second.
+ *
+ * `read-excel-file` turns Excel's date serials (fractional days) into
+ * milliseconds with `Math.floor`, and the fraction is rarely exact in floating
+ * point: a time of 12:30:00 arrives as 12:29:59.999, and a field that shows
+ * minutes displays 12:29. A date within a millisecond of a whole second is put
+ * back on it; a genuine sub-second value is left alone.
+ */
+function snapToSecond(cell: SheetCell): SheetCell {
+    if (!(cell instanceof Date)) return cell;
+    const time = cell.getTime();
+    const second = Math.round(time / 1000) * 1000;
+    return Math.abs(time - second) <= 1 ? new Date(second) : cell;
+}
+
+/**
  * Whether this file is delimited text rather than a workbook.
  *
  * Browsers report `text/csv`, `application/csv` or nothing at all for the same
@@ -204,7 +220,7 @@ export function convertFileToJson(file: File): Promise<ConversionResult> {
                             // A `__proto__` header would be the prototype setter
                             // here rather than a column; refused, as in `csv.ts`.
                             if (header && !isPrototypePollutingKey(header)) {
-                                obj[header] = cell;
+                                obj[header] = snapToSecond(cell);
                             }
                         });
                         parsedData.push(obj);

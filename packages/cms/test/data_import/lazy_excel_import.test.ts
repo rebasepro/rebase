@@ -24,7 +24,7 @@ import { convertFileToJson } from "../../src/data_import/utils/file_to_json";
  */
 describe("importing a spreadsheet with exceljs loaded on demand", () => {
 
-    async function workbookFile(rows: Array<Array<string | number>>): Promise<File> {
+    async function workbookFile(rows: Array<Array<string | number | Date>>): Promise<File> {
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet("Sheet1");
         for (const row of rows) sheet.addRow(row);
@@ -72,7 +72,7 @@ describe("importing a spreadsheet with exceljs loaded on demand", () => {
         await expect(convertFileToJson(file)).rejects.toThrow(/renamed\.xlsx/);
     });
 
-    test("reads numbers, text and dates back as themselves", async () => {
+    test("reads numbers and text back as themselves", async () => {
         // The reader swap changed which library produces these values, and the
         // import maps them by type — a number arriving as "9.5" would be a
         // string column in every imported row.
@@ -82,6 +82,31 @@ describe("importing a spreadsheet with exceljs loaded on demand", () => {
         expect(propertiesOrder).toEqual(["name", "price"]);
         expect(data).toEqual([{ name: "Widget", price: 9.5 }]);
         expect(typeof (data[0] as { price: unknown }).price).toBe("number");
+    });
+
+    /** Write `when` into a date column, import the workbook, return what came back. */
+    async function importedDate(when: Date): Promise<Date> {
+        const file = await workbookFile([["name", "when"], ["Launch", when]]);
+        const { data } = await convertFileToJson(file);
+        const value = (data[0] as { when: unknown }).when;
+        if (!(value instanceof Date)) throw new Error(`the date column read back as ${typeof value}`);
+        return value;
+    }
+
+    test("reads a date on a whole minute back on that minute", async () => {
+        // Excel stores a date as a fractional count of days, and the reader
+        // turns that into milliseconds with `Math.floor`. 12:30 is not exact in
+        // floating point, so it arrived as 12:29:59.999 — and a field that
+        // shows minutes displayed 12:29.
+        const when = await importedDate(new Date("2024-03-01T12:30:00.000Z"));
+
+        expect(when.toISOString()).toBe("2024-03-01T12:30:00.000Z");
+    });
+
+    test("keeps a genuine sub-second time rather than rounding it away", async () => {
+        const when = await importedDate(new Date("2024-03-01T12:30:00.500Z"));
+
+        expect(Math.abs(when.getTime() - Date.parse("2024-03-01T12:30:00.500Z"))).toBeLessThanOrEqual(1);
     });
 
     test("a blank header column does not shift the columns after it", async () => {
