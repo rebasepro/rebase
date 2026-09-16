@@ -11,7 +11,42 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Changed
+
+- **The record dialog has its Create and Save buttons at the bottom.** In a
+  collection opened with `openEntityMode: "dialog"`, such as `users` in a
+  scaffolded project, Create, "Create and close", Save and Discard sat in the
+  right-hand corner of the top bar. They are now in a footer under the form,
+  where every other dialog in the admin keeps its buttons. The top bar keeps the
+  title, the overflow menu and the window controls. The side panel and the
+  full-screen record still keep Save in the top bar, where it stays in view
+  while a long form scrolls.
+
+- **A form of four fields or fewer is one column.** The derived layout paired
+  fields by type, so the new-user form put Email beside Name and left Roles
+  alone on the row below. Short forms now stack. A `span` set on a property is
+  still honoured, and longer forms keep their columns.
+
+### Removed
+
+- **`PropertyIdCopyTooltip` and `LabelWithIconAndTooltip` are gone from
+  `@rebasepro/cms`.** Use `PropertyKeyHint` to show a property's key beside a
+  label of your own, or `LabelWithIcon` with its new `propertyKey` prop.
+
 ### Fixed
+
+- **A refused Google sign-in onto an existing account now tells the visitor
+  what to do, in their language.** Signing in with a provider onto an address
+  whose account cannot be linked automatically showed the API's message on the
+  login screen, word for word: "…Sign in with your existing method, then POST
+  to /auth/link/google to link google to your account." `LoginView` now shows
+  "An account with this email already exists. Sign in with your email and
+  password instead." when that account holds a password, and "Sign in the way
+  you did before." otherwise, in all seven locales. The server's response is
+  unchanged for API callers, and the `EMAIL_NOT_VERIFIED` error now carries
+  `details: { reason, provider }`, where `reason` is
+  `"local-account-unverified"` or `"provider-email-unverified"`, so your own
+  login screen can do the same.
 
 - **Starring a collection on the admin home page no longer draws a star the
   size of a card.** The favourites chip passed `size="small"` to a lucide icon,
@@ -35,6 +70,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   auth collection, so the admin and the server agree on which columns are the
   server's, whether or not the file says so. The boot warning asking you to add
   `excludeFromApi: true` is unchanged.
+
+- **Tab moves to the next field in a record dialog or side panel.** Tab from a
+  field could land on the dialog itself, so the next Tab started again from the
+  header buttons, and Shift+Tab did the same. Leaving the field closed a tooltip
+  rendered inside the dialog. Radix's focus trap treats any node removed while
+  focus is between two elements as the focused element being deleted: it
+  focused the dialog, and the browser abandoned the move. The kit's `Dialog` and
+  `Sheet` now complete a move interrupted this way, whatever removed the node.
+
+- **The property ID no longer covers the form.** Text, date, switch, geopoint,
+  binary and vector fields opened a "Property ID" tooltip over their own label
+  as soon as they took focus, and again on hover. The key now appears in small
+  type beside the label when you rest the pointer on it, and clicking it copies
+  it. It covers nothing, never opens on focus, and is not a Tab stop.
 
 ## [0.21.1] - 2026-09-15
 
