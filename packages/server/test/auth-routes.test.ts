@@ -617,6 +617,7 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(res.status).toBe(403);
             const body = await res.json() as any;
             expect(body.error.code).toBe("EMAIL_NOT_VERIFIED");
+            expect(body.error.details).toEqual({ reason: "provider-email-unverified", provider: "google" });
             // No takeover, and no duplicate account as a consolation prize.
             expect(mockAuthRepo.linkUserIdentity).not.toHaveBeenCalled();
             expect(mockAuthRepo.createUser).not.toHaveBeenCalled();

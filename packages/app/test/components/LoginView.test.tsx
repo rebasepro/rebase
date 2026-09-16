@@ -360,6 +360,43 @@ enabledProviders: ["github"] }
             expect(screen.getByText(/new sign-ups are disabled/i)).toBeInTheDocument();
         });
 
+        /** What the client SDK throws for `{ error: { code, message, details } }`. */
+        function apiError(code: string, message: string, details?: unknown): Error {
+            return Object.assign(new Error(message), { code, details });
+        }
+
+        const LINK_INSTRUCTIONS = "An account with this email already exists with a different sign-in method. " +
+            "That account's email address was never verified, so it cannot be linked automatically. " +
+            "Sign in with your existing method, then POST to /auth/link/google to link google to your account.";
+
+        it("tells the visitor to use their password, not to POST to an endpoint, when the account has one", () => {
+            // Seen on app.rebase.pro: Google sign-in onto an address whose
+            // password account was never verified showed the API's
+            // developer-facing instructions verbatim.
+            mockAuthController.authProviderError = apiError("EMAIL_NOT_VERIFIED", LINK_INSTRUCTIONS, {
+                reason: "local-account-unverified",
+                provider: "google"
+            });
+            renderWithGoogle();
+
+            expect(screen.getByText("auth_account_exists_sign_in_with_password")).toBeInTheDocument();
+            expect(screen.queryByText(/auth\/link/)).not.toBeInTheDocument();
+        });
+
+        it("says to sign in the way they did before when the reason does not name a password", () => {
+            // The provider did not verify the address — the existing account
+            // may have no password at all, so the screen must not promise one.
+            // Also what a server that sends no `details` gets.
+            for (const details of [{ reason: "provider-email-unverified", provider: "google" }, undefined]) {
+                mockAuthController.authProviderError = apiError("EMAIL_NOT_VERIFIED", LINK_INSTRUCTIONS, details);
+                const { unmount } = renderWithGoogle();
+
+                expect(screen.getByText("auth_account_exists_with_different_credential")).toBeInTheDocument();
+                expect(screen.queryByText(/auth\/link/)).not.toBeInTheDocument();
+                unmount();
+            }
+        });
+
         it("does not show a stale failure once the user is signed in", () => {
             mockAuthController.authProviderError = new Error("Registration is disabled");
             mockAuthController.user = { uid: "1" };

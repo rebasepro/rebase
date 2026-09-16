@@ -701,6 +701,7 @@ export interface RebaseTranslations {
     auth_wrong_password: string;
     auth_user_disabled: string;
     auth_account_exists_with_different_credential: string;
+    auth_account_exists_sign_in_with_password: string;
     auth_email_already_in_use: string;
     auth_google_permissions_required: string;
     auth_invalid_email_password: string;

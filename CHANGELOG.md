@@ -4,6 +4,19 @@
 
 ### Fixed
 
+- **A refused Google sign-in onto an existing account now tells the visitor
+  what to do, in their language.** Signing in with a provider onto an address
+  whose account cannot be linked automatically showed the API's message on the
+  login screen, word for word: "…Sign in with your existing method, then POST
+  to /auth/link/google to link google to your account." `LoginView` now shows
+  "An account with this email already exists. Sign in with your email and
+  password instead." when that account holds a password, and "Sign in the way
+  you did before." otherwise, in all seven locales. The server's response is
+  unchanged for API callers, and the `EMAIL_NOT_VERIFIED` error now carries
+  `details: { reason, provider }`, where `reason` is
+  `"local-account-unverified"` or `"provider-email-unverified"`, so your own
+  login screen can do the same.
+
 - **Starring a collection on the admin home page no longer draws a star the
   size of a card.** The favourites chip passed `size="small"` to a lucide icon,
   which writes `size` straight into the SVG's `width` and `height`. `small` is

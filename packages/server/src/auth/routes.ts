@@ -661,9 +661,19 @@ displayName: user.displayName });
                             const why = decision.reason === "provider-email-unverified"
                                 ? `${provider.id} has not verified this email address, so it cannot be linked automatically.`
                                 : "That account's email address was never verified, so it cannot be linked automatically.";
-                            throw ApiError.forbidden(
+                            // The message is for whoever reads the API response,
+                            // and names the endpoint. A login screen shows its
+                            // own words instead, chosen by `details.reason`:
+                            // "local-account-unverified" means the account
+                            // behind this address signs in with a password.
+                            throw new ApiError(
+                                403,
+                                "EMAIL_NOT_VERIFIED",
                                 `An account with this email already exists with a different sign-in method. ${why} Sign in with your existing method, then POST to /auth/link/${provider.id} to link ${provider.id} to your account.`,
-                                "EMAIL_NOT_VERIFIED"
+                                {
+                                    reason: decision.reason,
+                                    provider: provider.id
+                                }
                             );
                         }
                         // Link Provider to existing account

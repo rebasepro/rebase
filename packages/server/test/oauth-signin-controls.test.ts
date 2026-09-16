@@ -274,7 +274,11 @@ describe("POST /auth/<provider> — auto-linking onto an existing account", () =
         const res = await signIn(app);
 
         expect(res.status).toBe(403);
-        expect(((await res.json()) as { error: { code: string } }).error.code).toBe("EMAIL_NOT_VERIFIED");
+        const { error } = (await res.json()) as { error: { code: string; details?: { reason?: string } } };
+        expect(error.code).toBe("EMAIL_NOT_VERIFIED");
+        // What a login screen reads to say "sign in with your password" rather
+        // than quote an endpoint at the visitor.
+        expect(error.details?.reason).toBe("local-account-unverified");
         expect(repo.linkUserIdentity).not.toHaveBeenCalled();
         expect(repo.createUser).not.toHaveBeenCalled();
     });

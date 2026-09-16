@@ -42,6 +42,7 @@ import { RebaseLogo } from "../RebaseLogo";
 import { LanguageToggle } from "../LanguageToggle";
 import { useModeController, useTranslation } from "../../hooks";
 import { consumeOAuthCallback, startOAuthRedirect } from "./oauth-redirect-flow";
+import { authErrorMessage } from "./auth-error-message";
 
 /**
  * Props for the generic LoginView.
@@ -390,9 +391,7 @@ export function LoginView({
     // user is present — a stale failure must not sit over a screen that has
     // since succeeded. `LoginForm` renders the same value for the email path.
     const controllerError = authController.authProviderError && !authController.user
-        ? (authController.authProviderError instanceof Error
-            ? authController.authProviderError.message
-            : String(authController.authProviderError))
+        ? authErrorMessage(authController.authProviderError, t)
         : null;
     const buttonsErrorMessage = providerError ?? controllerError;
 
@@ -957,7 +956,7 @@ function LoginForm({
             {(() => {
                 const err = authController.authProviderError;
                 if (!err || authController.user) return null;
-                const msg: string = err instanceof Error ? err.message : String(err);
+                const msg = authErrorMessage(err, t);
                 return (
                     <div className="w-full mb-2">
                         <ErrorView error={msg}/>
