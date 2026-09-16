@@ -13,6 +13,16 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Fixed
 
+- **Starring a collection on the admin home page no longer draws a star the
+  size of a card.** The favourites chip passed `size="small"` to a lucide icon,
+  which writes `size` straight into the SVG's `width` and `height`. `small` is
+  not a length, so the browser dropped it and the icon filled the chip. The
+  same mistake made four more icons render oversized: the join-path delete
+  button in the collection editor's relations tab, the export button, the
+  empty avatar in the user picker, and "Log in anonymously" on the Firebase
+  login screen. All five now pass `iconSize`, and a lint rule
+  (`rebase/lucide-icon-numeric-size`) refuses a named size on a lucide icon.
+
 - **"New user" in the admin saves again when `users.ts` does not mark the
   secret columns.** A project's own `users` collection replaces the default,
   and a copy scaffolded before `excludeFromApi` was in the template leaves it
