@@ -25,19 +25,23 @@ import { probeTool } from "../probe-tool.mjs";
 
 const SERVER_VERSION = "version --format {{.Server.Version}}";
 
-/** A PATH holding exactly the fakes given, plus the system dirs they run with. */
-function fakeTools(tools) {
+/**
+ * A PATH holding exactly the fakes given, plus the system dirs they run with.
+ * `systemDirs: false` leaves those out, for a case that must find no tool at all:
+ * a CI runner ships the real docker in /usr/bin.
+ */
+function fakeTools(tools, { systemDirs = true } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-probe-tool-"));
     for (const [name, body] of Object.entries(tools)) {
         const file = path.join(dir, name);
         fs.writeFileSync(file, `#!/bin/sh\n${body}\n`);
         fs.chmodSync(file, 0o755);
     }
-    return { env: { PATH: `${dir}:/usr/bin:/bin` }, dir };
+    return { env: { PATH: systemDirs ? `${dir}:/usr/bin:/bin` : dir }, dir };
 }
 
-function withTools(tools, fn) {
-    const { env, dir } = fakeTools(tools);
+function withTools(tools, fn, options) {
+    const { env, dir } = fakeTools(tools, options);
     try {
         return fn(env);
     } finally {
@@ -88,10 +92,12 @@ test("a daemon that never answers is reported as not answering, not waited on", 
 });
 
 test("a tool that is not installed says so", () => {
+    // No system dirs on this PATH. With /usr/bin on it, the ubuntu-24.04 runner
+    // found its own docker and the probe answered `{ ok: true, version: "28.0.4" }`.
     withTools({}, (env) => {
         assert.deepEqual(probeTool("docker", { env }), { ok: false, reason: "docker is not on PATH" });
         assert.deepEqual(probeTool("helm", { env }), { ok: false, reason: "helm is not on PATH" });
-    });
+    }, { systemDirs: false });
 });
 
 test("helm is bounded the same way", () => {
