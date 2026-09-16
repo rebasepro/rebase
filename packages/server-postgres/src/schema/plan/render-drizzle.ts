@@ -19,7 +19,7 @@
  *   all arrive decided. The Drizzle generator disagreeing with the DDL one is
  *   what left `geopoint` with a database column and no Drizzle key.
  */
-import type { ColumnPlan, ForeignKeyPlan, PgType, PolicyPlan, RelationPlan, SchemaPlan, TablePlan } from "./types";
+import type { ColumnPlan, ForeignKeyPlan, OneRelationPlan, PgType, PolicyPlan, RelationPlan, SchemaPlan, TablePlan } from "./types";
 import { renderPredicate } from "../collection-index";
 
 /** What the generated file may leave out. */
@@ -334,7 +334,7 @@ export function renderDrizzleSchema(plan: SchemaPlan, options: DrizzleRenderOpti
     for (const table of plan.tables) {
         const entries = plan.relations.filter(r => r.tableVar === table.varName);
         if (entries.length === 0) continue;
-        const rendered = entries.map(relation => renderRelation(table, relation));
+        const rendered = entries.map(relation => renderRelation(table, relation, uses));
         const varName = `${table.varName}Relations`;
         body += `export const ${varName} = drizzleRelations(${table.varName}, ({ one, many }) => ({\n${rendered.join(",\n")}\n}));\n\n`;
         if (!relationVars.includes(varName)) relationVars.push(varName);
@@ -355,19 +355,30 @@ export function renderDrizzleSchema(plan: SchemaPlan, options: DrizzleRenderOpti
     return out;
 }
 
-const renderRelation = (table: TablePlan, relation: RelationPlan): string => {
+const renderRelation = (table: TablePlan, relation: RelationPlan, uses: BuilderUses): string => {
     if (relation.kind === "many") {
-        return `    ${quote(relation.key)}: many(${relation.targetVar}, { relationName: ${quote(relation.relationName!)} })`;
+        return `    ${quote(relation.key)}: many(${relation.targetVar}, { relationName: ${quote(relation.relationName)} })`;
     }
-    // A `hasOne` inverse has no `fields`/`references` to give: the foreign key
-    // lives on the target. `one(target, { relationName })` is not a
-    // `RelationConfig` (TS2345) *and* not something the runtime survives —
-    // `createOne` reads `config.fields.reduce(...)` unconditionally — so a bare
-    // `one(target)` is the documented FK-less form.
-    if (!relation.fields) return `    ${quote(relation.key)}: one(${relation.targetVar})`;
-    return `    ${quote(relation.key)}: one(${relation.targetVar}, {\n` +
+    return `    ${quote(relation.key)}: one${oneTypeArguments(table, relation, uses)}(${relation.targetVar}, {\n` +
         `        fields: [${relation.fields.map(f => member(table.varName, f)).join(", ")}],\n` +
-        `        references: [${relation.references!.map(r => member(relation.targetVar, r)).join(", ")}],\n` +
-        `        relationName: ${quote(relation.relationName!)}\n` +
+        `        references: [${relation.references.map(r => member(relation.targetVar, r)).join(", ")}],\n` +
+        `        relationName: ${quote(relation.relationName)}\n` +
         "    })";
+};
+
+/**
+ * Explicit type arguments for a `one()` whose target row may not exist.
+ *
+ * Drizzle types a `one()` as never null when every column in `fields` is NOT
+ * NULL — right for a foreign key, wrong for a `hasOne`, whose `fields` are this
+ * table's own key. Giving `TColumns` as a column of this table with no declared
+ * nullability makes the related row `T | null` in a relational query's result,
+ * which is what the database returns. Empty for every other `one()`, whose
+ * inferred type is already right.
+ */
+const oneTypeArguments = (table: TablePlan, relation: OneRelationPlan, uses: BuilderUses): string => {
+    if (!relation.nullable) return "";
+    needs(uses, "type AnyPgColumn");
+    const column = `AnyPgColumn<{ tableName: ${quote(table.table)} }>`;
+    return `<typeof ${relation.targetVar}, [${relation.fields.map(() => column).join(", ")}]>`;
 };

@@ -1338,13 +1338,26 @@ function planRelations(
                     break;
                 case "hasOne":
                     // The foreign key lives on the TARGET table, so this side
-                    // has no `fields`/`references` to give — and Drizzle has no
-                    // third form. `one(target, { relationName })` is not a
-                    // `RelationConfig` (TS2345) *and* not something the runtime
-                    // survives: `createOne` reads `config.fields.reduce(...)`
-                    // unconditionally. A bare `one(target)` is the documented
-                    // FK-less form.
-                    plans.push({ tableVar, key, kind: "one", targetVar });
+                    // states the join from its own end: its source key against
+                    // the target's foreign key, under the owning side's name.
+                    // Drizzle has no `one()` paired by `relationName` alone:
+                    // `one(target, { relationName })` is not a `RelationConfig`
+                    // (TS2345) and `createOne` reads `config.fields.reduce(...)`.
+                    // A bare `one(target)` is paired by table, which throws once
+                    // the target has two links back here or the link is to its
+                    // own table.
+                    plans.push({
+                        tableVar,
+                        key,
+                        kind: "one",
+                        targetVar,
+                        relationName,
+                        fields: [relation.sourceKey
+                            ? fieldKeyForColumn(collection, relation.sourceKey)
+                            : getPrimaryKeyName(collection)],
+                        references: [fieldKeyForColumn(target, relation.foreignKeyOnTarget)],
+                        nullable: true
+                    });
                     break;
                 case "hasMany":
                     plans.push({ tableVar, key, kind: "many", targetVar, relationName });
