@@ -11,6 +11,21 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+### Fixed
+
+- **"New user" in the admin saves again when `users.ts` does not mark the
+  secret columns.** A project's own `users` collection replaces the default,
+  and a copy scaffolded before `excludeFromApi` was in the template leaves it
+  off `passwordHash` and `emailVerificationToken`. The server adds the flag at
+  boot, but the admin built its collections from the file as written, so the
+  new-user form sent both fields as `null`. The server then refused the create:
+  "'passwordHash', 'emailVerificationToken' are excluded from the API on
+  'users' and cannot be written through it". Neither field is shown in the
+  form. Every `CollectionRegistry` now applies the same rule when it copies an
+  auth collection, so the admin and the server agree on which columns are the
+  server's, whether or not the file says so. The boot warning asking you to add
+  `excludeFromApi: true` is unchanged.
+
 ## [0.21.1] - 2026-09-15
 
 ### Added
