@@ -3811,3 +3811,46 @@ Gate: `rebase/lucide-icon-numeric-size` in `eslint.config.mjs`, an error under
 so a new icon is covered without editing the rule. Each of the five files as they were
 before the fix fails it, as do a direct `lucide-react` import and a relative
 `../icons` import. `GitHubIcon size="small"` and `size="1.5rem"` pass.
+
+## 66. A node removed while focus is between two elements, inside a focus trap
+
+Radix's `FocusScope` watches a modal for removed nodes. If one goes while
+`document.activeElement` is `body`, it assumes the focused element was deleted
+and focuses the modal container. But `activeElement` is also `body` during every
+ordinary focus move: the browser fires `focusout` before focus lands on the next
+element. So anything that unmounts in response to a blur is removed inside that
+window. The scope focuses the container, the browser abandons the move it was
+making, and Tab from one field lands on the dialog. The next Tab starts again
+from the header.
+
+The reported trigger was the CMS "Property ID" tooltip. It wrapped each text
+field's input, opened when the input took focus, and closed again on blur. The
+tooltip portals into the dialog's popup host, which is inside the focus trap
+because the scroll lock only lets a popup scroll there (see the comment on
+`popupHost` in `Dialog.tsx`). Neither piece is wrong by itself. The failure
+depends on when the removal happens, not on which component does it. A
+validation message cleared on blur would do the same.
+
+It hides because clicking into the next field works: the mouse sets focus again
+after the correction. Only the keyboard shows it, and jsdom cannot reproduce it.
+jsdom finishes the whole focus move before the observer's microtask runs.
+
+**Sweep:** list every focus trap and ask whether anything inside it can remove a
+node from a `focusout` or `blur` handler. The fix belongs to the trap, not to
+the removers, because the list of removers is open.
+
+**Sweep (2026-09-16):**
+
+| checked | result |
+|---|---|
+| `@rebasepro/ui` `Dialog`, the record dialog | **BUG**, the reported one. Fixed by `useRestoreInterruptedFocus`. |
+| `@rebasepro/ui` `Sheet`, the side panel | **BUG**. Same trap, and popups portal into its content. Fixed by the same hook. |
+| Direct `@radix-ui/react-dialog`, `react-alert-dialog` or `FocusScope` use outside the kit (`packages/*/src`, `saas/frontend/src`) | clean. None. |
+| CMS field bindings wrapping a control in a tooltip | **BUG** (the trigger). The tooltip is removed; the key is an inline `PropertyKeyHint`. |
+
+Gate: `tests/e2e/tests/entity-dialog.spec.ts`. In real Chromium it removes a
+node from the dialog in the Email field's `focusout`, then presses Tab and
+Shift+Tab. With the hook call removed from `Dialog`, Tab lands on the dialog and
+the test fails. The hook takes its note in a `window` capture listener: a note
+taken on the container, while bubbling, is too late for a removal made by a
+listener on the field itself.

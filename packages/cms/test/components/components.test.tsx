@@ -9,6 +9,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: jest.fn(),
     useAuthController: jest.fn(),
+    useTranslation: () => ({ t: (key: string) => key === "copy" ? "Copy" : key }),
     LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>
 }));
 
@@ -48,7 +49,7 @@ jest.mock("@rebasepro/ui", () => {
 
 import { FieldCaption } from "../../src/components/FieldCaption";
 import { RebaseAuthGate } from "../../src/components/RebaseAuthGate";
-import { PropertyIdCopyTooltip, PropertyIdCopyTooltipContent } from "../../src/components/PropertyIdCopyTooltip";
+import { PropertyKeyHint } from "../../src/components/PropertyKeyHint";
 import { PropertyConfigBadge } from "../../src/components/PropertyConfigBadge";
 import { useRebaseRegistry, useAuthController } from "@rebasepro/app";
 import { PropertyConfig } from "@rebasepro/cms-types";
@@ -139,7 +140,7 @@ describe("React Components Tests", () => {
         });
     });
 
-    describe("PropertyIdCopyTooltip Component", () => {
+    describe("PropertyKeyHint Component", () => {
         beforeEach(() => {
             // Mock navigator.clipboard API
             Object.defineProperty(navigator, "clipboard", {
@@ -150,46 +151,43 @@ describe("React Components Tests", () => {
             });
         });
 
-        test("should render PropertyIdCopyTooltip and contain children", () => {
-            render(
-                <PropertyIdCopyTooltip propertyKey="my_property_key">
-                    <button data-testid="target-button">Hover me</button>
-                </PropertyIdCopyTooltip>
-            );
+        // It replaced a tooltip that opened whenever a field took focus and
+        // covered the label being read. Inline and out of the tab order is the
+        // whole point, so both are pinned.
+        test("renders the key inline, with no floating layer, outside the tab order", () => {
+            render(<PropertyKeyHint propertyKey="my_property_key"/>);
 
-            expect(screen.getByTestId("target-button")).toBeTruthy();
-            expect(screen.getByTestId("tooltip")).toBeTruthy();
+            const hint = screen.getByRole("button", { name: "Copy my_property_key" });
+            expect(hint.textContent).toContain("my_property_key");
+            expect(hint.tabIndex).toBe(-1);
+            expect(screen.queryByTestId("tooltip")).toBeNull();
         });
 
-        test("should render content, show copy text initially, and toggle to 'Copied' on click", async () => {
+        test("copies the key on click without also clicking what the label sits in", async () => {
             jest.useFakeTimers();
+            const onParentClick = jest.fn();
 
-            render(<PropertyIdCopyTooltipContent propertyKey="my_property_key" />);
+            render(
+                <div onClick={onParentClick}>
+                    <PropertyKeyHint propertyKey="my_property_key"/>
+                </div>
+            );
 
-            // Check initial text
-            const typographies = screen.getAllByTestId("typography");
-            const labelTypo = typographies[0];
-            const keyTypo = typographies[1];
+            expect(screen.getByTestId("copy-icon")).toBeTruthy();
 
-            expect(labelTypo.textContent).toBe("Property ID");
-            expect(keyTypo.textContent).toBe("my_property_key");
-
-            const copyButton = screen.getByTestId("copy-icon");
-
-            // Click copy button
             await act(async () => {
-                fireEvent.click(copyButton);
+                fireEvent.click(screen.getByRole("button", { name: "Copy my_property_key" }));
             });
 
             expect(navigator.clipboard.writeText).toHaveBeenCalledWith("my_property_key");
-            expect(labelTypo.textContent).toBe("Copied");
+            expect(onParentClick).not.toHaveBeenCalled();
+            expect(screen.queryByTestId("copy-icon")).toBeNull();
 
-            // Fast-forward 2 seconds
             await act(async () => {
-                jest.advanceTimersByTime(2000);
+                jest.advanceTimersByTime(1600);
             });
 
-            expect(labelTypo.textContent).toBe("Property ID");
+            expect(screen.getByTestId("copy-icon")).toBeTruthy();
 
             jest.useRealTimers();
         });

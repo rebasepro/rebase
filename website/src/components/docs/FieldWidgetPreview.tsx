@@ -189,7 +189,7 @@ function MultilinePreview() {
     );
 }
 
-// MarkdownEditorFieldBinding: LabelWithIconAndTooltip + ProseMirror-like editor container
+// MarkdownEditorFieldBinding: LabelWithIcon + ProseMirror-like editor container
 function MarkdownPreview() {
     const handleImageUpload = useCallback(async (file: File): Promise<string> => {
         return URL.createObjectURL(file);
@@ -249,7 +249,7 @@ function UrlPreview() {
     );
 }
 
-// StorageUploadFieldBinding: LabelWithIconAndTooltip + dropzone with min-height
+// StorageUploadFieldBinding: LabelWithIcon + dropzone with min-height
 function FileUploadPreview() {
     return (
         <>
@@ -371,7 +371,7 @@ function DateTimePreview() {
     );
 }
 
-// RepeatFieldBinding: ExpandablePanel with LabelWithIconAndTooltip title + ArrayContainer items
+// RepeatFieldBinding: ExpandablePanel with LabelWithIcon title + ArrayContainer items
 function RepeatPreview() {
     const [items, setItems] = useState(["react", "typescript", "node"]);
     const title = (
@@ -582,7 +582,7 @@ function KeyValuePreview() {
     );
 }
 
-// ReferenceFieldBinding: LabelWithIconAndTooltip + EntityPreviewContainer card
+// ReferenceFieldBinding: LabelWithIcon + EntityPreviewContainer card
 function ReferencePreview() {
     return (
         <>

@@ -3,7 +3,7 @@ import type { ArrayProperty, Property } from "@rebasepro/types";
 import React from "react";
 ;
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";
 import { getArrayResolvedProperties } from "@rebasepro/common";
@@ -55,7 +55,7 @@ export function ArrayCustomShapedFieldBinding({
     });
 
     const title = (<>
-        <LabelWithIconAndTooltip
+        <LabelWithIcon
             propertyKey={propertyKey}
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}

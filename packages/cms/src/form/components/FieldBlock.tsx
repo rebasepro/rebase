@@ -3,7 +3,7 @@ import type { PropertySpan } from "@rebasepro/cms-types";
 import React from "react";
 import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
+import { PropertyKeyHint } from "../../components/PropertyKeyHint";
 
 /**
  * Grid placement for a span.
@@ -147,29 +147,31 @@ export function FieldBlock({
             className={"relative flex flex-col min-w-0"}>
 
             {showLabel && (
-                <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                    <div className={cls(
-                        "flex items-center gap-1.5 font-medium leading-tight mb-1.5",
-                        // Primary, not secondary: the label names the field and the
-                        // reference sets its labels in the primary ink; the type icon
-                        // beside it stays muted so the name carries the row.
-                        "text-[13px] text-text-primary dark:text-text-primary-dark"
-                    )}>
-                        {/* Small and quiet: enough to tell a number from a
-                            relation at a glance, not enough to compete with the
-                            field name. Matched to the label's 13px rather than
-                            left at the 16px `smallest` token, which put the
-                            heaviest mark on the row on the least important
-                            thing in it. */}
-                        {(property || icon) && (
-                            <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
-                                {property ? getIconForProperty(property, LABEL_ICON_SIZE) : icon}
-                            </span>
-                        )}
-                        <span className={"truncate"}>{property?.name ?? label ?? propertyKey}</span>
-                        {required && <span className={"text-red-500 dark:text-red-500 -ml-1"}>*</span>}
-                    </div>
-                </PropertyIdCopyTooltip>
+                <div className={cls(
+                    "group/label flex items-center gap-1.5 min-w-0 font-medium leading-tight mb-1.5",
+                    // Primary, not secondary: the label names the field and the
+                    // reference sets its labels in the primary ink; the type icon
+                    // beside it stays muted so the name carries the row.
+                    "text-[13px] text-text-primary dark:text-text-primary-dark"
+                )}>
+                    {/* Small and quiet: enough to tell a number from a
+                        relation at a glance, not enough to compete with the
+                        field name. Matched to the label's 13px rather than
+                        left at the 16px `smallest` token, which put the
+                        heaviest mark on the row on the least important
+                        thing in it. */}
+                    {(property || icon) && (
+                        <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
+                            {property ? getIconForProperty(property, LABEL_ICON_SIZE) : icon}
+                        </span>
+                    )}
+                    <span className={"truncate"}>{property?.name ?? label ?? propertyKey}</span>
+                    {required && <span className={"text-red-500 dark:text-red-500 -ml-1"}>*</span>}
+                    {/* In the row, not over it. This was a tooltip on the
+                        label and on the control, which opened whenever a
+                        field took focus and covered the label being read. */}
+                    {property && <PropertyKeyHint propertyKey={propertyKey}/>}
+                </div>
             )}
 
             <div className={"min-w-0"}>

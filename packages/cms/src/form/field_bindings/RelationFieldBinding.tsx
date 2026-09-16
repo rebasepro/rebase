@@ -4,7 +4,7 @@ import type { RelationProperty } from "@rebasepro/types";
 import { Entity, getCollectionDataPath, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ErrorView, IconForView } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
@@ -79,7 +79,7 @@ function RelationSelectorBinding({
 
     return (
         <div className="">
-            {!hideLabel && <LabelWithIconAndTooltip
+            {!hideLabel && <LabelWithIcon
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}
@@ -155,7 +155,7 @@ function SingleRelationFieldBinding({
 
     return (
         <>
-            {!hideLabel && <LabelWithIconAndTooltip
+            {!hideLabel && <LabelWithIcon
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}

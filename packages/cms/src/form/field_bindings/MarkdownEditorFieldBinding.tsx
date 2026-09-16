@@ -1,7 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { resourceKeyOf } from "@rebasepro/types";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useAuthController, useStorageSource } from "@rebasepro/app";
 import { useStorageSources } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";
@@ -219,7 +219,7 @@ export function MarkdownEditorFieldBinding({
     return (
         <>
             {!hideLabel && <div className="flex items-center w-full">
-                <LabelWithIconAndTooltip
+                <LabelWithIcon
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}

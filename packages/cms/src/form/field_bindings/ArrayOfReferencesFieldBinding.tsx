@@ -6,7 +6,7 @@ import React, { useCallback, useMemo } from "react";
 import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../preview";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
 import { getReferenceFrom } from "@rebasepro/common";
@@ -111,7 +111,7 @@ export function ArrayOfReferencesFieldBinding({
     }, [ofProperty.path, ofProperty.admin?.previewProperties, value]);
 
     const title = (<>
-        <LabelWithIconAndTooltip
+        <LabelWithIcon
             propertyKey={propertyKey}
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}

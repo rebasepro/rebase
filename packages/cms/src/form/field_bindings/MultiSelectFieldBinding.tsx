@@ -4,7 +4,7 @@ import React, { useCallback } from "react";
 
 ;
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { enumToObjectEntries, getLabelOrConfigFrom } from "@rebasepro/common";
@@ -102,7 +102,7 @@ export function MultiSelectFieldBinding({
                 value={validValue ? value.map((v) => v?.toString()) : []}
                 disabled={disabled}
                 modalPopover={true}
-                label={hideLabel ? undefined : <LabelWithIconAndTooltip
+                label={hideLabel ? undefined : <LabelWithIcon
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}

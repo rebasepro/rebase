@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { cls, ExpandablePanel } from "@rebasepro/ui";
 
@@ -97,7 +97,7 @@ expanded }
                     });
                 }}
                 innerClassName={"px-2 md:px-4 pb-2 md:pb-4 pt-1 md:pt-2 bg-surface-card"}
-                title={<LabelWithIconAndTooltip
+                title={<LabelWithIcon
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}

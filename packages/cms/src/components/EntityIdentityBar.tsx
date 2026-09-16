@@ -154,23 +154,8 @@ export function EntityIdentityBar({
 
     const { t } = useTranslation();
 
-    const saveLabel = status === "existing"
-        ? t("save")
-        : status === "copy" ? t("create_copy") : t("create");
-    const closeLabel = status === "existing"
-        ? t("save_and_close")
-        : status === "copy" ? t("create_copy_and_close") : t("create_and_close");
     const hasMenu = Boolean(recordActions) || Boolean(onInspect) || Boolean(onViewHistory)
         || Boolean(externalLink);
-
-    // The two shapes "save and close" takes, so the Save button next to it knows
-    // whether it is still the primary action.
-    const saveAndCloseButton = Boolean(onSaveAndClose) && saveAndClosePlacement === "button";
-    const saveAndCloseMenu = Boolean(onSaveAndClose) && saveAndClosePlacement === "menu";
-
-    const saveTooltip = hasErrors
-        ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving")
-        : undefined;
 
     return (
         <div className={cls(
@@ -215,89 +200,17 @@ export function EntityIdentityBar({
 
             <div className={"flex-1"}/>
 
-            {/* Only where there is something to save. The read-only detail
-                view has no Save button, and reporting "Saved" there implies an
-                editing session the user never started. */}
-            {onSave && <SaveState dirty={dirty} saving={saving} status={status} t={t}/>}
-
             {pluginActions}
 
-            {onDiscard && dirty && !saving && (
-                <Button variant={"text"} size={"small"} onClick={onDiscard}>
-                    {status === "existing" ? t("discard") : t("clear")}
-                </Button>
-            )}
-
-            {onSave && (
-                // `rounded-lg overflow-hidden`: the two halves of the split
-                // button are square inside and the group carries the radius, so
-                // there is one control with a seam rather than two buttons that
-                // happen to touch. Their borders match their own fill, so the
-                // seam has to be drawn — see the `▾` half for where and in what.
-                <div className={"flex items-stretch rounded-lg overflow-hidden"}>
-                    <Tooltip title={saveTooltip}>
-                        <LoadingButton
-                            // Where a separate close button carries it, closing
-                            // is the dominant intent and takes the filled
-                            // treatment. Under the `▾` the record is staying
-                            // open, so Save keeps it.
-                            variant={saveAndCloseButton ? "text" : "filled"}
-                            color={"primary"}
-                            size={"small"}
-                            loading={saving && !saveAndCloseButton}
-                            disabled={saveDisabled}
-                            onClick={onSave}
-                            className={saveAndCloseMenu ? "rounded-none" : undefined}>
-                            {saveLabel}
-                        </LoadingButton>
-                    </Tooltip>
-
-                    {saveAndCloseMenu && <>
-                        <Menu align={"end"}
-                            trigger={
-                                <Button variant={"filled"}
-                                    color={"primary"}
-                                    size={"small"}
-                                    disabled={saveDisabled}
-                                    aria-label={closeLabel}
-                                    // The seam is this half's own left border,
-                                    // tinted from `currentColor` — the ink the
-                                    // label is drawn in — so it holds on any
-                                    // button colour and dims with the control
-                                    // rather than needing a case per state. It
-                                    // was a `bg-white/25` span between the
-                                    // halves: a bright hairline scratched over a
-                                    // saturated blue, and, being a sibling of
-                                    // the buttons rather than part of one, it
-                                    // stayed at full strength while `disabled`
-                                    // dropped both halves to `opacity-40` — a
-                                    // rule brighter than the button it bisected.
-                                    // Inline because it has to beat the
-                                    // variant's `border-<color>` on one edge.
-                                    style={{ borderLeftColor: "color-mix(in oklab, currentColor 15%, transparent)" }}
-                                    className={"rounded-none px-1.5"}>
-                                    <ChevronDownIcon size={iconSize.smallest}/>
-                                </Button>
-                            }>
-                            <MenuItem onClick={onSaveAndClose}>
-                                <CheckIcon size={iconSize.smallest}/>
-                                {closeLabel}
-                            </MenuItem>
-                        </Menu>
-                    </>}
-                </div>
-            )}
-
-            {saveAndCloseButton && (
-                <LoadingButton variant={"filled"}
-                    color={"primary"}
-                    size={"small"}
-                    loading={saving}
-                    disabled={saveDisabled}
-                    onClick={onSaveAndClose}>
-                    {closeLabel}
-                </LoadingButton>
-            )}
+            <EntitySaveActions status={status}
+                dirty={dirty}
+                saving={saving}
+                onSave={onSave}
+                onDiscard={onDiscard}
+                saveDisabled={saveDisabled}
+                hasErrors={hasErrors}
+                onSaveAndClose={onSaveAndClose}
+                saveAndClosePlacement={saveAndClosePlacement}/>
 
             {hasMenu && (
                 <Menu align={"end"}
@@ -347,6 +260,134 @@ export function EntityIdentityBar({
             )}
         </div>
     );
+}
+
+export type EntitySaveActionsProps = Pick<EntityIdentityBarProps,
+    "status" | "dirty" | "saving" | "onSave" | "onDiscard" | "saveDisabled" | "hasErrors"
+    | "onSaveAndClose" | "saveAndClosePlacement">;
+
+/**
+ * Save, "save and close", Discard, and the words saying where the edit stands.
+ *
+ * Its own component because it has two homes. On a page and in the side panel
+ * it sits in the identity bar, where it stays in view while the form scrolls. In
+ * the dialog it sits in a footer under the form: a dialog is read top to bottom
+ * and finished at the bottom, where every other dialog in the app keeps its
+ * buttons, and the bar at its top is left to say what the record is.
+ */
+export function EntitySaveActions({
+    status,
+    dirty,
+    saving,
+    onSave,
+    onDiscard,
+    saveDisabled,
+    hasErrors,
+    onSaveAndClose,
+    saveAndClosePlacement = "button"
+}: EntitySaveActionsProps) {
+
+    const { t } = useTranslation();
+
+    const saveLabel = status === "existing"
+        ? t("save")
+        : status === "copy" ? t("create_copy") : t("create");
+    const closeLabel = status === "existing"
+        ? t("save_and_close")
+        : status === "copy" ? t("create_copy_and_close") : t("create_and_close");
+
+    // The two shapes "save and close" takes, so the Save button next to it knows
+    // whether it is still the primary action.
+    const saveAndCloseButton = Boolean(onSaveAndClose) && saveAndClosePlacement === "button";
+    const saveAndCloseMenu = Boolean(onSaveAndClose) && saveAndClosePlacement === "menu";
+
+    const saveTooltip = hasErrors
+        ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving")
+        : undefined;
+
+    return <>
+        {/* Only where there is something to save. The read-only detail
+            view has no Save button, and reporting "Saved" there implies an
+            editing session the user never started. */}
+        {onSave && <SaveState dirty={dirty} saving={saving} status={status} t={t}/>}
+
+        {onDiscard && dirty && !saving && (
+            <Button variant={"text"} size={"small"} onClick={onDiscard}>
+                {status === "existing" ? t("discard") : t("clear")}
+            </Button>
+        )}
+
+        {onSave && (
+            // `rounded-lg overflow-hidden`: the two halves of the split
+            // button are square inside and the group carries the radius, so
+            // there is one control with a seam rather than two buttons that
+            // happen to touch. Their borders match their own fill, so the
+            // seam has to be drawn — see the `▾` half for where and in what.
+            <div className={"flex items-stretch rounded-lg overflow-hidden"}>
+                <Tooltip title={saveTooltip}>
+                    <LoadingButton
+                        // Where a separate close button carries it, closing
+                        // is the dominant intent and takes the filled
+                        // treatment. Under the `▾` the record is staying
+                        // open, so Save keeps it.
+                        variant={saveAndCloseButton ? "text" : "filled"}
+                        color={"primary"}
+                        size={"small"}
+                        loading={saving && !saveAndCloseButton}
+                        disabled={saveDisabled}
+                        onClick={onSave}
+                        className={saveAndCloseMenu ? "rounded-none" : undefined}>
+                        {saveLabel}
+                    </LoadingButton>
+                </Tooltip>
+
+                {saveAndCloseMenu && <>
+                    <Menu align={"end"}
+                        trigger={
+                            <Button variant={"filled"}
+                                color={"primary"}
+                                size={"small"}
+                                disabled={saveDisabled}
+                                aria-label={closeLabel}
+                                // The seam is this half's own left border,
+                                // tinted from `currentColor` — the ink the
+                                // label is drawn in — so it holds on any
+                                // button colour and dims with the control
+                                // rather than needing a case per state. It
+                                // was a `bg-white/25` span between the
+                                // halves: a bright hairline scratched over a
+                                // saturated blue, and, being a sibling of
+                                // the buttons rather than part of one, it
+                                // stayed at full strength while `disabled`
+                                // dropped both halves to `opacity-40` — a
+                                // rule brighter than the button it bisected.
+                                // Inline because it has to beat the
+                                // variant's `border-<color>` on one edge.
+                                style={{ borderLeftColor: "color-mix(in oklab, currentColor 15%, transparent)" }}
+                                className={"rounded-none px-1.5"}>
+                                <ChevronDownIcon size={iconSize.smallest}/>
+                            </Button>
+                        }>
+                        <MenuItem onClick={onSaveAndClose}>
+                            <CheckIcon size={iconSize.smallest}/>
+                            {closeLabel}
+                        </MenuItem>
+                    </Menu>
+                </>}
+            </div>
+        )}
+
+        {saveAndCloseButton && (
+            <LoadingButton variant={"filled"}
+                color={"primary"}
+                size={"small"}
+                loading={saving}
+                disabled={saveDisabled}
+                onClick={onSaveAndClose}>
+                {closeLabel}
+            </LoadingButton>
+        )}
+    </>;
 }
 
 /**

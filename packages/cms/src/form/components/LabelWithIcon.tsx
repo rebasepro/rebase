@@ -1,5 +1,6 @@
 import React, { forwardRef } from "react";
 import { cls } from "@rebasepro/ui";
+import { PropertyKeyHint } from "../../components/PropertyKeyHint";
 
 interface LabelWithIconProps {
     icon: React.ReactNode;
@@ -17,6 +18,13 @@ interface LabelWithIconProps {
      * one more thing that can collide.
      */
     labelId?: string;
+    /**
+     * The property's key, revealed beside the label on hover and copied on
+     * click — see {@link PropertyKeyHint}. Leave it out where the label is drawn
+     * inside the control it names (a switch, a date field), where a second
+     * clickable thing would sit inside the first.
+     */
+    propertyKey?: string;
 }
 
 /**
@@ -30,12 +38,13 @@ export const LabelWithIcon = forwardRef<HTMLDivElement, LabelWithIconProps>(
         small,
         className,
         required,
-        labelId
+        labelId,
+        propertyKey
     }, ref) => {
         return (
             <div
                 ref={ref}
-                className={cls("align-middle inline-flex items-center my-0.5",
+                className={cls("group/label align-middle inline-flex items-center min-w-0 my-0.5",
                     small ? "gap-1" : "gap-2",
                     className)}
             >
@@ -47,6 +56,7 @@ export const LabelWithIcon = forwardRef<HTMLDivElement, LabelWithIconProps>(
                 >
                     {(title ?? "") + (required ? " *" : "")}
                 </span>
+                {propertyKey && <PropertyKeyHint propertyKey={propertyKey}/>}
             </div>
         );
     }

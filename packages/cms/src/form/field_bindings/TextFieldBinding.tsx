@@ -17,7 +17,6 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyPreview } from "../../preview";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { getIconForProperty } from "../../util/property_utils";
 
 /**
@@ -117,60 +116,58 @@ export function TextFieldBinding<T extends string | number>({
     // present — it wires `aria-labelledby` — so it only needs this as a fallback.
     const accessibleName = property.name ?? propertyKey;
     return (<>
-            <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                {isMultiline ? (
-                    <div className={cls(
-                        "rounded-md relative max-w-full min-h-[64px]",
-                        fieldBackgroundMixin,
-                        fieldBackgroundHoverMixin,
-                        showError && error ? "border border-red-500 dark:border-red-600" : ""
-                    )}>
-                        {label && <div
-                            className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
-                            {label}
-                        </div>}
-                        <TextareaAutosize
-                            value={displayValue}
-                            onChange={onChange}
-                            autoFocus={autoFocus}
-                            disabled={disabled}
-                            aria-label={accessibleName}
-                            className={cls(
-                                "rounded-md resize-none w-full outline-none text-sm bg-transparent min-h-[64px] px-3",
-                                label ? "pt-8 pb-2" : "py-2",
-                                disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
-                                showError && error ? "text-red-500 dark:text-red-600" : ""
-                            )}
-                        />
-                        {property.admin?.clearable && (
-                            <div
-                                className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
-                                <IconButton onClick={handleClearClick}>
-                                    <XIcon/>
-                                </IconButton>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <TextField
-                        size={size}
+            {isMultiline ? (
+                <div className={cls(
+                    "rounded-md relative max-w-full min-h-[64px]",
+                    fieldBackgroundMixin,
+                    fieldBackgroundHoverMixin,
+                    showError && error ? "border border-red-500 dark:border-red-600" : ""
+                )}>
+                    {label && <div
+                        className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
+                        {label}
+                    </div>}
+                    <TextareaAutosize
                         value={displayValue}
                         onChange={onChange}
                         autoFocus={autoFocus}
-                        label={label}
-                        aria-label={label ? undefined : accessibleName}
-                        type={inputType}
                         disabled={disabled}
-                        endAdornment={
-                            property.admin?.clearable && <IconButton
-                                onClick={handleClearClick}>
+                        aria-label={accessibleName}
+                        className={cls(
+                            "rounded-md resize-none w-full outline-none text-sm bg-transparent min-h-[64px] px-3",
+                            label ? "pt-8 pb-2" : "py-2",
+                            disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
+                            showError && error ? "text-red-500 dark:text-red-600" : ""
+                        )}
+                    />
+                    {property.admin?.clearable && (
+                        <div
+                            className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
+                            <IconButton onClick={handleClearClick}>
                                 <XIcon/>
                             </IconButton>
-                        }
-                        error={showError ? !!error : undefined}
-                        inputClassName={error ? "text-red-500 dark:text-red-600" : ""}/>
-                )}
-            </PropertyIdCopyTooltip>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <TextField
+                    size={size}
+                    value={displayValue}
+                    onChange={onChange}
+                    autoFocus={autoFocus}
+                    label={label}
+                    aria-label={label ? undefined : accessibleName}
+                    type={inputType}
+                    disabled={disabled}
+                    endAdornment={
+                        property.admin?.clearable && <IconButton
+                            onClick={handleClearClick}>
+                            <XIcon/>
+                        </IconButton>
+                    }
+                    error={showError ? !!error : undefined}
+                    inputClassName={error ? "text-red-500 dark:text-red-600" : ""}/>
+            )}
             <FieldHelperText includeDescription={includeDescription}
                              showError={showError}
                              error={error}

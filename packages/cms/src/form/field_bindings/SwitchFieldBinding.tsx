@@ -8,7 +8,6 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { BooleanSwitchWithLabel } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 
 /**
  * Simple boolean switch biding to a boolean property.
@@ -40,24 +39,22 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
     return (
         <>
 
-            <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                <BooleanSwitchWithLabel
-                    value={value as boolean | null}
-                    onValueChange={(v) => setValue(v)}
-                    error={showError}
-                    // The control is `justify-between`, so with the label lifted
-                    // out the switch would drift to the far edge of an otherwise
-                    // empty box. Anchor it to the start instead.
-                    position={hideLabel ? "start" : undefined}
-                    label={hideLabel ? undefined : <LabelWithIcon
-                        icon={getIconForProperty(property, "small")}
-                        required={property.validation?.required}
-                        title={property.name ?? propertyKey}/>}
-                    disabled={disabled}
-                    autoFocus={autoFocus}
-                    size={size}
-                />
-            </PropertyIdCopyTooltip>
+            <BooleanSwitchWithLabel
+                value={value as boolean | null}
+                onValueChange={(v) => setValue(v)}
+                error={showError}
+                // The control is `justify-between`, so with the label lifted
+                // out the switch would drift to the far edge of an otherwise
+                // empty box. Anchor it to the start instead.
+                position={hideLabel ? "start" : undefined}
+                label={hideLabel ? undefined : <LabelWithIcon
+                    icon={getIconForProperty(property, "small")}
+                    required={property.validation?.required}
+                    title={property.name ?? propertyKey}/>}
+                disabled={disabled}
+                autoFocus={autoFocus}
+                size={size}
+            />
 
             <FieldHelperText includeDescription={includeDescription}
                              showError={showError}

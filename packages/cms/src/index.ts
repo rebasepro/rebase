@@ -19,7 +19,7 @@ export {
     EntityCardBinding,
     useSelectionController,
     PropertyConfigBadge,
-    PropertyIdCopyTooltip,
+    PropertyKeyHint,
     CollectionTableBinding,
     CollectionRowActions,
     VirtualTableInput,

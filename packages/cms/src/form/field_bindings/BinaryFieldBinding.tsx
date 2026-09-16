@@ -6,7 +6,6 @@ import { Button, CheckIcon, cls, defaultBorderMixin, IconButton, PencilIcon, Tex
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { getIconForProperty } from "../../util/property_utils";
 
 /** Base64, optionally padded. Empty is allowed — that is a cleared field. */
@@ -100,70 +99,68 @@ export function BinaryFieldBinding({
                 />
             </div>}
 
-            <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                <div className="w-full">
-                    {!isEditing ? (
-                        <div className={cls("flex items-center justify-between gap-2 p-4 rounded-xl border bg-surface-field", defaultBorderMixin)}>
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isPopulated ? "bg-emerald-500" : "bg-surface-300 dark:bg-surface-600"}`}/>
-                                <span className="text-sm font-semibold text-text-primary truncate">
-                                    {malformed
-                                        ? "Invalid base64"
-                                        : isPopulated ? `${humanSize(bytes)} of binary data` : "Empty"}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                {!disabled && (
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        onClick={() => setIsEditing(true)}
-                                        startIcon={<PencilIcon size={14}/>}
-                                    >
-                                        {isPopulated ? "Edit base64" : "Add base64"}
-                                    </Button>
-                                )}
-                                {isPopulated && !disabled && (
-                                    <IconButton
-                                        size="small"
-                                        onClick={handleClear}
-                                        className="text-text-secondary hover:text-red-500"
-                                        aria-label="Clear binary value"
-                                    >
-                                        <Trash2Icon size={14}/>
-                                    </IconButton>
-                                )}
-                            </div>
+            <div className="w-full">
+                {!isEditing ? (
+                    <div className={cls("flex items-center justify-between gap-2 p-4 rounded-xl border bg-surface-field", defaultBorderMixin)}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isPopulated ? "bg-emerald-500" : "bg-surface-300 dark:bg-surface-600"}`}/>
+                            <span className="text-sm font-semibold text-text-primary truncate">
+                                {malformed
+                                    ? "Invalid base64"
+                                    : isPopulated ? `${humanSize(bytes)} of binary data` : "Empty"}
+                            </span>
                         </div>
-                    ) : (
-                        <div className={cls("flex flex-col gap-2 p-4 rounded-xl border", defaultBorderMixin)}>
-                            <TextField
-                                size={size}
-                                aria-label={`${property.name ?? propertyKey} base64 value`}
-                                value={text}
-                                onChange={onChange}
-                                autoFocus={autoFocus ?? true}
-                                multiline
-                                minRows={4}
-                                disabled={disabled}
-                                placeholder="Base64-encoded bytes, e.g. iVBORw0KGgo…"
-                                error={showError ? Boolean(error) || malformed : malformed}
-                                inputClassName={`font-mono text-xs ${malformed ? "text-red-500" : ""}`}
-                            />
-                            <div className="flex justify-end">
+                        <div className="flex items-center gap-2 shrink-0">
+                            {!disabled && (
                                 <Button
-                                    variant="filled"
+                                    variant="outlined"
                                     size="small"
-                                    onClick={() => setIsEditing(false)}
-                                    startIcon={<CheckIcon size={14}/>}
+                                    onClick={() => setIsEditing(true)}
+                                    startIcon={<PencilIcon size={14}/>}
                                 >
-                                    Done
+                                    {isPopulated ? "Edit base64" : "Add base64"}
                                 </Button>
-                            </div>
+                            )}
+                            {isPopulated && !disabled && (
+                                <IconButton
+                                    size="small"
+                                    onClick={handleClear}
+                                    className="text-text-secondary hover:text-red-500"
+                                    aria-label="Clear binary value"
+                                >
+                                    <Trash2Icon size={14}/>
+                                </IconButton>
+                            )}
                         </div>
-                    )}
-                </div>
-            </PropertyIdCopyTooltip>
+                    </div>
+                ) : (
+                    <div className={cls("flex flex-col gap-2 p-4 rounded-xl border", defaultBorderMixin)}>
+                        <TextField
+                            size={size}
+                            aria-label={`${property.name ?? propertyKey} base64 value`}
+                            value={text}
+                            onChange={onChange}
+                            autoFocus={autoFocus ?? true}
+                            multiline
+                            minRows={4}
+                            disabled={disabled}
+                            placeholder="Base64-encoded bytes, e.g. iVBORw0KGgo…"
+                            error={showError ? Boolean(error) || malformed : malformed}
+                            inputClassName={`font-mono text-xs ${malformed ? "text-red-500" : ""}`}
+                        />
+                        <div className="flex justify-end">
+                            <Button
+                                variant="filled"
+                                size="small"
+                                onClick={() => setIsEditing(false)}
+                                startIcon={<CheckIcon size={14}/>}
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <FieldHelperText
                 includeDescription={includeDescription}

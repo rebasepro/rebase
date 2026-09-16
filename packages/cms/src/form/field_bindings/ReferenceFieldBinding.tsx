@@ -8,7 +8,7 @@ import { Entity, EntityReference } from "@rebasepro/types";
 import { ErrorView } from "@rebasepro/app";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
 import { IconForView } from "@rebasepro/app";
@@ -97,7 +97,7 @@ function ReferenceFieldBindingInternal({
 
     return (
         <>
-            {!minimalistView && !hideLabel && <LabelWithIconAndTooltip
+            {!minimalistView && !hideLabel && <LabelWithIcon
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}

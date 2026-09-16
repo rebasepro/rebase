@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Field, useFormex } from "@rebasepro/forms";
 
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { EnumValuesChip } from "../../preview";
 
@@ -79,7 +79,7 @@ export function BlockFieldBinding({
     };
 
     const title = (
-        <LabelWithIconAndTooltip
+        <LabelWithIcon
             propertyKey={propertyKey}
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}

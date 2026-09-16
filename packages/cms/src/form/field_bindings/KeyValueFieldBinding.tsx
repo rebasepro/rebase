@@ -5,7 +5,7 @@ import { DataType, GeoPoint } from "@rebasepro/types";
 
 import { ArrayContainer } from "../../components/ArrayContainer";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -67,7 +67,7 @@ export function KeyValueFieldBinding({
                                      initialValue={initialValues}
                                      fieldName={property.name ?? propertyKey}/>;
 
-    const title = <LabelWithIconAndTooltip
+    const title = <LabelWithIcon
         propertyKey={propertyKey}
         icon={getIconForProperty(property, "small")}
         required={property.validation?.required}

@@ -21,16 +21,12 @@ const usersCollection: PostgresCollectionConfig = {
             validation: {
                 required: true,
                 unique: true
-            },
-            // Four short fields split into a 2×2 grid, which is a square of
-            // unrelated values rather than a form. Full width, one column.
-            admin: { span: 4 }
+            }
         },
         displayName: {
             name: "Name",
             type: "string",
-            columnName: "display_name",
-            admin: { span: 4 }
+            columnName: "display_name"
         },
         photoURL: {
             name: "Photo URL",
@@ -43,7 +39,6 @@ const usersCollection: PostgresCollectionConfig = {
             name: "Roles",
             type: "array",
             columnType: "text[]",
-            admin: { span: 4 },
             of: {
                 name: "Role",
                 type: "string",
@@ -114,8 +109,7 @@ const usersCollection: PostgresCollectionConfig = {
             name: "Created At",
             type: "date",
             columnName: "created_at",
-            admin: { readOnly: true,
-span: 4 }
+            admin: { readOnly: true }
         },
         updatedAt: {
             name: "Updated At",

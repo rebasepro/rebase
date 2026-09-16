@@ -4,7 +4,7 @@ import type { RelationProperty } from "@rebasepro/types";
 import { Entity, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, resolveRelationProperty } from "@rebasepro/common";
@@ -110,7 +110,7 @@ export function MultipleRelationFieldBinding({
     }, [relation, property.admin?.previewProperties, value]);
 
     const title = (<>
-        <LabelWithIconAndTooltip
+        <LabelWithIcon
             propertyKey={propertyKey}
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}

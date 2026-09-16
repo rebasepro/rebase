@@ -16,7 +16,6 @@ import {
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { getIconForProperty } from "../../util/property_utils";
 
 /**
@@ -106,96 +105,94 @@ export function VectorFieldBinding({
                 {label}
             </div>}
 
-            <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                <div className="w-full">
-                    {!isEditing ? (
-                        /* Compact Preview Card */
-                        <div className={cls("flex flex-col gap-3 p-4 rounded-xl border bg-surface-field transition-all duration-200", defaultBorderMixin)}>
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                                <div className="flex items-center gap-2.5">
-                                    {/* Status Dot */}
-                                    <div className={`w-2.5 h-2.5 rounded-full ${isPopulated ? "bg-emerald-500 animate-pulse" : "bg-surface-300 dark:bg-surface-600"}`} />
-                                    <span className="text-sm font-semibold text-text-primary dark:text-text-primary-dark">
-                                        {isPopulated ? `${arrayValue.length} Dimensions` : "Empty Vector"}
+            <div className="w-full">
+                {!isEditing ? (
+                    /* Compact Preview Card */
+                    <div className={cls("flex flex-col gap-3 p-4 rounded-xl border bg-surface-field transition-all duration-200", defaultBorderMixin)}>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5">
+                                {/* Status Dot */}
+                                <div className={`w-2.5 h-2.5 rounded-full ${isPopulated ? "bg-emerald-500 animate-pulse" : "bg-surface-300 dark:bg-surface-600"}`} />
+                                <span className="text-sm font-semibold text-text-primary dark:text-text-primary-dark">
+                                    {isPopulated ? `${arrayValue.length} Dimensions` : "Empty Vector"}
+                                </span>
+                                {isPopulated && (
+                                    <span className="text-xs text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded-full bg-surface-raised font-medium">
+                                        Embedding
                                     </span>
-                                    {isPopulated && (
-                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded-full bg-surface-raised font-medium">
-                                            Embedding
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    {isPopulated && (
-                                        <Button
-                                            variant="text"
-                                            size="small"
-                                            onClick={() => setShowValues(!showValues)}
-                                            startIcon={showValues ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
-                                        >
-                                            {showValues ? "Hide values" : "Show values"}
-                                        </Button>
-                                    )}
-                                    {!disabled && (
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            onClick={() => setIsEditing(true)}
-                                            startIcon={<PencilIcon size={14} />}
-                                        >
-                                            {isPopulated ? "Edit values" : "Add values"}
-                                        </Button>
-                                    )}
-                                    {isPopulated && !disabled && (
-                                        <IconButton size="small" onClick={handleClearClick} className="text-text-secondary hover:text-red-500">
-                                            <Trash2Icon size={14} />
-                                        </IconButton>
-                                    )}
-                                </div>
+                                )}
                             </div>
 
-                            {/* Collapsible scrollable numbers list */}
-                            {showValues && isPopulated && (
-                                <div className="mt-1 p-3 rounded-lg bg-surface-well border border-hairline max-h-36 overflow-y-auto font-mono text-[11px] leading-relaxed text-text-secondary dark:text-text-secondary-dark break-all selection:bg-primary/20">
-                                    {arrayValue.join(", ")}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        /* Editing View: Text Input */
-                        <div className={cls("flex flex-col gap-2 p-4 rounded-xl border bg-surface-field", defaultBorderMixin)}>
-                            <TextField
-                                size={size}
-                                aria-label={`${property.name ?? propertyKey} vector values`}
-                                value={textValue}
-                                onChange={onChange}
-                                autoFocus={true}
-                                placeholder={`e.g., 0.15, -0.42, 0.88 (Requires ${property.dimensions} dimensions)`}
-                                disabled={disabled}
-                                error={showError ? !!error : undefined}
-                                inputClassName={error ? "text-red-500 dark:text-red-600 font-mono text-xs" : "font-mono text-xs"}
-                            />
-                            <div className="flex justify-end gap-2 mt-2">
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => setIsEditing(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    variant="filled"
-                                    size="small"
-                                    onClick={() => setIsEditing(false)}
-                                    startIcon={<CheckIcon size={14} />}
-                                >
-                                    Done
-                                </Button>
+                            <div className="flex items-center gap-2">
+                                {isPopulated && (
+                                    <Button
+                                        variant="text"
+                                        size="small"
+                                        onClick={() => setShowValues(!showValues)}
+                                        startIcon={showValues ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
+                                    >
+                                        {showValues ? "Hide values" : "Show values"}
+                                    </Button>
+                                )}
+                                {!disabled && (
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => setIsEditing(true)}
+                                        startIcon={<PencilIcon size={14} />}
+                                    >
+                                        {isPopulated ? "Edit values" : "Add values"}
+                                    </Button>
+                                )}
+                                {isPopulated && !disabled && (
+                                    <IconButton size="small" onClick={handleClearClick} className="text-text-secondary hover:text-red-500">
+                                        <Trash2Icon size={14} />
+                                    </IconButton>
+                                )}
                             </div>
                         </div>
-                    )}
-                </div>
-            </PropertyIdCopyTooltip>
+
+                        {/* Collapsible scrollable numbers list */}
+                        {showValues && isPopulated && (
+                            <div className="mt-1 p-3 rounded-lg bg-surface-well border border-hairline max-h-36 overflow-y-auto font-mono text-[11px] leading-relaxed text-text-secondary dark:text-text-secondary-dark break-all selection:bg-primary/20">
+                                {arrayValue.join(", ")}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    /* Editing View: Text Input */
+                    <div className={cls("flex flex-col gap-2 p-4 rounded-xl border bg-surface-field", defaultBorderMixin)}>
+                        <TextField
+                            size={size}
+                            aria-label={`${property.name ?? propertyKey} vector values`}
+                            value={textValue}
+                            onChange={onChange}
+                            autoFocus={true}
+                            placeholder={`e.g., 0.15, -0.42, 0.88 (Requires ${property.dimensions} dimensions)`}
+                            disabled={disabled}
+                            error={showError ? !!error : undefined}
+                            inputClassName={error ? "text-red-500 dark:text-red-600 font-mono text-xs" : "font-mono text-xs"}
+                        />
+                        <div className="flex justify-end gap-2 mt-2">
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => setIsEditing(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="filled"
+                                size="small"
+                                onClick={() => setIsEditing(false)}
+                                startIcon={<CheckIcon size={14} />}
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <FieldHelperText
                 includeDescription={includeDescription}

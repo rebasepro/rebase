@@ -19,7 +19,7 @@ export * from "./CollectionViewBinding/EntityCardBinding";
 export * from "./CollectionViewBinding/useSelectionController";
 
 export * from "./PropertyConfigBadge";
-export * from "./PropertyIdCopyTooltip";
+export * from "./PropertyKeyHint";
 
 export * from "./CollectionTableBinding";
 // VirtualTable is exported from @rebasepro/ui

@@ -9,7 +9,6 @@ import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { cls, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { resolveEnumValues } from "@rebasepro/common";
 
 /**
@@ -65,14 +64,13 @@ export function SelectFieldBinding({
                 position="item-aligned"
                 inputClassName={cls("w-full")}
                 label={hideLabel ? undefined : (
-                    <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                        <LabelWithIcon
-                            icon={getIconForProperty(property, "small")}
-                            required={property.validation?.required}
-                            title={property.name ?? propertyKey}
-                            className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
-                        />
-                    </PropertyIdCopyTooltip>)}
+                    <LabelWithIcon
+                        icon={getIconForProperty(property, "small")}
+                        required={property.validation?.required}
+                        title={property.name ?? propertyKey}
+                        propertyKey={propertyKey}
+                        className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
+                    />)}
                 endAdornment={
                     property.admin?.clearable && !disabled && <IconButton
                         size="small"

@@ -6,9 +6,9 @@
  *
  * The reason this is a pure function rather than logic inside the form is that
  * the *defaults* are the interesting part. A collection that never writes an
- * `admin.form` block still has to get a two-column layout out of this — the flat
- * run of full-width fields it produced before was the single biggest cost in the
- * form, and no amount of config would have fixed it for collections nobody
+ * `admin.form` block still has to get a two-column layout out of this once it is
+ * long enough to need one — the flat run of full-width fields it produced before
+ * was the single biggest cost in the form, and no amount of config would have fixed it for collections nobody
  * hand-tunes. Deriving it here means it is testable in isolation, which matters
  * because "what span does a date get" is exactly the kind of rule that rots.
  */
@@ -33,6 +33,18 @@ import { isHidden } from "./property_presentation";
  * number by definition.
  */
 const GRID_COLUMNS = 4 satisfies PropertySpan;
+
+/**
+ * The most fields a form can hold and still be laid out as one column.
+ *
+ * Columns are a density tool: they buy back height on a form long enough to
+ * scroll. A form this short fits on any surface without scrolling, so pairing
+ * its fields buys nothing and costs the reading order — the eye zig-zags across
+ * values that are next to each other only because of their types. The users
+ * form was the case that showed it: Email beside Name, then Roles alone on the
+ * row below, in a dialog with room to spare.
+ */
+const SINGLE_COLUMN_MAX_FIELDS = 4;
 
 /** A field placed on the grid. */
 export interface ResolvedFormField {
@@ -379,11 +391,22 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
         });
     }
 
+    // A short form is one column. Only the derived widths change: a span the
+    // author wrote is kept, because they meant it. Counted across the whole
+    // form rather than per section, so one form never mixes the two rules.
+    const fieldCount = sections.reduce((sum, section) => sum + section.fields.length, 0);
+    const singleColumn = fieldCount <= SINGLE_COLUMN_MAX_FIELDS;
+
     // A configured section that ended up empty (every key hidden, unknown, or
     // claimed by the rail) would render as a heading over nothing.
     const nonEmpty = sections
         .filter(s => s.fields.length > 0)
-        .map(s => ({ ...s, fields: fillRows(s.fields) }));
+        .map(s => ({
+            ...s,
+            fields: fillRows(singleColumn
+                ? s.fields.map(f => f.spanExplicit ? f : { ...f, span: GRID_COLUMNS })
+                : s.fields)
+        }));
 
     return {
         sections: nonEmpty,

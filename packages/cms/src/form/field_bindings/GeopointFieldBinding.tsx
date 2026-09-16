@@ -6,7 +6,6 @@ import { IconButton, TextField, Trash2Icon } from "@rebasepro/ui";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { getIconForProperty } from "../../util/property_utils";
 
 /** Latitude runs −90…90, longitude −180…180. Anything else is not a place. */
@@ -141,52 +140,50 @@ export function GeopointFieldBinding({
                 />
             </div>}
 
-            <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                {/* Clear sits beside the inputs rather than above them, so
-                    entering a location does not grow the field by a row and
-                    knock it out of line with its neighbour. */}
-                <div className="flex gap-4 w-full items-center">
-                    <TextField
-                        className="flex-1"
-                        size={size}
-                        label="Latitude"
-                        value={latText}
-                        autoFocus={autoFocus}
-                        disabled={disabled}
-                        error={showError ? Boolean(error) || latInvalid : latInvalid}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                            setLatText(e.target.value);
-                            commit(e.target.value, lngText);
-                        }}
-                        placeholder="e.g. 41.3874"
-                        inputClassName="font-mono"
-                    />
-                    <TextField
-                        className="flex-1"
-                        size={size}
-                        label="Longitude"
-                        value={lngText}
-                        disabled={disabled}
-                        error={showError ? Boolean(error) || lngInvalid : lngInvalid}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                            setLngText(e.target.value);
-                            commit(latText, e.target.value);
-                        }}
-                        placeholder="e.g. 2.1686"
-                        inputClassName="font-mono"
-                    />
-                    {!disabled && (latText || lngText) && (
-                        <IconButton
-                            size="small"
-                            onClick={handleClear}
-                            className="shrink-0 text-text-secondary hover:text-red-500"
-                            aria-label="Clear location"
-                        >
-                            <Trash2Icon size={14}/>
-                        </IconButton>
-                    )}
-                </div>
-            </PropertyIdCopyTooltip>
+            {/* Clear sits beside the inputs rather than above them, so
+                entering a location does not grow the field by a row and
+                knock it out of line with its neighbour. */}
+            <div className="flex gap-4 w-full items-center">
+                <TextField
+                    className="flex-1"
+                    size={size}
+                    label="Latitude"
+                    value={latText}
+                    autoFocus={autoFocus}
+                    disabled={disabled}
+                    error={showError ? Boolean(error) || latInvalid : latInvalid}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                        setLatText(e.target.value);
+                        commit(e.target.value, lngText);
+                    }}
+                    placeholder="e.g. 41.3874"
+                    inputClassName="font-mono"
+                />
+                <TextField
+                    className="flex-1"
+                    size={size}
+                    label="Longitude"
+                    value={lngText}
+                    disabled={disabled}
+                    error={showError ? Boolean(error) || lngInvalid : lngInvalid}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                        setLngText(e.target.value);
+                        commit(latText, e.target.value);
+                    }}
+                    placeholder="e.g. 2.1686"
+                    inputClassName="font-mono"
+                />
+                {!disabled && (latText || lngText) && (
+                    <IconButton
+                        size="small"
+                        onClick={handleClear}
+                        className="shrink-0 text-text-secondary hover:text-red-500"
+                        aria-label="Clear location"
+                    >
+                        <Trash2Icon size={14}/>
+                    </IconButton>
+                )}
+            </div>
 
             <FieldHelperText
                 includeDescription={includeDescription}

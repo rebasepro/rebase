@@ -4,6 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { paperMixin } from "../styles";
 import { cls } from "../util";
 import { PortalContainerProvider, usePortalContainer } from "../hooks/PortalContainerContext";
+import { useRestoreInterruptedFocus } from "../hooks/useRestoreInterruptedFocus";
 
 export type DialogProps = {
     open?: boolean;
@@ -72,6 +73,11 @@ export const Dialog = ({
     // Handing descendants this host keeps them inside it.
     const [popupHost, setPopupHost] = useState<HTMLDivElement | null>(null);
 
+    // The focus trap's container. Tab between two fields used to land here
+    // whenever the first field's tooltip closed on the way out.
+    const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+    useRestoreInterruptedFocus(contentEl);
+
     // Get the portal container from context
     const contextContainer = usePortalContainer();
 
@@ -110,6 +116,7 @@ export const Dialog = ({
                     />
 
                     <DialogPrimitive.Content
+                        ref={setContentEl}
                         onEscapeKeyDown={onEscapeKeyDown}
                         onOpenAutoFocus={(e) => {
                             if (disableInitialFocus) {

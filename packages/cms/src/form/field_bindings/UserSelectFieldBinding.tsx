@@ -5,7 +5,6 @@ import React from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { getIconForProperty } from "../../util/property_utils";
-import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { UserSelector } from "../../components/UserSelector";
 
 type UserSelectProps = FieldProps<StringProperty>;
@@ -41,14 +40,13 @@ export function UserSelectFieldBinding({
 
     return (
         <>
-            {!hideLabel && <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                <LabelWithIcon
-                    icon={getIconForProperty(property, "small")}
-                    required={property.validation?.required}
-                    title={property.name}
-                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
-                />
-            </PropertyIdCopyTooltip>}
+            {!hideLabel && <LabelWithIcon
+                icon={getIconForProperty(property, "small")}
+                required={property.validation?.required}
+                title={property.name}
+                propertyKey={propertyKey}
+                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
+            />}
 
             <UserSelector
                 value={value as string | null | undefined}

@@ -4,6 +4,7 @@ import { cls } from "../util";
 import { defaultBorderMixin } from "../styles";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { usePortalContainer, PortalContainerProvider } from "../hooks/PortalContainerContext";
+import { useRestoreInterruptedFocus } from "../hooks/useRestoreInterruptedFocus";
 
 interface SheetProps {
     children: React.ReactNode;
@@ -46,6 +47,9 @@ export const Sheet: React.FC<SheetProps> = ({
 }) => {
     const [displayed, setDisplayed] = useState(false);
     const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+    // Popups portal into the content, which is also the focus trap's container:
+    // one closing on blur used to drop a Tab onto the panel itself.
+    useRestoreInterruptedFocus(contentEl);
 
     // Get the portal container from context
     const contextContainer = usePortalContainer();

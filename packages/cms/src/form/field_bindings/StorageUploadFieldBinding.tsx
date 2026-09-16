@@ -6,7 +6,7 @@ import { StorageConfig } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useDropzone } from "react-dropzone";
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
@@ -108,7 +108,7 @@ export function StorageUploadFieldBinding({
         <>
 
             {!minimalistView && !hideLabel &&
-                <LabelWithIconAndTooltip
+                <LabelWithIcon
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}

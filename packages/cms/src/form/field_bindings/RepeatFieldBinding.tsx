@@ -3,7 +3,7 @@ import type { ArrayProperty } from "@rebasepro/types";
 import React, { useState } from "react";
 ;
 import { FieldHelperText } from "../components/FieldHelperText";
-import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getArrayResolvedProperties, getDefaultValueFor } from "@rebasepro/common";
@@ -111,7 +111,7 @@ export function RepeatFieldBinding({
     />;
 
     const title = (<>
-        <LabelWithIconAndTooltip
+        <LabelWithIcon
             propertyKey={propertyKey}
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}

@@ -16,6 +16,7 @@ import {
     cls,
     CodeIcon,
     defaultBorderMixin,
+    DialogActions,
     HistoryIcon,
     IconButton,
     Maximize2Icon,
@@ -45,7 +46,7 @@ import { getEditHandoffValues } from "../form/form_utils";
 import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
-import { EntityIdentityBar } from "./EntityIdentityBar";
+import { EntityIdentityBar, EntitySaveActions } from "./EntityIdentityBar";
 import { useUndoableDiscard } from "../form/useUndoableDiscard";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
@@ -879,6 +880,47 @@ parentEntityIds,
             );
         });
 
+    const onSave = formActionsContext ? () => {
+        sideDialogContext.setPendingClose?.(false);
+        pendingCloseRef.current = false;
+        formActionsContext.submit();
+    } : undefined;
+
+    const onSaveAndClose = formActionsContext && canCloseAfterSave ? () => {
+        // Lowered again once the submit settles. A submit the form
+        // rejects never reaches `onSaved`, so nothing would consume the
+        // flag and the *next* save — a keyboard ⌘S, say — would close
+        // the panel out from under an edit nobody asked to finish. A
+        // save that succeeds has already closed by the time this runs.
+        if (layout === "split") {
+            pendingCloseRef.current = true;
+            Promise.resolve(formActionsContext.submit())
+                .finally(() => { pendingCloseRef.current = false; });
+            return;
+        }
+        sideDialogContext.setPendingClose?.(true);
+        Promise.resolve(formActionsContext.submit())
+            .finally(() => sideDialogContext.setPendingClose?.(false));
+    } : undefined;
+
+    // Unlike the form's own Discard, this one does not stop to ask — so it has
+    // to be reversible. See {@link useUndoableDiscard}.
+    const onDiscard = formActionsContext
+        ? () => discard(formActionsContext.formex, status)
+        : undefined;
+
+    /**
+     * The dialog keeps Save at its foot, not in the bar.
+     *
+     * A dialog is filled in top to bottom and finished at the bottom, which is
+     * where every other dialog in the app puts its buttons; up in the bar's
+     * right-hand corner, Create was the one thing on screen the eye had to
+     * travel back up to reach. The bar keeps what the record is and the ways
+     * out of it. The side panel and the pages keep Save in the bar, where it
+     * stays in view while a long form scrolls.
+     */
+    const actionsInFooter = layout === "dialog";
+
     const fullScreenButton = !barActions && // Not in split: the list panel beside it carries the close control,
     // and an expand button there competes with it.
     (layout === "side_panel" || layout === "dialog") && entityId ? (
@@ -919,35 +961,12 @@ parentEntityIds,
             onBack={layout === "full_screen" && !onShowList
                 ? () => navigate(withListState(urlController.buildUrlCollectionPath(path)))
                 : undefined}
-            onSave={formActionsContext ? () => {
-                sideDialogContext.setPendingClose?.(false);
-                pendingCloseRef.current = false;
-                formActionsContext.submit();
-            } : undefined}
-            onSaveAndClose={formActionsContext && canCloseAfterSave ? () => {
-                // Lowered again once the submit settles. A submit the form
-                // rejects never reaches `onSaved`, so nothing would consume the
-                // flag and the *next* save — a keyboard ⌘S, say — would close
-                // the panel out from under an edit nobody asked to finish. A
-                // save that succeeds has already closed by the time this runs.
-                if (layout === "split") {
-                    pendingCloseRef.current = true;
-                    Promise.resolve(formActionsContext.submit())
-                        .finally(() => { pendingCloseRef.current = false; });
-                    return;
-                }
-                sideDialogContext.setPendingClose?.(true);
-                Promise.resolve(formActionsContext.submit())
-                    .finally(() => sideDialogContext.setPendingClose?.(false));
-            } : undefined}
+            onSave={actionsInFooter ? undefined : onSave}
+            onSaveAndClose={actionsInFooter ? undefined : onSaveAndClose}
             // Welded to Save in the split, its own button in the overlays.
             saveAndClosePlacement={layout === "split" ? "menu" : "button"}
             onClose={onCloseRequest}
-            // Unlike the form's own Discard, this one does not stop to ask —
-            // so it has to be reversible. See {@link useUndoableDiscard}.
-            onDiscard={formActionsContext
-                ? () => discard(formActionsContext.formex, status)
-                : undefined}
+            onDiscard={actionsInFooter ? undefined : onDiscard}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             externalLink={usedEntity
@@ -1060,6 +1079,20 @@ parentEntityIds,
                 refreshToken={savedCount}
                 includeHistory={includeHistoryView}/>
         </div>
+
+        {actionsInFooter && onSave && (
+            <DialogActions translucent={false}>
+                <EntitySaveActions
+                    status={status}
+                    dirty={Boolean(formContext?.formex?.dirty)}
+                    saving={Boolean(formContext?.isSaving)}
+                    hasErrors={hasFormErrors}
+                    saveDisabled={!canEdit || saveDisabled}
+                    onSave={onSave}
+                    onSaveAndClose={onSaveAndClose}
+                    onDiscard={onDiscard}/>
+            </DialogActions>
+        )}
 
     </div>;
 
