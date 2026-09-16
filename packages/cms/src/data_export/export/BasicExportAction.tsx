@@ -12,6 +12,7 @@ import {
     DialogTitle,
     DownloadIcon,
     IconButton,
+    iconSize,
     Label,
     RadioGroup,
     RadioGroupItem,
@@ -71,7 +72,7 @@ export function BasicExportAction({
                 size={"small"}
                 color={"primary"} onClick={handleClickOpen}>
                 <DownloadIcon
-                    size={"small"}/>
+                    size={iconSize.small}/>
             </IconButton>
         </Tooltip>
 

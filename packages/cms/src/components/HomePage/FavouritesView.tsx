@@ -1,7 +1,7 @@
 import type { NavigationEntry } from "@rebasepro/cms-types";
 import { useNavigate } from "react-router";
 ;
-import { Chip, Collapse, StarIcon } from "@rebasepro/ui";
+import { Chip, Collapse, iconSize, StarIcon } from "@rebasepro/ui";
 import { useUserConfigurationPersistence } from "@rebasepro/app";
 import { useNavigationStateController } from "../../hooks/navigation/contexts/NavigationStateContext";
 
@@ -32,7 +32,7 @@ function NavigationChip({ entry }: { entry: NavigationEntry }) {
         onClick={() => navigate(entry.url)}
         icon={<StarIcon
             onClick={onIconClick}
-            size={"small"}
+            size={iconSize.small}
             className={favourite ? "text-secondary" : "text-surface-400 dark:text-surface-500"}/>
         }>
         {entry.name}

@@ -10,6 +10,7 @@ import {
     DialogContent,
     DialogTitle,
     IconButton,
+    iconSize,
     Select,
     SelectItem,
     Table,
@@ -398,7 +399,7 @@ joinPath: steps };
 joinPath: (prev.joinPath ?? []).filter((_, i) => i !== stepIndex) }
                                                                     : null)}
                                                             >
-                                                                <Trash2Icon size="smallest"/>
+                                                                <Trash2Icon size={iconSize.smallest}/>
                                                             </IconButton>
                                                         </div>
                                                         <TextField

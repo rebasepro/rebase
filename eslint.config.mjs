@@ -2,6 +2,79 @@ import pluginJs from "@eslint/js";
 import pluginReact from "eslint-plugin-react";
 import tseslint from "typescript-eslint";
 import pluginReactHooks from "eslint-plugin-react-hooks";
+import fs from "node:fs";
+import path from "node:path";
+
+/**
+ * The lucide icons `@rebasepro/ui` re-exports, read from its barrel so the list
+ * cannot drift from what callers actually import.
+ */
+function readLucideReexports() {
+    const barrel = fs.readFileSync(path.join(import.meta.dirname, "packages/ui/src/icons/index.ts"), "utf8");
+    const names = new Set();
+    for (const [, block] of barrel.matchAll(/export\s*\{([^}]*)\}\s*from\s*"lucide-react"/g)) {
+        for (const specifier of block.split(",")) {
+            const local = specifier.trim().split(/\s+as\s+/).pop();
+            if (local) names.add(local);
+        }
+    }
+    // An empty set would pass every file: the barrel changed shape, so say so.
+    if (names.size === 0) throw new Error("eslint.config.mjs: found no lucide re-exports in packages/ui/src/icons/index.ts");
+    return names;
+}
+
+/**
+ * A lucide icon writes `size` straight into the SVG's `width` and `height`, and
+ * its type is `string | number`, so `<StarIcon size="small"/>` compiles. The
+ * browser then drops `width="small"` as an invalid length and the icon grows to
+ * fill its container — the favourites chip on the CMS home page rendered a star
+ * the size of a card. The named sizes belong to Rebase's own icon components
+ * (`IconForView`, `GitHubIcon`, `AIIcon`); a lucide icon takes `iconSize.small`.
+ */
+const lucideIconNumericSize = {
+    meta: {
+        type: "problem",
+        messages: {
+            namedSize: "`{{icon}}` is a lucide icon, which writes `size` into the SVG's width and height: \"{{value}}\" is not a length, so the icon grows to fill its container. Pass `iconSize.{{value}}` from @rebasepro/ui."
+        },
+        schema: []
+    },
+    create(context) {
+        const lucideReexports = readLucideReexports();
+        const lucideLocals = new Set();
+        const namedSizes = new Set(["smallest", "small", "medium", "large"]);
+        const isUiIconsBarrel = (source) => source === "@rebasepro/ui" || /(^|\/)icons(\/index)?$/.test(source);
+        const stringValue = (value) => {
+            if (!value) return undefined;
+            if (value.type === "Literal") return typeof value.value === "string" ? value.value : undefined;
+            if (value.type !== "JSXExpressionContainer") return undefined;
+            const expression = value.expression;
+            if (expression.type === "Literal" && typeof expression.value === "string") return expression.value;
+            if (expression.type === "TemplateLiteral" && expression.expressions.length === 0) return expression.quasis[0].value.cooked;
+            return undefined;
+        };
+        return {
+            ImportDeclaration(node) {
+                const source = node.source.value;
+                for (const specifier of node.specifiers) {
+                    if (specifier.type !== "ImportSpecifier") continue;
+                    const imported = specifier.imported.name ?? specifier.imported.value;
+                    if (source === "lucide-react" || (isUiIconsBarrel(source) && lucideReexports.has(imported))) {
+                        lucideLocals.add(specifier.local.name);
+                    }
+                }
+            },
+            JSXAttribute(node) {
+                if (node.name.type !== "JSXIdentifier" || node.name.name !== "size") return;
+                const element = node.parent;
+                if (element.name.type !== "JSXIdentifier" || !lucideLocals.has(element.name.name)) return;
+                const value = stringValue(node.value);
+                if (!namedSizes.has(value)) return;
+                context.report({ node, messageId: "namedSize", data: { icon: element.name.name, value } });
+            }
+        };
+    }
+};
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -101,7 +174,8 @@ export default [
         files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
 
         plugins: {
-            "react-hooks": pluginReactHooks
+            "react-hooks": pluginReactHooks,
+            rebase: { rules: { "lucide-icon-numeric-size": lucideIconNumericSize } }
         },
 
         languageOptions: {
@@ -187,6 +261,8 @@ export default [
             // hiding a genuinely new stale closure was.
             "react-hooks/rules-of-hooks": "error",
             "react-hooks/exhaustive-deps": "warn",
+            // See `lucideIconNumericSize` at the top of this file.
+            "rebase/lucide-icon-numeric-size": "error",
             "@typescript-eslint/no-unused-vars": ["warn", {
                 "argsIgnorePattern": "^_",
                 "varsIgnorePattern": "^_",

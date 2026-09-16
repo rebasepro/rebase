@@ -314,7 +314,7 @@ export function FirebaseLoginView({
                             disabled={disabled}
                             text={"Log in anonymously"}
                             icon={<UserIcon
-                                size={"medium"}/>}
+                                size={iconSize.medium}/>}
                             onClick={authController.anonymousLogin}/>}
 
                     {allowSkipLogin &&

@@ -338,7 +338,7 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
             ) : (
                 <div className="w-7 h-7 rounded-full bg-surface-raised flex items-center justify-center shrink-0">
                     <CircleUserIcon
-                        size={"smallest"}
+                        size={iconSize.smallest}
                         className="text-text-disabled dark:text-text-disabled-dark"
                     />
                 </div>

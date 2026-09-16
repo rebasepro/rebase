@@ -3770,3 +3770,44 @@ passes on both sides. Gate: two more cases in `release-docs.test.mjs` kill six
 mutations: the zero-count rule off, applied with bullets too, said twice beside the
 rename hint, naming no release, and the stray check off or counting the page
 `[Unreleased]` goes to.
+
+## 65. A shared vocabulary on a component that does not speak it
+
+`size="small"` is correct on almost everything in `@rebasepro/ui`: `Chip`,
+`IconButton`, `CircularProgress`, `IconForView`, `GitHubIcon`. The lucide icons
+the same barrel re-exports look like the rest of the kit and do not share the
+vocabulary. A lucide icon writes `size` into the SVG's `width` and `height`, and
+types it `string | number`, so `<StarIcon size="small"/>` compiles. The browser
+drops `width="small"` as an invalid length and the SVG falls back to filling its
+container. The favourites chip on the CMS home page rendered a 300px star where a
+20px one belonged.
+
+It hides because the wrong call site looks exactly like the one next to it, and
+the type is too wide to object. `GitHubIcon` already carried a comment describing
+this failure (it resolves the keyword itself). That fixed the wrapper, not the
+callers of the raw icons.
+
+**Sweep:** for any prop name several components share (`size`, `color`,
+`variant`), find the components where it has a different domain, and check every
+call site that passes one component's value to the other. Here that meant
+walking the TSX AST for JSX whose tag is imported from `lucide-react` or is a
+lucide re-export of `@rebasepro/ui`, with a string `size`. A text search misses
+the attribute on its own line, and four of the five were on their own line.
+
+**Sweep (2026-09-16):**
+
+| checked | result |
+|---|---|
+| `FavouritesView` — `StarIcon size="small"` | **BUG**, the reported one. Fixed. |
+| `CollectionRelationsTab` — `Trash2Icon size="smallest"` | **BUG**. Fixed. |
+| `BasicExportAction` — `DownloadIcon size="small"` | **BUG**. Fixed. |
+| `UserSelectPopover` — `CircleUserIcon size="smallest"` | **BUG**. Fixed. |
+| `FirebaseLoginView` — `UserIcon size="medium"` | **BUG**. Fixed. |
+| lucide icons sized by a variable or ternary (`Alert`, `Checkbox`, `Select`, `MultiSelect`, `SearchBar`, `SortButton`, `RelationSelector`, `UserSelector`, `property_utils`) | clean. Each resolves to a number. |
+| `IconForView`, `AIIcon`, `GitHubIcon`, `LucideIconByName` | clean. The first three map the keyword to pixels; the last takes `number` only. |
+
+Gate: `rebase/lucide-icon-numeric-size` in `eslint.config.mjs`, an error under
+`check:lint`. It reads the lucide re-exports from `packages/ui/src/icons/index.ts`,
+so a new icon is covered without editing the rule. Each of the five files as they were
+before the fix fails it, as do a direct `lucide-react` import and a relative
+`../icons` import. `GitHubIcon size="small"` and `size="1.5rem"` pass.
