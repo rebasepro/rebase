@@ -1041,6 +1041,7 @@ const defaultUsersCollection { auth, callbacks, childCollections, dataSource, da
 function aggregateAlias
 function and
 function applyDefaultValuesOnCreate
+function authSecretsMissingExclusion
 function buildCollectionFromTableMetadata
 function buildCompositeId
 function buildConditionContext
@@ -1181,6 +1182,7 @@ function updateUserAutoValues
 function wrapAsEntityData
 function wrapAsSdkData
 interface AnonymousGrantRisk { detail, explanation, pattern }
+interface AuthSecretCandidate { auth, properties }
 interface CheckOperationOptions { clauses, onUnknown }
 interface DataSourceResolvable { dataSource, databaseId, engine }
 interface DecodedCursor { id, orderBy, values }
