@@ -35,6 +35,18 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ### Fixed
 
+- **The service key is no longer rate limited.** The data API buckets callers
+  as API key, signed-in user, then IP — and `identify` saw the service key's
+  `uid: "service"` and gave it the ordinary user allowance of 1000 requests per
+  15 minutes, shared across every service-key caller. It is the deployment's own
+  credential and already reaches every row, so the limit protected nothing that
+  was not already open to whoever holds the key; what it stopped was the work
+  the key exists for. A backfill of 7,925 rows died at row ~1000 with a 429, and
+  a managed deployment has no `rateLimit` surface to raise. The service identity
+  now skips the limiter entirely, without spending the bucket of whoever shares
+  its key. API keys keep their own `rate_limit`, users the `user` allowance,
+  anonymous traffic the IP bucket.
+
 - **A refused Google sign-in onto an existing account now tells the visitor
   what to do, in their language.** Signing in with a provider onto an address
   whose account cannot be linked automatically showed the API's message on the
