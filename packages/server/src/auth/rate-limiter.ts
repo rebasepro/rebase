@@ -5,6 +5,7 @@ import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitStore } from "./rate-limit-store";
 import { extractBearerToken } from "./bearer-token";
 import { isJwtConfigured, verifyAccessToken } from "./jwt";
+import { SERVICE_IDENTITY } from "./rls-scope";
 import { logger } from "../utils/logger";
 
 /**
@@ -494,6 +495,22 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
             return `ip:${defaultKeyGenerator(c, trustedProxyHops)}`;
         },
         resolveLimit: async (c) => {
+            // The service key is not a caller to bound. It is the deployment's
+            // own credential: it already reaches every row through
+            // `SERVICE_IDENTITY`, so a limit on it protects nothing that is not
+            // already open to whoever holds it. What it does reliably stop is
+            // the work the key exists for — backfills, migrations, imports,
+            // server-to-server jobs — which arrive as thousands of legitimate
+            // requests and met the ordinary signed-in-user allowance, because
+            // `identify` sees `uid: "service"` and buckets it as a user. A
+            // managed deployment has no `rateLimit` surface to raise, so the
+            // only way through was to sleep between writes.
+            //
+            // `null` means "skip the limiter", which `createRateLimiter`
+            // honours before it touches the store.
+            const serviceIdentity = c.get("user") as { uid?: string } | undefined;
+            if (serviceIdentity?.uid === SERVICE_IDENTITY.uid) return null;
+
             const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
             if (key) return key.rate_limit ?? apiKeyLimit;
             return (await identify(c)) ? userLimit : anonLimit;

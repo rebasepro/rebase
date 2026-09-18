@@ -41,6 +41,44 @@ describe("createDataRateLimiter", () => {
     const hit = (app: Hono, ip = "1.2.3.4") =>
         app.fetch(new Request("http://localhost/data", { headers: { "x-real-ip": ip } }));
 
+    /**
+     * The service key is the deployment's own credential. It already reaches
+     * every row, so throttling it protects nothing that is not already open to
+     * whoever holds it — while reliably breaking the backfills and migrations
+     * the key exists for. It used to be bucketed as `user:service` and given
+     * the ordinary signed-in allowance, and a managed deployment has no
+     * `rateLimit` surface to raise.
+     */
+    it("never limits the service identity", async () => {
+        const app = appWith((c) => c.set("user", { uid: "service", roles: ["admin"] }), { user: 2 });
+
+        for (let i = 0; i < 25; i += 1) {
+            expect((await hit(app)).status).toBe(200);
+        }
+    });
+
+    it("does not let the service identity spend another bucket's allowance", async () => {
+        // Skipping the limiter must mean skipping the counter too: if the
+        // service key still hit the store, a backfill would exhaust the bucket
+        // for whoever shares its key and lock real callers out.
+        const app = new Hono();
+        app.use("/*", async (c, next) => {
+            c.set("user", c.req.header("x-as-service") ? { uid: "service", roles: ["admin"] } : { uid: "user-1" });
+            await next();
+        });
+        app.use("/*", createDataRateLimiter({ store, user: 2 }));
+        app.get("/data", (c) => c.json({ ok: true }));
+
+        for (let i = 0; i < 10; i += 1) {
+            const res = await app.fetch(new Request("http://localhost/data", { headers: { "x-as-service": "1" } }));
+            expect(res.status).toBe(200);
+        }
+        // user-1 still has its full allowance of 2.
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(200);
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(200);
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(429);
+    });
+
     it("limits a signed-in user, which nothing did before", async () => {
         const app = appWith((c) => c.set("user", { uid: "user-1" }), { user: 2 });
 
