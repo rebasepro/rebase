@@ -35,6 +35,24 @@ database: undefined });
         expect(state.blockedOn).toBe("no_database");
     });
 
+    it("does not call a serving project undeployable, or offer to replace its database", () => {
+        // The regression this exists for. A project deployed the documented way
+        // provisions its managed Postgres in the deploy pipeline, and for a long
+        // time nothing wrote a `databases` row for it. This function then
+        // reported `no_database` for projects that were serving traffic — and
+        // named `db create`, which against a live database is the one command
+        // that can repoint the app at an empty one.
+        //
+        // A successful deploy is proof: it cannot succeed without a database.
+        const state = resolveBlockedState({
+            projectStatus: "active",
+            database: undefined,
+            lastDeploy: { status: "success" }
+        });
+        expect(state.blockedOn).toBeNull();
+        expect(state.nextAction).toBeNull();
+    });
+
     it("is null while a deploy is actually in flight", () => {
         const state = resolveBlockedState({
             projectStatus: "provisioning",

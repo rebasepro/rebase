@@ -149,7 +149,20 @@ export function resolveBlockedState(input: {
 }): BlockedState {
     // First, because it is the state that never resolves itself. A project
     // with no database cannot deploy, and no amount of waiting attaches one.
-    if (!input.database) {
+    //
+    // Unless it already did. A project whose last deploy SUCCEEDED has a
+    // database by definition — the deploy path provisions the managed stack and
+    // the runtime ensures the schema at boot, neither of which can happen
+    // without one. For a long time that path wrote no `databases` row, so this
+    // branch fired on projects that were serving traffic: it reported
+    // `blockedOn: no_database` beside `status: active`, and named `db create`
+    // as the remedy — the one command that could provision a SECOND database
+    // and repoint the app at it, away from the rows.
+    //
+    // So the absence of a row is only conclusive before anything has deployed.
+    // Afterwards it describes the control plane's bookkeeping, not the project,
+    // and `db create` must never be suggested for it.
+    if (!input.database && input.lastDeploy?.status !== "success") {
         return {
             blockedOn: "no_database",
             nextAction: "rebase cloud db create --type managed"
@@ -189,7 +202,7 @@ nextAction: "rebase cloud deploy" };
 
     // A database that has been attached but never reached — the deploy
     // succeeded and the app cannot talk to its own store.
-    if (input.database.connectionStatus === "failed") {
+    if (input.database?.connectionStatus === "failed") {
         return { blockedOn: "database_unreachable",
 nextAction: "rebase cloud db test" };
     }
