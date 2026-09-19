@@ -11,6 +11,7 @@ import {
 } from "@rebasepro/types";
 import { FindParams } from "./transport";
 import { normalizeOrderBy, resolveFindWindow } from "@rebasepro/common";
+import { splitSearchTerms } from "@rebasepro/utils";
 
 /**
  * A local evaluator for `FindParams`, so cached rows can answer a query the
@@ -284,16 +285,23 @@ export function matchesLogical(
  * cached row does not carry — a local list may therefore be missing rows the
  * server would have returned, which is why {@link isExactlyEvaluable} refuses
  * to call a search query exact.
+ *
+ * Every term has to match, but they may match different fields — the same rule
+ * both drivers apply, and the one that finds `sebastian melendez` on a row that
+ * keeps the two halves of a name in separate fields. Matching the typed string
+ * as a whole found neither that row nor, because the space was part of the
+ * needle, anything at all for `sebastian `.
  */
 export function matchesSearch(row: Record<string, unknown>, searchString: string | undefined): boolean {
     if (!searchString) return true;
-    const needle = searchString.trim().toLowerCase();
-    if (!needle) return true;
-    for (const value of Object.values(row)) {
-        if (typeof value === "string" && value.toLowerCase().includes(needle)) return true;
-        if (typeof value === "number" && String(value).includes(needle)) return true;
-    }
-    return false;
+    const terms = splitSearchTerms(searchString).map(term => term.toLowerCase());
+    if (terms.length === 0) return true;
+    const values = Object.values(row);
+    return terms.every(term => values.some(value => {
+        if (typeof value === "string") return value.toLowerCase().includes(term);
+        if (typeof value === "number") return String(value).includes(term);
+        return false;
+    }));
 }
 
 /** Does this row belong in the result set for `params`, ignoring pagination? */

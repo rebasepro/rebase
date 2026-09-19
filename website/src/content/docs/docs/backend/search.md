@@ -10,11 +10,18 @@ compiles to depends on whether the collection has asked for anything more.
 ## The default
 
 With no configuration, `.search()` is a **case-insensitive substring match**,
-OR-ed across the collection's top-level `string` properties:
+OR-ed across the collection's top-level `string` properties. The search string
+is split on whitespace and every term has to match — but they may match
+different properties, so a name kept in two columns is still found:
 
 ```sql
-WHERE name ILIKE '%term%' OR description ILIKE '%term%'
+-- .search("ada lovelace")
+WHERE (first_name ILIKE '%ada%'      OR last_name ILIKE '%ada%')
+  AND (first_name ILIKE '%lovelace%' OR last_name ILIKE '%lovelace%')
 ```
+
+Wrap a run in double quotes — `.search('"ada lovelace"')` — to search for the
+phrase instead, the same way the full-text path below reads them.
 
 This is enough for a small collection with its text in plain columns. It has
 three limits that no setting inside it can fix:
@@ -33,8 +40,7 @@ are escaped before the pattern is built, so searching for `50%` searches for
 operator takes a pattern (`.where("title", "like", "post-%")`); `.search()` does
 not.
 
-The default does not change, and a collection that has not opted in compiles to
-exactly the SQL it always did.
+A one-word search compiles to exactly the SQL it always did.
 
 ## Opting in
 

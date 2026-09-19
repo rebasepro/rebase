@@ -3,10 +3,11 @@
  *
  * ## Why this is opt-in
  *
- * Without a `search` block, `.search()` behaves exactly as it always has: an
- * `ILIKE '%term%'` OR-ed across the collection's top-level, non-enum `string`
- * properties. That default is unchanged and will stay unchanged — declaring
- * this block is the only way to get anything else.
+ * Without a `search` block, `.search()` is `ILIKE '%term%'` per whitespace-
+ * separated term, OR-ed across the collection's top-level, non-enum `string`
+ * properties and AND-ed across the terms — so two typed words may be found in
+ * two different columns, as they are here. Declaring this block is the only way
+ * to get anything more than that.
  *
  * The default has three limits that no amount of tuning inside it can fix:
  * it cannot reach inside `map` (JSONB) or `array` properties, it has no notion

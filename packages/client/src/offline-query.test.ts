@@ -253,6 +253,24 @@ describe("local query engine", () => {
             expect(runLocalQuery(rows, { searchString: "   " }).data).toHaveLength(3);
         });
 
+        it("asks every term of a search, of any field", () => {
+            // The server's fallback does the same: OR across the fields, AND
+            // across the terms. Anything less finds no row at all when the two
+            // words a user typed are two different fields — a first and a last
+            // name — and a trailing space becomes part of the needle.
+            const people: Row[] = [
+                { id: "p1", first: "Sebastian", last: "Melendez" },
+                { id: "p2", first: "Sebastian", last: "Ruiz" }
+            ];
+            const ids = (searchString: string) =>
+                runLocalQuery(people, { searchString }).data.map((r) => r.id);
+
+            expect(ids("sebastian melendez")).toEqual(["p1"]);
+            expect(ids("melendez sebastian")).toEqual(["p1"]);
+            expect(ids("sebastian ")).toEqual(["p1", "p2"]);
+            expect(ids("sebastian gomez")).toEqual([]);
+        });
+
         it("combines where, logical and search with AND", () => {
             const params: FindParams = {
                 where: { status: ["==", "draft"] },

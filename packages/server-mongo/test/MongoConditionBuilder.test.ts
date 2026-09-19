@@ -6,6 +6,7 @@
 
 import { MongoConditionBuilder } from "../src/db/MongoConditionBuilder";
 import { CollectionConfig, FilterValues } from "@rebasepro/types";
+import { Document, Filter } from "mongodb";
 
 describe("MongoConditionBuilder", () => {
     describe("buildFilterConditions", () => {
@@ -348,17 +349,48 @@ type: "string" },
 type: "number" }
         };
 
-        it("builds a regex condition per string property", () => {
-            const conditions = MongoConditionBuilder.buildSearchConditions("ada", props);
+        it("offers the term every string property", () => {
+            const [condition] = MongoConditionBuilder.buildSearchConditions("ada", props);
 
-            expect(conditions).toHaveLength(2);
-            expect(conditions.map(c => Object.keys(c)[0]).sort()).toEqual(["bio", "name"]);
+            const or = (condition as { $or: Filter<Document>[] }).$or;
+            expect(or.map(c => Object.keys(c)[0]).sort()).toEqual(["bio", "name"]);
         });
 
         it("does not search non-string properties", () => {
             const conditions = MongoConditionBuilder.buildSearchConditions("ada", props);
 
-            expect(conditions.some(c => "age" in c)).toBe(false);
+            expect(JSON.stringify(conditions)).not.toContain("age");
+        });
+
+        it("asks every term of the search, of any field", () => {
+            // `sebastian melendez` is a first name and a last name. Matching the
+            // whole typed string per field finds neither, which is what the
+            // Postgres fallback did too until both were split into terms.
+            const [condition] = MongoConditionBuilder.buildSearchConditions("ada lovelace", props);
+
+            const and = (condition as { $and: { $or: Filter<Document>[] }[] }).$and;
+            expect(and).toHaveLength(2);
+            for (const term of and) {
+                expect(term.$or.map(c => Object.keys(c)[0]).sort()).toEqual(["bio", "name"]);
+            }
+
+            const matches = (row: Record<string, string>) =>
+                and.every(term => term.$or.some(clause => {
+                    const [[field, { $regex }]] = Object.entries(clause as Record<string, { $regex: RegExp }>);
+                    return $regex.test(row[field] ?? "");
+                }));
+
+            expect(matches({ name: "Ada", bio: "Lovelace, countess" })).toBe(true);
+            expect(matches({ name: "Ada", bio: "Byron" })).toBe(false);
+        });
+
+        it("drops the space a user leaves after a word", () => {
+            // `ada ` searched for the space as well, so it matched nothing.
+            const [condition] = MongoConditionBuilder.buildSearchConditions("ada ", props);
+
+            const or = (condition as { $or: { name: { $regex: RegExp } }[] }).$or;
+            expect(or[0].name.$regex.test("Ada Lovelace")).toBe(true);
+            expect(or[0].name.$regex.source).toBe("ada");
         });
 
         it("matches case-insensitively on the search string", () => {

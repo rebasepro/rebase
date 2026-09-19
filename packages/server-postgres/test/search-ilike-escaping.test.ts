@@ -40,14 +40,21 @@ const collection: CollectionConfig = {
     idField: "id"
 };
 
-/** The bound pattern the ILIKE condition would send. */
-const patternFor = (searchString: string): string => {
+/** The bound patterns the ILIKE condition would send, one per search term. */
+const patternsFor = (searchString: string): string[] => {
     const conditions = DrizzleConditionBuilder.buildSearchConditions(
         searchString, collection.properties, docs, collection
     );
     expect(conditions).toHaveLength(1);
     const { params } = new PgDialect().sqlToQuery(conditions[0]);
-    return String(params[0]);
+    return params.map(String);
+};
+
+/** The single bound pattern of a one-term search. */
+const patternFor = (searchString: string): string => {
+    const patterns = patternsFor(searchString);
+    expect(patterns).toHaveLength(1);
+    return patterns[0];
 };
 
 describe("a search term is matched as literal text", () => {
@@ -66,7 +73,11 @@ describe("a search term is matched as literal text", () => {
     });
 
     it("leaves an ordinary term exactly as it was", () => {
-        expect(patternFor("auditor iso 14001")).toBe("%auditor iso 14001%");
+        expect(patternFor("auditor")).toBe("%auditor%");
+    });
+
+    it("escapes each term of a multi-word search", () => {
+        expect(patternsFor("50% a_c")).toEqual(["%50\\%%", "%a\\_c%"]);
     });
 
     it("gives a hostile pattern no wildcards to backtrack over", () => {

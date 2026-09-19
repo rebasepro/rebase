@@ -12,7 +12,7 @@ import {
     fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
 } from "@rebasepro/common";
 import { currentFieldViewer } from "../services/field-viewer";
-import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
+import { generateForeignKeyName, splitSearchTerms, toWireKey } from "@rebasepro/utils";
 /**
  * Postgres's own default for `pg_trgm.word_similarity_threshold`. Named here
  * because the fuzzy predicate has to know when the index-backed operator agrees
@@ -2182,13 +2182,20 @@ whereConditions };
      * - **Declared** — one `@@ websearch_to_tsquery` against the generated
      *   `tsvector` column. Stems, drops stopwords, AND-es the terms, reaches
      *   inside JSONB and arrays, and uses the GIN index.
-     * - **Not declared** — the original `ILIKE '%term%'` OR-ed across top-level
-     *   string properties, with the term escaped (see {@link escapeLikePattern})
-     *   so it is matched as the literal text the user typed.
+     * - **Not declared** — `ILIKE '%term%'` per term, OR-ed across top-level
+     *   string properties and AND-ed across the terms, with each term escaped
+     *   (see {@link escapeLikePattern}) so it is matched as the literal text
+     *   the user typed.
      *
-     * The second is the default and stays the default. A collection that has
-     * not opted in compiles to exactly the SQL it compiled to before this
-     * branch existed, which is the only reason it is safe to have added it.
+     * The second is the default and stays the default, and it AND-es terms for
+     * the same reason `websearch_to_tsquery` does: a person typing two words
+     * into a search box means both, and a name lives in two columns. Matching
+     * the whole string per column instead — which is what this did — cannot
+     * find `sebastian melendez` on a row with `first_name`/`last_name`, and
+     * could not find `sebastian ` at all.
+     *
+     * Returns at most one condition. Every caller ORs what it gets back, which
+     * is right across columns and wrong across terms, so the AND is built here.
      *
      * `collection` is optional so that the callers which genuinely have no
      * collection in hand — nested paths, derived views — keep working; without
@@ -2209,6 +2216,7 @@ whereConditions };
 
         let declaredStringProperties = 0;
         const viewer = currentFieldViewer();
+        const searchableColumns: AnyPgColumn[] = [];
 
         for (const [key, prop] of Object.entries(properties)) {
             const p = prop as Record<string, unknown>;
@@ -2225,7 +2233,7 @@ whereConditions };
                 declaredStringProperties++;
                 const fieldColumn = table[key as keyof typeof table] as AnyPgColumn;
                 if (fieldColumn && supportsILike(fieldColumn)) {
-                    searchConditions.push(ilike(fieldColumn, `%${escapeLikePattern(searchString)}%`));
+                    searchableColumns.push(fieldColumn);
                 }
             }
         }
@@ -2235,13 +2243,36 @@ whereConditions };
         // which reads as "no such row" rather than as the breakage it is. Say so
         // once per query: this is how the `instanceof` version of
         // {@link supportsILike} failed silently in the field for months.
-        if (declaredStringProperties > 0 && searchConditions.length === 0) {
+        if (declaredStringProperties > 0 && searchableColumns.length === 0) {
             logger.warn(
                 `[search] "${collection?.slug ?? "collection"}" declares ${declaredStringProperties} string ` +
                 "property(ies) but none compiled to a searchable column, so this search can only return nothing. " +
                 "Check that the generated schema's column types are text/varchar/char."
             );
         }
+        if (searchableColumns.length === 0) return [];
+
+        // Every term has to match *something*, but not the same something:
+        // "sebastian melendez" is a first name and a last name, and matching the
+        // whole string per column finds neither. See {@link splitSearchTerms}.
+        //
+        // A string with no terms at all is only whitespace. It stays the single
+        // literal pattern it has always been rather than becoming "no rows": an
+        // empty condition list means "match nothing" to every caller here, and a
+        // stray space is not a reason to answer that.
+        const terms = splitSearchTerms(searchString);
+        const perTerm = (terms.length > 0 ? terms : [searchString]).map(term => {
+            const pattern = `%${escapeLikePattern(term)}%`;
+            return DrizzleConditionBuilder.combineConditionsWithOr(
+                searchableColumns.map(column => ilike(column, pattern))
+            ) as SQL;
+        });
+
+        // One condition, already AND-ed across terms, because every caller ORs
+        // what it gets back — which is right for "this column or that one" and
+        // wrong for "this term and that one". A single-term search compiles to
+        // exactly the SQL it compiled to before this existed.
+        searchConditions.push(DrizzleConditionBuilder.combineConditionsWithAnd(perTerm) as SQL);
 
         return searchConditions;
     }

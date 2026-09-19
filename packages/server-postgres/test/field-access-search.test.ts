@@ -13,7 +13,7 @@
  * `validate-config.ts` refuses that combination at boot instead.
  */
 import { CollectionConfig } from "@rebasepro/types";
-import { pgTable, serial, text, integer } from "drizzle-orm/pg-core";
+import { pgTable, PgDialect, serial, text, integer } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { withFieldViewer } from "../src/services/field-viewer";
 
@@ -39,35 +39,44 @@ const collection: CollectionConfig = {
     idField: "id"
 };
 
-const conditionCount = (roles?: string[]): number =>
-    (roles
-        ? withFieldViewer({ roles }, () =>
-            DrizzleConditionBuilder.buildSearchConditions("ada", collection.properties, staff, collection))
-        : DrizzleConditionBuilder.buildSearchConditions("ada", collection.properties, staff, collection)
-    ).length;
+/**
+ * How many columns the compiled search actually looks at.
+ *
+ * Counted out of the SQL rather than off the array: the builder returns one
+ * condition with the readable columns OR-ed inside it, so a caller that reaches
+ * one extra column shows up as one extra `ilike`, not one extra condition.
+ */
+const searchedColumnCount = (roles?: string[]): number => {
+    const build = () =>
+        DrizzleConditionBuilder.buildSearchConditions("ada", collection.properties, staff, collection);
+    const conditions = roles ? withFieldViewer({ roles }, build) : build();
+    if (conditions.length === 0) return 0;
+    const { sql } = new PgDialect().sqlToQuery(conditions[0]);
+    return sql.split(" ilike ").length - 1;
+};
 
 describe("the fallback ILIKE search", () => {
     it("searches only the readable string columns for a caller without the role", () => {
         // `name` only — not `notes`, not `password_hash`.
-        expect(conditionCount(["staff"])).toBe(1);
+        expect(searchedColumnCount(["staff"])).toBe(1);
     });
 
     it("searches the restricted one too for a caller holding the role", () => {
-        expect(conditionCount(["hr"])).toBe(2);
+        expect(searchedColumnCount(["hr"])).toBe(2);
     });
 
     it("searches it for `admin`, who satisfies any non-empty list", () => {
-        expect(conditionCount(["admin"])).toBe(2);
+        expect(searchedColumnCount(["admin"])).toBe(2);
     });
 
     it("never searches an `excludeFromApi` column, whoever is asking", () => {
         // Two is `name` + `notes`. A third would be `password_hash`, and the
         // whole point of the flag is that no caller reaches it.
-        expect(conditionCount(["admin"])).toBe(2);
-        expect(conditionCount(["hr"])).toBe(2);
+        expect(searchedColumnCount(["admin"])).toBe(2);
+        expect(searchedColumnCount(["hr"])).toBe(2);
     });
 
     it("searches everything but the excluded column on the trusted server plane", () => {
-        expect(conditionCount()).toBe(2);
+        expect(searchedColumnCount()).toBe(2);
     });
 });

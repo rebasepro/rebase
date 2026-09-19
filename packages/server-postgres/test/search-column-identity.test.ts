@@ -51,21 +51,28 @@ const collection: CollectionConfig = {
     }
 } as unknown as CollectionConfig;
 
-/** The columns each condition was built against, by SQL identifier. */
+/**
+ * The columns the search was built against, by SQL identifier.
+ *
+ * One condition comes back, the columns OR-ed inside it — the search string
+ * here is a single term, so the terms are not also AND-ed on top of that.
+ */
 const searchedColumns = (table: unknown): string[] => {
     const conditions = DrizzleConditionBuilder.buildSearchConditions(
         "francesco", collection.properties, table as never, collection
     );
-    const dialect = new PgDialect();
-    return conditions.map(c => dialect.sqlToQuery(c).sql);
+    if (conditions.length === 0) return [];
+    expect(conditions).toHaveLength(1);
+    const { sql } = new PgDialect().sqlToQuery(conditions[0]);
+    return sql.replace(/^\(|\)$/g, "").split(" or ");
 };
 
 describe("the ILIKE fallback tests column type, not class identity", () => {
     it("searches every text-bearing column of a normally-built table", () => {
         expect(searchedColumns(users)).toEqual([
             "\"users\".\"email\" ilike $1",
-            "\"users\".\"display_name\" ilike $1",
-            "\"users\".\"bio\" ilike $1"
+            "\"users\".\"display_name\" ilike $2",
+            "\"users\".\"bio\" ilike $3"
         ]);
     });
 

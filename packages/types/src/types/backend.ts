@@ -109,7 +109,14 @@ export interface ConditionBuilder<T = unknown> {
     ): T[];
 
     /**
-     * Build search conditions for text search
+     * Build search conditions for text search.
+     *
+     * At most one condition comes back, already complete: callers OR what they
+     * get, and OR is right across the searchable *fields* but wrong across the
+     * *terms* of the search string — a person typing two words means both, and
+     * the two halves of a name are two different fields. The empty array still
+     * means "nothing here can be searched", which every caller reads as "no
+     * rows".
      */
     buildSearchConditions(
         searchString: string,

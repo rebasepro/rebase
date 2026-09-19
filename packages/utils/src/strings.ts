@@ -159,3 +159,53 @@ export function prettifyIdentifier(input: string) {
         .replace(/\b\w/g, (char) => char.toUpperCase());
     return s;
 }
+
+/**
+ * How many terms one search string is allowed to contribute.
+ *
+ * Every term multiplies the work: the substring fallback compiles to one
+ * `ILIKE '%term%'` per term *per searchable column*, evaluated per row on a
+ * sequential scan. Eight is far past what a person types into a search box and
+ * still bounds a pasted paragraph to a fixed number of predicates. Terms past
+ * the cap are dropped rather than rejected — dropping only widens the result
+ * set, and a search box that errors on a long paste is worse than one that
+ * matches on its first eight words.
+ */
+export const MAX_SEARCH_TERMS = 8;
+
+/**
+ * The terms a user meant when they typed into a search box.
+ *
+ * A search box is not a substring box. Typing `sebastian melendez` on a
+ * collection whose name is split across `first_name` and `last_name` has to
+ * find the row, and matching the whole string against each field separately
+ * cannot: no single column holds both words. Splitting on whitespace and
+ * requiring *every* term to match *some* field is what does, and it is what
+ * `websearch_to_tsquery` already does for collections that declared a `search`
+ * block — so this is also what keeps the two search paths answering the same
+ * question.
+ *
+ * It fixes the trailing space too: `sebastian ` matched nothing at all, because
+ * the space was part of the pattern.
+ *
+ * A double-quoted run is one term, again matching the full-text path, so a
+ * caller who really does want the phrase can ask for it. An unbalanced quote is
+ * stripped rather than honoured — the alternative is that everything after a
+ * stray `"` silently becomes one long term that matches nothing.
+ *
+ * Returns an empty array for a string with no terms in it at all (whitespace,
+ * or nothing but quotes); the caller decides what an empty search means, since
+ * only it knows whether "no constraint" or "no rows" is the safe reading.
+ */
+export function splitSearchTerms(searchString: string, maxTerms = MAX_SEARCH_TERMS): string[] {
+    const terms: string[] = [];
+    const pattern = /"([^"]*)"|(\S+)/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(searchString)) !== null) {
+        const term = (match[1] ?? match[2].replace(/"/g, "")).trim();
+        if (!term) continue;
+        terms.push(term);
+        if (terms.length >= maxTerms) break;
+    }
+    return terms;
+}

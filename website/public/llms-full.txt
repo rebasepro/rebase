@@ -2786,6 +2786,19 @@ yet, listed so that nobody reads a promise into them:
 
 #### Fixed
 
+- **A search for two words finds a row that keeps them in two fields.**
+  Searching `sebastian melendez` on a collection with `first_name` and
+  `last_name` returned nothing: the default search compiled one
+  `ILIKE '%sebastian melendez%'` per column, and no column holds both words.
+  Typing `sebastian ` returned nothing either — the trailing space was part of
+  the pattern. The search string is now split into terms, OR-ed across the
+  searchable fields and AND-ed across the terms, which is what
+  `websearch_to_tsquery` already did for a collection that declared a `search`
+  block, so both paths answer the same question. Double quotes keep a run
+  together as a phrase, a one-word search compiles to exactly the SQL it always
+  did, and no search that used to match stops matching. Same fix in the Mongo
+  driver and in the offline evaluator, which had the same shape.
+
 - **The service key is no longer rate limited.** The data API buckets callers
   as API key, signed-in user, then IP — and `identify` saw the service key's
   `uid: "service"` and gave it the ordinary user allowance of 1000 requests per
@@ -18770,11 +18783,18 @@ compiles to depends on whether the collection has asked for anything more.
 ### The default
 
 With no configuration, `.search()` is a **case-insensitive substring match**,
-OR-ed across the collection's top-level `string` properties:
+OR-ed across the collection's top-level `string` properties. The search string
+is split on whitespace and every term has to match — but they may match
+different properties, so a name kept in two columns is still found:
 
 ```sql
-WHERE name ILIKE '%term%' OR description ILIKE '%term%'
+-- .search("ada lovelace")
+WHERE (first_name ILIKE '%ada%'      OR last_name ILIKE '%ada%')
+  AND (first_name ILIKE '%lovelace%' OR last_name ILIKE '%lovelace%')
 ```
+
+Wrap a run in double quotes — `.search('"ada lovelace"')` — to search for the
+phrase instead, the same way the full-text path below reads them.
 
 This is enough for a small collection with its text in plain columns. It has
 three limits that no setting inside it can fix:
@@ -18793,8 +18813,7 @@ are escaped before the pattern is built, so searching for `50%` searches for
 operator takes a pattern (`.where("title", "like", "post-%")`); `.search()` does
 not.
 
-The default does not change, and a collection that has not opted in compiles to
-exactly the SQL it always did.
+A one-word search compiles to exactly the SQL it always did.
 
 ### Opting in
 

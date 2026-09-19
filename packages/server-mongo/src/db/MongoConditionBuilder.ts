@@ -6,6 +6,7 @@
 
 import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, OrderByTuple, WhereFilterOp } from "@rebasepro/types";
 import { normalizeDriverOrderBy, toFilterTuples } from "@rebasepro/common";
+import { splitSearchTerms } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError, logger } from "@rebasepro/server";
 
@@ -174,11 +175,18 @@ export class MongoConditionBuilder {
     }
 
     /**
-     * Build search conditions for text search
+     * Build search conditions for text search.
+     *
+     * Terms are split on whitespace and AND-ed, while the fields are OR-ed
+     * within each term: a person typing `sebastian melendez` into a search box
+     * means both words, and the two live in different fields, so matching the
+     * whole string per field finds nothing. See {@link splitSearchTerms}; the
+     * Postgres driver's fallback path answers the same way.
      *
      * @param searchString - Text to search for
      * @param properties - The collection's properties, searched for string fields
-     * @returns Array of MongoDB filter objects for text search
+     * @returns At most one MongoDB filter — callers OR what they get back, which
+     *   is right across fields and wrong across terms, so the AND is built here
      */
     static buildSearchConditions(
         searchString: string,
@@ -191,9 +199,7 @@ export class MongoConditionBuilder {
         if (!searchString) return [];
 
         // Build regex conditions for each searchable string property
-        const orConditions: Filter<Document>[] = [];
-        const escapedSearch = escapeRegExp(searchString);
-        const searchRegex = new RegExp(escapedSearch, "i");
+        const searchableFields: string[] = [];
 
         for (const [key, prop] of Object.entries(properties)) {
             // `type`, not `dataType`. No property in `@rebasepro/types` has ever
@@ -207,18 +213,27 @@ export class MongoConditionBuilder {
             // wrong key, so the test data agreed with the bug and the two
             // never met a real collection between them.
             if (prop?.type === "string" || typeof prop === "string") {
-                orConditions.push({
-                    [key]: { $regex: searchRegex }
-                });
+                searchableFields.push(key);
             }
         }
 
         // If no properties to search, use MongoDB text search
-        if (orConditions.length === 0) {
+        if (searchableFields.length === 0) {
             return [{ $text: { $search: searchString } }];
         }
 
-        return orConditions;
+        // A string with no terms in it is only whitespace; it stays the single
+        // literal pattern it has always been rather than matching everything.
+        const terms = splitSearchTerms(searchString);
+        const perTerm = (terms.length > 0 ? terms : [searchString]).map(term => {
+            const regex = new RegExp(escapeRegExp(term), "i");
+            return this.combineConditionsWithOr(
+                searchableFields.map(field => ({ [field]: { $regex: regex } }))
+            ) as Filter<Document>;
+        });
+
+        const combined = this.combineConditionsWithAnd(perTerm);
+        return combined ? [combined] : [];
     }
 
     /**

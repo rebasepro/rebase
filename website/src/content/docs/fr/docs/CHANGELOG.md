@@ -35,6 +35,19 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ### Fixed
 
+- **A search for two words finds a row that keeps them in two fields.**
+  Searching `sebastian melendez` on a collection with `first_name` and
+  `last_name` returned nothing: the default search compiled one
+  `ILIKE '%sebastian melendez%'` per column, and no column holds both words.
+  Typing `sebastian ` returned nothing either — the trailing space was part of
+  the pattern. The search string is now split into terms, OR-ed across the
+  searchable fields and AND-ed across the terms, which is what
+  `websearch_to_tsquery` already did for a collection that declared a `search`
+  block, so both paths answer the same question. Double quotes keep a run
+  together as a phrase, a one-word search compiles to exactly the SQL it always
+  did, and no search that used to match stops matching. Same fix in the Mongo
+  driver and in the offline evaluator, which had the same shape.
+
 - **The service key is no longer rate limited.** The data API buckets callers
   as API key, signed-in user, then IP — and `identify` saw the service key's
   `uid: "service"` and gave it the ordinary user allowance of 1000 requests per
