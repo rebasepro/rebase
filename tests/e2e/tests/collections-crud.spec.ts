@@ -77,6 +77,25 @@ test.describe("CMS Collections UI CRUD", () => {
         // not incidental tidying.
         await page.getByRole("button", { name: "Close", exact: true }).click();
 
+        // The list is ordered `id DESC` — the total-order tiebreak every sort
+        // ends on — over a primary key that is a random UUID, so a new row
+        // lands at a uniformly random position among the ~30 seeded tags. The
+        // table renders a window of about 19 rows, and a row outside it is not
+        // in the DOM at all, which is why this read as "element(s) not found"
+        // rather than as something off screen.
+        //
+        // Asserting on the unfiltered list was therefore a coin flip weighted
+        // roughly 60/40, and it came up tails on CI runs 34641904527 and
+        // 35124051045 — all three attempts each, because every retry leaks its
+        // tag and lengthens the list it is about to lose to.
+        //
+        // Searching first is what gives "the row reached the table" an answer.
+        // It does not weaken the assertion: the row still has to render, and
+        // the search box has to exclude, which is asserted below.
+        const searchInput = page.getByPlaceholder(/Search/i).first();
+        await expect(searchInput).toBeVisible();
+        await searchInput.fill(tagName);
+
         const createdRow = rowsIn(page).filter({ hasText: tagName }).first();
         await expect(createdRow).toBeVisible({ timeout: 15000 });
 
@@ -99,6 +118,13 @@ test.describe("CMS Collections UI CRUD", () => {
 
         await page.getByRole("button", { name: "Close", exact: true }).click();
 
+        // Re-applied, not assumed: opening a record and closing it resets the
+        // toolbar, and the search term goes with it — the list comes back
+        // unfiltered at its full count. Without this the row is back to being
+        // a lottery ticket in the rendered window.
+        await expect(searchInput).toBeVisible();
+        await searchInput.fill(updatedTagName);
+
         const updatedRow = rowsIn(page).filter({ hasText: updatedTagName }).first();
         await expect(updatedRow).toBeVisible({ timeout: 15000 });
 
@@ -106,19 +132,20 @@ test.describe("CMS Collections UI CRUD", () => {
         //
         // The row still being there proves nothing on its own — a search box
         // that filtered nothing would pass that. What it has to do is exclude
-        // the rows that do not match, so the count is the assertion.
-        const searchInput = page.getByPlaceholder(/Search/i).first();
-        await expect(searchInput).toBeVisible();
+        // the rows that do not match, so the count is the assertion. Clearing
+        // first is what gives that count something to exclude.
+        await searchInput.clear();
         await expect(rowsIn(page).nth(1)).toBeVisible({ timeout: 10000 });
 
         await searchInput.fill(updatedTagName);
         await expect(rowsIn(page)).toHaveCount(1, { timeout: 10000 });
         await expect(updatedRow).toBeVisible();
 
-        await searchInput.clear();
-        await expect(rowsIn(page).nth(1)).toBeVisible({ timeout: 10000 });
-
         // ── Delete ──────────────────────────────────────────────────────
+        //
+        // Deleted from the filtered list on purpose. Clearing the search here
+        // would drop the row back to its random position in a list the table
+        // only partly renders — the coin flip above wearing a different hat.
         await updatedRow.hover();
         const rowCheckbox = updatedRow.getByRole("checkbox");
         await expect(rowCheckbox).toBeVisible();

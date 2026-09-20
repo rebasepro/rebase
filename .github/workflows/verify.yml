@@ -529,6 +529,13 @@ jobs:
       # one: green each time. It has grown since — 36 tests, ~1.4m — as the
       # BaaS REST surface and the panel's own write path were added to it.
       #
+      # "Green each time" was too small a sample, and read as determinism it was
+      # wrong: `collections-crud` lost about one run in fifteen to a list whose
+      # order is random (see the comment at its create step) and the re-runs
+      # taught everyone it was a flake. Fixed 2026-09-20. The lesson for anything
+      # added here: a suite this size is green by luck often enough that "I ran
+      # it a few times" is not evidence — repeat the individual test.
+      #
       # The reason it could not simply be switched on is the database. CI's is
       # always empty, so `/auth/config` reports `needsSetup` and LoginView shows
       # its bootstrap form instead of the sign-in screen — globalSetup waited for
