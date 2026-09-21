@@ -32,7 +32,7 @@ longer reach your project. So climb only as far as you have to.
 | 6 | **`rebase eject`** | The entrypoint and the `Dockerfile`, in your repository | — | **Platform runtime upgrades stop reaching this project.** CORS, auth wiring, storage and shutdown become yours |
 
 :::tip[Two rungs are commonly skipped for no reason]
-<span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` (rung 2) narrows a read *before it is compiled*, which is the
+`beforeQuery` (rung 2) narrows a read *before it is compiled*, which is the
 thing people usually reach rung 3 or 5 for. And a `search` block with
 `mode: "hybrid"` (rung 1) is what people usually reach for raw SQL for. Both are
 new enough that older answers on the internet do not mention them.
@@ -73,7 +73,7 @@ reach a collection's rows that goes around them.
 
 | Callback | Fires | Use it for |
 |---|---|---|
-| `beforeQuery` <span class="since-badge" data-since="0.22">Since 0.22</span> | before a read is compiled | narrowing **which rows** a read asks for |
+| `beforeQuery` | before a read is compiled | narrowing **which rows** a read asks for |
 | `afterRead` | per row, after it is fetched | redaction, PII masking, computed fields |
 | `beforeSave` | after validation, before the write | defaults, derived columns, refusing a write |
 | `afterSave` | after the write, before the commit | side effects that must be undone with it |
@@ -86,7 +86,7 @@ reach a collection's rows that goes around them.
 
 ### Narrowing a read with `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> `afterRead` sees rows that have already been fetched, so it can redact a value
+`afterRead` sees rows that have already been fetched, so it can redact a value
 but cannot stop the row being read. `beforeQuery` runs earlier: it is handed the
 parsed query and returns conditions to **AND** into it.
 
@@ -269,7 +269,7 @@ so and one throwing `admin.executeSql is not a function` at the call site.
 patching `@rebasepro/server-postgres`, or ejecting for one behaviour, that is
 worth an issue rather than a fork —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-<span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` and `search.mode: "hybrid"` both exist because a patched driver
+`beforeQuery` and `search.mode: "hybrid"` both exist because a patched driver
 was the only alternative.
 
 ## Related

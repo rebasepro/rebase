@@ -1,5 +1,5 @@
 ---
-sourceHash: 97a20df64eaeffc7
+sourceHash: ceab8562a236c9de
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
 description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.
@@ -13,7 +13,7 @@ Rebase bietet zwei Ebenen für Entity-Lifecycle-Callbacks – beide verwenden de
 - **Globale Callbacks**: Werden bei `initializeRebaseBackend({ callbacks })` definiert. Sie werden bei **jeder** Collection und auf jedem Datenpfad ausgelöst (REST-API, WebSocket / Realtime, serverseitiges `rebase.dataAsAdmin`).
 
 Verwenden Sie globale Callbacks für:
-- **Row-Scoping** — <span class="since-badge" data-since="0.22">Seit 0.22</span> `beforeQuery` auf jeder Collection, sodass Lesezugriffe eines Mandanten an einer zentralen Stelle statt pro Collection eingegrenzt werden. Nur Postgres: Neben einer MongoDB- oder Firestore-Datenquelle verweigert ein globales `beforeQuery` den Start, anstatt die Lesezugriffe dieser Quelle uneingeschränkt zu lassen. Siehe [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Row-Scoping** — `beforeQuery` auf jeder Collection, sodass Lesezugriffe eines Mandanten an einer zentralen Stelle statt pro Collection eingegrenzt werden. Nur Postgres: Neben einer MongoDB- oder Firestore-Datenquelle verweigert ein globales `beforeQuery` den Start, anstatt die Lesezugriffe dieser Quelle uneingeschränkt zu lassen. Siehe [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **PII-Maskierung** — Ausblenden sensibler Felder für Nicht-Admin-Aufrufer über alle Collections hinweg.
 - **Einheitliches Audit-Logging** — Protokollieren jeder Erstellung, Aktualisierung oder Löschung an einem zentralen Ort.
 - **Querschnittliche Validierung** — Durchsetzen von Invarianten, die mehrere Collections umfassen.
@@ -70,7 +70,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> `beforeQuery` grenzt einen Lesezugriff ein, bevor er kompiliert wird; siehe
+`beforeQuery` grenzt einen Lesezugriff ein, bevor er kompiliert wird; siehe
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 Alle Callbacks können ein `Promise` (asynchron) oder einen einfachen Wert (synchron) zurückgeben.

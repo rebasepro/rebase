@@ -131,7 +131,7 @@ const articlesCollection = defineCollection({
 
 ### `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Called **before a read is compiled**, to narrow which rows it asks for. Return
+Called **before a read is compiled**, to narrow which rows it asks for. Return
 conditions to AND into the query; return nothing to add none.
 
 ```typescript

@@ -1,5 +1,5 @@
 ---
-sourceHash: f3f10a71f8d6c351
+sourceHash: e229c0d2b62d6bee
 title: Slots
 sidebar_label: Slots
 description: Referência para todos os slots de pontos de extensão de UI disponíveis no Rebase — locais nomeados onde você pode injetar componentes customizados.
@@ -92,16 +92,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Ações acima da barra de ações do formulário |
 | `form.before` | `PluginFormActionProps` | Conteúdo antes do título/lista de campos do formulário |
 | `form.after` | `PluginFormActionProps` | Conteúdo após a lista de campos do formulário |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Ações por linha em tabelas de coleção, ao lado das ferramentas de linha integradas |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> UI injetada antes de um campo de formulário individual |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> UI injetada após um campo de formulário individual |
+| `entity.row.actions` | `EntityRowActionsProps` | Ações por linha em tabelas de coleção, ao lado das ferramentas de linha integradas |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injetada antes de um campo de formulário individual |
+| `entity.field.after` | `EntityFieldSlotProps` | UI injetada após um campo de formulário individual |
 
 #### Global / Shell
 
 | Slot | Tipo de Props | Descrição |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Busca entre coleções, na app bar ao lado dos breadcrumbs |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Ações de nível superior, no final da app bar |
+| `global.search` | `GlobalSearchProps` | Busca entre coleções, na app bar ao lado dos breadcrumbs |
+| `shell.toolbar` | `ShellToolbarProps` | Ações de nível superior, no final da app bar |
 
 :::note
 Para um widget na página inicial, use `home.children.start`, `home.children.end`,

@@ -1,5 +1,5 @@
 ---
-sourceHash: d83b91c0dc03f048
+sourceHash: 89b27e051b61084c
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter — Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject — und was die jeweilige Stufe erreichen kann und was nicht.
@@ -33,7 +33,7 @@ erreichen Ihr Projekt nicht mehr. Klettern Sie also nur so weit, wie Sie wirklic
 | 6 | **`rebase eject`** | Den Einstiegspunkt und das `Dockerfile` in Ihrem Repository | — | **Plattform-Laufzeitaktualisierungen erreichen dieses Projekt nicht mehr.** CORS, Auth-Verdrahtung, Storage und Shutdown liegen in Ihrer Verantwortung |
 
 :::tip[Zwei Stufen werden häufig ohne Grund übersprungen]
-<span class="since-badge" data-since="0.22">Seit 0.22</span> `beforeQuery` (Stufe 2) schränkt einen Lesevorgang ein, *bevor er kompiliert wird*, was
+`beforeQuery` (Stufe 2) schränkt einen Lesevorgang ein, *bevor er kompiliert wird*, was
 genau der Grund ist, warum Leute normalerweise zu Stufe 3 oder 5 greifen. Und ein `search`-Block mit
 `mode: "hybrid"` (Stufe 1) ist das, wofür Leute typischerweise zu nativem SQL greifen. Beide sind
 neu genug, dass ältere Antworten im Internet sie noch nicht erwähnen.
@@ -74,7 +74,7 @@ an die Zeilen einer Collection heranzukommen, die an ihnen vorbeiführt.
 
 | Callback | Wird ausgelöst | Verwenden für |
 |---|---|---|
-| `beforeQuery` <span class="since-badge" data-since="0.22">Seit 0.22</span> | bevor ein Lesevorgang kompiliert wird | Einschränken, **welche Zeilen** ein Lesevorgang abfragt |
+| `beforeQuery` | bevor ein Lesevorgang kompiliert wird | Einschränken, **welche Zeilen** ein Lesevorgang abfragt |
 | `afterRead` | pro Zeile, nachdem sie abgerufen wurde | Reduzierung/Schwärzung, PII-Maskierung, berechnete Felder |
 | `beforeSave` | nach der Validierung, vor dem Schreiben | Standardwerte, abgeleitete Spalten, Ablehnen eines Schreibvorgangs |
 | `afterSave` | nach dem Schreiben, vor dem Commit | Nebeneffekte, die mit diesem rückgängig gemacht werden müssen |
@@ -87,7 +87,7 @@ an die Zeilen einer Collection heranzukommen, die an ihnen vorbeiführt.
 
 ### Einen Lesevorgang mit `beforeQuery` einschränken
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> `afterRead` sieht Zeilen, die bereits abgerufen wurden; es kann also einen Wert
+`afterRead` sieht Zeilen, die bereits abgerufen wurden; es kann also einen Wert
 schwärzen, aber nicht verhindern, dass die Zeile gelesen wird. `beforeQuery` läuft früher: Es erhält die
 geparste Abfrage und gibt Bedingungen zurück, die per **AND** angehängt werden.
 
@@ -268,7 +268,7 @@ oder ob an der Aufrufstelle ein Fehler wie `admin.executeSql is not a function` 
 `@rebasepro/server-postgres` zu patchen oder für ein einzelnes Verhalten ein Eject durchzuführen,
 ist das eher ein Issue als ein Fork wert —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-<span class="since-badge" data-since="0.22">Seit 0.22</span> Sowohl `beforeQuery` als auch `search.mode: "hybrid"` existieren, weil ein
+Sowohl `beforeQuery` als auch `search.mode: "hybrid"` existieren, weil ein
 gepatchter Driver zuvor die einzige Alternative war.
 
 ## Verwandte Themen

@@ -11,6 +11,8 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-21
+
 ### Added
 
 - **Linking an account returns the provider's profile picture.** `verify`

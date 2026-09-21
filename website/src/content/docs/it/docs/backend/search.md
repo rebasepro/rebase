@@ -1,5 +1,5 @@
 ---
-sourceHash: 96b96a778ac5c3a6
+sourceHash: 7047b4fd73bde89d
 title: Ricerca
 sidebar_label: Ricerca
 description: Come si comporta .search() per impostazione predefinita e come abilitare la ricerca full-text con ranking per una collection Postgres sui campi specificati — inclusi contenuti JSONB e array.
@@ -112,7 +112,7 @@ La configurazione della ricerca testuale di Postgres, che determina lo stemming 
 
 ### `mode`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Come una stringa di ricerca viene confrontata con i campi specificati.
+Come una stringa di ricerca viene confrontata con i campi specificati.
 
 | `mode` | Corrispondenze | Trova `Muñoz` da `munoz` | Trova `sebastian` da `seb` |
 |---|---|---|---|
@@ -180,7 +180,7 @@ La colonna generata si chiama `search_vector`. Modificala solo in caso di collis
 
 `_score` corrisponde a `ts_rank` calcolato sulla stessa query usata per trovare le righe, ed è presente solo quando la collection ha abilitato la ricerca full-text *e* la richiesta contiene una stringa di ricerca.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Con `mode: "hybrid"`, una riga trovata solo dalla parte della sottostringa riceve un punteggio costante ridotto (0.001) anziché zero — inferiore al più piccolo `ts_rank` che una corrispondenza reale di lessema possa produrre, di conseguenza una corrispondenza di parola intera supererà sempre una corrispondenza per sottostringa, e le righe trovate solo per sottostringa utilizzeranno il criterio di spareggio definito dalla query anziché essere restituite nell'ordine casuale della tabella.
+Con `mode: "hybrid"`, una riga trovata solo dalla parte della sottostringa riceve un punteggio costante ridotto (0.001) anziché zero — inferiore al più piccolo `ts_rank` che una corrispondenza reale di lessema possa produrre, di conseguenza una corrispondenza di parola intera supererà sempre una corrispondenza per sottostringa, e le righe trovate solo per sottostringa utilizzeranno il criterio di spareggio definito dalla query anziché essere restituite nell'ordine casuale della tabella.
 
 Con `fuzzy` attivo, la somiglianza dei trigrammi viene **sommata** a tale rank. Non si tratta di un semplice affinamento — è ciò che rende `fuzzy` un vero e proprio sistema di ranking. Un errore di battitura non trova alcuna corrispondenza sul percorso esatto, quindi ogni riga trovata avrebbe un `ts_rank` pari esattamente a zero; ordinare solo per rank restituirebbe la corrispondenza migliore nell'ordine casuale della tabella. I due termini vengono sommati anziché ponderati, in modo che una riga che ha avuto una corrispondenza esatta contribuisca con entrambi e superi una riga semplicemente simile senza la necessità di specificare un coefficiente. Al di fuori di queste due condizioni, `orderBy: "_score"` viene considerato un campo sconosciuto e restituisce 400 anziché restituire silenziosamente righe non ordinate.
 
@@ -207,7 +207,7 @@ Il costo è applicato per singola query e non per collection: viene eseguito un 
 
 **Lo snippet contiene markup per definizione** — ogni corrispondenza è racchiusa in `<mark>`. Esegui il rendering come HTML o rimuovi i tag, ma non trattarlo come testo normale e non fidarti ciecamente del testo circostante: si tratta del contenuto digitato dall'utente. Suddividere la stringa su `<mark>` e renderizzare le parti è più sicuro rispetto all'uso di `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> In `mode: "hybrid"`, viene segnalato anche un campo che ha prodotto una corrispondenza solo per sottostringa — si tratta del campo che ha generato il risultato. Il suo snippet viene restituito senza evidenziazioni: `ts_headline` evidenzia i lessemi e una parola parziale non lo è.
+In `mode: "hybrid"`, viene segnalato anche un campo che ha prodotto una corrispondenza solo per sottostringa — si tratta del campo che ha generato il risultato. Il suo snippet viene restituito senza evidenziazioni: `ts_headline` evidenzia i lessemi e una parola parziale non lo è.
 
 Con `unaccent` attivo, gli snippet vengono letti con gli accenti rimossi — `Auditoria`, non `Auditoría`. `ts_headline` sul testo originale non può trovare una corrispondenza prodotta da una query senza accenti, quindi restituirebbe il testo privo di qualsiasi evidenziazione; uno snippet leggibile che evidenzia le corrispondenze è preferibile a uno esteticamente migliore che non evidenzia nulla.
 

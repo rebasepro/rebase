@@ -1,5 +1,5 @@
 ---
-sourceHash: d83b91c0dc03f048
+sourceHash: 89b27e051b61084c
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escala de extensão do lado do servidor — declaração, callback de coleção, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.
@@ -32,7 +32,7 @@ projeto. Portanto, suba apenas até onde for estritamente necessário.
 | 6 | **`rebase eject`** | O ponto de entrada e o `Dockerfile`, no seu repositório | — | **As atualizações de runtime da plataforma deixam de chegar a este projeto.** CORS, configuração de autenticação, storage e encerramento passam a ser sua responsabilidade |
 
 :::tip[Dois degraus costumam ser ignorados sem motivo]
-<span class="since-badge" data-since="0.22">Desde 0.22</span> O `beforeQuery` (degrau 2) restringe uma leitura *antes de ela ser compilada*, que é o
+O `beforeQuery` (degrau 2) restringe uma leitura *antes de ela ser compilada*, que é o
 motivo pelo qual as pessoas normalmente recorrem ao degrau 3 ou 5. E um bloco `search` com
 `mode: "hybrid"` (degrau 1) é o motivo pelo qual as pessoas normalmente recorrem ao SQL puro. Ambos são
 novos o suficiente para que respostas mais antigas na internet não os mencionem.
@@ -75,7 +75,7 @@ acessar as linhas de uma coleção contornando-os.
 
 | Callback | Quando é acionado | Use para |
 |---|---|---|
-| `beforeQuery` <span class="since-badge" data-since="0.22">Desde 0.22</span> | antes de uma leitura ser compilada | restringir **quais linhas** uma leitura solicita |
+| `beforeQuery` | antes de uma leitura ser compilada | restringir **quais linhas** uma leitura solicita |
 | `afterRead` | por linha, após ser buscada | ocultação, mascaramento de PII, campos computados |
 | `beforeSave` | após a validação, antes da escrita | valores padrão, colunas derivadas, recusar uma escrita |
 | `afterSave` | após a escrita, antes do commit | efeitos colaterais que devem ser desfeitos com ela |
@@ -88,7 +88,7 @@ acessar as linhas de uma coleção contornando-os.
 
 ### Restringindo uma leitura com `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> O `afterRead` visualiza linhas que já foram buscadas, portanto ele pode ocultar um valor,
+O `afterRead` visualiza linhas que já foram buscadas, portanto ele pode ocultar um valor,
 mas não pode impedir que a linha seja lida. O `beforeQuery` executa antes: ele recebe a
 consulta analisada e retorna condições para aplicar com **AND** a ela.
 
@@ -276,7 +276,7 @@ da chamada.
 `@rebasepro/server-postgres` ou executando o eject por causa de um único comportamento,
 vale mais a pena abrir uma issue do que criar um fork —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-<span class="since-badge" data-since="0.22">Desde 0.22</span> Tanto o `beforeQuery` quanto `search.mode: "hybrid"` existem porque ter um driver modificado com patches era a única alternativa.
+Tanto o `beforeQuery` quanto `search.mode: "hybrid"` existem porque ter um driver modificado com patches era a única alternativa.
 
 ## Relacionados
 

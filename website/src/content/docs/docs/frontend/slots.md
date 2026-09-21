@@ -91,16 +91,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> Per-row actions in collection tables, beside the built-in row tools |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> UI injected before an individual form field |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> UI injected after an individual form field |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
+| `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
 
 #### Global / Shell
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> Cross-collection search, in the app bar beside the breadcrumbs |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> Top-level actions, at the end of the app bar |
+| `global.search` | `GlobalSearchProps` | Cross-collection search, in the app bar beside the breadcrumbs |
+| `shell.toolbar` | `ShellToolbarProps` | Top-level actions, at the end of the app bar |
 
 :::note
 For a widget on the home page, use `home.children.start`, `home.children.end`,

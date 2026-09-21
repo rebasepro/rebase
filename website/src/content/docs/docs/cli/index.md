@@ -22,7 +22,7 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Machine-readable output
 
-`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list` and <span class="since-badge" data-since="0.22">Since 0.22</span> `rebase upgrade` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
+`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list` and `rebase upgrade` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ## Commands
 
@@ -86,7 +86,7 @@ upload limit is 100 MB compressed — see the changelog for the reasoning.
 
 ### `rebase upgrade`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Move every `@rebasepro/*` package the project pins to one release, then
+Move every `@rebasepro/*` package the project pins to one release, then
 install with the package manager its lockfile names. `rebase upgrade` takes the
 latest; `--to 0.21.0` an exact version, with no registry lookup; `--to canary` a
 dist-tag. Each pin in `dependencies`, `devDependencies` and
@@ -408,7 +408,7 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` with no app name deploys the backend. <span class="since-badge" data-since="0.22">Since 0.22</span> A backend bundle
+`deploy` with no app name deploys the backend. A backend bundle
 deploy also uploads the project's source — what git tracks, never a `.env` — so a
 platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
 --platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.

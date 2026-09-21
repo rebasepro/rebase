@@ -1,5 +1,5 @@
 ---
-sourceHash: f3f10a71f8d6c351
+sourceHash: e229c0d2b62d6bee
 title: Slot
 sidebar_label: Slot
 description: Riferimento per tutti gli slot dei punti di estensione dell'interfaccia utente disponibili in Rebase — posizioni con nome in cui è possibile iniettare componenti personalizzati.
@@ -92,16 +92,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Azioni sopra la barra delle azioni del form |
 | `form.before` | `PluginFormActionProps` | Contenuto prima del titolo del form/elenco dei campi |
 | `form.after` | `PluginFormActionProps` | Contenuto dopo l'elenco dei campi del form |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Da 0.22</span> Azioni per singola riga nelle tabelle di collezione, accanto agli strumenti di riga integrati |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Da 0.22</span> UI iniettata prima di un singolo campo del form |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Da 0.22</span> UI iniettata dopo un singolo campo del form |
+| `entity.row.actions` | `EntityRowActionsProps` | Azioni per singola riga nelle tabelle di collezione, accanto agli strumenti di riga integrati |
+| `entity.field.before` | `EntityFieldSlotProps` | UI iniettata prima di un singolo campo del form |
+| `entity.field.after` | `EntityFieldSlotProps` | UI iniettata dopo un singolo campo del form |
 
 #### Globale / Shell
 
 | Slot | Tipo props | Descrizione |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Da 0.22</span> Ricerca globale tra collezioni, nella barra dell'applicazione accanto ai breadcrumb |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Da 0.22</span> Azioni di primo livello, all'estremità della barra dell'applicazione |
+| `global.search` | `GlobalSearchProps` | Ricerca globale tra collezioni, nella barra dell'applicazione accanto ai breadcrumb |
+| `shell.toolbar` | `ShellToolbarProps` | Azioni di primo livello, all'estremità della barra dell'applicazione |
 
 :::note
 Per un widget nella home page, usa `home.children.start`, `home.children.end`,

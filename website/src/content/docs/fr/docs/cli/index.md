@@ -1,5 +1,5 @@
 ---
-sourceHash: c8a8fbca59f68e48
+sourceHash: 0cdbaa95461e2a6e
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -23,7 +23,7 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Sortie lisible par machine
 
-`--json` est le paramètre d'activation, et en dehors de la famille `cloud`, c'est le seul : `rebase status`, `rebase resources`, `rebase apps list` et <span class="since-badge" data-since="0.22">Since 0.22</span> `rebase upgrade` placent alors une valeur JSON unique sur stdout — le résultat, ou une enveloppe `{"error": {"message", "code", "hint", "issues"}}` avec un code de sortie différent de zéro — à **chaque** sortie de la commande, afin qu'un appelant puisse analyser stdout de manière inconditionnelle. Sans cela, elles écrivent du texte lisible par un humain et les erreurs vont vers stderr. `rebase cloud` utilise la même enveloppe et constitue la seule exception à cette option : elle active également le JSON d'elle-même lorsque stdout n'est pas un TTY, ou lorsque `REBASE_JSON=1` est défini. Ainsi, `rebase cloud status | cat` produit du JSON tandis que `rebase status | cat` n'en produit pas — dans un script, passez explicitement `--json` plutôt que de vous fier à l'une ou l'autre règle.
+`--json` est le paramètre d'activation, et en dehors de la famille `cloud`, c'est le seul : `rebase status`, `rebase resources`, `rebase apps list` et `rebase upgrade` placent alors une valeur JSON unique sur stdout — le résultat, ou une enveloppe `{"error": {"message", "code", "hint", "issues"}}` avec un code de sortie différent de zéro — à **chaque** sortie de la commande, afin qu'un appelant puisse analyser stdout de manière inconditionnelle. Sans cela, elles écrivent du texte lisible par un humain et les erreurs vont vers stderr. `rebase cloud` utilise la même enveloppe et constitue la seule exception à cette option : elle active également le JSON d'elle-même lorsque stdout n'est pas un TTY, ou lorsque `REBASE_JSON=1` est défini. Ainsi, `rebase cloud status | cat` produit du JSON tandis que `rebase status | cat` n'en produit pas — dans un script, passez explicitement `--json` plutôt que de vous fier à l'une ou l'autre règle.
 
 ## Commandes
 
@@ -83,7 +83,7 @@ Les dépendances sont incluses (vendored) par défaut afin qu'un redémarrage de
 
 ### `rebase upgrade`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Fait passer chaque paquet `@rebasepro/*` épinglé par le projet à une même
+Fait passer chaque paquet `@rebasepro/*` épinglé par le projet à une même
 version, puis installe avec le gestionnaire de paquets que désigne le fichier de
 verrouillage. `rebase upgrade` prend la plus récente ; `--to 0.21.0`, une version
 exacte, sans interroger le registre ; `--to canary`, un dist-tag. Chaque version
@@ -342,7 +342,7 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` sans nom d'application déploie le backend. <span class="since-badge" data-since="0.22">Since 0.22</span> Un déploiement de bundle
+`deploy` sans nom d'application déploie le backend. Un déploiement de bundle
 backend téléverse aussi le code source du projet — ce que git suit, jamais un `.env` —
 pour qu'une mise à jour de la plateforme puisse le reconstruire ; `--no-source` l'évite pour un déploiement. `rebase cloud settings set --platform-rebuilds off` désactive les reconstructions de la plateforme pour le projet : les mises à jour ne déplacent alors que le runtime, et la source conservée est supprimée.
 `--allow-downgrade` déploie un bundle construit sur une version plus ancienne que celle qu'exécute le projet.

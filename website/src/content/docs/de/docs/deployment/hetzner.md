@@ -1,5 +1,5 @@
 ---
-sourceHash: 4aa8f66e9039e583
+sourceHash: 07bac8e87682b53f
 title: Rebase auf Hetzner Cloud bereitstellen
 description: Stellen Sie Rebase mit Terraform oder Docker Compose auf Hetzner Cloud bereit – für exzellente Performance und Datensouveränität in der EU.
 sidebar_label: Hetzner Cloud
@@ -60,7 +60,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 Für ein produktives Deployment empfiehlt sich einer der beiden Ansätze, bei denen keine Dateien manuell auf den Server kopiert werden müssen:
 
-- **In ein Image einbinden** – `FROM rebasepro/server:0.21.1`, dann `COPY dist-bundle /bundle`, und die Bereitstellung durch Ändern eines Tags durchführen.
+- **In ein Image einbinden** – `FROM rebasepro/server:0.22.0`, dann `COPY dist-bundle /bundle`, und die Bereitstellung durch Ändern eines Tags durchführen.
 - **Über HTTP bereitstellen** – setzen Sie `REBASE_BUNDLE_URL`, und die Runtime lädt das Bundle bei jedem Start herunter und entpackt es. Genau das tut das obige Terraform-Modul, und derselbe Mechanismus wird auch vom Helm-Chart verwendet.
 
 ## 4. Konfigurieren und ausführen

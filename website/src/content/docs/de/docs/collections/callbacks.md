@@ -1,5 +1,5 @@
 ---
-sourceHash: b853df8c5b0b5e4a
+sourceHash: c71850336649c023
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für kollektionsübergreifende Operationen.
@@ -116,7 +116,7 @@ const articlesCollection = defineCollection({
 
 ### `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> Wird aufgerufen, **bevor ein Lesevorgang kompiliert wird**, um einzugrenzen, welche Zeilen angefordert werden. Geben Sie Bedingungen zurück, die mit UND in die Abfrage eingefügt werden; geben Sie nichts zurück, um keine hinzuzufügen.
+Wird aufgerufen, **bevor ein Lesevorgang kompiliert wird**, um einzugrenzen, welche Zeilen angefordert werden. Geben Sie Bedingungen zurück, die mit UND in die Abfrage eingefügt werden; geben Sie nichts zurück, um keine hinzuzufügen.
 
 ```typescript
 beforeQuery: ({

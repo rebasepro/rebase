@@ -1,5 +1,5 @@
 ---
-sourceHash: 97a20df64eaeffc7
+sourceHash: ceab8562a236c9de
 title: Hook di backend globali
 sidebar_label: Hook globali
 description: Applica callback di ciclo di vita trasversali a ogni collection a livello server utilizzando CollectionCallbacks.
@@ -13,7 +13,7 @@ Rebase fornisce due livelli di callback per il ciclo di vita delle entità — e
 - **Callback globali**: definiti su `initializeRebaseBackend({ callbacks })`. Vengono eseguiti su **ogni** collection, su qualsiasi percorso dati (API REST, WebSocket / realtime, `rebase.dataAsAdmin` lato server).
 
 Usa i callback globali per:
-- **Row scoping** — <span class="since-badge" data-since="0.22">Dalla 0.22</span> `beforeQuery` su ogni collection, in modo che le letture di un tenant vengano limitate in un unico punto anziché per ciascuna collection. Solo per Postgres: affiancato a una sorgente dati MongoDB o Firestore, un `beforeQuery` globale rifiuta l'avvio anziché lasciare le letture di quella sorgente non limitate. Vedi [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Row scoping** — `beforeQuery` su ogni collection, in modo che le letture di un tenant vengano limitate in un unico punto anziché per ciascuna collection. Solo per Postgres: affiancato a una sorgente dati MongoDB o Firestore, un `beforeQuery` globale rifiuta l'avvio anziché lasciare le letture di quella sorgente non limitate. Vedi [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Mascheramento PII** — oscura i campi sensibili per i chiamanti non amministratori in tutte le collection.
 - **Audit logging unificato** — registra ogni creazione, aggiornamento o eliminazione in un unico punto.
 - **Validazione trasversale** — applica invarianti che interessano più collection.
@@ -70,7 +70,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Dalla 0.22</span> `beforeQuery` restringe una lettura prima che venga compilata; vedi
+`beforeQuery` restringe una lettura prima che venga compilata; vedi
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 Tutti i callback possono restituire una `Promise` (asincroni) o un valore diretto (sincroni).

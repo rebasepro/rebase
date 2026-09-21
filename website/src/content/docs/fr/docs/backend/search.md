@@ -1,5 +1,5 @@
 ---
-sourceHash: 96b96a778ac5c3a6
+sourceHash: 7047b4fd73bde89d
 title: Recherche
 sidebar_label: Recherche
 description: Comment .search() se comporte par défaut, et comment activer la recherche en texte intégral classée par pertinence sur les champs de votre choix pour une collection Postgres — y compris les contenus JSONB et tableaux.
@@ -112,7 +112,7 @@ La configuration de recherche de texte de Postgres, qui détermine la racinisati
 
 ### `mode`
 
-<span class="since-badge" data-since="0.22">Depuis la version 0.22</span> La manière dont une chaîne de recherche est mise en correspondance avec les champs indiqués.
+La manière dont une chaîne de recherche est mise en correspondance avec les champs indiqués.
 
 | `mode` | Correspondances | Trouve `Muñoz` à partir de `munoz` | Trouve `sebastian` à partir de `seb` |
 |---|---|---|---|
@@ -180,7 +180,7 @@ La colonne générée est nommée `search_vector`. Ne la modifiez que si ce nom 
 
 `_score` correspond au `ts_rank` calculé avec la même requête que celle ayant servi à trouver les lignes, et n'est présent que si la collection a activé l'option *et* que la requête contenait une chaîne de recherche.
 
-<span class="since-badge" data-since="0.22">Depuis la version 0.22</span> Avec `mode: "hybrid"`, une ligne trouvée uniquement par la partie sous-chaîne obtient un score constant faible (0.001) plutôt que zéro — en dessous du plus petit `ts_rank` qu'une correspondance exacte de lexème peut produire. Ainsi, une correspondance sur un mot entier surpasse toujours une correspondance partielle, et les lignes issues uniquement d'une correspondance par sous-chaîne se départagent selon les critères secondaires de la requête au lieu d'être renvoyées dans un ordre aléatoire.
+Avec `mode: "hybrid"`, une ligne trouvée uniquement par la partie sous-chaîne obtient un score constant faible (0.001) plutôt que zéro — en dessous du plus petit `ts_rank` qu'une correspondance exacte de lexème peut produire. Ainsi, une correspondance sur un mot entier surpasse toujours une correspondance partielle, et les lignes issues uniquement d'une correspondance par sous-chaîne se départagent selon les critères secondaires de la requête au lieu d'être renvoyées dans un ordre aléatoire.
 
 Lorsque `fuzzy` est activé, la similarité de trigrammes est **ajoutée** à ce rang. Ce n'est pas un simple affinement — c'est ce qui permet à `fuzzy` de proposer un classement. Une faute de frappe ne correspond à rien sur le chemin exact, donc chaque ligne trouvée a un `ts_rank` valant exactement zéro ; trier uniquement par rang renverrait la meilleure correspondance dans n'importe quel ordre. Les deux termes sont additionnés plutôt que pondérés, de sorte qu'une ligne correspondant exactement cumule les deux et surpasse une ligne simplement similaire sans avoir besoin d'un coefficient explicite. En dehors de ces deux conditions, `orderBy: "_score"` est un champ inconnu et renvoie une erreur 400 au lieu de renvoyer silencieusement des lignes non triées.
 
@@ -207,7 +207,7 @@ Par requête, et non par collection, car le coût est par requête : un `ts_head
 
 **L'extrait (snippet) contient du balisage par construction** — chaque correspondance est entourée de balises `<mark>`. Affichez-le sous forme de HTML ou supprimez les balises, mais ne le traitez pas comme du texte brut, et ne faites pas confiance au texte environnant : il s'agit de ce que l'utilisateur a saisi. Découper selon `<mark>` et afficher les morceaux est plus sûr que d'utiliser `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">Depuis la version 0.22</span> Avec le `mode: "hybrid"`, un champ qui ne correspond que par sous-chaîne est également signalé — c'est le champ qui a déclenché le résultat. Son extrait est renvoyé sans aucune mise en valeur : `ts_headline` met en évidence les lexèmes, or une moitié de mot n'en est pas un.
+Avec le `mode: "hybrid"`, un champ qui ne correspond que par sous-chaîne est également signalé — c'est le champ qui a déclenché le résultat. Son extrait est renvoyé sans aucune mise en valeur : `ts_headline` met en évidence les lexèmes, or une moitié de mot n'en est pas un.
 
 Lorsque `unaccent` est activé, les extraits sont présentés sans accents — `Auditoria`, et non `Auditoría`. `ts_headline` sur le texte original ne peut pas trouver une correspondance produite par une requête sans accent, et renverrait donc le texte sans aucune mise en valeur ; un extrait lisible avec surbrillance vaut mieux qu'un extrait plus élégant qui n'en surligne aucune silencieusement.
 

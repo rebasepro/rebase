@@ -1,5 +1,5 @@
 ---
-sourceHash: 67566dbd11f6e659
+sourceHash: 61fe21675b54e7a5
 title: Runtime et bundles
 sidebar_label: Runtime & Bundles
 description: Comment un projet Rebase se divise en un bundle de projet et un runtime versionné, et pourquoi cette séparation rend possibles les mises à niveau, les applications multi-dépôts et l'hébergement géré.
@@ -57,7 +57,7 @@ avant d'accepter de démarrer :
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.21.1", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.22.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -109,7 +109,7 @@ mal fonctionner plus tard.
 C'est pourquoi mettre à niveau Rebase dans un déploiement auto-hébergé se résume à un changement de tag :
 
 ```yaml
-image: rebasepro/server:0.21.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.22.0   # a newer tag — your bundle is untouched
 ```
 
 ## Le développement emprunte le même chemin

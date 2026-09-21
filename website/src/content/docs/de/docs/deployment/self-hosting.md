@@ -1,5 +1,5 @@
 ---
-sourceHash: 691ddcb4610e34e6
+sourceHash: c5827fa03f8801fd
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -130,7 +130,7 @@ Für ein echtes Deployment empfiehlt es sich, beides in ein Image zu packen, wod
 exakt festgelegt wird, was ausgeführt wird:
 
 ```dockerfile
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -232,7 +232,7 @@ ausführen kann, ist somit geeignet. Zwei Dinge müssen überall beachtet werden
 
 ```toml
 [build]
-  image = "rebasepro/server:0.21.1"
+  image = "rebasepro/server:0.22.0"
 
 [http_service]
   internal_port = 8080
@@ -380,7 +380,7 @@ als mehrere kooperierende Prozesse gestartet werden. Siehe [Getrennte Prozesse](
 ## Aktualisierung
 
 ```yaml
-image: rebasepro/server:0.21.1
+image: rebasepro/server:0.22.0
 ```
 
 Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Hauptversion (Major) des Runtime-Vertrags

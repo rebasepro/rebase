@@ -1,5 +1,5 @@
 ---
-sourceHash: 973d76b134971c29
+sourceHash: 78c7b0d8c3e6c984
 title: Surcharges de composants (Swizzling)
 sidebar_label: Surcharges de composants
 description: Remplacez les composants d'interface utilisateur par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.
@@ -60,7 +60,7 @@ function App() {
 
 Pour surcharger des composants uniquement pour une collection spécifique, ajoutez un objet `components` sous son bloc `admin`. Cela est utile pour personnaliser les états vides, les cartes ou les vues de détail pour des modèles particuliers.
 
-<span class="since-badge" data-since="0.22">Depuis la version 0.22</span> Dans la structure par défaut, `config/collections/` est chargé **à la fois** par le panneau d'administration et par le backend, qui lit les mêmes fichiers pour dériver le schéma et l'API. Référencez donc chaque composant par son **chemin de module** plutôt qu'en l'important. `Component` accepte les mêmes formes que `admin.Field` et `entityViews[].Builder` : un chemin, un `import()` paresseux (lazy), ou le composant lui-même.
+Dans la structure par défaut, `config/collections/` est chargé **à la fois** par le panneau d'administration et par le backend, qui lit les mêmes fichiers pour dériver le schéma et l'API. Référencez donc chaque composant par son **chemin de module** plutôt qu'en l'important. `Component` accepte les mêmes formes que `admin.Field` et `entityViews[].Builder` : un chemin, un `import()` paresseux (lazy), ou le composant lui-même.
 
 ```ts
 // config/collections/products.ts

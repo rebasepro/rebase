@@ -1,5 +1,5 @@
 ---
-sourceHash: c8a8fbca59f68e48
+sourceHash: 0cdbaa95461e2a6e
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -23,7 +23,7 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Saída legível por máquina
 
-`--json` é a flag de controle, e fora da família `cloud` é a única: `rebase status`, `rebase resources`, `rebase apps list` e <span class="since-badge" data-since="0.22">Since 0.22</span> `rebase upgrade` colocam um único valor JSON no stdout — o resultado, ou um envelope `{"error": {"message", "code", "hint", "issues"}}` com uma saída diferente de zero — em **todas** as finalizações do comando, permitindo que quem faz a chamada faça o parse do stdout incondicionalmente. Sem ela, eles exibem texto para leitura humana e as falhas vão para o stderr. `rebase cloud` usa o mesmo envelope e é a única exceção à flag: ele também ativa o JSON automaticamente quando o stdout não for um TTY, ou quando `REBASE_JSON=1` estiver definido. Assim, `rebase cloud status | cat` resulta em JSON, enquanto `rebase status | cat` não — em um script, passe `--json` explicitamente em vez de confiar em qualquer uma das regras.
+`--json` é a flag de controle, e fora da família `cloud` é a única: `rebase status`, `rebase resources`, `rebase apps list` e `rebase upgrade` colocam um único valor JSON no stdout — o resultado, ou um envelope `{"error": {"message", "code", "hint", "issues"}}` com uma saída diferente de zero — em **todas** as finalizações do comando, permitindo que quem faz a chamada faça o parse do stdout incondicionalmente. Sem ela, eles exibem texto para leitura humana e as falhas vão para o stderr. `rebase cloud` usa o mesmo envelope e é a única exceção à flag: ele também ativa o JSON automaticamente quando o stdout não for um TTY, ou quando `REBASE_JSON=1` estiver definido. Assim, `rebase cloud status | cat` resulta em JSON, enquanto `rebase status | cat` não — em um script, passe `--json` explicitamente em vez de confiar em qualquer uma das regras.
 
 ## Comandos
 
@@ -83,7 +83,7 @@ As dependências são incluídas no pacote por padrão para que a reinicializaç
 
 ### `rebase upgrade`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Leva cada pacote `@rebasepro/*` que o projeto fixa para uma mesma versão
+Leva cada pacote `@rebasepro/*` que o projeto fixa para uma mesma versão
 e depois instala com o gerenciador de pacotes indicado pelo lockfile.
 `rebase upgrade` usa a mais recente; `--to 0.21.0`, uma versão exata, sem consultar
 o registry; `--to canary`, uma dist-tag. Cada versão fixada em `dependencies`,
@@ -366,7 +366,7 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` sem o nome do aplicativo faz o deploy do backend. <span class="since-badge" data-since="0.22">Since 0.22</span> Um deploy de
+`deploy` sem o nome do aplicativo faz o deploy do backend. Um deploy de
 bundle de backend também envia o código-fonte do projeto — o que o git rastreia, nunca
 um `.env` — para que uma atualização da plataforma possa reconstruí-lo;
 `--no-source` pula isso em um deploy. `rebase cloud settings set --platform-rebuilds off` desativa as reconstruções da plataforma para o projeto: as atualizações passam a mover só o runtime, e o código-fonte guardado é apagado. `--allow-downgrade` faz o deploy de um bundle compilado em uma versão mais antiga do que a que o projeto executa.

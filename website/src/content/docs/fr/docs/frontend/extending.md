@@ -1,5 +1,5 @@
 ---
-sourceHash: 026e97ba1b999743
+sourceHash: c63661257e39dcba
 title: Étendre Rebase
 sidebar_label: Étendre Rebase
 description: Un guide de décision pour choisir le bon mécanisme d'extension — plugins, slots, surcharges de composants, vues d'entités, actions, et plus encore.
@@ -208,10 +208,10 @@ Si ce que vous souhaitez modifier relève du comportement du serveur plutôt que
 
 | Je souhaite… | Échelon | Référence |
 |---|---|---|
-| Restreindre les lignes renvoyées par une lecture | callback `beforeQuery` <span class="since-badge" data-since="0.22">Depuis 0.22</span> | [Étendre le serveur](/docs/backend/extending#2-collection-callbacks) |
+| Restreindre les lignes renvoyées par une lecture | callback `beforeQuery` | [Étendre le serveur](/docs/backend/extending#2-collection-callbacks) |
 | Masquer une valeur lors de la sortie | callback `afterRead` | [Callbacks](/docs/collections/callbacks) |
 | Ajouter mon propre endpoint | fonction personnalisée | [Fonctions personnalisées](/docs/backend/custom-functions) |
-| Permettre à la recherche de trouver des sous-chaînes *et* d'ignorer les accents | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Depuis 0.22</span> | [Recherche](/docs/backend/search) |
+| Permettre à la recherche de trouver des sous-chaînes *et* d'ignorer les accents | `search.mode: "hybrid"` | [Recherche](/docs/backend/search) |
 | Avoir le contrôle total du processus serveur | serveur personnalisé, puis `rebase eject` | [Étendre le serveur](/docs/backend/extending) |
 
 → [Rebase ne fait pas X](/docs/backend/extending)

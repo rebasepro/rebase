@@ -1,5 +1,5 @@
 ---
-sourceHash: 973d76b134971c29
+sourceHash: 78c7b0d8c3e6c984
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
 description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten Implementierungen auf Anwendungs- oder Collection-Ebene.
@@ -60,7 +60,7 @@ function App() {
 
 Um Komponenten nur für eine bestimmte Collection zu überschreiben, fügen Sie ein `components`-Objekt unterhalb des `admin`-Blocks hinzu. Dies ist nützlich, um leere Zustände (Empty States), Cards oder Detailansichten für bestimmte Modelle anzupassen.
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> Im Standard-Scaffolding wird `config/collections/` **sowohl** vom Admin-Panel als auch vom Backend geladen, welches dieselben Dateien liest, um das Schema und die API abzuleiten. Verweisen Sie daher auf jede Komponente per **Modulpfad** anstatt sie zu importieren. `Component` akzeptiert dieselben Formate wie `admin.Field` und `entityViews[].Builder`: einen Pfad, ein Lazy-`import()` oder die Komponente selbst.
+Im Standard-Scaffolding wird `config/collections/` **sowohl** vom Admin-Panel als auch vom Backend geladen, welches dieselben Dateien liest, um das Schema und die API abzuleiten. Verweisen Sie daher auf jede Komponente per **Modulpfad** anstatt sie zu importieren. `Component` akzeptiert dieselben Formate wie `admin.Field` und `entityViews[].Builder`: einen Pfad, ein Lazy-`import()` oder die Komponente selbst.
 
 ```ts
 // config/collections/products.ts

@@ -1,5 +1,5 @@
 ---
-sourceHash: 96b96a778ac5c3a6
+sourceHash: 7047b4fd73bde89d
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como habilitar a busca de texto completo ranqueada em uma coleção Postgres nos campos especificados — incluindo conteúdo JSONB e array.
@@ -168,7 +168,7 @@ do seu conteúdo para obter stemming.
 
 ### `mode`
 
-<span class="since-badge" data-since="0.22">A partir da 0.22</span> Como uma string de busca é comparada com os campos especificados.
+Como uma string de busca é comparada com os campos especificados.
 
 | `mode` | Corresponde | Encontra `Muñoz` a partir de `munoz` | Encontra `sebastian` a partir de `seb` |
 |---|---|---|---|
@@ -270,7 +270,7 @@ O `_score` é o `ts_rank` contra a mesma consulta com a qual as linhas foram
 combinadas e está presente apenas quando a coleção optou por esse recurso *e* a
 requisição continha uma string de busca.
 
-<span class="since-badge" data-since="0.22">A partir da 0.22</span> Com `mode: "hybrid"`, uma linha encontrada apenas pela parte da substring
+Com `mode: "hybrid"`, uma linha encontrada apenas pela parte da substring
 recebe uma pontuação constante pequena (0.001) em vez de zero — abaixo do menor
 `ts_rank` que uma correspondência real de lexema pode produzir, de modo que uma
 correspondência de palavra inteira sempre supere uma de substring, e as linhas
@@ -323,7 +323,7 @@ exportação.
 e não confie no texto ao redor: é exatamente o que o usuário digitou. Dividir pelo
 `<mark>` e renderizar as partes é mais seguro do que usar `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">A partir da 0.22</span> Sob `mode: "hybrid"`, um campo correspondido apenas por substring também é
+Sob `mode: "hybrid"`, um campo correspondido apenas por substring também é
 reportado — é o campo que causou a correspondência. Seu snippet retorna sem nada
 marcado: `ts_headline` marca lexemas, e meia palavra não é um lexema.
 

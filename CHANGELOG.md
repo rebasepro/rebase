@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-21
+
 ### Added
 
 - **Linking an account returns the provider's profile picture.** `verify`

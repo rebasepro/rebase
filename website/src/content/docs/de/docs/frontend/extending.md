@@ -1,5 +1,5 @@
 ---
-sourceHash: 026e97ba1b999743
+sourceHash: c63661257e39dcba
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Entscheidungsleitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
@@ -208,10 +208,10 @@ Wenn Sie das Verhalten des Servers ändern möchten und nicht die Darstellung de
 
 | Ich möchte… | Stufe | Referenz |
 |---|---|---|
-| Einschränken, welche Zeilen ein Lesevorgang zurückgibt | `beforeQuery`-Callback <span class="since-badge" data-since="0.22">Seit 0.22</span> | [Server erweitern](/docs/backend/extending#2-collection-callbacks) |
+| Einschränken, welche Zeilen ein Lesevorgang zurückgibt | `beforeQuery`-Callback | [Server erweitern](/docs/backend/extending#2-collection-callbacks) |
 | Einen Wert bei der Ausgabe maskieren | `afterRead`-Callback | [Callbacks](/docs/collections/callbacks) |
 | Einen eigenen Endpunkt hinzufügen | Benutzerdefinierte Funktion | [Benutzerdefinierte Funktionen](/docs/backend/custom-functions) |
-| Sicherstellen, dass die Suche Teilstrings findet *und* Akzente ignoriert | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Seit 0.22</span> | [Suche](/docs/backend/search) |
+| Sicherstellen, dass die Suche Teilstrings findet *und* Akzente ignoriert | `search.mode: "hybrid"` | [Suche](/docs/backend/search) |
 | Die volle Kontrolle über den Serverprozess haben | Eigener Server, dann `rebase eject` | [Server erweitern](/docs/backend/extending) |
 
 → [Rebase unterstützt kein X](/docs/backend/extending)

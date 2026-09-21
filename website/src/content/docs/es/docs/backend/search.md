@@ -1,5 +1,5 @@
 ---
-sourceHash: 96b96a778ac5c3a6
+sourceHash: 7047b4fd73bde89d
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo habilitar en una colección de Postgres la búsqueda de texto completo con relevancia en los campos que indiques, incluyendo contenido JSONB y arrays.
@@ -112,7 +112,7 @@ La configuración de búsqueda de texto de Postgres, que determina la lematizaci
 
 ### `mode`
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> Cómo se compara una cadena de búsqueda con los campos que especificaste.
+Cómo se compara una cadena de búsqueda con los campos que especificaste.
 
 | `mode` | Coincidencias | Encuentra `Muñoz` a partir de `munoz` | Encuentra `sebastian` a partir de `seb` |
 |---|---|---|---|
@@ -180,7 +180,7 @@ La columna generada se llama `search_vector`. Cámbiala solo si entra en conflic
 
 `_score` es el `ts_rank` respecto a la misma consulta con la que se compararon las filas, y solo está presente cuando la colección ha habilitado esta función *y* la solicitud incluye una cadena de búsqueda.
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> Con `mode: "hybrid"`, una fila encontrada únicamente por la parte de la subcadena obtiene una pequeña constante (0.001) en lugar de cero —por debajo del `ts_rank` más pequeño que una coincidencia de lexema real pueda producir—, por lo que una coincidencia de palabra completa siempre supera a una de subcadena, y las filas que solo coinciden por subcadena recurren al criterio de desempate de la propia consulta en lugar de devolverse en cualquier orden arbitrario determinado por la tabla.
+Con `mode: "hybrid"`, una fila encontrada únicamente por la parte de la subcadena obtiene una pequeña constante (0.001) en lugar de cero —por debajo del `ts_rank` más pequeño que una coincidencia de lexema real pueda producir—, por lo que una coincidencia de palabra completa siempre supera a una de subcadena, y las filas que solo coinciden por subcadena recurren al criterio de desempate de la propia consulta en lugar de devolverse en cualquier orden arbitrario determinado por la tabla.
 
 Con `fuzzy` activado, la similitud de trigramas se **suma** a esa clasificación. Esto no es un simple ajuste fino; es lo que hace que `fuzzy` clasifique resultados. Un error tipográfico no coincide con nada en la ruta exacta, por lo que cada fila que encuentra tiene un `ts_rank` de exactamente cero; ordenar solo por rango devolvería la mejor coincidencia en cualquier orden arbitrario de la tabla. Los dos términos se suman en lugar de ponderarse, por lo que una fila que coincidió de forma exacta aporta ambos y supera a una fila meramente similar sin necesidad de un coeficiente que lo determine. Fuera de esas dos condiciones, `orderBy: "_score"` se considera un campo desconocido y devuelve 400 en lugar de devolver filas desordenadas silenciosamente.
 
@@ -207,7 +207,7 @@ Por consulta, no por colección, porque el coste es por consulta: un `ts_headlin
 
 **El fragmento (snippet) contiene marcado HTML por diseño**: cada coincidencia está envuelta en `<mark>`. Renderízalo como HTML o elimina las etiquetas, pero no lo trates como texto sin formato, y no confíes en el texto circundante: es lo que el usuario haya escrito. Dividir por `<mark>` y renderizar las partes es más seguro que usar `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> Con `mode: "hybrid"`, un campo que coincide únicamente por subcadena también se reporta: es el campo que causó la coincidencia. Su fragmento se devuelve sin nada marcado: `ts_headline` marca lexemas, y media palabra no es un lexema.
+Con `mode: "hybrid"`, un campo que coincide únicamente por subcadena también se reporta: es el campo que causó la coincidencia. Su fragmento se devuelve sin nada marcado: `ts_headline` marca lexemas, y media palabra no es un lexema.
 
 Con `unaccent` activado, los fragmentos se leen con los acentos normalizados: `Auditoria`, no `Auditoría`. `ts_headline` sobre el texto original no puede encontrar una coincidencia producida por una consulta sin acentos, por lo que devolvería el texto sin nada resaltado; un fragmento legible que resalta es mejor que uno más bonito que silenciosamente no resalta nada.
 

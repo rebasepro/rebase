@@ -1,5 +1,5 @@
 ---
-sourceHash: 96b96a778ac5c3a6
+sourceHash: 7047b4fd73bde89d
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie Sie eine Postgres-Collection für die gerankte Volltextsuche über die von Ihnen benannten Felder aktivieren – einschließlich JSONB- und Array-Inhalten.
@@ -176,7 +176,7 @@ aktivieren.
 
 ### `mode`
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> Wie ein Suchbegriff mit den von Ihnen benannten Feldern abgeglichen wird.
+Wie ein Suchbegriff mit den von Ihnen benannten Feldern abgeglichen wird.
 
 | `mode` | Treffer | Findet `Muñoz` anhand von `munoz` | Findet `sebastian` anhand von `seb` |
 |---|---|---|---|
@@ -282,7 +282,7 @@ Recreate, was die Tabelle umschreibt.
 wurden, und ist nur vorhanden, wenn die Collection aktiviert wurde *und* die
 Anfrage einen Suchstring enthielt.
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> Bei `mode: "hybrid"` erhält eine Zeile, die nur durch den Substring-Teil
+Bei `mode: "hybrid"` erhält eine Zeile, die nur durch den Substring-Teil
 gefunden wurde, einen kleinen konstanten Wert (0.001) statt null – unterhalb des
 kleinsten `ts_rank`, den ein echter Lexem-Treffer erzeugen kann. Dadurch
 übertrifft ein Ganzwort-Treffer immer einen Substring-Treffer, und die Zeilen,
@@ -340,7 +340,7 @@ Text nicht: Es ist der Text, den der Benutzer eingegeben hat. Das Aufteilen
 anhand von `<mark>` und Rendern der Einzelteile ist sicherer als
 `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">Seit 0.22</span> Unter `mode: "hybrid"` wird auch ein Feld gemeldet, das nur per Substring
+Unter `mode: "hybrid"` wird auch ein Feld gemeldet, das nur per Substring
 übereinstimmt – es ist das Feld, das den Treffer verursacht hat. Dessen Snippet
 wird ohne Markierungen zurückgegeben: `ts_headline` markiert Lexeme, und ein
 halbes Wort ist kein Lexem.

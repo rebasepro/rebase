@@ -1,5 +1,5 @@
 ---
-sourceHash: f3f10a71f8d6c351
+sourceHash: e229c0d2b62d6bee
 title: Slots
 sidebar_label: Slots
 description: Référence de tous les slots de points d'extension d'interface utilisateur disponibles dans Rebase — des emplacements nommés où vous pouvez injecter des composants personnalisés.
@@ -92,16 +92,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Actions au-dessus de la barre d'actions du formulaire |
 | `form.before` | `PluginFormActionProps` | Contenu avant le titre du formulaire / la liste des champs |
 | `form.after` | `PluginFormActionProps` | Contenu après la liste des champs du formulaire |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Actions par ligne dans les tableaux de collection, à côté des outils de ligne intégrés |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Interface utilisateur injectée avant un champ de formulaire individuel |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Interface utilisateur injectée après un champ de formulaire individuel |
+| `entity.row.actions` | `EntityRowActionsProps` | Actions par ligne dans les tableaux de collection, à côté des outils de ligne intégrés |
+| `entity.field.before` | `EntityFieldSlotProps` | Interface utilisateur injectée avant un champ de formulaire individuel |
+| `entity.field.after` | `EntityFieldSlotProps` | Interface utilisateur injectée après un champ de formulaire individuel |
 
 #### Global / Shell
 
 | Slot | Type de Props | Description |
 |------|--------------|-------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Recherche multi-collections, dans la barre d'application à côté du fil d'Ariane |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Actions de niveau supérieur, à la fin de la barre d'application |
+| `global.search` | `GlobalSearchProps` | Recherche multi-collections, dans la barre d'application à côté du fil d'Ariane |
+| `shell.toolbar` | `ShellToolbarProps` | Actions de niveau supérieur, à la fin de la barre d'application |
 
 :::note
 Pour un widget sur la page d'accueil, utilisez `home.children.start`, `home.children.end`,

@@ -1,5 +1,5 @@
 ---
-sourceHash: 026e97ba1b999743
+sourceHash: c63661257e39dcba
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: "Una guía de decisión para elegir el mecanismo de extensión adecuado: plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más."
@@ -227,10 +227,10 @@ muestra el panel, esta no es la página indicada. El servidor tiene su propia es
 
 | Quiero… | Nivel | Referencia |
 |---|---|---|
-| Restringir qué filas devuelve una lectura | Callback `beforeQuery` <span class="since-badge" data-since="0.22">Desde 0.22</span> | [Extender el servidor](/docs/backend/extending#2-collection-callbacks) |
+| Restringir qué filas devuelve una lectura | Callback `beforeQuery` | [Extender el servidor](/docs/backend/extending#2-collection-callbacks) |
 | Ocultar/censurar un valor en la respuesta de salida | Callback `afterRead` | [Callbacks](/docs/collections/callbacks) |
 | Agregar un endpoint propio | función personalizada | [Funciones personalizadas](/docs/backend/custom-functions) |
-| Hacer que la búsqueda encuentre subcadenas *y* normalice acentos | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Desde 0.22</span> | [Búsqueda](/docs/backend/search) |
+| Hacer que la búsqueda encuentre subcadenas *y* normalice acentos | `search.mode: "hybrid"` | [Búsqueda](/docs/backend/search) |
 | Tomar el control del proceso del servidor | servidor personalizado, luego `rebase eject` | [Extender el servidor](/docs/backend/extending) |
 
 → [Rebase no hace X](/docs/backend/extending)

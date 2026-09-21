@@ -1,5 +1,5 @@
 ---
-sourceHash: 97a20df64eaeffc7
+sourceHash: ceab8562a236c9de
 title: Hooks Globais de Backend
 sidebar_label: Hooks Globais
 description: Aplique callbacks de ciclo de vida transversais a todas as coleções no nível do servidor usando CollectionCallbacks.
@@ -13,7 +13,7 @@ O Rebase oferece dois níveis de callbacks de ciclo de vida de entidades — amb
 - **Callbacks globais**: Definidos em `initializeRebaseBackend({ callbacks })`. Eles são disparados em **todas** as coleções, em todos os caminhos de dados (API REST, WebSocket / realtime, `rebase.dataAsAdmin` no lado do servidor).
 
 Use callbacks globais para:
-- **Escopo de linhas (Row scoping)** — <span class="since-badge" data-since="0.22">Desde 0.22</span> `beforeQuery` em todas as coleções, para que as leituras de um locatário (tenant) sejam restringidas em um único local, em vez de coleção por coleção. Apenas para Postgres: junto a uma fonte de dados MongoDB ou Firestore, um `beforeQuery` global se recusará a inicializar em vez de deixar as leituras dessa fonte irrestritas. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Escopo de linhas (Row scoping)** — `beforeQuery` em todas as coleções, para que as leituras de um locatário (tenant) sejam restringidas em um único local, em vez de coleção por coleção. Apenas para Postgres: junto a uma fonte de dados MongoDB ou Firestore, um `beforeQuery` global se recusará a inicializar em vez de deixar as leituras dessa fonte irrestritas. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Mascaramento de PII** — ocultar campos confidenciais para chamadores não administradores em todas as coleções.
 - **Registro de auditoria unificado** — registrar cada criação, atualização ou exclusão em um único lugar.
 - **Validação transversal** — aplicar invariantes que abrangem várias coleções.
@@ -70,7 +70,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> `beforeQuery` restringe uma leitura antes que ela seja compilada; consulte
+`beforeQuery` restringe uma leitura antes que ela seja compilada; consulte
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 Todos os callbacks podem retornar uma `Promise` (assíncrono) ou um valor direto (síncrono).

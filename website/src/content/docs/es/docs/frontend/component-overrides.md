@@ -1,5 +1,5 @@
 ---
-sourceHash: 973d76b134971c29
+sourceHash: 78c7b0d8c3e6c984
 title: Sobrescritura de componentes (Swizzling)
 sidebar_label: Sobrescritura de componentes
 description: Sobrescribe componentes de interfaz de usuario predeterminados con implementaciones personalizadas a nivel de aplicación o colección.
@@ -60,7 +60,7 @@ function App() {
 
 Para sobrescribir componentes únicamente para una colección específica, añade un objeto `components` bajo su bloque `admin`. Esto es útil para personalizar estados vacíos, tarjetas o vistas de detalle para modelos particulares.
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> En el scaffold predeterminado, `config/collections/` es cargado **tanto** por el panel de administración como por el backend, el cual lee los mismos archivos para derivar el esquema y la API. Por lo tanto, apunta a cada componente mediante una **ruta de módulo** en lugar de importarlo. `Component` admite las mismas formas que `admin.Field` y `entityViews[].Builder`: una ruta, un `import()` perezoso (lazy) o el componente en sí.
+En el scaffold predeterminado, `config/collections/` es cargado **tanto** por el panel de administración como por el backend, el cual lee los mismos archivos para derivar el esquema y la API. Por lo tanto, apunta a cada componente mediante una **ruta de módulo** en lugar de importarlo. `Component` admite las mismas formas que `admin.Field` y `entityViews[].Builder`: una ruta, un `import()` perezoso (lazy) o el componente en sí.
 
 ```ts
 // config/collections/products.ts

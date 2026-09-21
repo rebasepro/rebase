@@ -1,5 +1,5 @@
 ---
-sourceHash: f3f10a71f8d6c351
+sourceHash: e229c0d2b62d6bee
 title: Slots
 sidebar_label: Slots
 description: Referenz für alle in Rebase verfügbaren UI-Erweiterungspunkt-Slots – benannte Positionen, an denen Sie benutzerdefinierte Komponenten einfügen können.
@@ -92,16 +92,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Aktionen oberhalb der Formular-Aktionsleiste |
 | `form.before` | `PluginFormActionProps` | Inhalt vor dem Formulartitel / der Feldliste |
 | `form.after` | `PluginFormActionProps` | Inhalt nach der Formularfeldliste |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Seit 0.22</span> Zeilenbezogene Aktionen in Collection-Tabellen, neben den integrierten Zeilenwerkzeugen |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Seit 0.22</span> Vor einem einzelnen Formularfeld eingefügte Benutzeroberfläche |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Seit 0.22</span> Nach einem einzelnen Formularfeld eingefügte Benutzeroberfläche |
+| `entity.row.actions` | `EntityRowActionsProps` | Zeilenbezogene Aktionen in Collection-Tabellen, neben den integrierten Zeilenwerkzeugen |
+| `entity.field.before` | `EntityFieldSlotProps` | Vor einem einzelnen Formularfeld eingefügte Benutzeroberfläche |
+| `entity.field.after` | `EntityFieldSlotProps` | Nach einem einzelnen Formularfeld eingefügte Benutzeroberfläche |
 
 #### Global / Shell
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|--------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Seit 0.22</span> Sammlungsübergreifende Suche, in der App-Leiste neben den Breadcrumbs |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Seit 0.22</span> Aktionen auf oberster Ebene, am Ende der App-Leiste |
+| `global.search` | `GlobalSearchProps` | Sammlungsübergreifende Suche, in der App-Leiste neben den Breadcrumbs |
+| `shell.toolbar` | `ShellToolbarProps` | Aktionen auf oberster Ebene, am Ende der App-Leiste |
 
 :::note
 Für ein Widget auf der Startseite verwenden Sie `home.children.start`, `home.children.end`,

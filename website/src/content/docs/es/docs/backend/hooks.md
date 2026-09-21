@@ -1,5 +1,5 @@
 ---
-sourceHash: 97a20df64eaeffc7
+sourceHash: ceab8562a236c9de
 title: Hooks globales del backend
 sidebar_label: Hooks globales
 description: Aplica callbacks de ciclo de vida transversales a cada colección a nivel de servidor usando CollectionCallbacks.
@@ -13,7 +13,7 @@ Rebase proporciona dos niveles de callbacks del ciclo de vida de entidades; ambo
 - **Callbacks globales**: Se definen en `initializeRebaseBackend({ callbacks })`. Se disparan en **cada** colección, en cada ruta de datos (API REST, WebSocket / tiempo real, `rebase.dataAsAdmin` en el servidor).
 
 Utilice callbacks globales para:
-- **Alcance de filas (Row scoping)** — <span class="since-badge" data-since="0.22">Desde 0.22</span> `beforeQuery` en cada colección, de modo que las lecturas de un inquilino se delimiten en un solo lugar en vez de por colección. Solo Postgres: junto a una fuente de datos de MongoDB o Firestore, un `beforeQuery` global rechaza iniciarse en lugar de dejar las lecturas de esa fuente sin delimitar. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Alcance de filas (Row scoping)** — `beforeQuery` en cada colección, de modo que las lecturas de un inquilino se delimiten en un solo lugar en vez de por colección. Solo Postgres: junto a una fuente de datos de MongoDB o Firestore, un `beforeQuery` global rechaza iniciarse en lugar de dejar las lecturas de esa fuente sin delimitar. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Enmascaramiento de PII** — ofusca campos sensibles para quienes realizan llamadas sin permisos de administrador en todas las colecciones.
 - **Registro de auditoría unificado** — registra cada creación, actualización o eliminación en un solo lugar.
 - **Validación transversal** — aplica invariantes que abarcan múltiples colecciones.
@@ -70,7 +70,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> `beforeQuery` delimita una lectura antes de que se compile; consulte
+`beforeQuery` delimita una lectura antes de que se compile; consulte
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 Todos los callbacks pueden devolver una `Promise` (asíncrono) o un valor simple (síncrono).

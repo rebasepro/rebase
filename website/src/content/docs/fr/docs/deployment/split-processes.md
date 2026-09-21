@@ -1,5 +1,5 @@
 ---
-sourceHash: 9fdd342675873877
+sourceHash: 4497d118312ff8ce
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -221,7 +221,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.21.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.22.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Seul le tag vaut généralement la peine d'être fixé : le dépôt est hérité, il s'agit donc

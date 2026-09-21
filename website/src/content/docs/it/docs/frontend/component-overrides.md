@@ -1,5 +1,5 @@
 ---
-sourceHash: 973d76b134971c29
+sourceHash: 78c7b0d8c3e6c984
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
 description: Esegui l'override dei componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collection.
@@ -60,7 +60,7 @@ function App() {
 
 Per eseguire l'override dei componenti solo per una collection specifica, aggiungi un oggetto `components` all'interno del relativo blocco `admin`. Questo è utile per personalizzare empty state, card o viste di dettaglio per determinati modelli.
 
-<span class="since-badge" data-since="0.22">Da 0.22</span> Nello scaffold predefinito, `config/collections/` viene caricato **sia** dal pannello di amministrazione che dal backend, il quale legge gli stessi file per ricavare lo schema e le API. Di conseguenza, fai riferimento a ciascun componente tramite il suo **percorso del modulo (module path)** invece di importarlo direttamente. `Component` accetta le stesse forme di `admin.Field` e `entityViews[].Builder`: un percorso, un `import()` lazy, oppure il componente stesso.
+Nello scaffold predefinito, `config/collections/` viene caricato **sia** dal pannello di amministrazione che dal backend, il quale legge gli stessi file per ricavare lo schema e le API. Di conseguenza, fai riferimento a ciascun componente tramite il suo **percorso del modulo (module path)** invece di importarlo direttamente. `Component` accetta le stesse forme di `admin.Field` e `entityViews[].Builder`: un percorso, un `import()` lazy, oppure il componente stesso.
 
 ```ts
 // config/collections/products.ts

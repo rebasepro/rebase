@@ -1,5 +1,5 @@
 ---
-sourceHash: 026e97ba1b999743
+sourceHash: c63661257e39dcba
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida alle decisioni per scegliere il giusto meccanismo di estensione — plugin, slot, override di componenti, viste entità, azioni e altro ancora.
@@ -208,10 +208,10 @@ Se ciò che desideri modificare riguarda il comportamento del server anziché ci
 
 | Voglio… | Livello | Riferimento |
 |---|---|---|
-| Restringere le righe restituite da una lettura | callback `beforeQuery` <span class="since-badge" data-since="0.22">Da 0.22</span> | [Estendere il server](/docs/backend/extending#2-collection-callbacks) |
+| Restringere le righe restituite da una lettura | callback `beforeQuery` | [Estendere il server](/docs/backend/extending#2-collection-callbacks) |
 | Rimuovere/oscurare un valore in uscita | callback `afterRead` | [Callback](/docs/collections/callbacks) |
 | Aggiungere un proprio endpoint | funzione personalizzata | [Funzioni personalizzate](/docs/backend/custom-functions) |
-| Fare in modo che la ricerca trovi sottostringhe *e* ignori gli accenti | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Da 0.22</span> | [Ricerca](/docs/backend/search) |
+| Fare in modo che la ricerca trovi sottostringhe *e* ignori gli accenti | `search.mode: "hybrid"` | [Ricerca](/docs/backend/search) |
 | Gestire direttamente il processo del server | server personalizzato, poi `rebase eject` | [Estendere il server](/docs/backend/extending) |
 
 → [Rebase doesn't do X](/docs/backend/extending)

@@ -1,5 +1,5 @@
 ---
-sourceHash: c8a8fbca59f68e48
+sourceHash: 0cdbaa95461e2a6e
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -23,7 +23,7 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Maschinenlesbare Ausgabe
 
-`--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie ist es der einzige: `rebase status`, `rebase resources`, `rebase apps list` und <span class="since-badge" data-since="0.22">Since 0.22</span> `rebase upgrade` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder einen `{"error": {"message", "code", "hint", "issues"}}`-Umschlag bei einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter geben sie menschenlesbaren Text aus und Fehler gehen nach stderr. `rebase cloud` verwendet denselben Umschlag und ist die einzige Ausnahme von diesem Schalter: Es aktiviert JSON auch automatisch, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher liefert `rebase cloud status | cat` JSON, während `rebase status | cat` dies nicht tut — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der beiden Regeln zu verlassen.
+`--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie ist es der einzige: `rebase status`, `rebase resources`, `rebase apps list` und `rebase upgrade` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder einen `{"error": {"message", "code", "hint", "issues"}}`-Umschlag bei einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter geben sie menschenlesbaren Text aus und Fehler gehen nach stderr. `rebase cloud` verwendet denselben Umschlag und ist die einzige Ausnahme von diesem Schalter: Es aktiviert JSON auch automatisch, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher liefert `rebase cloud status | cat` JSON, während `rebase status | cat` dies nicht tut — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der beiden Regeln zu verlassen.
 
 ## Befehle
 
@@ -83,7 +83,7 @@ Abhängigkeiten werden standardmäßig gevendort, damit ein Pod-Neustart nicht j
 
 ### `rebase upgrade`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Hebt jedes `@rebasepro/*`-Paket, das das Projekt pinnt, auf ein einziges
+Hebt jedes `@rebasepro/*`-Paket, das das Projekt pinnt, auf ein einziges
 Release an und installiert dann mit dem Paketmanager, den die Lockfile nennt.
 `rebase upgrade` nimmt das neueste Release, `--to 0.21.0` eine exakte Version ohne
 Registry-Abfrage, `--to canary` einen Dist-Tag. Jeder Pin in `dependencies`,
@@ -345,7 +345,7 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` ohne App-Namen deployt das Backend. <span class="since-badge" data-since="0.22">Since 0.22</span> Ein Backend-Bundle-Deploy
+`deploy` ohne App-Namen deployt das Backend. Ein Backend-Bundle-Deploy
 lädt außerdem den Quellcode des Projekts hoch — was Git verfolgt, niemals eine `.env` —,
 damit ein Plattform-Upgrade es neu bauen kann; `--no-source` überspringt das für ein Deploy. `rebase cloud settings set --platform-rebuilds off` schaltet Plattform-Rebuilds für das Projekt ab: Upgrades bewegen dann nur die Runtime, und der gespeicherte Quellcode wird gelöscht.
 `--allow-downgrade` deployt ein Bundle, das auf einem älteren Release gebaut wurde, als das Projekt ausführt.

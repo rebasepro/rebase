@@ -1,5 +1,5 @@
 ---
-sourceHash: 97a20df64eaeffc7
+sourceHash: ceab8562a236c9de
 title: Hooks Backend Globaux
 sidebar_label: Hooks Globaux
 description: Appliquez des callbacks de cycle de vie transversaux à chaque collection au niveau du serveur à l'aide de CollectionCallbacks.
@@ -13,7 +13,7 @@ Rebase propose deux niveaux de callbacks de cycle de vie des entités — tous d
 - **Callbacks globaux** : Définis sur `initializeRebaseBackend({ callbacks })`. Ils se déclenchent sur **chaque** collection, sur chaque chemin de données (API REST, WebSocket / temps réel, `rebase.dataAsAdmin` côté serveur).
 
 Utilisez les callbacks globaux pour :
-- **Le ciblage des lignes (Row scoping)** — <span class="since-badge" data-since="0.22">Depuis la version 0.22</span> `beforeQuery` sur chaque collection, afin que les lectures d'un tenant soient restreintes à un seul endroit plutôt que par collection. Postgres uniquement : à côté d'une source de données MongoDB ou Firestore, un `beforeQuery` global refusera de démarrer plutôt que de laisser les lectures de cette source sans restriction. Voir [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Le ciblage des lignes (Row scoping)** — `beforeQuery` sur chaque collection, afin que les lectures d'un tenant soient restreintes à un seul endroit plutôt que par collection. Postgres uniquement : à côté d'une source de données MongoDB ou Firestore, un `beforeQuery` global refusera de démarrer plutôt que de laisser les lectures de cette source sans restriction. Voir [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Le masquage des données personnelles (PII)** — masquer les champs sensibles pour les appelants non-administrateurs sur l'ensemble des collections.
 - **La journalisation d'audit unifiée** — consigner chaque création, mise à jour ou suppression à un emplacement unique.
 - **La validation transversale** — appliquer des invariants qui s'étendent sur plusieurs collections.
@@ -70,7 +70,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Depuis la version 0.22</span> `beforeQuery` restreint une lecture avant qu'elle ne soit compilée ; voir
+`beforeQuery` restreint une lecture avant qu'elle ne soit compilée ; voir
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 Tous les callbacks peuvent renvoyer une `Promise` (asynchrone) ou une valeur simple (synchrone).

@@ -1,5 +1,5 @@
 ---
-sourceHash: d83b91c0dc03f048
+sourceHash: 89b27e051b61084c
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, custom function, rotte personalizzate, server personalizzato, eject — con ciò che ciascuna può o non può raggiungere.
@@ -32,7 +32,7 @@ tuo progetto. Sali quindi solo fin dove è strettamente necessario.
 | 6 | **`rebase eject`** | L'entrypoint e il `Dockerfile`, nel tuo repository | — | **Gli aggiornamenti del runtime della piattaforma smettono di raggiungere questo progetto.** CORS, configurazione dell'autenticazione, storage e shutdown diventano a carico tuo |
 
 :::tip[Due gradini vengono spesso saltati senza motivo]
-<span class="since-badge" data-since="0.22">Da 0.22</span> `beforeQuery` (gradino 2) restringe una lettura *prima che venga compilata*, che è solitamente
+`beforeQuery` (gradino 2) restringe una lettura *prima che venga compilata*, che è solitamente
 il motivo per cui si ricorre al gradino 3 o 5. E un blocco `search` con
 `mode: "hybrid"` (gradino 1) è ciò per cui le persone ricorrono solitamente a SQL grezzo (raw SQL). Entrambi sono
 sufficientemente recenti da non essere menzionati nelle risposte più datate sul web.
@@ -76,7 +76,7 @@ aggirandoli.
 
 | Callback | Si attiva | Usalo per |
 |---|---|---|
-| `beforeQuery` <span class="since-badge" data-since="0.22">Da 0.22</span> | prima che una lettura venga compilata | restringere **quali righe** richiede una lettura |
+| `beforeQuery` | prima che una lettura venga compilata | restringere **quali righe** richiede una lettura |
 | `afterRead` | per riga, dopo che è stata recuperata | redazione/oscuramento, mascheramento di PII, campi calcolati |
 | `beforeSave` | dopo la validazione, prima della scrittura | valori predefiniti, colonne derivate, rifiuto di una scrittura |
 | `afterSave` | dopo la scrittura, prima del commit | effetti collaterali che devono essere annullati insieme ad essa |
@@ -89,7 +89,7 @@ aggirandoli.
 
 ### Restringere una lettura con `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Da 0.22</span> `afterRead` vede le righe che sono già state recuperate, quindi può oscurare un valore
+`afterRead` vede le righe che sono già state recuperate, quindi può oscurare un valore
 ma non può impedire che la riga venga letta. `beforeQuery` viene eseguito prima: riceve la
 query analizzata e restituisce condizioni da concatenare con **AND** al suo interno.
 
@@ -280,7 +280,7 @@ chiaramente di non poter eseguire SQL e uno che genera un'eccezione
 patch a `@rebasepro/server-postgres` o a fare l'eject per un singolo comportamento,
 vale la pena aprire una issue invece di creare un fork —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-<span class="since-badge" data-since="0.22">Da 0.22</span> Sia `beforeQuery` sia `search.mode: "hybrid"` esistono proprio perché una versione con
+Sia `beforeQuery` sia `search.mode: "hybrid"` esistono proprio perché una versione con
 patch del driver era l'unica alternativa.
 
 ## Risorse correlate

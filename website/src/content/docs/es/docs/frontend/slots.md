@@ -1,5 +1,5 @@
 ---
-sourceHash: f3f10a71f8d6c351
+sourceHash: e229c0d2b62d6bee
 title: Slots
 sidebar_label: Slots
 description: Referencia para todos los slots de puntos de extensión de la interfaz de usuario disponibles en Rebase — ubicaciones con nombre donde puedes inyectar componentes personalizados.
@@ -92,16 +92,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Acciones encima de la barra de acciones del formulario |
 | `form.before` | `PluginFormActionProps` | Contenido antes del título del formulario/lista de campos |
 | `form.after` | `PluginFormActionProps` | Contenido después de la lista de campos del formulario |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Acciones por fila en tablas de colección, junto a las herramientas de fila integradas |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Interfaz inyectada antes de un campo de formulario individual |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Interfaz inyectada después de un campo de formulario individual |
+| `entity.row.actions` | `EntityRowActionsProps` | Acciones por fila en tablas de colección, junto a las herramientas de fila integradas |
+| `entity.field.before` | `EntityFieldSlotProps` | Interfaz inyectada antes de un campo de formulario individual |
+| `entity.field.after` | `EntityFieldSlotProps` | Interfaz inyectada después de un campo de formulario individual |
 
 #### Global / Shell
 
 | Slot | Props Type | Descripción |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Búsqueda entre colecciones, en la barra de aplicaciones junto a las migas de pan |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Desde 0.22</span> Acciones de nivel superior, al final de la barra de aplicaciones |
+| `global.search` | `GlobalSearchProps` | Búsqueda entre colecciones, en la barra de aplicaciones junto a las migas de pan |
+| `shell.toolbar` | `ShellToolbarProps` | Acciones de nivel superior, al final de la barra de aplicaciones |
 
 :::note
 Para un widget en la página de inicio, usa `home.children.start`, `home.children.end`,

@@ -12,7 +12,7 @@ Rebase provides two levels of entity lifecycle callbacks — both use the same `
 - **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
 
 Use global callbacks for:
-- **Row scoping** — <span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` on every collection, so a tenant's reads are narrowed in one place instead of per collection. Postgres only: beside a MongoDB or Firestore data source, a global `beforeQuery` refuses to boot rather than leave that source's reads unnarrowed. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Row scoping** — `beforeQuery` on every collection, so a tenant's reads are narrowed in one place instead of per collection. Postgres only: beside a MongoDB or Firestore data source, a global `beforeQuery` refuses to boot rather than leave that source's reads unnarrowed. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **PII masking** — redact sensitive fields for non-admin callers across all collections.
 - **Unified audit logging** — log every create, update, or delete in one place.
 - **Cross-cutting validation** — enforce invariants that span multiple collections.
@@ -69,7 +69,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` narrows a read before it is compiled; see
+`beforeQuery` narrows a read before it is compiled; see
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 All callbacks may return a `Promise` (async) or a plain value (sync).

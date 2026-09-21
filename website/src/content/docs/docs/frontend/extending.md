@@ -226,10 +226,10 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 | I want to… | Rung | Reference |
 |---|---|---|
-| Narrow which rows a read returns | `beforeQuery` callback <span class="since-badge" data-since="0.22">Since 0.22</span> | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
+| Narrow which rows a read returns | `beforeQuery` callback | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
 | Redact a value on the way out | `afterRead` callback | [Callbacks](/docs/collections/callbacks) |
 | Add an endpoint of my own | custom function | [Custom Functions](/docs/backend/custom-functions) |
-| Make search find substrings *and* fold accents | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Since 0.22</span> | [Search](/docs/backend/search) |
+| Make search find substrings *and* fold accents | `search.mode: "hybrid"` | [Search](/docs/backend/search) |
 | Own the server process | custom server, then `rebase eject` | [Extending the server](/docs/backend/extending) |
 
 → [Rebase doesn't do X](/docs/backend/extending)

@@ -1,5 +1,5 @@
 ---
-sourceHash: b853df8c5b0b5e4a
+sourceHash: c71850336649c023
 title: Callbacks de entidades
 sidebar_label: Callbacks
 description: Usa callbacks del ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -116,7 +116,7 @@ const articlesCollection = defineCollection({
 
 ### `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> Se llama **antes de que se compile una lectura**, para restringir qué filas solicita. Devuelve condiciones para combinar mediante AND en la consulta; no devuelvas nada para no agregar ninguna.
+Se llama **antes de que se compile una lectura**, para restringir qué filas solicita. Devuelve condiciones para combinar mediante AND en la consulta; no devuelvas nada para no agregar ninguna.
 
 ```typescript
 beforeQuery: ({

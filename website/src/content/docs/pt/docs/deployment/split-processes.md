@@ -1,5 +1,5 @@
 ---
-sourceHash: 9fdd342675873877
+sourceHash: 4497d118312ff8ce
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -160,7 +160,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.21.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.22.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Geralmente, vale a pena fixar apenas a tag: o repositório é herdado, então trata-se de um projeto e uma imagem com uma unidade modificada. O `bundleUrl` cumpre a mesma função quando `bundle.mode: url`.

@@ -1,5 +1,5 @@
 ---
-sourceHash: d83b91c0dc03f048
+sourceHash: 89b27e051b61084c
 title: Rebase ne gère pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacune peut et ne peut pas atteindre.
@@ -33,7 +33,7 @@ de la plateforme n'atteignent plus votre projet. Montez donc seulement jusqu'où
 | 6 | **`rebase eject`** | Le point d'entrée et le `Dockerfile`, dans votre dépôt | — | **Les mises à niveau du runtime de la plateforme n'atteignent plus ce projet.** CORS, configuration de l'authentification, stockage et arrêt deviennent votre responsabilité |
 
 :::tip[Deux échelons sont souvent sautés sans raison]
-<span class="since-badge" data-since="0.22">Depuis 0.22</span> `beforeQuery` (échelon 2) restreint une lecture *avant qu'elle ne soit compilée*, ce qui est
+`beforeQuery` (échelon 2) restreint une lecture *avant qu'elle ne soit compilée*, ce qui est
 la raison pour laquelle les gens passent habituellement à l'échelon 3 ou 5. Et un bloc `search` avec
 `mode: "hybrid"` (échelon 1) est ce pour quoi les gens se tournent généralement vers du SQL brut. Tous deux sont
 suffisamment récents pour que les réponses plus anciennes sur Internet ne les mentionnent pas.
@@ -74,7 +74,7 @@ d'accéder aux lignes d'une collection en les contournant.
 
 | Callback | Se déclenche | Utilisé pour |
 |---|---|---|
-| `beforeQuery` <span class="since-badge" data-since="0.22">Depuis 0.22</span> | avant qu'une lecture ne soit compilée | restreindre **quelles lignes** une lecture demande |
+| `beforeQuery` | avant qu'une lecture ne soit compilée | restreindre **quelles lignes** une lecture demande |
 | `afterRead` | par ligne, après sa récupération | masquage, anonymisation des données personnelles, champs calculés |
 | `beforeSave` | après validation, avant l'écriture | valeurs par défaut, colonnes dérivées, refus d'une écriture |
 | `afterSave` | après l'écriture, avant le commit | effets de bord qui doivent être annulés avec celle-ci |
@@ -87,7 +87,7 @@ d'accéder aux lignes d'une collection en les contournant.
 
 ### Restreindre une lecture avec `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Depuis 0.22</span> `afterRead` a accès aux lignes qui ont déjà été récupérées, ce qui lui permet de masquer une valeur
+`afterRead` a accès aux lignes qui ont déjà été récupérées, ce qui lui permet de masquer une valeur
 mais ne peut pas empêcher la ligne d'être lue. `beforeQuery` intervient plus tôt : la requête
 analysée lui est transmise et il renvoie des conditions à combiner avec **AND**.
 
@@ -270,7 +270,7 @@ vous en informe clairement et un pilote qui lève `admin.executeSql is not a fun
 à devoir patcher `@rebasepro/server-postgres`, ou à exécuter `eject` pour un seul comportement, cela
 mérite une issue plutôt qu'un fork —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-<span class="since-badge" data-since="0.22">Depuis 0.22</span> `beforeQuery` et `search.mode: "hybrid"` existent tous deux parce qu'un pilote patché
+`beforeQuery` et `search.mode: "hybrid"` existent tous deux parce qu'un pilote patché
 était la seule alternative possible.
 
 ## Voir aussi

@@ -2762,6 +2762,8 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+### [0.22.0] - 2026-09-21
+
 #### Added
 
 - **Linking an account returns the provider's profile picture.** `verify`
@@ -12834,7 +12836,7 @@ const articlesCollection = defineCollection({
 
 #### `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Called **before a read is compiled**, to narrow which rows it asks for. Return
+Called **before a read is compiled**, to narrow which rows it asks for. Return
 conditions to AND into the query; return nothing to add none.
 
 ```typescript
@@ -14340,7 +14342,7 @@ longer reach your project. So climb only as far as you have to.
 | 6 | **`rebase eject`** | The entrypoint and the `Dockerfile`, in your repository | — | **Platform runtime upgrades stop reaching this project.** CORS, auth wiring, storage and shutdown become yours |
 
 :::tip[Two rungs are commonly skipped for no reason]
-<span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` (rung 2) narrows a read *before it is compiled*, which is the
+`beforeQuery` (rung 2) narrows a read *before it is compiled*, which is the
 thing people usually reach rung 3 or 5 for. And a `search` block with
 `mode: "hybrid"` (rung 1) is what people usually reach for raw SQL for. Both are
 new enough that older answers on the internet do not mention them.
@@ -14381,7 +14383,7 @@ reach a collection's rows that goes around them.
 
 | Callback | Fires | Use it for |
 |---|---|---|
-| `beforeQuery` <span class="since-badge" data-since="0.22">Since 0.22</span> | before a read is compiled | narrowing **which rows** a read asks for |
+| `beforeQuery` | before a read is compiled | narrowing **which rows** a read asks for |
 | `afterRead` | per row, after it is fetched | redaction, PII masking, computed fields |
 | `beforeSave` | after validation, before the write | defaults, derived columns, refusing a write |
 | `afterSave` | after the write, before the commit | side effects that must be undone with it |
@@ -14394,7 +14396,7 @@ reach a collection's rows that goes around them.
 
 #### Narrowing a read with `beforeQuery`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> `afterRead` sees rows that have already been fetched, so it can redact a value
+`afterRead` sees rows that have already been fetched, so it can redact a value
 but cannot stop the row being read. `beforeQuery` runs earlier: it is handed the
 parsed query and returns conditions to **AND** into it.
 
@@ -14575,7 +14577,7 @@ so and one throwing `admin.executeSql is not a function` at the call site.
 patching `@rebasepro/server-postgres`, or ejecting for one behaviour, that is
 worth an issue rather than a fork —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-<span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` and `search.mode: "hybrid"` both exist because a patched driver
+`beforeQuery` and `search.mode: "hybrid"` both exist because a patched driver
 was the only alternative.
 
 ### Related
@@ -19361,7 +19363,7 @@ content's language to get stemming.
 
 #### `mode`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> How a search string is matched against the fields you named.
+How a search string is matched against the fields you named.
 
 | `mode` | Matches | Finds `Muñoz` from `munoz` | Finds `sebastian` from `seb` |
 |---|---|---|---|
@@ -19460,7 +19462,7 @@ renaming it later is a drop and recreate, which rewrites the table.
 present only when the collection opted in *and* the request carried a search
 string.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> With `mode: "hybrid"`, a row found only by the substring half scores a small
+With `mode: "hybrid"`, a row found only by the substring half scores a small
 constant (0.001) rather than zero — below the smallest `ts_rank` a real lexeme
 match can produce, so a whole-word hit always outranks a substring one, and the
 substring-only rows fall back to the query's own tiebreaker instead of coming
@@ -19510,7 +19512,7 @@ text, and do not trust the surrounding text: it is whatever the user typed.
 Splitting on `<mark>` and rendering the parts is safer than
 `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Under `mode: "hybrid"`, a field matched only by substring is reported too — it
+Under `mode: "hybrid"`, a field matched only by substring is reported too — it
 is the field that caused the hit. Its snippet comes back with nothing marked:
 `ts_headline` marks lexemes, and half a word is not one.
 
@@ -21102,7 +21104,7 @@ Rebase provides two levels of entity lifecycle callbacks — both use the same `
 - **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
 
 Use global callbacks for:
-- **Row scoping** — <span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` on every collection, so a tenant's reads are narrowed in one place instead of per collection. Postgres only: beside a MongoDB or Firestore data source, a global `beforeQuery` refuses to boot rather than leave that source's reads unnarrowed. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Row scoping** — `beforeQuery` on every collection, so a tenant's reads are narrowed in one place instead of per collection. Postgres only: beside a MongoDB or Firestore data source, a global `beforeQuery` refuses to boot rather than leave that source's reads unnarrowed. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **PII masking** — redact sensitive fields for non-admin callers across all collections.
 - **Unified audit logging** — log every create, update, or delete in one place.
 - **Cross-cutting validation** — enforce invariants that span multiple collections.
@@ -21158,7 +21160,7 @@ type CollectionCallbacks = {
 };
 ```
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> `beforeQuery` narrows a read before it is compiled; see
+`beforeQuery` narrows a read before it is compiled; see
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
 All callbacks may return a `Promise` (async) or a plain value (sync).
@@ -22556,10 +22558,10 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 | I want to… | Rung | Reference |
 |---|---|---|
-| Narrow which rows a read returns | `beforeQuery` callback <span class="since-badge" data-since="0.22">Since 0.22</span> | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
+| Narrow which rows a read returns | `beforeQuery` callback | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
 | Redact a value on the way out | `afterRead` callback | [Callbacks](/docs/collections/callbacks) |
 | Add an endpoint of my own | custom function | [Custom Functions](/docs/backend/custom-functions) |
-| Make search find substrings *and* fold accents | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Since 0.22</span> | [Search](/docs/backend/search) |
+| Make search find substrings *and* fold accents | `search.mode: "hybrid"` | [Search](/docs/backend/search) |
 | Own the server process | custom server, then `rebase eject` | [Extending the server](/docs/backend/extending) |
 
 → [Rebase doesn't do X](/docs/backend/extending)
@@ -22840,7 +22842,7 @@ function App() {
 
 To override components only for a specific collection, add a `components` object under its `admin` block. This is useful for customizing empty states, cards, or detail views for particular models.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend, which reads the same files to derive the schema and the API. So point at each component by **module path** rather than importing it. `Component` takes the same forms as `admin.Field` and `entityViews[].Builder`: a path, a lazy `import()`, or the component itself.
+In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend, which reads the same files to derive the schema and the API. So point at each component by **module path** rather than importing it. `Component` takes the same forms as `admin.Field` and `entityViews[].Builder`: a path, a lazy `import()`, or the component itself.
 
 ```ts
 // config/collections/products.ts
@@ -24121,16 +24123,16 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> Per-row actions in collection tables, beside the built-in row tools |
-| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> UI injected before an individual form field |
-| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> UI injected after an individual form field |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
+| `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
 
 ##### Global / Shell
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> Cross-collection search, in the app bar beside the breadcrumbs |
-| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Since 0.22</span> Top-level actions, at the end of the app bar |
+| `global.search` | `GlobalSearchProps` | Cross-collection search, in the app bar beside the breadcrumbs |
+| `shell.toolbar` | `ShellToolbarProps` | Top-level actions, at the end of the app bar |
 
 :::note
 For a widget on the home page, use `home.children.start`, `home.children.end`,
@@ -34100,7 +34102,7 @@ pnpm dlx @rebasepro/cli <command>
 
 ### Machine-readable output
 
-`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list` and <span class="since-badge" data-since="0.22">Since 0.22</span> `rebase upgrade` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
+`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list` and `rebase upgrade` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ### Commands
 
@@ -34164,7 +34166,7 @@ upload limit is 100 MB compressed — see the changelog for the reasoning.
 
 #### `rebase upgrade`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Move every `@rebasepro/*` package the project pins to one release, then
+Move every `@rebasepro/*` package the project pins to one release, then
 install with the package manager its lockfile names. `rebase upgrade` takes the
 latest; `--to 0.21.0` an exact version, with no registry lookup; `--to canary` a
 dist-tag. Each pin in `dependencies`, `devDependencies` and
@@ -34486,7 +34488,7 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` with no app name deploys the backend. <span class="since-badge" data-since="0.22">Since 0.22</span> A backend bundle
+`deploy` with no app name deploys the backend. A backend bundle
 deploy also uploads the project's source — what git tracks, never a `.env` — so a
 platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
 --platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
@@ -35810,7 +35812,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.21.1", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.22.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -35861,7 +35863,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.21.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.22.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -36912,7 +36914,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -37014,7 +37016,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.21.1"
+  image = "rebasepro/server:0.22.0"
 
 [http_service]
   internal_port = 8080
@@ -37163,7 +37165,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.21.1
+image: rebasepro/server:0.22.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -37388,7 +37390,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.21.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.22.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -37659,7 +37661,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -37760,7 +37762,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -37865,7 +37867,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -37993,7 +37995,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.21.1` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.22.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -38137,7 +38139,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -38249,7 +38251,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 
@@ -38343,7 +38345,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.21.1
+FROM rebasepro/server:0.22.0
 COPY dist-bundle /bundle
 ```
 

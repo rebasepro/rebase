@@ -59,7 +59,7 @@ function App() {
 
 To override components only for a specific collection, add a `components` object under its `admin` block. This is useful for customizing empty states, cards, or detail views for particular models.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend, which reads the same files to derive the schema and the API. So point at each component by **module path** rather than importing it. `Component` takes the same forms as `admin.Field` and `entityViews[].Builder`: a path, a lazy `import()`, or the component itself.
+In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend, which reads the same files to derive the schema and the API. So point at each component by **module path** rather than importing it. `Component` takes the same forms as `admin.Field` and `entityViews[].Builder`: a path, a lazy `import()`, or the component itself.
 
 ```ts
 // config/collections/products.ts

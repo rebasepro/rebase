@@ -162,7 +162,7 @@ content's language to get stemming.
 
 ### `mode`
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> How a search string is matched against the fields you named.
+How a search string is matched against the fields you named.
 
 | `mode` | Matches | Finds `Muñoz` from `munoz` | Finds `sebastian` from `seb` |
 |---|---|---|---|
@@ -261,7 +261,7 @@ renaming it later is a drop and recreate, which rewrites the table.
 present only when the collection opted in *and* the request carried a search
 string.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> With `mode: "hybrid"`, a row found only by the substring half scores a small
+With `mode: "hybrid"`, a row found only by the substring half scores a small
 constant (0.001) rather than zero — below the smallest `ts_rank` a real lexeme
 match can produce, so a whole-word hit always outranks a substring one, and the
 substring-only rows fall back to the query's own tiebreaker instead of coming
@@ -311,7 +311,7 @@ text, and do not trust the surrounding text: it is whatever the user typed.
 Splitting on `<mark>` and rendering the parts is safer than
 `dangerouslySetInnerHTML`.
 
-<span class="since-badge" data-since="0.22">Since 0.22</span> Under `mode: "hybrid"`, a field matched only by substring is reported too — it
+Under `mode: "hybrid"`, a field matched only by substring is reported too — it
 is the field that caused the hit. Its snippet comes back with nothing marked:
 `ts_headline` marks lexemes, and half a word is not one.
 

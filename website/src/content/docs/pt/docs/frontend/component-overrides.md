@@ -1,5 +1,5 @@
 ---
-sourceHash: 973d76b134971c29
+sourceHash: 78c7b0d8c3e6c984
 title: Substituições de Componentes (Swizzling)
 sidebar_label: Substituições de Componentes
 description: Substitua componentes de interface padrão por implementações personalizadas no nível da aplicação ou da coleção.
@@ -60,7 +60,7 @@ function App() {
 
 Para substituir componentes apenas para uma coleção específica, adicione um objeto `components` sob o bloco `admin` dela. Isso é útil para personalizar estados vazios, cards ou visualizações de detalhes para modelos específicos.
 
-<span class="since-badge" data-since="0.22">Desde 0.22</span> No scaffold padrão, `config/collections/` é carregado **tanto** pelo painel de administração quanto pelo backend, que lê os mesmos arquivos para derivar o schema e a API. Portanto, aponte para cada componente pelo **caminho do módulo** em vez de importá-lo. `Component` aceita as mesmas formas que `admin.Field` e `entityViews[].Builder`: um caminho, um `import()` dinâmico/lazy ou o próprio componente.
+No scaffold padrão, `config/collections/` é carregado **tanto** pelo painel de administração quanto pelo backend, que lê os mesmos arquivos para derivar o schema e a API. Portanto, aponte para cada componente pelo **caminho do módulo** em vez de importá-lo. `Component` aceita as mesmas formas que `admin.Field` e `entityViews[].Builder`: um caminho, um `import()` dinâmico/lazy ou o próprio componente.
 
 ```ts
 // config/collections/products.ts
