@@ -22,7 +22,12 @@ export interface RebaseCollectionsPluginOptions {
 // a string path there was left as a string and the resolver logged "raw string
 // ComponentRef at runtime" and rendered nothing. Key-name based, so nesting
 // presentation under `admin` needs no change here.
-const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter"]);
+//
+// `Component` is `ComponentOverride.Component`, reachable from a collection
+// through `admin.components`. It is the same ref as the other four and needs the
+// same transform, or the path form the type now accepts would arrive at
+// `resolveComponentRef` as a bare string.
+const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
 
 /**
  * `callbacks:` is the server's block, all of it, and none of it may travel to

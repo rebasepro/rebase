@@ -59,18 +59,10 @@ export interface SlotRegistry {
     /** Inject UI after an individual form field. */
     "entity.field.after": EntityFieldSlotProps;
 
-    // ── Collection filter panel ───────────────────────────────────────
-    /** Custom filter sidebar for a collection. */
-    "collection.filter-panel": CollectionFilterPanelProps;
-
-    // ── Dashboard ─────────────────────────────────────────────────────
-    /** Widget rendered on the dashboard / home page. */
-    "dashboard.widget": DashboardWidgetProps;
-
-    // ── Global ────────────────────────────────────────────────────────
-    /** Cross-collection search bar component. */
+    // ── Global / Shell ────────────────────────────────────────────────
+    /** Cross-collection search, rendered in the app bar beside the breadcrumbs. */
     "global.search": GlobalSearchProps;
-    /** Top-level toolbar actions rendered in the shell toolbar area. */
+    /** Top-level actions, rendered at the end of the app bar. */
     "shell.toolbar": ShellToolbarProps;
 
     // ── Kanban ────────────────────────────────────────────────────────
@@ -79,33 +71,40 @@ export interface SlotRegistry {
 }
 
 /**
- * Valid slot names for UI extension points.
- * @group Plugins
- */
-/**
- * Slots this build declares but renders nowhere.
+ * Slots this build declares but renders nowhere. **Empty, and meant to stay so.**
  *
- * Every name here appears in {@link SlotRegistry}, has a props interface, and
- * is listed in the public slot reference alongside the ones that work — so a
- * plugin author picks one off the table, registers a component, sees nothing,
- * and has no way to tell whether the fault is theirs. Seven of twenty-nine were
- * in that state.
+ * It held seven of twenty-nine. Each appeared in {@link SlotRegistry}, had a
+ * props interface, and had a row in the public slot reference alongside the
+ * ones that work — so a plugin author picked one off the table, registered a
+ * component, saw nothing, and had no way to tell whether the fault was theirs.
+ *
+ * Five were implemented: `entity.field.before` and `entity.field.after` render
+ * in `PropertyFieldBinding` (the one component every form field goes through),
+ * `entity.row.actions` in `CollectionRowActions`, and `global.search` and
+ * `shell.toolbar` in `DefaultAppBar`. Two were removed, because nothing was
+ * missing that a declared slot would have supplied:
+ *
+ * - **`collection.filter-panel`** described a filter sidebar the admin does not
+ *   have. Rendering it meant inventing a region, which is a feature and not a
+ *   slot; `collection.toolbar` and `collection.widgets` are the declared places
+ *   for filter UI beside a table, and both work.
+ * - **`dashboard.widget`** took `{ context }` and nothing else, so it carried
+ *   no position on a page that already has four positions —
+ *   `home.children.start`, `home.children.end`, `home.cards` and
+ *   `home.card.widget`.
  *
  * This is a statement of fact, not a wish list: `slot-render-sites.test.ts`
  * derives the same set by scanning for render sites and fails when the two
- * disagree. Implementing a slot therefore forces its removal from here, and
- * declaring one without rendering it forces its addition — at which point
- * `Rebase` warns anyone who registers for it, which is the whole point.
+ * disagree — in *both* directions. So a slot declared without a render site
+ * has to be added back here, at which point `Rebase` warns anyone who registers
+ * for it, which is the whole point.
  */
-export const UNRENDERED_SLOTS = [
-    "collection.filter-panel",
-    "dashboard.widget",
-    "entity.field.after",
-    "entity.field.before",
-    "entity.row.actions",
-    "global.search",
-    "shell.toolbar"
-] as const satisfies readonly (keyof SlotRegistry)[];
+export const UNRENDERED_SLOTS = [] as const satisfies readonly (keyof SlotRegistry)[];
+
+/**
+ * Valid slot names for UI extension points.
+ * @group Plugins
+ */
 
 export type SlotName = keyof SlotRegistry;
 
@@ -265,24 +264,40 @@ export interface KanbanAddColumnProps {
 // ── New slot prop interfaces ──────────────────────────────────────────
 
 /**
- * Props for `entity.row.actions` slot.
- * Rendered for each row in a entity collection table.
+ * Props for the `entity.row.actions` slot.
+ *
+ * Rendered per row in a collection table, in the same hover overlay as the
+ * built-in row actions — beside `edit` and the collapsed action menu.
+ *
+ * `collection`, `path` and `selectionController` are optional because the
+ * render site's own are: a table can be shown without selection enabled, and a
+ * relation picker renders rows with no collection path behind them. A slot
+ * declaring them required would have promised a row's address that a row does
+ * not always have.
+ *
  * @group Plugins
  */
 export interface EntityRowActionsProps {
     entity: Entity;
-    entityId: string;
-    path: string;
-    collection: AdminCollection;
-    parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-    selectionController: SelectionController;
+    entityId: string | number;
+    path?: string;
+    collection?: AdminCollection;
+    selectionController?: SelectionController;
     context: RebaseContext;
 }
 
 /**
- * Props for `entity.field.before` and `entity.field.after` slots.
- * Rendered around individual form fields in the entity edit view.
+ * Props for the `entity.field.before` and `entity.field.after` slots.
+ *
+ * Rendered around every form field, from the one component every field goes
+ * through — so a contribution appears beside a string field and a date field
+ * alike.
+ *
+ * `collection` is optional: a field can be rendered outside a collection form
+ * (an array item's inner property, a custom view that binds a property
+ * directly), and those are the same fields. `propertyKey` may be a nested name
+ * such as `address.street` or `friends[2]`, exactly as the field itself sees it.
+ *
  * @group Plugins
  */
 export interface EntityFieldSlotProps {
@@ -290,36 +305,17 @@ export interface EntityFieldSlotProps {
     property: Property;
     path: string;
     entityId?: string | number;
-    collection: AdminCollection;
+    collection?: AdminCollection;
     context: RebaseContext;
 }
 
 /**
- * Props for `collection.filter-panel` slot.
- * Custom filter sidebar rendered alongside the collection table.
- * @group Plugins
- */
-export interface CollectionFilterPanelProps {
-    path: string;
-    collection: AdminCollection;
-    parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-    tableController: EntityTableController;
-    context: RebaseContext;
-}
-
-/**
- * Props for `dashboard.widget` slot.
- * Widgets rendered on the home / dashboard page.
- * @group Plugins
- */
-export interface DashboardWidgetProps {
-    context: RebaseContext;
-}
-
-/**
- * Props for `global.search` slot.
- * Cross-collection search bar rendered in the app shell.
+ * Props for the `global.search` slot.
+ *
+ * Rendered in the app bar after the breadcrumbs and before the spacer — where
+ * a search box goes. Takes only the context, so a contribution reads the
+ * collections, the navigation and the client off it.
+ *
  * @group Plugins
  */
 export interface GlobalSearchProps {
@@ -327,8 +323,12 @@ export interface GlobalSearchProps {
 }
 
 /**
- * Props for `shell.toolbar` slot.
- * Actions rendered in the top-level toolbar / app bar area.
+ * Props for the `shell.toolbar` slot.
+ *
+ * Rendered at the end of the app bar, with the language, theme and user
+ * actions. Same props as {@link GlobalSearchProps}: the two are told apart by
+ * where they render, not by what they are handed.
+ *
  * @group Plugins
  */
 export interface ShellToolbarProps {

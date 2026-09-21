@@ -18,7 +18,7 @@ import {
     SunMoonIcon,
     Typography
 } from "@rebasepro/ui";
-import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation } from "@rebasepro/app";
+import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation, useRebaseContext, useSlot } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { User } from "@rebasepro/types";
 import { useApp } from "./app/useApp";
@@ -120,6 +120,15 @@ export const DefaultAppBar = function DefaultAppBar({
     const user = userProp ?? authController.user;
     const { t } = useTranslation();
 
+    // The two shell slots. Both take the context and nothing else, which is why
+    // they are told apart by *where* they render rather than by their props: a
+    // cross-collection search belongs beside the breadcrumbs, where a search
+    // box goes, and a toolbar action belongs with the other actions at the end.
+    const rebaseContext = useRebaseContext();
+    const slotProps = React.useMemo(() => ({ context: rebaseContext }), [rebaseContext]);
+    const globalSearch = useSlot("global.search", slotProps);
+    const shellToolbar = useSlot("shell.toolbar", slotProps);
+
     let avatarComponent: React.ReactElement | null;
 
     if (user) {
@@ -203,12 +212,16 @@ export const DefaultAppBar = function DefaultAppBar({
             </div>
             {startAdornment}
 
+            {globalSearch}
+
             <div className={"grow"}/>
 
             {endAdornment &&
                 <ErrorBoundary>
                     {endAdornment}
                 </ErrorBoundary>}
+
+            {shellToolbar}
 
             {includeLanguageToggle && <LanguageToggle/>}
 

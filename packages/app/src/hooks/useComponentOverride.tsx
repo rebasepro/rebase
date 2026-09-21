@@ -1,6 +1,7 @@
 import React, { useContext, useMemo } from "react";
 import type { OverridableComponentName } from "@rebasepro/cms-types";
 import { ComponentOverrideContext } from "../contexts/ComponentOverrideContext";
+import { resolveComponentRef } from "./useResolvedComponent";
 
 /**
  * Resolves a potentially overridden component.
@@ -43,9 +44,25 @@ export function useComponentOverride<P>(
 
         if (!override) return DefaultComponent;
 
+        // `Component` is a `ComponentRef`, so a collection may name its override
+        // by module path — which is the only form a `config/collections` file
+        // can use without importing React into the backend. The resolver turns
+        // a path (already rewritten to a lazy ref by the Vite transform) or an
+        // `import()` into a component, and hands a direct reference straight
+        // back.
+        //
+        // Resolved at the map's own props type — `ComponentOverride` is declared
+        // without a type argument there, so the override is written against
+        // `Record<string, unknown>` and the single widening to `P` happens at
+        // the return, exactly where it did before this was a ref.
+        const UserComponent = resolveComponentRef(override.Component);
+        // An override that cannot be resolved is not an override. The resolver
+        // has already said why on the console; rendering the default beats
+        // rendering nothing at all, which is what a missing component does.
+        if (!UserComponent) return DefaultComponent;
+
         if (override.wrap) {
             // Wrapping mode: inject OriginalComponent as a prop
-            const UserComponent = override.Component;
             const Wrapper = (props: P) => (
                 <UserComponent {...(props as Record<string, unknown>)} OriginalComponent={DefaultComponent} />
             );
@@ -54,6 +71,6 @@ export function useComponentOverride<P>(
         }
 
         // Eject mode: full replacement
-        return override.Component as React.ComponentType<P>;
+        return UserComponent as React.ComponentType<P>;
     }, [collectionOverrides, globalOverrides, name, DefaultComponent]);
 }

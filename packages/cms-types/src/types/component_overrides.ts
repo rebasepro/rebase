@@ -1,5 +1,6 @@
 import type React from "react";
 import type { Property } from "@rebasepro/types";
+import type { ReactComponentRef } from "../react_component_ref";
 import type { WhereFilterOp } from "@rebasepro/types";
 
 // ── Scoped component name unions ──────────────────────────────────────
@@ -161,11 +162,25 @@ export interface ComponentOverride<P = Record<string, unknown>> {
      * The replacement component. Receives the same props as the built-in
      * component it replaces.
      *
+     * A module path (`"../../frontend/src/MyForm"`), a lazy `import()`, or the
+     * component itself — a {@link ReactComponentRef}, like every other
+     * component a collection points at (`admin.Field`, `entityViews[].Builder`,
+     * `admin.properties[].Filter`).
+     *
+     * The path form is what lets a collection declare an override at all. This
+     * field is reachable from `defineCollection` through `admin.components`, and
+     * `config/collections/*.ts` is loaded by the backend as well as the browser:
+     * a bare component reference there is a top-level React import in a process
+     * that only wants the schema. It was `React.ComponentType<P>` alone, which
+     * made that the *only* way to write one — the same defect
+     * `EntityAction.icon` had, and `collection-config-react-free.test.ts` is
+     * what now keeps the class swept.
+     *
      * When `wrap` is true, an additional `OriginalComponent` prop is injected
      * containing the default component, allowing you to render it within
      * your custom wrapper.
      */
-    Component: React.ComponentType<P>;
+    Component: ReactComponentRef<P>;
 
     /**
      * When true, the original default component is injected as the

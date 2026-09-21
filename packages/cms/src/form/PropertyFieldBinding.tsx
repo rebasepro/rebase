@@ -15,7 +15,7 @@ import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 
 import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
-import { useAuthController, useCustomizationController } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useRebaseContext, useSlot } from "@rebasepro/app";
 import { Typography } from "@rebasepro/ui";
 import { getFieldConfig, getFieldId } from "../components/field_configs";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -211,6 +211,22 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
 
     const { plugins } = useCustomizationController();
 
+    // This is the one component every form field goes through, which is why the
+    // two field slots render here rather than in each field binding: a slot
+    // honoured by the string field and not by the date field is worse than one
+    // that never renders at all.
+    const rebaseContext = useRebaseContext();
+    const fieldSlotProps = React.useMemo(() => ({
+        propertyKey,
+        property,
+        path: context.path ?? "",
+        entityId: context.entityId,
+        collection: context.collection,
+        context: rebaseContext
+    }), [propertyKey, property, context.path, context.entityId, context.collection, rebaseContext]);
+    const beforeField = useSlot("entity.field.before", fieldSlotProps);
+    const afterField = useSlot("entity.field.after", fieldSlotProps);
+
     const customFieldProps: unknown = property.admin?.customProps;
     const value = formexFieldProps.field.value;
     const error = getIn(formexFieldProps.form.errors, propertyKey) as string | string[] | undefined;
@@ -268,9 +284,13 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
 
     return (
         <ErrorBoundary>
+            {beforeField}
+
             <Suspense fallback={null}>
                 <UsedComponent {...cmsFieldProps}/>
             </Suspense>
+
+            {afterField}
 
             {underlyingValueHasChanged && !isSubmitting &&
                 <Typography variant={"caption"} className={"ml-3.5"}>

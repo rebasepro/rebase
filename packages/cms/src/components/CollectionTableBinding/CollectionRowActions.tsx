@@ -15,7 +15,7 @@ import {
     Skeleton,
     Tooltip
 } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/app";
+import { useTranslation, useSlot } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/app";
@@ -84,11 +84,26 @@ export const CollectionRowActions = function CollectionRowActions({
     const sidePanelCtrl = context.sidePanelController;
     const { t } = useTranslation();
 
+    // Plugin row actions, rendered in the same hover overlay as the built-in
+    // ones — beside `edit` and before the collapsed menu, which is where a
+    // per-row action goes. `collection`, `path` and `selectionController` are
+    // forwarded as they arrive: a relation picker renders rows with no
+    // collection path, and a table can be shown with selection off.
+    const rowSlotProps = React.useMemo(() => ({
+        entity,
+        entityId: entity.id,
+        path,
+        collection,
+        selectionController,
+        context
+    }), [entity, path, collection, selectionController, context]);
+    const slotActions = useSlot("entity.row.actions", rowSlotProps);
+
     const onCheckedChange = useCallback((checked: boolean) => {
         selectionController?.toggleEntitySelection(entity, checked);
     }, [entity, selectionController?.toggleEntitySelection]);
 
-    const hasActions = actions.length > 0;
+    const hasActions = actions.length > 0 || slotActions.length > 0;
     const hasCollapsedActions = actions.some(a => a.collapsed || a.collapsed === undefined);
 
     const collapsedActions = actions.filter(a => a.collapsed || a.collapsed === undefined);
@@ -166,6 +181,8 @@ export const CollectionRowActions = function CollectionRowActions({
                             </Tooltip>
                         );
                     })}
+
+                    {slotActions}
 
                     {hasCollapsedActions &&
                         <Menu

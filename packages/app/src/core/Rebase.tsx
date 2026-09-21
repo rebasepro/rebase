@@ -118,12 +118,13 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         ...((plugins ?? []).flatMap((p) => p.slots ?? []))
     ], [directSlots, plugins]);
 
-    // Seven of the twenty-nine declared slots are rendered nowhere. They have
-    // props interfaces and rows in the public slot reference, so registering
-    // for one looks exactly like registering for one that works — and then
-    // nothing happens, with no way to tell whether the fault is the plugin's.
-    // `UNRENDERED_SLOTS` is kept honest by `slot-render-sites.test.ts`, which
-    // derives the same set by scanning for render sites.
+    // A declared slot that is rendered nowhere has a props interface and a row
+    // in the public slot reference, so registering for one looks exactly like
+    // registering for one that works — and then nothing happens, with no way to
+    // tell whether the fault is the plugin's. `UNRENDERED_SLOTS` is empty today
+    // and `slot-render-sites.test.ts` keeps it honest in both directions, so
+    // this loop warns about nothing until a slot is declared ahead of its
+    // render site again.
     useEffect(() => {
         const dead = new Set<string>(UNRENDERED_SLOTS);
         const registered = new Set(resolvedSlots.map(s => s.slot).filter(slot => dead.has(slot)));
