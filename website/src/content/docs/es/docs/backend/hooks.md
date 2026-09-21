@@ -1,21 +1,22 @@
 ---
-sourceHash: e7b16241ef98f0de
+sourceHash: 97a20df64eaeffc7
 title: Hooks globales del backend
 sidebar_label: Hooks globales
 description: Aplica callbacks de ciclo de vida transversales a cada colección a nivel de servidor usando CollectionCallbacks.
 ---
 
-## Descripción general
+## Visión general
 
-Rebase proporciona dos niveles de callbacks del ciclo de vida de entidades — ambos usan el mismo tipo `CollectionCallbacks` de `@rebasepro/types`:
+Rebase proporciona dos niveles de callbacks del ciclo de vida de entidades; ambos utilizan el mismo tipo `CollectionCallbacks` de `@rebasepro/types`:
 
-- **[Callbacks por colección](/docs/collections/callbacks)**: Definidos en configuraciones de colección individuales. Se ejecutan únicamente para esa colección.
-- **Callbacks globales**: Definidos en `initializeRebaseBackend({ callbacks })`. Se activan en **cada** colección, en cada ruta de datos (API REST, WebSocket / realtime, `rebase.dataAsAdmin` en el servidor).
+- **[Callbacks por colección](/docs/collections/callbacks)**: Se definen en configuraciones de colección individuales. Se ejecutan únicamente para esa colección.
+- **Callbacks globales**: Se definen en `initializeRebaseBackend({ callbacks })`. Se disparan en **cada** colección, en cada ruta de datos (API REST, WebSocket / tiempo real, `rebase.dataAsAdmin` en el servidor).
 
-Usa callbacks globales para:
-- **Enmascaramiento de PII** — ocultar campos confidenciales para emisores que no son administradores en todas las colecciones.
-- **Registro de auditoría unificado** — registrar cada creación, actualización o eliminación en un solo lugar.
-- **Validación transversal** — aplicar invariantes que abarcan múltiples colecciones.
+Utilice callbacks globales para:
+- **Alcance de filas (Row scoping)** — <span class="since-badge" data-since="0.22">Desde 0.22</span> `beforeQuery` en cada colección, de modo que las lecturas de un inquilino se delimiten en un solo lugar en vez de por colección. Solo Postgres: junto a una fuente de datos de MongoDB o Firestore, un `beforeQuery` global rechaza iniciarse en lugar de dejar las lecturas de esa fuente sin delimitar. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Enmascaramiento de PII** — ofusca campos sensibles para quienes realizan llamadas sin permisos de administrador en todas las colecciones.
+- **Registro de auditoría unificado** — registra cada creación, actualización o eliminación en un solo lugar.
+- **Validación transversal** — aplica invariantes que abarcan múltiples colecciones.
 
 :::note
 **Orden de ejecución**: callbacks globales → callbacks de colección → callbacks de propiedad.
@@ -26,14 +27,14 @@ Usa callbacks globales para:
 ## Configuración
 
 :::note[Dónde va esto]
-**Runtime administrado** — `export const callbacks = { … }` desde `config/index.ts`. El runtime lee esa exportación al arrancar; no es necesario cambiar nada más.
+**Runtime gestionado** — `export const callbacks = { … }` desde `config/index.ts`. El runtime lee esa exportación al arrancar; no es necesario cambiar nada más.
 
-**Ejected** — la clave `callbacks` en `initializeRebaseBackend({ … })`.
+**Eyectado (Ejected)** — la clave `callbacks` en `initializeRebaseBackend({ … })`.
 
-El mapa completo está en [Descripción general del backend](/docs/backend/#where-each-option-lives).
+El mapa completo está en [Visión general del backend](/docs/backend/#where-each-option-lives).
 :::
 
-Pasa la clave `callbacks` a `initializeRebaseBackend`:
+Pase la clave `callbacks` a `initializeRebaseBackend`:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -59,6 +60,7 @@ const instance = await initializeRebaseBackend({
 
 ```typescript
 type CollectionCallbacks = {
+    beforeQuery?(props): QueryNarrowing | void;     // Conditions to AND into a read before it is compiled
     afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
     afterSave?(props):   void;                      // After the write, still in the transaction
@@ -68,16 +70,19 @@ type CollectionCallbacks = {
 };
 ```
 
-Todos los callbacks pueden devolver una `Promise` (asíncrona) o un valor plano (síncrono).
+<span class="since-badge" data-since="0.22">Desde 0.22</span> `beforeQuery` delimita una lectura antes de que se compile; consulte
+[`beforeQuery`](/docs/collections/callbacks#beforequery).
+
+Todos los callbacks pueden devolver una `Promise` (asíncrono) o un valor simple (síncrono).
 
 ---
 
-## Props de los callbacks
+## Props de callbacks
 
 Cada callback recibe un único objeto de props. Campos comunes:
 
 | Campo | Tipo | Presente en |
-|-------|------|------------|
+|-------|------|-------------|
 | `collection` | `CollectionConfig` | Todos los callbacks |
 | `path` | `string` | Todos los callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
@@ -89,11 +94,17 @@ Cada callback recibe un único objeto de props. Campos comunes:
 
 `context.user` contiene el usuario autenticado (`uid`, `roles`, etc.), o es `undefined` para solicitudes públicas.
 
-`collection` siempre está presente. Un callback global se activa para cada colección, por lo que es el único nivel que se registra independientemente de cualquiera de ellas — pero aun así nunca recibe una colección inexistente. Una solicitud que especifique una ruta que el registro de colecciones no pueda resolver es rechazada con `404 NOT_FOUND` antes de que se ejecute cualquier nivel, que es la misma respuesta que las rutas de lectura y escritura dan a dicha ruta de todos modos. La alternativa — omitir el nivel para esas rutas — convertiría a `afterRead` en un paso de ofuscación con una excepción silenciosa, por lo que no está disponible.
+`collection` siempre está presente. Un callback global se dispara para cada colección, por lo que
+es el único nivel que se registra independientemente de cualquiera de ellas, pero aun así
+nunca recibe una colección faltante. Una solicitud que nombra una ruta que el registro de
+colecciones no puede resolver se rechaza con `404 NOT_FOUND` antes de que se ejecute ningún nivel,
+que es la misma respuesta que las rutas de lectura y escritura dan a dicha ruta de todos modos. La
+alternativa —omitir el nivel para esas rutas— convertiría a `afterRead` en un paso de
+ofuscación con una excepción silenciosa, por lo que no se ofrece.
 
 ---
 
-## Pipeline de ejecución
+## Flujo de ejecución
 
 ```
 [Client Request]
@@ -125,32 +136,43 @@ Cada callback recibe un único objeto de props. Campos comunes:
 
 ## Semántica bloqueante vs. asíncrona
 
-**Todos los callbacks de la siguiente lista se esperan con `await`, y todos ellos se ejecutan dentro de la transacción que lleva la escritura.** No existe un nivel de tipo «fire and forget»: la fila y todo lo que hicieron sus callbacks se confirman juntos (commit) o no se confirman en absoluto.
+**Cada callback en la lista a continuación se espera con `await`, y todos ellos se ejecutan dentro de la
+transacción que procesa la escritura.** No existe un nivel de "disparar y olvidar": la
+fila y todo lo que hicieron sus callbacks se confirman (commit) juntos o no se confirma nada.
 
-- **`beforeSave`, `beforeDelete`** — si el callback lanza un error (throws), la operación se rechaza con un HTTP 400 que incluye tu mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lanza un `RebaseApiError` de `@rebasepro/types` para elegir el estado tú mismo — consulta [Callbacks de entidad](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo pero sin mensaje, y responde **403** con ese código.
-- **`afterRead`** — la fila devuelta (o fila transformada) es lo que recibe el emisor. Su transacción es `READ ONLY` — consulta [más abajo](#afterread-cannot-write).
-- **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, de forma esperada con `await`. Si lanzan un error aquí, se revierte (rollback) la fila y se responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantiene un bloqueo (lock).
-- **`afterSaveError`** — se ejecuta cuando el guardado falla, a la salida.
+- **`beforeSave`, `beforeDelete`** — si el callback lanza un error (throw), la operación se rechaza con un HTTP 400 que incluye su mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lance un `RebaseApiError` de `@rebasepro/types` para elegir el estado usted mismo — consulte [Callbacks de entidad](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo sin mensaje, y responde **403** con ese código.
+- **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-cannot-write).
+- **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, con `await`. Si lanzan un error aquí, se revierte (rollback) la fila y se responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantiene un bloqueo activo.
+- **`afterSaveError`** — se ejecuta cuando el guardado falló, en la salida.
 
 :::caution[Esta página solía decir lo contrario]
-Las versiones anteriores decían que `afterSave` y `afterDelete` "se ejecutan después de que la transacción hace commit" y "no bloquean la respuesta HTTP". Nunca hicieron ninguna de las dos cosas. El código que se escribió basándose en esa afirmación — por ejemplo, una llamada de webhook en `afterSave` — ha estado manteniendo abierta una transacción de base de datos durante la duración de un viaje de ida y vuelta HTTP (round trip), y revirtiendo la fila cada vez que el extremo remoto estaba caído.
+Las versiones anteriores decían que `afterSave` y `afterDelete` "se ejecutan después de que la transacción
+haga commit" y "no bloquean la respuesta HTTP". En realidad, nunca hicieron ninguna de las dos cosas. El código que
+se escribió en base a esa frase —por ejemplo, una llamada a un webhook en `afterSave`— ha
+estado manteniendo una transacción de base de datos abierta durante la duración de un viaje de ida y vuelta HTTP,
+y revirtiendo la fila siempre que el extremo remoto estuviera caído.
 :::
 
 ### Efectos secundarios que no deben retener la transacción
 
-Cualquier cosa lenta, o cualquier cosa que no se pueda deshacer si la transacción se revierte (rollback), no pertenece al cuerpo del callback:
+Cualquier cosa lenta, o cualquier cosa que no se pueda deshacer si la transacción se revierte,
+no pertenece al cuerpo del callback:
 
-| Objetivo | Haz esto en su lugar |
+| Desea | Haga esto en su lugar |
 |---|---|
-| Llamar a un tercero, enviar correos, generar un archivo | [Encolar un trabajo](/docs/backend/jobs). Un trabajo encolado en una transacción que se revierte nunca fue encolado — que es el comportamiento que deseas. |
-| Notificar a otros procesos que algo sucedió | Publica en un [canal de tiempo real](/docs/backend/realtime) después de que la escritura retorne, no desde dentro del hook. |
-| Trabajar en una [función personalizada](/docs/backend/custom-functions) que el emisor no necesita esperar | `waitUntil(c, promise)` de `@rebasepro/server/functions` — se ejecuta después de la respuesta, y el host lo espera antes de apagarse. |
+| Llamar a un tercero, enviar correo, generar un archivo | [Encolar un trabajo](/docs/backend/jobs). Un trabajo encolado en una transacción que se revierte nunca fue encolado — lo cual es el comportamiento deseado. |
+| Notificar a otros procesos que algo sucedió | Publicar en un [canal en tiempo real](/docs/backend/realtime) después de que la escritura retorne, no desde dentro del hook. |
+| Trabajo en una [función personalizada](/docs/backend/custom-functions) que el emisor de la llamada no necesita esperar | `waitUntil(c, promise)` de `@rebasepro/server/functions` — se ejecuta después de la respuesta, y el host espera a que termine antes de apagarse. |
 
-La regla general: si el trabajo aún debe ocurrir cuando la escritura se deshace, no es parte de la escritura, por lo que no va dentro del hook.
+La regla general: si el trabajo aún debe ocurrir cuando se deshace la escritura,
+no es parte de la escritura, por lo que no debe ir dentro del hook.
 
-### `afterRead` no puede escribir
+### `afterRead` no puede escribir {#afterread-cannot-write}
 
-Una lectura con ámbito de solicitud abre su transacción como `READ ONLY`. `afterRead` se ejecuta dentro de ella, por lo que **ninguna escritura desde ese callback puede tener éxito** — ni una creación con `context.data`, ni una actualización, ni una oculta en una función auxiliar que invoque. Postgres rechaza la instrucción con SQLSTATE `25006`, y al emisor se le responde:
+Una lectura con alcance de solicitud abre su transacción en modo `READ ONLY`. `afterRead` se ejecuta dentro
+de ella, por lo que **ninguna escritura desde ese callback puede tener éxito** — ni una creación con `context.data`,
+ni una actualización, ni una oculta dentro de una función auxiliar a la que invoque. Postgres rechaza la
+instrucción con SQLSTATE `25006`, y al emisor de la llamada se le responde:
 
 ```json
 { "error": { "message": "An `afterRead` callback tried to write. …",
@@ -158,9 +180,14 @@ Una lectura con ámbito de solicitud abre su transacción como `READ ONLY`. `aft
              "details": { "dbCode": "25006" } } }
 ```
 
-Eso es un 409, no un 500: es tu código siendo rechazado, no el servidor fallando. El modo de solo lectura es deliberado — una lectura que escribe silenciosamente es una lectura cuyo costo, bloqueos y superficie de RLS nadie tenía presupuestados.
+Eso es un 409, no un 500: es su código el que está siendo rechazado, no el servidor fallando.
+El modo de solo lectura es deliberado — una lectura que escribe de forma silenciosa es una lectura cuyo
+costo, bloqueos y superficie de RLS nadie tenía presupuestados.
 
-Por lo tanto, **la auditoría de lectura no pertenece a `afterRead`**. En su lugar, registra la lectura fuera de la solicitud — desde un trabajo en segundo plano alimentado por lo que ya emitas, o desde una función personalizada que haga la lectura *y* la escritura mediante dos llamadas separadas:
+Por lo tanto, **la auditoría de lectura no pertenece a `afterRead`**. Registre la lectura fuera de la
+solicitud en su lugar — desde un trabajo en segundo plano alimentado por lo que ya emita, o
+desde una función personalizada que realice la lectura *y* la escritura mediante dos llamadas
+independientes:
 
 ```typescript no-verify
 // ✗ Fails with READ_ONLY_TRANSACTION on every read.
@@ -185,7 +212,8 @@ export default defineFunction("read-article", (app) => {
 });
 ```
 
-La auditoría en el lado de la escritura no tiene ese problema: `afterSave` y `afterDelete` se ejecutan en una transacción de lectura y escritura, y la fila de auditoría se confirma (commit) junto con el cambio que registra.
+La auditoría del lado de la escritura no tiene tal problema: `afterSave` y `afterDelete` se ejecutan en una
+transacción de lectura-escritura, y la fila de auditoría se confirma junto con el cambio que registra.
 
 ---
 
@@ -193,7 +221,7 @@ La auditoría en el lado de la escritura no tiene ese problema: `afterSave` y `a
 
 ### Enmascaramiento de PII
 
-Enmascarar direcciones de correo electrónico para emisores que no son administradores en todas las colecciones:
+Ofusque las direcciones de correo electrónico para los emisores sin privilegios de administrador en todas las colecciones:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -214,7 +242,10 @@ const instance = await initializeRebaseBackend({
 
 ### Registro de auditoría global
 
-Registra cada eliminación, en todas las colecciones, en una tabla `audit_log`. Debido a que `afterDelete` se ejecuta en la propia transacción de la eliminación, la fila de auditoría y la eliminación se confirman juntas — no hay ventana en la que una exista sin la otra:
+Registre cada eliminación, en todas las colecciones, en una tabla `audit_log`. Debido a que
+`afterDelete` se ejecuta en la propia transacción de la eliminación, la fila de auditoría y la
+eliminación se confirman juntas — no hay un intervalo en el que una exista sin la
+otra:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -236,11 +267,13 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-Ten en cuenta lo que esto aporta y lo que cuesta: si la fila de auditoría no se puede escribir, la eliminación tampoco se produce. Para un registro de auditoría, esto suele ser lo que se desea. Si no es así, captura el error en el callback y acláralo en un comentario.
+Tenga en cuenta lo que esto aporta y lo que cuesta: si la fila de auditoría no se puede escribir, la
+eliminación tampoco se produce. Para un registro de auditoría, esto suele ser lo que se desea.
+Si no es así, capture el error en el callback e indíquelo en un comentario.
 
-### Lógica específica de la colección
+### Lógica específica por colección
 
-Los callbacks globales se activan para todas las colecciones. Para acotar la lógica a una sola colección, verifica `collection.slug` o `path`:
+Los callbacks globales se disparan para todas las colecciones. Para delimitar la lógica a una sola colección, verifique `collection.slug` o `path`:
 
 ```typescript
 callbacks: {
@@ -255,4 +288,4 @@ callbacks: {
 }
 ```
 
-Para callbacks que solo aplican a una única colección, opta en su lugar por los [callbacks por colección](/docs/collections/callbacks).
+Para callbacks que solo se aplican a una única colección, prefiera en su lugar [callbacks por colección](/docs/collections/callbacks).

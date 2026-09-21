@@ -253,7 +253,7 @@ interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storag
 interface BundleSchema { enums, relations, tables }
 interface CapturedEmail { at, html, id, links, messageId, subject, text, to }
 interface CollectionDefaults { defaultSecurityRules }
-interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
+interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register, setGlobalCallbacks }
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConfigProblem { kind, message, path, severity }
@@ -420,6 +420,7 @@ const DEFAULT_LIST_LIMIT
 const DEFAULT_RESOURCE_KEY
 const DEFAULT_SEARCH_COLUMN
 const DEFAULT_SEARCH_LANGUAGE
+const DEFAULT_SEARCH_MODE
 const DEFAULT_SEARCH_WEIGHT
 const DEFAULT_STORAGE_SOURCE_KEY
 const DEFAULT_TENANT_BYPASS_ROLES
@@ -575,6 +576,7 @@ interface BatchResult { data, meta }
 interface BatchWriteOperation { collection, id, onConflict, op, path, ref, values }
 interface BatchWriteProps { operations }
 interface BeforeDeleteProps { collection, context, id, path, row }
+interface BeforeQueryProps { collection, context, operation, path, query }
 interface BelongsToRelation { kind, localKey, onDelete, onUpdate, overrides, relationName, target }
 interface BinaryProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BooleanProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
@@ -593,7 +595,7 @@ interface ChannelRetentionRule { limit, match, ttl }
 interface ClassifiedSchemaChanges { applicable, changes, verdict }
 interface CollectionAccessor { aggregate, count, create, createMany, delete, deleteMany, find, findById, include, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
 interface CollectionPatchMessage { channel, error, id, payload, pks, requestId, row, rows, subscriptionId, type }
-interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
+interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register, setGlobalCallbacks }
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
 interface CollectionTenantConfig { bypassRoles, field, from }
 interface CollectionUpdateMessage { channel, error, meta, payload, pks, requestId, row, rows, subscriptionId, type }
@@ -692,6 +694,7 @@ interface PropertyValidationSchema { required, requiredMessage, unique, uniqueIn
 interface PublicSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface QueryBuilderInterface { find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
 interface QueryFilter { field, operator, value }
+interface QueryNarrowing { filter, logical }
 interface QueueConsumer { handler, queue }
 interface QueueEnqueueOptions { maxAttempts, runAt }
 interface QueueHandle { engine, enqueue, handler, key, kind, label, options, toString, transport, usedBy }
@@ -699,6 +702,7 @@ interface QueueOptions { engine, label, maxAttempts, transport }
 interface QueueRuntime { enqueue }
 interface RawPolicyExpression { kind, sql }
 interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
 interface RealtimeChannelsConfig { bus, channels }
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions, port, runtime, schema, type, usersCollection }
@@ -749,7 +753,7 @@ interface SchemaChangeFile { contents, path }
 interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
 interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
 interface SchemaEditingAdmin { planSchemaChange }
-interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, unaccent }
+interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, mode, unaccent }
 interface SearchField { path, weight }
 interface SearchMatch { field, snippet }
 interface SearchOptions { collection, databaseId, filter, limit, order, orderBy }
@@ -821,7 +825,7 @@ type ChannelBusHandler
 type ChannelBusSetting
 type ChannelMessage
 type ChildViewSource
-type CollectionCallbacks { afterDelete, afterRead, afterSave, afterSaveError, beforeDelete, beforeSave }
+type CollectionCallbacks { afterDelete, afterRead, afterSave, afterSaveError, beforeDelete, beforeQuery, beforeSave }
 type CollectionConfig
 type CollectionIndex
 type CollectionRegistryController { collections, convertIdsToPaths, getCollection, getParentCollectionSlugs, getParentEntityIds, getParentReferencesFromPath, getRawCollection, initialised }
@@ -890,6 +894,7 @@ type PropertyCallbacks { afterRead, beforeSave }
 type PropertyTypeNotOnThisEngine
 type QueryComputedFields
 type QueueHandler
+type ReadOperation
 type RebaseAppConfig
 type RebaseAppType
 type RebaseCallContext { client, data, driver, storageSource, user }
@@ -908,6 +913,7 @@ type RestFilterOp
 type RowOf
 type SchemaChangeKind
 type SchemaChangeVerdict
+type SearchMode
 type SearchWeight
 type SecurityOperation
 type SecurityRule
@@ -1036,6 +1042,7 @@ const REBASE_INTERNAL_SCHEMAS
 const REBASE_INTERNAL_TABLES
 const REBASE_USER_ROLE
 const TENANT_INDEX_REASON
+const assertBeforeQueryIsPostgresOnly
 const buildPropertyCallbacks
 const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 function aggregateAlias
@@ -1218,6 +1225,7 @@ type TriState
 type UnknownResolution
 
 ## @rebasepro/utils
+const MAX_SEARCH_TERMS
 const defaultDateFormat
 const isArrayValue
 const isEmptyArray
@@ -1272,6 +1280,7 @@ function setIn
 function sha1Hex
 function singular
 function slugify
+function splitSearchTerms
 function suggestNearMiss
 function toArray
 function toPostgresIdentifier

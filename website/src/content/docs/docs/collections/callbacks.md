@@ -12,6 +12,7 @@ Callbacks let you hook into the entity lifecycle to:
 - **Transform data** before saving (computed fields, slugification)
 - **Validate** business rules beyond schema validation
 - **Trigger side effects** after writes (send emails, sync APIs, update caches)
+- **Narrow a read** before it is compiled, so a caller only ever sees their own rows
 - **Filter/transform** data after reading
 - **Cascade operations** — clean up related records on delete
 
@@ -127,6 +128,57 @@ const articlesCollection = defineCollection({
 ```
 
 ## Callback Reference
+
+### `beforeQuery`
+
+<span class="since-badge" data-since="0.22">Since 0.22</span> Called **before a read is compiled**, to narrow which rows it asks for. Return
+conditions to AND into the query; return nothing to add none.
+
+```typescript
+beforeQuery: ({
+    operation,   // "list" | "get" | "count" | "aggregate" | "relation"
+    query,       // the parsed read, read-only
+    context
+}) => {
+    if (context.user?.roles?.includes("admin")) return;
+    return { filter: { tenant_id: ["==", context.user?.tenant ?? null] } };
+}
+```
+
+`afterRead` sees rows that have already been fetched, so it can redact a value
+but cannot stop the row being read. This runs earlier, and three things about it
+are worth knowing:
+
+- **It can only narrow.** The return value is a filter to AND in, and no value
+  it can return widens the read. `filter` takes the same field filters a query
+  does; `logical` takes an `or`/`and` group, for a scope like "mine, or shared
+  with me" — still AND-ed in as a whole, so the `or` only ever chooses among
+  rows the rest of the query already admits.
+- **It fires on every read path.** The listing, the single get, the count, the
+  aggregate, the search, the vector read, a nested-path listing, the realtime
+  refetch behind a `.listen()`, and the rows loaded for a relation or an
+  `?include=` — where it is the **target** collection's hook that applies,
+  because those are the target's rows.
+- **A filter it cannot compile refuses the request.** Naming a column the table
+  does not have is a 400, never a dropped condition.
+
+One read is deliberately not narrowed: the uniqueness check behind
+`validation: { unique: true }`. It asks whether a value exists anywhere in the
+table, and narrowed it would answer "unique" for a value a hidden row already
+holds.
+
+:::caution[Postgres only, for now]
+`beforeQuery` is implemented by `@rebasepro/server-postgres`. A collection served
+by MongoDB or Firestore that declares one **fails at boot**, by name, rather
+than being served with the hook silently inert — which for a row filter would
+mean every row served to everybody. A [global](/docs/backend/hooks)
+`beforeQuery` fails at boot the same way if any data source is not Postgres, and
+so does one attached later with `setCollectionCallbacks`. Redaction that works
+on every engine is [`afterRead`](#afterread).
+:::
+
+→ [Extending the server](/docs/backend/extending#2-collection-callbacks) for
+where this sits among the other options.
 
 ### `beforeSave`
 

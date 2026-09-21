@@ -57,13 +57,15 @@ function App() {
 
 ## Collection-Level Component Overrides
 
-To override components only for a specific collection, add a `components` object to its definition. This is useful for customizing empty states, cards, or detail views for particular models.
+To override components only for a specific collection, add a `components` object under its `admin` block. This is useful for customizing empty states, cards, or detail views for particular models.
 
-```tsx
+<span class="since-badge" data-since="0.22">Since 0.22</span> In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend, which reads the same files to derive the schema and the API. So point at each component by **module path** rather than importing it. `Component` takes the same forms as `admin.Field` and `entityViews[].Builder`: a path, a lazy `import()`, or the component itself.
+
+```ts
+// config/collections/products.ts
 import { defineCollection } from "@rebasepro/cms-types";
-import { ProductCustomForm } from "./components/ProductCustomForm";
 
-const productsCollection = defineCollection({
+export const productsCollection = defineCollection({
     name: "Products",
     slug: "products",
     table: "products",
@@ -71,29 +73,41 @@ const productsCollection = defineCollection({
     admin: {
         components: {
             // Eject Mode: Replace the default entity form view
-            "Entity.Form": { Component: ProductCustomForm },
+            "Entity.Form": { Component: "../../frontend/src/ProductCustomForm" },
 
             // Wrap Mode: Wrap the empty state to add quick links
             "Collection.EmptyState": {
-                // `OriginalComponent` is injected at runtime when `wrap: true`; the override
-                    // slot's type does not model it, hence the annotation.
-                    Component: (({ OriginalComponent, ...props }: {
-                        OriginalComponent: React.ComponentType<Record<string, unknown>>
-                    }) => (
-                    <div className="empty-state-wrapper">
-                        <OriginalComponent {...props} />
-                        <button onClick={() => importDemoProducts()}>
-                            Load Demo Products
-                        </button>
-                    </div>
-                )) as unknown as React.ComponentType<Record<string, unknown>>,
+                Component: "../../frontend/src/ProductsEmptyState",
                 wrap: true
             }
         }
     }
 });
-
 ```
+
+The wrapping component lives with the rest of your frontend code, and receives the built-in one as `OriginalComponent`:
+
+```tsx
+// frontend/src/ProductsEmptyState.tsx
+import type React from "react";
+
+export default function ProductsEmptyState({ OriginalComponent, ...props }: {
+    OriginalComponent: React.ComponentType<Record<string, unknown>>
+}) {
+    return (
+        <div className="empty-state-wrapper">
+            <OriginalComponent {...props} />
+            <button onClick={() => importDemoProducts()}>
+                Load Demo Products
+            </button>
+        </div>
+    );
+}
+```
+
+Each module needs a **default export**. The collections Vite plugin rewrites a path into a lazy import, so the component is its own chunk and loads the first time the override renders. That rewrite covers the files inside the configured `collectionsDir`. A path in a file outside it reaches the admin as a bare string: the console says so, and the built-in component renders in its place. Outside `collectionsDir`, write the lazy import yourself: `Component: () => import("../../frontend/src/ProductCustomForm")`.
+
+A direct reference (`Component: ProductCustomForm`) also works, but only in a collection file nothing on the server loads, because importing the component also imports React and everything it pulls in.
 
 ---
 

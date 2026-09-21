@@ -25,6 +25,48 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   holding one is a column that turns into a broken image later — copy the bytes
   somewhere you own while the URL is still good.
 
+- **`beforeQuery` narrows which rows a read asks for.** `afterRead` sees rows
+  after they are fetched, so a tenant scope or a per-role row filter could only
+  be an RLS policy or a condition pushed into every caller. A collection's
+  `callbacks.beforeQuery`, or a global one on `initializeRebaseBackend`, returns
+  a `filter` or a `logical` group that is AND-ed into the read before it is
+  compiled. It can only narrow: nothing it returns can drop or replace the
+  caller's own conditions. It applies to the listing, the single get, the count,
+  the aggregate, search, vector reads, nested paths, the realtime refetch behind
+  `.listen()`, and the rows loaded for a relation or an `?include=`, where the
+  target collection's hook is the one that applies. A hook filter that names a
+  column the table does not have refuses the request with
+  `400 UNKNOWN_FILTER_FIELD`, whatever `configureUnknownFilterFields` is set to.
+  Postgres only: a MongoDB or Firestore collection that declares one fails at
+  boot rather than serving every row.
+
+- **`search.mode` can be `"hybrid"`, which finds substrings and folds accents
+  in one collection.** Full-text search matches whole words, so `seb` never
+  found `Sebastian` and `audit` never found `Lead Auditor`. The plain search
+  finds substrings but cannot fold accents, so `munoz` never found `Muñoz`.
+  `mode: "hybrid"` ORs the indexed full-text match with an accent-folded
+  substring match over the same `search.fields`, and ranks full-text hits above
+  substring-only ones. It changes the query and not the generated column, so it
+  can be turned on for a live collection without the rebuild a changed `search`
+  block otherwise needs; it adds the `unaccent` extension and one helper
+  function if they are missing. The substring half cannot use the GIN index,
+  which is why `"fts"` stays the default.
+
+- **Five plugin slots that rendered nowhere now render.**
+  `entity.field.before` and `entity.field.after` render around every form
+  field, `entity.row.actions` in each table row's hover tools, `global.search`
+  in the app bar beside the breadcrumbs, and `shell.toolbar` at the end of the
+  app bar. All five were declared and documented, and registering for one did
+  nothing. `UNRENDERED_SLOTS` is now empty, and a test that scans for render
+  sites fails if a slot is declared without one again.
+
+- **A component override can be named by module path.** An override in a
+  collection's `admin.components` took only a component, so declaring one meant
+  importing React into `config/collections/*.ts`, which the backend loads too.
+  `Component` now takes a path or a lazy `import()`, as `admin.Field` does, and
+  the collections Vite plugin turns the path into a lazy import. An override
+  that cannot be resolved renders the built-in component instead of nothing.
+
 ### Changed
 
 - **The record dialog has its Create and Save buttons at the bottom.** In a
@@ -41,11 +83,27 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   alone on the row below. Short forms now stack. A `span` set on a property is
   still honoured, and longer forms keep their columns.
 
+- **The `entity.row.actions` and field slot props describe what their render
+  sites have.** In `EntityRowActionsProps`, `entityId` is `string | number`,
+  `path`, `collection` and `selectionController` are optional, and
+  `parentCollectionSlugs` and `parentEntityIds` are gone. In
+  `EntityFieldSlotProps`, `collection` is optional. A relation picker renders
+  rows with no collection path, a table can hide selection, and a field can be
+  rendered outside a collection form. A component typed against the old props
+  has to handle the optional ones.
+
 ### Removed
 
 - **`PropertyIdCopyTooltip` and `LabelWithIconAndTooltip` are gone from
   `@rebasepro/cms`.** Use `PropertyKeyHint` to show a property's key beside a
   label of your own, or `LabelWithIcon` with its new `propertyKey` prop.
+
+- **The `collection.filter-panel` and `dashboard.widget` slots, with
+  `CollectionFilterPanelProps` and `DashboardWidgetProps`.** Neither ever
+  rendered. The admin has no filter sidebar for the first to render into; put
+  filter UI in `collection.toolbar` or `collection.widgets`. The second named no
+  position on the page; the home page has `home.children.start`,
+  `home.children.end`, `home.cards` and `home.card.widget`.
 
 ### Fixed
 
@@ -123,6 +181,17 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   as soon as they took focus, and again on hover. The key now appears in small
   type beside the label when you rest the pointer on it, and clicking it copies
   it. It covers nothing, never opens on focus, and is not a Tab stop.
+
+- **Global callbacks run.** The `callbacks` passed to `initializeRebaseBackend`,
+  and `export const callbacks` from `config/index.ts` on the managed runtime,
+  were stored on the backend's own collection registry. No driver reads that
+  one: each builds a registry of its own at boot and looks for global callbacks
+  there. So a global `afterRead`, `beforeSave`, `afterSave`, `beforeDelete` or
+  `afterDelete` was accepted and never called, on any data path. The backend now
+  hands them to every driver at boot, and refuses to start if a driver returns
+  no registry that can take them. **If you declared global callbacks, they start
+  running with this release** — read them again before you upgrade. A global
+  `beforeQuery` beside a MongoDB or Firestore data source also refuses to start.
 
 ## [0.21.1] - 2026-09-15
 

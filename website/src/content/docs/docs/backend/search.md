@@ -120,8 +120,11 @@ Rebase records a fingerprint of the expression on the column when it creates it,
 and compares it on every boot and every `db push`. A change is refused, loudly,
 with the two statements that apply it — a `DROP COLUMN` and an `ADD COLUMN`,
 which rewrite the table and rebuild the GIN index. Run them at a time you
-choose; nothing rewrites a live table on your behalf. (Turning `fuzzy` on is
-additive — a second column — and applies without any of this.)
+choose; nothing rewrites a live table on your behalf.
+
+Two changes are exempt. Turning `fuzzy` on is additive — a second column — and
+applies without any of this. Setting [`mode`](#mode) changes the query rather
+than the column, so it applies with a deploy.
 
 Boot refuses rather than serving, because the alternative is what this check
 replaced: a column that keeps indexing the previous field set, and a search that
@@ -156,6 +159,60 @@ The Postgres text search configuration, which decides stemming and stopwords.
 `"simple"` is the default because it is the only choice that is never wrong — a
 stemmer applied to the wrong language silently mangles lexemes. Set it to your
 content's language to get stemming.
+
+### `mode`
+
+<span class="since-badge" data-since="0.22">Since 0.22</span> How a search string is matched against the fields you named.
+
+| `mode` | Matches | Finds `Muñoz` from `munoz` | Finds `sebastian` from `seb` |
+|---|---|---|---|
+| `"fts"` (default) | whole lexemes, via the `tsvector` and its GIN index | with `unaccent` | no |
+| `"hybrid"` | that, `OR` a substring match over the same fields | **always** | **yes** |
+
+```typescript
+search: {
+    language: "spanish",
+    mode: "hybrid",
+    fields: ["full_name", "questionnaire.certifications"]
+}
+```
+
+The default and the no-block default have opposite holes, which is what this
+mode closes. Measured against a real Postgres on five rows
+(`search-mode-matrix.test.ts` in `@rebasepro/server-postgres`):
+
+| query | no block (ILIKE) | `"fts"` + `unaccent` | `"hybrid"` |
+|---|---|---|---|
+| `munoz` | `Ana Munoz` | `Ana Munoz`, `Sebastian Muñoz` | `Ana Munoz`, `Sebastian Muñoz` |
+| `seb` | both Sebastians | — | both Sebastians |
+| `audit` | the `Lead Auditor` | — | the `Lead Auditor` |
+| `iso 14001` | the `ISO 14001` row | the `ISO 14001` row | the `ISO 14001` row |
+
+`fuzzy` reaches the same rows, but only once its similarity floor is tuned: at
+the 0.3 default, `iso 14001` also returns an `ISO 9001` row. `"hybrid"` has no
+threshold to tune — a substring either occurs or it does not.
+
+**What it costs.** The substring half cannot use the GIN index; a leading `%`
+never can. The `@@` half still runs first and still uses the index, so what the
+mode adds is a scan over the rows the index rejected. On a large table that is
+the difference between an index scan and a sequential one, which is why this is
+a mode and not the default.
+
+**Changing it on a live collection is safe** — the one option in this block
+that is. `mode` is query-side: it changes no generated column, no generation
+expression and no index, so it does not trip the refusal described in
+[Changing the block later](#changing-the-block-later). Turning it on takes a
+deploy and nothing else.
+
+It folds accents on the substring half **whether or not `unaccent` is set**,
+because that folding is also query-side. That is deliberate: `unaccent` is the
+setting you cannot turn on later without rewriting the table, so a collection
+stuck without it can still stop missing `Muñoz`. What `unaccent` still buys is
+folding on the `@@` half, where the lexemes are stored.
+
+It does add the `unaccent` extension and one `IMMUTABLE` helper function to the
+database if they are not there already. Both statements are
+`IF NOT EXISTS` / `CREATE OR REPLACE`, and neither touches a table.
 
 ### `unaccent`
 
@@ -204,6 +261,12 @@ renaming it later is a drop and recreate, which rewrites the table.
 present only when the collection opted in *and* the request carried a search
 string.
 
+<span class="since-badge" data-since="0.22">Since 0.22</span> With `mode: "hybrid"`, a row found only by the substring half scores a small
+constant (0.001) rather than zero — below the smallest `ts_rank` a real lexeme
+match can produce, so a whole-word hit always outranks a substring one, and the
+substring-only rows fall back to the query's own tiebreaker instead of coming
+back in whatever order the table felt like.
+
 With `fuzzy` on, the trigram similarity is **added** to that rank. This is not a
 refinement — it is what makes `fuzzy` a ranking at all. A typo matches nothing on
 the exact path, so every row it finds has a `ts_rank` of exactly zero; ordering
@@ -247,6 +310,10 @@ rather than reading the index. Right for a page of results, wrong for an export.
 text, and do not trust the surrounding text: it is whatever the user typed.
 Splitting on `<mark>` and rendering the parts is safer than
 `dangerouslySetInnerHTML`.
+
+<span class="since-badge" data-since="0.22">Since 0.22</span> Under `mode: "hybrid"`, a field matched only by substring is reported too — it
+is the field that caused the hit. Its snippet comes back with nothing marked:
+`ts_headline` marks lexemes, and half a word is not one.
 
 With `unaccent` on, snippets read with accents folded — `Auditoria`, not
 `Auditoría`. `ts_headline` over the original text cannot find a hit that an

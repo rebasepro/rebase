@@ -154,6 +154,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
+                        { label: "Extending the server", slug: "docs/backend/extending" },
                         { label: "REST API", slug: "docs/backend/api" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "API keys", slug: "docs/backend/api-keys" },

@@ -63,6 +63,7 @@
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Field access](https://rebase.pro/docs/collections/field-access): Per-property read and write permissions by role. A caller the row's security rules let through still does not receive a field their roles cannot read.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
+- [Rebase doesn't do X](https://rebase.pro/docs/backend/extending): The server-side extension ladder — declaration, collection callback, custom function, your own routes, your own server, eject — with what each one can and cannot reach.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
 - [Writing over REST](https://rebase.pro/docs/backend/writes): Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-collection batches.
 - [API keys](https://rebase.pro/docs/backend/api-keys): Scoped, revocable keys for machine callers: what a key can reach, how scopes compose with row-level security, and the admin endpoints that manage them.

@@ -10,6 +10,11 @@ Rebase offers roughly a dozen extension mechanisms — plugins, slots, component
 
 This guide helps you pick the right mechanism for your use case, then links to the detailed reference for each.
 
+Everything here is the **admin panel**. For the server — narrowing a read,
+adding a route, embedding the driver in your own process, `rebase eject` — see
+[Rebase doesn't do X](/docs/backend/extending), which is the same kind of table
+for the backend.
+
 ## Decision Table
 
 | I want to… | Mechanism | Scope | Reference |
@@ -54,7 +59,7 @@ A plugin bundles collections, views, component overrides, slot contributions, au
 
 **Scope:** app (contributed per-slot).
 
-Slots are named UI extension points scattered throughout the CMS chrome. You register a React component targeting a slot name, and it renders at that location. There are 29 slots covering the home page, navigation, collection views, forms, entity rows, dashboards, and more.
+Slots are named UI extension points scattered throughout the CMS chrome. You register a React component targeting a slot name, and it renders at that location. There are 27 slots covering the home page, navigation, collection views, forms, entity rows, form fields and the app bar — and every one of them is rendered.
 
 → [Slots reference](/docs/frontend/slots)
 
@@ -213,6 +218,21 @@ Computed/virtual columns displayed in the collection table. These don't correspo
 Custom field widgets for specific property types, providing custom form fields and preview components.
 
 → [Custom Fields](/docs/frontend/custom-fields)
+
+## Not the admin panel
+
+If the thing you want to change is what the server does rather than what the
+panel shows, this is the wrong page. The server has its own ladder:
+
+| I want to… | Rung | Reference |
+|---|---|---|
+| Narrow which rows a read returns | `beforeQuery` callback <span class="since-badge" data-since="0.22">Since 0.22</span> | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
+| Redact a value on the way out | `afterRead` callback | [Callbacks](/docs/collections/callbacks) |
+| Add an endpoint of my own | custom function | [Custom Functions](/docs/backend/custom-functions) |
+| Make search find substrings *and* fold accents | `search.mode: "hybrid"` <span class="since-badge" data-since="0.22">Since 0.22</span> | [Search](/docs/backend/search) |
+| Own the server process | custom server, then `rebase eject` | [Extending the server](/docs/backend/extending) |
+
+→ [Rebase doesn't do X](/docs/backend/extending)
 
 ## Precedence Summary
 

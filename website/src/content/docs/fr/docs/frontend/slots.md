@@ -1,13 +1,15 @@
 ---
-sourceHash: 24ecb93e6262aeca
+sourceHash: f3f10a71f8d6c351
 title: Slots
 sidebar_label: Slots
-description: Référence pour tous les points d'extension d'interface utilisateur (slots) disponibles dans Rebase — emplacements nommés où vous pouvez injecter des composants personnalisés.
+description: Référence de tous les slots de points d'extension d'interface utilisateur disponibles dans Rebase — des emplacements nommés où vous pouvez injecter des composants personnalisés.
 ---
 
 ## Vue d'ensemble
 
-Les slots sont des points d'extension d'interface utilisateur nommés où vous pouvez injecter des composants React personnalisés. Chaque slot dispose de props typées spécifiques à son emplacement dans l'interface utilisateur. Rebase est livré avec 29 slots intégrés couvrant la page d'accueil, la navigation, les vues de collection, les formulaires d'entités, les tableaux de bord et bien plus encore.
+Les slots sont des points d'extension d'interface utilisateur nommés où vous pouvez injecter des composants React personnalisés. Chaque slot dispose de props typées spécifiques à son emplacement dans l'interface utilisateur. Rebase est livré avec 27 slots intégrés couvrant la page d'accueil, la navigation, les vues de collection, les formulaires d'entités, la barre d'application, et bien plus encore.
+
+Chaque slot du tableau ci-dessous est rendu. Si vous enregistrez un composant pour l'un d'eux et que rien ne s'affiche, l'erreur vient de votre composant ou de ses props, et non du slot — `UNRENDERED_SLOTS` dans `@rebasepro/cms-types` est vide, et un test génère cette liste en analysant les points de rendu, de sorte qu'un slot ne peut pas être déclaré ici sans en avoir un.
 
 ## Utilisation
 
@@ -53,80 +55,84 @@ const myPlugin: RebasePlugin = {
 
 #### Page d'accueil
 
-| Slot | Type de props | Description |
+| Slot | Type de Props | Description |
 |------|--------------|-------------|
 | `home.actions` | `PluginGenericProps` | Actions dans l'en-tête de la page d'accueil |
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Cartes supplémentaires sur la page d'accueil |
 | `home.children.start` | `PluginGenericProps` | Contenu au début de la page d'accueil |
 | `home.children.end` | `PluginGenericProps` | Contenu à la fin de la page d'accueil |
-| `home.card.widget` | `HomeCardWidgetSlotProps` | Widget compact à l'intérieur d'une carte de collection de la page d'accueil |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Widget compact à l'intérieur d'une carte de collection sur la page d'accueil |
 | `home.collection.actions` | `PluginHomePageActionsProps` | Actions sur les cartes de collection de la page d'accueil |
 
 #### Navigation
 
-| Slot | Type de props | Description |
+| Slot | Type de Props | Description |
 |------|--------------|-------------|
-| `navigation.header` | `NavigationSlotProps` | Sous le logo dans le tiroir latéral (sidebar) |
-| `navigation.footer` | `NavigationSlotProps` | Au-dessus du bouton de réduction en bas du tiroir |
+| `navigation.header` | `NavigationSlotProps` | Sous le logo dans le volet latéral |
+| `navigation.footer` | `NavigationSlotProps` | Au-dessus du bouton de réduction en bas du volet |
 
 #### Vue de collection
 
-| Slot | Type de props | Description |
+| Slot | Type de Props | Description |
 |------|--------------|-------------|
-| `collection.actions` | `CollectionActionsProps` | Actions de barre d'outils côté fin (après les `Actions` de collection) |
-| `collection.actions.start` | `CollectionActionsProps` | Actions de barre d'outils côté début (aux côtés des filtres) |
+| `collection.actions` | `CollectionActionsProps` | Actions de la barre d'outils côté fin (après les `Actions` de collection) |
+| `collection.actions.start` | `CollectionActionsProps` | Actions de la barre d'outils côté début (aux côtés des filtres) |
 | `collection.header.action` | `CollectionHeaderActionProps` | Boutons d'action dans l'en-tête de colonne |
 | `collection.add-column` | `CollectionAddColumnProps` | Zone « Ajouter une colonne » dans l'en-tête du tableau |
 | `collection.error` | `CollectionErrorProps` | Affichage de l'état d'erreur pour une collection |
-| `collection.toolbar` | `CollectionToolbarProps` | Widgets supplémentaires à l'intérieur de la ligne de barre d'outils de collection |
-| `collection.empty-state` | `CollectionEmptyStateProps` | État vide personnalisé lorsqu'une collection n'a pas de données |
-| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets au-dessus du tableau de collection |
-| `collection.filter-panel` | `CollectionFilterPanelProps` | Barre latérale de filtres personnalisée à côté du tableau. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
+| `collection.toolbar` | `CollectionToolbarProps` | Widgets supplémentaires dans la ligne de la barre d'outils de collection |
+| `collection.empty-state` | `CollectionEmptyStateProps` | État vide personnalisé lorsque la collection ne contient aucune donnée |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets au-dessus du tableau de la collection |
 
 #### Entité / Formulaire
 
-| Slot | Type de props | Description |
+| Slot | Type de Props | Description |
 |------|--------------|-------------|
 | `form.actions` | `PluginFormActionProps` | Actions dans la barre d'actions du formulaire d'entité |
 | `form.actions.top` | `PluginFormActionProps` | Actions au-dessus de la barre d'actions du formulaire |
 | `form.before` | `PluginFormActionProps` | Contenu avant le titre du formulaire / la liste des champs |
 | `form.after` | `PluginFormActionProps` | Contenu après la liste des champs du formulaire |
-| `entity.row.actions` | `EntityRowActionsProps` | Actions par ligne dans les tableaux d'entités. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
-| `entity.field.before` | `EntityFieldSlotProps` | UI injectée avant un champ de formulaire individuel. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
-| `entity.field.after` | `EntityFieldSlotProps` | UI injectée après un champ de formulaire individuel. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
+| `entity.row.actions` | `EntityRowActionsProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Actions par ligne dans les tableaux de collection, à côté des outils de ligne intégrés |
+| `entity.field.before` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Interface utilisateur injectée avant un champ de formulaire individuel |
+| `entity.field.after` | `EntityFieldSlotProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Interface utilisateur injectée après un champ de formulaire individuel |
 
-#### Tableau de bord
+#### Global / Shell
 
-| Slot | Type de props | Description |
+| Slot | Type de Props | Description |
 |------|--------------|-------------|
-| `dashboard.widget` | `DashboardWidgetProps` | Widgets sur le tableau de bord / la page d'accueil. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
+| `global.search` | `GlobalSearchProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Recherche multi-collections, dans la barre d'application à côté du fil d'Ariane |
+| `shell.toolbar` | `ShellToolbarProps` | <span class="since-badge" data-since="0.22">Depuis 0.22</span> Actions de niveau supérieur, à la fin de la barre d'application |
 
-#### Global
+:::note
+Pour un widget sur la page d'accueil, utilisez `home.children.start`, `home.children.end`,
+`home.cards` ou `home.card.widget` — ce sont les quatre positions de la page d'accueil.
+Il n'y a pas de `dashboard.widget` : il ne prenait que le contexte et ne désignait donc
+aucune position sur une page qui en comptait déjà quatre.
 
-| Slot | Type de props | Description |
-|------|--------------|-------------|
-| `global.search` | `GlobalSearchProps` | Composant de barre de recherche multi-collections. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
-| `shell.toolbar` | `ShellToolbarProps` | Actions de barre d'outils de premier niveau dans la barre d'application. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend actuellement. |
+Pour une interface de filtrage à côté d'un tableau, utilisez `collection.toolbar` ou
+`collection.widgets`. Il n'y a pas de `collection.filter-panel` : l'interface d'administration
+ne dispose pas d'une barre latérale de filtres dans laquelle il pourrait être rendu.
+:::
 
 #### Kanban
 
-| Slot | Type de props | Description |
+| Slot | Type de Props | Description |
 |------|--------------|-------------|
-| `kanban.setup` | `KanbanSetupProps` | UI de configuration du tableau Kanban |
+| `kanban.setup` | `KanbanSetupProps` | Interface utilisateur de configuration du tableau Kanban |
 | `kanban.add-column` | `KanbanAddColumnProps` | « Ajouter une colonne » dans la vue Kanban |
 
-## Référence des props de slot
+## Référence des props des slots
 
-Tous les types de props de slot sont exportés depuis `@rebasepro/types` et peuvent être importés pour des composants de slot sécurisés par le typage :
+Tous les types de props de slots sont exportés depuis `@rebasepro/types` et peuvent être importés pour des composants de slot sécurisés au niveau des types :
 
 ```typescript
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";
 ```
 
-Chaque type de props donne accès au contexte pertinent pour l'emplacement du slot — métadonnées de collection, données d'entité, état de navigation, et plus encore. Consultez les définitions de types individuelles pour obtenir tous les détails sur les propriétés.
+Chaque type de props donne accès au contexte pertinent pour l'emplacement du slot — métadonnées de collection, données d'entité, état de navigation, et plus encore. Reportez-vous aux définitions de types individuelles pour connaître tous les détails des propriétés.
 
 ## Voir aussi
 
-- [Remplacement de composants (Swizzling)](/docs/frontend/component-overrides/) — quand un slot ne suffit pas
+- [Surcharges de composants (Swizzling)](/docs/frontend/component-overrides/) — lorsqu'un slot ne suffit pas
 - [Étendre Rebase](/docs/frontend/extending/) — le reste de la surface d'extension
-- [Plugins](/docs/plugins/) — distribuer du contenu de slots sous forme de plugin
+- [Plugins](/docs/plugins/) — distribuer le contenu d'un slot sous forme de plugin
