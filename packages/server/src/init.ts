@@ -20,7 +20,7 @@ import {
     parseEnvBoolean,
     resourceKeyOf
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
@@ -105,6 +105,7 @@ import {
     type RuntimeSurfaceOptions
 } from "./init/surfaces";
 import { injectCallbackClient } from "./init/callback-client";
+import { handGlobalCallbacksTo } from "./init/global-callbacks";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured, requireAdmin } from "./auth";
 import { createJwksRoutes } from "./auth/jwks-routes";
@@ -1270,6 +1271,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 provision: config.provisionSchema ?? true
             }
         });
+        // Global callbacks were set on `collectionRegistry` above, and no driver
+        // reads that one — see `handGlobalCallbacksTo`.
+        if (config.callbacks) {
+            handGlobalCallbacksTo(b.id || bootstrapper.type, bootstrapper.type, driverResult, config.callbacks);
+        }
         delegates[b.id || bootstrapper.type] = driverResult.driver;
         // Kept because a later step has to hand each bootstrapper back its own
         // result: `finalizeSecurityPosture` reaches into the driver it
@@ -3498,6 +3504,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         slug: string,
         callbacks: import("@rebasepro/types").CollectionCallbacks
     ): void => {
+        // The boot-time check on `beforeQuery` saw the collection's declared
+        // callbacks, not these, so it is repeated here before anything is
+        // assigned: a hook attached to a collection its engine cannot narrow is
+        // the same inert row filter it refuses at boot.
+        const declared = collectionRegistry.get(slug);
+        if (declared) assertBeforeQueryIsPostgresOnly([{ ...declared, callbacks }]);
         let attached = 0;
         // Assignment, not a merge — attaching callbacks REPLACES whatever the
         // collection declared. That is the right semantics (the caller is

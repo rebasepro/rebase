@@ -1,4 +1,5 @@
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
+import type { CollectionCallbacks } from "./entity_callbacks";
 import type { OrderByTuple } from "./filter-operators";
 import type { LogicalCondition } from "../controllers/data";
 import type { AuthAdapter } from "./auth_adapter";
@@ -425,6 +426,18 @@ export interface CollectionRegistryInterface {
      * Get the currently registered global callbacks, if any.
      */
     getGlobalCallbacks(): any | undefined;
+
+    /**
+     * Take the global callbacks declared on `initializeRebaseBackend({ callbacks })`.
+     *
+     * A driver resolves callbacks from the registry it builds for itself, so
+     * this is how the backend's global ones reach it: the coordinator hands
+     * them over after `initializeDriver` returns. Optional so a registry for a
+     * driver that runs no callbacks still type-checks, but a project that
+     * declares global callbacks over a registry without it is refused at boot
+     * — hooks that never run look exactly like hooks that passed.
+     */
+    setGlobalCallbacks?(callbacks: CollectionCallbacks): void;
 }
 
 // =============================================================================
