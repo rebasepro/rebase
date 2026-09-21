@@ -54,6 +54,7 @@ import {
     relationalCollections,
     resolveCollectionRelations,
     resolveJunctionSpecs,
+    assertBeforeQueryIsPostgresOnly,
     resolveStringColumnLength,
     securityRuleToConditions
 } from "@rebasepro/common";
@@ -497,6 +498,9 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // Before the filter, deliberately: a `search` block on a collection this
     // engine does not store would otherwise be dropped without a word.
     assertSearchIsPostgresOnly(allCollections);
+    // Same reasoning, and a stronger reason to be loud: a `beforeQuery` that
+    // does nothing is a row filter that does nothing.
+    assertBeforeQueryIsPostgresOnly(allCollections);
 
     // A Firestore or MongoDB collection has no table here, and generating one
     // is not merely wasted output: `db push` would create it, and the doctor

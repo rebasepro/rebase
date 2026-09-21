@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
-import type { IncludeSpec, NullsPlacement, VectorSearchParams } from "@rebasepro/types";
+import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
@@ -26,6 +26,7 @@ import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-c
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
 import { andSoftDelete, withSoftDelete, type WithDeleted } from "./soft-delete";
+import { beforeQueryCondition, beforeQueryConditions, type ReadCallContextProvider } from "./read-scope";
 import { ApiError, logger } from "@rebasepro/server";
 import { reachedDatabase } from "../utils/pg-error-utils";
 
@@ -119,8 +120,18 @@ export function numericAggregateAliases(
 export class FetchService {
     private relationService: RelationService;
 
-    constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) {
-        this.relationService = new RelationService(db, registry);
+    constructor(
+        private db: DrizzleClient,
+        private registry: PostgresCollectionRegistry,
+        /**
+         * How this service's reads reach the identity their `beforeQuery` hooks
+         * run as. Passed by the driver that constructed it; absent only in a
+         * test, where a collection declaring the hook is refused rather than
+         * read unnarrowed. See `read-scope.ts`.
+         */
+        private callContext?: ReadCallContextProvider
+    ) {
+        this.relationService = new RelationService(db, registry, callContext);
     }
 
     /**
@@ -154,6 +165,86 @@ export class FetchService {
             collection,
             registry: this.registry,
             sourceIdColumn: collection ? this.resolveIdColumn(collection, table) : undefined
+        };
+    }
+
+    /**
+     * The conditions this collection's `beforeQuery` hooks ask to add, for a
+     * read that is about to be compiled.
+     *
+     * Resolved here, from the registry this service already holds, rather than
+     * handed in by a caller — so a read path that builds a WHERE cannot serve
+     * one of these collections without the hook. `[]` when nothing is declared,
+     * which leaves the compiled SQL byte-identical.
+     *
+     * Every caller pushes the result onto the same `allConditions` array its
+     * own filter goes into, and every one of those arrays is AND-ed. That is
+     * what keeps a hook additive: it is not trusted to narrow, it is only ever
+     * given a way to.
+     */
+    private narrowRead(
+        collectionPath: string,
+        collection: CollectionConfig,
+        table: PgTable<any>,
+        operation: ReadOperation,
+        query: ReadQuery
+    ): Promise<SQL[]> {
+        return beforeQueryConditions(
+            { registry: this.registry, callContext: this.callContext },
+            collection, collectionPath, table as PgTable<never>,
+            { operation, query }, this.filterContext(collectionPath, table)
+        );
+    }
+
+    /** {@link narrowRead}, pre-combined, for the reads that hold one `SQL`. */
+    private narrowReadCondition(
+        collectionPath: string,
+        collection: CollectionConfig,
+        table: PgTable<any>,
+        operation: ReadOperation,
+        query: ReadQuery
+    ): Promise<SQL | undefined> {
+        return beforeQueryCondition(
+            { registry: this.registry, callContext: this.callContext },
+            collection, collectionPath, table as PgTable<never>,
+            { operation, query }, this.filterContext(collectionPath, table)
+        );
+    }
+
+    /**
+     * The read the hooks are shown, from the options a read path was given.
+     *
+     * Transport is left out on purpose — a `databaseId`, an `include` tree, a
+     * `withDeleted` flag are not part of "which rows". What is in is what a
+     * scope might reasonably branch on.
+     */
+    private static describeRead(options: {
+        filter?: ReadQuery["filter"];
+        logical?: LogicalCondition;
+        searchString?: string;
+        limit?: number;
+        offset?: number;
+        orderBy?: string | OrderByTuple[];
+        order?: "desc" | "asc";
+        fields?: string[];
+        relatedTo?: NestedPathHop;
+    }): ReadQuery {
+        const orderBy = normalizeDriverOrderBy(options.orderBy, options.order);
+        return {
+            filter: options.filter,
+            logical: options.logical,
+            searchString: options.searchString,
+            limit: options.limit,
+            offset: options.offset,
+            orderBy: orderBy && orderBy.length > 0 ? orderBy : undefined,
+            fields: options.fields,
+            relatedTo: options.relatedTo
+                ? {
+                    parentSlug: options.relatedTo.parentCollection.slug,
+                    parentId: options.relatedTo.parentId,
+                    relationName: options.relatedTo.relation.relationName
+                }
+                : undefined
         };
     }
 
@@ -1221,6 +1312,17 @@ idColumn };
         const parsedIdObj = parseIdValues(id, idInfoArray);
         const parsedId = parsedIdObj[idInfo.fieldName];
 
+        // Resolved once, before either path builds its WHERE: `db.query` and the
+        // `db.select` fallback below both serve this request, so a row the hook
+        // excludes has to be absent down both — which is what happened to the
+        // soft-delete condition when each path grew its own filter.
+        const narrowing = await this.narrowReadCondition(
+            collectionPath, collection, table, "get", {}
+        );
+        const identity = narrowing
+            ? and(eq(idField, parsedId), narrowing) as SQL
+            : eq(idField, parsedId);
+
         // Primary path: use db.query.findFirst with relation loading
 
         const tableName = getTableName(table);
@@ -1236,7 +1338,7 @@ idColumn };
                     // Soft delete: a stamped row answers 404 like any other
                     // absent one, so `findById` and `find` agree about which
                     // rows exist.
-                    where: andSoftDelete(eq(idField, parsedId), collection, table, withDeleted),
+                    where: andSoftDelete(identity, collection, table, withDeleted),
                     with: withConfig,
                     ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
@@ -1264,7 +1366,7 @@ idColumn };
         const result = await this.db
             .select(visibleOne as never)
             .from(table)
-            .where(andSoftDelete(eq(idField, parsedId), collection, table, withDeleted))
+            .where(andSoftDelete(identity, collection, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return undefined;
@@ -1577,6 +1679,15 @@ relatedTo: hop });
             if (logicalCondition) allConditions.push(logicalCondition);
         }
 
+        // The same narrowing the listing applies. A `beforeQuery` honoured by
+        // one and not the other is a page reading "1 of 4 results" — the same
+        // failure mode as the soft-delete condition above, which is why they sit
+        // together.
+        allConditions.push(...await this.narrowRead(
+            effectivePath, collection, table, "count",
+            FetchService.describeRead({ ...options, relatedTo: hop })
+        ));
+
         // A `threshold` genuinely narrows the row set on the fetch path, and
         // this count did not apply it — so a similarity-filtered listing
         // reported the size of the *unfiltered* set, and `hasMore` stayed true
@@ -1699,6 +1810,12 @@ relatedTo: hop });
             );
             if (logicalCondition) conditions.push(logicalCondition);
         }
+        // An aggregate is an efficient way to learn about rows you cannot
+        // select, so it is narrowed by the same hook as the listing. Without
+        // this, `count(*)` over a scoped collection reports the unscoped total.
+        conditions.push(...await this.narrowRead(
+            collectionPath, collection, table, "aggregate", FetchService.describeRead(options)
+        ));
         if (conditions.length > 0) {
             const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(conditions);
             if (finalCondition) query = query.where(finalCondition);
@@ -1747,7 +1864,15 @@ relatedTo: hop });
     }
 
     /**
-     * Check if a field value is unique
+     * Check if a field value is unique.
+     *
+     * Deliberately **not** narrowed by `beforeQuery`, and it is the only read
+     * here that is not. The question is whether the value exists anywhere in
+     * the table, not whether it exists among the rows this caller can see:
+     * narrowed, it would answer "unique" for a value a hidden row already
+     * holds, and the insert would then be rejected by the unique constraint
+     * with a message about a row the caller has no way to find. Uniqueness is a
+     * property of the table.
      */
     async checkUniqueField(
         collectionPath: string,
@@ -1919,10 +2044,21 @@ relatedTo: hop }, include
         // `GET /:id` and the listing agree about which rows exist.
         const withDeleted = options?.withDeleted;
         const projection = this.columnProjection(table, collection, options?.fields, idInfoArray);
+        // The REST single get is narrowed by the same hook as the listing, so
+        // `find()[0]` and `findById()` agree about which rows exist — and so
+        // that a row excluded from a scoped listing cannot be read by guessing
+        // its id.
+        const narrowing = await this.narrowReadCondition(
+            collectionPath, collection, table, "get",
+            FetchService.describeRead({ fields: options?.fields })
+        );
+        const identity = narrowing
+            ? and(eq(idField, parsedId), narrowing) as SQL
+            : eq(idField, parsedId);
         const result = await this.db
             .select(projection as never)
             .from(table)
-            .where(andSoftDelete(eq(idField, parsedId), collection, table, withDeleted))
+            .where(andSoftDelete(identity, collection, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return null;
@@ -2063,6 +2199,13 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath, table));
             if (logicalCondition) allConditions.push(logicalCondition);
         }
+
+        // This is the one place this pipeline builds a WHERE, so it is the one
+        // place the hook has to be applied for the listing, the search, the
+        // vector read, the nested-path listing and the realtime refetch.
+        allConditions.push(...await this.narrowRead(
+            collectionPath, collection, table, "list", FetchService.describeRead(options)
+        ));
 
         if (vectorMeta?.filter) {
             allConditions.push(vectorMeta.filter);

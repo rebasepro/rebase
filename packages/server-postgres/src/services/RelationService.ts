@@ -26,6 +26,7 @@ import { bindThroughJunction } from "./junction-writes";
 // comment reappearing under its post is the same bug as one reappearing in the
 // listing. See `soft-delete.ts`.
 import { andSoftDelete, softDeleteCondition } from "./soft-delete";
+import { beforeQueryCondition, type ReadCallContextProvider } from "./read-scope";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -99,6 +100,18 @@ function narrowed(base: SQL, narrow?: SQL): SQL {
 }
 
 /**
+ * Two optional conditions, AND-ed: either, both, or neither.
+ *
+ * The include's own `where` and the target collection's `beforeQuery` arrive
+ * separately and are both optional, and they have to reach the loaders as one
+ * condition because that is the shape every relation kind threads through.
+ */
+function narrowBoth(a?: SQL, b?: SQL): SQL | undefined {
+    if (a && b) return and(a, b)!;
+    return a ?? b;
+}
+
+/**
  * The registry has no table for a collection a relation just asked about.
  *
  * "Parent table not found" was the whole message, four times over, and it names
@@ -146,7 +159,57 @@ export interface RelatedRow<M extends Record<string, unknown> = Record<string, u
 }
 
 export class RelationService {
-    constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) { }
+    constructor(
+        private db: DrizzleClient,
+        private registry: PostgresCollectionRegistry,
+        /**
+         * How this service's reads reach the identity their `beforeQuery` hooks
+         * run as. Passed by the driver that constructed it; absent only in a
+         * test, where a collection declaring the hook is refused rather than
+         * read unnarrowed. See `read-scope.ts`.
+         */
+        private callContext?: ReadCallContextProvider
+    ) { }
+
+    /**
+     * The **target** collection's `beforeQuery` narrowing, for rows reached
+     * through a relation.
+     *
+     * The target's, not the parent's, because these are the target's rows: a
+     * scope on `comments` has to hold whether they are listed at
+     * `/comments` or loaded as `post.comments`. Without this an `include` is a
+     * way around every row filter a collection declares — the exact hole
+     * `stripUnreadable` was once missing from the relation-ref branch.
+     *
+     * Folded into the `narrow` condition the loaders already thread through
+     * every relation kind, so a `via` join, a junction, a foreign key and the
+     * dynamic relation builder all apply it or none of them do.
+     */
+    private narrowTargetRead(
+        parentCollection: CollectionConfig,
+        relation: ResolvedRelation,
+        parentId?: string | number
+    ): Promise<SQL | undefined> {
+        const targetCollection = relation.target();
+        const targetTable = getTableForCollection(targetCollection, this.registry);
+        return beforeQueryCondition(
+            { registry: this.registry, callContext: this.callContext },
+            targetCollection,
+            targetCollection.slug,
+            targetTable as PgTable<never>,
+            {
+                operation: "relation",
+                query: {
+                    relatedTo: {
+                        parentSlug: parentCollection.slug,
+                        parentId,
+                        relationName: relation.relationName
+                    }
+                }
+            },
+            { collection: targetCollection, registry: this.registry }
+        );
+    }
 
     /**
      * One target row, as the {@link RelatedRow} everything here returns.
@@ -454,6 +517,12 @@ export class RelationService {
         if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
+        // The target collection's `beforeQuery`, resolved before either branch
+        // builds a WHERE. `via` used to be the branch that carried none of the
+        // conditions the other one does, so a scope applied there and not here
+        // would be a read-only relation kind that answers with every row.
+        const relatedNarrowing = await this.narrowTargetRead(parentCollection, relation, parentId);
+
         // Handle join path relations
         if (relation.kind === "via") {
             let query = this.db.select().from(parentTable).$dynamic();
@@ -488,7 +557,7 @@ export class RelationService {
 
             // Add where condition for the parent row
             const parentIdField = parentTable[requirePrimaryKeys(parentCollection, this.registry)[0].fieldName as keyof typeof parentTable] as AnyPgColumn;
-            query = query.where(eq(parentIdField, parsedParentId));
+            query = query.where(narrowed(eq(parentIdField, parsedParentId), relatedNarrowing));
 
             if (options.limit) {
                 query = query.limit(options.limit);
@@ -531,6 +600,9 @@ export class RelationService {
         // target collection, so it is that collection's flag that decides.
         const relatedSoftDelete = softDeleteCondition(targetCollection, targetTable);
         if (relatedSoftDelete) additionalFilters.push(relatedSoftDelete);
+
+        // And the target's `beforeQuery`, for the same reason.
+        if (relatedNarrowing) additionalFilters.push(relatedNarrowing);
 
         // Handle search conditions if searchString is provided
         if (options.searchString) {
@@ -664,6 +736,13 @@ export class RelationService {
         const countSoftDelete = softDeleteCondition(targetCollection, targetTable);
         if (countSoftDelete) additionalFilters = [...additionalFilters, countSoftDelete];
 
+        // The target's `beforeQuery`, so the count and the listing describe the
+        // same rows. `isRelated` gates reads, updates and deletes at a nested
+        // address on this number, so a count that saw rows the listing does not
+        // would authorise a write to a row the caller cannot read.
+        const countNarrowing = await this.narrowTargetRead(parentCollection, relation, parentId);
+        if (countNarrowing) additionalFilters = [...additionalFilters, countNarrowing];
+
         // Start count with distinct to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
 
@@ -752,7 +831,12 @@ export class RelationService {
         // exactly the rot `soft-delete.ts` exists to prevent. Folded into
         // `narrow` here, it composes with the include's own `where` and every
         // branch below applies both or neither.
-        const narrowTarget = andSoftDelete(narrow, targetCollection, targetTable);
+        // The target collection's own `beforeQuery`, folded in beside the
+        // soft-delete stamp for the same reason and at the same point.
+        const narrowTarget = andSoftDelete(
+            narrowBoth(narrow, await this.narrowTargetRead(parentCollection, relation)),
+            targetCollection, targetTable
+        );
 
         // Handle join path relations with batching
         if (relation.kind === "via") {
@@ -987,7 +1071,12 @@ export class RelationService {
         // exactly the rot `soft-delete.ts` exists to prevent. Folded into
         // `narrow` here, it composes with the include's own `where` and every
         // branch below applies both or neither.
-        const narrowTarget = andSoftDelete(narrow, targetCollection, targetTable);
+        // The target collection's own `beforeQuery`, folded in beside the
+        // soft-delete stamp for the same reason and at the same point.
+        const narrowTarget = andSoftDelete(
+            narrowBoth(narrow, await this.narrowTargetRead(parentCollection, relation)),
+            targetCollection, targetTable
+        );
 
         // Handle join path relations (many-to-many through junction tables)
         if (relation.kind === "via") {

@@ -16,6 +16,7 @@ import {
 } from "./collection-helpers";
 import type { NestedPathHop } from "./nested-path";
 import { RelationService } from "./RelationService";
+import type { ReadCallContextProvider } from "./read-scope";
 import {
     applyJunctionMembership,
     bindJoinPathJunction,
@@ -150,8 +151,18 @@ export function serializePivot(
 export class RelationWriteService {
     private reads: RelationService;
 
-    constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) {
-        this.reads = new RelationService(db, registry);
+    constructor(
+        private db: DrizzleClient,
+        private registry: PostgresCollectionRegistry,
+        /**
+         * How this service's reads reach the identity their `beforeQuery` hooks
+         * run as. Passed by the driver that constructed it; absent only in a
+         * test, where a collection declaring the hook is refused rather than
+         * read unnarrowed. See `read-scope.ts`.
+         */
+        private callContext?: ReadCallContextProvider
+    ) {
+        this.reads = new RelationService(db, registry, callContext);
     }
 
 

@@ -15,6 +15,7 @@ import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "./factory";
 import { MongoAuthRepository, MongoUserService, MongoRoleService } from "./auth/services";
 import { logger } from "@rebasepro/server";
+import { assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
 
 export interface MongoDriverConfig {
     connection: Db;
@@ -53,6 +54,12 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
 
             const registry = new MongoCollectionRegistry();
             if (collections) {
+                // `beforeQuery` compiles a filter into the query before it runs,
+                // and this driver does not. A hook left declared here would look
+                // configured while every read kept returning every row — so it
+                // is a boot failure, not a silent no-op. A mixed app is caught
+                // by the Postgres planner; this is the Mongo-only case.
+                assertBeforeQueryIsPostgresOnly(collections);
                 collections.forEach(collection => registry.register(collection));
             }
 

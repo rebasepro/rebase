@@ -249,7 +249,11 @@ export class PostgresBackendDriver implements DataDriver {
         public poolManager?: DatabasePoolManager,
         historyService?: HistoryService
     ) {
-        this.dataService = new DataService(db, registry);
+        // The context every `beforeQuery` hook on this driver's reads runs
+        // with, established once here rather than threaded through a dozen read
+        // signatures. Lazy because `this.client` is attached after construction
+        // and `this.data` reads through whichever handle this driver holds.
+        this.dataService = new DataService(db, registry, () => this.buildCallContext());
         this.realtimeService = realtimeService;
         this.historyService = historyService;
         this.user = user;
@@ -1236,7 +1240,7 @@ export class PostgresBackendDriver implements DataDriver {
         const txDriver = new PostgresBackendDriver(
             tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
         );
-        txDriver.dataService = new DataService(tx, this.registry);
+        txDriver.dataService = new DataService(tx, this.registry, () => txDriver.buildCallContext());
         txDriver.client = this.client;
         // Carry the caller's notification batching through, so a bulk write
         // nested in an outer transaction still holds its events until commit.
@@ -1263,7 +1267,7 @@ export class PostgresBackendDriver implements DataDriver {
         const txDriver = new PostgresBackendDriver(
             tx, this.realtimeService, this.registry, user, this.poolManager, this.historyService
         );
-        txDriver.dataService = new DataService(tx, this.registry);
+        txDriver.dataService = new DataService(tx, this.registry, () => txDriver.buildCallContext());
         txDriver.client = this.client;
         return txDriver.buildCallContext();
     }
@@ -2287,7 +2291,17 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 // listener on this driver subscribes as — see `authContextOf`.
                 await applyAuthContext(tx, authContextOf(this.user), this.delegate.rlsUserRole);
 
-                const txEntityService = new DataService(tx, this.delegate.registry);
+                // Bound to `tx`, so a `beforeQuery` on this request sees the
+                // caller and reads through the same RLS-scoped transaction the
+                // rows come from — the correction `callContextWithin` was
+                // written for, applied to the hook as well as to `afterRead`.
+                // Built at most once per request, and only for a collection
+                // that declares a hook.
+                let hookContext: RebaseCallContext | undefined;
+                const txEntityService = new DataService(
+                    tx, this.delegate.registry,
+                    () => (hookContext ??= this.delegate.callContextWithin(tx, this.user))
+                );
                 const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
                 txDelegate.dataService = txEntityService;

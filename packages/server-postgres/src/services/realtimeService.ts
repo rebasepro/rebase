@@ -382,6 +382,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     constructor(private db: NodePgDatabase<any>, private registry: PostgresCollectionRegistry) {
         super();
+        // No call-context provider, deliberately. This service is the
+        // *no-driver* fallback — the branches below that cannot apply a database
+        // auth context either — and without a driver there is no context to
+        // build a `beforeQuery` hook from. So a hooked collection's read here
+        // refuses rather than being served unnarrowed, which is the direction a
+        // fallback has to fail in: the fallbacks above it are already written
+        // around not handing out *more* than the path they stand in for.
         this.dataService = new DataService(db, registry);
     }
 
@@ -1182,7 +1189,15 @@ roles: ["anon"] };
                         },
                         this.rlsUserRole
                     );
-                    const txEntityService = new DataService(tx, this.registry);
+                    // Bound to the subscriber's own transaction and identity, so
+                    // a `beforeQuery` narrows a subscription frame exactly as it
+                    // narrows the `find()` that asked the same question. Lazy and
+                    // memoized: nothing is built for a collection with no hook.
+                    let hookContext: RebaseCallContext | undefined;
+                    const txEntityService = new DataService(
+                        tx, this.registry,
+                        () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
+                    );
                     // The REST pipeline, not the driver's own fetch — one
                     // query, one include loader, one place search is decided.
                     //
@@ -1343,7 +1358,14 @@ roles: ["anon"] };
                         },
                         this.rlsUserRole
                     );
-                    return countOnce(new DataService(tx, this.registry));
+                    // The same narrowing as the rows it is counting: a frame
+                    // whose `meta.total` came from an unnarrowed count says
+                    // "1 of 4 results".
+                    let hookContext: RebaseCallContext | undefined;
+                    return countOnce(new DataService(
+                        tx, this.registry,
+                        () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
+                    ));
                 });
             } else {
                 total = await countOnce(this.dataService);
@@ -1457,7 +1479,15 @@ roles: ["anon"] };
                         },
                         this.rlsUserRole
                     );
-                    const txEntityService = new DataService(tx, this.registry);
+                    // Bound to the subscriber's own transaction and identity, so
+                    // a `beforeQuery` narrows a subscription frame exactly as it
+                    // narrows the `find()` that asked the same question. Lazy and
+                    // memoized: nothing is built for a collection with no hook.
+                    let hookContext: RebaseCallContext | undefined;
+                    const txEntityService = new DataService(
+                        tx, this.registry,
+                        () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
+                    );
                     // The REST pipeline, for the same reason the collection refetch
                     // uses it: `listenById()` and `findById()` are the same read,
                     // and `fetchOne` renders the admin's view model — every relation

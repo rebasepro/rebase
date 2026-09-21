@@ -2,6 +2,7 @@
 import { FilterValues, IncludeSpec, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { FetchService } from "./FetchService";
+import type { ReadCallContextProvider } from "./read-scope";
 import type { WithDeleted } from "./soft-delete";
 import { PersistService } from "./PersistService";
 import { RelationService } from "./RelationService";
@@ -35,9 +36,19 @@ export class DataService implements DataRepository {
     private fetchService: FetchService;
     private persistService: PersistService;
 
-    constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) {
-        this.fetchService = new FetchService(db, registry);
-        this.persistService = new PersistService(db, registry);
+    constructor(
+        private db: DrizzleClient,
+        private registry: PostgresCollectionRegistry,
+        /**
+         * How this service's reads reach the identity their `beforeQuery` hooks
+         * run as. Passed by the driver that constructed it; absent only in a
+         * test, where a collection declaring the hook is refused rather than
+         * read unnarrowed. See `read-scope.ts`.
+         */
+        private callContext?: ReadCallContextProvider
+    ) {
+        this.fetchService = new FetchService(db, registry, callContext);
+        this.persistService = new PersistService(db, registry, callContext);
     }
 
     // =============================================================

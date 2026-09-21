@@ -14,6 +14,7 @@ import {
 } from "./collection-helpers";
 import { sanitizeAndConvertDates, serializeDataToServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
+import type { ReadCallContextProvider } from "./read-scope";
 import { RelationWriteService } from "./RelationWriteService";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
@@ -41,10 +42,20 @@ export class PersistService {
     private relationWrites: RelationWriteService;
     private fetchService: FetchService;
 
-    constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) {
-        this.relationService = new RelationService(db, registry);
-        this.relationWrites = new RelationWriteService(db, registry);
-        this.fetchService = new FetchService(db, registry);
+    constructor(
+        private db: DrizzleClient,
+        private registry: PostgresCollectionRegistry,
+        /**
+         * How this service's reads reach the identity their `beforeQuery` hooks
+         * run as. Passed by the driver that constructed it; absent only in a
+         * test, where a collection declaring the hook is refused rather than
+         * read unnarrowed. See `read-scope.ts`.
+         */
+        private callContext?: ReadCallContextProvider
+    ) {
+        this.relationService = new RelationService(db, registry, callContext);
+        this.relationWrites = new RelationWriteService(db, registry, callContext);
+        this.fetchService = new FetchService(db, registry, callContext);
     }
 
 
