@@ -167,5 +167,3 @@ Sie `cursor` und paginieren Sie per Offset.
 
 - [Daten abfragen](/docs/sdk/querying/) – Filter, der Fluent Builder, Sortierung.
 - [Aggregate & Suche](/docs/sdk/aggregates-and-search/) – Warum Relevanz keinen Cursor bestimmen kann.
-
----

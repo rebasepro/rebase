@@ -235,5 +235,3 @@ en un archivo `.env` commiteado.
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — lo que produce `rebase build` y lo que lo inicializa
 - [Split Processes](/docs/deployment/split-processes/) — ejecutar un solo bundle como varios procesos
 - [CLI Commands](/docs/cli/) — `rebase apps` y el resto
-
----

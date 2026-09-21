@@ -137,5 +137,3 @@ Il n'a aucun impact sur ce qu'un agent connecté à votre base de données peut 
 — cela dépend des identifiants dont il dispose, et aucun contenu Markdown ne peut
 changer cela. Consultez
 [le modèle d'identifiants du serveur MCP](/docs/ai/mcp#what-the-server-can-reach).
-
----

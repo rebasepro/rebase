@@ -189,5 +189,3 @@ rendert; das Backend ändert sich dadurch nicht. Unter
 - [Sicherheitsregeln (RLS)](/docs/collections/security-rules/) – das Zugriffsmodell
 - [Benutzerdefinierte Funktionen](/docs/backend/custom-functions/) – eigene Routen
 - [Bereitstellung](/docs/getting-started/deployment/) – der Weg in die Produktion
-
----

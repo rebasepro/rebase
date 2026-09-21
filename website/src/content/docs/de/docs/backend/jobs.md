@@ -117,5 +117,3 @@ Auf dem Job wird nur die **ID** des Webhooks gespeichert, niemals der Webhook se
 
 - **[Cron-Jobs](/docs/backend/cron-jobs)** — Aufgaben nach Zeitplan
 - **[Webhooks](/docs/recipes/webhooks)** — andere Systeme bei Änderungen benachrichtigen
-
----

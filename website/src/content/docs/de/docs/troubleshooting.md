@@ -158,5 +158,3 @@ Jeder API-Fehler liefert denselben Envelope und enthält einen `code`. Die [Fehl
 - [Fehlercodes](/docs/backend/errors/) – Jeder `code`, den die API zurückgeben kann, mit Status und Lösung.
 - [Umgebung & Konfiguration](/docs/getting-started/configuration/) – Jede Variable, die die Runtime liest, und diejenigen, ohne die der Start in der Produktion verweigert wird.
 - [Backend-Übersicht](/docs/backend/) – Was der Boot-Vorgang der Reihe nach tut und welche Probe welche Frage beantwortet.
-
----

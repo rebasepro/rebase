@@ -214,12 +214,12 @@ STRICT RULES:
 3. DO NOT translate frontmatter keys (the YAML at the top between ---).
 4. You MAY translate the VALUES of frontmatter fields like "title" and "description".
 5. DO NOT translate URLs or file paths.
-6. Return ONLY the raw translated file content. Do not add any conversational text before or after the markdown.
+6. Return ONLY the raw translated file content, without the <file> tags. Do not add any conversational text before or after the markdown.
 
-File content to translate:
----
+File content to translate, between the <file> tags:
+<file>
 ${content}
----`;
+</file>`;
 
     try {
         const result = await model.generateContent(prompt);
@@ -233,6 +233,10 @@ ${content}
         } else if (translatedText.startsWith('\`\`\`')) {
             translatedText = translatedText.replace(/^\`\`\`\n?/, '').replace(/\n?\`\`\`$/, '');
         }
+
+        // The model may still echo the <file> tags that wrap the file in the prompt.
+        translatedText = translatedText.replace(/^\s*<file>\s*\n/, '').replace(/\n\s*<\/file>\s*$/, '');
+        translatedText = stripStrayClosingRule(translatedText, content);
 
         translatedText = translatedText.trim() + '\n';
 
@@ -265,6 +269,34 @@ ${content}
         console.error(`Gemini API Error translating to ${targetLang}:`, error.message);
         throw error;
     }
+}
+
+/**
+ * A thematic break (`---`, `***`, `___`) standing alone on the last line.
+ */
+const TRAILING_THEMATIC_BREAK = /\n {0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})\s*$/;
+
+/**
+ * Drops a final `---` the English page does not end with.
+ *
+ * The prompt used to wrap the file in `---` … `---`, the same line that fences
+ * frontmatter and draws a horizontal rule, and the model read the closing one
+ * as part of the page: 188 translated pages across the five locales ended in a
+ * rule their English source does not have, rendered as a stray line under the
+ * last paragraph. (The doubled opening `---` that `assertValidFrontmatter`
+ * rejects is the same echo at the other end.) The prompt now uses `<file>`
+ * tags, and this keeps the output right if the model echoes a rule anyway.
+ *
+ * A page whose English source does end with a rule keeps its own, and so does
+ * a page that is all frontmatter, whose last `---` is the closing fence.
+ */
+export function stripStrayClosingRule(text, sourceContent) {
+    if (TRAILING_THEMATIC_BREAK.test(sourceContent)) return text;
+    const match = TRAILING_THEMATIC_BREAK.exec(text);
+    if (!match) return text;
+    const frontmatter = text.match(/^---\n[\s\S]*?\n---/);
+    if (frontmatter && match.index < frontmatter[0].length) return text;
+    return text.slice(0, match.index).trimEnd() + '\n';
 }
 
 /**

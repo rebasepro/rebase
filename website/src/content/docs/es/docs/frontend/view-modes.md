@@ -216,5 +216,3 @@ const articlesCollection = defineCollection({
 
 - **[Vistas de Entidad](/docs/frontend/entity-views)** — Pestañas personalizadas en formularios de entidad
 - **[Acciones de Entidad](/docs/frontend/entity-actions)** — Acciones de entidad personalizadas
-
----

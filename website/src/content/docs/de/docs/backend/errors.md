@@ -261,5 +261,3 @@ Eine Route verwendet einen dieser Codes, wenn nichts Spezifischeres zutrifft.
 `pnpm verify:docs` schlägt fehl, wenn ein Code, den der Server auslösen kann, in diesen Tabellen fehlt, wenn eine Tabelle einen Code auflistet, den nichts auslösen kann, wenn ein angegebener Status nicht mit dem Quellcode übereinstimmt oder wenn eine Code-Familie wie `PG_<SQLSTATE>` keine Zeile für einen SQLSTATE enthält, dem Aufrufer begegnen. Der entsprechende Schritt ist `tooling/scripts/docs-verify/check-error-codes.mjs`.
 
 Er prüft sich zuerst selbst. Der Scan liest Codes aus TypeScript statt aus einem laufenden Server aus, weshalb seine blinden Flecken konstruktionsbedingt lautlos sind: Einst konnte er einen Code nicht erkennen, der über einen einzeiligen Wrapper übergeben wurde, oder einen, der nach einer Nachricht mit einer `)` stand, und meldete „jeder Code, den der Server auslösen kann, ist dokumentiert“, obwohl auf der Seite siebzehn davon fehlten. Daher führt dieser Schritt eine Test-Fixture genau dieser Formen aus, bevor er diese Seite liest, und verweigert jeden Erfolgsbericht, falls er diese nicht erkennen kann.
-
----

@@ -438,5 +438,3 @@ Beide geben **den Response-Body der Funktion unverändert (verbatim)** zurück. 
 - **[Echtzeit-Abonnements](/docs/sdk/realtime)** — Live-Daten über WebSockets
 - **[Speicher & Dateien](/docs/sdk/storage)** — Dateien hochladen, herunterladen und verwalten
 - **[Relationen](/docs/collections/relations)** — Beziehungen zwischen Collections definieren
-
----

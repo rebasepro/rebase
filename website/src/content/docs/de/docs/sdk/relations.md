@@ -291,5 +291,3 @@ Wenn ein abgeleiteter Wert kein Aggregat über eine Relation ist, legen Sie ihn 
 - [Daten abfragen](/docs/sdk/querying/) – der Query-Builder, den diese Accessors zurückgeben
 - [Relationen](/docs/collections/relations/) – Deklarieren der Links, die diese Seite liest
 - [REST-API](/docs/backend/api/) – dasselbe `include` über HTTP
-
----

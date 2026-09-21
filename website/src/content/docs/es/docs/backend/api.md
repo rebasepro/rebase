@@ -483,5 +483,3 @@ Para conocer la forma de los endpoints en lugar del esquema subyacente, el docum
 - **[SDK de cliente](/docs/sdk)** — Cliente con seguridad de tipos para la API REST
 - **[Colecciones](/docs/collections)** — Define tu esquema de datos
 - **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — Controla el acceso por fila
-
----

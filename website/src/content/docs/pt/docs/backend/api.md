@@ -571,5 +571,3 @@ fica em `GET /api/docs`, com o Swagger UI em `/api/swagger` quando
 - **[SDK do Cliente](/docs/sdk)** — Cliente com tipagem estática (type-safe) para a API REST
 - **[Coleções](/docs/collections)** — Defina o schema dos seus dados
 - **[Regras de Segurança (RLS)](/docs/collections/security-rules)** — Controle o acesso por linha
-
----

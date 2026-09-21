@@ -337,5 +337,3 @@ Per prevenire timing attack (attacchi basati sui tempi di esecuzione), Rebase co
 - **[Adapter di autenticazione personalizzati](/docs/backend/auth-adapters/)** — come sostituire il provider sottostante
 - **[Regole di sicurezza (RLS)](/docs/collections/security-rules/)** — cosa fa una policy con `rebase.uid()`
 - **[Autenticazione con l'SDK client](/docs/sdk/authentication/)** — come chiamare queste route dall'SDK
-
----

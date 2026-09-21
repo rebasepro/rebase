@@ -195,5 +195,3 @@ capture-a ali, ou entregue o trabalho à fila do dispatcher.
 
 -   **[Callbacks de Entidade](/docs/collections/callbacks)** — Referência completa de callbacks
 -   **[Receita de Blog CMS](/docs/recipes/blog-cms)** — Exemplo completo de blog
-
----

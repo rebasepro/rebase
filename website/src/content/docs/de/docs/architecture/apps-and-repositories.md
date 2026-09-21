@@ -240,5 +240,3 @@ ist, gehört nicht in eine Ausgabe, die am Ende in einer committeten `.env` land
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) – was `rebase build` erzeugt und was es startet
 - [Split Processes](/docs/deployment/split-processes/) – ein Bundle als mehrere Prozesse ausführen
 - [CLI Commands](/docs/cli/) – `rebase apps` und der Rest
-
----

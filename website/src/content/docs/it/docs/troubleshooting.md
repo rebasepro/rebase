@@ -158,5 +158,3 @@ Ogni errore dell'API restituisce lo stesso envelope e include un `code`. Il [rif
 - [Codici di errore](/docs/backend/errors/) — ogni `code` che l'API può restituire, con lo stato e la soluzione.
 - [Ambiente e configurazione](/docs/getting-started/configuration/) — ogni variabile letta dal runtime e quelle senza le quali l'ambiente di produzione rifiuta l'avvio.
 - [Panoramica del backend](/docs/backend/) — cosa esegue l'avvio, in ordine, e a quale domanda risponde ciascuna probe.
-
----

@@ -388,5 +388,3 @@ garante ainda, listadas para que ninguém veja nelas uma promessa que não exist
 - [Atualização](/docs/upgrading/) — o que realmente quebrou, versão por versão
 - [Changelog](/docs/changelog/) — todas as alterações, incluindo aquelas que não quebraram nada
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — contrato 3 — o formato de bundle contra o qual um projeto implantado já está compilado
-
----

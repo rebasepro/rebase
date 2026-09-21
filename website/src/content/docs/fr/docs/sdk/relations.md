@@ -359,5 +359,3 @@ propriété ordinaire.
 - [Interroger les données](/docs/sdk/querying/) — le constructeur de requêtes renvoyé par ces accesseurs
 - [Relations](/docs/collections/relations/) — déclarer les liaisons lues par cette page
 - [API REST](/docs/backend/api/) — le même `include` via HTTP
-
----

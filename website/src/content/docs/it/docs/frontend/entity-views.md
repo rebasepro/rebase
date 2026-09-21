@@ -94,5 +94,3 @@ entityViews: [
 
 - **[Campi Personalizzati](/docs/frontend/custom-fields)** — Crea campi modulo personalizzati
 - **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
-
----

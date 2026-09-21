@@ -120,5 +120,3 @@ Zwei davon verlangen, unaufgefordert gelesen zu werden. `rebase-basics` besagt, 
 ```
 
 Skills werden über das `@rebasepro/agent-skills`-Paket bereitgestellt, von dem die CLI abhängt. Das bedeutet, dass der bereitgestellte Satz Ihrer installierten CLI-Version entspricht.
-
----

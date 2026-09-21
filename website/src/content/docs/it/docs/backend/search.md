@@ -182,5 +182,3 @@ Il blocco `search` è disponibile esclusivamente per Postgres e viene rifiutato 
 - [REST API](/docs/backend/api/) — i parametri di query con cui una ricerca raggiunge il server
 - [Indici](/docs/backend/indexes/) — cosa crea il blocco search e quali risorse richiede
 - [Interrogare i dati](/docs/sdk/querying/) — eseguire ricerche dall'SDK client
-
----

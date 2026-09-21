@@ -94,5 +94,3 @@ entityViews: [
 
 - **[Campos Personalizados](/docs/frontend/custom-fields)** — Criar campos de formulário personalizados
 - **[Ações de Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
-
----

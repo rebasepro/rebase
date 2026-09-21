@@ -417,5 +417,3 @@ Bucket bleibt daher ungebunden und antwortet mit 501.
 - [Backend-Überblick](/docs/backend/) — `dataSources` und wo die Deklaration lebt
 - [Storage-Konfiguration](/docs/backend/storage/) — dieselbe Form für Buckets
 - [Umgebung & Konfiguration](/docs/getting-started/configuration/) — die `__SUFFIX`-Konvention, die eine Quelle an ihre Variablen bindet
-
----

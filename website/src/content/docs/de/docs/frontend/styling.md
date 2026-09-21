@@ -90,5 +90,3 @@ Vor dem Release einer benutzerdefinierten Ansicht:
 - Text ist `<Typography variant=…>`, keine Schriftgrößenklasse.
 - Container sind `Card` / `Paper`, kein `<div>` mit einem manuell geschriebenen Rahmen.
 - Schalten Sie das Theme um und prüfen Sie die Seite. Das ist der gesamte Test, und er dauert fünf Sekunden.
-
----

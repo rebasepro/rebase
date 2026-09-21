@@ -198,5 +198,3 @@ Dispatchers.
 
 - **[Entity-Callbacks](/docs/collections/callbacks)** — Vollständige Callback-Referenz
 - **[Blog-CMS-Rezept](/docs/recipes/blog-cms)** — Vollständiges Blog-Beispiel
-
----

@@ -243,5 +243,3 @@ a un output che finirà in un file `.env` tracciato con commit.
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — cosa produce `rebase build` e cosa lo avvia
 - [Split Processes](/docs/deployment/split-processes/) — eseguire un singolo bundle come processi multipli
 - [CLI Commands](/docs/cli/) — `rebase apps` e il resto
-
----

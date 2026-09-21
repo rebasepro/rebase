@@ -177,5 +177,3 @@ requer a sessão de um usuário administrador ou a service key.
 - [REST API](/docs/backend/api/) — os endpoints que uma chave chama
 - [Índice de endpoints](/docs/backend/endpoints/) — a barreira de verificação em cada rota, incluindo chaves
 - [Regras de Segurança (RLS)](/docs/collections/security-rules/) — o que o banco de dados impõe além dos escopos de uma chave
-
----

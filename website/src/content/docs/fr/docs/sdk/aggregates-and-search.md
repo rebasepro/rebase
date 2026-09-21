@@ -222,5 +222,3 @@ distances lors d'une écriture.
 - [Interroger les données](/docs/sdk/querying/) — le constructeur de requêtes sur lequel ils s'appuient
 - [Recherche](/docs/backend/search/) — comment la recherche en texte intégral et vectorielle est configurée sur le backend
 - [API REST](/docs/backend/api/) — les mêmes requêtes via HTTP
-
----

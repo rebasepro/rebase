@@ -314,5 +314,3 @@ mensaje que contenía un `)`, y reportó que "cada código que el servidor puede
 emitir está documentado" sobre una página a la que le faltaban diecisiete de
 ellos. Por ello, el paso ejecuta un fixture exactamente con esas estructuras
 antes de leer esta página, y se niega a reportar nada si no es capaz de verlos.
-
----

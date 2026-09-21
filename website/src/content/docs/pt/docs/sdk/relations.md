@@ -291,5 +291,3 @@ Se um valor derivado não for um agregado sobre uma relação, coloque-o no banc
 - [Consultando dados](/docs/sdk/querying/) — o construtor de consultas retornado por estes acessadores
 - [Relações](/docs/collections/relations/) — declarando as conexões que esta página lê
 - [API REST](/docs/backend/api/) — o mesmo `include` via HTTP
-
----

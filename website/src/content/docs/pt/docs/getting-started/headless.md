@@ -179,5 +179,3 @@ backend não muda. [Frontend Setup](/docs/frontend/) é por onde começar.
 - [Security Rules (RLS)](/docs/collections/security-rules/) — o modelo de acesso
 - [Custom Functions](/docs/backend/custom-functions/) — suas próprias rotas
 - [Deployment](/docs/getting-started/deployment/) — levando para produção
-
----

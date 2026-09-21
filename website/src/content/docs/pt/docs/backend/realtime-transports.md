@@ -180,5 +180,3 @@ O SDK envia heartbeats de presença a cada ~20 segundos contra um timeout de 30 
 - [Realtime & WebSocket](/docs/backend/realtime/) — assinaturas, canais e presença em uma única instância
 - [Split Processes](/docs/deployment/split-processes/) — o modelo de implantação para o qual isso é relevante
 - [Self-hosting](/docs/deployment/self-hosting/) — executando o runtime você mesmo
-
----

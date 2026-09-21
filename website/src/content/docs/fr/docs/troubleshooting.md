@@ -240,5 +240,3 @@ le statut associé et la solution.
 - [Codes d'erreur](/docs/backend/errors/) — chaque `code` que l'API peut renvoyer, avec le statut et la solution.
 - [Environnement et configuration](/docs/getting-started/configuration/) — toutes les variables lues par le runtime, et celles sans lesquelles la production refuse de démarrer.
 - [Vue d'ensemble du backend](/docs/backend/) — ce que fait le démarrage, dans l'ordre, et quelle sonde répond à quelle question.
-
----

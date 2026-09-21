@@ -177,5 +177,3 @@ requiere una sesión de usuario administrador o la clave de servicio.
 - [API REST](/docs/backend/api/) — los endpoints a los que llama una clave
 - [Índice de endpoints](/docs/backend/endpoints/) — la barrera en cada ruta, incluidas las claves
 - [Reglas de seguridad (RLS)](/docs/collections/security-rules/) — lo que la base de datos aplica por encima de los alcances de una clave
-
----

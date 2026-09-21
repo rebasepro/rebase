@@ -117,5 +117,3 @@ O `shutdown()` impede que o worker reivindique novos jobs e aguarda os que estã
 
 - **[Cron Jobs](/docs/backend/cron-jobs)** — trabalho agendado
 - **[Webhooks](/docs/recipes/webhooks)** — notifique outros sistemas sobre alterações
-
----

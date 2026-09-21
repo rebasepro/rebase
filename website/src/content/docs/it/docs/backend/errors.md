@@ -307,5 +307,3 @@ riga singola, o uno scritto dopo un messaggio contenente una `)`, e segnalava ch
 generabile dal server è documentato" su una pagina a cui ne mancavano diciassette. Per questo
 motivo, lo stage esegue una fixture esattamente con queste casistiche prima di leggere questa
 pagina, e si rifiuta di segnalare qualsiasi esito se non riesce a individuarle.
-
----

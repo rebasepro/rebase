@@ -74,5 +74,3 @@ const ordersCollection = defineCollection({
 
 - **[Ações da Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
 - **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulário personalizados
-
----

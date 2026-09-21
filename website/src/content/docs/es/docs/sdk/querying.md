@@ -438,5 +438,3 @@ Ambos devuelven **el cuerpo de la respuesta de la función textualmente**. Ningu
 - **[Suscripciones en tiempo real](/docs/sdk/realtime)** — Datos en directo con WebSockets
 - **[Almacenamiento y archivos](/docs/sdk/storage)** — Subir, descargar y gestionar archivos
 - **[Relaciones](/docs/collections/relations)** — Definir relaciones entre colecciones
-
----

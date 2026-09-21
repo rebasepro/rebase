@@ -323,5 +323,3 @@ Em desenvolvimento, um bucket declarado que nada vincula é um diretório local 
 - [Visão geral do backend](/docs/backend/) — `dataSources` e onde vive a declaração
 - [Configuração do armazenamento](/docs/backend/storage/) — a mesma forma para os buckets
 - [Ambiente e configuração](/docs/getting-started/configuration/) — a convenção `__SUFFIX` que vincula uma fonte às suas variáveis
-
----

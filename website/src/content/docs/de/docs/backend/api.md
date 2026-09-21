@@ -588,5 +588,3 @@ wenn `enableSwagger` aktiviert ist.
 - **[Client SDK](/docs/sdk)** — Typsicherer Client für die REST-API
 - **[Collections](/docs/collections)** — Definieren Sie Ihr Datenschema
 - **[Sicherheitsregeln (RLS)](/docs/collections/security-rules)** — Zugriff auf Zeilenebene steuern
-
----

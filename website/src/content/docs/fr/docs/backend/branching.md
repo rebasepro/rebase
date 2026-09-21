@@ -243,5 +243,3 @@ Dans la mesure où les branches sont des bases de données PostgreSQL distinctes
 - [Commandes CLI](/docs/cli/) — `rebase db branch` et ses options
 - [Génération de schéma](/docs/cli/schema/) — comment est généré le schéma qu'une branche copie
 - [Environnement et configuration](/docs/getting-started/configuration/) — `DATABASE_URL`, et ordre de priorité d'une branche active
-
----

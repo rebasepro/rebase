@@ -170,5 +170,3 @@ e pagina tramite offset.
 
 - [Interrogare i dati](/docs/sdk/querying/) — filtri, fluent builder, ordinamento.
 - [Aggregazioni e ricerca](/docs/sdk/aggregates-and-search/) — perché la rilevanza non può fungere da chiave per un cursore.
-
----

@@ -284,5 +284,3 @@ callbacks: {
 ```
 
 Para callbacks que se aplicam apenas a uma única coleção, prefira usar [callbacks por coleção](/docs/collections/callbacks).
-
----

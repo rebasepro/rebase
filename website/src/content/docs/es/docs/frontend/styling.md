@@ -90,5 +90,3 @@ Antes de publicar una vista personalizada:
 - El texto es `<Typography variant=…>`, no una clase de tamaño de fuente.
 - Los contenedores son `Card` / `Paper`, no un `<div>` con un borde escrito a mano.
 - Alterna el tema y observa la página. Esa es toda la prueba, y toma cinco segundos.
-
----

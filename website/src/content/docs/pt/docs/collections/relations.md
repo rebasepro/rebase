@@ -554,5 +554,3 @@ normalização.
 
 - **[Regras de Segurança](/docs/collections/security-rules)** — Segurança em Nível de Linha
 - **[Propriedades](/docs/collections/properties)** — Referência de tipos de propriedade
-
----

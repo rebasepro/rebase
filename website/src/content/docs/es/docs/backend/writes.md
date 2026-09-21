@@ -147,5 +147,3 @@ La estructura, las colecciones desconocidas, los campos desconocidos, las restri
 Está limitado al mismo número de operaciones que una escritura masiva (1000 por defecto), ya que un lote mantiene sus bloqueos durante toda la transacción. Un controlador que no pueda hacer que el lote sea atómico responderá con `BATCH_UNSUPPORTED` en lugar de recurrir a un bucle de escrituras individuales — lo que no proporcionaría ni la atomicidad ni el único viaje de ida y vuelta por los que se recurre a un lote.
 
 Un `update` o `delete` que haga referencia a una fila inexistente hace fallar a todo el lote con un `404`, por la misma razón por la que se rechaza una escritura parcial en cualquier otro lugar: el estado aplicado a medias es un estado sin una buena recuperación.
-
----

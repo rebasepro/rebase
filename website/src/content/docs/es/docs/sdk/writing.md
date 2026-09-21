@@ -291,5 +291,3 @@ que no existe hace fallar todo el lote con un 404. Un backend cuyo controlador n
 pueda hacerlo atómico responde con `BATCH_UNSUPPORTED` en lugar de ejecutar un bucle.
 
 `idempotencyKey` y `returning` funcionan exactamente igual que en cualquier otra escritura.
-
----

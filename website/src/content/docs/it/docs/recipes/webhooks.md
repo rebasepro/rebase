@@ -196,5 +196,3 @@ Se un fallimento *non* deve costare all'utente la sua scrittura, non deve propag
 
 - **[Callback delle Entità](/docs/collections/callbacks)** — Riferimento completo ai callback
 - **[Ricetta CMS per Blog](/docs/recipes/blog-cms)** — Esempio completo di blog
-
----

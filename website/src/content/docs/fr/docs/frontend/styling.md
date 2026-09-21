@@ -90,5 +90,3 @@ Avant de déployer une vue personnalisée :
 - Le texte utilise `<Typography variant=…>`, et non une classe de taille de police.
 - Les conteneurs sont des `Card` / `Paper`, et non un `<div>` avec une bordure écrite à la main.
 - Basculez le thème et observez la page. C'est l'intégralité du test, et cela prend cinq secondes.
-
----

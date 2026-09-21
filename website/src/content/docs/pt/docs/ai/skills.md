@@ -140,5 +140,3 @@ base de código.
 
 As skills são distribuídas a partir do pacote `@rebasepro/agent-skills`, do qual a CLI depende,
 portanto, o conjunto obtido corresponde à versão instalada da sua CLI.
-
----

@@ -180,5 +180,3 @@ L'SDK invia l'heartbeat della presence ogni ~20 secondi rispetto a un timeout di
 - [Realtime & WebSocket](/docs/backend/realtime/) — sottoscrizioni, canali e presence su una singola istanza
 - [Split Processes](/docs/deployment/split-processes/) — la tipologia di architettura di deployment per cui questo è rilevante
 - [Self-hosting](/docs/deployment/self-hosting/) — eseguire il runtime in autonomia
-
----

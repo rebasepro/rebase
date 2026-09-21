@@ -198,5 +198,3 @@ properties: {
 - **[Vues d'entité](/docs/frontend/entity-views)** — Onglets personnalisés dans l'éditeur d'entité
 - **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
 - **[Colonnes supplémentaires](/docs/frontend/additional-columns)** — Colonnes de tableau calculées
-
----

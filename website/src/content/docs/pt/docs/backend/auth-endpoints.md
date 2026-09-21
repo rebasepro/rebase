@@ -338,5 +338,3 @@ Para prevenir timing attacks, o Rebase valida tanto a chave de serviço configur
 - **[Adaptadores de autenticação personalizados](/docs/backend/auth-adapters/)** — substituindo o provedor por trás delas
 - **[Regras de segurança (RLS)](/docs/collections/security-rules/)** — o que uma política faz com `rebase.uid()`
 - **[Autenticação no SDK cliente](/docs/sdk/authentication/)** — chamando essas rotas a partir do SDK
-
----

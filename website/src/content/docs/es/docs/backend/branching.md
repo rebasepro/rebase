@@ -243,5 +243,3 @@ Dado que las ramas son bases de datos de PostgreSQL independientes, no puedes ej
 - [Comandos de la CLI](/docs/cli/) — `rebase db branch` y sus opciones
 - [Generación de esquemas](/docs/cli/schema/) — cómo se produce el esquema que copia una rama
 - [Entorno y configuración](/docs/getting-started/configuration/) — `DATABASE_URL` y la prioridad de una rama seleccionada
-
----

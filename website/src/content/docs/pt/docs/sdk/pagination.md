@@ -170,5 +170,3 @@ remova `cursor` e pagine por offset.
 
 - [Consultando dados](/docs/sdk/querying/) — filtros, o fluent builder, ordenação.
 - [Agregações e busca](/docs/sdk/aggregates-and-search/) — por que a relevância não pode ser chave de um cursor.
-
----

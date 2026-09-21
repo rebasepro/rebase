@@ -436,5 +436,3 @@ Les deux méthodes renvoient **le corps de la réponse de la fonction, tel quel*
 - **[Abonnements temps réel](/docs/sdk/realtime)** — Données en direct avec WebSockets
 - **[Stockage & Fichiers](/docs/sdk/storage)** — Téléverser, télécharger et gérer des fichiers
 - **[Relations](/docs/collections/relations)** — Définir des relations entre collections
-
----

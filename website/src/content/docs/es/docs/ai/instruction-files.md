@@ -137,5 +137,3 @@ No tiene ningún impacto en lo que un agente conectado a tu base de datos pueda
 *hacer* — eso lo decide la credencial que posee, y nada en Markdown puede
 cambiarlo. Consulta
 [el modelo de credenciales del servidor MCP](/docs/ai/mcp#what-the-server-can-reach).
-
----

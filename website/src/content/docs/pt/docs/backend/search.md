@@ -271,5 +271,3 @@ em regex; as coleções do Firestore utilizam o controlador externo de busca tex
 - [REST API](/docs/backend/api/) — os parâmetros de consulta com os quais uma busca chega ao servidor
 - [Indexes](/docs/backend/indexes/) — o que o bloco search cria e qual é o seu custo
 - [Querying Data](/docs/sdk/querying/) — realizando buscas a partir do SDK cliente
-
----

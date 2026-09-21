@@ -170,5 +170,3 @@ et effectuez une pagination par offset.
 
 - [Interroger les données](/docs/sdk/querying/) — filtres, fluent builder, tri.
 - [Agrégats et recherche](/docs/sdk/aggregates-and-search/) — pourquoi la pertinence ne peut pas servir de clé de curseur.
-
----

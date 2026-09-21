@@ -90,5 +90,3 @@ Antes de publicar uma visualização personalizada:
 - O texto é `<Typography variant=…>`, não uma classe de tamanho de fonte.
 - Contêineres são `Card` / `Paper`, não uma `<div>` com uma borda escrita manualmente.
 - Alterne o tema e olhe para a página. Esse é todo o teste e leva cinco segundos.
-
----

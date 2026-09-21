@@ -197,5 +197,3 @@ Si un échec ne doit *pas* coûter son écriture à l'utilisateur, il ne doit pa
 
 - **[Callbacks d'Entité](/docs/collections/callbacks)** — Référence complète des callbacks
 - **[Recette CMS de Blog](/docs/recipes/blog-cms)** — Exemple complet de blog
-
----

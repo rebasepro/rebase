@@ -196,5 +196,3 @@ All dies führt zur Build-Zeit zu Fehlern, unter Nennung der Collection und der 
 - [Suche](/docs/backend/search) – gerankte Volltextsuche, die ihren eigenen GIN-Index über einen generierten `tsvector` aufbaut
 - [Vektorsuche](/docs/sdk/aggregates-and-search#vector-search) – der ANN-Index über einer Embedding-Spalte, konfiguriert an der Property
 - [Schema as Code](/docs/architecture/schema-as-code) – wie Deklarationen die Datenbank erreichen und was ein abgeleiteter Name ist
-
----

@@ -221,5 +221,3 @@ Schreibvorgang keine Distanzen neu berechnet werden.
 - [Daten abfragen](/docs/sdk/querying/) — der Query-Builder, auf dem diese Abfragen aufbauen
 - [Suche](/docs/backend/search/) — wie Volltext- und Vektorsuche im Backend konfiguriert werden
 - [REST-API](/docs/backend/api/) — dieselben Abfragen über HTTP
-
----

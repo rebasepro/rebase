@@ -162,5 +162,3 @@ Définissez `sharedState.channelBusConfigured: true` pour confirmer que vous l'a
 configuré — le chart ne l'utilise que pour décider d'émettre un avertissement ou
 non. Les abonnements classiques aux collections ne sont pas affectés ; ceux-ci
 transitent par le CDC de Postgres.
-
----

@@ -408,5 +408,3 @@ vincular y responde 501.
 - [Descripción general del backend](/docs/backend/) — `dataSources` y dónde vive la declaración
 - [Configuración del almacenamiento](/docs/backend/storage/) — la misma forma para los buckets
 - [Entorno y configuración](/docs/getting-started/configuration/) — la convención `__SUFFIX` que vincula una fuente a sus variables
-
----

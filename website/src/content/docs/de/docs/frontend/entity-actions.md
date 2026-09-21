@@ -106,5 +106,3 @@ const collection = defineCollection({
 
 - **[Zusätzliche Spalten](/docs/frontend/additional-columns)** — Berechnete Tabellenspalten
 - **[Benutzerdefinierte Felder](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder
-
----

@@ -81,5 +81,3 @@ stattdessen ein Soft Delete erhält, geht davon aus, dass die Daten endgültig g
 - **[Defining Collections](/docs/collections)** — wo `softDelete` deklariert wird
 - **[REST API](/docs/backend/api)** — die Delete- und Abfrage-Endpunkte, zu denen diese Parameter gehören
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — wer überhaupt eine Zeile löschen darf
-
----

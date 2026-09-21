@@ -243,5 +243,3 @@ Como as branches são bancos de dados PostgreSQL separados, você não pode exec
 - [Comandos da CLI](/docs/cli/) — `rebase db branch` e suas flags
 - [Geração de Esquema](/docs/cli/schema/) — como o esquema que uma branch copia é gerado
 - [Ambiente e Configuração](/docs/getting-started/configuration/) — `DATABASE_URL` e sobre o que uma branch alternada tem precedência
-
----

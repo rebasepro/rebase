@@ -117,5 +117,3 @@ Sul job viene memorizzato solo l'**id** del webhook, mai il webhook stesso — a
 
 - **[Cron Jobs](/docs/backend/cron-jobs)** — lavoro pianificato
 - **[Webhooks](/docs/recipes/webhooks)** — invia notifiche ad altri sistemi in caso di modifiche
-
----

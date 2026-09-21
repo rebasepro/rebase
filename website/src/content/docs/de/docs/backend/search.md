@@ -273,5 +273,3 @@ Abgleich bei; Firestore-Collections verwenden den externen Textsuch-Controller.
 - [REST-API](/docs/backend/api/) — die Abfrageparameter, als die eine Suche den Server erreicht
 - [Indizes](/docs/backend/indexes/) — was der Suchblock erstellt und was er kostet
 - [Daten abfragen](/docs/sdk/querying/) — Suchen über das Client-SDK
-
----

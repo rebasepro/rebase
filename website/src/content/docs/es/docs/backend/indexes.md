@@ -279,5 +279,3 @@ elimina:
 - [Búsqueda](/docs/backend/search) — búsqueda de texto completo con clasificación (*ranked full-text*), que construye su propio índice GIN sobre un `tsvector` generado
 - [Búsqueda vectorial](/docs/sdk/aggregates-and-search#vector-search) — el índice ANN sobre una columna de embeddings, configurado en la propiedad
 - [Schema as code](/docs/architecture/schema-as-code) — cómo llegan las declaraciones a la base de datos y qué es un nombre derivado
-
----

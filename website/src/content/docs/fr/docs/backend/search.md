@@ -272,5 +272,3 @@ basée sur des expressions régulières ; les collections Firestore utilisent le
 - [REST API](/docs/backend/api/) — les paramètres de requête sous lesquels une recherche parvient au serveur
 - [Index](/docs/backend/indexes/) — ce que le bloc search crée, et ce que cela coûte
 - [Interroger les données](/docs/sdk/querying/) — effectuer des recherches depuis le SDK client
-
----

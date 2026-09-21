@@ -142,5 +142,3 @@ codebase.
 
 Les compétences sont fournies par le paquet `@rebasepro/agent-skills`, dont dépend le CLI,
 de sorte que l'ensemble obtenu correspond à la version installée de votre CLI.
-
----

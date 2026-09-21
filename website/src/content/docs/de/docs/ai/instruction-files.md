@@ -137,5 +137,3 @@ Sie hat keinen Einfluss darauf, was ein mit Ihrer Datenbank verbundener Agent
 *tun* darf – dies wird durch die Anmeldeinformationen (Credentials) bestimmt,
 über die er verfügt, und nichts im Markdown kann das ändern. Siehe
 [das Credential-Modell des MCP-Servers](/docs/ai/mcp#what-the-server-can-reach).
-
----

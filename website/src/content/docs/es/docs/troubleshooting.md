@@ -158,5 +158,3 @@ Cada fallo de la API responde con la misma estructura y contiene un `code`. La [
 - [Códigos de error](/docs/backend/errors/) — cada `code` con el que la API puede responder, junto con su estado y solución.
 - [Entorno y configuración](/docs/getting-started/configuration/) — cada variable que lee el runtime y aquellas sin las cuales producción se negará a iniciar.
 - [Visión general del backend](/docs/backend/) — qué hace el arranque, en orden, y qué prueba responde a qué pregunta.
-
----

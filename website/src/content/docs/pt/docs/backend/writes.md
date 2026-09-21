@@ -224,5 +224,3 @@ não ofereceria nem a atomicidade nem o round trip único buscados ao usar um lo
 Um `update` ou `delete` especificando uma linha que não existe faz todo o lote falhar com `404`,
 pelo mesmo motivo que uma escrita parcial é recusada em qualquer outro lugar: um estado
 parcialmente aplicado não oferece uma recuperação adequada.
-
----

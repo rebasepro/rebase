@@ -106,5 +106,3 @@ const collection = defineCollection({
 
 - **[Colunas Adicionais](/docs/frontend/additional-columns)** — Colunas de tabela computadas
 - **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulário personalizados
-
----

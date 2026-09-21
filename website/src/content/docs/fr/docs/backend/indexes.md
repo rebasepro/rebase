@@ -196,5 +196,3 @@ Toutes ces situations lèvent une erreur au moment du build, en indiquant la col
 - [Recherche](/docs/backend/search) — recherche en texte intégral avec classement, qui construit son propre index GIN sur un `tsvector` généré
 - [Recherche vectorielle](/docs/sdk/aggregates-and-search#vector-search) — l'index ANN sur une colonne d'embedding, configuré sur la propriété
 - [Schéma as code](/docs/architecture/schema-as-code) — comment les déclarations parviennent à la base de données, et ce qu'est un nom dérivé
-
----

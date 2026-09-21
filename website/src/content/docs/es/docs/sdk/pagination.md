@@ -132,5 +132,3 @@ La ordenación aún debe ser **total**, lo que en la práctica significa única:
 
 - [Consulta de datos](/docs/sdk/querying/) — filtros, el constructor fluido, ordenación.
 - [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/) — por qué la relevancia no puede servir como clave para un cursor.
-
----

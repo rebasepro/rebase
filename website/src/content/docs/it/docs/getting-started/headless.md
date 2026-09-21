@@ -178,5 +178,3 @@ backend non cambia. Si comincia da [Configurazione del frontend](/docs/frontend/
 - [Regole di sicurezza (RLS)](/docs/collections/security-rules/) — il modello di accesso
 - [Funzioni personalizzate](/docs/backend/custom-functions/) — le tue route
 - [Deployment](/docs/getting-started/deployment/) — portare l'applicazione in produzione
-
----

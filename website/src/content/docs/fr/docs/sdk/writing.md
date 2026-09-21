@@ -289,5 +289,3 @@ qui n'existe pas fait échouer l'ensemble du lot avec une erreur 404. Un backend
 ne peut pas assurer l'atomicité renvoie `BATCH_UNSUPPORTED` plutôt que d'exécuter une boucle.
 
 `idempotencyKey` et `returning` fonctionnent de la même manière que pour toute autre écriture.
-
----

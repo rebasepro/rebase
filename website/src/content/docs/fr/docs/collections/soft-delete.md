@@ -56,5 +56,3 @@ Un **vrai** `DELETE` s'effectue avec `?hard=true` lors de l'appel de suppression
 - **[Définition des collections](/docs/collections)** — où `softDelete` est déclaré
 - **[API REST](/docs/backend/api)** — les points de terminaison de suppression et de requête auxquels ces paramètres s'appliquent
 - **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — qui est autorisé à supprimer une ligne
-
----

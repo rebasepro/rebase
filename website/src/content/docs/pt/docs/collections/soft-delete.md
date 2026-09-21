@@ -76,5 +76,3 @@ recebeu um soft delete acredita que os dados foram apagados.
 - **[Definindo Collections](/docs/collections)** — onde o `softDelete` é declarado
 - **[API REST](/docs/backend/api)** — os endpoints de exclusão e consulta aos quais esses parâmetros pertencem
 - **[Regras de Segurança (RLS)](/docs/collections/security-rules)** — quem tem permissão para excluir uma linha
-
----

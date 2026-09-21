@@ -401,5 +401,3 @@ Sans le mode hors ligne activé, `observe()` correspond à `find()` combiné à 
 - **[Synchronisation hors ligne & Local-First](/docs/sdk/offline)** — Requêtes en direct qui survivent à une interruption de connexion
 - **[Authentification](/docs/sdk/authentication)** — Connexion et gestion des sessions
 - **[Backend temps réel](/docs/backend/realtime)** — Configuration WebSocket côté serveur
-
----

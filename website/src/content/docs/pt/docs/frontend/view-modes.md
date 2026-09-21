@@ -213,4 +213,3 @@ const articlesCollection = defineCollection({
 
 - **[Visualizações de Entidade](/docs/frontend/entity-views)** — Abas personalizadas em formulários de entidade
 - **[Ações de Entidade](/docs/frontend/entity-actions)** — Ações de entidade personalizadas
----

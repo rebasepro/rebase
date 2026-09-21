@@ -128,5 +128,3 @@ E tieni a mente il limite: questo file determina ciò che un assistente *scrive*
 ha alcuna influenza su ciò che un agente connesso al tuo database può *fare* — questo è
 determinato dalle credenziali in suo possesso, e nulla nel Markdown può cambiarlo. Vedi
 [il modello di credenziali del server MCP](/docs/ai/mcp#what-the-server-can-reach).
-
----

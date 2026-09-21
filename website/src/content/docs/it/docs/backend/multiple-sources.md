@@ -324,5 +324,3 @@ In sviluppo, un bucket dichiarato che nulla lega è una directory locale — `up
 - [Panoramica del backend](/docs/backend/) — `dataSources` e dove vive la dichiarazione
 - [Configurazione dell'archiviazione](/docs/backend/storage/) — la stessa forma per i bucket
 - [Ambiente e configurazione](/docs/getting-started/configuration/) — la convenzione `__SUFFIX` che lega un'origine alle sue variabili
-
----

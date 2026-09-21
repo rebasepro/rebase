@@ -280,5 +280,3 @@ elimina:
   coluna de embedding, configurado na propriedade
 - [Schema como código](/docs/architecture/schema-as-code) — como as declarações chegam
   ao banco de dados e o que é um nome derivado
-
----

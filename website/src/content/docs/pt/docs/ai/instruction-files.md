@@ -129,5 +129,3 @@ E tenha em mente os limites: este arquivo molda o que um assistente *escreve*. E
 não tem qualquer impacto sobre o que um agente conectado ao seu banco de dados pode *fazer* — isso
 é determinado pelas credenciais que ele possui, e nada no Markdown muda isso. Consulte
 [o modelo de credenciais do servidor MCP](/docs/ai/mcp#what-the-server-can-reach).
-
----

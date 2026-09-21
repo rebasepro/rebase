@@ -372,5 +372,3 @@ non vi è ancora alcuna garanzia formale, elencate affinché nessuno vi legga pr
 - [Upgrading](/docs/upgrading/) — cosa si è effettivamente rotto, release per release
 - [Changelog](/docs/changelog/) — ogni modifica, comprese quelle che non hanno rotto nulla
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — contratto 3 — il formato del bundle rispetto al quale un progetto distribuito è già compilato
-
----

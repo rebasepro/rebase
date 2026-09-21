@@ -235,5 +235,3 @@ La tabla anterior es lo que se garantiza. Estas son las partes de la política q
 - [Actualización](/docs/upgrading/) — qué se rompió realmente, versión por versión
 - [Changelog](/docs/changelog/) — cada cambio, incluidos los que no rompieron nada
 - [Runtime y bundles](/docs/architecture/runtime-and-bundles/) — contrato 3 — el formato de bundle contra el que ya está compilado un proyecto desplegado
-
----

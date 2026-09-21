@@ -293,5 +293,3 @@ Treiber dies nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, an
 durchlaufen.
 
 `idempotencyKey` und `returning` funktionieren genau wie bei jedem anderen Schreibvorgang.
-
----

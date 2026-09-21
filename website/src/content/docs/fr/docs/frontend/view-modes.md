@@ -216,5 +216,3 @@ const articlesCollection = defineCollection({
 
 - **[Vues d'entités](/docs/frontend/entity-views)** — Onglets personnalisés sur les formulaires d'entités
 - **[Actions d'entités](/docs/frontend/entity-actions)** — Actions d'entités personnalisées
-
----

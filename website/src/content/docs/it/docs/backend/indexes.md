@@ -283,5 +283,3 @@ si propone di eliminare:
   colonna embedding, configurato sulla proprietà
 - [Schema as code](/docs/architecture/schema-as-code) — come le dichiarazioni raggiungono
   il database e cos'è un nome derivato
-
----

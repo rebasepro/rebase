@@ -257,5 +257,3 @@ Poiché i branch sono database PostgreSQL separati, non è possibile eseguire qu
 - [Comandi CLI](/docs/cli/) — `rebase db branch` e i suoi flag
 - [Generazione dello schema](/docs/cli/schema/) — come viene generato lo schema copiato da un branch
 - [Ambiente e configurazione](/docs/getting-started/configuration/) — `DATABASE_URL` e le priorità rispetto a un branch selezionato
-
----

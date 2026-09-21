@@ -147,5 +147,3 @@ Struktur, unbekannte Sammlungen, unbekannte Felder, Wertebeschränkungen, Feldop
 Begrenzt auf dieselbe Anzahl von Operationen wie ein Bulk-Schreibvorgang (standardmäßig 1000), da ein Batch seine Sperren für die gesamte Transaktion hält. Ein Treiber, der den Batch nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, anstatt auf eine Schleife von Einzelschreibvorgängen zurückzugreifen – was weder die Atomizität noch den einzelnen Roundtrip bieten würde, für die ein Batch gedacht ist.
 
 Ein `update` oder `delete`, das eine nicht existierende Zeile benennt, lässt den gesamten Batch mit einem `404` fehlschlagen – aus demselben Grund, aus dem partielle Schreibvorgänge überall sonst abgelehnt werden: Ein halb angewendeter Zustand bietet keine verlässliche Wiederherstellung.
-
----

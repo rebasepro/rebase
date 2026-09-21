@@ -338,5 +338,3 @@ Pour prévenir les attaques temporelles (timing attacks), Rebase valide la clé 
 - **[Adaptateurs d'authentification personnalisés](/docs/backend/auth-adapters/)** — remplacer le fournisseur sous-jacent
 - **[Règles de sécurité (RLS)](/docs/collections/security-rules/)** — ce qu'une politique fait avec `rebase.uid()`
 - **[Authentification avec le SDK client](/docs/sdk/authentication/)** — appeler ces routes depuis le SDK
-
----

@@ -291,5 +291,3 @@ Se un valore derivato non è un aggregato su una relazione, inseriscilo nel data
 - [Querying Data](/docs/sdk/querying/) — il query builder restituito da questi accessor
 - [Relations](/docs/collections/relations/) — dichiarare i collegamenti letti da questa pagina
 - [REST API](/docs/backend/api/) — lo stesso `include` su HTTP
-
----

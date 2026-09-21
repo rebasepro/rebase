@@ -289,5 +289,3 @@ inesistente fa fallire l'intero batch con un 404. Un backend il cui driver
 non può garantire l'atomicità risponde con `BATCH_UNSUPPORTED` anziché iterare in loop.
 
 `idempotencyKey` e `returning` funzionano esattamente come per qualsiasi altra operazione di scrittura.
-
----

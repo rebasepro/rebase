@@ -76,5 +76,3 @@ definitivamente e ha ottenuto un soft delete crederebbe erroneamente che i dati 
 - **[Definire le Collection](/docs/collections)** — dove viene dichiarato `softDelete`
 - **[API REST](/docs/backend/api)** — gli endpoint di eliminazione e query a cui appartengono questi parametri
 - **[Regole di Sicurezza (RLS)](/docs/collections/security-rules)** — chi ha i permessi per eliminare una riga
-
----

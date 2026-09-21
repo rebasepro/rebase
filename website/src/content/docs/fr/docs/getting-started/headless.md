@@ -189,5 +189,3 @@ affiche ; le backend ne change pas. C'est dans
 - [Règles de sécurité (RLS)](/docs/collections/security-rules/) — le modèle d'accès
 - [Fonctions personnalisées](/docs/backend/custom-functions/) — vos propres routes
 - [Déploiement](/docs/getting-started/deployment/) — passage en production
-
----

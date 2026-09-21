@@ -440,5 +440,3 @@ ein Versprechen hineininterpretiert:
 - [Upgraden](/docs/upgrading/) — was tatsächlich gebrochen ist, Release für Release
 - [Changelog](/docs/changelog/) — jede Änderung, einschließlich derer, die nichts gebrochen haben
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — Vertrag 3 — das Bundle-Format, gegen das ein deploytes Projekt bereits gebaut ist
-
----

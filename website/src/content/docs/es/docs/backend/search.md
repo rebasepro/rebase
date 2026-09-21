@@ -182,5 +182,3 @@ El bloque `search` es exclusivo de Postgres y se rechaza al iniciar en otros mot
 - [REST API](/docs/backend/api/) — los parámetros de consulta con los que una búsqueda llega al servidor
 - [Indexes](/docs/backend/indexes/) — qué crea el bloque de búsqueda y cuánto cuesta
 - [Querying Data](/docs/sdk/querying/) — cómo buscar desde el SDK cliente
-
----

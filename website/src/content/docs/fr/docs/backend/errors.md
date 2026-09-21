@@ -261,5 +261,3 @@ Une route renvoie l'un de ces codes lorsqu'aucun motif plus précis ne s'appliqu
 `pnpm verify:docs` échoue lorsqu'un code que le serveur peut émettre est absent de ces tableaux, lorsqu'un tableau liste un code qui ne peut jamais être levé, lorsqu'un statut indiqué diverge du code source, ou lorsqu'une famille de codes telle que `PG_<SQLSTATE>` ne documente pas une ligne pour un SQLSTATE rencontré par les appelants. L'étape correspondante est `tooling/scripts/docs-verify/check-error-codes.mjs`.
 
 Ce script commence par se vérifier lui-même. L'analyse extrait les codes directement depuis TypeScript et non depuis un serveur en cours d'exécution, de sorte que ses angles morts sont silencieux par conception : il lui est arrivé de ne pas détecter un code encapsulé dans un wrapper d'une ligne, ou placé après un message contenant une parenthèse `)`, affirmant alors à tort que « chaque code émis par le serveur est documenté » sur une page où il en manquait dix-sept. Désormais, cette étape exécute d'abord un jeu de test reproduisant fidèlement ces cas de figure avant de lire cette page, et refuse de rendre son verdict si elle ne parvient pas à les repérer.
-
----

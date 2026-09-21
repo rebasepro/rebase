@@ -184,5 +184,3 @@ Affiche ce dont un client a besoin pour joindre le projet. Il n'affiche jamais d
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — ce que `rebase build` produit et ce qui le démarre
 - [Split Processes](/docs/deployment/split-processes/) — exécuter un bundle sous forme de plusieurs processus
 - [CLI Commands](/docs/cli/) — `rebase apps` et le reste
-
----

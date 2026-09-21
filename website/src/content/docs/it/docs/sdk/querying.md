@@ -438,5 +438,3 @@ Entrambi i metodi restituiscono **il corpo della risposta della funzione, tale e
 - **[Sottoscrizioni Realtime](/docs/sdk/realtime)** — Dati in tempo reale con i WebSocket
 - **[Storage & File](/docs/sdk/storage)** — Carica, scarica e gestisci file
 - **[Relazioni](/docs/collections/relations)** — Definisci relazioni tra collezioni
-
----

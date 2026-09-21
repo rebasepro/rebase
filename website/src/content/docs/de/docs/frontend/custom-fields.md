@@ -198,4 +198,3 @@ properties: {
 - **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs im Entitäts-Editor
 - **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Zusätzliche Spalten](/docs/frontend/additional-columns)** — Berechnete Tabellenspalten
----

@@ -182,5 +182,3 @@ den Service-Key.
 - [REST-API](/docs/backend/api/) – die Endpunkte, die ein Schlüssel aufruft
 - [Endpunkt-Index](/docs/backend/endpoints/) – die Zugangskontrolle auf jeder Route, einschließlich Schlüsseln
 - [Sicherheitsregeln (RLS)](/docs/collections/security-rules/) – was die Datenbank zusätzlich zu den Scopes eines Schlüssels erzwingt
-
----

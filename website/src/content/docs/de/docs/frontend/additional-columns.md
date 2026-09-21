@@ -74,5 +74,3 @@ const ordersCollection = defineCollection({
 
 - **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder
-
----

@@ -222,5 +222,3 @@ e a solução.
 - [Códigos de erro](/docs/backend/errors/) — todos os `code`s que a API pode responder, com o status e a solução.
 - [Ambiente e Configuração](/docs/getting-started/configuration/) — todas as variáveis que o runtime lê e aquelas sem as quais o ambiente de produção se recusa a iniciar.
 - [Visão Geral do Backend](/docs/backend/) — o que a inicialização faz, em ordem, e qual probe responde a qual pergunta.
-
----

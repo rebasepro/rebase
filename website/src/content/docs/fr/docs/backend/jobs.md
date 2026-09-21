@@ -117,5 +117,3 @@ Seul l'**identifiant** du webhook est stocké dans le job, jamais le webhook lui
 
 - **[Cron Jobs](/docs/backend/cron-jobs)** — planifier des tâches régulières
 - **[Webhooks](/docs/recipes/webhooks)** — notifier d'autres systèmes lors d'une modification
-
----

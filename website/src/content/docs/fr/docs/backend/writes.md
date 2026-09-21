@@ -147,5 +147,3 @@ Le format, les collections inconnues, les champs inconnus, les contraintes sur l
 Le volume est plafonné au même nombre d'opérations qu'une écriture en masse (1000 par défaut), car un lot conserve ses verrous pendant toute la durée de la transaction. Un pilote incapable de rendre le lot atomique répond `BATCH_UNSUPPORTED` plutôt que de se rabattre sur une boucle d'écritures unitaires — ce qui n'assurerait ni l'atomicité ni l'aller-retour unique pour lesquels un lot est utilisé.
 
 Un `update` ou un `delete` ciblant une ligne inexistante fait échouer l'ensemble du lot avec un code `404`, pour la même raison qu'une écriture partielle est rejetée partout ailleurs : une application partielle est un état pour lequel il n'existe aucune reprise satisfaisante.
-
----

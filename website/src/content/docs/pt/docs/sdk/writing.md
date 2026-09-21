@@ -290,5 +290,3 @@ que não existe faz todo o lote falhar com um erro 404. Um backend cujo driver
 não possa garantir a atomicidade responde com `BATCH_UNSUPPORTED` em vez de entrar em loop.
 
 `idempotencyKey` e `returning` funcionam da mesma forma que em qualquer outra escrita.
-
----

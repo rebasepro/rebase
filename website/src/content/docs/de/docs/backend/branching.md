@@ -243,5 +243,3 @@ Da Branches separate PostgreSQL-Datenbanken sind, können Sie keine SQL-`JOIN`-A
 - [CLI-Befehle](/docs/cli/) — `rebase db branch` und dessen Flags
 - [Schema-Generierung](/docs/cli/schema/) — wie das Schema erzeugt wird, das ein Branch kopiert
 - [Umgebung & Konfiguration](/docs/getting-started/configuration/) — `DATABASE_URL` und worüber ein aktiv geschalteter Branch Vorrang hat
-
----

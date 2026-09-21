@@ -56,5 +56,3 @@ Un `DELETE` **real** es `?hard=true` en la llamada de eliminación. Requiere exa
 - **[Definición de colecciones](/docs/collections)** — dónde se declara `softDelete`
 - **[API REST](/docs/backend/api)** — los endpoints de eliminación y consulta a los que pertenecen estos parámetros
 - **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — quién puede eliminar una fila en primer lugar
-
----

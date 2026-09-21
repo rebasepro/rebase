@@ -115,5 +115,3 @@ Dos de ellas solicitan ser leídas sin indicación previa. `rebase-basics` indic
 ```
 
 Las habilidades se distribuyen desde el paquete `@rebasepro/agent-skills`, del cual depende la CLI, por lo que el conjunto obtenido coincide con la versión instalada de tu CLI.
-
----

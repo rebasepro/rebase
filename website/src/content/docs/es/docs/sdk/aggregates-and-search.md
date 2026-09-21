@@ -162,5 +162,3 @@ embedding: {
 - [Consultar datos](/docs/sdk/querying/) — el constructor de consultas sobre el que se ejecutan
 - [Búsqueda](/docs/backend/search/) — cómo se configuran las búsquedas de texto completo y vectoriales en el backend
 - [API REST](/docs/backend/api/) — las mismas consultas a través de HTTP
-
----

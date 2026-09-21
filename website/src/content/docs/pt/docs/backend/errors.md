@@ -312,5 +312,3 @@ contendo `)`, relatando falsamente que "todos os códigos emitidos pelo servidor
 estão documentados" em uma página que omitia dezessete deles. Por isso, a rotina
 executa um teste com essas estruturas exatas antes de ler esta página e se
 recusa a gerar qualquer relatório caso não consiga detectá-las.
-
----

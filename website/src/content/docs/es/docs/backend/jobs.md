@@ -117,5 +117,3 @@ Solo el **id** del webhook se almacena en el trabajo, nunca el webhook en sí; d
 
 - **[Trabajos Cron](/docs/backend/cron-jobs)** — trabajo según una programación
 - **[Webhooks](/docs/recipes/webhooks)** — notificar a otros sistemas ante un cambio
-
----

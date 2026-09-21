@@ -210,5 +210,3 @@ escrita.
 - [Consultando dados](/docs/sdk/querying/) — o construtor de consultas sobre o qual estes operam
 - [Busca](/docs/backend/search/) — como a busca textual e vetorial são configuradas no backend
 - [API REST](/docs/backend/api/) — as mesmas consultas via HTTP
-
----

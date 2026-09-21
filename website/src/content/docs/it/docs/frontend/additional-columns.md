@@ -74,5 +74,3 @@ const ordersCollection = defineCollection({
 
 - **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
 - **[Campi Personalizzati](/docs/frontend/custom-fields)** — Campi modulo personalizzati
-
----

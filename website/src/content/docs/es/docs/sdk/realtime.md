@@ -372,5 +372,3 @@ Sin el modo offline habilitado, `observe()` es `find()` más `listen()` en una s
 - **[Sincronización offline y local-first](/docs/sdk/offline)** — Consultas en vivo que sobreviven a una conexión caída
 - **[Autenticación](/docs/sdk/authentication)** — Inicio de sesión y gestión de sesiones
 - **[Backend en tiempo real](/docs/backend/realtime)** — Configuración de WebSocket en el lado del servidor
-
----

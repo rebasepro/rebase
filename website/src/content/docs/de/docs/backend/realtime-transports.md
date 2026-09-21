@@ -173,5 +173,3 @@ Das SDK sendet alle ~20 Sekunden einen Presence-Heartbeat bei einem Timeout von 
 - [Realtime & WebSocket](/docs/backend/realtime/) — Abonnements, Channels und Presence auf einer einzelnen Instanz
 - [Split Processes](/docs/deployment/split-processes/) — Die Deployment-Form, für die dies relevant ist
 - [Self-hosting](/docs/deployment/self-hosting/) — Die Runtime selbst betreiben
-
----

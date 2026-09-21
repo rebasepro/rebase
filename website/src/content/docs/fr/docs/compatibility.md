@@ -432,5 +432,3 @@ personne n'y voie un engagement implicite :
 - [Mise à niveau](/docs/upgrading/) — ce qui a réellement changé de manière cassante, version par version
 - [Changelog](/docs/changelog/) — chaque changement, y compris ceux qui n'ont rien cassé
 - [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — contrat 3 — le format de bundle sur lequel un projet déployé est déjà construit
-
----

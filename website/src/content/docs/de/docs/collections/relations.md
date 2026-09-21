@@ -573,5 +573,3 @@ Normalisierung gestempelte Fassung.
 
 - **[Sicherheitsregeln](/docs/collections/security-rules)** — Zeilenebenen-Sicherheit
 - **[Eigenschaften](/docs/collections/properties)** — Referenz der Eigenschaftstypen
-
----

@@ -414,5 +414,3 @@ répond 501.
 - [Aperçu du backend](/docs/backend/) — `dataSources` et l'endroit où vit la déclaration
 - [Configuration du stockage](/docs/backend/storage/) — la même forme pour les buckets
 - [Environnement et configuration](/docs/getting-started/configuration/) — la convention `__SUFFIX` qui lie une source à ses variables
-
----

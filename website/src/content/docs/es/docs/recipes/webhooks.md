@@ -195,5 +195,3 @@ captúralo ahí, o entrega el trabajo a la cola del dispatcher.
 
 - **[Devoluciones de llamada de entidad](/docs/collections/callbacks)** — Referencia completa de devoluciones de llamada
 - **[Receta de CMS para Blog](/docs/recipes/blog-cms)** — Ejemplo completo de blog
-
----

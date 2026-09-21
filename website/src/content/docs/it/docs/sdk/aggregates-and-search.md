@@ -209,5 +209,3 @@ operazione di scrittura.
 - [Interrogare i dati](/docs/sdk/querying/) — il query builder su cui queste funzionalità si basano
 - [Ricerca](/docs/backend/search/) — come vengono configurate la ricerca full-text e vettoriale sul backend
 - [API REST](/docs/backend/api/) — le stesse query tramite HTTP
-
----

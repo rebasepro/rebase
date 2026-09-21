@@ -90,5 +90,3 @@ Prima di rilasciare una vista personalizzata:
 - Il testo è `<Typography variant=…>`, non una classe per la dimensione del font.
 - I contenitori sono `Card` / `Paper`, non un `<div>` con un bordo scritto a mano.
 - Cambia il tema e guarda la pagina. Questo è l'intero test e richiede cinque secondi.
-
----

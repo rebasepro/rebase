@@ -436,5 +436,3 @@ Ambos retornam **o corpo de resposta da função, textualmente**. Nenhum deles t
 - **[Inscrições em Tempo Real](/docs/sdk/realtime)** — Dados ao vivo com WebSockets
 - **[Armazenamento e Arquivos](/docs/sdk/storage)** — Envio, download e gerenciamento de arquivos
 - **[Relações](/docs/collections/relations)** — Defina relações entre coleções
-
----

@@ -358,5 +358,3 @@ propiedad ordinaria.
 - [Consultar datos](/docs/sdk/querying/) — el generador de consultas que devuelven estos accesores
 - [Relaciones](/docs/collections/relations/) — declarar los enlaces que lee esta página
 - [API REST](/docs/backend/api/) — el mismo `include` a través de HTTP
-
----

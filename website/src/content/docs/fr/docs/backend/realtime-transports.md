@@ -180,5 +180,3 @@ Le SDK envoie un battement de cœur (heartbeat) de présence environ toutes les 
 - [Temps réel et WebSocket](/docs/backend/realtime/) — abonnements, canaux et présence sur une seule instance
 - [Processus séparés](/docs/deployment/split-processes/) — la configuration de déploiement pour laquelle cela compte
 - [Auto-hébergement](/docs/deployment/self-hosting/) — exécuter le runtime vous-même
-
----

@@ -484,5 +484,3 @@ Per verificare la struttura degli endpoint anziché lo schema sottostante, il do
 - **[Client SDK](/docs/sdk)** — Client con tipizzazione statica per l'API REST
 - **[Collections](/docs/collections)** — Definisci lo schema dei tuoi dati
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Controlla l'accesso per singola riga
-
----

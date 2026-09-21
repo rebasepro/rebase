@@ -336,5 +336,3 @@ Um Timing-Angriffe zu verhindern, validiert Rebase sowohl den vom Benutzer konfi
 - **[Benutzerdefinierte Auth-Adapter](/docs/backend/auth-adapters/)** — Ersetzen des zugrunde liegenden Anbieters
 - **[Sicherheitsregeln (RLS)](/docs/collections/security-rules/)** — was eine Policy mit `rebase.uid()` macht
 - **[Client-SDK-Authentifizierung](/docs/sdk/authentication/)** — Aufrufen dieser Routen über das SDK
-
----

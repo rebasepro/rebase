@@ -176,5 +176,3 @@ richiede la sessione di un utente admin o la chiave di servizio.
 - [API REST](/docs/backend/api/) — gli endpoint chiamati da una chiave
 - [Indice degli endpoint](/docs/backend/endpoints/) — il controllo di accesso su ogni route, chiavi incluse
 - [Regole di sicurezza (RLS)](/docs/collections/security-rules/) — ciò che il database applica oltre agli ambiti di una chiave
-
----

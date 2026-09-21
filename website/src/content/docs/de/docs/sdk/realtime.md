@@ -372,5 +372,3 @@ Ohne aktivierten Offline-Modus ist `observe()` eine Kombination aus `find()` und
 - **[Offline- & Local-First-Synchronisation](/docs/sdk/offline)** — Live-Abfragen, die einen Verbindungsabbruch überstehen
 - **[Authentifizierung](/docs/sdk/authentication)** — Anmeldung und Sitzungsverwaltung
 - **[Realtime-Backend](/docs/backend/realtime)** — Serverseitige WebSocket-Konfiguration
-
----

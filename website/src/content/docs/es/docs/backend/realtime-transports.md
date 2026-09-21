@@ -180,5 +180,3 @@ El SDK envía un heartbeat de presencia aproximadamente cada 20 segundos frente 
 - [Tiempo real y WebSocket](/docs/backend/realtime/) — suscripciones, canales y presencia en una sola instancia
 - [Procesos divididos](/docs/deployment/split-processes/) — el modelo de despliegue donde esto resulta relevante
 - [Autohospedaje](/docs/deployment/self-hosting/) — cómo ejecutar el entorno de ejecución por tu cuenta
-
----

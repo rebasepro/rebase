@@ -245,5 +245,3 @@ Un'operazione di `update` o `delete` che fa riferimento a una riga inesistente f
 fallire l'intero batch con un `404`, per lo stesso motivo per cui una scrittura
 parziale viene rifiutata ovunque: uno stato applicato solo a metà non consente un
 ripristino agevole.
-
----

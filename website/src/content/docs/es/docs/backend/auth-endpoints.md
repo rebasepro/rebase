@@ -283,5 +283,3 @@ Para evitar ataques de temporización (timing attacks), Rebase valida tanto la c
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — sustitución del proveedor subyacente
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — lo que hace una directiva con `rebase.uid()`
 - **[Client SDK Authentication](/docs/sdk/authentication/)** — llamada a estas rutas desde el SDK
-
----

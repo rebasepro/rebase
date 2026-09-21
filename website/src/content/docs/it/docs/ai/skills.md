@@ -115,5 +115,3 @@ Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifi
 ```
 
 Le skill vengono distribuite tramite il pacchetto `@rebasepro/agent-skills`, dal quale dipende la CLI, quindi il set ottenuto corrisponde alla versione della CLI installata.
-
----

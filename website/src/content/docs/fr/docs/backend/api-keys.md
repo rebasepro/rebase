@@ -177,5 +177,3 @@ nécessite la session d'un utilisateur administrateur ou la clé de service.
 - [API REST](/docs/backend/api/) — les endpoints qu'une clé appelle
 - [Index des endpoints](/docs/backend/endpoints/) — le contrôle d'accès sur chaque route, clés comprises
 - [Règles de sécurité (RLS)](/docs/collections/security-rules/) — ce que la base de données applique en plus des portées d'une clé
-
----

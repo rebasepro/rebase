@@ -483,5 +483,3 @@ Pour connaître la forme des points de terminaison plutôt que le schéma sous-j
 - **[SDK Client](/docs/sdk)** — Client typé pour l'API REST
 - **[Collections](/docs/collections)** — Définissez votre schéma de données
 - **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — Contrôlez l'accès ligne par ligne
-
----
