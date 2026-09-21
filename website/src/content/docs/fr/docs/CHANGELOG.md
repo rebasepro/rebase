@@ -11,6 +11,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Added
+
+- **Linking an account returns the provider's profile picture.** `verify`
+  already fetches a photo from every provider that has one, and both sign-in
+  branches pass it to `updateUser` — but `POST /auth/link/:provider` asked for
+  the same profile, got the same answer and dropped it. An app whose users link
+  an account *after* signing up therefore had no route to a picture at all,
+  which is the normal case wherever the account came first. Both branches now
+  answer with `photoURL`, the idempotent already-linked one included, so a
+  re-link is also a way to refresh it. Returned rather than stored on purpose:
+  these URLs are signed and expire (LinkedIn's within weeks), so a column
+  holding one is a column that turns into a broken image later — copy the bytes
+  somewhere you own while the URL is still good.
+
 ### Changed
 
 - **The record dialog has its Create and Save buttons at the bottom.** In a
