@@ -700,7 +700,16 @@ newPassword })
         providerId: string,
         payload: Record<string, unknown>
     ) {
-        return transport.request<{ success: boolean; provider: string; alreadyLinked: boolean; }>(
+        return transport.request<{
+            success: boolean;
+            provider: string;
+            alreadyLinked: boolean;
+            /**
+             * The provider's profile picture, when it has one. Usually a signed
+             * URL with an expiry, so copy the bytes rather than storing this.
+             */
+            photoURL?: string | null;
+        }>(
             authPath + "/link/" + providerId,
             {
                 method: "POST",

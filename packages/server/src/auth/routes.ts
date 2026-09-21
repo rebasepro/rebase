@@ -829,7 +829,12 @@ displayName: user.displayName });
                 }
                 if (identityOwner) {
                     // Already linked to this same user — idempotent success.
-                    return c.json({ success: true, provider: provider.id, alreadyLinked: true });
+                    return c.json({
+                        success: true,
+                        provider: provider.id,
+                        alreadyLinked: true,
+                        photoURL: externalUser.photoUrl ?? null
+                    });
                 }
 
                 await authRepo.linkUserIdentity(
@@ -839,7 +844,30 @@ displayName: user.displayName });
                     { email: externalUser.email }
                 );
 
-                return c.json({ success: true, provider: provider.id, alreadyLinked: false });
+                return c.json({
+                    success: true,
+                    provider: provider.id,
+                    alreadyLinked: false,
+                    // The profile picture the provider just handed us, passed
+                    // back rather than dropped.
+                    //
+                    // `verify` fetches it on every provider that has one, and
+                    // sign-in uses it: both branches above call `updateUser`
+                    // with `externalUser.photoUrl`. This route asked for the
+                    // same profile, got the same answer and threw it away, so
+                    // an app whose users link an account *after* signing up had
+                    // no route to a picture at all — which is not a smaller
+                    // case than sign-in, it is the normal one for any product
+                    // where the account came first.
+                    //
+                    // Returned rather than stored, deliberately. These URLs are
+                    // signed and expire (LinkedIn's `media.licdn.com` links
+                    // within weeks), so a column holding one is a column that
+                    // silently turns into a broken image later. The caller gets
+                    // it while it is still good and decides what to do — copy
+                    // the bytes somewhere it owns, or nothing.
+                    photoURL: externalUser.photoUrl ?? null
+                });
             });
         }
     }
