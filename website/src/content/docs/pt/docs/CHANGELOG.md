@@ -193,6 +193,20 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   running with this release** — read them again before you upgrade. A global
   `beforeQuery` beside a MongoDB or Firestore data source also refuses to start.
 
+- **Cloud status no longer tells a serving project to create its database.**
+  A managed project whose database the control plane had not recorded showed
+  `blockedOn: no_database` beside `status: active` in `rebase cloud status`,
+  and suggested `rebase cloud db create --type managed`, the one command that
+  could provision a second, empty database and point the app at it. A project
+  that has deployed once has a database, so the CLI now reports it blocked on a
+  missing database only before its first deploy.
+
+- **A time imported from Excel keeps its minute.** The spreadsheet reader turns
+  Excel's fractional-day dates into milliseconds by rounding down, so 12:30
+  often arrived as 12:29:59.999 and a field showing minutes displayed 12:29. A
+  date within a millisecond of a whole second is now put back on it; a real
+  sub-second time is left alone.
+
 ## [0.21.1] - 2026-09-15
 
 ### Added
