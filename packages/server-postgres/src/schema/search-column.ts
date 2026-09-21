@@ -51,9 +51,11 @@ import {
     MapProperty,
     SearchConfig,
     SearchField,
+    SearchMode,
     SearchWeight,
     isPostgresCollectionConfig,
     DEFAULT_SEARCH_COLUMN,
+    DEFAULT_SEARCH_MODE,
     DEFAULT_SEARCH_LANGUAGE,
     DEFAULT_SEARCH_WEIGHT,
     DEFAULT_FUZZY_THRESHOLD
@@ -90,6 +92,20 @@ export interface ResolvedSearchField {
     sql: string;
     /** The plain-text term this field contributes, for the fuzzy column. */
     textSql: string;
+    /**
+     * The same text with accents folded **unconditionally**, for the substring
+     * half of {@link SearchMode} `"hybrid"`.
+     *
+     * Separate from {@link textSql} rather than replacing it, and that
+     * separation is the whole migration story for `mode`. `textSql` feeds the
+     * *stored* generated columns, so changing it changes their generation
+     * expression, which changes the fingerprint, which makes the next boot
+     * refuse (see `searchStampGuards`). This one is only ever interpolated into
+     * a WHERE clause, so a collection can switch to `"hybrid"` — and gain
+     * accent folding on the substring half — without rebuilding a column or
+     * taking an ACCESS EXCLUSIVE lock.
+     */
+    foldedTextSql: string;
 }
 
 /** Everything the generators need to render one collection's search column. */
@@ -100,6 +116,12 @@ export interface SearchColumnSpec {
     column: string;
     language: string;
     unaccent: boolean;
+    /**
+     * How the query side matches. Deliberately absent from
+     * {@link SearchColumnSpec.expression} and from every fingerprint: it
+     * describes the WHERE clause, not the column.
+     */
+    mode: SearchMode;
     fields: ResolvedSearchField[];
     /** Body of `GENERATED ALWAYS AS ( … ) STORED` for the tsvector column. */
     expression: string;
@@ -290,7 +312,8 @@ const resolveField = (
 
     const column = columnNameOf(head, prop);
     const field = { column, jsonPath: rest, kind: classified.kind };
-    const textSql = normalize(rawTextSql(field), cfg.unaccent === true);
+    const raw = rawTextSql(field);
+    const textSql = normalize(raw, cfg.unaccent === true);
     const language = cfg.language ?? DEFAULT_SEARCH_LANGUAGE;
 
     return {
@@ -300,7 +323,8 @@ const resolveField = (
         kind: classified.kind,
         weight,
         sql: `setweight(to_tsvector(${quote(language)}, ${textSql}), ${quote(weight)})`,
-        textSql
+        textSql,
+        foldedTextSql: normalize(raw, true)
     };
 };
 
@@ -341,8 +365,14 @@ export const buildSearchColumnSpec = (collection: CollectionConfig): SearchColum
         seen.add(f.path);
     }
 
+    const mode = cfg.mode ?? DEFAULT_SEARCH_MODE;
+
     const extensions: string[] = [];
-    if (cfg.unaccent) extensions.push("unaccent");
+    // `hybrid` folds accents on its substring half whatever `unaccent` says, so
+    // it needs the dictionary and the helper even on a block that never asked
+    // for folding in the stored column. Both statements are idempotent, which
+    // is what keeps turning the mode on out of the column-rebuild business.
+    if (cfg.unaccent || mode === "hybrid") extensions.push("unaccent");
     if (cfg.fuzzy) extensions.push("pg_trgm");
 
     const spec: SearchColumnSpec = {
@@ -351,6 +381,7 @@ export const buildSearchColumnSpec = (collection: CollectionConfig): SearchColum
         column,
         language: cfg.language ?? DEFAULT_SEARCH_LANGUAGE,
         unaccent: cfg.unaccent === true,
+        mode,
         fields,
         expression: fields.map(f => f.sql).join(" || "),
         indexName: toPostgresIdentifier(`${table}_${column}_gin`),
@@ -402,7 +433,7 @@ export const searchHelperFunctions = (spec: SearchColumnSpec): string[] => {
         `    $$ SELECT coalesce(string_agg(v, ' '), '')\n` +
         `       FROM jsonb_array_elements_text(jsonb_path_query_array($1, 'strict $.**?(@.type() == "string")')) AS v $$;`
     ];
-    if (spec.unaccent) {
+    if (spec.unaccent || spec.mode === "hybrid") {
         // The two-argument form with an explicit dictionary is the one that can
         // honestly be called immutable: the single-argument form resolves the
         // dictionary through the current search_path at call time.

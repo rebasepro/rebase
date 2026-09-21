@@ -19,6 +19,15 @@ import { generateForeignKeyName, splitSearchTerms, toWireKey } from "@rebasepro/
  * with the collection's declared threshold and when it would narrow too far.
  */
 const PG_TRGM_WORD_SIMILARITY_DEFAULT = 0.6;
+/**
+ * What a substring-only hit contributes to `_score` under
+ * {@link SearchMode} `"hybrid"`.
+ *
+ * Below the smallest `ts_rank` a real lexeme match can produce (a single
+ * D-weighted hit is 0.1 × 0.0607927 ≈ 0.006), so a row found by the indexed
+ * half always outranks one found only by substring.
+ */
+const HYBRID_SUBSTRING_SCORE = 0.001;
 import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from "../schema/search-column";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
@@ -2315,10 +2324,27 @@ whereConditions };
         const query = DrizzleConditionBuilder.normalizedTsQuery(searchString, spec);
         const exact = sql`${column} @@ ${query}`;
 
-        if (!spec.fuzzy) return exact;
+        // `hybrid`: the indexed whole-lexeme predicate OR a substring match over
+        // the same declared fields. One collection then answers both halves of
+        // what a search box is, which neither branch does on its own —
+        // measured, on the same five rows, in `search-mode-matrix.test.ts`:
+        //
+        //   query   | fts + unaccent    | ILIKE default       | hybrid
+        //   munoz   | Muñoz, Munoz      | Munoz               | Muñoz, Munoz
+        //   seb     | —                 | Sebastian, Sebastián| Sebastian, Sebastián
+        //   audit   | —                 | Lead Auditor        | Lead Auditor
+        //
+        // OR-ed rather than replacing the `@@`: the index still serves the half
+        // it can serve, and the exact half is what carries the ranking.
+        const substring = spec.mode === "hybrid"
+            ? DrizzleConditionBuilder.buildFoldedSubstringCondition(searchString, spec)
+            : undefined;
+        const matched = substring ? sql`(${exact} OR ${substring})` : exact;
+
+        if (!spec.fuzzy) return matched;
 
         const fuzzyColumn = table[spec.fuzzy.column as keyof typeof table] as AnyPgColumn | undefined;
-        if (!fuzzyColumn) return exact;
+        if (!fuzzyColumn) return matched;
 
         const needle = spec.unaccent
             ? sql`${sql.raw(SEARCH_UNACCENT_FN)}(${searchString})`
@@ -2349,7 +2375,77 @@ whereConditions };
             ? sql`(${needle} OPERATOR(public.<%) ${fuzzyColumn} AND ${similar})`
             : similar;
 
-        return sql`(${exact} OR ${fuzzy})`;
+        return sql`(${matched} OR ${fuzzy})`;
+    }
+
+    /**
+     * The substring half of {@link SearchMode} `"hybrid"`: every term found
+     * somewhere in the declared fields, with accents folded on both sides.
+     *
+     * Terms are AND-ed and fields OR-ed, exactly as the ILIKE default does and
+     * for the same reason — a person typing two words means both, and a name
+     * lives in two columns (`splitSearchTerms`). What it does *not* share with
+     * the default is its reach: these are the declared `search.fields`, so it
+     * folds accents, joins `text[]` and walks into JSONB through the same
+     * IMMUTABLE helpers the generated column uses.
+     *
+     * The needle is folded with the same function as the document, so
+     * `munoz` and `Muñoz` meet in the middle rather than one side being
+     * normalized and the other not — the subtle way to build a search that
+     * matches nothing.
+     *
+     * Interpolated as raw SQL because the field expressions are generated (they
+     * name columns and helper functions, which are identifiers, not values);
+     * the *term* is a bind parameter, escaped for LIKE first — see
+     * {@link escapeLikePattern} for what that escape is for.
+     */
+    static buildFoldedSubstringCondition(
+        searchString: string,
+        spec: SearchColumnSpec
+    ): SQL | undefined {
+        if (spec.fields.length === 0) return undefined;
+
+        const perTerm = DrizzleConditionBuilder.foldedNeedles(searchString).map(needle =>
+            DrizzleConditionBuilder.combineConditionsWithOr(
+                spec.fields.map(f => sql`${sql.raw(f.foldedTextSql)} ILIKE ${needle}`)
+            ) as SQL
+        );
+
+        return DrizzleConditionBuilder.combineConditionsWithAnd(perTerm);
+    }
+
+    /**
+     * Whether one text expression holds **any** term of the search string.
+     *
+     * The per-field question, where {@link buildFoldedSubstringCondition} asks
+     * the per-row one: `OR` across terms rather than `AND`, because a two-word
+     * query satisfied across two fields has each field carrying one term. Used
+     * by `_matches` to name the fields that caused a substring hit.
+     */
+    static foldedSubstringOf(searchString: string, text: SQL): SQL {
+        return DrizzleConditionBuilder.combineConditionsWithOr(
+            DrizzleConditionBuilder.foldedNeedles(searchString)
+                .map(needle => sql`${text} ILIKE ${needle}`)
+        ) as SQL;
+    }
+
+    /**
+     * One accent-folded `%term%` bind parameter per search term.
+     *
+     * The needle is folded with the same function as the document, so `munoz`
+     * and `Muñoz` meet in the middle instead of one side being normalized and
+     * the other not — the subtle way to build a search that matches nothing.
+     *
+     * A string with no terms at all is only whitespace, and stays the single
+     * literal pattern it is on the ILIKE path rather than becoming "no rows",
+     * so both paths answer a stray space the same way.
+     */
+    private static foldedNeedles(searchString: string): SQL[] {
+        const terms = splitSearchTerms(searchString);
+        const effective = terms.length > 0 ? terms : [searchString];
+        return effective.map(term =>
+            sql`${sql.raw(SEARCH_UNACCENT_FN)}(${`%${escapeLikePattern(term)}%`})`
+        );
     }
 
     /**
@@ -2409,20 +2505,35 @@ whereConditions };
         // `ord` keeps the author's declared field order in the output, so the
         // most important field they named reads first rather than whichever
         // Postgres aggregated first.
+        //
+        // Two text columns per field under `hybrid`: `txt` is what the tsvector
+        // was built from and what `ts_headline` reads, `folded` is what the
+        // substring half matched. They differ whenever `unaccent` is off, and a
+        // single column would make one of the two halves report the wrong
+        // fields.
         const rows = spec.fields.map((f, i) =>
-            sql`(${i}, ${f.path}, ${sql.raw(f.textSql)})`
+            sql`(${i}, ${f.path}, ${sql.raw(f.textSql)}, ${sql.raw(f.foldedTextSql)})`
         );
+
+        // Which fields a row reports. Under `hybrid` a field that matched only
+        // by substring is reported too — it is the field that caused the hit,
+        // and leaving it out would answer "matched nothing" for the row the
+        // mode exists to find. Its snippet comes back with nothing marked:
+        // `ts_headline` marks lexemes, and half a word is not one.
+        const matchedField = spec.mode === "hybrid"
+            ? sql`(to_tsvector(${config}::regconfig, f.txt) @@ ${query} OR ${DrizzleConditionBuilder.foldedSubstringOf(searchString, sql`f.folded`)})`
+            : sql`to_tsvector(${config}::regconfig, f.txt) @@ ${query}`;
 
         return sql`(
             SELECT coalesce(jsonb_agg(s.m ORDER BY f.ord), '[]'::jsonb)
-            FROM (VALUES ${sql.join(rows, sql`, `)}) AS f(ord, path, txt)
+            FROM (VALUES ${sql.join(rows, sql`, `)}) AS f(ord, path, txt, folded)
             CROSS JOIN LATERAL (
                 SELECT jsonb_build_object(
                     'field', f.path,
                     'snippet', ts_headline(${config}::regconfig, f.txt, ${query},
                         'StartSel=<mark>,StopSel=</mark>,MaxWords=14,MinWords=1,MaxFragments=1,FragmentDelimiter= … ')
                 ) AS m
-                WHERE to_tsvector(${config}::regconfig, f.txt) @@ ${query}
+                WHERE ${matchedField}
             ) s
         )`;
     }
@@ -2446,7 +2557,34 @@ whereConditions };
         const column = table[spec.column as keyof typeof table] as AnyPgColumn | undefined;
         if (!column) return undefined;
 
-        const rank = sql`ts_rank(${column}, ${DrizzleConditionBuilder.normalizedTsQuery(searchString, spec)})`;
+        const base = sql`ts_rank(${column}, ${DrizzleConditionBuilder.normalizedTsQuery(searchString, spec)})`;
+
+        // Under `hybrid`, `ts_rank` alone is not a ranking for the same reason
+        // it is not one under `fuzzy`: it is **zero** for every row the
+        // substring half matched and the `@@` half did not, which is the whole
+        // population of a prefix query like `seb`. Ordering by it would return
+        // those rows in whatever order the table felt like.
+        //
+        // A constant, not a score, because a substring match carries no
+        // measurable strength — `audit` is inside `Auditor` and that is all
+        // there is to know. It sits below any real `ts_rank`: the smallest a
+        // matching `ts_rank` can be is a single D-weighted hit, 0.1 × 0.0607927
+        // ≈ 0.006, so `0.001` keeps every lexeme match above every
+        // substring-only one and leaves the substring-only rows to the
+        // deterministic id tiebreaker the order builder already appends.
+        const rank = spec.mode === "hybrid"
+            ? (() => {
+                const substring = DrizzleConditionBuilder.buildFoldedSubstringCondition(searchString, spec);
+                // A literal, cast, rather than a bind parameter: Postgres infers
+                // a `CASE` branch's type from its siblings, so a bound `0.001`
+                // beside `ELSE 0` is read as an integer and refused
+                // ("invalid input syntax for type integer").
+                return substring
+                    ? sql`(${base} + CASE WHEN ${substring} THEN ${sql.raw(`${HYBRID_SUBSTRING_SCORE}::real`)} ELSE 0 END)`
+                    : base;
+            })()
+            : base;
+
         if (!spec.fuzzy) return rank;
 
         const fuzzyColumn = table[spec.fuzzy.column as keyof typeof table] as AnyPgColumn | undefined;

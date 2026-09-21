@@ -69,6 +69,54 @@ export interface SearchConfig {
     fields: readonly (string | SearchField)[];
 
     /**
+     * How a search string is matched against the indexed fields.
+     *
+     * - `"fts"` (default) — one `@@ websearch_to_tsquery` against the generated
+     *   `tsvector`. Stems, drops stopwords, reaches inside JSONB and arrays,
+     *   uses the GIN index, and ranks. It matches **whole lexemes**, so `seb`
+     *   does not find `sebastian` and `audit` does not find `Auditor`.
+     * - `"hybrid"` — that predicate `OR` a substring match over the same
+     *   declared fields, with accents folded on both sides. So one collection
+     *   gets accent folding *and* substring/prefix matching, which is what a
+     *   search box is: measured on five rows in `search-mode-matrix.test.ts`,
+     *   `munoz` finds `Sebastian Munoz`, `seb` finds both Sebastians, `audit`
+     *   finds the `ISO 14001 Lead Auditor`, and `iso 14001` does **not** drag
+     *   in the `ISO 9001` row the way a loose `fuzzy` threshold does.
+     *
+     * ### Why this is a mode rather than the default
+     *
+     * The substring half cannot use the GIN index — a leading `%` never can —
+     * so it is a scan over the declared fields' text, evaluated per row. The
+     * `@@` half still runs first and still uses the index; what the mode costs
+     * is the rows the index rejected, which the planner has to look at anyway
+     * to apply the `OR`. On a large table that is the difference between an
+     * index scan and a sequential one, and that is the author's call to make
+     * rather than this default's.
+     *
+     * ### Changing this on a live collection
+     *
+     * Safe, and deliberately so. `mode` is **query-side only**: it changes no
+     * generated column, no generation expression and no index, so it does not
+     * trip the boot-time refusal a changed `search` block otherwise gets
+     * (`searchDriftMessage` — rebuilding a STORED generated column rewrites the
+     * table under an ACCESS EXCLUSIVE lock). Turning `"hybrid"` on for a
+     * collection whose column already exists takes a deploy and nothing else.
+     *
+     * The accent folding on the substring half is likewise query-side and
+     * unconditional under `"hybrid"` — it does **not** require
+     * {@link SearchConfig.unaccent}, which is what makes the switch free. What
+     * `unaccent` still buys is folding on the `@@` half, where the lexemes are
+     * stored, and that one *is* a column rebuild.
+     *
+     * It does add the `unaccent` extension and one IMMUTABLE helper function to
+     * the database if they are not there already. Both are `IF NOT EXISTS` /
+     * `CREATE OR REPLACE`, so both are additive and idempotent.
+     *
+     * @default "fts"
+     */
+    mode?: SearchMode;
+
+    /**
      * The Postgres text search configuration, which decides stemming and
      * stopwords. `"spanish"` stems `auditores` to `auditor` and drops `de`;
      * `"simple"` does neither.
@@ -164,6 +212,13 @@ export interface SearchField {
 }
 
 /**
+ * How {@link SearchConfig.mode} matches a search string.
+ *
+ * @group Search
+ */
+export type SearchMode = "fts" | "hybrid";
+
+/**
  * Postgres tsvector weight classes, strongest to weakest.
  *
  * @group Search
@@ -172,6 +227,9 @@ export type SearchWeight = "A" | "B" | "C" | "D";
 
 /** The column name used when {@link SearchConfig.column} is not given. */
 export const DEFAULT_SEARCH_COLUMN = "search_vector";
+
+/** The matching strategy used when {@link SearchConfig.mode} is not given. */
+export const DEFAULT_SEARCH_MODE: SearchMode = "fts";
 
 /** The text search configuration used when {@link SearchConfig.language} is not given. */
 export const DEFAULT_SEARCH_LANGUAGE = "simple";
