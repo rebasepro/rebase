@@ -619,12 +619,14 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
         collection: CollectionConfig;
         junction?: { relation: ResolvedRelation; source: CollectionConfig };
     }>();
+    const junctionShapes = new Map<string, { keys: string; claim: string }>();
     for (const collection of collections) {
         const tableName = getTableName(collection);
         if (tableName) tableEntries.set(tableName, { collection });
-        for (const relation of Object.values(resolveCollectionRelations(collection))) {
+        for (const [relationKey, relation] of Object.entries(resolveCollectionRelations(collection))) {
             if (!isManyToMany(relation)) continue;
             const junctionTable = relation.through.table;
+            assertOneJunctionShape(junctionShapes, junctionTable, collection, relation.relationName ?? relationKey, relation);
             if (tableEntries.has(junctionTable)) continue;
             tableEntries.set(junctionTable, {
                 collection: { table: junctionTable, properties: {} } as CollectionConfig,
@@ -694,6 +696,50 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
         collections,
         options
     };
+}
+
+/**
+ * Refuse two many-to-many relations that resolve to one junction table with
+ * different key columns.
+ *
+ * A default `through` is named after the two tables, so `posts.tags` and
+ * `posts.featuredTags` both resolve to `posts_tags` — one keyed by `tag_id`,
+ * the other by `featured_tag_id`. One table is created, from whichever came
+ * first, so the other relation read and wrote a column that was never there.
+ * The two sides of one link (`posts.tags` and `tags.posts`) share a junction
+ * legitimately, and they name the same two columns — so the comparison is of
+ * the (column, endpoint) pairs, in either order.
+ */
+function assertOneJunctionShape(
+    seen: Map<string, { keys: string; claim: string }>,
+    junctionTable: string,
+    collection: CollectionConfig,
+    relationName: string,
+    relation: ResolvedRelation
+): void {
+    if (!isManyToMany(relation)) return;
+    // A target that does not resolve plans no junction here; `resolveJunctionSpecs` skips it the same way.
+    const target: CollectionConfig | undefined = relation.target();
+    if (!target) return;
+    const sourceTable = getTableName(collection);
+    const targetTable = getTableName(target);
+    const { sourceColumn, targetColumn } = relation.through;
+    const keys = JSON.stringify([[sourceColumn, sourceTable], [targetColumn, targetTable]].sort());
+    const claim = `the relation "${relationName}" of collection "${describe(collection)}" ` +
+        `("${sourceColumn}" → ${sourceTable}, "${targetColumn}" → ${targetTable})`;
+    const first = seen.get(junctionTable);
+    if (!first) {
+        seen.set(junctionTable, { keys, claim });
+        return;
+    }
+    if (first.keys === keys) return;
+    throw new Error(
+        `Two many-to-many relations resolve to the junction table "${junctionTable}" with different key ` +
+        `columns: ${first.claim} and ${claim}. Only one table is created, so one of them would read ` +
+        "and write columns that do not exist. Give the second its own junction — " +
+        `\`through: { table: "${sourceTable}_${toSnakeCase(relationName)}" }\` — or, if both are meant to ` +
+        "be one link, declare it once."
+    );
 }
 
 // ── A collection's table ─────────────────────────────────────────────────────
