@@ -113,7 +113,7 @@ export function MarkdownEditorFieldBinding({
     useEffect(() => {
         getMarkdownUtils().then(() => {
             // Update canonical ref with the proper round-tripped value now that ProseMirror is loaded
-            canonicalRef.current = canonicalizeMarkdown(value);
+            canonicalRef.current = canonicalizeMarkdown(canonicalSourceRef.current);
         });
     }, []);
 
@@ -127,6 +127,9 @@ export function MarkdownEditorFieldBinding({
     );
     // Track it in a ref so the callback always has the latest
     const canonicalRef = useRef(canonicalInitialValue);
+    // The value the canonical form was computed from — what this field was
+    // given, as opposed to what the user has typed into it since.
+    const canonicalSourceRef = useRef<string | null>(value);
 
     const onContentChange = useCallback((content: string) => {
         const normalizedContent = normalizeMarkdown(content);
@@ -135,6 +138,12 @@ export function MarkdownEditorFieldBinding({
         // This eliminates ALL false positives from parse→serialize normalization
         // differences (trailing nodes, bullet chars, whitespace, etc.).
         if (normalizedContent === canonicalRef.current) {
+            // Back to the value this field was given — so the form holds that
+            // value again, verbatim, and not whatever was typed on the way.
+            if (value !== canonicalSourceRef.current) {
+                internalValue.current = canonicalSourceRef.current;
+                setValue(canonicalSourceRef.current);
+            }
             return;
         }
         // Also compare against the current form value to avoid redundant updates
@@ -148,6 +157,7 @@ export function MarkdownEditorFieldBinding({
     useEffect(() => {
         if (internalValue.current !== value) {
             internalValue.current = value;
+            canonicalSourceRef.current = value;
             canonicalRef.current = canonicalizeMarkdown(value);
             setFieldVersion(v => v + 1);
         }
