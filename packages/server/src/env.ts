@@ -48,6 +48,40 @@ function assertUsableSchema(extend: unknown): void {
  */
 const optionalBoolString = z.enum(["true", "false", ""]).optional().transform(v => v === "true");
 
+/** Blank — empty or whitespace only — is unset. */
+function blankIsUnset(value: unknown): unknown {
+    return typeof value === "string" && value.trim() === "" ? undefined : value;
+}
+
+/**
+ * A numeric variable, where a blank value means unset.
+ *
+ * Parsing one as `z.string().default(...).transform(Number)` or
+ * `z.coerce.number()` reads an empty value as `0`: `.default()` fires only for
+ * `undefined`, and `Number("")` and `Number("  ")` are both 0. A compose file
+ * with `PORT=${PORT}` and nothing set, or a `.env` line with a name and no
+ * value, is the ordinary way to declare a variable without setting it — and 0
+ * is not neutral for any of these: a random port, no body limit at all.
+ *
+ * So blank takes `fallback`, and a value that is not a number fails the boot
+ * naming the variable instead of arriving as `NaN`. An explicit `0` is still 0.
+ */
+export function numericEnvVar(name: string, fallback: number) {
+    return z.preprocess(
+        blankIsUnset,
+        z.coerce.number({ message: `${name} must be a number` }).default(fallback)
+    );
+}
+
+/**
+ * The blank-is-unset half of {@link numericEnvVar}, around a variable's own
+ * number schema — for one with no default, where blank and unset are both
+ * `undefined`.
+ */
+export function optionalNumericEnvVar<T extends z.ZodType<number | undefined>>(schema: T) {
+    return z.preprocess(blankIsUnset, schema);
+}
+
 /**
  * Helper to determine if a string is a localhost or loopback address/URL.
  */
@@ -114,7 +148,7 @@ function isLocalhostOrLoopback(value: string): boolean {
  */
 const rebaseEnvSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-    PORT: z.string().default("3001").transform(Number),
+    PORT: numericEnvVar("PORT", 3001),
     DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
     ADMIN_CONNECTION_STRING: z.string().url().optional(),
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters long"),
@@ -154,9 +188,9 @@ const rebaseEnvSchema = z.object({
     ALLOW_LOCALHOST_IN_PRODUCTION: optionalBoolString,
     CORS_ORIGINS: z.string().optional(),
     FRONTEND_URL: z.string().optional(),
-    DB_POOL_MAX: z.string().default("20").transform(Number),
-    DB_POOL_IDLE_TIMEOUT: z.string().default("30000").transform(Number),
-    DB_POOL_CONNECT_TIMEOUT: z.string().default("10000").transform(Number),
+    DB_POOL_MAX: numericEnvVar("DB_POOL_MAX", 20),
+    DB_POOL_IDLE_TIMEOUT: numericEnvVar("DB_POOL_IDLE_TIMEOUT", 30000),
+    DB_POOL_CONNECT_TIMEOUT: numericEnvVar("DB_POOL_CONNECT_TIMEOUT", 10000),
     DATABASE_DIRECT_URL: z.string().url().optional(),
     DATABASE_READ_URL: z.string().url().optional(),
     FORCE_LOCAL_STORAGE: optionalBoolString,
@@ -246,7 +280,6 @@ export function areSecretsEphemeral(input: {
  * export const env = loadEnv({
  *     extend: z.object({
  *         SMTP_HOST: z.string().optional(),
- *         SMTP_PORT: z.string().default("587").transform(Number),
  *         STRIPE_SECRET_KEY: z.string(),
  *     })
  * });

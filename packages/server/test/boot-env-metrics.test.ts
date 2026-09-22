@@ -295,4 +295,50 @@ describe("loadBootEnv", () => {
         process.env.DATABASE_URL = "not-a-url";
         expect(() => loadBootEnv()).toThrow(/DATABASE_URL must be a valid URL/);
     });
+
+    /**
+     * A numeric variable declared with no value is unset, not zero.
+     *
+     * `z.coerce.number()` turns `""` and `"  "` into 0, which passes
+     * `.int().nonnegative()` — and a body limit of 0 is no body limit: the
+     * middleware applies one only when it is positive, so a compose file with
+     * `REBASE_MAX_BODY_SIZE=${MAX_BODY}` and nothing set removed the limit from
+     * every route under /api, the unauthenticated auth routes included.
+     */
+    describe("numeric variables", () => {
+        beforeEach(() => {
+            process.env.NODE_ENV = "production";
+            process.env.JWT_SECRET = "j".repeat(48);
+            process.env.REBASE_SERVICE_KEY = "s".repeat(48);
+            process.env.CORS_ORIGINS = "https://app.example.com";
+            process.env.DATABASE_URL = "postgresql://db.example.com:5432/app";
+        });
+
+        it("reads a blank REBASE_MAX_BODY_SIZE as unset, so the default limit applies", () => {
+            for (const blank of ["", "  "]) {
+                process.env.REBASE_MAX_BODY_SIZE = blank;
+                expect(loadBootEnv().REBASE_MAX_BODY_SIZE).toBeUndefined();
+            }
+        });
+
+        it("keeps an explicit REBASE_MAX_BODY_SIZE=0, the documented way to turn the limit off", () => {
+            process.env.REBASE_MAX_BODY_SIZE = "0";
+            expect(loadBootEnv().REBASE_MAX_BODY_SIZE).toBe(0);
+        });
+
+        it("still refuses a REBASE_MAX_BODY_SIZE that is not a number of bytes", () => {
+            process.env.REBASE_MAX_BODY_SIZE = "10MB";
+            expect(() => loadBootEnv()).toThrow(/REBASE_MAX_BODY_SIZE must be a number of bytes/);
+        });
+
+        it("reads a blank SMTP_PORT as unset, taking 587", () => {
+            process.env.SMTP_PORT = "";
+            expect(loadBootEnv().SMTP_PORT).toBe(587);
+        });
+
+        it("refuses an SMTP_PORT that is not a number, naming it", () => {
+            process.env.SMTP_PORT = "smtp";
+            expect(() => loadBootEnv()).toThrow(/SMTP_PORT must be a number/);
+        });
+    });
 });

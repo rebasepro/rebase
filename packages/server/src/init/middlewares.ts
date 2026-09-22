@@ -71,7 +71,17 @@ export function configureMiddlewares(
     // Request Body Size Limit. It is registered here, before any router is
     // mounted, so the exemption set is read per request: the routes that
     // carry their own limit are mounted later and add themselves to it then.
+    //
+    // Only `0` (or less) turns it off. `NaN` is not greater than zero either, so
+    // a size nobody could interpret — an embedder's `Number(process.env.MAX_BODY)`
+    // with the variable unset — would read as "off" for every route, silently.
+    // It is refused instead.
     const maxBodySize = config.maxBodySize ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
+    if (!Number.isFinite(maxBodySize)) {
+        throw new Error(
+            `maxBodySize must be a number of bytes (e.g. 10485760), or 0 to turn the limit off; got ${maxBodySize}.`
+        );
+    }
     if (maxBodySize > 0) {
         const limitBody = bodyLimit({
             maxSize: maxBodySize,

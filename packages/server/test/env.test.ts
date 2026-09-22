@@ -162,6 +162,60 @@ describe("env configuration and localhost validation", () => {
 });
 
 /**
+ * A numeric variable declared with no value is unset, not zero.
+ *
+ * `z.string().default("3001").transform(Number)` read an empty value as `0`:
+ * `.default()` fires only for `undefined`, and `Number("")` and `Number("  ")`
+ * are both 0. A compose file with `PORT=${PORT}` and nothing set, or a `.env`
+ * line with a name and no value, is the ordinary way to declare a variable
+ * without setting it — and 0 is not neutral for any of these: a production
+ * server listened on a random port.
+ */
+describe("loadEnv numeric variables", () => {
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+        process.env = {
+            DATABASE_URL: "postgresql://localhost:5432/rebase",
+            JWT_SECRET: "super-secret-jwt-key-must-be-long-long-long"
+        };
+    });
+
+    afterEach(() => {
+        process.env = { ...originalEnv };
+    });
+
+    it.each([
+        ["PORT", 3001],
+        ["DB_POOL_MAX", 20],
+        ["DB_POOL_IDLE_TIMEOUT", 30000],
+        ["DB_POOL_CONNECT_TIMEOUT", 10000]
+    ] as const)("reads a blank %s as unset, taking its default", (name, fallback) => {
+        for (const blank of ["", "   "]) {
+            process.env[name] = blank;
+            expect(loadEnv()[name]).toBe(fallback);
+        }
+    });
+
+    it("keeps an explicit PORT=0, which asks the OS for a free port", () => {
+        process.env.PORT = "0";
+        expect(loadEnv().PORT).toBe(0);
+    });
+
+    it("reads a value with surrounding whitespace", () => {
+        process.env.PORT = " 4000 ";
+        expect(loadEnv().PORT).toBe(4000);
+    });
+
+    it("refuses a value that is not a number, naming the variable", () => {
+        // It used to arrive as NaN, which `listen()` refuses much later and
+        // without saying which variable produced it.
+        process.env.DB_POOL_MAX = "twenty";
+        expect(() => loadEnv()).toThrow(/DB_POOL_MAX must be a number/);
+    });
+});
+
+/**
  * A second copy of zod is the difference between a deploy that works and one
  * that comes up, reports success, and runs zero crons.
  *

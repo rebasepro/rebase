@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { loadEnv, type RebaseEnv } from "../env";
+import { loadEnv, numericEnvVar, optionalNumericEnvVar, type RebaseEnv } from "../env";
 import { BundleError } from "./bundle";
 
 /**
@@ -14,7 +14,7 @@ import { BundleError } from "./bundle";
 const bootEnvExtension = z.object({
     // ── Email ────────────────────────────────────────────────────────────────
     SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.string().default("587").transform(Number),
+    SMTP_PORT: numericEnvVar("SMTP_PORT", 587),
     SMTP_SECURE: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
@@ -215,12 +215,15 @@ const bootEnvExtension = z.object({
      * and then fail a `> 0` check — silently removing every body limit from the
      * API. A boot failure naming the variable is the only safe reading of a
      * value nobody can interpret.
+     *
+     * Blank is unset, for the same reason: coerced, `""` is 0, and 0 is the
+     * explicit "no limit" — see {@link numericEnvVar}.
      */
-    REBASE_MAX_BODY_SIZE: z.coerce
+    REBASE_MAX_BODY_SIZE: optionalNumericEnvVar(z.coerce
         .number({ message: "REBASE_MAX_BODY_SIZE must be a number of bytes (e.g. 10485760)" })
         .int()
         .nonnegative()
-        .optional(),
+        .optional()),
     REBASE_COMPRESSION: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     REBASE_HISTORY: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     /** Comma-separated origins allowed to make credentialed cross-origin calls. */
