@@ -126,6 +126,42 @@ function headingSlug(text) {
 const MAX_LINES = 600;
 const LENGTH_EXEMPT = [/\/CHANGELOG\.md$/];
 
+/**
+ * The page with every fenced code block blanked out, line for line.
+ *
+ * Fenced code is a sample, not a link graph: a `[x](/docs/y)` inside one is
+ * being shown, not followed, and a `# comment` inside one is not a heading.
+ *
+ * Line-based, not a regex. The regex this replaces began `^(\s*)`, and `\s`
+ * matches a newline: the "indent" swallowed the blank line above a fence, so
+ * the closing fence had to follow a blank line too, and the match ran past the
+ * real one to the next fence that did — deleting the prose in between. 216
+ * links on 96 pages were never read. Blanking rather than deleting keeps every
+ * finding's line number true.
+ *
+ * A fence closes on a line of the same character, at least as long, and
+ * nothing else — CommonMark's rule, with any indentation so a fence inside a
+ * list item counts.
+ */
+export function withoutFences(text) {
+    const lines = text.split("\n");
+    let fence = null;
+    for (let i = 0; i < lines.length; i++) {
+        const marker = lines[i].match(/^[ \t]*(`{3,}|~{3,})/);
+        if (fence === null) {
+            if (!marker) continue;
+            fence = marker[1];
+            lines[i] = "";
+        } else {
+            const closes = marker && marker[1][0] === fence[0] && marker[1].length >= fence.length &&
+                /^[ \t]*(`+|~+)[ \t]*$/.test(lines[i]);
+            lines[i] = "";
+            if (closes) fence = null;
+        }
+    }
+    return lines.join("\n");
+}
+
 export function checkDocsLinks(root) {
     const files = [...new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))].sort();
 
@@ -133,7 +169,7 @@ export function checkDocsLinks(root) {
     /** @type {Map<string, Set<string>>} */
     const headings = new Map();
     for (const file of files) {
-        const text = readFileSync(path.join(root, file), "utf8");
+        const text = withoutFences(readFileSync(path.join(root, file), "utf8"));
         headings.set(
             routeOf(file),
             new Set([...text.matchAll(/^#{1,6}\s+(.+?)\s*$/gm)].map(m => headingSlug(m[1])))
@@ -145,9 +181,7 @@ export function checkDocsLinks(root) {
 
     for (const file of files) {
         const raw = readFileSync(path.join(root, file), "utf8");
-        // Fenced code is a sample, not a link graph: a `[x](/docs/y)` inside one
-        // is being shown, not followed.
-        const text = raw.replace(/^(\s*)(`{3,}|~{3,})[\s\S]*?\n\1\2\s*$/gm, "");
+        const text = withoutFences(raw);
         let outbound = 0;
 
         for (const m of text.matchAll(/\]\((\/(?:docs|de|es|fr|it|pt)\/[^)\s]*|\/docs[^)\s]*)\)/g)) {
