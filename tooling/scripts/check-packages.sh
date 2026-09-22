@@ -58,8 +58,10 @@ for pkg_dir in "$PACKAGES_DIR"/*/; do
     [ -d "$src_dir" ] || continue
     [ -f "$pkg_json" ] || continue
 
-    # Collect unique @rebasepro/* imports from source (not from test files)
-    imports=$(grep -rh --exclude="*.test.*" --exclude="*.spec.*" 'from "@rebasepro/[a-zA-Z0-9_-]+"' "$src_dir" 2>/dev/null \
+    # Collect unique @rebasepro/* imports from source (not from test files).
+    # -E: in a basic regex `+` is a literal character, so this matched nothing
+    # and the section passed over any tree at all.
+    imports=$(grep -rhE --exclude="*.test.*" --exclude="*.spec.*" 'from "@rebasepro/[a-zA-Z0-9_-]+"' "$src_dir" 2>/dev/null \
         | grep -vE '^\s*(\*|//|/\*)' \
         | grep -oE '@rebasepro/[a-zA-Z0-9_-]+' \
         | sort -u || true)
