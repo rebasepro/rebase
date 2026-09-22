@@ -5,6 +5,7 @@ import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 import { toFindParams } from "./collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
+import { useStableFilterValues } from "./useStableFilterValues";
 import type { AdminCollection } from "@rebasepro/cms-types";
 /**
  * @group Hooks and utilities
@@ -94,8 +95,10 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
     // Map to PostgREST format for orderBy
     const orderByParams: [string, "asc" | "desc"] | undefined = sortBy ? [String(sortBy[0]), sortBy[1]] : undefined;
 
-    // filterValues is already FilterValues — pass directly
-    const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
+    // filterValues is already FilterValues — pass directly. Held by content,
+    // not identity: callers write it inline.
+    const whereParams = useStableFilterValues(
+        filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined);
 
     const [data, setData] = useState<Entity<M>[]>([]);
 
@@ -170,7 +173,7 @@ meta: res.meta });
                 cancelled = true;
             };
         }
-    }, [path, itemCount, offset, page, currentSort, sortByProperty, filterValues, searchString, dataClient, collection]);
+    }, [path, itemCount, offset, page, currentSort, sortByProperty, whereParams, searchString, dataClient, collection]);
 
     return useMemo(() => ({
         data,

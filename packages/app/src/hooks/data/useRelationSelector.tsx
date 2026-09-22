@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
 import { getRelationIncludeParams } from "../../util/previews";
+import { useStableFilterValues } from "./useStableFilterValues";
 import type { AdminCollection } from "@rebasepro/cms-types";
 export interface RelationItem {
     id: string | number;
@@ -83,6 +84,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
 ): RelationSelectorController {
 
     const dataClient = useData();
+    // Held by content, not identity: callers write it inline.
+    const stableFixedFilter = useStableFilterValues(fixedFilter);
 
     const [items, setItems] = useState<RelationItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -161,7 +164,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         setLoading(true);
 
         // fixedFilter is already FilterValues — pass directly
-        const whereParams = fixedFilter && Object.keys(fixedFilter).length > 0 ? fixedFilter : undefined;
+        const whereParams = stableFixedFilter && Object.keys(stableFixedFilter).length > 0 ? stableFixedFilter : undefined;
 
         const onEntitiesUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
             const newItems = res.data.map((e) => entityToRelationItem(e));
@@ -223,7 +226,7 @@ meta: res.meta });
         }
 
         unsubscribeRef.current = unsubscribe || null;
-    }, [dataClient, path, fixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading, includeParams]);
+    }, [dataClient, path, stableFixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading, includeParams]);
 
     // Search function with debouncing
     const search = useCallback((searchString: string) => {
