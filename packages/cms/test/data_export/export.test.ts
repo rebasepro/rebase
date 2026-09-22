@@ -5,7 +5,7 @@ import {
     getEntityCSVExportableData,
     getEntityJsonExportableData
 } from "../../src/data_export/export/export";
-import { Entity, Properties, EntityReference } from "@rebasepro/types";
+import { Entity, Properties, EntityReference, EntityRelation, GeoPoint } from "@rebasepro/types";
 
 describe("Export Utility Functions", () => {
     const mockProperties: Properties = {
@@ -213,6 +213,94 @@ describe("Export Utility Functions", () => {
                     extraJsonField: "data2"
                 }
             ]);
+        });
+    });
+
+    /**
+     * The admin's rows carry an `EntityRelation` for every relation — even one
+     * nobody included, built from the foreign key — and a geopoint is an
+     * object. `toCSVCell` ran `String()` on both, so every such cell in the
+     * file read `[object Object]`.
+     */
+    describe("relations and geopoints", () => {
+        const properties: Properties = {
+            title: { type: "string" },
+            author: { type: "relation", relation: { target: "authors", kind: "belongsTo" } },
+            tags: { type: "relation", relation: { target: "tags", kind: "manyToMany" } },
+            location: { type: "geopoint" }
+        };
+        const entities: Entity<any>[] = [{
+            id: 1,
+            path: "posts",
+            values: {
+                title: "A",
+                author: new EntityRelation(7, "authors"),
+                tags: [
+                    new EntityRelation(3, "tags", { id: 3, path: "tags", values: { name: "x" } }),
+                    new EntityRelation("t-4", "tags")
+                ],
+                location: new GeoPoint(41.9, 12.5)
+            }
+        }, {
+            id: 2,
+            path: "posts",
+            values: {
+                title: "B",
+                author: null,
+                tags: [],
+                location: { latitude: -33.9, longitude: 18.4 }
+            }
+        }];
+        const headers = ["id", "title", "author", "tags", "location"].map(key => ({ key, label: key }));
+
+        test("a CSV export writes a relation as its id and a geopoint as JSON", () => {
+            const rows = getEntityCSVExportableData(entities, undefined, properties, headers, "string");
+            const csv = rows.map(row => entryToCSVRow(row)).join("");
+
+            expect(csv).not.toContain("[object Object]");
+            expect(csv).toEqual(
+                "\"1\",\"A\",\"7\",\"[3,\"\"t-4\"\"]\",\"{\"\"latitude\"\":41.9,\"\"longitude\"\":12.5}\"\r\n"
+                + "\"2\",\"B\",,\"[]\",\"{\"\"latitude\"\":-33.9,\"\"longitude\"\":18.4}\"\r\n");
+        });
+
+        test("a flattened CSV export writes one id per relation column", () => {
+            const flatHeaders = [
+                { key: "tags[0]", label: "tags[0]" },
+                { key: "tags[1]", label: "tags[1]" }
+            ];
+            expect(getEntityCSVExportableData(entities, undefined, properties, flatHeaders, "string"))
+                .toEqual([[3, "t-4"], [undefined, undefined]]);
+        });
+
+        test("a JSON export writes a relation as its id", () => {
+            const [first] = getEntityJsonExportableData(entities, undefined, properties, "string");
+
+            expect(first).toEqual({
+                id: 1,
+                title: "A",
+                author: 7,
+                tags: [3, "t-4"],
+                location: { latitude: 41.9, longitude: 12.5 }
+            });
+        });
+
+        test("a relation that arrived as its bare foreign key is exported as it is", () => {
+            const bare: Entity<any>[] = [{ id: 1, path: "posts", values: { author: 7, tags: [3] } }];
+            expect(getEntityJsonExportableData(bare, undefined, properties, "string"))
+                .toEqual([{ id: 1, author: 7, tags: [3] }]);
+        });
+
+        test("a relation nested in an array property is exported as its id", () => {
+            const arrayOfRelations: Properties = {
+                tags: { type: "array", of: { type: "relation", relation: { target: "tags", kind: "manyToMany" } } }
+            };
+            const rows: Entity<any>[] = [{ id: 1, path: "posts", values: { tags: [new EntityRelation(3, "tags")] } }];
+            expect(getEntityJsonExportableData(rows, undefined, arrayOfRelations, "string"))
+                .toEqual([{ id: 1, tags: [3] }]);
+        });
+
+        test("an object in a cell of no declared type is written as JSON, not [object Object]", () => {
+            expect(entryToCSVRow([{ a: 1 }])).toEqual("\"{\"\"a\"\":1}\"\r\n");
         });
     });
 

@@ -1,4 +1,4 @@
-import { Entity, EntityReference, Properties, Property } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation, Properties, Property } from "@rebasepro/types";
 import { type ArrayValuesCount, getArrayValuesCount, getValueInPath } from "@rebasepro/utils";
 
 interface Header {
@@ -172,6 +172,22 @@ function toExportableDate(inputValue: unknown): Date | undefined {
     return undefined;
 }
 
+/**
+ * The id a relation value points at, for a relation property's value — an
+ * `EntityRelation`, or the same thing still in its `{ __type: "relation" }`
+ * wire form. `undefined` for anything else, so a bare foreign key passes
+ * through as the id it already is.
+ */
+function relationIdForExport(value: unknown): string | number | undefined {
+    if (value instanceof EntityRelation) return value.id;
+    if (typeof value === "object" && value !== null
+        && "__type" in value && value.__type === "relation"
+        && "id" in value && (typeof value.id === "string" || typeof value.id === "number")) {
+        return value.id;
+    }
+    return undefined;
+}
+
 function processValueForExport(inputValue: unknown,
     property: Property,
     exportType: "csv" | "json",
@@ -179,7 +195,14 @@ function processValueForExport(inputValue: unknown,
 ): unknown {
 
     let value: unknown;
-    if (property.type === "map" && property.properties) {
+    if (property.type === "relation") {
+        // A relation is exported as the id it points at — what the import
+        // writes back — rather than the view-model object the admin holds,
+        // which a CSV cell printed as `[object Object]`. To-many relations
+        // are arrays of them.
+        const toId = (item: unknown) => relationIdForExport(item) ?? item;
+        value = Array.isArray(inputValue) ? inputValue.map(toId) : toId(inputValue);
+    } else if (property.type === "map" && property.properties) {
         value = processValuesForExport(inputValue as Record<string, unknown>, property.properties as Properties, exportType, dateExportType);
     } else if (property.type === "array") {
         if (property.of && Array.isArray(inputValue)) {
@@ -263,7 +286,12 @@ export function escapeCsvFormula(value: string): string {
 
 function toCSVCell(v: unknown): string {
     if (v === null || v === undefined) return "";
-    const s = Array.isArray(v) ? JSON.stringify(v) : String(v);
+    // An array or object (a geopoint, a value no property declares) is written
+    // as its JSON: `String()` of an object is `[object Object]`. Date
+    // properties are normalised before they get here.
+    const s = Array.isArray(v) || (typeof v === "object" && !(v instanceof Date))
+        ? JSON.stringify(v)
+        : String(v);
     return "\"" + escapeCsvFormula(s).replaceAll("\"", "\"\"") + "\"";
 }
 
