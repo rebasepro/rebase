@@ -44,6 +44,45 @@ describe("rls-enabled-not-forced", () => {
         expect(f.detail).toContain("a superuser");
     });
 
+    // Postgres exempts from non-forced RLS every role that has the owner's
+    // privileges, not only the owner: `object_ownercheck` asks
+    // `has_privs_of_role`. A NOLOGIN owner is therefore only harmless when
+    // nothing that logs in, and nothing a caller arrives as, is a member of it.
+    it("is `high` when the owner cannot log in but a login role is a member of it", () => {
+        const [f] = rlsEnabledNotForced.run(
+            owned("app_owner", [role("app_owner"), role("app", { canLogin: true, memberOf: ["app_owner"] })])
+        );
+
+        expect(f.severity).toBe("high");
+        expect(f.detail).toContain("but app can");
+        expect(f.impact).not.toContain("No caller bypasses policies");
+    });
+
+    it("is `critical` when a role callers arrive as is a member of the owner", () => {
+        const [f] = rlsEnabledNotForced.run(
+            owned("app_owner", [role("app_owner"), role("anon", { memberOf: ["app_owner"] }), role("authenticated")])
+        );
+
+        expect(f.severity).toBe("critical");
+        expect(f.impact).toContain("anon");
+        expect(f.fix).toContain('REVOKE "app_owner" FROM "anon";');
+    });
+
+    it("is `critical` when a role callers arrive as owns the table", () => {
+        const [f] = rlsEnabledNotForced.run(owned("anon", [role("anon"), role("authenticated")]));
+
+        expect(f.severity).toBe("critical");
+        expect(f.fix).toBe('ALTER TABLE "public"."orders" FORCE ROW LEVEL SECURITY;');
+    });
+
+    it("stays `medium` when the only members of a NOLOGIN owner cannot log in either", () => {
+        const [f] = rlsEnabledNotForced.run(
+            owned("app_owner", [role("app_owner"), role("migrator", { memberOf: ["app_owner"] })])
+        );
+
+        expect(f.severity).toBe("medium");
+    });
+
     it("does NOT flag a table with FORCE set", () => {
         const findings = rlsEnabledNotForced.run(
             snapshot({
