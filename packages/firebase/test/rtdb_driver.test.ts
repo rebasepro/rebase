@@ -57,6 +57,9 @@ function renderDriver(firebaseApp: FirebaseApp): DataDriver {
 
 const driver = renderDriver(app);
 
+/** Let the client raise the events a local write or a new listener queued. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 /** Seed a whole node, so the local view of it is complete. */
 function seed(path: string, value: Record<string, unknown>): void {
     set(ref(database, path), value).catch(() => undefined);
@@ -120,6 +123,59 @@ describe("useFirebaseRTDBDelegate", () => {
             expect(typeof saved.id).toBe("string");
             expect(await driver.fetchOne({ path: "created_users", id: String(saved.id) }))
                 .toEqual({ id: saved.id, name: "zoe" });
+        });
+
+    });
+
+    describe("reads", () => {
+
+        const people = {
+            a1: { name: "zed", age: 50 },
+            b2: { name: "amy", age: 10 },
+            c3: { name: "bob", age: 30 },
+            d4: { name: "cat", age: 20 }
+        };
+
+        it("an ordered read comes back in that order", async () => {
+            seed("people_ordered", people);
+
+            const rows = await driver.fetchCollection({ path: "people_ordered", orderBy: "age" });
+
+            // In key order — how the plain object `val()` lists them — this was
+            // a1, b2, c3, d4.
+            expect(rows.map((row) => `${row.id}:${row.age}`)).toEqual(["b2:10", "d4:20", "c3:30", "a1:50"]);
+        });
+
+        it("a page of an ordered read is that page of the order", async () => {
+            seed("people_paged", people);
+
+            const rows = await driver.fetchCollection({
+                path: "people_paged",
+                orderBy: "age",
+                limit: 2,
+                offset: 2
+            });
+
+            expect(rows.map((row) => `${row.id}:${row.age}`)).toEqual(["c3:30", "a1:50"]);
+        });
+
+        it("a live page of an ordered read is that page of the order", async () => {
+            seed("people_live", people);
+            const { listenCollection } = driver;
+            if (!listenCollection) throw new Error("the delegate cannot listen");
+
+            const updates: Record<string, unknown>[][] = [];
+            const unsubscribe = listenCollection({
+                path: "people_live",
+                orderBy: "age",
+                limit: 2,
+                offset: 2,
+                onUpdate: (rows) => updates.push(rows)
+            });
+            await settle();
+            unsubscribe();
+
+            expect(updates.at(-1)?.map((row) => `${row.id}:${row.age}`)).toEqual(["c3:30", "a1:50"]);
         });
 
     });

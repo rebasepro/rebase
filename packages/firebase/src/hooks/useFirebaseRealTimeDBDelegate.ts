@@ -1,6 +1,7 @@
 import { FirebaseApp } from "firebase/app";
 import {
     Database,
+    DataSnapshot,
     endAt,
     equalTo,
     get,
@@ -177,6 +178,26 @@ function rtdbConstraints(plan: RTDBQueryPlan): QueryConstraint[] {
     return constraints;
 }
 
+/**
+ * The rows of a query result, in the query's order, with the first `skip` dropped.
+ *
+ * `snapshot.val()` is a plain object, and an object's keys come back in key
+ * order (integer-like keys first), not in the order the query sorted the
+ * children. Read that way, `orderBy` was lost and an offset page dropped rows
+ * by key rather than by position — page two of a list ordered by `age` held
+ * whichever rows sorted last by id. `forEach` walks the children in query order.
+ */
+function rowsFromSnapshot(snapshot: DataSnapshot, skip: number): Record<string, unknown>[] {
+    const rows: Record<string, unknown>[] = [];
+    snapshot.forEach((child) => {
+        rows.push({
+            ...(delegateToCMSModel(child.val()) as Record<string, unknown>),
+            id: child.key
+        });
+    });
+    return rows.slice(skip);
+}
+
 export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: FirebaseApp }): DataDriver {
 
     const fetchCollection = useCallback(async <M extends Record<string, any>>(
@@ -192,14 +213,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         const plan = planRTDBQuery(props);
         const dbQuery = query(ref(database, props.path), ...rtdbConstraints(plan));
 
-        const entity = await get(dbQuery);
-        if (entity.exists()) {
-            return Object.entries(entity.val()).slice(plan.skip ?? 0).map(([id, values]) => ({
-                ...(delegateToCMSModel(values) as Record<string, unknown>),
-                id
-            }));
-        }
-        return [];
+        return rowsFromSnapshot(await get(dbQuery), plan.skip ?? 0);
     }, [firebaseApp]);
 
     const listenCollection = useCallback(<M extends Record<string, any>>(
@@ -219,17 +233,9 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         // regardless of what the subscription asked for.
         const plan = planRTDBQuery(props);
         const dbQuery = query(ref(database, props.path), ...rtdbConstraints(plan));
-        const unsubscribe = onValue(dbQuery, (entity) => {
-            if (entity.exists()) {
-                const result: Record<string, unknown>[] = Object.entries(entity.val()).slice(plan.skip ?? 0).map(([id, values]) => ({
-                    ...(delegateToCMSModel(values) as Record<string, unknown>),
-                    id
-                }));
-                onUpdate(result);
-            } else {
-                onUpdate([]);
-            }
-        }, (error) => onError?.(error));
+        const unsubscribe = onValue(dbQuery,
+            (entity) => onUpdate(rowsFromSnapshot(entity, plan.skip ?? 0)),
+            (error) => onError?.(error));
 
         return () => unsubscribe();
     }, [firebaseApp]);
