@@ -15,7 +15,6 @@
  */
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, type Db } from "mongodb";
-import { Hono } from "hono";
 import { MongoAuthRepository } from "../src/auth/services";
 import { ensureAuthCollectionsExist } from "../src/auth/ensure-collections";
 // From the files themselves, so the router signs with the same module
@@ -23,7 +22,6 @@ import { ensureAuthCollectionsExist } from "../src/auth/ensure-collections";
 import { configureJwt, generateAccessToken } from "../../server/src/auth/jwt";
 import { createAuthRoutes } from "../../server/src/auth/routes";
 import { createAdminUsersRoute } from "../../server/src/auth/admin-users-route";
-import { errorHandler } from "../../server/src/api/errors";
 
 const PASSWORD = "Str0ng-Passw0rd!";
 
@@ -49,16 +47,19 @@ beforeEach(async () => {
     await ensureAuthCollectionsExist(db);
 });
 
+/** The two routers as a backend mounts them, each with its own error handler. */
 function app(repo: MongoAuthRepository) {
-    const root = new Hono();
-    root.onError(errorHandler);
-    root.route("/auth", createAuthRoutes({ authRepo: repo, allowRegistration: true, allowAnonymous: true }));
-    root.route("/admin", createAdminUsersRoute({ authRepo: repo }));
-    return root;
+    return {
+        auth: createAuthRoutes({ authRepo: repo, allowRegistration: true, allowAnonymous: true }),
+        admin: createAdminUsersRoute({ authRepo: repo })
+    };
 }
+type App = ReturnType<typeof app>;
 
-const send = (root: Hono, method: string, path: string, body?: unknown, token?: string) =>
-    Promise.resolve(root.request(path, {
+const send = (root: App, method: string, path: string, body?: unknown, token?: string) => {
+    const [, mount, ...rest] = path.split("/");
+    const router = mount === "auth" ? root.auth : root.admin;
+    return Promise.resolve(router.request(`/${rest.join("/")}`, {
         method,
         headers: {
             "Content-Type": "application/json",
@@ -66,6 +67,7 @@ const send = (root: Hono, method: string, path: string, body?: unknown, token?: 
         },
         body: body === undefined ? undefined : JSON.stringify(body)
     }));
+};
 
 const claimsOf = (jwt: string) => JSON.parse(Buffer.from(jwt.split(".")[1], "base64url").toString("utf8"));
 
