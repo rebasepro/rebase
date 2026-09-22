@@ -20,8 +20,7 @@ jest.mock("@rebasepro/app", () => {
         useRebaseContext: () => ({}),
         useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] }),
         useAuthController: () => ({ user: { uid: "u1" } }),
-        useSnackbarController: () => ({ open: () => undefined }),
-        useTranslation: () => ({ t: (key: string) => key })
+        useSnackbarController: () => ({ open: () => undefined })
     };
     return new Proxy({}, {
         get: (_t, key: string | symbol) =>
@@ -31,7 +30,7 @@ jest.mock("@rebasepro/app", () => {
     });
 });
 
-import { AuthControllerContext, CustomizationControllerContext } from "@rebasepro/app";
+import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 
 /**
@@ -73,7 +72,7 @@ function entityOf(values: Post): Entity<Post> {
  * only captures the form's context; without it the real fields render, which
  * needs the two controllers they read.
  */
-function formFor(values: Post, onSubmit: EntityFormProps<Post>["onSubmit"], withBuilder = true) {
+function formFor(values: Post, onSubmit: EntityFormProps<Post>["onSubmit"], withBuilder = true, locale = "en") {
     const form = <EntityForm<Post>
         path="posts"
         entityId="1"
@@ -85,12 +84,14 @@ function formFor(values: Post, onSubmit: EntityFormProps<Post>["onSubmit"], with
         onSubmit={onSubmit}
         computedInitialValues={values}/>;
     if (withBuilder) return form;
-    return <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
-        <CustomizationControllerContext.Provider
-            value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
-            {form}
-        </CustomizationControllerContext.Provider>
-    </AuthControllerContext.Provider>;
+    return <RebaseI18nProvider locale={locale}>
+        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <CustomizationControllerContext.Provider
+                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                {form}
+            </CustomizationControllerContext.Provider>
+        </AuthControllerContext.Provider>
+    </RebaseI18nProvider>;
 }
 
 function recordingSubmit(stored: () => Post) {
@@ -180,7 +181,7 @@ describe("EntityForm: a record changed elsewhere while the form is open", () => 
         expect(context.formex.canUndo).toBe(false);
     });
 
-    it("a field edited here and elsewhere keeps the edit and says it was updated elsewhere", async () => {
+    it("a field edited here and elsewhere keeps the edit and says it was updated elsewhere, translated", async () => {
         const v1: Post = { title: "T", price: 10 };
         const v2: Post = { title: "T", price: 20 };
         let stored = v1;
@@ -204,6 +205,21 @@ describe("EntityForm: a record changed elsewhere while the form is open", () => 
         });
         expect(payloads).toEqual([{ price: 15 }]);
         expect(screen.queryByText("This value has been updated elsewhere")).toBeNull();
+    });
+
+    it("says it in the reader's language", async () => {
+        const v1: Post = { title: "T", price: 10 };
+        const v2: Post = { title: "T", price: 20 };
+        const { onSubmit } = recordingSubmit(() => v2);
+        const view = render(formFor(v1, onSubmit, false, "it"));
+
+        await act(async () => {
+            context.setFieldValue("price", 15);
+        });
+        await act(async () => {
+            view.rerender(formFor(v2, onSubmit, false, "it"));
+        });
+        expect(screen.getByText("Questo valore è stato aggiornato altrove")).toBeTruthy();
     });
 
     it("an autosave sends only what was edited here", async () => {

@@ -35,6 +35,7 @@ jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => ({ marker: "context" }),
     useAuthController: () => ({ user: undefined }),
     useCustomizationController: () => ({ propertyConfigs: {}, plugins: [] }),
+    useTranslation: () => ({ t: (key: string) => key }),
     resolveComponentRef: (ref: unknown) => ref,
     isDisabled: () => false,
     isHidden: () => false,

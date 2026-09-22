@@ -15,7 +15,7 @@ import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 
 import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
-import { useAuthController, useCustomizationController, useRebaseContext, useSlot } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useRebaseContext, useSlot, useTranslation } from "@rebasepro/app";
 import { Typography } from "@rebasepro/ui";
 import { getFieldConfig, getFieldId } from "../components/field_configs";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -210,6 +210,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
  }) {
 
     const { plugins } = useCustomizationController();
+    const { t } = useTranslation();
 
     // This is the one component every form field goes through, which is why the
     // two field slots render here rather than in each field binding: a slot
@@ -294,7 +295,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
 
             {underlyingValueHasChanged && !isSubmitting &&
                 <Typography variant={"caption"} className={"ml-3.5"}>
-                    This value has been updated elsewhere
+                    {t("value_updated_elsewhere")}
                 </Typography>}
 
         </ErrorBoundary>);
