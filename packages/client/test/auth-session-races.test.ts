@@ -452,3 +452,100 @@ describe("two tabs sharing one persisted session", () => {
         expect(stored(shared)).toBeNull();
     });
 });
+
+describe("a refresh that cannot reach the server", () => {
+    it("keeps a session restored on load when the backend is unreachable", async () => {
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        const fetchMock: typeof fetch = async () => { throw new TypeError("Failed to fetch"); };
+        // Opened offline, with an access token that expired overnight.
+        const storage = storageHolding(storedSession(1, "u1", -60_000));
+        const transport = createTransport({ baseUrl: "http://api.test", fetch: fetchMock });
+        const auth = createAuth(transport, { storage });
+        const events: AuthChangeEvent[] = [];
+        auth.onAuthStateChange((event) => { events.push(event); });
+
+        await auth.isInitialized();
+
+        // The refresh token was never refused — it was never delivered.
+        expect(auth.getSession()?.user.uid).toBe("u1");
+        expect(auth.getSession()?.refreshToken).toBe("R1");
+        expect(stored(storage)?.refreshToken).toBe("R1");
+        expect(transport.getHeaders().Authorization).toBe("Bearer a1");
+        expect(events).toEqual([]);
+    });
+
+    it("refreshes a session kept on load once the backend answers", async () => {
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        let reachable = false;
+        const fetchMock: typeof fetch = async (input) => {
+            if (!reachable) throw new TypeError("Failed to fetch");
+            return path(input).endsWith("/auth/refresh") ? tokenResponse(2) : jsonResponse({});
+        };
+        const storage = storageHolding(storedSession(1, "u1", -60_000));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: fetchMock }), { storage });
+        await auth.isInitialized();
+
+        reachable = true;
+        jest.advanceTimersByTime(1_000);
+        await flush();
+
+        expect(auth.getSession()?.refreshToken).toBe("R2");
+        expect(stored(storage)?.refreshToken).toBe("R2");
+    });
+
+    it("still drops a session restored on load whose refresh token is refused", async () => {
+        const fetchMock: typeof fetch = async () => errorResponse(401, "INVALID_TOKEN");
+        const storage = storageHolding(storedSession(1, "u1", -60_000));
+        const transport = createTransport({ baseUrl: "http://api.test", fetch: fetchMock });
+        const auth = createAuth(transport, { storage });
+
+        await auth.isInitialized();
+
+        expect(auth.getSession()).toBeNull();
+        expect(stored(storage)).toBeNull();
+        expect(transport.getHeaders().Authorization).toBeUndefined();
+    });
+
+    it("keeps the session when scheduled refreshes run out of retries on an unreachable backend", async () => {
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        let refreshCalls = 0;
+        const fetchMock: typeof fetch = async () => {
+            refreshCalls++;
+            return errorResponse(503, "UNAVAILABLE");
+        };
+        const storage = storageHolding(storedSession(1, "u1", 60_000));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: fetchMock }), { storage });
+        const events: AuthChangeEvent[] = [];
+        auth.onAuthStateChange((event) => { events.push(event); });
+
+        for (let i = 0; i < 20; i++) {
+            jest.advanceTimersByTime(60_000);
+            await flush();
+        }
+
+        // The first attempt and five retries — then it stops asking…
+        expect(refreshCalls).toBe(6);
+        // …without deciding the user is signed out.
+        expect(events).toEqual([]);
+        expect(auth.getSession()?.refreshToken).toBe("R1");
+        expect(stored(storage)?.refreshToken).toBe("R1");
+    });
+
+    it("still signs out when the server keeps refusing the token as already used", async () => {
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        const fetchMock: typeof fetch = async () => errorResponse(401, "TOKEN_ALREADY_USED");
+        const storage = storageHolding(storedSession(1, "u1", 60_000));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: fetchMock }), { storage });
+        const events: AuthChangeEvent[] = [];
+        auth.onAuthStateChange((event) => { events.push(event); });
+
+        for (let i = 0; i < 20; i++) {
+            jest.advanceTimersByTime(60_000);
+            await flush();
+        }
+
+        expect(events).toEqual(["SIGNED_OUT"]);
+        expect(auth.getSession()).toBeNull();
+        expect(stored(storage)).toBeNull();
+    });
+});

@@ -96,7 +96,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      */
     const MAX_TIMER_DELAY_MS = 2_147_483_647;
     // Auto-refresh resilience: retry transient failures with exponential backoff
-    // (1s, 2s, 4s, … capped) before giving up and signing out.
+    // (1s, 2s, 4s, … capped) before giving up.
     const MAX_REFRESH_RETRIES = 5;
     const REFRESH_RETRY_BASE_MS = 1000;
     const REFRESH_RETRY_MAX_MS = 30000;
@@ -215,8 +215,13 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * another sign-in — and deleting it signed that tab out on its next load.
      */
     function abandonSessionLocally() {
+        endSession(storageHoldsCurrentSession());
+    }
+
+    /** Whether storage holds this client's session — or no session at all. */
+    function storageHoldsCurrentSession(): boolean {
         const persisted = loadStoredSession();
-        endSession(!persisted || !currentSession || persisted.refreshToken === currentSession.refreshToken);
+        return !persisted || !currentSession || persisted.refreshToken === currentSession.refreshToken;
     }
 
     /** Drop the session from memory, storage and the transport, and say so. */
@@ -289,13 +294,25 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
                 return;
             }
             if (attempt >= MAX_REFRESH_RETRIES) {
-                abandonSessionLocally();
+                // Out of retries. A token the server kept refusing — as
+                // already used, the one refusal retried at all — is as dead as
+                // one it rejected outright. A server that could not be reached,
+                // or kept failing, has said nothing about the token: the
+                // session stays, and the next request it refuses tries again.
+                if (err instanceof RebaseApiError && (err.status === 401 || err.status === 403)) {
+                    abandonSessionLocally();
+                }
                 return;
             }
             // Transient failure — back off and retry rather than dropping the session.
-            const backoff = Math.min(REFRESH_RETRY_BASE_MS * 2 ** attempt, REFRESH_RETRY_MAX_MS);
-            refreshTimeout = setTimeout(() => { void attemptScheduledRefresh(attempt + 1); }, backoff);
+            scheduleRetry(attempt);
         }
+    }
+
+    /** Try the scheduled refresh again after a backoff: 1s, 2s, 4s, … capped. */
+    function scheduleRetry(attempt: number) {
+        const backoff = Math.min(REFRESH_RETRY_BASE_MS * 2 ** attempt, REFRESH_RETRY_MAX_MS);
+        refreshTimeout = setTimeout(() => { void attemptScheduledRefresh(attempt + 1); }, backoff);
     }
 
     function scheduleRefresh(expiresAt: number) {
@@ -1114,12 +1131,28 @@ refreshToken: session.refreshToken };
                 resolveInitialized!();
             } else if (authFlowMode === "cookie" || stored.refreshToken) {
                 currentSession = stored;
+                const epoch = sessionEpoch;
                 refreshSession().then(() => {
                     resolveInitialized!();
-                }).catch(() => {
-                    currentSession = null;
-                    clearStoredSession();
-                    transport.setToken(null);
+                }).catch((err: unknown) => {
+                    if (epoch === sessionEpoch && currentSession) {
+                        if (isFatalRefreshError(err)) {
+                            // The refresh token itself was refused: there is no
+                            // session to restore.
+                            if (storageHoldsCurrentSession()) clearStoredSession();
+                            currentSession = null;
+                            transport.setToken(null);
+                        } else {
+                            // Offline, or the backend restarting. The refresh
+                            // token was never refused, only not delivered, and
+                            // deleting it here signed out every app opened
+                            // without a connection — while a running app, on
+                            // the very same error, keeps its session. Keep it
+                            // here too, and try again on the backoff schedule.
+                            transport.setToken(currentSession.accessToken);
+                            if (autoRefresh) scheduleRetry(0);
+                        }
+                    }
                     resolveInitialized!();
                 });
             } else {
