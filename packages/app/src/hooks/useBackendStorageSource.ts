@@ -8,9 +8,20 @@ import {
     UploadFileProps,
     UploadFileResult,
     DownloadConfig,
-    StorageListResult
+    DownloadMetadata,
+    StorageListResult,
+    isPublicStoragePath
 } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
+
+/**
+ * A storage key as it goes into a URL path: each segment encoded, the `/`
+ * between them kept. A raw key with `#`, `?` or `%` in it cut the URL short or
+ * made the server's decode throw.
+ */
+function encodeStorageKey(key: string): string {
+    return key.split("/").map(encodeURIComponent).join("/");
+}
 
 export interface BackendStorageSourceProps {
     /**
@@ -51,8 +62,9 @@ export function useBackendStorageSource({
 
     const storageBasePath = `${apiUrl.replace(/\/+$/, "")}${apiPath}/storage`;
 
-    // Cache for download URLs to avoid redundant API calls
-    const urlsCache = useMemo(() => new Map<string, DownloadConfig>(), []);
+    // Cache for download URLs to avoid redundant API calls. A private file's
+    // URL carries a download token that expires, and the entry with it.
+    const urlsCache = useMemo(() => new Map<string, { config: DownloadConfig; expiresAt?: number }>(), []);
 
     /**
      * Make an authenticated request to the storage API
@@ -126,8 +138,8 @@ export function useBackendStorageSource({
         // Check cache first
         const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
         const cached = urlsCache.get(cacheKey);
-        if (cached) {
-            return cached;
+        if (cached && (cached.expiresAt === undefined || cached.expiresAt > Date.now())) {
+            return cached.config;
         }
 
         // Build the file path for the API
@@ -149,7 +161,16 @@ export function useBackendStorageSource({
 fileNotFound: true };
         }
 
-        const response = await fetchWithAuth(`${storageBasePath}/metadata/${filePath}`);
+        const fileUrl = `${storageBasePath}/file/${encodeStorageKey(filePath)}`;
+
+        // A public file is served token-less at a permanent URL.
+        if (isPublicStoragePath(filePath)) {
+            const publicConfig: DownloadConfig = { url: fileUrl };
+            urlsCache.set(cacheKey, { config: publicConfig });
+            return publicConfig;
+        }
+
+        const response = await fetchWithAuth(`${storageBasePath}/metadata/${encodeStorageKey(filePath)}`);
 
         if (response.status === 404) {
             return {
@@ -163,19 +184,31 @@ fileNotFound: true };
             throw new Error(error.error || "Failed to get download URL");
         }
 
-        const result = await response.json();
+        const result: { data: DownloadMetadata } = await response.json();
 
-        const token = await getAuthToken();
-        const tokenQuery = token ? `?token=${token}` : "";
+        if (result.data.public) {
+            const publicConfig: DownloadConfig = { url: fileUrl, metadata: result.data };
+            urlsCache.set(cacheKey, { config: publicConfig });
+            return publicConfig;
+        }
 
-        // The URL should point to the storage file endpoint
+        // A private file is read with the short-lived download token the
+        // metadata call minted for this one path. Never the session's access
+        // token: the file route refuses it, and a URL is no place for a
+        // full-privilege credential — it lands in `<img src>` and access logs.
+        const scopedToken = result.data.token;
         const downloadConfig: DownloadConfig = {
-            url: `${storageBasePath}/file/${filePath}${tokenQuery}`,
+            url: scopedToken ? `${fileUrl}?token=${encodeURIComponent(scopedToken)}` : fileUrl,
             metadata: result.data
         };
 
-        // Cache the result
-        urlsCache.set(cacheKey, downloadConfig);
+        urlsCache.set(cacheKey, {
+            config: downloadConfig,
+            // Ten seconds early, so a URL handed out is still good when used.
+            expiresAt: result.data.tokenExpiresIn
+                ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000
+                : undefined
+        });
 
         return downloadConfig;
     }, [fetchWithAuth, storageBasePath, urlsCache]);
@@ -187,23 +220,14 @@ fileNotFound: true };
         key: string,
         bucket?: string
     ): Promise<File | null> => {
-        let filePath = key;
-
-        // Handle protocol URLs
-        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
-            const withoutProtocol = filePath.substring(filePath.indexOf("://") + 3);
-            filePath = withoutProtocol;
-        }
-
-        if (bucket && filePath && !filePath.startsWith(bucket)) {
-            filePath = `${bucket}/${filePath}`;
-        }
-
-        if (!filePath || filePath.trim() === "" || filePath === "/") {
+        const downloadConfig = await getSignedUrl(key, bucket);
+        if (downloadConfig.fileNotFound || !downloadConfig.url) {
             return null;
         }
 
-        const response = await fetchWithAuth(`${storageBasePath}/file/${filePath}`);
+        // The URL carries its own scoped token. No Authorization header: the
+        // file route refuses the session's access token.
+        const response = await fetch(downloadConfig.url);
 
         if (response.status === 404) {
             return null;
@@ -214,9 +238,9 @@ fileNotFound: true };
         }
 
         const blob = await response.blob();
-        const fileName = filePath.split("/").pop() || "file";
+        const fileName = (bucket ? `${bucket}/${key}` : key).split("/").pop() || "file";
         return new File([blob], fileName, { type: blob.type });
-    }, [fetchWithAuth, storageBasePath]);
+    }, [getSignedUrl]);
 
     /**
      * Delete a file
@@ -241,7 +265,7 @@ fileNotFound: true };
             return;
         }
 
-        const response = await fetchWithAuth(`${storageBasePath}/file/${filePath}`, {
+        const response = await fetchWithAuth(`${storageBasePath}/file/${encodeStorageKey(filePath)}`, {
             method: "DELETE"
         });
 
