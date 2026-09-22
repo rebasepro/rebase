@@ -466,7 +466,8 @@ export async function ensureCollectionTables(
     // it stops being invisible.
     for (const withheld of plan.withheldConstraints) {
         const message =
-            `No NOT NULL on "${withheld.target}": ${withheld.reason} ${withheld.remedy}`;
+            `No ${withheld.kind === "unique" ? "UNIQUE" : "NOT NULL"} on "${withheld.target}": ` +
+            `${withheld.reason} ${withheld.remedy}`;
         logger.warn(`[schema] ${message}`);
         log?.(message);
     }

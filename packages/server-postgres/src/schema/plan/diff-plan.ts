@@ -148,11 +148,12 @@ export interface OrphanedRequiredColumn {
 export interface WithheldConstraint {
     /** `schema.table.column`. */
     target: string;
-    kind: "not-null";
+    kind: "not-null" | "unique";
     /**
      * Why, in a sentence that names the obstacle rather than the rule. The
      * reader is looking at a column that is nullable when they asked for
-     * required, and needs to know what to do about it.
+     * required, or accepts duplicates when they asked for unique, and needs to
+     * know what to do about it.
      */
     reason: string;
     /** What would make it applicable. */
@@ -457,16 +458,41 @@ export function diffPlanAgainstCatalogue(
 
         // A table this run is creating has no rows yet, so the constraints
         // `db push` writes are free to apply. On a table that already exists
-        // they are not: `SET NOT NULL` is checked against live rows and a UNIQUE
-        // would fail on existing duplicates. So the constraints are emitted for
-        // the fresh case — which is the whole managed-runtime path, and the one
-        // that diverged from `db push` — and withheld for the adopted one.
+        // they are checked against live rows, so each is applied only where it
+        // cannot fail.
+        //
+        // NOT NULL needs every existing row to get a value: an empty table, or
+        // a default that backfills them.
+        //
+        // UNIQUE needs every existing row to get a *different* value, and a
+        // column being added gets either its default in every row — the same
+        // value, so a second row fails — or NULL in every row, and NULLs are
+        // distinct. So it holds on an empty table, and on any table when the
+        // column arrives with no default. A column that is already there is
+        // not touched: whether it carries a unique constraint or index under
+        // some other name is not something the catalogue read here says.
         const notNullIsSafe = fresh || empty || hasDefault;
+        const uniqueIsSafe = fresh || empty || !hasDefault;
         const applicable: ColumnPlan = {
             ...column,
-            unique: column.unique && fresh,
+            unique: column.unique && !columnExists && uniqueIsSafe,
             nullable: column.nullable || !(notNullIsSafe || columnExists)
         };
+        if (column.unique && !columnExists && !uniqueIsSafe) {
+            withheldConstraints.push({
+                target: key,
+                kind: "unique",
+                reason:
+                    `"${column.column}" is unique, but "${table.qualified}" ` +
+                    (existing.populatedTables === undefined ? "may already hold rows" : "already holds rows") +
+                    " and the column's default would give every one of them the same value, so UNIQUE " +
+                    "would fail as it was added.",
+                remedy:
+                    "Give each existing row its own value, then add the constraint — " +
+                    `\`ALTER TABLE "${table.schema}"."${table.table}" ADD UNIQUE ("${column.column}")\` — ` +
+                    "or drop the property's default."
+            });
+        }
         if (required && !columnExists && !notNullIsSafe) {
             withheldConstraints.push({
                 target: key,

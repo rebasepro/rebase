@@ -132,7 +132,7 @@ export interface SchemaChangePlan {
 export interface WithheldSchemaConstraint {
     /** `schema.table.column`. */
     target: string;
-    kind: "not-null";
+    kind: "not-null" | "unique";
     /** What is in the way, naming the obstacle rather than the rule. */
     reason: string;
     /** What would make it applicable. */
