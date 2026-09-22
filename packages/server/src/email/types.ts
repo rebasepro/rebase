@@ -98,8 +98,9 @@ export interface EmailConfig {
      * The reset link will be: {baseUrl}/reset-password?token={token}
      *
      * Must be absolute: mail clients have no base document to resolve a relative
-     * href against. `createEmailService` refuses to start when email is
-     * configured and no absolute base URL can be resolved.
+     * href against. The verification and magic-link bases fall back to this
+     * one and nothing falls back to it, so `createEmailService` refuses to
+     * start when email is configured without it.
      */
     resetPasswordUrl?: string;
 

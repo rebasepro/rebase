@@ -13,9 +13,9 @@ import type { EmailConfig } from "./types";
  *
  * Two changes: the fallback chains live here rather than being re-spelled at
  * each call site (only the magic-link route had one), and
- * {@link assertEmailLinkBases} refuses at boot when no absolute base can be
- * resolved. A configuration error that only ever shows up as "the link in the
- * email does nothing" is worth a failed start.
+ * {@link assertEmailLinkBases} refuses at boot when any link kind has no
+ * absolute base. A configuration error that only ever shows up as "the link in
+ * the email does nothing" is worth a failed start.
  */
 
 /** Which link a base URL is being resolved for. */
@@ -75,7 +75,8 @@ export function resolveEmailLinkBase(
 }
 
 /**
- * Throw when an email configuration cannot produce a followable link.
+ * Throw when an email configuration cannot produce a followable link of every
+ * kind it sends.
  *
  * Called from `createEmailService`, i.e. from every boot path that wires email
  * up (the managed runtime, both driver bootstrappers, and any app that passes
@@ -94,7 +95,14 @@ export function assertEmailLinkBases(config: EmailConfig): void {
         );
     }
 
-    if (!resolveEmailLinkBase(config, "resetPassword") && !resolveEmailLinkBase(config, "verifyEmail")) {
+    // Every kind, not any: the fallbacks run one way. Verification and magic
+    // links fall back to `resetPasswordUrl`, and nothing falls back to them, so
+    // a config with only `verifyEmailUrl` built good verification links and a
+    // dead link in every password-reset and magic-link email.
+    const unresolved = (Object.keys(LINK_BASE_FIELDS) as EmailLinkKind[])
+        .filter(kind => !resolveEmailLinkBase(config, kind));
+
+    if (unresolved.length === Object.keys(LINK_BASE_FIELDS).length) {
         throw new Error(
             "Email is configured but no base URL for emailed links is set. Password-reset, verification " +
             "and magic-link emails would carry relative hrefs, which are dead links in every mail client. " +
@@ -102,4 +110,20 @@ export function assertEmailLinkBases(config: EmailConfig): void {
             "\"https://app.example.com\"."
         );
     }
+
+    if (unresolved.length > 0) {
+        throw new Error(
+            `Email is configured without a base URL for ${unresolved.map(kind => LINK_KIND_LABELS[kind]).join(" and ")} ` +
+            "emails, so their links would be relative hrefs — dead in every mail client. Those links fall back " +
+            "to `auth.email.resetPasswordUrl` only: set FRONTEND_URL (or `auth.email.resetPasswordUrl`) to an " +
+            "absolute URL such as \"https://app.example.com\"."
+        );
+    }
 }
+
+/** How each link kind is named in a boot error. */
+const LINK_KIND_LABELS: Record<EmailLinkKind, string> = {
+    resetPassword: "password-reset",
+    verifyEmail: "verification",
+    magicLink: "magic-link"
+};

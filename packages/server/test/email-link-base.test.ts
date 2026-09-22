@@ -64,6 +64,23 @@ resetPasswordUrl: "https://app.test" })).not.toThrow();
         expect(() => assertEmailLinkBases(base)).toThrow(/no base URL for emailed links/i);
     });
 
+    it("throws when only the verification base is set — reset and magic links have no fallback to it", () => {
+        // `verifyEmailUrl` and `magicLinkUrl` fall back to `resetPasswordUrl`;
+        // nothing falls back to them. A config with only `verifyEmailUrl`
+        // passed, and every password-reset and magic-link email went out
+        // with `href="/reset-password?token=…"`.
+        expect(() => assertEmailLinkBases({ ...base,
+verifyEmailUrl: "https://app.test" })).toThrow(/password-reset and magic-link/);
+        expect(() => assertEmailLinkBases({ ...base,
+verifyEmailUrl: "https://app.test" })).toThrow(/resetPasswordUrl/);
+    });
+
+    it("throws when the verification and magic-link bases are set but the reset base is not", () => {
+        expect(() => assertEmailLinkBases({ ...base,
+verifyEmailUrl: "https://app.test",
+magicLinkUrl: "https://app.test" })).toThrow(/password-reset/);
+    });
+
     it("throws when a base URL is set but relative", () => {
         expect(() => assertEmailLinkBases({ ...base,
 resetPasswordUrl: "app.test" })).toThrow(/relative link base/i);
