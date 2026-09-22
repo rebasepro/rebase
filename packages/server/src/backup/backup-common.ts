@@ -128,6 +128,23 @@ function byNewest(a: BackupInfo, b: BackupInfo): number {
     return tb - ta;
 }
 
+/**
+ * The absolute path of a local backup file, or `null` for anything the download
+ * route must not serve: a path outside the backup directory, a file that is not
+ * a backup, or one that does not exist.
+ */
+function resolveLocalBackupFile(dest: { path: string }, key: string): string | null {
+    const stat = fs.existsSync(dest.path) ? fs.statSync(dest.path) : null;
+    const dir = stat?.isDirectory() ? dest.path : path.dirname(dest.path);
+    const resolvedDir = path.resolve(dir);
+    const resolved = path.resolve(key);
+    // Only allow reads inside the backup directory, and only backup files.
+    if (!resolved.startsWith(resolvedDir + path.sep) || !isBackupFile(resolved)) {
+        return null;
+    }
+    return fs.existsSync(resolved) ? resolved : null;
+}
+
 /** Read a single backup's bytes. Guards against path traversal for local. */
 export async function readBackupBytes(
     dest: BackupDestination,
@@ -135,15 +152,8 @@ export async function readBackupBytes(
     storage?: StorageController
 ): Promise<{ bytes: Uint8Array<ArrayBuffer>; name: string } | null> {
     if (dest.kind === "local") {
-        const stat = fs.existsSync(dest.path) ? fs.statSync(dest.path) : null;
-        const dir = stat?.isDirectory() ? dest.path : path.dirname(dest.path);
-        const resolvedDir = path.resolve(dir);
-        const resolved = path.resolve(key);
-        // Only allow reads inside the backup directory, and only backup files.
-        if (!resolved.startsWith(resolvedDir + path.sep) || !isBackupFile(resolved)) {
-            return null;
-        }
-        if (!fs.existsSync(resolved)) return null;
+        const resolved = resolveLocalBackupFile(dest, key);
+        if (!resolved) return null;
         return { bytes: new Uint8Array(fs.readFileSync(resolved)), name: path.basename(resolved) };
     }
 
@@ -152,4 +162,53 @@ export async function readBackupBytes(
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
     return { bytes: new Uint8Array(await file.arrayBuffer()), name: key.split("/").pop() || key };
+}
+
+/**
+ * A single backup, opened for streaming, with its size. Same guards as
+ * {@link readBackupBytes}.
+ *
+ * What the download route serves. A dump is the size of the database, and
+ * reading it whole put all of it on the API process's heap — twice for a local
+ * destination (`readFileSync`, then a copy) and on top of the controller's own
+ * buffer for object storage — and a file over 2 GiB never downloaded at all:
+ * `readFileSync` throws `ERR_FS_FILE_TOO_LARGE` there.
+ *
+ * A local file is read from disk as the response is written. Object storage
+ * still arrives through {@link StorageController.getObject}, which is a
+ * buffered `File` by contract; streaming that avoids the second copy.
+ */
+export async function openBackupStream(
+    dest: BackupDestination,
+    key: string,
+    storage?: StorageController
+): Promise<{ stream: ReadableStream<Uint8Array>; size: number; name: string } | null> {
+    if (dest.kind === "local") {
+        const resolved = resolveLocalBackupFile(dest, key);
+        if (!resolved) return null;
+        const { size } = await fs.promises.stat(resolved);
+        return { stream: fileStream(resolved), size, name: path.basename(resolved) };
+    }
+
+    if (!storage) return null;
+    if (!isBackupFile(key)) return null;
+    const file = await storage.getObject(key, dest.bucket);
+    if (!file) return null;
+    return { stream: file.stream(), size: file.size, name: key.split("/").pop() || key };
+}
+
+/** A file on disk as a web stream, read a chunk at a time as the response is written. */
+function fileStream(filePath: string): ReadableStream<Uint8Array> {
+    const file = fs.createReadStream(filePath);
+    const chunks: AsyncIterator<Buffer> = file[Symbol.asyncIterator]();
+    return new ReadableStream<Uint8Array>({
+        async pull(controller) {
+            const next = await chunks.next();
+            if (next.done) controller.close();
+            else controller.enqueue(next.value);
+        },
+        cancel() {
+            file.destroy();
+        }
+    });
 }

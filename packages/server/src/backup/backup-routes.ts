@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import type { StorageController } from "../storage";
-import { BackupDestination, listBackupObjects, readBackupBytes } from "./backup-common";
+import { BackupDestination, listBackupObjects, openBackupStream } from "./backup-common";
 
 export interface BackupRoutesConfig {
     /**
@@ -44,13 +44,15 @@ export function createBackupRoutes(config: BackupRoutesConfig): Hono<HonoEnv> {
         if (!key) {
             throw ApiError.badRequest("Missing 'key' query parameter.");
         }
-        const result = await readBackupBytes(dest, key, config.storage);
+        // Streamed: a dump is the size of the database. See `openBackupStream`.
+        const result = await openBackupStream(dest, key, config.storage);
         if (!result) {
             throw ApiError.notFound(`Backup not found: ${key}`);
         }
         c.header("Content-Type", "application/octet-stream");
+        c.header("Content-Length", String(result.size));
         c.header("Content-Disposition", `attachment; filename="${result.name}"`);
-        return c.body(result.bytes);
+        return c.body(result.stream);
     });
 
     return router;
