@@ -20,17 +20,19 @@ export function useClearRestoreValue<T>({
         setValue: (value: T | null, shouldValidate?: boolean) => void
     }) {
 
-    const clearedValueRef = useRef<T | null>(null);
+    // Boxed, so "nothing was cleared" is not confused with a cleared 0,
+    // `false` or "" — each of which the field would otherwise never get back.
+    const clearedRef = useRef<{ value: T } | null>(null);
     useEffect(() => {
         const shouldClearValueIfDisabled = typeof property.admin?.disabled === "object" && Boolean(property.admin?.disabled.clearOnDisabled);
         if (shouldClearValueIfDisabled) {
             if (value != null) {
-                clearedValueRef.current = value;
+                clearedRef.current = { value };
                 setValue(null);
             }
-        } else if (clearedValueRef.current) {
-            setValue(clearedValueRef.current);
-            clearedValueRef.current = null;
+        } else if (clearedRef.current) {
+            setValue(clearedRef.current.value);
+            clearedRef.current = null;
         }
     }, [property]);
 }
