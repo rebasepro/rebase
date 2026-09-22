@@ -215,10 +215,14 @@ properties: {} } as unknown as CollectionConfig;
 permissions } as unknown as ApiKeyMasked);
             await next();
         });
-        const generator = new RestApiGenerator(
-            [createTestCollection("authors"), createTestCollection("posts")],
-            driver
-        );
+        const posts = createTestCollection("posts");
+        const authors = {
+            ...createTestCollection("authors"),
+            properties: {
+                posts: { type: "relation", relation: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" } }
+            }
+        } as unknown as CollectionConfig;
+        const generator = new RestApiGenerator([authors, posts], driver);
         parent.route("/", generator.generateRoutes());
         return parent as unknown as Hono;
     }

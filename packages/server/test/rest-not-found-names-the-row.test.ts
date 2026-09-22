@@ -16,11 +16,25 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
  * 404. Somebody checks whether the row exists, finds it in psql, concludes the
  * API is broken, and spends the afternoon in the wrong file.
  */
+const lines = {
+    slug: "order_lines",
+    name: "Order lines",
+    table: "order_lines",
+    properties: { id: { name: "ID", type: "string", isId: "uuid" } }
+} as unknown as CollectionConfig;
+
 const orders = {
     slug: "orders",
     name: "Orders",
     table: "orders",
-    properties: { id: { name: "ID", type: "string", isId: "uuid" } }
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        lines: {
+            name: "Lines",
+            type: "relation",
+            relation: { kind: "hasMany", target: () => lines, foreignKeyOnTarget: "order_id" }
+        }
+    }
 } as unknown as CollectionConfig;
 
 function app(): Hono<HonoEnv> {
@@ -39,7 +53,7 @@ function app(): Hono<HonoEnv> {
     const hono = new Hono<HonoEnv>();
     hono.onError(errorHandler);
     hono.use("/*", async (c, next) => { c.set("driver", driver); await next(); });
-    hono.route("/api/data", new RestApiGenerator([orders], driver).generateRoutes());
+    hono.route("/api/data", new RestApiGenerator([orders, lines], driver).generateRoutes());
     return hono;
 }
 

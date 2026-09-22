@@ -24,6 +24,34 @@ describe("RestApiGenerator", () => {
             admin: {} as any
         } as unknown as jest.Mocked<DataDriver>;
 
+        const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string) => ({
+            type: "relation",
+            relation: { kind: "hasMany", target, foreignKeyOnTarget }
+        });
+        const comments = { slug: "comments", name: "Comments", singularName: "Comment", properties: {} } as unknown as CollectionConfig;
+        const books = { slug: "books", name: "Books", singularName: "Book", properties: {} } as unknown as CollectionConfig;
+        const posts = {
+            slug: "posts",
+            name: "Posts",
+            singularName: "Post",
+            properties: {
+                title: { name: "Title", type: "string" },
+                comments: hasMany(() => comments, "post_id")
+            }
+        } as unknown as CollectionConfig;
+        // The parent of every nested path below. A nested path is resolved
+        // through the relations its parent declares, so the parent has to be a
+        // collection that declares them: an unknown one is a 404.
+        const authors = {
+            slug: "authors",
+            name: "Authors",
+            singularName: "Author",
+            properties: {
+                posts: hasMany(() => posts, "author_id"),
+                books: hasMany(() => books, "author_id")
+            }
+        } as unknown as CollectionConfig;
+
         mockCollections = [
             {
                 slug: "users",
@@ -31,12 +59,10 @@ describe("RestApiGenerator", () => {
                 singularName: "User",
                 properties: {}
             } as any,
-            {
-                slug: "posts",
-                name: "Posts",
-                singularName: "Post",
-                properties: {}
-            } as any
+            posts,
+            authors,
+            books,
+            comments
         ];
     });
 
@@ -182,8 +208,8 @@ name: "Alice" } as any;
          * Hono sub-router routing quirks where `/:slug/:id` eats the request
          * before the `/:parent/:parentId/*` wildcard gets a chance.
          *
-         * We use "authors" as the parent slug since it's NOT a registered
-         * collection, so it can only match the wildcard catch-all.
+         * Every path here has three or more segments, which no root route
+         * matches, so each reaches the wildcard catch-all.
          */
 
         it("list subcollection - GET /authors/123/posts", async () => {

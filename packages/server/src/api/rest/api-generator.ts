@@ -15,7 +15,7 @@ import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/a
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { completeUserCreation } from "../../auth/admin-user-ops";
-import { findRelation, getJunctionConfigForRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import { findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
     createIdempotencyStore,
     IDEMPOTENCY_HEADER,
@@ -108,7 +108,39 @@ function idempotencyKeyReused(key: string): ApiError {
     );
 }
 
+/**
+ * A nested path — `authors/1/posts`, `authors/1/posts/2/comments` — resolved
+ * to what it addresses.
+ */
+interface NestedPath {
+    /**
+     * The path to hand the driver: the caller's, with its first segment spelled
+     * as the collection's slug. The driver then resolves the collection this
+     * route resolved, rather than re-deriving it from a spelling.
+     */
+    path: string;
+    /**
+     * Every collection the path passes through, root first. The last is the
+     * one the path addresses — whose rows it reads and writes.
+     */
+    chain: CollectionConfig[];
+    /** The relation the path's last relation segment names. */
+    relation: ResolvedRelation;
+}
 
+/**
+ * The synthetic collection standing in for the junction a relation reaches
+ * through, or `undefined` when it is not a `manyToMany` carrying
+ * `through.properties`.
+ *
+ * The same `getJunctionConfigForRelation` the schema planner and the driver
+ * use, so the shape validated here is the shape the columns were emitted from.
+ */
+function junctionCollectionFor(relation: ResolvedRelation): CollectionConfig | undefined {
+    if (!isManyToMany(relation)) return undefined;
+    if (Object.keys(relation.through.properties).length === 0) return undefined;
+    return getJunctionConfigForRelation(relation.through);
+}
 
 /**
  * Lightweight REST API generator that leverages existing Rebase DataDriver.
@@ -463,34 +495,74 @@ export class RestApiGenerator {
     }
 
     /**
-     * The collection a nested path writes into — the target of the relation its
-     * last segment names.
+     * The collection a path's first segment names.
      *
-     * Needed so a nested write can be checked against a schema at all. Without
-     * it these routes skipped `assertKnownWriteFields` entirely, which is why a
-     * typo `POST /posts` rejected with a 400 while the same typo on
-     * `POST /authors/1/posts` was dropped from the statement and answered 201.
-     *
-     * Returns `undefined` rather than throwing when the path cannot be walked:
-     * the driver raises the authoritative error a moment later, and duplicating
-     * it here would report a resolution failure as a validation failure.
+     * By the rule the driver's registry applies (`CollectionRegistry.get`),
+     * because the driver is what a nested path is forwarded to: the slug, then
+     * the slug written in kebab case — URLs are — then the table name. Matching
+     * the slug alone left the other two spellings resolving in the driver and
+     * in nothing here, so a nested request spelled either way was checked
+     * against no collection at all.
      */
-    private resolveNestedWriteCollection(collectionPath: string): CollectionConfig | undefined {
-        const segments = collectionPath.split("/").filter(s => s && s !== "undefined");
-        let current = this.collections.find(c => c.slug === segments[0]);
+    private collectionNamed(segment: string): CollectionConfig | undefined {
+        const bySlug = (slug: string) => this.collections.find(c => c.slug === slug);
+        return bySlug(segment)
+            ?? (segment.includes("-") ? bySlug(segment.replace(/-/g, "_")) : undefined)
+            ?? this.collections.find(c => getTableName(c) === segment);
+    }
 
-        for (let i = 2; i < segments.length && current; i += 2) {
-            const relation = findRelation(resolveCollectionRelations(current), segments[i]);
-            if (!relation) return undefined;
-            try {
-                const target = relation.target();
-                current = this.collections.find(c => c.slug === target?.slug) ?? target;
-            } catch {
-                return undefined;
-            }
+    /**
+     * Walk a nested path to the collection it addresses — the target of the
+     * relation its last segment names.
+     *
+     * Needed so a nested request can be checked against a schema at all: the
+     * fields a body may write and a query may read are the target's. A path
+     * that names nothing is a 404 here, before anything else happens. This
+     * used to return `undefined` instead and leave the refusal to the driver,
+     * and every check on these routes was written `if (target) …` — so a path
+     * the driver could resolve and this walk could not was a request with no
+     * checks on it, rather than a refused one.
+     *
+     * The path handed back is spelled with the root's slug, which is what
+     * makes the two agree: whatever spelling arrived, the driver is asked about
+     * the collection this route checked the request against.
+     */
+    private resolveNestedPath(collectionPath: string): NestedPath {
+        const segments = collectionPath.split("/").filter(Boolean);
+        const root = this.collectionNamed(segments[0]);
+        if (!root) {
+            throw new ApiError(
+                404,
+                "NOT_FOUND",
+                `Unknown collection '${segments[0]}'. It is not defined in this backend, `
+                + "or its route is not exposed.",
+                undefined,
+                true
+            );
         }
 
-        return current;
+        const chain = [root];
+        let relation: ResolvedRelation | undefined;
+        for (let i = 2; i < segments.length; i += 2) {
+            const current = chain[chain.length - 1];
+            relation = findRelation(resolveCollectionRelations(current), segments[i]);
+            if (!relation) {
+                throw new ApiError(
+                    404,
+                    "UNKNOWN_RELATION",
+                    `Collection '${current.slug}' has no relation '${segments[i]}'.`,
+                    undefined,
+                    true
+                );
+            }
+            const target = relation.target();
+            chain.push(this.collections.find(c => c.slug === target.slug) ?? target);
+        }
+        if (!relation) {
+            throw ApiError.notFound(`'${collectionPath}' names a collection, not a relation of one.`);
+        }
+
+        return { path: [root.slug, ...segments.slice(1)].join("/"), chain, relation };
     }
 
     /**
@@ -513,10 +585,11 @@ export class RestApiGenerator {
     private async updateRelationPivotFromBody(
         c: Context<HonoEnv>,
         driver: DataDriver,
-        collectionPath: string,
+        nested: NestedPath,
         targetId: string,
         body: Record<string, unknown>
     ): Promise<Response> {
+        const collectionPath = nested.path;
         const extras = Object.keys(body).filter(key => key !== JUNCTION_PIVOT_KEY);
         if (extras.length > 0) {
             throw ApiError.badRequest(
@@ -537,7 +610,7 @@ export class RestApiGenerator {
             );
         }
 
-        const junction = this.resolveJunctionCollection(collectionPath);
+        const junction = junctionCollectionFor(nested.relation);
         if (!junction) {
             throw ApiError.badRequest(
                 `'${collectionPath}' does not reach its target through a \`manyToMany\` that declares ` +
@@ -563,38 +636,6 @@ export class RestApiGenerator {
         });
 
         return new Response(null, { status: 204 });
-    }
-
-    /**
-     * The synthetic collection standing in for the junction a nested path's last
-     * hop reaches through, or `undefined` when that hop is not a `manyToMany`
-     * carrying `through.properties`.
-     *
-     * Built from the relation rather than by walking every collection: the same
-     * `getJunctionConfigForRelation` the schema planner and the driver use, so
-     * the shape validated here is the shape the columns were emitted from.
-     */
-    private resolveJunctionCollection(collectionPath: string): CollectionConfig | undefined {
-        const segments = collectionPath.split("/").filter(s => s && s !== "undefined");
-        if (segments.length < 3) return undefined;
-
-        let current = this.collections.find(c => c.slug === segments[0]);
-        let relation: ResolvedRelation | undefined;
-
-        for (let i = 2; i < segments.length && current; i += 2) {
-            relation = findRelation(resolveCollectionRelations(current), segments[i]);
-            if (!relation) return undefined;
-            try {
-                const target = relation.target();
-                current = this.collections.find(c => c.slug === target?.slug) ?? target;
-            } catch {
-                return undefined;
-            }
-        }
-
-        if (!relation || !isManyToMany(relation)) return undefined;
-        if (Object.keys(relation.through.properties).length === 0) return undefined;
-        return getJunctionConfigForRelation(relation.through);
     }
 
     /**
@@ -1428,13 +1469,14 @@ id };
 
             const driver = this.getScopedDriver(c);
 
-            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
-
             // Resolved before the query is parsed, not after: the field-access
             // refusal is part of parsing, and the branch below already needed
             // this collection to narrow its response.
-            const nestedCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
-            const nestedAccess = nestedCollection ? { collection: nestedCollection, c } : undefined;
+            const nested = this.resolveNestedPath(parsed.collectionPath);
+            const nestedCollection = nested.chain[nested.chain.length - 1];
+            const nestedAccess = { collection: nestedCollection, c };
+
+            this.enforceSubcollectionApiKeyPermission(c, nested.path);
 
             if (parsed.id === "count") {
                 // GET /parent/:parentId/child/count — count child entities
@@ -1443,7 +1485,7 @@ id };
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
                 const total = driver.count ? await driver.count({
-                    path: parsed.collectionPath,
+                    path: nested.path,
                     filter: queryOptions.where,
                     // The two sibling counts in this file forward the group and
                     // this one did not, so a nested `/count?or=(…)` answered
@@ -1460,19 +1502,18 @@ id };
                 const fetchService = driver.restFetchService;
                 const entity = fetchService
                     ? await fetchService.fetchOneForRest(
-                        parsed.collectionPath, parsed.id, queryOptions.include, undefined,
+                        nested.path, parsed.id, queryOptions.include, undefined,
                         { fields: queryOptions.fields, withDeleted: queryOptions.withDeleted }
                     )
-                    : await driver.fetchOne({ path: parsed.collectionPath,
+                    : await driver.fetchOne({ path: nested.path,
 id: parsed.id });
-                if (!entity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
+                if (!entity) throw this.entityNotFound(nested.path, parsed.id);
 
                 // `?fields=` is advertised on this endpoint too. It reached
                 // `queryOptions` and was read by nothing here, so a
                 // subcollection read returned every column while the root read
                 // narrowed — the same defect `projectResponseFields` exists to
                 // fix, surviving on the route family it was never wired into.
-                if (!nestedCollection) return c.json(entity);
                 return c.json(projectResponseFields(
                     [entity as Record<string, unknown>],
                     queryOptions.fields,
@@ -1500,11 +1541,11 @@ id: parsed.id });
                     // The collection hoisted above, not a second lookup of the
                     // same path: one resolve, so the access check and the read
                     // are answered about the same collection.
-                    nestedCollection ?? ({ slug: parsed.collectionPath } as CollectionConfig),
+                    nestedCollection,
                     queryOptions,
                     searchString,
                     searchExplainRaw === "true",
-                    parsed.collectionPath
+                    nested.path
                 );
 
                 return c.json({
@@ -1524,18 +1565,17 @@ id: parsed.id });
 
             const driver = this.getScopedDriver(c);
 
+            const nested = this.resolveNestedPath(parsed.collectionPath);
+            const targetCollection = nested.chain[nested.chain.length - 1];
 
-            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
+            this.enforceSubcollectionApiKeyPermission(c, nested.path);
             const body = await parseJsonBody(c);
 
-            const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
-            if (targetCollection) {
-                assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
-                assertWriteValuesValid(body, targetCollection, { status: "new" });
-            }
+            assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
+            assertWriteValuesValid(body, targetCollection, { status: "new" });
 
             const entity = await driver.save({
-                path: parsed.collectionPath,
+                path: nested.path,
                 values: body,
                 status: "new"
             });
@@ -1558,8 +1598,10 @@ id: parsed.id });
 
             const driver = this.getScopedDriver(c);
 
+            const nested = this.resolveNestedPath(parsed.collectionPath);
+            const targetCollection = nested.chain[nested.chain.length - 1];
 
-            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
+            this.enforceSubcollectionApiKeyPermission(c, nested.path);
 
             const body = await parseJsonBody(c);
 
@@ -1574,17 +1616,14 @@ id: parsed.id });
             // request to do two different writes at one address, and guessing an
             // order for them is how one of the two silently does not happen.
             if (JUNCTION_PIVOT_KEY in body) {
-                return this.updateRelationPivotFromBody(c, driver, parsed.collectionPath, parsed.id, body);
+                return this.updateRelationPivotFromBody(c, driver, nested, parsed.id, body);
             }
 
-            const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
-            if (targetCollection) {
-                assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
-                assertWriteValuesValid(body, targetCollection);
-            }
+            assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
+            assertWriteValuesValid(body, targetCollection);
 
             const entity = await driver.save({
-                path: parsed.collectionPath,
+                path: nested.path,
                 id: parsed.id,
                 values: body,
                 status: "existing"
@@ -1614,15 +1653,16 @@ id: parsed.id });
 
             const driver = this.getScopedDriver(c);
 
+            const nested = this.resolveNestedPath(parsed.collectionPath);
 
-            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
+            this.enforceSubcollectionApiKeyPermission(c, nested.path);
 
             // `?hard=true` — a real DELETE on a soft-delete collection. Same
             // permission as the delete it replaces; see `soft-delete-params.ts`.
             const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
 
             const existingEntity = await driver.fetchOne({
-                path: parsed.collectionPath,
+                path: nested.path,
                 id: parsed.id,
                 // `withDeleted` when the caller asked to purge: a hard delete of an
                 // ALREADY soft-deleted row is the "empty trash" operation, and the
@@ -1632,7 +1672,7 @@ id: parsed.id });
                 withDeleted: hardDelete ? true : undefined
             });
 
-            if (!existingEntity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
+            if (!existingEntity) throw this.entityNotFound(nested.path, parsed.id);
 
             await driver.delete({
                 hard: hardDelete,
@@ -1640,7 +1680,7 @@ id: parsed.id });
                     // The address from the path, for the same reason as the
                     // collection-level delete above: a row carries no id.
                     id: parsed.id,
-                    path: parsed.collectionPath
+                    path: nested.path
                 }
             });
 

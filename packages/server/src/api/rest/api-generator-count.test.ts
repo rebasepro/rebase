@@ -108,7 +108,16 @@ describe("RestApiGenerator - Count Endpoint", () => {
         // Three call sites issue a count in this file; two forwarded the group
         // and this one did not, so `GET /authors/1/posts/count?or=(…)` reported
         // the unnarrowed total beside a narrowed list.
-        const app = createApp([collection, createTestCollection("authors")], driver);
+        const authors = {
+            ...createTestCollection("authors"),
+            properties: {
+                products: {
+                    type: "relation",
+                    relation: { kind: "hasMany", target: () => collection, foreignKeyOnTarget: "author_id" }
+                }
+            }
+        } as unknown as CollectionConfig;
+        const app = createApp([collection, authors], driver);
 
         const res = await app.request("/authors/1/products/count?or=(status.eq.draft,status.eq.review)");
         expect(res.status).toBe(200);
