@@ -1,4 +1,4 @@
-import { CollectionConfig, JUNCTION_PIVOT_KEY, isManyToMany, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
 import {
     type FieldViewer,
     canWriteField,
@@ -405,6 +405,11 @@ function collectViolations(
     // has nothing to say about a value that is not there.
     if (value === null || value === undefined) return;
 
+    if (isFieldOperation(value) && typeof value === "object") {
+        collectFieldOperationViolations(key, property, value, into);
+        return;
+    }
+
     switch (property.type) {
         case "string": {
             if (typeof value !== "string") return;
@@ -538,6 +543,59 @@ function collectViolations(
         default:
             // boolean, geopoint, relation, reference, vector, binary carry only
             // `required`/`unique`, both of which the database enforces.
+    }
+}
+
+/**
+ * What a field operation writes, judged by the rules the value it becomes part
+ * of answers to.
+ *
+ * `{ tags: { $push: "bogus" } }` stores `"bogus"` in `tags` as surely as
+ * `{ tags: [..., "bogus"] }` does, so each pushed element answers to the
+ * element rules — an `enum`, a string's length and pattern — and pushing more
+ * elements than `validation.max` allows is over it whatever the array held.
+ * `$merge` sets the keys it names, so those answer to the map's properties, and
+ * an `$inc` of a whole-number property is a whole number. Checked only on the
+ * plain values, an operation was a way around every one of these.
+ *
+ * What an operation *produces* — the stored array plus the pushed elements, the
+ * stored number plus the increment — depends on the stored row, which this
+ * request never sees, so it is not judged here: holding an `$inc` to a `min` or
+ * `max` takes a guard in the statement that does the arithmetic. A malformed
+ * operation is `assertFieldOpsValid`'s to refuse, so one is skipped here rather
+ * than judged.
+ */
+function collectFieldOperationViolations(
+    key: string,
+    property: Property,
+    operation: object,
+    into: WriteViolation[]
+): void {
+    const entries = Object.entries(operation);
+    if (entries.length !== 1) return;
+    const [operator, operand] = entries[0];
+
+    if (operator === "$push" && property.type === "array" && operand !== undefined) {
+        const pushed = Array.isArray(operand) ? operand : [operand];
+        const of = property.of;
+        if (of && !Array.isArray(of)) {
+            pushed.forEach(item => collectViolations(key, of as Property, item, into));
+        }
+        const max = property.validation?.max;
+        if (max !== undefined && pushed.length > max) {
+            into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${max} item${max === 1 ? "" : "s"}; $push adds ${pushed.length}.` });
+        }
+        return;
+    }
+
+    if (operator === "$merge" && property.type === "map" && typeof operand === "object" && operand !== null && !Array.isArray(operand)) {
+        collectViolations(key, property, operand, into);
+        return;
+    }
+
+    if (operator === "$inc" && property.type === "number" && property.validation?.integer
+        && typeof operand === "number" && !Number.isInteger(operand)) {
+        into.push({ field: key, code: "integer", message: `'${key}' must be a whole number, so $inc on it takes one (received ${operand}).` });
     }
 }
 

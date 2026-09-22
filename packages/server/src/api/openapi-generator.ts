@@ -1414,7 +1414,8 @@ function updateOperation(
             "statement holding the row lock. That is the difference between a counter that is correct " +
             "under concurrency and one that silently loses increments, because expressing the same " +
             "change as a value means reading it first. `$inc` needs a `number` property, `$push`/`$pull` " +
-            "an `array`, `$merge` a `map`; anything else is a 400. See the `FieldOperation` schema.",
+            "an `array`, `$merge` a `map`; anything else is a 400. Pushed elements and merged keys answer " +
+            "to the property's own rules, as a value would. See the `FieldOperation` schema.",
         operationId: `update${schemaName}`,
         parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" },

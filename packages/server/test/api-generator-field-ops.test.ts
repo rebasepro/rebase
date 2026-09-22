@@ -194,6 +194,160 @@ describe("field operations on PATCH", () => {
     });
 });
 
+describe("field operations against the property's declared rules", () => {
+    /**
+     * `{ tags: { $push: "bogus" } }` stores `"bogus"` in `tags` exactly as
+     * `{ tags: [..., "bogus"] }` does, and `{ stock: { $inc: -1000 } }` moves
+     * `stock` exactly as a new value would — but only the plain values were
+     * checked. An operation went around every `enum`, `max` and `min` the
+     * collection declares, while the same change sent as a value was a 400.
+     */
+    const products = {
+        slug: "products",
+        name: "Products",
+        singularName: "Product",
+        table: "products",
+        properties: {
+            id: { name: "ID", type: "string", isId: true },
+            stock: { name: "Stock", type: "number", validation: { min: 0 } },
+            rating: { name: "Rating", type: "number", enum: { 1: "One", 2: "Two" } },
+            views: { name: "Views", type: "number", validation: { integer: true } },
+            price: { name: "Price", type: "number" },
+            tags: {
+                name: "Tags",
+                type: "array",
+                of: { name: "Tag", type: "string", enum: { sale: "Sale", new: "New" } },
+                validation: { max: 2 }
+            },
+            meta: {
+                name: "Meta",
+                type: "map",
+                properties: { color: { name: "Color", type: "string", enum: { red: "Red", blue: "Blue" } } }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    function productHarness() {
+        const saves: Record<string, unknown>[] = [];
+        const driver = {
+            key: "postgres",
+            initialised: true,
+            async fetchOne({ id }: { id: string }) {
+                return { id: String(id), stock: 5, views: 1, tags: ["sale"] };
+            },
+            async save(props: Record<string, unknown>) {
+                saves.push(props);
+                return { id: "p1", ...(props.values as Record<string, unknown>) };
+            },
+            async updateMany({ updates }: { updates: { id: string; values: Record<string, unknown> }[] }) {
+                updates.forEach((update) => saves.push(update));
+                return updates.map((update) => ({ id: update.id, ...update.values }));
+            }
+        } as unknown as DataDriver;
+
+        const app = new Hono();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => {
+            c.set("driver", driver);
+            c.set("user", { uid: "user-1" });
+            await next();
+        });
+        app.route("/", new RestApiGenerator([products], driver).generateRoutes());
+        return { app, saves };
+    }
+
+    const patchProduct = (app: Hono, body: unknown) =>
+        app.request("/products/p1", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+    const refusal = async (res: Response) => {
+        expect(res.status).toBe(400);
+        return (await res.json() as {
+            error: { code: string; message: string; details?: { violations?: { field: string; code: string }[] } }
+        }).error;
+    };
+
+    it("refuses a pushed element the element's enum does not define", async () => {
+        const { app, saves } = productHarness();
+
+        const error = await refusal(await patchProduct(app, { tags: { $push: "bogus" } }));
+
+        expect(error.code).toBe("VALIDATION_CONSTRAINT");
+        expect(error.message).toContain("'bogus'");
+        expect(error.details?.violations).toEqual([expect.objectContaining({ field: "tags", code: "enum" })]);
+        expect(saves).toHaveLength(0);
+    });
+
+    it("judges every element of a pushed list", async () => {
+        const { app } = productHarness();
+
+        const error = await refusal(await patchProduct(app, { tags: { $push: ["new", "bogus"] } }));
+
+        expect(error.code).toBe("VALIDATION_CONSTRAINT");
+        expect(error.message).toContain("'bogus'");
+    });
+
+    it("refuses pushing more elements than the array may hold at all", async () => {
+        const { app } = productHarness();
+
+        const error = await refusal(await patchProduct(app, { tags: { $push: ["sale", "new", "sale"] } }));
+
+        expect(error.details?.violations).toEqual([expect.objectContaining({ field: "tags", code: "max_items" })]);
+    });
+
+    it("refuses a merged key the map's own property rejects", async () => {
+        const { app } = productHarness();
+
+        const error = await refusal(await patchProduct(app, { meta: { $merge: { color: "green" } } }));
+
+        expect(error.code).toBe("VALIDATION_CONSTRAINT");
+        expect(error.details?.violations).toEqual([expect.objectContaining({ field: "meta.color", code: "enum" })]);
+    });
+
+    it("refuses a fractional increment of a whole-number property", async () => {
+        const { app } = productHarness();
+
+        const error = await refusal(await patchProduct(app, { views: { $inc: 1.5 } }));
+
+        expect(error.details?.violations).toEqual([expect.objectContaining({ field: "views", code: "integer" })]);
+    });
+
+    it("refuses the same through the bulk update route", async () => {
+        const { app, saves } = productHarness();
+
+        const res = await app.request("/products/bulk", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates: [{ id: "p1", data: { tags: { $push: "bogus" } } }] })
+        });
+
+        expect((await refusal(res)).message).toMatch(/^Row 0: .*'bogus'/);
+        expect(saves).toHaveLength(0);
+    });
+
+    it("passes an operation within the rules through unchanged", async () => {
+        const { app, saves } = productHarness();
+
+        const res = await patchProduct(app, {
+            tags: { $push: "new" },
+            views: { $inc: 2 },
+            price: { $inc: -1.5 },
+            meta: { $merge: { color: "red" } }
+        });
+
+        expect(res.status).toBe(200);
+        expect(saves[0].values).toEqual({
+            tags: { $push: "new" },
+            views: { $inc: 2 },
+            price: { $inc: -1.5 },
+            meta: { $merge: { color: "red" } }
+        });
+    });
+});
+
 describe("the parser", () => {
     it("splits operations out of the plain values", () => {
         const { values, fieldOps } = splitFieldOps({ title: "x", views: { $inc: 2 } });
