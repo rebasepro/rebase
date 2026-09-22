@@ -71,8 +71,11 @@ jest.mock("@rebasepro/app", () => ({
     useStudioSchemaEditing: () => ({ available: editorAvailable, updateCollection }),
     useStudioCollectionRegistry: () => ({
         // `authors` is mapped; nothing else is. `table` is the field the editor
-        // matches on, and the id is what a save has to be filed under.
-        collections: [{ id: "authors",
+        // matches on, and the slug is what a save has to be filed under — a
+        // different word on purpose, so a save addressed by table name shows.
+        // (A Postgres collection has no `id`; this fixture used to give it one,
+        // which is how a save filed under the wrong key passed.)
+        collections: [{ slug: "writers",
 table: "authors",
 securityRules: [] }],
         getCollection: () => undefined
@@ -190,7 +193,11 @@ describe("saving a policy on a mapped table", () => {
 
         await waitFor(() => expect(updateCollection).toHaveBeenCalled());
         const [collectionId, patch] = updateCollection.mock.calls[0];
-        expect(collectionId).toBe("authors");
+        // The slug, never the table name: `updateCollection` looks collections
+        // up by slug, and one it cannot find is written as a new file holding
+        // nothing but these rules — a collection with no slug, which fails the
+        // next boot.
+        expect(collectionId).toBe("writers");
         expect((patch as { securityRules: { name: string }[] }).securityRules[0].name)
             .toBe("sweep_test_policy");
 
@@ -235,7 +242,9 @@ describe("importing a live policy into the codebase", () => {
     /** The rule the import appended, from the one save it made. */
     function importedRule(): Record<string, unknown> {
         expect(updateCollection).toHaveBeenCalledTimes(1);
-        const [, patch] = updateCollection.mock.calls[0];
+        const [collectionId, patch] = updateCollection.mock.calls[0];
+        // Filed under the collection's slug, as the save above is.
+        expect(collectionId).toBe("writers");
         const rules = (patch as { securityRules: Record<string, unknown>[] }).securityRules;
         return rules[rules.length - 1];
     }

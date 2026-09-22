@@ -893,7 +893,12 @@ totalPolicies };
 
                                         try {
                                             await saveSecurityRules(
-                                                (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData.tableName,
+                                                // The slug: `updateCollection` finds collections
+                                                // by it. A Postgres collection has no `id`, so
+                                                // this was the *table* name, which found nothing
+                                                // when it differed from the slug — and the save
+                                                // wrote a new file holding only these rules.
+                                                activeCollection.slug,
                                                 newRules
                                             );
 
@@ -1098,7 +1103,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                                                                     try {
                                                                         await saveSecurityRules(
-                                                                            (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData!.tableName,
+                                                                            activeCollection.slug,
                                                                             newRules
                                                                         );
 
