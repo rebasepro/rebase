@@ -16,7 +16,8 @@ import {
     remove,
     set,
     startAfter,
-    startAt
+    startAt,
+    update
 } from "firebase/database";
 import { useCallback } from "react";
 import { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
@@ -281,7 +282,8 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
     const save = useCallback(async <M extends Record<string, any>>({
         path,
         id,
-        values
+        values,
+        status
     }: SaveProps<M>): Promise<Record<string, unknown>> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
@@ -295,8 +297,19 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         }
 
         // Transform the data to RTDB format before saving
-        const transformedValues = cmsToRTDBModel(values, database);
-        await set(ref(database, `${path}/${finalId}`), transformedValues);
+        const transformedValues = cmsToRTDBRecord(values, database);
+        const rowRef = ref(database, `${path}/${finalId}`);
+        if (status === "existing") {
+            // An update names only the properties it changes — the SDK's
+            // `update(id, { name })`, and the admin form, which sends the
+            // changed top-level properties. `set()` replaces the whole node,
+            // so every field the update did not name was deleted. `update()`
+            // writes each named child whole and leaves the rest; a `null`
+            // child removes that field.
+            await update(rowRef, transformedValues);
+        } else {
+            await set(rowRef, transformedValues);
+        }
 
         return {
             ...values,
@@ -408,16 +421,16 @@ function cmsToRTDBModel(data: unknown, database: Database): unknown {
         // For dates, convert to ISO string or timestamp.
         return data.toISOString();
     } else if (data && typeof data === "object") {
-        return Object.entries(data as Record<string, unknown>)
-            .map(([key, v]) => {
-                const rtdbModel = cmsToRTDBModel(v, database);
-                if (rtdbModel !== undefined)
-                    return { [key]: rtdbModel };
-                else
-                    return {};
-            })
-            .reduce((a, b) => ({ ...a,
-...b }), {});
+        return cmsToRTDBRecord(data, database);
     }
     return data;
+}
+
+/** {@link cmsToRTDBModel} for a map of values: each child converted, keys kept. */
+function cmsToRTDBRecord(data: object, database: Database): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(data)) {
+        result[key] = cmsToRTDBModel(v, database);
+    }
+    return result;
 }
