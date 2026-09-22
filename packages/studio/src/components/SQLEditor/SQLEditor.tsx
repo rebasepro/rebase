@@ -895,7 +895,7 @@ role: selectedRole });
 
                 if (!isMonaco && !isInput) {
                     e.preventDefault();
-                    handleRun();
+                    handleRun(editorHandle.current?.getSelectedText());
                 }
             }
         };
@@ -1461,7 +1461,7 @@ isFavorite: !s.isFavorite } : s));
                                 </Menu>
 
                                 <Button
-                                    onClick={() => handleRun()}
+                                    onClick={() => handleRun(editorHandle.current?.getSelectedText())}
                                     disabled={loading}
                                     size="small"
                                     color="primary"

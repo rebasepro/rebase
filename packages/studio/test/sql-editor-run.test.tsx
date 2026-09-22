@@ -157,3 +157,35 @@ describe("the automatic LIMIT", () => {
         expect(await run("SELECT 1; DELETE FROM posts WHERE id = 1")).toBe("SELECT 1; DELETE FROM posts WHERE id = 1");
     });
 });
+
+/**
+ * Cmd+Enter in the editor ran the selection; the Run button beside it ran the
+ * whole buffer. Highlighting one statement of a script and pressing Run
+ * executed every statement in it.
+ */
+describe("running a selection", () => {
+    it("runs only the selected statement from the Run button", async () => {
+        render(<SQLEditor/>);
+        await typeSql("SELECT 1;\nSELECT * FROM posts");
+        editorSelection = "SELECT * FROM posts";
+
+        fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
+
+        await waitFor(() => expect(sent()).toHaveLength(1));
+        expect(sent()[0]).toBe("SELECT * FROM posts LIMIT 1000;");
+    });
+
+    it("runs only the selected statement from the shortcut outside the editor", async () => {
+        render(<SQLEditor/>);
+        await typeSql("SELECT 1;\nSELECT * FROM posts");
+        editorSelection = "SELECT * FROM posts";
+        // The shortcut is the page's only while no text field has the focus —
+        // and the sidebar's search takes it on mount.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+
+        fireEvent.keyDown(window, { key: "Enter", metaKey: true });
+
+        await waitFor(() => expect(sent()).toHaveLength(1));
+        expect(sent()[0]).toBe("SELECT * FROM posts LIMIT 1000;");
+    });
+});
