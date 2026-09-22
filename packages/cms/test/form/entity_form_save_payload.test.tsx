@@ -5,8 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams } from "@rebasepro/cms-types";
-import type { FormContext } from "../../src/types/fields";
+import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 import type { EntityFormProps } from "../../src/types/components/EntityFormProps";
 
 class ResizeObserverStub {
@@ -32,6 +31,7 @@ jest.mock("@rebasepro/app", () => {
     });
 });
 
+import { AuthControllerContext, CustomizationControllerContext } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 
 /**
@@ -41,28 +41,26 @@ import { EntityForm } from "../../src/form/EntityForm";
 
 type Post = Record<string, unknown>;
 
-const collection = {
-    slug: "posts",
-    name: "Posts",
-    properties: {
-        title: { type: "string", name: "Title" },
-        price: { type: "number", name: "Price" },
-        publishedAt: { type: "date", name: "Published at" },
-        address: {
-            type: "map",
-            name: "Address",
-            properties: {
-                street: { type: "string", name: "Street" },
-                city: { type: "string", name: "City" }
-            }
+const properties = {
+    title: { type: "string", name: "Title" },
+    price: { type: "number", name: "Price" },
+    publishedAt: { type: "date", name: "Published at" },
+    address: {
+        type: "map",
+        name: "Address",
+        properties: {
+            street: { type: "string", name: "Street" },
+            city: { type: "string", name: "City" }
         }
     }
-} as unknown as EntityFormProps<Post>["collection"];
+};
+
+const collection = { slug: "posts", name: "Posts", properties } as never;
 
 let context: FormContext<Post>;
 
 function CaptureContext({ formContext }: EntityCustomViewParams<Post>) {
-    context = formContext as FormContext<Post>;
+    context = formContext;
     return null;
 }
 
@@ -70,8 +68,13 @@ function entityOf(values: Post): Entity<Post> {
     return { id: "1", path: "posts", values };
 }
 
+/**
+ * The record form. With `withBuilder`, a Builder stands in for the fields and
+ * only captures the form's context; without it the real fields render, which
+ * needs the two controllers they read.
+ */
 function formFor(values: Post, onSubmit: EntityFormProps<Post>["onSubmit"], withBuilder = true) {
-    return <EntityForm<Post>
+    const form = <EntityForm<Post>
         path="posts"
         entityId="1"
         collection={collection}
@@ -81,6 +84,13 @@ function formFor(values: Post, onSubmit: EntityFormProps<Post>["onSubmit"], with
         onFormContextReady={(formContext) => { context = formContext; }}
         onSubmit={onSubmit}
         computedInitialValues={values}/>;
+    if (withBuilder) return form;
+    return <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <CustomizationControllerContext.Provider
+            value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+            {form}
+        </CustomizationControllerContext.Provider>
+    </AuthControllerContext.Provider>;
 }
 
 function recordingSubmit(stored: () => Post) {
@@ -125,6 +135,99 @@ describe("EntityForm: what a save of a stored record sends", () => {
         });
 
         expect(payloads).toEqual([{ address: { street: "Main 1", city: "Milan" } }]);
+    });
+
+});
+
+describe("EntityForm: a record changed elsewhere while the form is open", () => {
+
+    it("a field left alone follows the change, and the save does not write it back", async () => {
+        const v1: Post = { title: "T", price: 10 };
+        const v2: Post = { title: "T", price: 20 };
+        let stored = v1;
+        const { payloads, onSubmit } = recordingSubmit(() => stored);
+        const view = render(formFor(v1, onSubmit));
+
+        await act(async () => {
+            context.setFieldValue("title", "T2");
+        });
+        // Someone else sets the price; the listener delivers the new record.
+        stored = v2;
+        await act(async () => {
+            view.rerender(formFor(v2, onSubmit));
+        });
+        expect(context.values.price).toEqual(20);
+        expect(context.values.title).toEqual("T2");
+
+        await act(async () => {
+            await context.submit();
+        });
+        expect(payloads).toEqual([{ title: "T2" }]);
+    });
+
+    it("an unedited form follows the change and stays clean", async () => {
+        const v1: Post = { title: "T", price: 10 };
+        const v2: Post = { title: "T", price: 20 };
+        const { onSubmit } = recordingSubmit(() => v2);
+        const view = render(formFor(v1, onSubmit));
+
+        await act(async () => {
+            view.rerender(formFor(v2, onSubmit));
+        });
+        expect(context.values.price).toEqual(20);
+        expect(context.formex.dirty).toBe(false);
+        // Nothing the user did, so nothing for Undo to take back.
+        expect(context.formex.canUndo).toBe(false);
+    });
+
+    it("a field edited here and elsewhere keeps the edit and says it was updated elsewhere", async () => {
+        const v1: Post = { title: "T", price: 10 };
+        const v2: Post = { title: "T", price: 20 };
+        let stored = v1;
+        const { payloads, onSubmit } = recordingSubmit(() => stored);
+        const view = render(formFor(v1, onSubmit, false));
+
+        await act(async () => {
+            context.setFieldValue("price", 15);
+        });
+        expect(screen.queryByText("This value has been updated elsewhere")).toBeNull();
+
+        stored = v2;
+        await act(async () => {
+            view.rerender(formFor(v2, onSubmit, false));
+        });
+        expect(context.values.price).toEqual(15);
+        expect(screen.getByText("This value has been updated elsewhere")).toBeTruthy();
+
+        await act(async () => {
+            await context.submit();
+        });
+        expect(payloads).toEqual([{ price: 15 }]);
+        expect(screen.queryByText("This value has been updated elsewhere")).toBeNull();
+    });
+
+    it("an autosave sends only what was edited here", async () => {
+        const v1: Post = { title: "T", price: 10 };
+        const { payloads, onSubmit } = recordingSubmit(() => v1);
+        render(<EntityForm<Post>
+            path="posts"
+            entityId="1"
+            collection={{ slug: "posts", name: "Posts", properties, formAutoSave: true } as never}
+            entity={entityOf(v1)}
+            initialStatus="existing"
+            Builder={CaptureContext}
+            onSubmit={onSubmit}
+            computedInitialValues={v1}/>);
+
+        await act(async () => {
+            context.setFieldValue("title", "T2");
+        });
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 2100));
+        });
+        // The whole record would write back every field this form last
+        // heard about, over any change to it still on its way here.
+        expect(payloads).toEqual([{ title: "T2" }]);
     });
 
 });

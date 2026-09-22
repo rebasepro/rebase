@@ -110,7 +110,13 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
     }, false, 2000);
 
-    const [underlyingChanges] = useState<Partial<EntityValues<M>>>({});
+    /**
+     * The properties the record changed underneath an edit of the user's own,
+     * keyed to the value they changed to — each one shown as "updated
+     * elsewhere" while the form still holds something else. Filled by the
+     * effect that follows the baseline, below.
+     */
+    const [underlyingChanges, setUnderlyingChanges] = useState<Record<string, unknown>>({});
 
     const initialEntityId: string | number | undefined = useMemo(() => {
         if (status === "new" || status === "copy") {
@@ -213,6 +219,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             : {},
         onSubmit,
         onReset: () => {
+            setUnderlyingChanges({});
             onResetProp?.();
             // The stored values — a reset returns the form to them, and by now
             // that is the baseline whether or not it was at mount.
@@ -291,7 +298,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         const autoSaveEnabled = autoSave ?? false;
 
         if (autoSaveEnabled) {
-            setValuesToBeSaved(values);
+            setValuesToBeSaved(valuesToSave);
             return Promise.resolve();
         }
 
@@ -385,19 +392,54 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     useOnAutoSave(autoSave, formex, lastSavedValues, save);
 
+    /**
+     * The record changed while the form was open: someone else saved it, and
+     * the listener delivered the new version as a new baseline.
+     *
+     * An unmodified form follows it whole — formex does that. A modified one
+     * keeps the edit, and formex keeps *everything* it holds: a property the
+     * user never changed would still show the old value, differ from the new
+     * stored one, and be written back by the next save, reverting the other
+     * change without a word.
+     *
+     * So each top-level property that changed underneath is judged on its own,
+     * against the baseline the form last followed. One the user has not changed
+     * follows the record. One the user has changed keeps the edit — that is
+     * what a save writes — and is marked as updated elsewhere, so the overwrite
+     * is not a surprise.
+     */
+    const followedBaseline = useRef(baseInitialValues);
     useEffect(() => {
-        if (!autoSave && !formex.isSubmitting && underlyingChanges && entity) {
-            // we update the form fields from the driver data
-            // if they were not touched
-            Object.entries(underlyingChanges).forEach(([key, value]) => {
-                const formValue = formex.values[key];
-                if (!equal(value, formValue) && !formex.touched[key]) {
-                    console.debug("Updated value from the driver:", key, value);
-                    formex.setFieldValue(key, value !== undefined ? value : null);
-                }
-            });
+        const previous: Record<string, unknown> = followedBaseline.current ?? {};
+        const next: Record<string, unknown> = baseInitialValues ?? {};
+        followedBaseline.current = baseInitialValues;
+        if (previous === next) return;
+
+        const current: Record<string, unknown> = formex.values;
+        if (equal(previous, current)) return;
+
+        const conflicts: Record<string, unknown> = {};
+        const changedUnderneath = new Set([...Object.keys(previous), ...Object.keys(next)]);
+        for (const key of changedUnderneath) {
+            if (equal(previous[key], next[key])) {
+                changedUnderneath.delete(key);
+            } else if (equal(current[key], previous[key])) {
+                formex.setFieldValue(key, next[key]);
+            } else if (!equal(current[key], next[key])) {
+                conflicts[key] = next[key];
+            }
         }
-    }, [formex.isSubmitting, autoSave, underlyingChanges, entity, formex.values, formex.touched, formex.setFieldValue]);
+        if (changedUnderneath.size === 0) return;
+
+        setUnderlyingChanges(prev => {
+            const updated = { ...prev };
+            changedUnderneath.forEach(key => {
+                if (key in conflicts) updated[key] = conflicts[key];
+                else delete updated[key];
+            });
+            return updated;
+        });
+    }, [baseInitialValues]);
 
     const formFieldKeys = getFormFieldKeys(collection);
 
@@ -501,9 +543,8 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
 
         const underlyingValueHasChanged: boolean =
-            !!underlyingChanges &&
-            Object.keys(underlyingChanges).includes(field.key) &&
-            formex.touched[field.key];
+            field.key in underlyingChanges &&
+            !equal(formex.values[field.key], underlyingChanges[field.key]);
 
         const disabled = isFieldDisabled(property);
         // The panel-style editors carry their own header; everything else is
