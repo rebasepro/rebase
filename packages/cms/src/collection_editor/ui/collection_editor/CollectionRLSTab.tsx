@@ -111,6 +111,27 @@ function toSecurityRule(policy: Partial<PostgresPolicy>): SecurityRule {
     return base;
 }
 
+/**
+ * Build a {@link SecurityRule} from a live `pg_policies` row, for "Import to
+ * codebase".
+ *
+ * Not {@link toSecurityRule}: that one reads `roles` as the inline editor
+ * fills it, with *application* roles. A live policy's `roles` is its `TO`
+ * list — *database* roles — which is `pgRoles`. Imported as `roles`, `TO
+ * public` became a `rebase.roles()` check no user passes, and on a restrictive
+ * policy, which compiles to `NOT (roles) OR condition`, a gate every user
+ * passes.
+ *
+ * `pgRoles` is omitted at the `public` default, so a rule that targets every
+ * connection — nearly all of them — carries no advanced field it does not need.
+ */
+function livePolicyToSecurityRule(policy: PostgresPolicy): SecurityRule {
+    const { roles, ...rest } = policy;
+    const rule = toSecurityRule(rest);
+    const targetsEveryone = roles.length === 0 || (roles.length === 1 && roles[0] === "public");
+    return targetsEveryone ? rule : { ...rule, pgRoles: [...roles] };
+}
+
 export function CollectionRLSTab() {
     const { values, setFieldValue } = useFormex<CollectionWithSecurity>();
     const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
@@ -343,7 +364,7 @@ export function CollectionRLSTab() {
                                         <Tooltip title={readOnly ? readOnlyTitle : undefined}>
                                             <div>
                                                 <Button size="small" variant="outlined" color="primary" disabled={readOnly} onClick={() => {
-                                                    const rule: SecurityRule = toSecurityRule(dp);
+                                                    const rule: SecurityRule = livePolicyToSecurityRule(dp);
                                                     setFieldValue("securityRules", [...rules, rule]);
                                                 }}>
                                                     Import to codebase

@@ -32,12 +32,19 @@ let editorAvailable = true;
  */
 let hasCodebase = true;
 
+/**
+ * The `pg_policies` rows the load path answers with — none unless a test puts
+ * some there. Shaped as the driver returns them: `roles` is Postgres's array
+ * literal, not a JavaScript array.
+ */
+let livePolicies: Record<string, unknown>[] = [];
+
 /** One mapped table, and the SQL the editor's load path asks for. */
 const executeSql = jest.fn<(sql: string) => Promise<unknown>>(async (sql: string) => {
     if (sql.includes("pg_tables")) {
         return { rows: [{ schemaname: "public", tablename: "authors", rowsecurity: true }] };
     }
-    if (sql.includes("pg_policies")) return { rows: [] };
+    if (sql.includes("pg_policies")) return { rows: livePolicies };
     return { rows: [] };
 });
 
@@ -89,6 +96,7 @@ beforeEach(() => {
     updateCollection.mockReset();
     updateCollection.mockResolvedValue(undefined);
     executeSql.mockClear();
+    livePolicies = [];
     editorAvailable = true;
     hasCodebase = true;
     // Watched in both directions: the point of the bridge path is that it does
@@ -205,6 +213,78 @@ describe("saving a policy on a mapped table", () => {
         await waitFor(() =>
             expect(executeSql.mock.calls.some(call => /CREATE\s+POLICY/i.test(String(call[0])))).toBe(true));
         expect(updateCollection).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * "Import to codebase" on a policy that exists only in the database.
+ *
+ * A live policy's `roles` is its `TO` list — *database* roles. The import
+ * copied it into `SecurityRule.roles`, which holds *application* roles and
+ * compiles into a `rebase.roles()` check. For a restrictive policy that is a
+ * fail-open: `AS RESTRICTIVE TO public USING (tenant_id = …)` came back from
+ * the generator as `USING (NOT (… && ARRAY['public']) OR tenant_id = …)`, and
+ * since no user holds an application role called `public`, the gate passed for
+ * everyone. A permissive one matched nobody instead.
+ */
+describe("importing a live policy into the codebase", () => {
+    function importButtons(): Promise<HTMLElement[]> {
+        return screen.findAllByRole("button", { name: "Import to codebase" });
+    }
+
+    /** The rule the import appended, from the one save it made. */
+    function importedRule(): Record<string, unknown> {
+        expect(updateCollection).toHaveBeenCalledTimes(1);
+        const [, patch] = updateCollection.mock.calls[0];
+        const rules = (patch as { securityRules: Record<string, unknown>[] }).securityRules;
+        return rules[rules.length - 1];
+    }
+
+    it("keeps a restrictive policy's TO public out of the application roles", async () => {
+        livePolicies = [{
+            schemaname: "public",
+            tablename: "authors",
+            policyname: "tenant_isolation",
+            permissive: "RESTRICTIVE",
+            roles: "{public}",
+            cmd: "SELECT",
+            qual: "(tenant_id = current_setting('app.tenant')::uuid)",
+            with_check: null
+        }];
+
+        render(<RLSEditor/>);
+        fireEvent.click((await importButtons())[0]);
+
+        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+        // `public` is the default `TO` target, so the rule carries no role
+        // field at all — and above all no application-role check.
+        expect(importedRule()).toEqual({
+            name: "tenant_isolation",
+            operation: "select",
+            mode: "restrictive",
+            using: "(tenant_id = current_setting('app.tenant')::uuid)"
+        });
+    });
+
+    it("files a named database role under pgRoles", async () => {
+        livePolicies = [{
+            schemaname: "public",
+            tablename: "authors",
+            policyname: "service_writes",
+            permissive: "PERMISSIVE",
+            roles: "{rebase_user}",
+            cmd: "UPDATE",
+            qual: "true",
+            with_check: "true"
+        }];
+
+        render(<RLSEditor/>);
+        fireEvent.click((await importButtons())[0]);
+
+        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+        const rule = importedRule();
+        expect(rule.pgRoles).toEqual(["rebase_user"]);
+        expect(rule).not.toHaveProperty("roles");
     });
 });
 

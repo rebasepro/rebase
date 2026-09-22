@@ -33,6 +33,7 @@ import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } fr
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
+import { policyToRule } from "./policyRules";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -876,30 +877,11 @@ totalPolicies };
                                      * tables have always used.
                                      */
                                     if (activeCollection && hasCodebase) {
-                                        // Collection-mapped table: save via schema-editor API
-                                        const rule: Record<string, unknown> = {
-                                            name: newPolicy.policyname,
-                                            operation: newPolicy.cmd?.toLowerCase(),
-                                            mode: newPolicy.permissive?.toLowerCase(),
-                                            using: newPolicy.qual || undefined,
-                                            withCheck: newPolicy.with_check || undefined,
-                                            // The editor edits a `PostgresPolicy`, whose
-                                            // `roles` is the `TO` list — so it maps to
-                                            // `pgRoles`. Writing it to `roles` filed
-                                            // database roles as *application* roles, and
-                                            // the generator then compiled them into a
-                                            // `rebase.roles()` check no user could
-                                            // satisfy: the rule saved cleanly, pushed
-                                            // cleanly, and matched nothing.
-                                            //
-                                            // Omitted at the default so a rule that
-                                            // targets `public` — nearly all of them —
-                                            // does not carry an advanced field it does
-                                            // not need.
-                                            ...(newPolicy.roles && !(newPolicy.roles.length === 1 && newPolicy.roles[0] === "public")
-                                                ? { pgRoles: newPolicy.roles }
-                                                : {})
-                                        };
+                                        // Collection-mapped table: save via schema-editor API.
+                                        // The editor edits a `PostgresPolicy`, whose `roles`
+                                        // is the `TO` list — `policyToRule` files it under
+                                        // `pgRoles`, never `roles`.
+                                        const rule = policyToRule(newPolicy);
 
                                         const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                         let newRules;
@@ -1090,14 +1072,13 @@ message: e instanceof Error ? e.message : String(e) });
                                                                 variant="outlined"
                                                                 color="primary"
                                                                 onClick={async () => {
-                                                                    const rule: Record<string, unknown> = {
-                                                                        name: policy.policyname,
-                                                                        operation: policy.cmd?.toLowerCase(),
-                                                                        mode: policy.permissive?.toLowerCase(),
-                                                                        using: policy.qual || undefined,
-                                                                        withCheck: policy.with_check || undefined,
-                                                                        roles: policy.roles
-                                                                    };
+                                                                    // A live policy's `roles` is its `TO` list:
+                                                                    // database roles, so `pgRoles`. Copied into
+                                                                    // `roles`, `TO public` became an application-role
+                                                                    // check nobody passes — and on a restrictive
+                                                                    // policy, which compiles to `NOT (roles) OR …`,
+                                                                    // a gate everybody passes.
+                                                                    const rule = policyToRule(policy);
 
                                                                     const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                                                     const newRules = [...existingRules, rule];
