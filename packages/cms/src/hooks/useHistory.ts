@@ -130,10 +130,13 @@ signal });
     }, [fetchEntries, offset, enabled, entityId, entityKey, refreshTrigger]);
 
     const loadMore = useCallback(() => {
-        if (!isLoading && hasMore && offset + entries.length < total) {
+        // `entries` already holds every page up to the current offset; adding
+        // the offset to it counted those pages twice and stopped the scroll
+        // short of the oldest revisions.
+        if (!isLoading && hasMore && entries.length < total) {
             setOffset(prev => prev + pageSize);
         }
-    }, [isLoading, hasMore, pageSize, offset, entries.length, total]);
+    }, [isLoading, hasMore, pageSize, entries.length, total]);
 
     const revert = useCallback(async (historyId: string): Promise<Record<string, unknown>> => {
         if (!apiConfig?.apiUrl || !entityId) {
