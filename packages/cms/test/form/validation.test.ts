@@ -936,3 +936,80 @@ describe("custom-shaped array validation", () => {
         expect(result.success ? [] : result.error.issues.map(issue => issue.path.join("."))).toEqual(["pair.1"]);
     });
 });
+
+// ---------------------------------------------------------------------------
+// email and url, the way the server checks them
+// ---------------------------------------------------------------------------
+
+/**
+ * The server checks `email` and `url` on every string that declares them, and
+ * lets an empty string through — it is how a cleared text field arrives. The
+ * form checked them only when a `validation` block existed, and then refused
+ * the empty string.
+ */
+describe("email and url validation", () => {
+
+    it("checks an email with no validation block", async () => {
+        const schema = mapPropertyToZod({ property: { type: "string", email: true } as StringProperty });
+        expect((await schema.safeParseAsync("not-an-email")).success).toBe(false);
+        expect((await schema.safeParseAsync("ada@example.com")).success).toBe(true);
+    });
+
+    it("checks a url with no validation block", async () => {
+        const schema = mapPropertyToZod({ property: { type: "string", url: true } as StringProperty });
+        expect((await schema.safeParseAsync("not a url")).success).toBe(false);
+        expect((await schema.safeParseAsync("https://example.com")).success).toBe(true);
+    });
+
+    it("accepts a cleared optional email", async () => {
+        const schema = mapPropertyToZod({
+            property: { type: "string", email: true, validation: { max: 200 } } as StringProperty
+        });
+        expect((await schema.safeParseAsync("")).success).toBe(true);
+    });
+
+    it("accepts a cleared optional url", async () => {
+        const schema = mapPropertyToZod({
+            property: { type: "string", url: true, validation: { max: 200 } } as StringProperty
+        });
+        expect((await schema.safeParseAsync("")).success).toBe(true);
+    });
+
+    it("still requires a required email", async () => {
+        const schema = mapPropertyToZod({
+            property: { type: "string", email: true, validation: { required: true } } as StringProperty
+        });
+        expect((await schema.safeParseAsync("")).success).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// What a bound's message says
+// ---------------------------------------------------------------------------
+describe("bound messages name the bound that failed", () => {
+    const firstMessage = async (property: Property, value: unknown) => {
+        const result = await mapPropertyToZod({ property }).safeParseAsync(value);
+        expect(result.success).toBe(false);
+        return result.success ? "" : result.error.issues[0].message;
+    };
+
+    it("lessThan says lower", async () => {
+        expect(await firstMessage({ type: "number", name: "Score", validation: { lessThan: 10 } } as NumberProperty, 20))
+            .toEqual("Score must be lower than 10");
+    });
+
+    it("moreThan says higher", async () => {
+        expect(await firstMessage({ type: "number", name: "Score", validation: { moreThan: 10 } } as NumberProperty, 5))
+            .toEqual("Score must be higher than 10");
+    });
+
+    it("a date max names the maximum", async () => {
+        const min = new Date("2026-01-01T00:00:00Z");
+        const max = new Date("2026-12-31T00:00:00Z");
+        const message = await firstMessage(
+            { type: "date", name: "Due", validation: { min, max } } as DateProperty,
+            new Date("2027-06-01T00:00:00Z")
+        );
+        expect(message).toEqual(`Due must be before ${max}`);
+    });
+});

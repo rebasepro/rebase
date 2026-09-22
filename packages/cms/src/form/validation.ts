@@ -212,27 +212,32 @@ function getZodStringSchema({
         if (validation.trim) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.trim() : v, schema);
         if (validation.lowercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toLowerCase() : v, schema);
         if (validation.uppercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toUpperCase() : v, schema);
-        if (property.email) schema = schema.refine(
-            (value: unknown) => value == null || (typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)),
-            { message: `${fieldLabel(property, name)} must be an email` }
-        );
-        if (property.url) {
-            if (!property.storage || property.storage?.storeUrl) {
-                schema = schema.refine(
-                    (value: unknown) => {
-                        if (value == null) return true;
-                        try {
-                            new URL(value as string);
-                            return true;
-                        } catch {
-                            return false;
-                        }
-                    },
-                    { message: `${fieldLabel(property, name)} must be a url` }
-                );
-            } else {
-                console.warn(`Property ${fieldLabel(property, name)} has a url validation but its storage configuration is not set to store urls`);
-            }
+    }
+
+    // Checked the way the server checks them: on every string that declares
+    // them, `validation` block or not, and with the empty string let through —
+    // it is what a cleared text field holds, and whether the field may be
+    // empty is `required`'s question.
+    if (property.email) schema = schema.refine(
+        (value: unknown) => value == null || value === "" || (typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)),
+        { message: `${fieldLabel(property, name)} must be an email` }
+    );
+    if (property.url) {
+        if (!property.storage || property.storage?.storeUrl) {
+            schema = schema.refine(
+                (value: unknown) => {
+                    if (value == null || value === "") return true;
+                    try {
+                        new URL(value as string);
+                        return true;
+                    } catch {
+                        return false;
+                    }
+                },
+                { message: `${fieldLabel(property, name)} must be a url` }
+            );
+        } else {
+            console.warn(`Property ${fieldLabel(property, name)} has a url validation but its storage configuration is not set to store urls`);
         }
     }
     return schema;
@@ -278,11 +283,11 @@ function getZodNumberSchema({
         );
         if (validation.lessThan || validation.lessThan === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value < validation.lessThan!),
-            { message: `${fieldLabel(property, name)} must be higher than ${validation.lessThan}` }
+            { message: `${fieldLabel(property, name)} must be lower than ${validation.lessThan}` }
         );
         if (validation.moreThan || validation.moreThan === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value > validation.moreThan!),
-            { message: `${fieldLabel(property, name)} must be lower than ${validation.moreThan}` }
+            { message: `${fieldLabel(property, name)} must be higher than ${validation.moreThan}` }
         );
         if (validation.positive) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value > 0),
@@ -351,7 +356,7 @@ function getZodDateSchema({
         );
         if (validation.max) schema = schema.refine(
             (value: unknown) => value == null || (value instanceof Date && value <= validation.max!),
-            { message: `${fieldLabel(property, name)} must be before ${validation.min}` }
+            { message: `${fieldLabel(property, name)} must be before ${validation.max}` }
         );
     }
     return schema;
