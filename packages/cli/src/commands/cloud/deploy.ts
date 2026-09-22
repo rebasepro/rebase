@@ -1382,6 +1382,56 @@ export async function deployedUrl(
     }
 }
 
+/**
+ * The line an in-progress build keeps rewriting at the end of its log, to prove
+ * to the control plane that it is still alive.
+ *
+ * The control plane's own format — `HEARTBEAT_MARKER` and `heartbeatSuffix` in
+ * its `functions/deploy.ts` — which appends `\n<marker><ISO time>\n` to the log
+ * on every write and every 30 seconds, and drops it on the terminal write.
+ */
+export const BUILD_HEARTBEAT_MARKER = "⏳ Build in progress — control-plane heartbeat ";
+
+/**
+ * A deployment's log without its trailing heartbeat line: the build log itself.
+ *
+ * Only a heartbeat that is the last line is one. The same text anywhere else is
+ * the build quoting it.
+ */
+export function withoutHeartbeat(logs: string): string {
+    const at = logs.lastIndexOf(`\n${BUILD_HEARTBEAT_MARKER}`);
+    if (at < 0) return logs;
+    const newline = logs.indexOf("\n", at + 1);
+    return newline === -1 || newline === logs.length - 1 ? logs.slice(0, at) : logs;
+}
+
+/**
+ * What to print of a deployment's log, given everything printed so far.
+ *
+ * The `logs` column is not append-only. Its heartbeat line is rewritten at the
+ * end on every write, and a failed static deploy replaces its whole log with
+ * one line. Diffing the raw column by length therefore cut the start off every
+ * new chunk — as many characters as the heartbeat that had been there — and
+ * printed heartbeat fragments in their place: a failed managed deploy lost the
+ * first half of its reason.
+ *
+ * So the heartbeat is stripped first, and the log printed so far is compared
+ * with the log now. When it has only grown, the new text is printed. When it
+ * was rewritten, printing resumes from the start of the first line that
+ * differs, on a line of its own.
+ */
+export function nextLogChunk(printed: string, rowLogs: string): { chunk: string; printed: string } {
+    const logs = withoutHeartbeat(rowLogs);
+    if (logs.startsWith(printed)) return { chunk: logs.slice(printed.length), printed: logs };
+    // Shorter and already printed: nothing new to say.
+    if (printed.startsWith(logs)) return { chunk: "", printed };
+
+    let same = 0;
+    while (same < logs.length && logs[same] === printed[same]) same++;
+    const lineStart = logs.lastIndexOf("\n", same - 1) + 1;
+    return { chunk: `${printed.endsWith("\n") ? "" : "\n"}${logs.slice(lineStart)}`, printed: logs };
+}
+
 async function streamBuildLogs(
     client: CloudClient,
     deploymentId: string,
@@ -1389,7 +1439,7 @@ async function streamBuildLogs(
 ): Promise<string> {
     const quiet = opts.quiet === true;
     const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
-    let printed = 0;
+    let printed = "";
     const started = Date.now();
 
     for (;;) {
@@ -1401,11 +1451,9 @@ async function streamBuildLogs(
         }
         if (!dep) fail(`Deployment ${deploymentId} disappeared.`, undefined, "not_found");
 
-        const logs = dep.logs ?? "";
-        if (!quiet && logs.length > printed) {
-            process.stdout.write(logs.slice(printed));
-        }
-        printed = logs.length;
+        const next = nextLogChunk(printed, dep.logs ?? "");
+        if (!quiet && next.chunk !== "") process.stdout.write(next.chunk);
+        printed = next.printed;
 
         if (dep.status && dep.status !== "deploying") {
             if (dep.status !== "success") {
@@ -1418,7 +1466,7 @@ async function streamBuildLogs(
                             code: "deploy_failed",
                             status: null,
                             deploymentId,
-                            logs
+                            logs: withoutHeartbeat(dep.logs ?? "")
                         }
                     });
                     process.exit(1);
