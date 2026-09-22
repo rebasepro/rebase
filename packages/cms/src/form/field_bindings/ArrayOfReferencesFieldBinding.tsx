@@ -83,6 +83,7 @@ export function ArrayOfReferencesFieldBinding({
 
     const onEntryClick = (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (disabled || isSubmitting) return;
         referenceDialogController.open();
     };
 
@@ -108,7 +109,7 @@ export function ArrayOfReferencesFieldBinding({
                 includeEntityLink={ofProperty.admin?.includeEntityLink}
             />
         );
-    }, [ofProperty.path, ofProperty.admin?.previewProperties, value]);
+    }, [ofProperty.path, ofProperty.admin?.previewProperties, value, disabled, isSubmitting]);
 
     const title = (<>
         <LabelWithIcon
@@ -128,7 +129,7 @@ export function ArrayOfReferencesFieldBinding({
 
             <ArrayContainer droppableId={propertyKey}
                 value={value}
-                disabled={isSubmitting}
+                disabled={disabled || isSubmitting}
                 buildEntry={buildEntry}
                 canAddElements={false}
                 addLabel={property.name ? t("add_reference_to", { name: property.name }) : t("add_reference")}
@@ -139,10 +140,10 @@ export function ArrayOfReferencesFieldBinding({
             <Button
                 className="ml-3.5 my-4 justify-center text-left"
                 variant="text"
-                disabled={isSubmitting}
+                disabled={disabled || isSubmitting}
                 onClick={onEntryClick}>
                 <PencilIcon size={16}/>
-                {t("edit")} {property.name}
+                {t("edit_name", { name: property.name ?? propertyKey })}
             </Button>
         </div>}
     </>;

@@ -11,7 +11,7 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
-import { IconForView } from "@rebasepro/app";
+import { IconForView, useTranslation } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useClearRestoreValue } from "../useClearRestoreValue";
@@ -56,6 +56,7 @@ function ReferenceFieldBindingInternal({
         throw new Error("Property path is required for ReferenceFieldBinding");
     }
 
+    const { t } = useTranslation();
     const refValue = value as EntityReference | null | undefined;
 
     useClearRestoreValue({
@@ -92,6 +93,7 @@ function ReferenceFieldBindingInternal({
 
     const onEntryClick = (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (disabled || isSubmitting) return;
         referenceDialogController.open();
     };
 
@@ -125,11 +127,11 @@ function ReferenceFieldBindingInternal({
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-hover group-hover:bg-surface-hover")}
-                        onClick={onEntryClick}
+                        onClick={disabled || isSubmitting ? undefined : onEntryClick}
                         size={"medium"}>
                         <IconForView collectionOrView={collection}
                             className={"text-surface-300 dark:text-surface-600"}/>
-                        {`Edit ${property.name}`.toUpperCase()}
+                        {t("edit_name", { name: property.name ?? propertyKey }).toUpperCase()}
                     </EntityPreviewContainer>
                 </div>}
             </>}

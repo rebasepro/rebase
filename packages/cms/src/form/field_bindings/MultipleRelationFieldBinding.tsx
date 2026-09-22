@@ -83,6 +83,7 @@ export function MultipleRelationFieldBinding({
 
     const onEntryClick = (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (disabled || isSubmitting) return;
         referenceDialogController.open();
     };
 
@@ -107,7 +108,7 @@ export function MultipleRelationFieldBinding({
                 includeEntityLink={property.admin?.includeEntityLink}
             />
         );
-    }, [relation, property.admin?.previewProperties, value]);
+    }, [relation, property.admin?.previewProperties, value, disabled, isSubmitting]);
 
     const title = (<>
         <LabelWithIcon
@@ -127,7 +128,7 @@ export function MultipleRelationFieldBinding({
 
             <ArrayContainer droppableId={propertyKey}
                 value={value}
-                disabled={isSubmitting}
+                disabled={disabled || isSubmitting}
                 buildEntry={buildEntry}
                 canAddElements={false}
                 addLabel={property.name ? t("add_reference_to", { name: property.name }) : t("add_reference")}
@@ -139,10 +140,10 @@ export function MultipleRelationFieldBinding({
                 className="ml-3.5 my-4 justify-center text-left"
                 variant="text"
                 color="primary"
-                disabled={isSubmitting}
+                disabled={disabled || isSubmitting}
                 onClick={onEntryClick}>
                 <PencilIcon size={16}/>
-                {t("edit")} {property.name}
+                {t("edit_name", { name: property.name ?? propertyKey })}
             </Button>
         </div>}
     </>;

@@ -6,7 +6,7 @@ import React, { useCallback } from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
-import { ErrorView, IconForView } from "@rebasepro/app";
+import { ErrorView, IconForView, useTranslation } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, normalizeToEntityRelation, resolveRelationProperty } from "@rebasepro/common";
 import { cls } from "@rebasepro/ui";
@@ -124,6 +124,7 @@ function SingleRelationFieldBinding({
     setValue,
     relation
 }: FieldProps<RelationProperty> & { relation: Relation | undefined }) {
+    const { t } = useTranslation();
     const normalizedValue = value && !Array.isArray(value) ? normalizeToEntityRelation(value) : null;
     const validValue = !!normalizedValue;
 
@@ -148,6 +149,7 @@ function SingleRelationFieldBinding({
 
     const onEntryClick = (e: React.SyntheticEvent) => {
         e.preventDefault();
+        if (disabled || isSubmitting) return;
         referenceDialogController.open();
     };
 
@@ -183,11 +185,11 @@ function SingleRelationFieldBinding({
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-hover group-hover:bg-surface-hover")}
-                        onClick={onEntryClick}
+                        onClick={disabled || isSubmitting ? undefined : onEntryClick}
                         size={"medium"}>
                         <IconForView collectionOrView={collection}
                             className={"text-surface-300 dark:text-surface-600"}/>
-                        {`Edit ${property.name}`.toUpperCase()}
+                        {t("edit_name", { name: property.name ?? propertyKey }).toUpperCase()}
                     </EntityPreviewContainer>
                 </div>}
             </>}
