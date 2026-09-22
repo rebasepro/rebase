@@ -5,6 +5,7 @@ import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { cursorToStartAfter, topLevelIncludeNames } from "@rebasepro/common";
+import { isObject } from "@rebasepro/utils";
 import { assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
@@ -29,15 +30,27 @@ import { HARD_DELETE_QUERY_PARAM, parseHardDelete } from "./soft-delete-params";
  * (a valid "no explicit fields" write), but a **malformed** body throws a 400
  * rather than being silently swallowed to `{}` — which would turn bad input
  * into an unintended empty write.
+ *
+ * So does valid JSON that is not an object. Every body this API takes is one —
+ * a row, or an envelope around rows — and the cast used to let anything
+ * through: `null` reached the validators and threw a TypeError, a 500 for the
+ * caller's mistake, while `42` or `true` passed them and was handed to the
+ * driver as a row's values.
  */
 async function parseJsonBody(c: Context<HonoEnv>): Promise<Record<string, unknown>> {
     const raw = await c.req.text();
     if (!raw || raw.trim() === "") return {};
+    let parsed: unknown;
     try {
-        return JSON.parse(raw) as Record<string, unknown>;
+        parsed = JSON.parse(raw);
     } catch {
         throw ApiError.badRequest("Invalid JSON body");
     }
+    if (!isObject(parsed)) {
+        const got = parsed === null ? "null" : Array.isArray(parsed) ? "an array" : `a ${typeof parsed}`;
+        throw ApiError.badRequest(`The request body must be a JSON object, not ${got}.`);
+    }
+    return parsed;
 }
 
 /**

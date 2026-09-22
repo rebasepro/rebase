@@ -202,6 +202,30 @@ name: "Alice" } as any;
             );
         });
     });
+    describe("A body that is not a JSON object", () => {
+        // Every body this API takes is an object: a row, or an envelope around
+        // rows. `null` reached the validators as a row and threw a TypeError —
+        // a 500 for the caller's mistake — and `42` or `true` passed them and
+        // was handed to the driver as a row's values.
+        it.each(["null", "42", "true", "[1]", "\"text\""])("refuses %s on a create and an update", async (raw) => {
+            const app = createApp();
+            const send = (method: string, path: string) => app.request(path, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: raw
+            });
+
+            const create = await send("POST", "/api/users");
+            const update = await send("PATCH", "/api/users/1");
+
+            expect(create.status).toBe(400);
+            expect(update.status).toBe(400);
+            expect(((await create.json()) as { error: { message: string } }).error.message)
+                .toContain("must be a JSON object");
+            expect(mockDriver.save).not.toHaveBeenCalled();
+        });
+    });
+
     describe("Subcollection Routes", () => {
         /**
          * These tests use the flat app (no prefix nesting) to avoid
