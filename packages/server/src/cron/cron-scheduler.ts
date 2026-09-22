@@ -308,6 +308,35 @@ const MIN_SCHEDULE_INTERVAL_MS = 5_000; // 5 seconds
  */
 const MAX_TIMER_DELAY_MS = 2_147_483_647; // 2^31 - 1, ~24.8 days
 
+/**
+ * `setTimeout` for a delay that may exceed {@link MAX_TIMER_DELAY_MS}: armed in
+ * hops no longer than the ceiling, re-measured against the deadline on each
+ * wake. Returns the function that cancels it.
+ */
+function setLongTimeout(callback: () => void, delayMs: number): () => void {
+    const deadline = Date.now() + delayMs;
+    let handle: ReturnType<typeof setTimeout>;
+    const arm = () => {
+        handle = setTimeout(() => {
+            if (Date.now() < deadline) arm();
+            else callback();
+        }, Math.min(Math.max(deadline - Date.now(), 0), MAX_TIMER_DELAY_MS));
+    };
+    arm();
+    return () => clearTimeout(handle);
+}
+
+/**
+ * Why `timeoutSeconds` cannot be used, or `undefined` when it can. Infinity is
+ * a timeout that never fires; zero, a negative number or NaN would fail every
+ * run the moment it started.
+ */
+function invalidTimeoutReason(timeoutSeconds: number | undefined): string | undefined {
+    if (timeoutSeconds === undefined || timeoutSeconds === Infinity) return undefined;
+    if (typeof timeoutSeconds === "number" && Number.isFinite(timeoutSeconds) && timeoutSeconds > 0) return undefined;
+    return `timeoutSeconds must be a positive number of seconds, or Infinity for none — got ${String(timeoutSeconds)}`;
+}
+
 // ─── CronScheduler ───────────────────────────────────────────────────
 
 interface RegisteredJob {
@@ -420,6 +449,19 @@ export class CronScheduler {
                     name: loaded.definition.name ?? loaded.id,
                     schedule: loaded.definition.schedule,
                     reason
+                });
+                continue;
+            }
+            // Same treatment: a timeout that fails every run the moment it
+            // starts is a configuration error, not a run-time one.
+            const timeoutProblem = invalidTimeoutReason(loaded.definition.timeoutSeconds);
+            if (timeoutProblem) {
+                logger.error(`[cron] Rejecting job "${loaded.id}": ${timeoutProblem}.`);
+                this.rejected.set(loaded.id, {
+                    id: loaded.id,
+                    name: loaded.definition.name ?? loaded.id,
+                    schedule: loaded.definition.schedule,
+                    reason: timeoutProblem
                 });
                 continue;
             }
@@ -980,17 +1022,21 @@ export class CronScheduler {
         aborted.catch(() => undefined);
 
         try {
-            // Race with timeout
+            // Race with timeout. Past the 32-bit timer ceiling a plain
+            // setTimeout fires after 1ms, so a month-long timeout would fail
+            // every run at once; Infinity is no timeout at all.
             const timeout = (job.definition.timeoutSeconds ?? 300) * 1000;
-            const timeoutHandle = setTimeout(
-                () => abort.abort(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)),
-                timeout
-            );
+            const cancelTimeout = Number.isFinite(timeout)
+                ? setLongTimeout(
+                    () => abort.abort(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)),
+                    timeout
+                )
+                : undefined;
 
             try {
                 result = await Promise.race([Promise.resolve(job.definition.handler(ctx)), aborted]);
             } finally {
-                clearTimeout(timeoutHandle);
+                cancelTimeout?.();
             }
         } catch (err: unknown) {
             success = false;

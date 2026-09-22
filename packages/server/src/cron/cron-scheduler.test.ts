@@ -432,6 +432,58 @@ reason: "already_executing" });
             expect(aborted).toBe(true);
         }, 10000);
 
+        it("holds a timeout longer than the 32-bit timer ceiling", async () => {
+            // setTimeout clamps anything past ~24.8 days to 1ms, so a 30-day
+            // timeout failed every run a millisecond after it started.
+            const DAY = 86_400_000;
+            let settle: (value: string) => void = () => undefined;
+            scheduler.registerJobs([makeJob("month-long", {
+                timeoutSeconds: 30 * 86_400,
+                handler: () => new Promise<string>((resolve) => { settle = resolve; })
+            })]);
+
+            let log: CronJobLogEntry | undefined;
+            const run = scheduler.triggerJob("month-long").then((entry) => { log = entry; });
+            await jest.advanceTimersByTimeAsync(29 * DAY);
+            expect(log).toBeUndefined();
+            expect(scheduler.getJob("month-long")?.state).toBe("running");
+
+            await jest.advanceTimersByTimeAsync(DAY + 1_000);
+            await run;
+            expect(log!.success).toBe(false);
+            expect(log!.error).toContain("timed out after 2592000000ms");
+            settle("late");
+        });
+
+        it("finishes a run inside a timeout longer than the timer ceiling", async () => {
+            jest.useRealTimers();
+            scheduler.registerJobs([makeJob("month-long-quick", {
+                timeoutSeconds: 30 * 86_400,
+                handler: () => new Promise((resolve) => setTimeout(() => resolve("done"), 20))
+            })]);
+            const log = await scheduler.triggerJob("month-long-quick");
+            expect(log!.success).toBe(true);
+            expect(log!.result).toBe("done");
+        });
+
+        it("reads a timeout of Infinity as no timeout", async () => {
+            jest.useRealTimers();
+            scheduler.registerJobs([makeJob("unbounded", {
+                timeoutSeconds: Infinity,
+                handler: () => new Promise((resolve) => setTimeout(() => resolve("done"), 20))
+            })]);
+            const log = await scheduler.triggerJob("unbounded");
+            expect(log!.success).toBe(true);
+        });
+
+        it.each([0, -5, Number.NaN])("refuses a job whose timeout is %p, rather than failing every run", (timeoutSeconds) => {
+            scheduler.registerJobs([makeJob("bad-timeout", { timeoutSeconds })]);
+            expect(scheduler.getJob("bad-timeout")).toBeUndefined();
+            expect(scheduler.listRejectedJobs()).toEqual([
+                expect.objectContaining({ id: "bad-timeout", reason: expect.stringContaining("timeoutSeconds") })
+            ]);
+        });
+
         it("leaves ctx.signal unaborted for a run that finished", async () => {
             jest.useRealTimers();
             let seen: AbortSignal | undefined;
