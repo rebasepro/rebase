@@ -1926,6 +1926,109 @@ settled };
     });
 
     // -----------------------------------------------------------------------
+    // A visitor with no account
+    // -----------------------------------------------------------------------
+    /**
+     * `createRebaseClient` wires a token getter that answers `""` for a
+     * visitor, and the socket used to read that as a refusal: every
+     * `listen()`, `listenById()` and `observe()` failed with "user not logged
+     * in" before a frame was sent. A server with `requireAuth: false` serves
+     * anonymous subscribers — `find()` beside the same `listen()` worked — so
+     * the client was refusing on the server's behalf, and refusing what the
+     * server allows. The server decides now, as it already did for channels.
+     */
+    describe("a subscriber with no account", () => {
+        async function anonymousClient() {
+            const client = createClient({ getAuthToken: async () => "" });
+            await jest.advanceTimersByTimeAsync(10);
+            return { client, ws: getWs() };
+        }
+
+        it("subscribes without authenticating", async () => {
+            const { client, ws } = await anonymousClient();
+            const onError = jest.fn();
+            const onUpdate = jest.fn();
+
+            client.listenCollection({ path: "posts" }, onUpdate, onError);
+            await jest.advanceTimersByTimeAsync(0);
+
+            const sent = frames(ws);
+            expect(sent.map(m => m.type)).toEqual(["subscribe_collection"]);
+            expect(onError).not.toHaveBeenCalled();
+            ws.onmessage!({ data: JSON.stringify({
+                type: "collection_update",
+                subscriptionId: sent[0].payload.subscriptionId,
+                rows: [{ id: "1", title: "public post" }]
+            }) });
+            expect(onUpdate).toHaveBeenCalledWith([{ id: "1", title: "public post" }], undefined);
+        });
+
+        it("subscribes to one row, and unsubscribes, without authenticating", async () => {
+            const { client, ws } = await anonymousClient();
+            const onError = jest.fn();
+
+            const unsubscribe = client.listenOne({ path: "posts", id: "1" }, jest.fn(), onError);
+            await jest.advanceTimersByTimeAsync(0);
+            unsubscribe();
+            await jest.advanceTimersByTimeAsync(0);
+
+            expect(frames(ws).map(m => m.type)).toEqual(["subscribe_one", "unsubscribe"]);
+            expect(onError).not.toHaveBeenCalled();
+            expect(console.error).not.toHaveBeenCalled();
+        });
+
+        /**
+         * A server with `requireAuth: true` refuses the frame before it
+         * reaches the realtime service, and that refusal carries the frame's
+         * `requestId` and no `subscriptionId` — a subscribe has no pending
+         * request to match it by, so it fell through to a console warning and
+         * the listener waited out the 30s watchdog for a "timed out" that
+         * said nothing about why.
+         */
+        it("hands the server's refusal to onError, at once", async () => {
+            const { client, ws } = await anonymousClient();
+            const onError = jest.fn<(error: Error) => void>();
+
+            client.listenCollection({ path: "posts" }, jest.fn(), onError);
+            await jest.advanceTimersByTimeAsync(0);
+            const subscribe = frames(ws)[0];
+            ws.onmessage!({ data: JSON.stringify({
+                type: "ERROR",
+                requestId: subscribe.requestId,
+                payload: { error: { message: "Authentication required", code: "UNAUTHORIZED" } }
+            }) });
+            await jest.advanceTimersByTimeAsync(0);
+
+            expect(onError).toHaveBeenCalledTimes(1);
+            const error = onError.mock.calls[0][0] as ApiError;
+            expect(error).toBeInstanceOf(ApiError);
+            expect(error.code).toBe("UNAUTHORIZED");
+            expect(error.message).toBe("Authentication required");
+        });
+
+        it("hands a row subscription's refusal to onError too", async () => {
+            const { client, ws } = await anonymousClient();
+            const onError = jest.fn<(error: Error) => void>();
+
+            client.listenOne({ path: "posts", id: "1" }, jest.fn(), onError);
+            await jest.advanceTimersByTimeAsync(0);
+            ws.onmessage!({ data: JSON.stringify({
+                type: "ERROR",
+                requestId: frames(ws)[0].requestId,
+                payload: { error: { message: "Too many requests. Please slow down.", code: "RATE_LIMITED" } }
+            }) });
+
+            expect(onError).toHaveBeenCalledTimes(1);
+            expect((onError.mock.calls[0][0] as ApiError).code).toBe("RATE_LIMITED");
+        });
+
+        it("still refuses a request frame, which has an answer to wait for", async () => {
+            const { client } = await anonymousClient();
+            await expect(client.fetchCollection({ path: "posts" })).rejects.toThrow("not logged in");
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // ApiError
     // -----------------------------------------------------------------------
     describe("RebaseApiError (thrown by the WS client)", () => {

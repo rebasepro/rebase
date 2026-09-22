@@ -88,6 +88,29 @@ const CHANNEL_MESSAGE_TYPES = new Set([
 ]);
 
 /**
+ * Subscription frames. Like channel frames they get no response envelope, and
+ * like them they go out without an account when there is none: whether an
+ * anonymous visitor may subscribe is the server's `requireAuth` to decide, and
+ * a server that refuses answers the frame, which reaches the listener's
+ * `onError`.
+ */
+const SUBSCRIPTION_MESSAGE_TYPES = new Set([
+    "subscribe_collection",
+    "subscribe_one",
+    "unsubscribe"
+]);
+
+/**
+ * The token getter's "there is no account" — an empty token, or its own
+ * "not logged in". Distinct from a getter that failed, which says nothing about
+ * whether there is one.
+ */
+function isNotSignedIn(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes("not logged in");
+}
+
+/**
  * The other direction: the frame types the *server* addresses by channel.
  *
  * Not the mirror of {@link CHANNEL_MESSAGE_TYPES} — a request and its answer
@@ -916,9 +939,17 @@ export class RebaseWebSocketClient {
             }
         }
 
-        // Handle subscription errors
-        if (subscriptionId && (type === "ERROR" || message.error)) {
-            const collectionKey = this.backendToCollectionKey.get(subscriptionId);
+        // Handle subscription errors.
+        //
+        // A refusal the server issues before the frame reaches its realtime
+        // service — UNAUTHORIZED on a `requireAuth` server, RATE_LIMITED —
+        // carries the frame's `requestId` and no `subscriptionId`. A subscribe
+        // is sent with its subscription id as its request id, so that still
+        // names it; without this the refusal fell through to a console warning
+        // and the listener waited out the watchdog for a "timed out".
+        const erroredSubscriptionId = subscriptionId ?? requestId;
+        if (erroredSubscriptionId && (type === "ERROR" || message.error)) {
+            const collectionKey = this.backendToCollectionKey.get(erroredSubscriptionId);
             if (collectionKey) {
                 const collectionSub = this.collectionSubscriptions.get(collectionKey);
                 if (collectionSub) {
@@ -952,7 +983,7 @@ export class RebaseWebSocketClient {
                 }
             }
 
-            const entityKey = this.backendToEntityKey.get(subscriptionId);
+            const entityKey = this.backendToEntityKey.get(erroredSubscriptionId);
             if (entityKey) {
                 const entitySub = this.singleSubscriptions.get(entityKey);
                 if (entitySub) {
@@ -1127,15 +1158,24 @@ export class RebaseWebSocketClient {
         // require an account. A signed-in caller still authenticates: the
         // socket does it from `getAuthToken` on open, and the server authorizes
         // these frames either way.
+        //
+        // Subscription frames authenticate when there is an account and go out
+        // without one when there is not. Refusing them here refused every
+        // visitor's `listen()` on a server that serves visitors — `find()`
+        // beside it worked — so the client was deciding `requireAuth` for a
+        // server that had decided the other way.
+        const isSubscriptionFrame = SUBSCRIPTION_MESSAGE_TYPES.has(message.type as string);
         if (message.type !== "AUTHENTICATE"
             && !CHANNEL_MESSAGE_TYPES.has(message.type as string)
             && this.getAuthToken && !this.isAuthenticated) {
             try {
                 await this.ensureAuthenticated();
             } catch (error: unknown) {
-                const errorMessage = error instanceof Error ? error.message : "Authentication required";
-                reject(new RebaseApiError(errorMessage));
-                return;
+                if (!(isSubscriptionFrame && isNotSignedIn(error))) {
+                    const errorMessage = error instanceof Error ? error.message : "Authentication required";
+                    reject(new RebaseApiError(errorMessage));
+                    return;
+                }
             }
         }
 
@@ -1143,9 +1183,7 @@ export class RebaseWebSocketClient {
         message.requestId = requestId;
 
         const expectsResponse = !(
-            message.type === "subscribe_collection"
-            || message.type === "subscribe_one"
-            || message.type === "unsubscribe"
+            isSubscriptionFrame
             || CHANNEL_MESSAGE_TYPES.has(message.type as string)
         );
 
@@ -1709,6 +1747,9 @@ onError });
 
         this.sendMessage({
             type: "subscribe_collection",
+            // So a refusal addressed by request id names the subscription —
+            // see the subscription-error branch of `handleWebSocketMessage`.
+            requestId: backendSubscriptionId,
             payload: {
                 ...subscription.props,
                 subscriptionId: backendSubscriptionId
@@ -1737,6 +1778,7 @@ onError });
 
         this.sendMessage({
             type: "subscribe_one",
+            requestId: backendSubscriptionId,
             payload: {
                 ...subscription.props,
                 subscriptionId: backendSubscriptionId
