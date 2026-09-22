@@ -265,7 +265,12 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             maxWidth={singleEntity ? "2xl" : "lg"}
             aria-labelledby="delete-dialog"
             open={open}
-            onOpenChange={(open) => !open ? onClose() : undefined}
+            // Escape and a click outside are a cancel, not just a close: the
+            // abort flag is what stops a bulk delete's queue, and a dialog that
+            // only closed left it deleting with nothing on screen.
+            onOpenChange={(open) => {
+                if (!open) handleCancel();
+            }}
         >
             <DialogTitle id="delete-dialog-title">
                 {dialogTitle}
