@@ -103,15 +103,34 @@ export class MongoConditionBuilder {
      *
      * Always returns a condition or throws: there is no operator this can be
      * given that legitimately means "no condition".
+     *
+     * `negated` asks for the documents where the condition is *false* — not
+     * merely not true. The two differ by the documents where it is unknown,
+     * which in SQL is a comparison against NULL: `NOT (status = 'draft')` does
+     * not return a row whose status is NULL, and the Postgres driver is the
+     * reference every caller of this API writes against. So a comparison is
+     * false only where the field holds a value and the comparison fails on it.
+     * The null tests are never unknown, and negate to each other.
      */
     private static buildCondition(
         field: string,
         op: WhereFilterOp,
-        value: any
+        value: any,
+        negated = false
     ): Filter<Document> {
         // Null-testing operators ignore their value.
-        if (op === "is-null") return { [field]: { $eq: null } };
-        if (op === "is-not-null") return { [field]: { $ne: null } };
+        if (op === "is-null" || op === "is-not-null") {
+            const isNull = (op === "is-null") !== negated;
+            return { [field]: isNull ? { $eq: null } : { $ne: null } };
+        }
+        if (negated) {
+            return {
+                $and: [
+                    { [field]: { $ne: null } },
+                    { $nor: [this.buildCondition(field, op, value)] }
+                ]
+            };
+        }
 
         // Pattern matching → regular expressions.
         if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
@@ -145,31 +164,44 @@ export class MongoConditionBuilder {
     }
 
     /**
-     * Translate an `or(...)` / `and(...)` group, nesting included.
+     * Translate an `or(...)` / `and(...)` / `not(...)` group, nesting included.
+     *
+     * `not` negates the conjunction of its conditions — the rule stated on
+     * `LogicalCondition`. It used to fall through to the `and` branch, so
+     * `not(status = 'draft')` returned exactly the drafts. It is compiled by
+     * pushing the negation down to the leaves (De Morgan), each of which knows
+     * which documents make it false rather than merely not true — see
+     * {@link buildCondition}. A `$nor` around the group would be shorter and
+     * wrong: it also matches every document where the condition is unknown.
      *
      * Returns `undefined` for a group with nothing in it. `$or: []` is an error
      * in Mongo and `$and: []` matches every document, so neither is a
      * defensible reading of "no conditions".
      */
-    static buildLogicalConditions(logical: LogicalCondition | undefined): Filter<Document> | undefined {
+    static buildLogicalConditions(logical: LogicalCondition | undefined, negated = false): Filter<Document> | undefined {
         if (!logical || !Array.isArray(logical.conditions)) return undefined;
 
+        // A `not` group is its conjunction, negated once more.
+        const negateParts = logical.type === "not" ? !negated : negated;
         const parts: Filter<Document>[] = [];
         for (const entry of logical.conditions) {
             if (!entry) continue;
             if ("type" in entry && "conditions" in entry) {
-                const nested = this.buildLogicalConditions(entry as LogicalCondition);
+                const nested = this.buildLogicalConditions(entry as LogicalCondition, negateParts);
                 if (nested) parts.push(nested);
                 continue;
             }
             const { column, operator, value } = entry as FilterCondition;
-            parts.push(this.buildCondition(column, operator, value));
+            parts.push(this.buildCondition(column, operator, value, negateParts));
         }
 
         // Through the same combiners the rest of this class uses, so a
         // one-condition group reads as the bare condition — identical to how
         // `filter` would have expressed it — rather than as `{ $and: [x] }`.
-        return logical.type === "or"
+        // Negated, an `or` is the `and` of its negated parts and the other
+        // way round.
+        const disjunction = (logical.type === "or") !== negateParts;
+        return disjunction
             ? this.combineConditionsWithOr(parts)
             : this.combineConditionsWithAnd(parts);
     }
