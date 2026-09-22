@@ -262,6 +262,16 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
 
         const orderByParam: [string, "asc" | "desc"] | undefined = currentOrderProperty ? [currentOrderProperty, "asc"] : undefined;
 
+        // Whether this subscription is still the column's current one. Every
+        // answer — live, fallback or one-shot — checks it before it paints:
+        // a read issued for the previous search, or for the page size before a
+        // load-more, can resolve after the one that replaced it, and it would
+        // otherwise overwrite the newer rows. `isCleaningUpRef` cannot say
+        // this: it is one flag for the whole board, and the next subscription
+        // sets it straight back to false.
+        let active = true;
+        const isCurrent = () => active && !isCleaningUpRef.current;
+
         // Mark column as loading
         setColumnData(prev => ({
             ...prev,
@@ -274,8 +284,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
 
         // onUpdate callback
         const onUpdate = async (entities: Entity<M>[]) => {
-            // Skip updates if we're cleaning up
-            if (isCleaningUpRef.current) return;
+            if (!isCurrent()) return;
 
             const pendingMap = pendingItemsRef.current;
 
@@ -368,6 +377,10 @@ values: { ...e.values,
                 }
             }
 
+            // `afterRead` above is awaited; the subscription may have been
+            // replaced in the meantime.
+            if (!isCurrent()) return;
+
             const newHasMore = entities.length >= itemCount;
 
             // Compare with current state — skip update if identical to avoid UI flash
@@ -423,8 +436,7 @@ values: { ...e.values,
         });
 
         const onError = (error: Error) => {
-            // Skip error handling if we're cleaning up
-            if (isCleaningUpRef.current) return;
+            if (!isCurrent()) return;
 
             console.error(`Error loading column ${column}:`, error);
 
@@ -437,7 +449,7 @@ values: { ...e.values,
             fetchOnce()
                 .then(res => onUpdate(res.data as Entity<M>[]))
                 .catch(() => {
-                    if (isCleaningUpRef.current) return;
+                    if (!isCurrent()) return;
                     setColumnData(prev => ({
                         ...prev,
                         [column]: {
@@ -474,24 +486,30 @@ values: { ...e.values,
             // over HTTP and paint that; the live data still wins whenever it
             // arrives. Costs nothing when realtime is healthy.
             const firstPaintFallback = setTimeout(() => {
-                if (liveDataReceived || isCleaningUpRef.current) return;
+                if (liveDataReceived || !isCurrent()) return;
                 fetchOnce()
                     .then(res => {
-                        if (liveDataReceived || isCleaningUpRef.current) return;
+                        if (liveDataReceived || !isCurrent()) return;
                         onUpdate(res.data as Entity<M>[]);
                     })
                     .catch(() => undefined);
             }, LIVE_FIRST_PAINT_TIMEOUT_MS);
 
             unsubscribersRef.current[column] = () => {
+                active = false;
                 clearTimeout(firstPaintFallback);
                 unsubscribe?.();
             };
         } else {
+            // Nothing to unsubscribe from, but the read is still superseded
+            // by whatever replaces this subscription.
+            unsubscribersRef.current[column] = () => {
+                active = false;
+            };
             fetchOnce()
                 .then(res => onUpdate(res.data as Entity<M>[]))
                 .catch((error: Error) => {
-                    if (isCleaningUpRef.current) return;
+                    if (!isCurrent()) return;
                     setColumnData(prev => ({
                         ...prev,
                         [column]: {
@@ -531,6 +549,10 @@ values: { ...e.values,
         const currentColumns = columns;
         const currentColumnItemCounts = columnItemCounts;
 
+        // Set by this run's cleanup, so a count issued for the previous search
+        // or filter cannot land after the one that replaced it.
+        let cancelled = false;
+
         // Small delay to ensure Firestore has cleaned up previous listeners
         const timeoutId = setTimeout(() => {
             if (isCleaningUpRef.current) return;
@@ -560,7 +582,7 @@ values: { ...e.values,
                         // while the column beneath it shows searched rows.
                         searchString: currentSearchString
                     }).then(count => {
-                        if (isCleaningUpRef.current) return;
+                        if (cancelled || isCleaningUpRef.current) return;
                         setColumnData(prev => ({
                             ...prev,
                             [column]: {
@@ -579,6 +601,7 @@ values: { ...e.values,
         }, 0);
 
         return () => {
+            cancelled = true;
             clearTimeout(timeoutId);
             isCleaningUpRef.current = true;
             const unsubscribers = { ...unsubscribersRef.current };

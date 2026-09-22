@@ -393,3 +393,80 @@ describe("useBoardDataController — afterRead", () => {
         expect(result.current.columnData.todo.entities[0].values).toMatchObject({ title: "Secret" });
     });
 });
+
+/** The `onUpdate` of the most recent subscription for a column. */
+function latestUpdateFor(column: string): (entities: unknown[]) => void {
+    const call = listen.mock.calls.filter(([params]: any[]) => params.where.status?.[1] === column).pop();
+    if (!call) throw new Error(`No listen registered for column ${column}`);
+    return (entities) => (call[1] as (res: { data: unknown[] }) => void)({ data: entities });
+}
+
+/**
+ * With no realtime, each column reads once per search. Nothing cancelled a read
+ * that a newer search had superseded: the one guard was a single flag the next
+ * subscription set straight back, so whichever answer arrived *last* won — and
+ * the older, broader search is the slower one.
+ */
+describe("useBoardDataController — superseded reads", () => {
+
+    beforeEach(() => {
+        listen.mockReset();
+        find.mockReset();
+        count.mockReset();
+    });
+
+    it("an older search's rows cannot overwrite a newer search's", async () => {
+        const noListen = { listen: undefined, find, count };
+        const spy = jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen } as never);
+        const reads: Record<string, (value: { data: unknown[] }) => void> = {};
+        find.mockImplementation((params: any) => new Promise(resolve => {
+            reads[params.searchString ?? ""] = resolve;
+        }));
+        count.mockResolvedValue(0);
+
+        const { result, rerender } = renderHook(({ search }) => useBoardDataController<Task, "todo">({
+            fullPath: "tasks",
+            collection,
+            columnProperty: "status",
+            columns: ["todo"],
+            pageSize: 30,
+            searchString: search
+        } as never), { initialProps: { search: "a" } });
+
+        await waitFor(() => expect(reads.a).toBeDefined());
+        rerender({ search: "ab" });
+        await waitFor(() => expect(reads.ab).toBeDefined());
+
+        await act(async () => reads.ab({ data: [entity("ab1", { status: "todo" })] }));
+        await act(async () => reads.a({ data: [entity("a1", { status: "todo" }), entity("a2", { status: "todo" })] }));
+
+        expect(result.current.columnData.todo.entities.map(e => e.id)).toEqual(["ab1"]);
+        spy.mockRestore();
+    });
+
+    it("an older search's count cannot overwrite a newer search's", async () => {
+        listen.mockReturnValue(() => undefined);
+        const counts: Record<string, (value: number) => void> = {};
+        count.mockImplementation((params: any) => new Promise(resolve => {
+            counts[params.searchString ?? ""] = resolve;
+        }));
+
+        const { result, rerender } = renderHook(({ search }) => useBoardDataController<Task, "todo">({
+            fullPath: "tasks",
+            collection,
+            columnProperty: "status",
+            columns: ["todo"],
+            pageSize: 30,
+            searchString: search
+        } as never), { initialProps: { search: "a" } });
+
+        await waitFor(() => expect(counts.a).toBeDefined());
+        rerender({ search: "ab" });
+        await waitFor(() => expect(counts.ab).toBeDefined());
+
+        await act(async () => counts.ab(1));
+        await act(async () => counts.a(40));
+
+        expect(result.current.columnData.todo.totalCount).toBe(1);
+    });
+});
