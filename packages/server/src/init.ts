@@ -3194,12 +3194,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // named 501. An empty chart and "this deployment keeps no history" must not
     // look alike.
     let metricsHistory: import("./metrics/history-recorder.js").MetricsHistory | undefined;
+    // Kept for the shutdown: the sampler's interval writes to the pool.
+    let stopMetricsSampler: (() => void) | undefined;
     try {
         const { createMetricsHistory } = await import("./metrics/history-recorder.js");
         metricsHistory = createMetricsHistory(defaultDriver);
         if (metricsHistory) {
             await metricsHistory.ensure();
-            metricsHistory.start();
+            stopMetricsSampler = metricsHistory.start();
         }
     } catch (err) {
         // A backend that serves is worth more than one that charts. This is the
@@ -3489,6 +3491,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         cronScheduler,
         jobQueue,
         rlsAudit,
+        stopMetricsSampler,
         realtimeServices
     });
 

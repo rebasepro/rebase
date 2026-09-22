@@ -76,7 +76,7 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
             // costs effectively nothing; `.enable()` is required, and the
             // histogram is reset each tick so every sample describes its own
             // minute rather than the process's whole life.
-            interface LoopHistogram { mean: number; enable(): void; reset(): void }
+            interface LoopHistogram { mean: number; enable(): void; disable(): void; reset(): void }
             let loop: LoopHistogram | null = null;
             try {
                 loop = monitorEventLoopDelay({ resolution: 20 }) as LoopHistogram;
@@ -111,7 +111,13 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
             // Not the reason this process should stay alive.
             timer.unref?.();
 
-            return () => { stopped = true; clearInterval(timer); };
+            // The histogram samples in libuv until it is disabled, so the stop
+            // ends both — a backend shut down in-process leaves nothing running.
+            return () => {
+                stopped = true;
+                clearInterval(timer);
+                loop?.disable();
+            };
         }
     };
 }
