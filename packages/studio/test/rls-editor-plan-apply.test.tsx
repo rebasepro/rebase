@@ -4,7 +4,7 @@
 import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 /**
  * Saving a policy on a collection-mapped table POSTed the rules straight to
@@ -285,6 +285,85 @@ describe("importing a live policy into the codebase", () => {
         const rule = importedRule();
         expect(rule.pgRoles).toEqual(["rebase_user"]);
         expect(rule).not.toHaveProperty("roles");
+    });
+});
+
+/**
+ * Editing a policy straight in the database — the hosted console, where there
+ * is no source to write to.
+ *
+ * The edit dropped the policy under its *new* name and created it under the
+ * new name, as two separate statements. Renaming `public_read` to
+ * `owner_read` dropped nothing and added a second policy beside the first, so
+ * the world-readable one stayed. And the two statements committed on their
+ * own: a typo in the new USING clause failed the CREATE after the DROP had
+ * already gone through, and the policy was simply gone.
+ */
+describe("editing a policy in the database", () => {
+    const publicRead = {
+        schemaname: "public",
+        tablename: "authors",
+        policyname: "public_read",
+        permissive: "PERMISSIVE",
+        roles: "{public}",
+        cmd: "SELECT",
+        qual: "true",
+        with_check: null
+    };
+
+    function label(key: keyof typeof en): string {
+        const value = en[key];
+        if (typeof value !== "string") throw new Error(`en.${String(key)} is not a string`);
+        return value;
+    }
+
+    /** Every statement the editor sent that touches a policy definition. */
+    function policyDdl(): string[] {
+        return executeSql.mock.calls
+            .map(call => String(call[0]))
+            .filter(sql => /(DROP|CREATE)\s+POLICY/i.test(sql));
+    }
+
+    async function editAndSave(newName: string): Promise<void> {
+        hasCodebase = false;
+        livePolicies = [publicRead];
+        render(<RLSEditor/>);
+
+        // The table is mapped, so the generated admin baseline is listed too:
+        // press the Edit that sits in `public_read`'s own row.
+        let row: HTMLElement | null = await screen.findByText("public_read");
+        while (row && within(row).queryAllByRole("button", { name: label("studio_rls_edit") }).length !== 1) {
+            row = row.parentElement;
+        }
+        if (!row) throw new Error("no row for public_read");
+        fireEvent.click(within(row).getByRole("button", { name: label("studio_rls_edit") }));
+        const nameField = await screen.findByLabelText(label("studio_policy_name"));
+        fireEvent.change(nameField, { target: { value: newName } });
+        fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
+
+        await waitFor(() => expect(policyDdl().length).toBeGreaterThan(0));
+    }
+
+    it("drops the policy under the name it had, not the one it is getting", async () => {
+        await editAndSave("owner_read");
+
+        const [statement] = policyDdl();
+        expect(statement).toMatch(/DROP POLICY IF EXISTS "public_read" ON "public"\."authors"/);
+        expect(statement).toMatch(/CREATE POLICY "owner_read" ON "public"\."authors"/);
+        expect(statement).not.toMatch(/DROP POLICY IF EXISTS "owner_read"/);
+    });
+
+    it("sends the drop and the create as one statement, so a failed create keeps the old policy", async () => {
+        await editAndSave("public_read");
+
+        // One call: a multi-statement simple query runs as a single implicit
+        // transaction, so the DROP rolls back if the CREATE fails.
+        expect(policyDdl()).toHaveLength(1);
+        const [statement] = policyDdl();
+        expect(statement.indexOf("DROP POLICY")).toBeLessThan(statement.indexOf("CREATE POLICY"));
+        // No explicit BEGIN/COMMIT: a failure between them would leave a pooled
+        // connection inside an aborted transaction.
+        expect(statement).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/i);
     });
 });
 

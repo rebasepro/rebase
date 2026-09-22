@@ -917,17 +917,30 @@ message: "Policy saved successfully" });
                                                 ? newPolicy.roles.map(r => sanitizeSqlIdentifier(r)).join(", ")
                                                 : "public";
 
-                                            // Drop existing policy if editing
-                                            if (editingPolicy !== "new") {
-                                                await databaseAdmin!.executeSql!(`DROP POLICY IF EXISTS ${policyName} ON ${qualifiedTable}`);
-                                            }
-
                                             let sql = `CREATE POLICY ${policyName} ON ${qualifiedTable}`;
                                             sql += ` AS ${permissive}`;
                                             sql += ` FOR ${cmd}`;
                                             sql += ` TO ${roles}`;
                                             if (newPolicy.qual) sql += ` USING (${newPolicy.qual})`;
                                             if (newPolicy.with_check) sql += ` WITH CHECK (${newPolicy.with_check})`;
+
+                                            // An edit replaces the policy under the name it
+                                            // *had* — the new one, when it was renamed, drops
+                                            // nothing and leaves the old policy granting
+                                            // beside its replacement.
+                                            //
+                                            // And in the same statement as the CREATE: Postgres
+                                            // runs a multi-statement simple query as one
+                                            // implicit transaction, so a CREATE that fails
+                                            // (a typo in USING) takes the DROP back with it
+                                            // instead of leaving the table without the policy.
+                                            // No explicit BEGIN/COMMIT — on a failure the
+                                            // COMMIT is skipped and the pooled connection is
+                                            // returned inside an aborted transaction.
+                                            if (editingPolicy !== "new") {
+                                                const previousName = sanitizeSqlIdentifier(editingPolicy.policyname);
+                                                sql = `DROP POLICY IF EXISTS ${previousName} ON ${qualifiedTable}; ${sql}`;
+                                            }
 
                                             await databaseAdmin!.executeSql!(sql);
 
