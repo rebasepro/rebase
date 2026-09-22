@@ -969,6 +969,9 @@ export interface RebaseTranslations {
     studio_rls_enable_force_rls?: string;
     studio_rls_disable_force_rls?: string;
     studio_rls_edit?: string;
+    studio_rls_edit_generated?: string;
+    studio_rls_edit_not_declared?: string;
+    studio_rls_edit_several_operations?: string;
     studio_rls_delete?: string;
     studio_rls_confirm_delete_title?: string;
     studio_rls_confirm_delete_body?: string;

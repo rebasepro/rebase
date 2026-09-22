@@ -33,9 +33,16 @@ import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } fr
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
-import { policyToRule } from "./policyRules";
+import { applyPolicyEdit, policyToRule, type PolicyEditRefusal } from "./policyRules";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
+
+/** What the editor says when an edit has no declared rule to go back to. */
+const POLICY_EDIT_REFUSALS: Record<PolicyEditRefusal, string> = {
+    generated: "studio_rls_edit_generated",
+    not_declared: "studio_rls_edit_not_declared",
+    several_operations: "studio_rls_edit_several_operations"
+};
 
 function classifyTableClient(
     tableName: string,
@@ -881,14 +888,27 @@ totalPolicies };
                                         // The editor edits a `PostgresPolicy`, whose `roles`
                                         // is the `TO` list — `policyToRule` files it under
                                         // `pgRoles`, never `roles`.
-                                        const rule = policyToRule(newPolicy);
-
                                         const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                         let newRules;
                                         if (editingPolicy === "new") {
-                                            newRules = [...existingRules, rule];
+                                            newRules = [...existingRules, policyToRule(newPolicy)];
                                         } else {
-                                            newRules = existingRules.map((r: { name?: string }) => r.name === editingPolicy.policyname ? rule : r);
+                                            // Back to the rule the policy compiles from, or
+                                            // a refusal that says why there is none — never
+                                            // the unchanged rules reported as saved.
+                                            const edit = applyPolicyEdit(
+                                                existingRules,
+                                                getEffectiveSecurityRules(activeCollection),
+                                                activeTableData.tableName,
+                                                editingPolicy,
+                                                newPolicy
+                                            );
+                                            if (!edit.ok) {
+                                                snackbarController.open({ type: "error",
+                                                    message: t(POLICY_EDIT_REFUSALS[edit.reason], { policy: editingPolicy.policyname }) });
+                                                return;
+                                            }
+                                            newRules = edit.rules;
                                         }
 
                                         try {

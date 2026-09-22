@@ -39,6 +39,12 @@ let hasCodebase = true;
  */
 let livePolicies: Record<string, unknown>[] = [];
 
+/** The mapped collection's declared `securityRules` — none unless a test says. */
+let declaredRules: Record<string, unknown>[] = [];
+
+/** Every snackbar the editor opened, so a refusal can be read back. */
+const snackbarOpen = jest.fn<(options: { type: string; message: string }) => void>();
+
 /** One mapped table, and the SQL the editor's load path asks for. */
 const executeSql = jest.fn<(sql: string) => Promise<unknown>>(async (sql: string) => {
     if (sql.includes("pg_tables")) {
@@ -61,7 +67,12 @@ const databaseAdmin = {
 };
 
 const translation = {
-    t: (key: string) => en[key as keyof typeof en] ?? key,
+    t: (key: string, options?: Record<string, unknown>) => {
+        const value = en[key as keyof typeof en] ?? key;
+        return options && typeof value === "string"
+            ? value.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => String(options[k] ?? ""))
+            : value;
+    },
     i18n: { language: "en" }
 };
 
@@ -77,14 +88,14 @@ jest.mock("@rebasepro/app", () => ({
         // which is how a save filed under the wrong key passed.)
         collections: [{ slug: "writers",
 table: "authors",
-securityRules: [] }],
+securityRules: declaredRules }],
         getCollection: () => undefined
     }),
     useStudioCapabilities: () => ({ codebase: hasCodebase }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ getAuthToken: async () => "token" }),
     useRebaseContext: () => ({ databaseAdmin }),
-    useSnackbarController: () => ({ open: jest.fn() }),
+    useSnackbarController: () => ({ open: snackbarOpen }),
     // The policy editor's expression fields are Monaco, which asks the host
     // whether it is in dark mode.
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
@@ -94,12 +105,15 @@ securityRules: [] }],
 }));
 
 import { RLSEditor } from "../src/components/RLSEditor/RLSEditor";
+import { getPolicyNamesForRule } from "@rebasepro/utils";
 
 beforeEach(() => {
     updateCollection.mockReset();
     updateCollection.mockResolvedValue(undefined);
     executeSql.mockClear();
     livePolicies = [];
+    declaredRules = [];
+    snackbarOpen.mockClear();
     editorAvailable = true;
     hasCodebase = true;
     // Watched in both directions: the point of the bridge path is that it does
@@ -373,6 +387,93 @@ describe("editing a policy in the database", () => {
         // No explicit BEGIN/COMMIT: a failure between them would leave a pooled
         // connection inside an aborted transaction.
         expect(statement).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/i);
+    });
+});
+
+/**
+ * Editing a policy that a declared rule compiles to, where the host has source.
+ *
+ * The edit found its rule by `rule.name === policy name`. An unnamed rule's
+ * policy is `<table>_<op>_<hash>`, a rule over several operations names its
+ * policies `<name>_<op>`, and the admin baseline Rebase adds is declared by no
+ * rule at all — so none of them matched, the unchanged rules were saved, and
+ * the editor said "Policy saved successfully".
+ */
+describe("editing a policy declared in code", () => {
+    function label(key: keyof typeof en): string {
+        const value = en[key];
+        if (typeof value !== "string") throw new Error(`en.${String(key)} is not a string`);
+        return value;
+    }
+
+    /** Open the editor on one policy's row, rename it, and press Save. */
+    async function editAndSave(policyName: string, newName: string): Promise<void> {
+        render(<RLSEditor/>);
+        let row: HTMLElement | null = await screen.findByText(policyName);
+        while (row && within(row).queryAllByRole("button", { name: label("studio_rls_edit") }).length !== 1) {
+            row = row.parentElement;
+        }
+        if (!row) throw new Error(`no row for ${policyName}`);
+        fireEvent.click(within(row).getByRole("button", { name: label("studio_rls_edit") }));
+
+        fireEvent.change(await screen.findByLabelText(label("studio_policy_name")), { target: { value: newName } });
+        fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
+    }
+
+    function errors(): string[] {
+        return snackbarOpen.mock.calls.filter(([o]) => o.type === "error").map(([o]) => o.message);
+    }
+
+    it("edits the unnamed rule a generated policy name belongs to, keeping its condition", async () => {
+        const rule = { operation: "select", access: "public" };
+        declaredRules = [rule];
+        const [generated] = getPolicyNamesForRule({ operation: "select", access: "public" }, "authors");
+
+        await editAndSave(generated, "public_read");
+
+        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+        const [, patch] = updateCollection.mock.calls[0];
+        // Renamed, and still `access: "public"`: the editor shows no USING for
+        // a structured rule, and an untouched condition is not a change.
+        expect((patch as { securityRules: unknown[] }).securityRules)
+            .toEqual([{ name: "public_read", operation: "select", access: "public" }]);
+    });
+
+    it("refuses one operation of a rule that covers several", async () => {
+        declaredRules = [{ name: "owner_access", operations: ["select", "update"], ownerField: "author_id" }];
+
+        await editAndSave("owner_access_select", "owner_read");
+
+        await waitFor(() => expect(errors()).toHaveLength(1));
+        expect(errors()[0]).toBe(label("studio_rls_edit_several_operations").replace("{{policy}}", "owner_access_select"));
+        expect(updateCollection).not.toHaveBeenCalled();
+    });
+
+    it("refuses a policy of the baseline Rebase generates", async () => {
+        await editAndSave("authors_default_admin_read", "admins_read");
+
+        await waitFor(() => expect(errors()).toHaveLength(1));
+        expect(errors()[0]).toBe(label("studio_rls_edit_generated").replace("{{policy}}", "authors_default_admin_read"));
+        expect(updateCollection).not.toHaveBeenCalled();
+    });
+
+    it("refuses a policy that exists only in the database", async () => {
+        livePolicies = [{
+            schemaname: "public",
+            tablename: "authors",
+            policyname: "hand_written",
+            permissive: "PERMISSIVE",
+            roles: "{public}",
+            cmd: "SELECT",
+            qual: "true",
+            with_check: null
+        }];
+
+        await editAndSave("hand_written", "hand_written_2");
+
+        await waitFor(() => expect(errors()).toHaveLength(1));
+        expect(errors()[0]).toBe(label("studio_rls_edit_not_declared").replace("{{policy}}", "hand_written"));
+        expect(updateCollection).not.toHaveBeenCalled();
     });
 });
 
