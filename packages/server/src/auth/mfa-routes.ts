@@ -176,6 +176,7 @@ iat: pending.iat };
  * front of this one — they bound different things.
  */
 const mfaVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+    name: "auth-mfa-verify",
     windowMs: 15 * 60 * 1000,
     limit: MFA_VERIFICATION_ATTEMPTS_PER_WINDOW,
     keyGenerator: async (c) => `mfa-verify:${(await resolveStepUpPrincipal(c as Context<HonoEnv>))?.uid ?? "unidentified"}`,

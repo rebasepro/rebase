@@ -37,6 +37,15 @@ interface RateLimiterOptions {
      */
     store?: RateLimitStore;
     /**
+     * Count in the deployment's shared store once one is configured, under
+     * this name. For a limiter declared at module load, which runs before any
+     * configuration exists and so cannot be handed a `store` — see
+     * {@link useSharedRateLimitStore}. The name namespaces the limiter's keys
+     * there: two limiters keyed by the same IP must not share one count.
+     * Ignored when `store` is given.
+     */
+    name?: string;
+    /**
      * Per-request limit override, for buckets whose allowance is data rather
      * than config (an API key's own `rate_limit`). Returning `undefined` uses
      * `limit`; returning `null` skips the limiter for this request.
@@ -113,6 +122,40 @@ function warnIfProxiedButUntrusted(hasForwardedFor: boolean): void {
 }
 
 /**
+ * The store this deployment shares its counts in, when it has one.
+ *
+ * Module state, because the limiters that read it are module constants: the
+ * auth limiters are built at import time, before `initializeRebaseBackend`
+ * has read `REBASE_RATE_LIMIT_STORE` or `rateLimit.store`, so they cannot be
+ * handed the store the way the data limiter is. Without this they each kept a
+ * private memory store whatever the deployment asked for, and on N replicas
+ * every login, reset, OTP and MFA limit was N times looser than configured.
+ */
+let sharedRateLimitStore: RateLimitStore | undefined;
+
+/**
+ * Point every named limiter at the deployment's shared store — or, with
+ * `undefined`, back at its own memory. Called once per boot with the store
+ * the data limiters use, and only when that store is shared (SQL, or one the
+ * operator supplied): the default memory store is swept on the data window,
+ * which is not every limiter's window.
+ */
+export function useSharedRateLimitStore(store: RateLimitStore | undefined): void {
+    sharedRateLimitStore = store;
+}
+
+/** The deployment's store under `name` when there is one, this limiter's own memory otherwise. */
+function namedStore(name: string, windowMs: number): RateLimitStore {
+    const local = new MemoryRateLimitStore(windowMs);
+    return {
+        hit: (key, window, limit) => sharedRateLimitStore
+            ? sharedRateLimitStore.hit(`${name}:${key}`, window, limit)
+            : local.hit(key, window, limit),
+        dispose: () => local.dispose()
+    };
+}
+
+/**
  * Create a rate-limiting middleware.
  *
  * Uses a sliding window: only hits within the last `windowMs` are counted.
@@ -124,7 +167,8 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
         limit = 100,
         keyGenerator = (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => defaultKeyGenerator(c, trustedProxyHops),
         message = "Too many requests, please try again later.",
-        store = new MemoryRateLimitStore(windowMs),
+        name,
+        store = name ? namedStore(name, windowMs) : new MemoryRateLimitStore(windowMs),
         resolveLimit
     } = options;
 
@@ -233,6 +277,7 @@ function defaultKeyGenerator(
  * 200 requests per 15 minutes per IP.
  */
 export const defaultAuthLimiter = createRateLimiter({
+    name: "auth-default",
     windowMs: 15 * 60 * 1000,
     limit: 200,
     message: "Too many authentication attempts, please try again later."
@@ -243,6 +288,7 @@ export const defaultAuthLimiter = createRateLimiter({
  * 50 requests per 15 minutes per IP.
  */
 export const strictAuthLimiter = createRateLimiter({
+    name: "auth-strict",
     windowMs: 15 * 60 * 1000,
     limit: 50,
     message: "Too many requests to this sensitive endpoint, please try again later."
@@ -313,6 +359,7 @@ export const captureRecipientEmail: MiddlewareHandler<HonoEnv> = async (c, next)
  * the limiter is never silently a no-op.
  */
 export const recipientEmailLimiter = createRateLimiter({
+    name: "auth-recipient-email",
     windowMs: 15 * 60 * 1000,
     limit: 5,
     keyGenerator: (c) => {
@@ -350,6 +397,7 @@ export async function notBefore<T>(startedAt: number, floorMs: number, result: T
 }
 
 export const verificationEmailLimiter = createRateLimiter({
+    name: "auth-verification-email",
     windowMs: 15 * 60 * 1000,
     limit: 5,
     keyGenerator: (c) => {

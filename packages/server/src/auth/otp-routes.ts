@@ -100,6 +100,7 @@ export function otpTokenMaterial(email: string, code: string): string {
  * replicas with the default, the effective budget is five attempts per replica.
  */
 const otpVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+    name: "auth-otp-verify",
     windowMs: 15 * 60 * 1000,
     limit: OTP_ATTEMPTS_PER_WINDOW,
     keyGenerator: (c) => {
@@ -125,6 +126,7 @@ const OTP_SENDS_PER_WINDOW = 5;
  * and useless as a mail bomb, matching `verificationEmailLimiter`.
  */
 const otpSendLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+    name: "auth-otp-send",
     windowMs: 15 * 60 * 1000,
     limit: OTP_SENDS_PER_WINDOW,
     keyGenerator: (c) => {
