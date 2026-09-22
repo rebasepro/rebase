@@ -16,7 +16,7 @@ import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
 import type { AuthRepository, OAuthProviderProfile, UserData } from "../src/auth/interfaces";
-import { configureJwt } from "../src/auth/jwt";
+import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { oauthCodeFlowSchema } from "../src/auth/oauth-code-flow";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "../src/auth/oauth-signin-policy";
 
@@ -111,6 +111,18 @@ function signIn(app: Hono<HonoEnv>, redirectUri = REDIRECT) {
     return app.request("/auth/acme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "auth-code", redirectUri })
+    });
+}
+
+/** `POST /auth/link/<provider>`, as the signed-in owner of `user-1`. */
+async function link(app: Hono<HonoEnv>, redirectUri = REDIRECT) {
+    return app.request("/auth/link/acme", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${await generateAccessToken("user-1", [])}`
+        },
         body: JSON.stringify({ code: "auth-code", redirectUri })
     });
 }
@@ -354,6 +366,32 @@ describe("POST /auth/<provider> — redirect URI allowlist", () => {
 
         expect(res.status).toBe(200);
     });
+
+    it("rejects the same redirectUri on the link route, before the code is spent", async () => {
+        // A code leaked through a stale registered URI, linked to the
+        // attacker's account, makes every later "Sign in with Acme" by the
+        // victim land in the attacker's account. The link door is a sign-in
+        // door for that identity, so it gets the same allowlist.
+        const app = createApp({ allowedRedirectUris: ["https://admin.example.com/callback"] });
+        const verify = jest.fn(verifyImpl);
+        verifyImpl = verify as typeof verifyImpl;
+
+        const res = await link(app, "https://evil.example.com/callback");
+
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe("REDIRECT_URI_NOT_ALLOWED");
+        expect(verify).not.toHaveBeenCalled();
+        expect(repo.linkUserIdentity).not.toHaveBeenCalled();
+    });
+
+    it("links through a redirectUri on the allowlist", async () => {
+        const app = createApp({ allowedRedirectUris: ["https://admin.example.com/callback"] });
+
+        const res = await link(app, "https://admin.example.com/callback?code=abc");
+
+        expect(res.status).toBe(200);
+        expect(repo.linkUserIdentity).toHaveBeenCalledWith("user-1", "acme", "acme-1", expect.any(Object));
+    });
 });
 
 describe("POST /auth/<provider> — provider errors are not echoed", () => {
@@ -364,6 +402,20 @@ describe("POST /auth/<provider> — provider errors are not echoed", () => {
         };
 
         const res = await signIn(app);
+
+        expect(res.status).toBe(401);
+        const body = await res.text();
+        expect(body).not.toContain("secret-looking-id");
+        expect(body).not.toContain("token exchange failed");
+    });
+
+    it("returns the same generic 401 on the link route", async () => {
+        const app = createApp();
+        verifyImpl = async () => {
+            throw new Error("Acme token exchange failed (400): {\"client_id\":\"secret-looking-id\",\"hint\":\"bad redirect\"}");
+        };
+
+        const res = await link(app);
 
         expect(res.status).toBe(401);
         const body = await res.text();

@@ -4,7 +4,7 @@ import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
-import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces";
+import type { AuthRepository, OAuthProvider, OAuthProviderProfile, CreateUserData } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -607,43 +607,61 @@ displayName: user.displayName });
     });
 
     /**
+     * Turn an OAuth request body into the provider's profile of the caller.
+     *
+     * Both OAuth doors come through here — sign-in and `/link/<provider>` —
+     * because both end with that provider identity resolving to an account,
+     * so both need the same two controls. The link door used to spend the
+     * code without the first and echo the provider's error without the second:
+     * a victim's code leaked through a stale registered URI could be linked to
+     * the attacker's account, after which the victim's own "Sign in with …"
+     * landed there.
+     *
+     * The redirect URI is allowlisted before the code is spent. The provider's
+     * own registered-URI match authorises *every* URI on that OAuth client — a
+     * leftover localhost entry, a staging host, a second product sharing the
+     * client id — and any of them can mint a code this backend would otherwise
+     * accept.
+     *
+     * A provider's error message is logged, never returned: its token-endpoint
+     * error body routinely echoes the client_id, the redirect URI and
+     * diagnostics about the credential state.
+     */
+    async function verifyProviderPayload(provider: OAuthProvider<unknown>, payload: unknown): Promise<OAuthProviderProfile> {
+        const requestedRedirectUri = typeof payload === "object" && payload !== null && "redirectUri" in payload
+            ? payload.redirectUri
+            : undefined;
+        if (typeof requestedRedirectUri === "string"
+            && !isRedirectUriAllowed(requestedRedirectUri, config.allowedRedirectUris)) {
+            throw ApiError.badRequest(
+                "redirectUri is not allowed for this backend",
+                "REDIRECT_URI_NOT_ALLOWED"
+            );
+        }
+
+        let externalUser: OAuthProviderProfile | null;
+        try {
+            externalUser = await provider.verify(payload);
+        } catch (err: unknown) {
+            logger.error(`[OAuth] ${provider.id} verification threw`, {
+                error: err instanceof Error ? err.message : String(err)
+            });
+            throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "OAUTH_ERROR");
+        }
+        if (!externalUser) {
+            throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
+        }
+        return externalUser;
+    }
+
+    /**
      * Dynamically mount OAuth provider routes
      */
     if (config.oauthProviders && config.oauthProviders.length > 0) {
         for (const provider of config.oauthProviders) {
             router.post(`/${provider.id}`, defaultAuthLimiter, async (c) => {
                 const payload = parseBody(provider.schema, await c.req.json());
-
-                // Allowlist the redirect URI before the code is spent. The
-                // provider's own registered-URI match authorises *every* URI
-                // on that OAuth client — a leftover localhost entry, a staging
-                // host, a second product sharing the client id — and any of
-                // them can mint a code this backend would otherwise accept.
-                const requestedRedirectUri = (payload as { redirectUri?: unknown }).redirectUri;
-                if (typeof requestedRedirectUri === "string"
-                    && !isRedirectUriAllowed(requestedRedirectUri, config.allowedRedirectUris)) {
-                    throw ApiError.badRequest(
-                        "redirectUri is not allowed for this backend",
-                        "REDIRECT_URI_NOT_ALLOWED"
-                    );
-                }
-
-                let externalUser;
-                try {
-                    externalUser = await provider.verify(payload);
-                } catch (err: unknown) {
-                    // The message is logged, never returned: a provider's
-                    // token-endpoint error body routinely echoes the client_id,
-                    // the redirect URI and diagnostics about the credential
-                    // state, and this response goes to an anonymous caller.
-                    logger.error(`[OAuth] ${provider.id} verification threw`, {
-                        error: err instanceof Error ? err.message : String(err)
-                    });
-                    throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "OAUTH_ERROR");
-                }
-                if (!externalUser) {
-                    throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
-                }
+                const externalUser = await verifyProviderPayload(provider, payload);
 
                 // Find or create user
                 let user = await authRepo.getUserByIdentity(provider.id, externalUser.providerId);
@@ -805,17 +823,7 @@ displayName: user.displayName });
                 }
 
                 const payload = parseBody(provider.schema, await c.req.json());
-
-                let externalUser;
-                try {
-                    externalUser = await provider.verify(payload);
-                } catch (err: unknown) {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    throw ApiError.unauthorized(`${provider.id} link failed: ${msg}`, "OAUTH_ERROR");
-                }
-                if (!externalUser) {
-                    throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
-                }
+                const externalUser = await verifyProviderPayload(provider, payload);
 
                 // Refuse to attach an identity that already belongs to someone
                 // else — one provider identity must resolve to exactly one
