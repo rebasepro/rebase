@@ -445,11 +445,16 @@ function useUpdateUrl<M extends Record<string, any> = any>(
             const parts = [preservedString, listState].filter(Boolean);
             const state = parts.join("&");
 
+            // The entry's existing state goes back in unchanged: react-router
+            // keeps its `idx` and `key` there. Replacing it with `{}` left Back
+            // with no index to compute a delta from, and react-router lets a
+            // POP with no delta through without asking any blocker — every
+            // unsaved-changes guard was skipped.
             const hash = window.location.hash;
             if (state === "")
-                window.history.replaceState({}, "", `${window.location.pathname}${hash}`);
+                window.history.replaceState(window.history.state, "", `${window.location.pathname}${hash}`);
             else
-                window.history.replaceState({}, "", `?${state}${hash}`);
+                window.history.replaceState(window.history.state, "", `?${state}${hash}`);
         }
     }, [filterValues, sortBy, searchString, updateUrl]);
 }
