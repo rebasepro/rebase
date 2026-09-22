@@ -208,16 +208,22 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * may be stale precisely because a sibling tab holds a live one, and
      * logging out on its behalf would turn one tab's bad luck into everybody
      * being signed out — the exact failure this work exists to remove.
+     *
+     * Storage is left alone when it no longer holds the session being
+     * abandoned. It is shared with every other tab of the app, so a different
+     * session there is a sibling's live one — a rotation this tab missed, or
+     * another sign-in — and deleting it signed that tab out on its next load.
      */
     function abandonSessionLocally() {
-        endSession();
+        const persisted = loadStoredSession();
+        endSession(!persisted || !currentSession || persisted.refreshToken === currentSession.refreshToken);
     }
 
     /** Drop the session from memory, storage and the transport, and say so. */
-    function endSession() {
+    function endSession(clearStorage = true) {
         sessionEpoch++;
         currentSession = null;
-        clearStoredSession();
+        if (clearStorage) clearStoredSession();
         if (refreshTimeout) {
             clearTimeout(refreshTimeout);
             refreshTimeout = null;
@@ -605,10 +611,68 @@ redirectUri });
         );
     }
 
+    /**
+     * The session a sibling tab has persisted since this one last looked, when
+     * it continues this one.
+     *
+     * Tabs of one app share `localStorage` but each holds its session in
+     * memory, and a refresh rotates the refresh token. Once one tab has
+     * refreshed, every other tab is holding a token the server has already
+     * superseded: presented after the server's reuse window it is refused
+     * with TOKEN_ALREADY_USED, again on every retry, until the tab gives up
+     * and signs out. Its replacement was in storage all along.
+     *
+     * Only a session of the same user counts. A different user in storage
+     * means another tab signed someone else in, and that is not this tab's
+     * session to take over.
+     */
+    function siblingSession(): RebaseSession | null {
+        if (!persistSession || authFlowMode === "cookie" || !currentSession) return null;
+        const persisted = loadStoredSession();
+        if (!persisted?.accessToken || !persisted.refreshToken) return null;
+        if (persisted.refreshToken === currentSession.refreshToken) return null;
+        if (!persisted.user?.uid || persisted.user.uid !== currentSession.user?.uid) return null;
+        return persisted;
+    }
+
+    /**
+     * Take over a sibling's session. Its access token is used as it is while
+     * it has time left — exactly as a session restored on load would be — and
+     * otherwise this answers `null` and the caller refreshes, now with the
+     * sibling's refresh token rather than the superseded one.
+     */
+    function adoptSibling(sibling: RebaseSession): RebaseSession | null {
+        currentSession = sibling;
+        if (sibling.expiresAt - REFRESH_BUFFER_MS <= Date.now()) return null;
+        transport.setToken(sibling.accessToken);
+        scheduleRefresh(sibling.expiresAt);
+        emit("TOKEN_REFRESHED", sibling);
+        return sibling;
+    }
+
     async function doRefreshSession(): Promise<RebaseSession> {
         const epoch = sessionEpoch;
         try {
-            return await requestRefresh(epoch);
+            // Inside the refresh lock, so a sibling that held it has finished
+            // and persisted what it received.
+            const sibling = siblingSession();
+            if (sibling) {
+                const adopted = adoptSibling(sibling);
+                if (adopted) return adopted;
+            }
+            try {
+                return await requestRefresh(epoch);
+            } catch (err) {
+                // Refused as already used: a sibling rotated it while this
+                // request was on the wire (or without taking the lock).
+                const late = epoch === sessionEpoch
+                    && err instanceof RebaseApiError
+                    && err.code === "TOKEN_ALREADY_USED"
+                    ? siblingSession()
+                    : null;
+                if (!late) throw err;
+                return adoptSibling(late) ?? await requestRefresh(epoch);
+            }
         } catch (err) {
             if (epoch !== sessionEpoch) return supersededRefresh();
             throw err;

@@ -297,3 +297,158 @@ describe("a refresh that answers after the session it was refreshing has ended",
     });
 });
 
+
+/**
+ * A fake `/auth/refresh` that rotates like the real one: each refresh token
+ * is good once, and presenting a superseded one answers TOKEN_ALREADY_USED
+ * (the server's answer past its reuse window).
+ */
+function rotatingServer(firstLive = 1) {
+    const live = new Set([`R${firstLive}`]);
+    const superseded = new Set<string>();
+    let n = firstLive;
+    const presented: string[] = [];
+    /** Runs before the answer is decided — a sibling rotating mid-request. */
+    let beforeAnswer: ((refreshToken: string) => void) | undefined;
+    const fetchMock: typeof fetch = async (input, init) => {
+        const url = path(input);
+        if (!url.endsWith("/auth/refresh")) return jsonResponse({});
+        const { refreshToken } = JSON.parse(String(init?.body)) as { refreshToken: string };
+        presented.push(refreshToken);
+        beforeAnswer?.(refreshToken);
+        if (superseded.has(refreshToken)) return errorResponse(401, "TOKEN_ALREADY_USED");
+        if (!live.has(refreshToken)) return errorResponse(401, "INVALID_TOKEN");
+        live.delete(refreshToken);
+        superseded.add(refreshToken);
+        n++;
+        live.add(`R${n}`);
+        return tokenResponse(n);
+    };
+    return {
+        fetchMock,
+        presented,
+        /** Rotate a token as though another tab's refresh had just landed. */
+        rotate(refreshToken: string): number {
+            live.delete(refreshToken);
+            superseded.add(refreshToken);
+            n++;
+            live.add(`R${n}`);
+            return n;
+        },
+        onRequest(fn: (refreshToken: string) => void) { beforeAnswer = fn; }
+    };
+}
+
+describe("two tabs sharing one persisted session", () => {
+    it("a tab whose token a sibling already rotated takes the sibling's session", async () => {
+        const server = rotatingServer();
+        const shared = storageHolding(storedSession(1));
+        const transportA = createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock });
+        const transportB = createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock });
+        const tabA = createAuth(transportA, { storage: shared, autoRefresh: false });
+        const tabB = createAuth(transportB, { storage: shared, autoRefresh: false });
+        const eventsB: AuthChangeEvent[] = [];
+        tabB.onAuthStateChange((event) => { eventsB.push(event); });
+
+        await tabA.refreshSession();
+        expect(stored(shared)?.refreshToken).toBe("R2");
+
+        // Tab B still holds R1 in memory. Spending it would be refused.
+        const session = await tabB.refreshSession();
+
+        expect(server.presented).toEqual(["R1"]);
+        expect(session.refreshToken).toBe("R2");
+        expect(tabB.getSession()?.accessToken).toBe("a2");
+        expect(transportB.getHeaders().Authorization).toBe("Bearer a2");
+        expect(stored(shared)?.refreshToken).toBe("R2");
+        expect(eventsB).toEqual(["TOKEN_REFRESHED"]);
+    });
+
+    it("a background tab's scheduled refresh neither signs out nor wipes the shared session", async () => {
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        const server = rotatingServer();
+        const shared = storageHolding(storedSession(1));
+        const tabB = createAuth(createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock }), { storage: shared });
+        const tabA = createAuth(createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock }), { storage: shared, autoRefresh: false });
+        const eventsB: AuthChangeEvent[] = [];
+        tabB.onAuthStateChange((event) => { eventsB.push(event); });
+
+        await tabA.refreshSession();
+        // Tab B's timer fires later, when A's token is itself about to expire.
+        for (let i = 0; i < 60; i++) {
+            jest.advanceTimersByTime(60_000);
+            await flush();
+        }
+
+        // B refreshed with the token A left in storage, not its own stale one.
+        expect(server.presented.slice(0, 2)).toEqual(["R1", "R2"]);
+        expect(eventsB).not.toContain("SIGNED_OUT");
+        expect(tabB.getSession()).not.toBeNull();
+        expect(stored(shared)?.refreshToken).toBe(tabB.getSession()?.refreshToken);
+    });
+
+    it("a refusal because a sibling rotated mid-request adopts the sibling's session", async () => {
+        const server = rotatingServer();
+        const shared = storageHolding(storedSession(1));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock }), { storage: shared, autoRefresh: false });
+        // While this tab's request is on the wire, another tab's lands first
+        // and persists its successor.
+        server.onRequest((token) => {
+            if (token !== "R1") return;
+            const next = server.rotate("R1");
+            shared.setItem(STORAGE_KEY, JSON.stringify(storedSession(next)));
+        });
+
+        const session = await auth.refreshSession();
+
+        expect(server.presented).toEqual(["R1"]);
+        expect(session.refreshToken).toBe("R2");
+        expect(auth.getSession()?.refreshToken).toBe("R2");
+    });
+
+    it("refreshes with the sibling's token when the sibling's access token is spent too", async () => {
+        const server = rotatingServer();
+        const shared = storageHolding(storedSession(1));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock }), { storage: shared, autoRefresh: false });
+        server.rotate("R1");
+        // The sibling persisted R2 long ago; its access token is expiring.
+        shared.setItem(STORAGE_KEY, JSON.stringify(storedSession(2, "u1", 30_000)));
+
+        const session = await auth.refreshSession();
+
+        expect(server.presented).toEqual(["R2"]);
+        expect(session.refreshToken).toBe("R3");
+        expect(stored(shared)?.refreshToken).toBe("R3");
+    });
+
+    it("a tab giving up leaves alone a session another tab persisted", async () => {
+        const server = rotatingServer(1);
+        const shared = storageHolding(storedSession(7, "u1"));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock }), { storage: shared, autoRefresh: false });
+        // Another tab signed a different user in.
+        const other = storedSession(1, "u2");
+        shared.setItem(STORAGE_KEY, JSON.stringify(other));
+        const events: AuthChangeEvent[] = [];
+        auth.onAuthStateChange((event) => { events.push(event); });
+
+        // R7 is refused outright: this tab's session is over.
+        expect(await auth.handleUnauthorized()).toBe(false);
+
+        expect(server.presented).toEqual(["R7"]);
+        expect(events).toEqual(["SIGNED_OUT"]);
+        expect(auth.getSession()).toBeNull();
+        // …but the other tab's sign-in is not this tab's to delete.
+        expect(stored(shared)).toEqual(other);
+    });
+
+    it("a tab giving up still clears storage that holds its own session", async () => {
+        const server = rotatingServer(1);
+        const shared = storageHolding(storedSession(7, "u1"));
+        const auth = createAuth(createTransport({ baseUrl: "http://api.test", fetch: server.fetchMock }), { storage: shared, autoRefresh: false });
+
+        expect(await auth.handleUnauthorized()).toBe(false);
+
+        expect(auth.getSession()).toBeNull();
+        expect(stored(shared)).toBeNull();
+    });
+});
