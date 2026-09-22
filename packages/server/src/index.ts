@@ -175,6 +175,10 @@ export * from "./api/errors";
 // driver packages are the other request boundary, and this is the rule they
 // have to apply to be that boundary rather than a way around it.
 export { assertWriteRequestValid } from "./api/rest/write-validation";
+// Its read-side twin: a filter, sort or projection over a field the caller may
+// not read is refused at the socket for the reason it is refused at `GET` — it
+// reads the withheld value one predicate at a time.
+export { assertQueryFieldsReadable } from "./api/rest/field-access-query";
 // Same exception, same reason: a field operation arrives on the socket exactly
 // as it arrives on `PATCH`, and the driver that compiles it to SQL needs the
 // one definition of what the operators are rather than a second copy.

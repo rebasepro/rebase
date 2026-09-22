@@ -1,6 +1,7 @@
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
+import { assertReadRequestReadable } from "./services/read-field-access";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
@@ -464,6 +465,37 @@ roles: verifiedUser.roles }
                     assertFieldOpsValid(values as Record<string, unknown>, collection);
                 };
 
+                /**
+                 * Apply the REST layer's read check to a socket request: no
+                 * filter, sort, projection or uniqueness probe over a field
+                 * this caller may not read. The strip keeps the value off the
+                 * wire; without this a `COUNT` still answers whether a hidden
+                 * value matches a pattern, one character at a time.
+                 *
+                 * Same viewer as `assertWriteRequest`, and silent in the same
+                 * case: a path that names no registered collection is the
+                 * driver's to answer.
+                 */
+                const assertReadRequest = (
+                    path: string | undefined,
+                    request: Parameters<typeof assertReadRequestReadable>[0]
+                ): void => {
+                    if (!path) return;
+                    let collection;
+                    try {
+                        collection = driver.registry?.getCollectionByPath(path);
+                    } catch {
+                        // A malformed nested path: the driver refuses it with
+                        // its own message.
+                        return;
+                    }
+                    if (!collection) return;
+                    const session = clientSessions.get(clientId);
+                    assertReadRequestReadable(request, collection, {
+                        roles: session?.user?.roles ?? ["anon"]
+                    });
+                };
+
                 // Helper to get correctly scoped delegate for the current request
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     // Check if the driver supports RLS-scoped delegates
@@ -493,6 +525,7 @@ roles: verifiedUser.roles }
                     case "FETCH_COLLECTION": {
                         wsDebug("📋 [WebSocket Server] Processing FETCH_COLLECTION request");
                         const request: FetchCollectionProps = payload;
+                        assertReadRequest(request.path, request);
                         const delegate = await getScopedDelegate();
                         // Bound the client-supplied limit with the SAME guarantee
                         // the REST ingress and `subscribe_collection` apply
@@ -602,6 +635,9 @@ colors: true }));
                             id,
                             collection
                         } = payload;
+                        // "Does anybody hold this value" is a read of the field,
+                        // answered for every row in the table.
+                        if (typeof name === "string") assertReadRequest(path, { filter: { [name]: ["==", value] } });
                         const delegate = await getScopedDelegate();
                         const isUnique = await delegate.checkUniqueField(path, name, value, id, collection);
                         wsDebug("🔍 [WebSocket Server] CHECK_UNIQUE_FIELD result:", isUnique);
@@ -624,6 +660,7 @@ colors: true }));
                         // holds — the page size is the caller's business, the total
                         // is not.
                         const request: FetchCollectionProps = payload;
+                        assertReadRequest(request.path, request);
                         const delegate = await getScopedDelegate();
                         const count = await delegate.count!(request);
                         const response = {

@@ -13,7 +13,8 @@ import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySp
 import { applyAuthContext } from "../security/rls-enforcement";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
-import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
+import { ApiError, logger, rawQueryLoggingEnabled } from "@rebasepro/server";
+import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
@@ -748,6 +749,25 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 orderBy = parseOrderBySpecStrict(request.orderBy, request.order);
             } catch (e) {
                 if (!(e instanceof OrderBySpecError)) throw e;
+                logger.warn(`[RealtimeService] Refused subscription to '${request.path}': ${e.message}`);
+                this.sendError(clientId, e.message, subscriptionId, e.code);
+                return;
+            }
+
+            // No filter, sort or projection over a field the subscriber may not
+            // read — the rule `GET` and the socket's request frames apply. The
+            // strip keeps the value out of every frame; a subscription filtered
+            // on it would still answer, row by row, whether it matches. Judged
+            // against the subscriber's roles, and `anon` for a socket that never
+            // signed in: an absent viewer is the trusted server plane.
+            try {
+                assertReadRequestReadable(
+                    { filter: request.filter, logical: request.logical, orderBy, fields: request.fields },
+                    collection,
+                    { roles: authContext?.roles ?? ["anon"] }
+                );
+            } catch (e) {
+                if (!(e instanceof ApiError)) throw e;
                 logger.warn(`[RealtimeService] Refused subscription to '${request.path}': ${e.message}`);
                 this.sendError(clientId, e.message, subscriptionId, e.code);
                 return;

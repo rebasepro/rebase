@@ -70,6 +70,7 @@ function assertEveryKindBindable
 function assertFieldOpsValid
 function assertIfMatch
 function assertNoFieldOpsOnCreate
+function assertQueryFieldsReadable
 function assertUploadWithinPropertyLimits
 function assertWriteRequestValid
 function blockedAddressReason
