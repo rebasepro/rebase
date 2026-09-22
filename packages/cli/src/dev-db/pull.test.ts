@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { anonymizableColumns, anonymizeStatements, describeTarget, dumpArgs, provisionableSchemas, replacementFor, restoreArgs, shouldAnonymize, type ColumnRef } from "./pull";
+import { anonymizableColumns, anonymizeStatements, describeTarget, dumpArgs, provisionableSchemas, replacementFor, restoreArgs, restoreOutcome, shouldAnonymize, type ColumnRef } from "./pull";
 
 function column(overrides: Partial<ColumnRef> & { column: string }): ColumnRef {
     return { schema: "public", table: "users", dataType: "text", ...overrides };
@@ -183,6 +183,50 @@ describe("pg_dump and pg_restore arguments", () => {
 
         expect(target).toBe(plan.target);
         expect(target).toContain("127.0.0.1");
+    });
+});
+
+/**
+ * What a finished `pg_restore` says about the copy.
+ *
+ * Its failure used to be swallowed whole — `.catch(() => "(pg_restore reported
+ * non-fatal diagnostics)")` — and followed by "✓ Local database now holds a
+ * copy". The local database had already been emptied by `--clean`, so a
+ * restore that stopped half-way, or never started, ended on a green tick over
+ * a partial or empty database.
+ */
+describe("restoreOutcome", () => {
+    it("calls a clean exit complete", () => {
+        expect(restoreOutcome({ exitCode: 0, stderr: "" })).toEqual({ started: true, failure: null });
+    });
+
+    it("counts the objects pg_restore skipped, from its own summary line", () => {
+        const outcome = restoreOutcome({
+            exitCode: 1,
+            stderr: "pg_restore: error: could not execute query: ERROR:  extension \"postgis\" is not available\n"
+                + "pg_restore: warning: errors ignored on restore: 12\n"
+        });
+
+        expect(outcome.started).toBe(true);
+        expect(outcome.failure).toMatch(/12 object\(s\)/);
+    });
+
+    it("still fails an exit it has no summary for", () => {
+        expect(restoreOutcome({ exitCode: 2, stderr: "" }).failure).toMatch(/exited with code 2/);
+    });
+
+    it("fails a restore that was killed part-way", () => {
+        const outcome = restoreOutcome({ exitCode: undefined, signal: "SIGKILL", stderr: "" });
+
+        expect(outcome.started).toBe(true);
+        expect(outcome.failure).toMatch(/SIGKILL/);
+    });
+
+    it("fails, and says nothing arrived, when pg_restore never started", () => {
+        const outcome = restoreOutcome({ exitCode: undefined, code: "ENOENT", stderr: "" });
+
+        expect(outcome.started).toBe(false);
+        expect(outcome.failure).toMatch(/ENOENT/);
     });
 });
 

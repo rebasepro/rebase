@@ -755,7 +755,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, restoreArgs } =
+    const { anonymizeStatements, describeTarget, dumpArgs, findPgTool, restoreArgs, restoreOutcome } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
@@ -771,13 +771,14 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         arg === "--schema" && rawArgs[index + 1] ? [rawArgs[index + 1]] : []);
     const anonymize = rawArgs.includes("--anonymize");
 
-    // Checked before anything destructive: discovering pg_dump is missing after
-    // dropping the local database would be the worst possible ordering.
-    const pgDumpVersion = await findPgDump();
-    if (!pgDumpVersion) {
-        console.error(chalk.red("✗ `pg_dump` is not on PATH, and this command cannot run without it."));
-        console.error(chalk.gray("  Install the PostgreSQL client tools, e.g. `brew install libpq`."));
-        process.exit(1);
+    // Both checked before anything destructive: discovering either is missing
+    // after dropping the local database would be the worst possible ordering.
+    for (const tool of ["pg_dump", "pg_restore"] as const) {
+        if (!await findPgTool(tool)) {
+            console.error(chalk.red(`✗ \`${tool}\` is not on PATH, and this command cannot run without it.`));
+            console.error(chalk.gray("  Install the PostgreSQL client tools, e.g. `brew install libpq`."));
+            process.exit(1);
+        }
     }
 
     // `--database-url` is refused rather than honoured, and refused rather than
@@ -856,18 +857,27 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     }
 
     const dumpFile = path.join(os.tmpdir(), `rebase-pull-${process.pid}.dump`);
+    let failure: string | null = null;
     try {
         console.log(chalk.gray("  Dumping…"));
         await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"] });
 
         console.log(chalk.gray("  Restoring…"));
-        // pg_restore exits non-zero for benign diagnostics (a DROP of something
-        // that was never there), so its status is not a verdict on its own —
-        // the query afterwards is.
-        await execa("pg_restore", restoreArgs(plan, dumpFile), { stdio: ["ignore", "inherit", "inherit"] })
-            .catch(() => console.log(chalk.gray("  (pg_restore reported non-fatal diagnostics)")));
+        // stderr is shown as it arrives and kept, for the count in its summary
+        // line. Not rejected: every way this ends is judged by `restoreOutcome`,
+        // and a failure is reported only after whatever did arrive has been
+        // anonymized.
+        const restored = restoreOutcome(await execa("pg_restore", restoreArgs(plan, dumpFile), {
+            stdin: "ignore",
+            stdout: "inherit",
+            stderr: ["pipe", "inherit"],
+            reject: false
+        }));
+        failure = restored.failure;
 
-        if (anonymize) {
+        // Before the verdict: a partial copy of personal data on a laptop is
+        // still personal data on a laptop.
+        if (anonymize && restored.started) {
             const { Client } = await import("pg");
             const client = new Client({ connectionString: target });
             await client.connect();
@@ -887,12 +897,19 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
             }
         }
 
-        await restoreAppRole(target);
-
-        console.log(chalk.green("✓ Local database now holds a copy of " + describeTarget(source)));
+        if (!failure) await restoreAppRole(target);
     } finally {
         fs.rmSync(dumpFile, { force: true });
     }
+
+    if (failure) {
+        console.error(chalk.red(`✗ ${failure}`));
+        console.error(chalk.yellow(`  The local database holds an incomplete copy of ${describeTarget(source)}.`));
+        console.error(chalk.gray("  Fix what the errors above name — often an extension or a role the source has — and pull again."));
+        process.exit(1);
+    }
+
+    console.log(chalk.green("✓ Local database now holds a copy of " + describeTarget(source)));
 }
 
 /**

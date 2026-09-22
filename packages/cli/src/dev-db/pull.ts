@@ -181,13 +181,58 @@ export function restoreArgs(plan: PullPlan, dumpFile: string): string[] {
     return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--dbname", plan.target, dumpFile];
 }
 
-/** Is `pg_dump` on PATH, and what version? Checked before anything destructive. */
-export async function findPgDump(): Promise<string | null> {
+/**
+ * Is this PostgreSQL client tool on PATH, and what version? Both are checked
+ * before anything destructive: discovering `pg_restore` is missing after the
+ * dump has been taken — or after `--clean` has emptied the target — is the
+ * worst possible ordering.
+ */
+export async function findPgTool(tool: "pg_dump" | "pg_restore"): Promise<string | null> {
     try {
-        const { stdout } = await execa("pg_dump", ["--version"]);
+        const { stdout } = await execa(tool, ["--version"]);
 
         return stdout.trim();
     } catch {
         return null;
     }
+}
+
+/** The fields of a finished `pg_restore` run that decide {@link restoreOutcome}. */
+export interface RestoreRun {
+    exitCode?: number;
+    signal?: string;
+    /** A spawn failure's code — `ENOENT` when the binary vanished. */
+    code?: string;
+    stderr?: string;
+}
+
+/**
+ * What a finished `pg_restore` says about the copy.
+ *
+ * `--clean` empties the target before anything is written, so every way this
+ * can end short of exit 0 leaves a partial or empty local database, and none of
+ * them may be reported as a copy. A non-zero exit is pg_restore saying it
+ * skipped statements — "errors ignored on restore: N" — and whatever those
+ * statements created (a table, its rows, an RLS policy) is missing locally.
+ *
+ * `started` says whether anything can have arrived, which is what decides
+ * whether an anonymization pass still has data to redact.
+ */
+export function restoreOutcome(run: RestoreRun): { started: boolean; failure: string | null } {
+    if (run.signal) {
+        return { started: true, failure: `pg_restore was stopped by ${run.signal} before it finished.` };
+    }
+    if (run.exitCode === undefined) {
+        return { started: false, failure: `pg_restore could not be started (${run.code ?? "unknown error"}).` };
+    }
+    if (run.exitCode === 0) return { started: true, failure: null };
+
+    const ignored = /errors ignored on restore: (\d+)/.exec(run.stderr ?? "");
+
+    return {
+        started: true,
+        failure: ignored
+            ? `pg_restore could not restore ${ignored[1]} object(s) — the errors are above.`
+            : `pg_restore exited with code ${run.exitCode}.`
+    };
 }
