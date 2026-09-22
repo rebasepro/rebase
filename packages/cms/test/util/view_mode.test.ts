@@ -9,7 +9,7 @@ import {
     resolveOpenEntityMode,
     resolveViewMode,
     VIEW_MODE_PARAM,
-    withViewMode
+    withListState
 } from "../../src/util/view_mode";
 
 // ---------------------------------------------------------------------------
@@ -52,31 +52,31 @@ describe("getViewModeFromSearch", () => {
 });
 
 // ---------------------------------------------------------------------------
-// withViewMode
+// withListState — the view mode
 // ---------------------------------------------------------------------------
-describe("withViewMode", () => {
+describe("withListState carries the view mode", () => {
     it("returns the URL unchanged when no view mode is active", () => {
-        expect(withViewMode("/c/products", "")).toBe("/c/products");
+        expect(withListState("/c/products", "")).toBe("/c/products");
     });
     it("appends the view mode to a bare URL", () => {
-        expect(withViewMode("/c/products", `?${VIEW_MODE_PARAM}=kanban`))
+        expect(withListState("/c/products", `?${VIEW_MODE_PARAM}=kanban`))
             .toBe(`/c/products?${VIEW_MODE_PARAM}=kanban`);
     });
     it("appends with & when the URL already has a query string", () => {
-        expect(withViewMode("/c/products?foo=bar", `?${VIEW_MODE_PARAM}=cards`))
+        expect(withListState("/c/products?foo=bar", `?${VIEW_MODE_PARAM}=cards`))
             .toBe(`/c/products?foo=bar&${VIEW_MODE_PARAM}=cards`);
     });
     it("keeps the hash after the query", () => {
-        expect(withViewMode("/c/products#new", `?${VIEW_MODE_PARAM}=table`))
+        expect(withListState("/c/products#new", `?${VIEW_MODE_PARAM}=table`))
             .toBe(`/c/products?${VIEW_MODE_PARAM}=table#new`);
     });
     it("does not duplicate an existing view mode param", () => {
-        expect(withViewMode(`/c/products?${VIEW_MODE_PARAM}=list`, `?${VIEW_MODE_PARAM}=kanban`))
+        expect(withListState(`/c/products?${VIEW_MODE_PARAM}=list`, `?${VIEW_MODE_PARAM}=kanban`))
             .toBe(`/c/products?${VIEW_MODE_PARAM}=list`);
     });
     it("reads the current browser location by default", () => {
         window.history.replaceState({}, "", `/c/products?${VIEW_MODE_PARAM}=cards`);
-        expect(withViewMode("/c/products/42")).toBe(`/c/products/42?${VIEW_MODE_PARAM}=cards`);
+        expect(withListState("/c/products/42")).toBe(`/c/products/42?${VIEW_MODE_PARAM}=cards`);
         window.history.replaceState({}, "", "/");
     });
 });
@@ -165,9 +165,9 @@ describe("custom view modes", () => {
     });
 
     it("carries a custom key across a navigation", () => {
-        // `withViewMode` has no collection in hand, so it must not validate:
+        // `withListState` has no collection in hand, so it must not validate:
         // dropping the param here is what reset the view on every row click.
-        expect(withViewMode("/c/places", `?${VIEW_MODE_PARAM}=map`))
+        expect(withListState("/c/places", `?${VIEW_MODE_PARAM}=map`))
             .toBe(`/c/places?${VIEW_MODE_PARAM}=map`);
     });
 

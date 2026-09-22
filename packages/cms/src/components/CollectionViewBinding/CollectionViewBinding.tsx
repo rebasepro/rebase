@@ -464,7 +464,7 @@ const CollectionViewBindingInner = React.memo(
                 navigation: urlController,
                 onClose: unselectNavigatedEntity
             })
-        }, [path, sidePanelController]);
+        }, [path, sidePanelController, openEntityMode, urlController, unselectNavigatedEntity, analyticsController]);
 
         /**
          * Attach rows that already exist to this parent.
@@ -817,7 +817,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 ...(collection.additionalFields ?? EMPTY_ARRAY),
                 ...subcollectionColumns
             ];
-        }, [collection, collectionWithLocalOrder, path, sidePanelController]);
+        }, [collection, collectionWithLocalOrder, path, sidePanelController, openEntityMode, urlController]);
 
         const updateLastDeleteTimestamp = useCallback(() => {
             setLastDeleteTimestamp(Date.now());

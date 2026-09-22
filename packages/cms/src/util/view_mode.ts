@@ -46,53 +46,24 @@ export function getViewModeFromSearch(search?: string, customKeys?: readonly str
 }
 
 /**
- * Append the active view mode to a URL so the target route keeps rendering the
- * view the user was last looking at.
- *
- * Every entity/collection navigation must go through this — a missed call site
- * silently resets the user's view mode mid-session.
- *
- * @param url the URL to decorate. May already contain a query string and/or hash.
- * @param search query string to read the view mode from. Defaults to the
- *        current browser location.
- */
-export function withViewMode(url: string, search?: string): string {
-    // Carries whatever the param holds rather than validating it. These call
-    // sites are navigations — they have no collection in hand, so they cannot
-    // know whether `map` is one of *this* collection's custom views. Checking
-    // against the built-ins here would drop every custom view on the first
-    // record click. The binding validates on read, which is where the answer
-    // is knowable.
-    const source = search ?? (typeof window !== "undefined" ? window.location.search : "");
-    const viewMode = new URLSearchParams(source).get(VIEW_MODE_PARAM);
-    if (!viewMode) return url;
-
-    // Preserve any hash — the param belongs to the query, which precedes it.
-    const hashIndex = url.indexOf("#");
-    const hash = hashIndex >= 0 ? url.substring(hashIndex) : "";
-    const base = hashIndex >= 0 ? url.substring(0, hashIndex) : url;
-
-    if (new URLSearchParams(base.split("?")[1] ?? "").has(VIEW_MODE_PARAM)) {
-        return url;
-    }
-
-    const separator = base.includes("?") ? "&" : "?";
-    return `${base}${separator}${VIEW_MODE_PARAM}=${viewMode}${hash}`;
-}
-
-/**
  * Carry the whole of the collection list's URL state onto a navigation target.
  *
- * `withViewMode` exists because losing the view mode mid-session is jarring.
- * Everything else the list writes to the URL — the search string, the filters,
- * the sort — is state the user built up deliberately, and losing *that* is
- * worse: opening a record from a search and pressing back returned an
- * unfiltered list with an empty search box, so the search had to be retyped
- * for every record they wanted to look at.
+ * Every navigation to the collection or one of its records goes through this —
+ * a missed call site silently resets the list mid-session. The list reads its
+ * state back from the URL on each navigation, so the view mode, the search
+ * string, the filters and the sort all have to travel: a URL without them
+ * returned an unfiltered list with an empty search box, and the search had to
+ * be retyped for every record the user wanted to look at.
  *
  * Copies every param the list currently has rather than an allowlist, because
  * filters are encoded under the field's own name — there is no fixed set to
  * list. Params already on the target win: the caller is more specific.
+ *
+ * Carries whatever `__view` holds rather than validating it. These call sites
+ * are navigations with no collection in hand, so they cannot know whether
+ * `map` is one of *this* collection's custom views; checking against the
+ * built-ins here would drop every custom view on the first record click. The
+ * binding validates on read, which is where the answer is knowable.
  *
  * @param url the URL to decorate. May carry a query string and/or a hash.
  * @param search query string to read from. Defaults to the browser location.

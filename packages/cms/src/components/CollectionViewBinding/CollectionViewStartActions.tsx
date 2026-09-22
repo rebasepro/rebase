@@ -13,7 +13,7 @@ import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useAdminContext } from "../../hooks/useAdminContext";
-import { withViewMode } from "../../util/view_mode";
+import { withListState } from "../../util/view_mode";
 import { useSplitView } from "./SplitViewContext";
 import { SelectionMenu } from "../../selection";
 
@@ -99,7 +99,7 @@ parentEntityIds,
     };
 
     const handleBackClick = useCallback(() => {
-        navigate(withViewMode(urlController.buildUrlCollectionPath(path)));
+        navigate(withListState(urlController.buildUrlCollectionPath(path)));
     }, [navigate, urlController, path]);
 
     // In a split view the control that closes the list lives at the leading

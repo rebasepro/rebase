@@ -93,9 +93,9 @@ export const useBuildSidePanel = (collectionRegistryController: CollectionRegist
                 for (let i = 0; i < panelsFromUrl.length; i++) {
                     const props = panelsFromUrl[i];
                     if (i === 0)
-                        sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController, location.search));
+                        sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController));
                     else
-                        sideDialogsController.open(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController, location.search))
+                        sideDialogsController.open(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController))
                 }
             }
             initialised.current = true;
@@ -120,7 +120,7 @@ export const useBuildSidePanel = (collectionRegistryController: CollectionRegist
                     return;
                 }
                 const lastPanel = panelsFromUrl[panelsFromUrl.length - 1];
-                const panelProps = propsToSidePanel(lastPanel, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController, location.search);
+                const panelProps = propsToSidePanel(lastPanel, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController);
                 const lastCurrentPanel = currentKeys.length > 0 ? currentKeys[currentKeys.length - 1] : undefined;
                 if (!lastCurrentPanel || lastCurrentPanel !== panelProps.key) {
                     sideDialogsController.replace(panelProps);
@@ -175,11 +175,10 @@ width: newWidth };
                 urlController.resolveDatabasePathsFrom,
                 smallLayout,
                 customizationController,
-                authController,
-                location.search
+                authController
             ));
 
-    }, [sideDialogsController, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, authController.user, location.search]);
+    }, [sideDialogsController, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, authController.user]);
 
     const replace = useCallback((props: SidePanelBindingProps<any>) => {
 
@@ -187,9 +186,9 @@ width: newWidth };
             throw Error("If you want to copy a entity you need to provide a entityId");
         }
 
-        sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController, location.search));
+        sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController));
 
-    }, [urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, sideDialogsController, smallLayout, authController.user, location.search]);
+    }, [urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, sideDialogsController, smallLayout, authController.user]);
 
     return useMemo(() => ({
         close,
@@ -277,11 +276,17 @@ const propsToSidePanel = (props: SidePanelBindingProps,
     resolveIdsFrom: (pathWithAliases: string) => string,
     smallLayout: boolean,
     customizationController: CustomizationController,
-    authController: AuthController,
-    locationSearch: string
+    authController: AuthController
 ): SideDialogPanelProps => {
 
     const collectionPath = removeInitialAndTrailingSlashes(props.path);
+
+    // The list's state — search, filters, sort, view mode — read from the
+    // address bar at the moment the panel opens. Not react-router's
+    // `location.search`: the list writes its state with `replaceState`, which
+    // the router does not observe, so that value is whatever the view mounted
+    // with, and the list reads a panel URL built from it back as its state.
+    const locationSearch = typeof window !== "undefined" ? window.location.search : "";
 
     // When updateUrl is explicitly false, don't generate URL paths — the dialog
     // opens as an overlay without affecting the browser URL / router.

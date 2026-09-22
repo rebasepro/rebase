@@ -14,7 +14,7 @@ import { useCollectionRegistryController } from "../../hooks/navigation/contexts
 import { useNavigate, useLocation } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { withViewMode } from "../../util/view_mode";
+import { withListState } from "../../util/view_mode";
 import { SplitViewProvider } from "./SplitViewContext";
 
 export type SplitListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
@@ -259,9 +259,13 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         };
     }, [selectedEntityId]); // Intentionally only depend on selectedEntityId
 
-    // Build a URL below this collection, preserving the active view mode.
+    // Build a URL below this collection, carrying the list's whole URL state —
+    // view mode, search, filters and sort — the way the record was opened.
+    // The list reads that state back from the URL on every navigation, so a
+    // URL carrying only the view mode reset the search box and the filters
+    // each time the record was closed or one of its tabs changed.
     const buildUrl = useCallback((subPath: string) => {
-        return withViewMode(urlController.buildUrlCollectionPath(subPath));
+        return withListState(urlController.buildUrlCollectionPath(subPath));
     }, [urlController]);
 
     // Close the detail panel: navigate back to the collection path

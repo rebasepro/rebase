@@ -34,7 +34,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView, createFormexStub, usePermissions, useTranslation, getIcon } from "@rebasepro/app";
 
 import { removeInitialAndTrailingSlashes, resolveDefaultSelectedView } from "@rebasepro/app";
-import { withViewMode } from "../util/view_mode";
+import { withListState } from "../util/view_mode";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import {
     useCustomizationController,
@@ -502,9 +502,10 @@ entityId }
         });
 
     // The breadcrumb's destination, and the back arrow's when it renders. Both
-    // keep the view mode: a collection reached from one of its own records must
-    // come back as the user left it.
-    const collectionUrl = withViewMode(urlController.buildUrlCollectionPath(path));
+    // keep the list's whole URL state: a collection reached from one of its own
+    // records must come back as the user left it — the same view mode, search,
+    // filters and sort.
+    const collectionUrl = withListState(urlController.buildUrlCollectionPath(path));
 
     // Full screen is the one layout with no way out of its own: a side panel and a
     // dialog can be dismissed, and a split keeps the list beside it, but opening an
