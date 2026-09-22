@@ -608,6 +608,22 @@ parentEntityIds,
         entity: usedEntity
     });
 
+    // What the record's own actions mean by `navigateBack`: leave the record.
+    // The delete action calls it once the row is gone. It is not this view's
+    // `navigateBack` prop, which every layout wires to "leave the edit view
+    // for the record's detail view" — after a delete that is a record that no
+    // longer exists, and the split, the side panel and the dialog stayed open
+    // on it.
+    const leaveRecord = useCallback(() => {
+        if (layout === "side_panel" || layout === "dialog") {
+            sideDialogContext.close(true);
+        } else if (onCloseRequest) {
+            onCloseRequest();
+        } else {
+            navigate(withListState(urlController.buildUrlCollectionPath(path)), { replace: true });
+        }
+    }, [layout, sideDialogContext, onCloseRequest, navigate, urlController, path]);
+
     const recordActionItems = usedEntity && recordActions.length
         ? recordActions.map((action, index) => {
             const clickProps = {
@@ -618,7 +634,7 @@ parentEntityIds,
                 context,
                 sidePanelController: adminContext.sidePanelController,
                 openEntityMode: layout,
-                navigateBack: navigateBack ?? (() => undefined),
+                navigateBack: leaveRecord,
                 formContext
             };
             const enabled = !action.isEnabled || action.isEnabled(clickProps as never);
