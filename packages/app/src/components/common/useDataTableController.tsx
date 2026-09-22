@@ -66,7 +66,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         collection,
         scrollRestoration,
         entitiesDisplayedFirst,
-        lastDeleteTimestamp: _lastDeleteTimestamp,
+        lastDeleteTimestamp,
         fixedFilter: fixedFilterFromProps,
         updateUrl
     }: DataTableControllerProps<M>)
@@ -280,7 +280,20 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         }
     }, [fixedFilter]);
 
+    // Without realtime the rows are one `find` per query, so nothing tells
+    // the table a row went away. `lastDeleteTimestamp` is how the collection
+    // view says it did (a delete, or linking existing rows), and a re-read is
+    // the only way to show it. A live subscription already delivers the
+    // change, so it is left alone.
+    const canListen = Boolean(dataClient.collection(path).listen);
+    const oneShotReadKey = canListen ? undefined : lastDeleteTimestamp;
+
     useEffect(() => {
+
+        // Cleared by this run's cleanup. A one-shot read has nothing to
+        // unsubscribe from, so without it an answer for a superseded query
+        // (the "ch" typed before "chair") landed on top of the newer one.
+        let cancelled = false;
 
         setDataLoading(true);
 
@@ -309,6 +322,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                     console.error(_e);
                 }
             }
+            if (cancelled) return;
             setDataLoading(false);
             setDataLoadingError(undefined);
             setRawData(entities.map(e => ({
@@ -323,6 +337,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         };
 
         const onError = (error: Error) => {
+            if (cancelled) return;
             console.error("ERROR", error);
             setDataLoading(false);
             setRawData((prev) => prev && prev.length > 0 ? prev : []);
@@ -355,11 +370,13 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                     searchString, include: includeParams }))
                 .then((res) => onEntitiesUpdate(res.data as Entity<M>[]))
                 .catch(onError);
-            unsubscribe = () => undefined;
         }
 
-        return unsubscribe;
-    }, [dataClient, path, itemCount, sortKey, filterValues, searchString]);
+        return () => {
+            cancelled = true;
+            unsubscribe?.();
+        };
+    }, [dataClient, path, itemCount, sortKey, filterValues, searchString, oneShotReadKey]);
 
     const orderedData = useDataOrder({
         data: rawData,
