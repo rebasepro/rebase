@@ -23,6 +23,7 @@ import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, AuthModuleConfig } from "../src/auth/routes";
 import type { AuthRepository } from "../src/auth/interfaces";
+import type { AuthHooks } from "../src/auth/auth-hooks";
 import { configureJwt } from "../src/auth/jwt";
 import { RECIPIENT_ROUTE_FLOOR_MS } from "../src/auth/rate-limiter";
 
@@ -54,7 +55,7 @@ function user(email: string) {
 let sent: jest.Mock;
 let knownAddresses: Set<string>;
 
-function createApp() {
+function createApp(authHooks?: AuthHooks) {
     sent = jest.fn().mockResolvedValue(undefined);
     knownAddresses = new Set();
 
@@ -71,9 +72,11 @@ function createApp() {
         emailService: { send: sent, isConfigured: () => true } as never,
         emailConfig: { from: "noreply@example.test" } as never,
         jwtSecret: TEST_SECRET,
-        // The OTP routes are opt-in, and one of the two routes under test here
-        // is theirs.
-        enableEmailOtp: true
+        authHooks,
+        // The OTP and magic-link routes are opt-in, and they are two of the
+        // routes under test here.
+        enableEmailOtp: true,
+        enableMagicLink: true
     } as unknown as AuthModuleConfig;
 
     const app = new Hono<HonoEnv>();
@@ -113,6 +116,43 @@ describe("a route that answers \"if an account exists…\"", () => {
         expect(unknownMs).toBeGreaterThanOrEqual(RECIPIENT_ROUTE_FLOOR_MS - 25);
         expect(knownMs).toBeGreaterThanOrEqual(RECIPIENT_ROUTE_FLOOR_MS - 25);
     }, 20_000);
+
+    it("holds a sign-in link request to the same floor, known address or not", async () => {
+        const app = createApp();
+        knownAddresses.add("magic-known@test.com");
+
+        const unknownStart = Date.now();
+        await app.request("/auth/magic-link", json({ email: "magic-unknown@test.com" }));
+        const unknownMs = Date.now() - unknownStart;
+
+        const knownStart = Date.now();
+        await app.request("/auth/magic-link", json({ email: "magic-known@test.com" }));
+        const knownMs = Date.now() - knownStart;
+
+        expect(unknownMs).toBeGreaterThanOrEqual(RECIPIENT_ROUTE_FLOOR_MS - 25);
+        expect(knownMs).toBeGreaterThanOrEqual(RECIPIENT_ROUTE_FLOOR_MS - 25);
+    }, 20_000);
+
+    it("does not wait on the mail server before answering a sign-in link request", async () => {
+        const app = createApp();
+        knownAddresses.add("magic-slow-smtp@test.com");
+        sent.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 3000)));
+
+        const started = Date.now();
+        const res = await app.request("/auth/magic-link", json({ email: "magic-slow-smtp@test.com" }));
+
+        expect(res.status).toBe(200);
+        expect(Date.now() - started).toBeLessThan(2000);
+    }, 20_000);
+
+    it("calls beforeLogin for an address with no account, so the hook is not the answer", async () => {
+        const beforeLogin = jest.fn(async () => undefined);
+        const app = createApp({ beforeLogin });
+
+        await app.request("/auth/magic-link", json({ email: "nobody-here@test.com" }));
+
+        expect(beforeLogin).toHaveBeenCalledWith("nobody-here@test.com", "magic-link");
+    });
 
     it("does not wait on the mail server before answering", async () => {
         // The send is off the response path, so a slow SMTP server cannot
@@ -157,6 +197,20 @@ describe("how many messages one address may be sent", () => {
 
         const other = await app.request("/auth/forgot-password", json({ email: "quiet@test.com" }));
         expect(other.status).toBe(200);
+    }, 30_000);
+
+    it("stops a sign-in-link mail bomb too", async () => {
+        const app = createApp();
+        const email = "magic-target@test.com";
+        knownAddresses.add(email);
+
+        let last: Response | undefined;
+        for (let i = 0; i < 8; i++) {
+            last = await app.request("/auth/magic-link", json({ email }));
+        }
+
+        expect(last!.status).toBe(429);
+        expect(sent.mock.calls.length).toBeLessThan(8);
     }, 30_000);
 
     it("stops a sign-in-code mail bomb too", async () => {

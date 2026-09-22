@@ -7,7 +7,13 @@ import { ApiError } from "../api/errors";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
 import { getMagicLinkTemplate, resolveEmailBranding } from "../email/templates";
 import { resolveEmailLinkBase } from "../email/link-base";
-import { strictAuthLimiter } from "./rate-limiter";
+import {
+    RECIPIENT_ROUTE_FLOOR_MS,
+    captureRecipientEmail,
+    notBefore,
+    recipientEmailLimiter,
+    strictAuthLimiter
+} from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
@@ -69,8 +75,25 @@ export function mountMagicLinkRoutes(deps: {
     /**
      * POST /auth/magic-link
      * Request a magic link email
+     *
+     * Answers the same words whether or not the address has an account, and
+     * is held to the same three things as its siblings `/otp` and
+     * `/forgot-password` so that nothing else answers the question either:
+     * the same response time, a per-address send limit, and `beforeLogin` on
+     * every attempt. This route had none of the three — the SMTP send was
+     * awaited only for a real account, and the only limit was per IP — so its
+     * timing named the customers and a spread-out run could fill one inbox.
      */
-    router.post("/magic-link", strictAuthLimiter, ...(captchaMiddleware ? [captchaMiddleware] : []), async (c) => {
+    router.post(
+        "/magic-link",
+        strictAuthLimiter,
+        // Per-address as well as per-IP: an IP is the attacker's to rotate,
+        // the mailbox being filled is not. See `recipientEmailLimiter`.
+        captureRecipientEmail,
+        recipientEmailLimiter,
+        ...(captchaMiddleware ? [captchaMiddleware] : []),
+        async (c) => {
+        const startedAt = Date.now();
         const { email } = parseBody(magicLinkSchema, await c.req.json());
 
         // Require email service
@@ -81,12 +104,15 @@ export function mountMagicLinkRoutes(deps: {
         // Always return success (security: don't reveal if email exists)
         const user = await authRepo.getUserByEmail(email);
 
-        if (user) {
-            // Call beforeLogin hook if provided (throw to reject)
-            if (ops.beforeLogin) {
-                await ops.beforeLogin(email, "magic-link");
-            }
+        // Fired for every attempt, not only the ones that name a real account,
+        // for the reason `/otp` gives: an enumeration run is made entirely of
+        // addresses that do not exist, and a hook called only for real ones
+        // is itself the answer.
+        if (ops.beforeLogin) {
+            await ops.beforeLogin(email, "magic-link");
+        }
 
+        if (user) {
             // Generate magic link token
             const token = generateSecureToken();
             const tokenHash = hashToken(token);
@@ -105,25 +131,26 @@ export function mountMagicLinkRoutes(deps: {
                 ? templateFn(magicLinkUrl, { email: user.email, displayName: user.displayName })
                 : getMagicLinkTemplate(magicLinkUrl, { email: user.email, displayName: user.displayName }, appName, logoUrl);
 
-            // Send email
-            try {
-                await emailService!.send({
-                    to: user.email,
-                    subject: emailContent.subject,
-                    html: emailContent.html,
-                    text: emailContent.text
-                });
-            } catch (emailError: unknown) {
+            // Deliberately NOT awaited: an SMTP round trip happens only on the
+            // branch where the address exists, so awaiting it made the
+            // response time the answer the response text refuses to give. A
+            // failure was already withheld from the caller for the same reason.
+            void emailService!.send({
+                to: user.email,
+                subject: emailContent.subject,
+                html: emailContent.html,
+                text: emailContent.text
+            }).catch((emailError: unknown) => {
                 logger.error("Failed to send magic link email", { error: emailError instanceof Error ? emailError.message : emailError });
-                // Don't reveal email sending failure to client
-            }
+            });
         }
 
-        // Always return success
-        return c.json({
+        // Held to a floor, so a known address and an unknown one take the same
+        // time to answer. See `RECIPIENT_ROUTE_FLOOR_MS`.
+        return notBefore(startedAt, RECIPIENT_ROUTE_FLOOR_MS, c.json({
             success: true,
             message: "If an account with that email exists, a magic link has been sent."
-        });
+        }));
     });
 
     /**
