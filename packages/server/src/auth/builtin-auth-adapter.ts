@@ -470,6 +470,9 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 await resolvedOps.beforeUserDelete(id);
             }
 
+            // The sessions end with the account on every engine — see the
+            // same line in `DELETE /admin/users/:uid`.
+            await repo.deleteAllRefreshTokensForUser(id);
             await repo.deleteUser(id);
 
             // Fire afterUserDelete hook (fire-and-forget)

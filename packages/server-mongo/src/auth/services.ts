@@ -40,9 +40,23 @@ function toUser(doc: any): UserData {
         emailVerified: doc.emailVerified ?? false,
         emailVerificationToken: doc.emailVerificationToken ?? null,
         emailVerificationSentAt: doc.emailVerificationSentAt ? new Date(doc.emailVerificationSentAt) : null,
+        // Read back, not just written: the guest flag is what tells a guest
+        // from an account on every door downstream — the token's claim,
+        // `policy.registered()`, `/auth/anonymous/link`.
+        isAnonymous: doc.isAnonymous === true,
+        metadata: doc.metadata ?? {},
         createdAt: new Date(doc.createdAt),
         updatedAt: new Date(doc.updatedAt)
     };
+}
+
+/**
+ * Mongo's duplicate-key error. The unique index on `email` in
+ * `ensure-collections.ts` is what raises it, and the answer to it is the same
+ * 409 Postgres gives for its 23505 — see `UserRepository.createUser`.
+ */
+function isDuplicateKey(error: unknown): boolean {
+    return (error as { code?: number })?.code === 11000;
 }
 
 export class MongoUserService implements UserRepository {
@@ -75,18 +89,16 @@ export class MongoUserService implements UserRepository {
             displayName: data.displayName ?? null,
             photoUrl: data.photoUrl ?? null,
             emailVerified: data.emailVerified ?? false,
+            isAnonymous: data.isAnonymous ?? false,
+            metadata: data.metadata ?? {},
             createdAt: now,
             updatedAt: now
         };
         try {
             await this.collection.insertOne(doc);
         } catch (error) {
-            // 11000 is Mongo's duplicate key, and the unique index on `email`
-            // in `ensure-collections.ts` is what raises it. Same answer as
-            // Postgres gives for its 23505, and the same answer the route
-            // gives when its pre-check sees the row — see
-            // `UserRepository.createUser`.
-            if ((error as { code?: number })?.code === 11000) {
+            // The same answer the route gives when its pre-check sees the row.
+            if (isDuplicateKey(error)) {
                 throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
             }
             throw error;
@@ -156,7 +168,18 @@ updatedAt: new Date() };
         return this.getUserById(id);
     }
 
+    /**
+     * Everything keyed by the user goes with them. Postgres does this by
+     * foreign-key cascade; Mongo has none, so it is spelled out — and the
+     * refresh tokens are the part that matters: left behind, a deleted user's
+     * session kept minting access tokens for a uid that no longer exists.
+     * Sessions first, so a failure part-way leaves an account that cannot sign
+     * in rather than a session with no account.
+     */
     async deleteUser(id: string): Promise<void> {
+        await this.db.collection<MongoDoc>("rebase_refresh_tokens").deleteMany({ uid: id });
+        await this.db.collection<MongoDoc>("rebase_password_reset_tokens").deleteMany({ uid: id });
+        await this.db.collection<MongoDoc>("magic_link_tokens").deleteMany({ uid: id });
         await this.collection.deleteOne({ id });
         await this.identitiesCollection.deleteMany({ uid: id });
         await this.userRolesCollection.deleteMany({ uid: id });

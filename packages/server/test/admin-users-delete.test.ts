@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
+import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 
@@ -33,6 +34,7 @@ function user(id: string): UserData {
 /** `admins` are the ids holding the admin role; `adminTotal` is how many exist. */
 function mockRepo(users: UserData[], admins: string[] = [], adminTotal = admins.length) {
     const deleteUser = jest.fn(async () => undefined);
+    const deleteAllRefreshTokensForUser = jest.fn(async () => undefined);
     const repo = {
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         getUserRoleIds: async (id: string) => (admins.includes(id) ? ["admin"] : ["editor"]),
@@ -40,10 +42,12 @@ function mockRepo(users: UserData[], admins: string[] = [], adminTotal = admins.
 total: adminTotal,
 limit: 1,
 offset: 0 }),
-        deleteUser
+        deleteUser,
+        deleteAllRefreshTokensForUser
     } as unknown as AuthRepository;
     return { repo,
-deleteUser };
+deleteUser,
+deleteAllRefreshTokensForUser };
 }
 
 async function bearer(userId: string): Promise<Record<string, string>> {
@@ -86,6 +90,40 @@ accessExpiresIn: "1h" });
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ success: true });
         expect(deleteUser).toHaveBeenCalledWith("editor-1");
+    });
+
+    /**
+     * Deleting an account is also how an administrator bans one, so it has to
+     * end the sessions. Postgres got that from a foreign-key cascade on the
+     * refresh tokens; the Mongo store, and any custom repository without one,
+     * left them — and the deleted user's refresh token kept minting access
+     * tokens. The door does it itself now, so the guarantee does not depend
+     * on what the engine cascades.
+     */
+    it("ends the deleted user's sessions before deleting them", async () => {
+        const { repo, deleteUser, deleteAllRefreshTokensForUser } = mockRepo([user("admin-1"), user("editor-1")], ["admin-1"], 3);
+        const app = createAdminUsersRoute({ authRepo: repo });
+
+        const res = await app.request("/users/editor-1", {
+            method: "DELETE",
+            headers: await bearer("admin-1")
+        });
+
+        expect(res.status).toBe(200);
+        expect(deleteAllRefreshTokensForUser).toHaveBeenCalledWith("editor-1");
+        expect(deleteAllRefreshTokensForUser.mock.invocationCallOrder[0])
+            .toBeLessThan(deleteUser.mock.invocationCallOrder[0]);
+    });
+
+    it("does the same through the adapter's userManagement.deleteUser", async () => {
+        const { repo, deleteUser, deleteAllRefreshTokensForUser } = mockRepo([user("editor-1")]);
+        const adapter = createBuiltinAuthAdapter({ authRepository: repo });
+
+        await adapter.userManagement!.deleteUser("editor-1");
+
+        expect(deleteAllRefreshTokensForUser).toHaveBeenCalledWith("editor-1");
+        expect(deleteAllRefreshTokensForUser.mock.invocationCallOrder[0])
+            .toBeLessThan(deleteUser.mock.invocationCallOrder[0]);
     });
 
     it("404s for a user that does not exist", async () => {

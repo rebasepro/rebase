@@ -35,6 +35,7 @@ describe("auth hooks fire on the admin paths the docs name", () => {
             getUserById: async (id: string) => admin(id),
             getUserByEmail: async () => null,
             deleteUser: async (id: string) => { deleted.push(id); },
+            deleteAllRefreshTokensForUser: async () => undefined,
             createUser: async (data: Record<string, unknown>) => { created.push(data); return { ...admin("new"), ...data }; },
             setUserRoles: async () => undefined
         } as unknown as AuthRepository;

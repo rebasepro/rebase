@@ -270,6 +270,71 @@ name: "Auditor" });
         });
     });
 
+    /**
+     * `createUser` wrote seven named fields and `toUser` read the same seven,
+     * so `isAnonymous` went in and came back as nothing: every guest minted by
+     * `POST /auth/anonymous` read as a full account. Its token carried no guest
+     * claim, `policy.registered()` let it through, and `/auth/anonymous/link`
+     * answered `NOT_ANONYMOUS` to every guest there was. `metadata` was dropped
+     * the same way.
+     */
+    describe("what a user document carries", () => {
+        it("writes and reads back the guest flag", async () => {
+            const repo = new MongoAuthRepository(db);
+            const guest = await repo.createUser({ email: "anon_1@anonymous.local", isAnonymous: true });
+            const member = await repo.createUser({ email: "member@rebase.pro" });
+
+            expect(guest.isAnonymous).toBe(true);
+            expect((await repo.getUserById(guest.id))?.isAnonymous).toBe(true);
+            expect((await repo.getUserByEmail("anon_1@anonymous.local"))?.isAnonymous).toBe(true);
+            expect((await repo.getUserById(member.id))?.isAnonymous).toBe(false);
+
+            // The upgrade `/auth/anonymous/link` performs.
+            await repo.updateUser(guest.id, { email: "upgraded@rebase.pro", isAnonymous: false });
+            expect((await repo.getUserById(guest.id))?.isAnonymous).toBe(false);
+        });
+
+        it("writes and reads back metadata", async () => {
+            const repo = new MongoAuthRepository(db);
+            const user = await repo.createUser({ email: "meta@rebase.pro", metadata: { plan: "pro", seats: 3 } });
+
+            expect(user.metadata).toEqual({ plan: "pro", seats: 3 });
+            expect((await repo.getUserById(user.id))?.metadata).toEqual({ plan: "pro", seats: 3 });
+        });
+    });
+
+    /**
+     * Postgres removes a deleted user's tokens by foreign-key cascade. Mongo has
+     * no cascade, and `deleteUser` removed the user, identity and role
+     * documents only — so a deleted (banned) user's refresh token went on
+     * minting access tokens for the deleted uid for the rest of its sliding
+     * 400-day life.
+     */
+    describe("deleting a user", () => {
+        it("takes their sessions and outstanding links with it, and nobody else's", async () => {
+            const repo = new MongoAuthRepository(db);
+            const gone = await repo.createUser({ email: "gone@rebase.pro" });
+            const kept = await repo.createUser({ email: "kept@rebase.pro" });
+            const future = new Date(Date.now() + 3600 * 1000);
+            for (const user of [gone, kept]) {
+                await repo.createRefreshToken(user.id, `refresh-${user.id}`, future, "ua", "ip", { id: `s-${user.id}`, startedAt: new Date() });
+                await repo.createPasswordResetToken(user.id, `reset-${user.id}`, future);
+                await repo.createMagicLinkToken(user.id, `magic-${user.id}`, future);
+            }
+
+            await repo.deleteUser(gone.id);
+
+            expect(await repo.findRefreshTokenByHash(`refresh-${gone.id}`)).toBeNull();
+            expect(await repo.listRefreshTokensForUser(gone.id)).toEqual([]);
+            expect(await repo.findValidPasswordResetToken(`reset-${gone.id}`)).toBeNull();
+            expect(await repo.findValidMagicLinkToken(`magic-${gone.id}`)).toBeNull();
+
+            expect(await repo.findRefreshTokenByHash(`refresh-${kept.id}`)).not.toBeNull();
+            expect(await repo.findValidPasswordResetToken(`reset-${kept.id}`)).not.toBeNull();
+            expect(await repo.findValidMagicLinkToken(`magic-${kept.id}`)).not.toBeNull();
+        });
+    });
+
     describe("MongoAuthRepository", () => {
         it("should implement aggregate auth operations", async () => {
             const repo = new MongoAuthRepository(db);
