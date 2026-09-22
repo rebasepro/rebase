@@ -24,6 +24,7 @@ import { execFileSync } from "node:child_process";
 
 import { checkTemplatePins } from "./check-template-pins.mjs";
 import { loadCliCommands } from "./docs-verify/cli-commands.mjs";
+import { checkResolutionMatchesShipped, stripJsonComments } from "./template-tsconfig.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
@@ -40,21 +41,6 @@ const BAAS = "baas";
 /** Files the blog preset owns; other presets replace them. Mirrors applyPreset. */
 const BLOG_FILES = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
 
-
-/**
- * JSONC → JSON, by scanning rather than by pattern.
- *
- * This was two regular expressions, and the block-comment one —
- * `/\/\*[\s\S]*?\*\//g` — treats any `/*` as an opener. A tsconfig is full of
- * them: `"src/**\/*"` in an `include`, and any comment that mentions a glob.
- * One added comment saying `../config/**` made the regex swallow from there to
- * the next `*\/` anywhere in the file, and the gate reported the tsconfig as
- * unparseable at a line that was fine.
- *
- * A scanner cannot make that mistake, because it knows whether it is inside a
- * string when it meets a slash. Strings are the only context that matters in
- * JSON; there are no template literals or regex literals to worry about.
- */
 /**
  * A template never imports `zod` directly.
  *
@@ -98,38 +84,6 @@ function checkNoDirectZodImports() {
     };
     walk(path.join(repoRoot, "packages/cli/templates"));
     return problems;
-}
-
-function stripJsonComments(source) {
-    let out = "";
-    let inString = false;
-    let i = 0;
-    while (i < source.length) {
-        const char = source[i];
-        if (inString) {
-            out += char;
-            if (char === "\\") { out += source[i + 1] ?? ""; i += 2; continue; }
-            if (char === '"') inString = false;
-            i += 1;
-            continue;
-        }
-        if (char === '"') { inString = true; out += char; i += 1; continue; }
-        if (char === "/" && source[i + 1] === "/") {
-            while (i < source.length && source[i] !== "\n") i += 1;
-            continue;
-        }
-        if (char === "/" && source[i + 1] === "*") {
-            i += 2;
-            while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
-            i += 2;
-            continue;
-        }
-        out += char;
-        i += 1;
-    }
-    // A trailing comma left behind by a removed entry is not our problem, but a
-    // comment that ended a line often leaves one dangling before `}` or `]`.
-    return out.replace(/,(\s*[}\]])/g, "$1");
 }
 
 function copyDir(from, to) {
@@ -406,54 +360,6 @@ function checkPinnedTypesAreDeclared() {
  *
  * So assert it on the files instead. Cheap, and it cannot be fooled by resolution.
  */
-/**
- * The compile below is not the compile the user gets.
- *
- * `TSCONFIG` above is synthetic — it has to be, because a scaffolded project
- * resolves `@rebasepro/*` through an install this check has no install for. But
- * a synthetic tsconfig can silently disagree with the shipped one, and it did:
- * this gate compiled every preset under `moduleResolution: "bundler"` while
- * `backend/tsconfig.json` shipped `"node"`, so the setting the user actually
- * compiles with was the one setting nothing checked. `node` is TypeScript's
- * node10 algorithm — no `exports` maps — and it is deprecated in TS 6.
- *
- * Only module resolution is compared, because it is the option that decides
- * whether an import resolves at all. The rest of the synthetic config differs
- * on purpose (noEmit, paths, typeRoots).
- */
-function checkResolutionMatchesShipped() {
-    const problems = [];
-    const expected = TSCONFIG.compilerOptions.moduleResolution;
-
-    for (const [root, workspaces] of [
-        [templateRoot, ["config", "backend", "frontend"]],
-        [path.join(repoRoot, "packages/cli/templates/overlays/baas"), ["config", "backend"]]
-    ]) {
-        for (const workspace of workspaces) {
-            const tsconfigPath = path.join(root, workspace, "tsconfig.json");
-            if (!fs.existsSync(tsconfigPath)) continue;
-            const raw = fs.readFileSync(tsconfigPath, "utf8")
-                .replace(/\/\*[\s\S]*?\*\//g, "")
-                .replace(/(^|[^:])\/\/.*$/gm, "$1");
-            let declared;
-            try {
-                declared = JSON.parse(raw).compilerOptions?.moduleResolution;
-            } catch {
-                continue; // checkPinnedTypesAreDeclared already reports a bad parse
-            }
-            if (declared !== undefined && declared !== expected) {
-                problems.push(
-                    `${path.relative(repoRoot, tsconfigPath)} sets moduleResolution: "${declared}", ` +
-                    `but this gate compiles the preset with "${expected}" — so the setting shipped to ` +
-                    "users is the one nothing checks"
-                );
-            }
-        }
-    }
-
-    return problems;
-}
-
 /**
  * `.env.example` is the file the docs call "a reference for the available
  * variables". It must actually be one.
@@ -956,7 +862,16 @@ if (scriptProblems.length > 0) {
     console.log("  ok   every scaffolded script can succeed on the tree it is scaffolded into");
 }
 
-const resolutionProblems = checkResolutionMatchesShipped();
+// The compile below is not the compile the user gets — see
+// template-tsconfig.mjs for why the shipped tsconfigs are compared to it.
+const resolutionProblems = checkResolutionMatchesShipped({
+    expected: TSCONFIG.compilerOptions.moduleResolution,
+    tsconfigs: [
+        ...["config", "backend", "frontend"].map(workspace => path.join(templateRoot, workspace, "tsconfig.json")),
+        ...["config", "backend"].map(workspace => path.join(baasOverlay, workspace, "tsconfig.json"))
+    ],
+    repoRoot
+});
 if (resolutionProblems.length > 0) {
     failed++;
     console.log("  FAIL shipped tsconfigs resolve the way this gate compiles");
