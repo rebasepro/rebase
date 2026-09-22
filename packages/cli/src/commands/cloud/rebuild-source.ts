@@ -348,6 +348,46 @@ export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): S
     };
 }
 
+/** The per-directory file of patterns a `--source` build context leaves out, beside `.gitignore`. */
+const CONTEXT_IGNORE_FILE = ".rebaseignore";
+
+/**
+ * The files of a `--source` build context: `dir` and what is under it, relative
+ * to it, POSIX, sorted.
+ *
+ * The same rules as the rebuild source — git decides, and {@link neverUploaded}
+ * after it — restricted to `dir`, which is the context's root, so a Dockerfile
+ * in it still reads its paths from there. A `dir` that is a subfolder of a
+ * repository is held to that repository's `.gitignore`, which is where a
+ * monorepo keeps it.
+ *
+ * `.rebaseignore` in `dir` leaves out more, read with `.gitignore` syntax and
+ * anchored at `dir`. It needs git to be read, like `.gitignore` outside a
+ * repository; without git, a context that has one is refused.
+ */
+export function listContextFiles(dir: string, git: GitRunner = runGit): string[] {
+    const root = fs.realpathSync(dir);
+    const unit = listUnit(root, git);
+    const prefix = toPosix(path.relative(unit.root, root));
+    let files = prefix === ""
+        ? unit.files
+        : unit.files.filter(file => file.startsWith(`${prefix}/`)).map(file => file.slice(prefix.length + 1));
+
+    const contextIgnore = path.join(root, CONTEXT_IGNORE_FILE);
+    if (fs.existsSync(contextIgnore)) {
+        // Everything under `dir` the patterns match — the only patterns read,
+        // since `--exclude-standard` is not passed — through a throwaway
+        // repository, so they anchor at `dir` whatever repository holds it.
+        const ignored = new Set(withScratchRepository(git, gitDir => nulSeparated(git(root, [
+            `--git-dir=${gitDir}`,
+            `--work-tree=${root}`,
+            "ls-files", "-z", "--others", "--ignored", `--exclude-from=${contextIgnore}`
+        ]))));
+        files = files.filter(file => !ignored.has(file));
+    }
+    return [...files].sort();
+}
+
 /**
  * Pack a listing into a gzipped tarball at `outPath`.
  *
@@ -357,7 +397,7 @@ export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): S
  * archive, as `packBundle` does; GNU tar accepts both. Every path handed to tar
  * is absolute, because GNU tar resolves a `-T` file after it has applied `-C`.
  */
-export function packSource(listing: SourceListing, outPath: string): Promise<void> {
+export function packSource(listing: Pick<SourceListing, "root" | "files">, outPath: string): Promise<void> {
     const listPath = `${outPath}.files`;
     fs.writeFileSync(listPath, listing.files.map(file => `${file}\0`).join(""));
     return new Promise<void>((resolve, reject) => {

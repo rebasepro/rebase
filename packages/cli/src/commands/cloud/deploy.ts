@@ -16,7 +16,6 @@ import chalk from "chalk";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { spawn } from "child_process";
 import { durationBucket, recordEvent } from "../../telemetry";
 import {
     requireClient,
@@ -37,7 +36,7 @@ import {
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
 import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, bundleCommit, declaredAppsFrom } from "./bundle-deploy";
-import { MAX_SOURCE_UPLOAD_BYTES, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
+import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
@@ -73,42 +72,24 @@ function sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
 }
 
-function run(cmd: string, cmdArgs: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const child = spawn(cmd, cmdArgs, { cwd,
-env: env ? { ...process.env,
-...env } : undefined,
-stdio: ["ignore", "ignore", "pipe"] });
-        let stderr = "";
-        child.stderr.on("data", (d) => (stderr += d.toString()));
-        child.on("error", reject);
-        child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(stderr || `${cmd} exited ${code}`))));
-    });
-}
-
 /**
- * Package `sourceDir` into a gzipped tarball, honoring `.gitignore`/`.rebaseignore`
- * and always excluding `.git` and `node_modules`. Returns the temp archive path.
+ * Package `sourceDir` into a gzipped tarball; returns the temp archive path.
+ *
+ * What goes in is {@link listContextFiles}: `.gitignore` read the way git reads
+ * it, `.rebaseignore` beside it, and never an env file, a database dump or the
+ * CLI's local state, whatever either says. The control plane keeps the archive
+ * as the project's source, so this is the last point anything can be kept back.
  */
 async function createSourceTarball(sourceDir: string): Promise<string> {
     const dir = path.resolve(sourceDir);
     if (!fs.existsSync(dir)) fail(`Source directory not found: ${dir}`);
 
     const tarPath = path.join(os.tmpdir(), `rebase-src-${Date.now()}.tar.gz`);
-    const tarArgs = ["-czf", tarPath, "--exclude=.git", "--exclude=node_modules"];
-    for (const ignore of [".gitignore", ".rebaseignore"]) {
-        if (fs.existsSync(path.join(dir, ignore))) tarArgs.push(`--exclude-from=${ignore}`);
-    }
-    tarArgs.push(".");
-
     try {
-        // COPYFILE_DISABLE: macOS bsdtar otherwise emits an AppleDouble sidecar
-        // (`._foo.ts`) for every file carrying an xattr — and macOS stamps the
-        // SIP-protected `com.apple.provenance` xattr routinely, so a stock
-        // checkout ships `._*` binary junk that crashes schema generation in
-        // the builder. GNU tar ignores the variable, so this is safe everywhere.
-        await run("tar", tarArgs, dir, { COPYFILE_DISABLE: "1" });
+        const files = listContextFiles(dir);
+        await packSource({ root: fs.realpathSync(dir), files }, tarPath);
     } catch (e) {
+        fs.rmSync(tarPath, { force: true });
         fail(`Failed to package source: ${e instanceof Error ? e.message : String(e)}`);
     }
     return tarPath;

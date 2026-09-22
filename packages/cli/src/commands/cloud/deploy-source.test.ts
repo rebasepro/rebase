@@ -12,6 +12,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { execFileSync } from "child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./context", async (importOriginal) => {
@@ -40,6 +41,7 @@ let cwd: string;
 let said: string[];
 let invoke: ReturnType<typeof vi.fn>;
 let requests: string[];
+let contextArchive: Buffer | undefined;
 
 function write(root: string, relative: string, content: string): void {
     const file = path.join(root, relative);
@@ -61,11 +63,16 @@ function bundle(kind: "backend" | "static"): void {
     write(bundleDir, "config/index.js", "export default {};\n");
 }
 
-/** Route the two uploads; `sourceStatus` decides how the source one answers. */
+/** Route the uploads; `sourceStatus` decides how the source one answers. */
 function controlPlane(sourceStatus = 200): void {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
         requests.push(url);
         if (url.includes("/deploy/bundle/upload")) return new Response(JSON.stringify({ bundleId: "b1" }));
+        if (url.includes("/deploy/upload")) {
+            // `--source`: the build context. Kept, so a test can read what left.
+            contextArchive = Buffer.from(init?.body as Uint8Array);
+            return new Response(JSON.stringify({ source: "gs://contexts/build-contexts/proj_1/c.tar.gz" }));
+        }
         if (url.includes("/deploy/source/upload")) {
             return sourceStatus === 200
                 ? new Response(JSON.stringify({ sourceId: SOURCE_ID }))
@@ -94,6 +101,7 @@ beforeEach(() => {
 
     said = [];
     requests = [];
+    contextArchive = undefined;
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
@@ -246,6 +254,76 @@ describe("a bundle refused as a downgrade", () => {
         expect(text).toContain("Rebuild it on 0.21.0 or later.");
         expect(text).toContain("rebase upgrade");
         expect(text).toContain("--allow-downgrade");
+    });
+});
+
+/**
+ * `--source <dir>` uploads a build context, and the control plane keeps it as
+ * the project's source archive. It used to be `tar .` with the root
+ * `.gitignore` read as tar globs: `.env.production` went up under the stock
+ * `.gitignore`, and in a monorepo subfolder — whose `.gitignore` is at the
+ * repository root — `.env` itself did.
+ */
+describe("a --source deploy", () => {
+    /** The entries of the build context the control plane was sent. */
+    function uploadedContext(): string[] {
+        expect(contextArchive).toBeDefined();
+        const tar = path.join(bundleDir, "context.tar.gz");
+        fs.writeFileSync(tar, contextArchive!);
+        return execFileSync("tar", ["-tzf", tar], { encoding: "utf8" })
+            .split("\n")
+            .filter(entry => entry !== "" && !entry.endsWith("/"))
+            .map(entry => entry.replace(/^\.\//, ""))
+            .sort();
+    }
+
+    function sourceDeploy(dir: string): Promise<void> {
+        return deployCommand(["node", "rebase", "cloud", "deploy", "--source", dir, "--no-follow"], "shop");
+    }
+
+    it("carries no env file and nothing the ignore files name", async () => {
+        write(project, ".gitignore", ".env\n.env.local\n!.env.example\nuploads/\nbackups/\n");
+        write(project, "backend/.gitignore", "fixtures/\n");
+        write(project, ".rebaseignore", "docs/private/\n");
+        write(project, ".env.production", "DATABASE_URL=postgres://prod\n");
+        write(project, "backend/.env.production", "STRIPE_KEY=sk_live_x\n");
+        write(project, ".env.example", "DATABASE_URL=\n");
+        write(project, "Dockerfile", "FROM node:22\n");
+        write(project, "backups/prod.dump", "PGDMP");
+        write(project, "uploads/avatar.png", "png");
+        write(project, "backend/fixtures/customers.csv", "a,b");
+        write(project, "backend/.rebase-dev-secrets.json", "{}");
+        write(project, "docs/private/notes.md", "# private");
+        write(project, "docs/public.md", "# public");
+        write(project, "node_modules/hono/index.js", "x");
+        controlPlane();
+
+        await sourceDeploy(".");
+
+        expect(uploadedContext()).toEqual([
+            ".env.example",
+            ".gitignore",
+            ".rebaseignore",
+            "Dockerfile",
+            "backend/.gitignore",
+            "backend/src/index.ts",
+            "docs/public.md",
+            "rebase.json"
+        ]);
+        expect(triggered().source).toBe("gs://contexts/build-contexts/proj_1/c.tar.gz");
+    });
+
+    it("reads the repository's .gitignore for a subfolder, and roots the context at the subfolder", async () => {
+        execFileSync("git", ["init", "-q"], { cwd: project, stdio: "ignore" });
+        write(project, ".gitignore", "uploads/\n");
+        write(project, "backend/.env", "SECRET=1\n");
+        write(project, "backend/uploads/avatar.png", "png");
+        write(project, "backend/Dockerfile", "FROM node:22\n");
+        controlPlane();
+
+        await sourceDeploy("backend");
+
+        expect(uploadedContext()).toEqual(["Dockerfile", "src/index.ts"]);
     });
 });
 
