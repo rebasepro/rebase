@@ -1,3 +1,4 @@
+import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
 import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
@@ -156,7 +157,7 @@ describe("ensureCollectionPolicies", () => {
             expect(result.unsecured[0].grantWithdrawn).toBe(true);
 
             // The privilege is actually taken back, naming that table.
-            expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON public\.customers FROM /.test(t))).toBe(true);
+            expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON "public"\."customers" FROM /.test(t))).toBe(true);
             // And no policy was attempted on a table with RLS off.
             expect(ran.some(t => /^CREATE POLICY[\s\S]*"customers"/.test(t))).toBe(false);
             // The healthy table is untouched by its neighbour's failure.
@@ -175,5 +176,45 @@ describe("ensureCollectionPolicies", () => {
             expect(result.unsecured.map(u => u.table)).toEqual(["public.customers"]);
             expect(result.unsecured[0].grantWithdrawn).toBe(false);
         });
+
+        /**
+         * The revoke named the table unquoted, so Postgres folded it to lower
+         * case: a mixed-case adopted table — Prisma's `"User"` — was revoked as
+         * `public.user`, which does not exist. `grantWithdrawn` came back false
+         * and boot refused to start, over a table it could have closed.
+         */
+        it("closes a mixed-case table by its exact name", async () => {
+            const users: CollectionConfig = {
+                name: "Users", slug: "users", table: "User", schema: "public",
+                properties: { id: { name: "ID", type: "string", isId: true } },
+                securityRules: [{ operation: "select", access: "public" }]
+            };
+            const db = new PGlite();
+            try {
+                await db.exec(
+                    "CREATE ROLE rebase_user;" +
+                    'CREATE TABLE "public"."User" ("id" TEXT PRIMARY KEY);' +
+                    'GRANT ALL PRIVILEGES ON "public"."User" TO rebase_user;'
+                );
+                // RLS cannot be enabled on a table the runtime does not own;
+                // PGlite runs as its owner, so the refusal is staged here.
+                const queryable: Queryable = {
+                    async query<T>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
+                        if (/ENABLE ROW LEVEL SECURITY/.test(text)) throw new Error("must be owner of table User");
+                        return db.query<T>(text, values);
+                    }
+                };
+                const result = await ensureCollectionPolicies(queryable, [users]);
+
+                expect(result.unsecured).toEqual([
+                    { table: "public.User", error: "must be owner of table User", grantWithdrawn: true }
+                ]);
+                const { rows } = await db.query<{ can: boolean }>(
+                    "SELECT has_table_privilege('rebase_user', '\"public\".\"User\"', 'SELECT') AS can");
+                expect(rows).toEqual([{ can: false }]);
+            } finally {
+                await db.close();
+            }
+        }, 30_000);
     });
 });

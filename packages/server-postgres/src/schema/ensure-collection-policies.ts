@@ -161,9 +161,14 @@ export async function ensureCollectionPolicies(
             // This is the fail-closed step the old code assumed it already had:
             // per-table, so one collection cannot take the rest of the
             // deployment down, but leaving nothing readable without RLS.
+            //
+            // Quoted, like every other statement here: unquoted, Postgres folds
+            // the name to lower case, so a mixed-case adopted table (`"User"`)
+            // was revoked as `public.user` — which fails, and a table that could
+            // have been closed refused the boot instead.
             let grantWithdrawn = false;
             try {
-                await client.query(`REVOKE ALL PRIVILEGES ON ${plan.qualified} FROM ${REBASE_USER_ROLE}`);
+                await client.query(`REVOKE ALL PRIVILEGES ON "${plan.schema}"."${plan.table}" FROM "${REBASE_USER_ROLE}"`);
                 grantWithdrawn = true;
             } catch {
                 // Fall through: reported below with `grantWithdrawn: false`,
