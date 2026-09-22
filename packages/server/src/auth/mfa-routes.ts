@@ -419,7 +419,19 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         // A challenge that has already been guessed at its limit is spent, and
         // stays spent for its remaining lifetime — otherwise one open challenge
         // is an unlimited number of guesses at six digits.
-        if ((challenge.attempts ?? 0) >= MAX_CHALLENGE_ATTEMPTS) {
+        //
+        // The attempt is claimed BEFORE the code is judged, and the claim's
+        // own count decides. Reading `challenge.attempts` and recording a
+        // failure afterwards is check-then-act: guesses sent in parallel —
+        // the shape a brute force takes — all read the same count and were
+        // all judged. The read stays as the cheap refusal for a challenge
+        // that is already spent.
+        const attempts = (challenge.attempts ?? 0) >= MAX_CHALLENGE_ATTEMPTS
+            ? MAX_CHALLENGE_ATTEMPTS + 1
+            : typeof authRepo.recordMfaChallengeAttempt === "function"
+                ? await authRepo.recordMfaChallengeAttempt(challengeId)
+                : undefined;
+        if (attempts !== undefined && attempts > MAX_CHALLENGE_ATTEMPTS) {
             logger.warn("[Security Audit] MFA challenge attempt limit reached", {
                 eventType: "auth.mfa.challenge.exhausted",
                 uid: principal.uid,
@@ -441,9 +453,6 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         }
 
         if (!isValid) {
-            const attempts = typeof authRepo.recordMfaChallengeAttempt === "function"
-                ? await authRepo.recordMfaChallengeAttempt(challengeId)
-                : undefined;
             logger.warn("[Security Audit] MFA verification failed", {
                 eventType: "auth.mfa.verify.failure",
                 uid: principal.uid,

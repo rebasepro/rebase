@@ -558,6 +558,35 @@ code: await currentCode(h.totpSecret) }, pre)
             expect(h.state.refreshTokens).toHaveLength(0);
         });
 
+        /**
+         * The cap was check-then-act: each request read `attempts` from the
+         * challenge, judged the code, and only then recorded the failure. A
+         * brute force sends its guesses in parallel, so every one of them read
+         * the same count and every one was judged — the atomic total that
+         * `recordMfaChallengeAttempt` returned was logged and never compared.
+         * The attempt is claimed first now, and a claim past the cap is refused
+         * before the code is looked at.
+         */
+        it("judges at most five guesses however many arrive at once", async () => {
+            const h = createHarness({ uid: "h2-parallel",
+enrolled: true });
+            const pre = { Authorization: `Bearer ${await generateAccessToken("h2-parallel", ["editor"])}` };
+
+            const opened = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, pre));
+            const challengeId = (await opened.json() as { challengeId: string }).challengeId;
+
+            const responses = await Promise.all(Array.from({ length: 8 }, () =>
+                h.app.request("/auth/mfa/challenge/verify", post({ challengeId,
+code: "000000" }, pre))));
+            const codes = await Promise.all(responses.map(async r => (await r.json() as { error: { code: string } }).error.code));
+
+            // A wrong six digits falls through to the recovery-code check, so
+            // this counts the guesses that were actually judged.
+            expect(h.repo.useRecoveryCode).toHaveBeenCalledTimes(5);
+            expect(codes.filter(code => code === "INVALID_CODE")).toHaveLength(5);
+            expect(codes.filter(code => code === "CHALLENGE_EXHAUSTED")).toHaveLength(3);
+        });
+
         it("throttles verification per account, not per IP", async () => {
             // The limiter is keyed on the uid because an IP is the attacker's
             // to rotate: every request below carries a different forwarded

@@ -1586,7 +1586,9 @@ export class MfaService implements MfaRepository {
     }
 
     /**
-     * Count one failed guess against a challenge and report the new total.
+     * Count one guess against a challenge and report the new total. The route
+     * claims it before judging the code, so the total it returns is what the
+     * cap is decided on.
      *
      * Incremented in the database rather than in the route so that guesses
      * arriving in parallel — the shape any real brute-force takes — cannot

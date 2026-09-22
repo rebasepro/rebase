@@ -658,9 +658,11 @@ export interface MfaRepository {
     claimMfaFactorCounter?(factorId: string, counter: number): Promise<boolean>;
 
     /**
-     * Record a failed verification against a challenge and return the new
-     * total. Atomic (`UPDATE … SET attempts = attempts + 1 RETURNING attempts`)
-     * so concurrent guesses cannot share one increment.
+     * Record a verification attempt against a challenge and return the new
+     * total. The route claims it before judging the code and refuses a claim
+     * past the cap, so this count is the cap. Atomic (`UPDATE … SET attempts =
+     * attempts + 1 RETURNING attempts`) so concurrent guesses cannot share
+     * one increment.
      *
      * Optional; where it is absent the route falls back to the rate limiters
      * alone.
