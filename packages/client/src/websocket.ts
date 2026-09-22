@@ -277,6 +277,17 @@ export class RebaseWebSocketClient {
     }>();
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
+    /**
+     * Whether a socket of this client has ever opened — what makes the next
+     * open a *reconnect*, whose server has forgotten every subscription and
+     * channel membership and must be told them again.
+     *
+     * Not `reconnectAttempts > 0`: that counter is a backoff budget, and a
+     * fresh one (after giving up, or after a sign-out dropped the socket)
+     * starts at zero, so the socket that finally came back looked like a first
+     * connect and nothing was re-sent.
+     */
+    private hadConnection = false;
     private isConnected = false;
     private messageQueue: Record<string, unknown>[] = [];
     private requestTimeoutMs = 30000;
@@ -457,6 +468,13 @@ export class RebaseWebSocketClient {
         // they were done, and holding the Node event loop open with a timer that
         // is not unref'd — which is the one thing `close()` exists to prevent.
         this.suspendSubscribeWatchdogs();
+        // What the socket delivered was read as the identity it was
+        // authenticated as, and a sign-out is exactly that identity going away.
+        // The registrations stay so a later dial can resume them; their rows do
+        // not, or the next `listen()` on the same query is handed the previous
+        // user's rows as already loaded — and, since a loaded registration
+        // needs no subscribe, never asks the server at all.
+        this.forgetCachedData();
         if (this.ws) {
             this.ws.onclose = null; // Prevent reconnect on explicit disconnect
             this.ws.onerror = null; // Prevent errors on explicit disconnect
@@ -487,7 +505,8 @@ export class RebaseWebSocketClient {
 
             this.ws!.onopen = async () => {
                 console.debug("Connected to PostgreSQL backend");
-                const wasReconnect = this.reconnectAttempts > 0;
+                const wasReconnect = this.hadConnection;
+                this.hadConnection = true;
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
 
@@ -507,7 +526,7 @@ export class RebaseWebSocketClient {
                 }
 
                 this.emit(wasReconnect ? "reconnect" : "connect");
-                this.processMessageQueue();
+                this.processMessageQueue(wasReconnect);
 
                 // Re-subscribe all active subscriptions after reconnect.
                 // The server-side subscription state was lost when the connection dropped,
@@ -573,11 +592,51 @@ export class RebaseWebSocketClient {
         }
     }
 
-    private processMessageQueue() {
+    private processMessageQueue(isReconnect: boolean) {
         while (this.messageQueue.length > 0 && this.isConnected) {
             const message = this.messageQueue.shift();
-            if (message) this.sendMessage(message);
+            if (!message) continue;
+            if (!this.shouldSendQueued(message, isReconnect)) {
+                // Fire-and-forget, so there is no answer to wait for: settle
+                // it the way a sent one is settled.
+                const resolveQueued = message._queuedResolve;
+                if (typeof resolveQueued === "function") resolveQueued(undefined);
+                continue;
+            }
+            this.sendMessage(message);
         }
+    }
+
+    /**
+     * Whether a frame that waited in the queue should go out on the socket
+     * that just opened. Only a subscribe can be refused, and one is exactly
+     * when sending it would give the server a subscription this side will not
+     * read:
+     *
+     * - Its registration is gone, or has been given a new id, while it waited.
+     *   A listener that unmounted before the socket opened (a StrictMode double
+     *   mount does exactly this) sends no `unsubscribe`, because there was no
+     *   socket to send it on, so the server would keep that one forever.
+     * - This open is a reconnect. `resubscribeAll` sends every registration
+     *   under a fresh id right after the queue drains, so the queued copy would
+     *   be the second of two. It is handed back to that pass instead.
+     */
+    private shouldSendQueued(message: Record<string, unknown>, isReconnect: boolean): boolean {
+        if (message.type !== "subscribe_collection" && message.type !== "subscribe_one") return true;
+        const payload = message.payload;
+        if (!payload || typeof payload !== "object" || !("subscriptionId" in payload)) return true;
+        const subscriptionId = payload.subscriptionId;
+        if (typeof subscriptionId !== "string") return true;
+
+        const registration = message.type === "subscribe_collection"
+            ? this.collectionSubscriptions.get(this.backendToCollectionKey.get(subscriptionId) ?? "")
+            : this.singleSubscriptions.get(this.backendToEntityKey.get(subscriptionId) ?? "");
+        if (!registration || registration.backendSubscriptionId !== subscriptionId) return false;
+        if (isReconnect) {
+            registration.subscribeInFlight = false;
+            return false;
+        }
+        return true;
     }
 
     private attemptReconnect() {
@@ -1762,6 +1821,27 @@ onError });
     }
 
     /**
+     * Drop every registration's cached rows, keeping the registrations.
+     *
+     * A registration without rows counts as not loaded, so the next listener
+     * to attach asks the server (or waits for the resubscribe) instead of
+     * being handed what is cached.
+     */
+    private forgetCachedData(): void {
+        for (const sub of this.collectionSubscriptions.values()) {
+            sub.latestData = undefined;
+            sub.latestMeta = undefined;
+            sub.lastUpdated = undefined;
+            sub.isInitialDataReceived = false;
+        }
+        for (const sub of this.singleSubscriptions.values()) {
+            sub.latestData = undefined;
+            sub.lastUpdated = undefined;
+            sub.isInitialDataReceived = false;
+        }
+    }
+
+    /**
      * Arm watchdogs for subscribes that were requested while offline and have
      * just been flushed to the socket. Their timers were deliberately not set at
      * request time, so without this they would have no timeout at all.
@@ -1828,8 +1908,16 @@ onError });
     private resubscribeAll(): void {
         console.debug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
 
+        // A registration still in flight here had its subscribe sent on this
+        // socket already, while it was authenticating: the close clears the
+        // flag on every registration, and the queue hands its own subscribes
+        // back to this pass. Re-sending one of those opened a second server
+        // subscription under a new id and orphaned the first — every write was
+        // refetched twice, and the extra one was never unsubscribed.
+
         // Re-subscribe collection subscriptions
         for (const [key, sub] of this.collectionSubscriptions.entries()) {
+            if (sub.subscribeInFlight) continue;
             // Generate a fresh backend ID since the old one is no longer valid on the server
             const oldBackendId = sub.backendSubscriptionId;
             const newBackendId = `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -1844,6 +1932,7 @@ onError });
 
         // Re-subscribe row subscriptions
         for (const [key, sub] of this.singleSubscriptions.entries()) {
+            if (sub.subscribeInFlight) continue;
             const oldBackendId = sub.backendSubscriptionId;
             const newBackendId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             sub.backendSubscriptionId = newBackendId;

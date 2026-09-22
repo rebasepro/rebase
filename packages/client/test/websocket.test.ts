@@ -1,5 +1,6 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { RebaseWebSocketClient } from "../src/websocket";
+import { RebaseRealtimeChannel } from "../src/realtime-channel";
 // The WS client now throws the unified RebaseApiError. Aliased to `ApiError`
 // so the existing instanceof/code assertions below read unchanged.
 import { RebaseApiError as ApiError } from "@rebasepro/types";
@@ -88,6 +89,11 @@ function createClient(opts?: Partial<ConstructorParameters<typeof RebaseWebSocke
 
 function getWs(): MockWebSocket {
     return MockWebSocket.instances[MockWebSocket.instances.length - 1];
+}
+
+/** Every frame a socket was given, parsed. */
+function frames(ws: MockWebSocket): Array<{ type: string; requestId?: string; payload: Record<string, any> }> {
+    return ws.sentMessages.map(m => JSON.parse(m));
 }
 
 // ---------------------------------------------------------------------------
@@ -802,6 +808,137 @@ limit: 20 }, jest.fn());
             expect(unsubMsg.type).toBe("unsubscribe");
         });
 
+        /**
+         * A subscribe asked for before the socket is up waits in the queue.
+         * These pin that what leaves the queue is one frame per live
+         * registration: the server keeps a subscription for every frame it
+         * gets, refetching on every write for each, and one this side no
+         * longer knows about is never unsubscribed.
+         */
+        describe("subscribes that waited for a socket", () => {
+            it("does not send the subscribe of a listener that left before the socket opened", () => {
+                // StrictMode: mount, unmount, mount — all before the first open.
+                const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234", WebSocket: MockWebSocket as any });
+                createdClients.push(client);
+                const unsubscribe = client.listenCollection({ path: "posts" }, jest.fn());
+                unsubscribe();
+                client.listenCollection({ path: "posts" }, jest.fn());
+                jest.advanceTimersByTime(10);
+
+                const subscribes = frames(getWs()).filter(m => m.type === "subscribe_collection");
+                expect(subscribes).toHaveLength(1);
+                // And it is the one this client can read.
+                const update = jest.fn();
+                client.listenCollection({ path: "posts" }, update);
+                getWs().onmessage!({ data: JSON.stringify({
+                    type: "collection_update",
+                    subscriptionId: subscribes[0].payload.subscriptionId,
+                    rows: [{ id: "1" }]
+                }) });
+                expect(update).toHaveBeenCalledWith([{ id: "1" }], undefined);
+            });
+
+            it("does the same for a row listener", () => {
+                const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234", WebSocket: MockWebSocket as any });
+                createdClients.push(client);
+                const unsubscribe = client.listenOne({ path: "posts", id: "1" }, jest.fn());
+                unsubscribe();
+                jest.advanceTimersByTime(10);
+
+                expect(frames(getWs()).filter(m => m.type === "subscribe_one")).toHaveLength(0);
+            });
+
+            it("sends a subscribe made during reconnect backoff exactly once", () => {
+                const client = createClient();
+                jest.runAllTimers();
+                getWs().close(); // reconnect scheduled 2s out
+
+                client.listenCollection({ path: "comments" }, jest.fn());
+                client.listenOne({ path: "comments", id: "7" }, jest.fn());
+                jest.advanceTimersByTime(2000 + 10);
+
+                expect(MockWebSocket.instances).toHaveLength(2);
+                const sent = frames(getWs());
+                expect(sent.filter(m => m.type === "subscribe_collection")).toHaveLength(1);
+                expect(sent.filter(m => m.type === "subscribe_one")).toHaveLength(1);
+            });
+
+            it("still sends it once when a dial in between fails", () => {
+                // A failed dial closes too, and a close marks every registration
+                // as not in flight — while its subscribe still sits in the queue.
+                const client = createClient();
+                jest.runAllTimers();
+                MockWebSocket.failToConnect = true;
+                try {
+                    getWs().close(); // retry 1 in 2s, which fails
+                    client.listenCollection({ path: "comments" }, jest.fn());
+                    jest.advanceTimersByTime(2000 + 10);
+                } finally {
+                    MockWebSocket.failToConnect = false;
+                }
+                jest.advanceTimersByTime(4000 + 10); // retry 2 comes up
+
+                expect(MockWebSocket.instances).toHaveLength(3);
+                const subscribes = frames(getWs()).filter(m => m.type === "subscribe_collection");
+                expect(subscribes).toHaveLength(1);
+                // The one sent is the one this side reads.
+                const update = jest.fn();
+                client.listenCollection({ path: "comments" }, update);
+                getWs().onmessage!({ data: JSON.stringify({
+                    type: "collection_update",
+                    subscriptionId: subscribes[0].payload.subscriptionId,
+                    rows: [{ id: "c" }]
+                }) });
+                expect(update).toHaveBeenCalledWith([{ id: "c" }], undefined);
+            });
+
+            it("sends a subscribe made while the reconnected socket authenticates exactly once", async () => {
+                const client = createClient({ getAuthToken: async () => "token" });
+                /** Answer every AUTHENTICATE the socket has been given so far. */
+                const answerAuth = () => {
+                    const ws = getWs();
+                    for (const m of frames(ws).filter(f => f.type === "AUTHENTICATE")) {
+                        ws.onmessage!({ data: JSON.stringify({ type: "AUTH_SUCCESS", requestId: m.requestId, payload: {} }) });
+                    }
+                };
+                await jest.advanceTimersByTimeAsync(10);
+                answerAuth();
+                await jest.advanceTimersByTimeAsync(0);
+
+                getWs().close();
+                await jest.advanceTimersByTimeAsync(2000 + 10);
+                // The new socket is open and waiting on its AUTHENTICATE.
+                client.listenCollection({ path: "comments" }, jest.fn());
+                await jest.advanceTimersByTimeAsync(0);
+                answerAuth();
+                await jest.advanceTimersByTimeAsync(0);
+                answerAuth();
+                await jest.advanceTimersByTimeAsync(0);
+
+                expect(MockWebSocket.instances).toHaveLength(2);
+                expect(frames(getWs()).filter(m => m.type === "subscribe_collection")).toHaveLength(1);
+            });
+
+            it("sends a subscribe made while the first dial was failing exactly once", () => {
+                // The server is down when the app starts, and up for the retry.
+                // No socket has opened yet, so there is nothing to re-send: the
+                // queued frame is the subscribe.
+                MockWebSocket.failToConnect = true;
+                try {
+                    const client = createClient();
+                    client.listenCollection({ path: "comments" }, jest.fn());
+                    jest.advanceTimersByTime(10);
+                    MockWebSocket.failToConnect = false;
+                    jest.advanceTimersByTime(2000 + 10);
+                } finally {
+                    MockWebSocket.failToConnect = false;
+                }
+
+                expect(MockWebSocket.instances).toHaveLength(2);
+                expect(frames(getWs()).filter(m => m.type === "subscribe_collection")).toHaveLength(1);
+            });
+        });
+
         it("provides cached data to late-joining subscriptions", () => {
             const client = createClient();
             jest.runAllTimers();
@@ -1317,6 +1454,139 @@ id: "1" }, onUpdate, onError);
                 goOnline();
                 client.ensureConnected();
                 expect(MockWebSocket.instances).toHaveLength(settled);
+            });
+
+            /**
+             * Dialling again is only half of coming back. The server forgot
+             * every subscription and channel membership when the socket died,
+             * so the new socket has to re-establish them — and it used to
+             * decide whether to by `reconnectAttempts > 0`, which the fresh
+             * budget had just reset to zero. The socket came up as a first
+             * connect: live views froze on their last rows and joined channels
+             * went quiet, with nothing reported anywhere.
+             */
+            it("re-sends live subscriptions and re-joins channels when the network is back", async () => {
+                const client = createClient();
+                jest.runAllTimers();
+                client.listenCollection({ path: "posts" }, jest.fn());
+                const channel = new RebaseRealtimeChannel("room", client);
+                await channel.join();
+                const first = getWs();
+                const sub = frames(first).find(m => m.type === "subscribe_collection")!;
+                first.onmessage!({ data: JSON.stringify({
+                    type: "collection_update",
+                    subscriptionId: sub.payload.subscriptionId,
+                    rows: [{ id: "1" }]
+                }) });
+
+                exhaustRetries();
+                serverIsBack();
+                goOnline();
+                await jest.advanceTimersByTimeAsync(10);
+
+                const types = frames(getWs()).map(m => m.type);
+                expect(types.filter(t => t === "subscribe_collection")).toHaveLength(1);
+                expect(types).toContain("join_channel");
+                await channel.leave();
+            });
+
+            it("re-sends live subscriptions when a caller asks for the connection", async () => {
+                const client = createClient();
+                jest.runAllTimers();
+                client.listenOne({ path: "posts", id: "1" }, jest.fn());
+                const sub = frames(getWs()).find(m => m.type === "subscribe_one")!;
+                getWs().onmessage!({ data: JSON.stringify({
+                    type: "single_update",
+                    subscriptionId: sub.payload.subscriptionId,
+                    row: { id: "1" }
+                }) });
+
+                exhaustRetries();
+                serverIsBack();
+                client.ensureConnected();
+                await jest.advanceTimersByTimeAsync(10);
+
+                expect(frames(getWs()).filter(m => m.type === "subscribe_one")).toHaveLength(1);
+            });
+        });
+
+        /**
+         * `SIGNED_OUT` drops the socket without closing the client, and keeps
+         * the subscriptions registered so a later dial can resume them. What
+         * it kept too was their cached rows — the signed-out user's rows — and
+         * a registration holding rows counts as loaded. The next `listen()` on
+         * the same query was handed those rows on the spot and sent no
+         * subscribe at all, so the next person to use the page saw the last
+         * one's data.
+         */
+        describe("after a sign-out", () => {
+            const deliver = (ws: MockWebSocket, type: "subscribe_collection" | "subscribe_one", update: Record<string, unknown>) => {
+                const sub = frames(ws).filter(m => m.type === type).at(-1)!;
+                ws.onmessage!({ data: JSON.stringify({ subscriptionId: sub.payload.subscriptionId, ...update }) });
+            };
+
+            it("does not hand the previous user's rows to a new listener", async () => {
+                const client = createClient();
+                jest.runAllTimers();
+                client.listenCollection({ path: "notifications" }, jest.fn());
+                deliver(getWs(), "subscribe_collection", { type: "collection_update", rows: [{ id: "a-1", owner: "userA" }] });
+
+                client.disconnect();
+                const next = jest.fn();
+                client.listenCollection({ path: "notifications" }, next);
+                await jest.advanceTimersByTimeAsync(10);
+
+                expect(next).not.toHaveBeenCalled();
+                // It asked the server instead — once, on the new socket.
+                expect(MockWebSocket.instances).toHaveLength(2);
+                expect(frames(getWs()).filter(m => m.type === "subscribe_collection")).toHaveLength(1);
+                deliver(getWs(), "subscribe_collection", { type: "collection_update", rows: [{ id: "b-1", owner: "userB" }] });
+                expect(next).toHaveBeenCalledTimes(1);
+                expect(next).toHaveBeenCalledWith([{ id: "b-1", owner: "userB" }], undefined);
+            });
+
+            it("does not hand the previous user's row to a new row listener", async () => {
+                const client = createClient();
+                jest.runAllTimers();
+                client.listenOne({ path: "profiles", id: "me" }, jest.fn());
+                deliver(getWs(), "subscribe_one", { type: "single_update", row: { id: "me", email: "a@example.com" } });
+
+                client.disconnect();
+                const next = jest.fn();
+                client.listenOne({ path: "profiles", id: "me" }, next);
+                await jest.advanceTimersByTimeAsync(10);
+
+                expect(next).not.toHaveBeenCalled();
+                expect(frames(getWs()).filter(m => m.type === "subscribe_one")).toHaveLength(1);
+            });
+
+            it("resumes a still-mounted subscription on the next socket", async () => {
+                const client = createClient();
+                jest.runAllTimers();
+                const mounted = jest.fn();
+                client.listenCollection({ path: "posts" }, mounted);
+                deliver(getWs(), "subscribe_collection", { type: "collection_update", rows: [{ id: "1" }] });
+
+                client.disconnect();
+                client.ensureConnected();
+                await jest.advanceTimersByTimeAsync(10);
+
+                expect(MockWebSocket.instances).toHaveLength(2);
+                expect(frames(getWs()).filter(m => m.type === "subscribe_collection")).toHaveLength(1);
+            });
+
+            it("re-joins a joined channel on the next socket", async () => {
+                const client = createClient();
+                jest.runAllTimers();
+                const channel = new RebaseRealtimeChannel("room", client);
+                await channel.join();
+
+                client.disconnect();
+                client.ensureConnected();
+                await jest.advanceTimersByTimeAsync(10);
+
+                expect(frames(getWs()).map(m => m.type)).toContain("join_channel");
+                await channel.leave();
             });
         });
 
