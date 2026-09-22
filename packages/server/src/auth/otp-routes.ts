@@ -52,6 +52,7 @@ import { hashToken } from "./admin-user-ops";
 import { getEmailOtpTemplate, resolveEmailBranding } from "../email/templates";
 import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
 import { logger } from "../utils/logger";
+import { redactRefreshToken } from "./cookie-utils";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /** How long a code is good for. */
@@ -357,8 +358,8 @@ export function mountOtpRoutes(deps: {
         }
 
         const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "otp") as AuthResponsePayload;
-        const finalResponse = await applyTransformHook(authResponse, "otp", c.req.raw, user.id);
-        return c.json(finalResponse);
+        const transformedResponse = await applyTransformHook(authResponse, "otp", c.req.raw, user.id);
+        return c.json(redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth));
     });
 }
 

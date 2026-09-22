@@ -11,7 +11,7 @@ import { strictAuthLimiter, defaultAuthLimiter } from "./rate-limiter";
 import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
-import { readRefreshToken, clearRefreshCookie } from "./cookie-utils";
+import { readRefreshToken, clearRefreshCookie, redactRefreshToken } from "./cookie-utils";
 import { isAnonymousAuthOpen } from "./registration-policy";
 import { revokeAllSessions } from "./token-revocation";
 import type { resolveAuthHooks } from "./auth-hooks";
@@ -390,8 +390,8 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         }
 
         const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "anonymous") as AuthResponsePayload;
-        const finalResponse = await applyTransformHook(authResponse, "anonymous", c.req.raw, user.id);
-        return c.json(finalResponse, 201);
+        const transformedResponse = await applyTransformHook(authResponse, "anonymous", c.req.raw, user.id);
+        return c.json(redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth), 201);
     });
 
     /**
@@ -452,7 +452,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         );
 
         const authResponse = buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken, "password") as AuthResponsePayload;
-        const finalResponse = await applyTransformHook(authResponse, "anonymous", c.req.raw, user.id);
-        return c.json(finalResponse);
+        const transformedResponse = await applyTransformHook(authResponse, "anonymous", c.req.raw, user.id);
+        return c.json(redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth));
     });
 }

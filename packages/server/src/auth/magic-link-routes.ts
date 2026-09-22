@@ -10,6 +10,7 @@ import { resolveEmailLinkBase } from "../email/link-base";
 import { strictAuthLimiter } from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
+import { redactRefreshToken } from "./cookie-utils";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /**
@@ -170,7 +171,7 @@ export function mountMagicLinkRoutes(deps: {
         }
 
         const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "magic-link") as AuthResponsePayload;
-        const finalResponse = await applyTransformHook(authResponse, "magic-link", c.req.raw, user.id);
-        return c.json(finalResponse);
+        const transformedResponse = await applyTransformHook(authResponse, "magic-link", c.req.raw, user.id);
+        return c.json(redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth));
     });
 }
