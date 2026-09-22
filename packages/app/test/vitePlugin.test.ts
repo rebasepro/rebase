@@ -1,4 +1,4 @@
-import { rebaseCollectionsPlugin, transformCollectionSource } from "../src/vitePlugin";
+import { isInsideDirectory, rebaseCollectionsPlugin, transformCollectionSource } from "../src/vitePlugin";
 
 /**
  * Helper: create a fully initialised plugin instance and return its
@@ -545,5 +545,32 @@ describe("rebaseCollectionsPlugin — dev server watcher", () => {
 
     it("watches an absolute collections directory as given", () => {
         expect(watchedPaths("/elsewhere/collections")).toEqual(["/elsewhere/collections"]);
+    });
+});
+
+/**
+ * Which module ids the transform treats as collection files.
+ *
+ * `path.resolve` gives `C:\\app\\config\\collections` on Windows, while Vite's
+ * id for a file in it is `C:/app/config/collections/posts.ts`. Compared as
+ * they came, no id ever matched on Windows, so the transform never ran: server
+ * callbacks shipped in the browser bundle and string `Field` refs stayed
+ * strings.
+ */
+describe("rebaseCollectionsPlugin — which files are collection files", () => {
+    it("matches a Windows id against a directory resolved with backslashes", () => {
+        expect(isInsideDirectory("C:/app/config/collections/posts.ts", "C:\\app\\config\\collections")).toBe(true);
+    });
+
+    it("matches an id that still carries backslashes", () => {
+        expect(isInsideDirectory("C:\\app\\config\\collections\\posts.ts", "C:/app/config/collections")).toBe(true);
+    });
+
+    it("does not match a sibling directory that shares the prefix", () => {
+        expect(isInsideDirectory("/app/config/collections-old/posts.ts", "/app/config/collections")).toBe(false);
+    });
+
+    it("matches a POSIX id inside the directory", () => {
+        expect(isInsideDirectory("/app/config/collections/posts.ts", "/app/config/collections")).toBe(true);
     });
 });
