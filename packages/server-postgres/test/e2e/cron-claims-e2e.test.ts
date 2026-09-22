@@ -264,11 +264,16 @@ describe("Cron slot claiming across instances (E2E)", () => {
             // `make_interval(days => $1)` binds a parameter into a named
             // argument. That combination either parses or it does not, and a
             // fake executeSql cannot tell you which.
+            //
+            // A job's most recent claim is kept however old it is — it is the
+            // record a catch-up reads — so the expired job has two, and only
+            // the one behind its latest goes.
             const old = nextJobId("expired");
             const recent = nextJobId("retained");
 
             await inspector.query(
                 `INSERT INTO rebase.cron_claims (job_id, slot, claimed_at) VALUES
+                 ($1, now() - interval '9 days', now() - interval '9 days'),
                  ($1, now() - interval '8 days', now() - interval '8 days'),
                  ($2, now() - interval '1 day',  now() - interval '1 day')`,
                 [old, recent]
@@ -276,7 +281,7 @@ describe("Cron slot claiming across instances (E2E)", () => {
 
             await instances[0].store.ensureTable();
 
-            expect(await countClaims(old)).toBe(0);
+            expect(await countClaims(old)).toBe(1);
             expect(await countClaims(recent)).toBe(1);
         });
     });
