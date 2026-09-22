@@ -10,7 +10,7 @@ import { assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
-import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./etag";
+import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag } from "./etag";
 import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
@@ -772,27 +772,83 @@ export class RestApiGenerator {
     }
 
     /**
-     * The row as the read routes serve it, for hashing into an `ETag`.
+     * The row an `ETag` is hashed from: the REST read of it, with no
+     * `?fields=` projection and no `?include=`.
      *
-     * A tag derived from a version column is the same whichever read produced
-     * the row, so nothing extra is fetched for it. The fallback hashes the row
-     * itself, and there the *shape* matters: `GET /:id` serves the REST walk
-     * while the write routes read through `driver.fetchOne` (the admin view
-     * model), so hashing whichever one happened to be in hand would give the
-     * same row two different tags and make every `If-Match` a coin toss.
+     * The read routes and the write routes both take their tag from here, so a
+     * tag a `GET` handed out and the tag a write compares it against are
+     * hashes of one rendering of the row. The write routes' own existence read
+     * is not that rendering, not even for its version column: `driver.fetchOne`
+     * returns the admin view model, where a date is a `{ __type: "date" }`
+     * envelope rather than the ISO string the REST row carries. Hashing it
+     * matched no tag any read ever handed out, so every conditional write to a
+     * collection with an `on_update` date was a 412.
+     *
+     * A driver without a REST read serves `GET /:id` from `fetchOne` too, so
+     * there the row already read is the rendering to hash.
+     *
+     * @param withDeleted how the row was read — a purge reads a trashed row,
+     *   and a tag compared against a read that hides it compares against
+     *   nothing.
      */
     private async rowForETag(
         driver: DataDriver,
-        collection: CollectionConfig,
+        address: RowAddress,
         id: string,
-        alreadyRead: Record<string, unknown> | undefined
+        alreadyRead: Record<string, unknown> | undefined,
+        withDeleted?: QueryOptions["withDeleted"]
     ): Promise<Record<string, unknown> | undefined> {
-        // A version column makes the tag independent of which read produced the
-        // row, so the one already in hand is the right one and costs nothing.
-        if (versionProperty(collection) && alreadyRead) return alreadyRead;
         const fetchService = driver.restFetchService;
         if (!fetchService) return alreadyRead;
-        return await fetchService.fetchOneForRest(collection.slug, id) as Record<string, unknown> | undefined;
+        return await fetchService.fetchOneForRest(address.path, id, undefined, undefined, { withDeleted }) ?? undefined;
+    }
+
+    /**
+     * `GET /:id`, at a row's own address or through a parent: the row as the
+     * query asked for it, and the `ETag` naming its version.
+     *
+     * The tag names the row, not the read. `?fields=` and `?include=` change
+     * what the response carries, and hashing what they produced gave one row a
+     * different tag for every way of reading it — none of them the tag a write
+     * computes, so the `If-Match` of any caller that read a projection or a
+     * relation was a 412. A narrowed read therefore takes its tag from
+     * {@link rowForETag}, the read the write routes make.
+     */
+    private async readRow(
+        driver: DataDriver,
+        address: RowAddress,
+        id: string,
+        queryOptions: QueryOptions
+    ): Promise<{ row: Record<string, unknown>; etag: string | undefined } | undefined> {
+        const { withDeleted } = queryOptions;
+        const fetchService = driver.restFetchService;
+        if (!fetchService) {
+            // `fetchOne` has no projection and no include, so this row is
+            // already the one a write compares against.
+            const row = await driver.fetchOne({
+                path: address.path,
+                id,
+                collection: address.driverCollection,
+                withDeleted
+            });
+            return row ? { row, etag: await rowETag(row, address.collection) } : undefined;
+        }
+
+        const narrowed = queryOptions.fields !== undefined || queryOptions.include !== undefined;
+        // Read before the narrowed row, not after: a write landing between the
+        // two then leaves the tag older than the body — a 412 the caller
+        // recovers from by reading again — and never newer, which would pass a
+        // write made against the older body over the change it never saw.
+        const tagged = narrowed ? await this.rowForETag(driver, address, id, undefined, withDeleted) : undefined;
+        // `fields` reaches the driver as a projection: the same columns a list
+        // read would select, so one row and a page of them cost the same per
+        // row rather than the get route paying for every column.
+        const row = await fetchService.fetchOneForRest(
+            address.path, id, queryOptions.include, undefined,
+            { fields: queryOptions.fields, withDeleted }
+        );
+        if (!row) return undefined;
+        return { row, etag: await rowETag(narrowed ? tagged : row, address.collection) };
     }
 
     /**
@@ -977,7 +1033,7 @@ values: entity as Record<string, unknown> },
             if (ifMatch) {
                 await assertIfMatch(
                     ifMatch,
-                    await this.rowForETag(driver, collection, id, existingEntity),
+                    await this.rowForETag(driver, address, id, existingEntity),
                     collection,
                     { collection: collection.slug, id }
                 );
@@ -1044,7 +1100,7 @@ values: entity as Record<string, unknown> },
                 // safe once somebody else has edited it in between.
                 await assertIfMatch(
                     ifMatch,
-                    await this.rowForETag(driver, collection, id, existingEntity),
+                    await this.rowForETag(driver, address, id, existingEntity, hardDelete ? true : undefined),
                     collection,
                     { collection: collection.slug, id }
                 );
@@ -1073,6 +1129,16 @@ values: entity as Record<string, unknown> },
     private createCollectionRoutes(collection: CollectionConfig): void {
         const basePath = `/${collection.slug}`;
         const resolvedCollection = collection;
+
+        // This collection's rows at their own address. The nested routes reach
+        // the same rows through a parent, and read and write them through the
+        // same methods.
+        const ownRow = (path: string): RowAddress => ({
+            collection: resolvedCollection,
+            path,
+            driverCollection: resolvedCollection,
+            name: collection.slug
+        });
 
         // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
@@ -1171,36 +1237,21 @@ values: entity as Record<string, unknown> },
             const queryDict = c.req.queries();
             const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const driver = this.getScopedDriver(c);
-            const fetchService = driver.restFetchService;
 
-            // Use include-aware path when available. `fields` reaches the
-            // driver as a projection here too — the same columns a list read
-            // would select, so one row and a page of them cost the same per
-            // row rather than the get route paying for every column.
-            const entity = fetchService
-                ? await fetchService.fetchOneForRest(
-                    collection.slug, String(id), queryOptions.include, undefined,
-                    { fields: queryOptions.fields, withDeleted: queryOptions.withDeleted }
-                )
-                : await this.fetchRawEntity(driver, resolvedCollection, String(id), queryOptions.withDeleted);
-
-            if (!entity) {
+            const read = await this.readRow(driver, ownRow(getCollectionDataPath(collection)), String(id), queryOptions);
+            if (!read) {
                 throw this.entityNotFound(collection.slug, String(id));
             }
 
             // The version this read saw, so the write that follows can name it
-            // and be refused if the row has moved on. Computed from the whole
-            // row, before `?fields=` narrows it: the tag identifies the row,
-            // not the projection the caller asked for, and two clients reading
-            // different columns of one row must agree about its version.
-            const etag = await rowETag(entity as Record<string, unknown>, resolvedCollection);
-            if (etag) c.header(ETAG_HEADER, etag);
+            // and be refused if the row has moved on.
+            if (read.etag) c.header(ETAG_HEADER, read.etag);
 
             // One row, shaped exactly as this route's list shapes each of its
             // own. Kept as a `body` rather than returned inline so the response
             // stays easy to extend with headers a caller has to see.
             const body = projectResponseFields(
-                [entity as Record<string, unknown>],
+                [read.row],
                 queryOptions.fields,
                 resolvedCollection,
                 { include: topLevelIncludeNames(queryOptions.include) }
@@ -1418,16 +1469,6 @@ values: entity as Record<string, unknown> },
             }, (result) => c.json(result as never));
         });
 
-        // This collection's rows at their own address. The nested routes reach
-        // the same rows through a parent, and write them through the same
-        // methods.
-        const ownRow = (path: string): RowAddress => ({
-            collection: resolvedCollection,
-            path,
-            driverCollection: resolvedCollection,
-            name: collection.slug
-        });
-
         // POST /collection - Create entity
         this.router.post(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
@@ -1600,15 +1641,13 @@ id };
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
                 const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
-                const fetchService = driver.restFetchService;
-                const entity = fetchService
-                    ? await fetchService.fetchOneForRest(
-                        nested.path, parsed.id, queryOptions.include, undefined,
-                        { fields: queryOptions.fields, withDeleted: queryOptions.withDeleted }
-                    )
-                    : await driver.fetchOne({ path: nested.path,
-id: parsed.id });
-                if (!entity) throw this.entityNotFound(nested.path, parsed.id);
+                const read = await this.readRow(driver, nestedRow(nested), parsed.id, queryOptions);
+                if (!read) throw this.entityNotFound(nested.path, parsed.id);
+
+                // The same tag the row's own address hands out, so a nested
+                // write — which compares `If-Match` like the root one — has
+                // one to compare.
+                if (read.etag) c.header(ETAG_HEADER, read.etag);
 
                 // `?fields=` is advertised on this endpoint too. It reached
                 // `queryOptions` and was read by nothing here, so a
@@ -1616,7 +1655,7 @@ id: parsed.id });
                 // narrowed — the same defect `projectResponseFields` exists to
                 // fix, surviving on the route family it was never wired into.
                 return c.json(projectResponseFields(
-                    [entity as Record<string, unknown>],
+                    [read.row],
                     queryOptions.fields,
                     nestedCollection,
                     { include: topLevelIncludeNames(queryOptions.include) }
@@ -1957,19 +1996,6 @@ id: parsed.id });
         }) : 0;
     }
 
-    /**
-     * Fetch single entity raw data without Entity wrapper (fallback)
-     */
-    private async fetchRawEntity(driver: DataDriver, collection: CollectionConfig, id: string, withDeleted?: boolean | "only") {
-        const entity = await driver.fetchOne({
-            path: getCollectionDataPath(collection),
-            id,
-            collection,
-            withDeleted
-        });
-
-        return entity ?? null;
-    }
 
 
 }

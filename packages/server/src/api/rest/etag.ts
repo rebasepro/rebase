@@ -86,9 +86,23 @@ export async function rowETag(
     // would hand them all one tag — so the fallback is taken per row, not per
     // collection.
     const source = version !== undefined && version !== null
-        ? `v:${version instanceof Date ? version.toISOString() : String(version)}`
+        ? `v:${renderVersion(version)}`
         : `r:${stableStringify(row)}`;
     return `"${await sha256Hex(source)}"`;
+}
+
+/**
+ * The version column's value, as the text a tag is hashed from.
+ *
+ * A string or a number is its own rendering. Anything else is rendered by its
+ * content: `String()` of an object is `[object Object]` whatever it holds, which
+ * gave every version of a row one tag the day a read handed the column back as
+ * an object — a stale `If-Match` then matched, and the write it exists to
+ * refuse went through.
+ */
+function renderVersion(version: unknown): string {
+    if (version instanceof Date) return version.toISOString();
+    return typeof version === "object" ? stableStringify(version) : String(version);
 }
 
 /**

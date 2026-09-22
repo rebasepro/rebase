@@ -287,14 +287,17 @@ describe("the REST read surface", () => {
     });
 
     describe("get by id", () => {
+        // The read that serves the body is the last one: a read narrowed by
+        // `include` or `fields` is preceded by a plain read of the same row, for
+        // its `ETag` (see api-generator-concurrency.test.ts).
         it("takes the same include spelling the list route does", async () => {
             await get("/posts/1?include=comments.author");
-            expect(fetchOneForRest.mock.calls[0][2]).toEqual(["comments.author"]);
+            expect(fetchOneForRest.mock.lastCall?.[2]).toEqual(["comments.author"]);
         });
 
         it("pushes `fields` down rather than trimming the response", async () => {
             await get("/posts/1?fields=id,title");
-            expect(fetchOneForRest.mock.calls[0][4]).toEqual({ fields: ["id", "title"] });
+            expect(fetchOneForRest.mock.lastCall?.[4]).toEqual({ fields: ["id", "title"] });
         });
     });
 });
