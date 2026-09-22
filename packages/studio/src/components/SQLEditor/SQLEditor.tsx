@@ -47,7 +47,7 @@ import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeSto
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { parseFirst } from "pgsql-ast-parser";
-import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
+import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, quoteTableName, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -599,7 +599,10 @@ message: resolution.error || "Resolution failed." });
             return;
         }
 
-        const tableName = resolution.tableName;
+        // Qualified when the query was: a bare name resolves through the
+        // search path, so a row of `archive.orders` was written to
+        // `public.orders`.
+        const tableName = quoteTableName(resolution.tableName, resolution.schemaName);
 
         const formatValue = (val: unknown) => {
             if (val === null || val === undefined) return "NULL";
@@ -635,7 +638,7 @@ message: resolution.error || "Resolution failed." });
             pk => `"${pk.dbColumn}" = ${formatValue(rowData[pk.resultColumn])}`
         ).join(" AND ");
 
-        const updateSql = `UPDATE "${tableName}" SET "${dbColumnName}" = ${formatValue(newValue)} WHERE ${whereConditions};`;
+        const updateSql = `UPDATE ${tableName} SET "${dbColumnName}" = ${formatValue(newValue)} WHERE ${whereConditions};`;
 
         try {
             if (databaseAdmin?.executeSql) {

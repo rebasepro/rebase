@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, extractTablesFromQuery, quoteTableName, resolveQueryCollections } from "./sql_utils";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -187,6 +187,62 @@ resultColumn: "order_id" },
             { dbColumn: "item_id",
 resultColumn: "item_id" }
         ]);
+    });
+});
+
+/**
+ * Inline editing on a table outside `public`.
+ *
+ * The schema a query named was dropped on the way to the UPDATE: editing a row
+ * of `SELECT * FROM archive.orders` ran `UPDATE "orders" …`, which the search
+ * path resolved to `public.orders` — a different table's row changed, and the
+ * console reported success.
+ */
+describe("inline editing in a named schema", () => {
+    const twoOrders: Record<string, TableInfo[]> = {
+        public: [{
+            schemaName: "public",
+            tableName: "orders",
+            columns: [
+                { name: "id", dataType: "integer", isPrimaryKey: true },
+                { name: "status", dataType: "text", isPrimaryKey: false }
+            ]
+        }],
+        archive: [{
+            schemaName: "archive",
+            tableName: "orders",
+            columns: [
+                { name: "order_no", dataType: "integer", isPrimaryKey: true },
+                { name: "status", dataType: "text", isPrimaryKey: false }
+            ]
+        }]
+    };
+
+    it("keeps the schema the query named, and that table's primary key", () => {
+        const result = determineTableAndPK("SELECT * FROM archive.orders LIMIT 1000;", "status", twoOrders);
+        expect(result.schemaName).toBe("archive");
+        expect(result.tableName).toBe("orders");
+        expect(result.primaryKeys).toEqual([{ dbColumn: "order_no", resultColumn: "order_no" }]);
+        expect(quoteTableName(result.tableName!, result.schemaName)).toBe("\"archive\".\"orders\"");
+    });
+
+    it("leaves an unqualified table to the search path, as the query did", () => {
+        const result = determineTableAndPK("SELECT * FROM orders", "status", twoOrders);
+        expect(result.schemaName).toBeUndefined();
+        expect(quoteTableName(result.tableName!, result.schemaName)).toBe("\"orders\"");
+    });
+
+    it("does not match a collection's table in another schema", () => {
+        // `users` is a collection in `public`; `archive.users` is not it.
+        expect(resolveQueryCollections("SELECT * FROM archive.users", mockSchemas, mockCollections)).toHaveLength(0);
+        expect(resolveQueryCollections("SELECT * FROM public.users", mockSchemas, mockCollections)).toHaveLength(1);
+    });
+
+    it("tells two same-named tables in a join apart by schema", () => {
+        const sql = "SELECT a.order_no, a.status FROM archive.orders a JOIN public.orders p ON p.id = a.order_no";
+        const result = determineTableAndPK(sql, "status", twoOrders);
+        expect(result.schemaName).toBe("archive");
+        expect(result.primaryKeys).toEqual([{ dbColumn: "order_no", resultColumn: "order_no" }]);
     });
 });
 

@@ -51,7 +51,35 @@ export function acceptsAutoLimit(sqlText: string): boolean {
  */
 export interface ExtractedTable {
     name: string;
+    /** The schema the query named, if it named one. */
+    schema?: string;
     alias?: string;
+}
+
+/**
+ * A table as SQL: `"schema"."table"` when the query named its schema, and a
+ * bare `"table"` when it left it to the search path — which then resolves it
+ * the same way it resolved the query.
+ */
+export function quoteTableName(tableName: string, schemaName?: string): string {
+    const quote = (identifier: string) => `"${identifier.replace(/"/g, "\"\"")}"`;
+    return schemaName ? `${quote(schemaName)}.${quote(tableName)}` : quote(tableName);
+}
+
+/**
+ * The introspected columns of a table the query named — in the schema it
+ * named, when it named one. Unqualified, the first schema that has a table of
+ * that name answers.
+ */
+function findTableInfo(schemas: Record<string, TableInfo[]>, table: ExtractedTable): TableInfo | undefined {
+    if (table.schema) {
+        return schemas[table.schema]?.find(t => t.tableName === table.name);
+    }
+    for (const schema of Object.values(schemas)) {
+        const tableInfo = schema.find(t => t.tableName === table.name);
+        if (tableInfo) return tableInfo;
+    }
+    return undefined;
 }
 
 /**
@@ -82,11 +110,12 @@ export function extractTablesFromQuery(sqlString: string): ExtractedTable[] {
         const tables: ExtractedTable[] = [];
 
         // pgsql-ast-parser From items — tables and joins with left/right branches
-        type FromNode = { type: string; name?: { name: string; alias?: string }; left?: FromNode; right?: FromNode };
+        type FromNode = { type: string; name?: { name: string; schema?: string; alias?: string }; left?: FromNode; right?: FromNode };
         const processFrom = (fromItems: FromNode[]) => {
             for (const item of fromItems) {
                 if (item.type === "table" && item.name) {
                     tables.push({ name: item.name.name,
+schema: item.name.schema,
 alias: item.name.alias });
                 }
                 if (item.type === "join") {
@@ -148,23 +177,20 @@ export function resolveQueryCollections(
     const results: ResolvedQueryCollection[] = [];
 
     for (const table of tables) {
-        // Match table name against collection table or slug->snake_case
+        // Match table name against collection table or slug->snake_case —
+        // and, when the query named a schema, the collection's schema too:
+        // `archive.orders` is not the `orders` collection's table, and its
+        // rows' ids open somebody else's records.
         const matched = collections.find(c => {
             const tableName = ("table" in c ? c.table : undefined) || toSnakeCase(c.slug);
-            return tableName === table.name;
+            const schemaName = ("schema" in c ? c.schema : undefined) || "public";
+            return tableName === table.name && (!table.schema || table.schema === schemaName);
         });
 
         if (!matched) continue;
 
         // Find columns belonging to this table from the schema
-        const tableColumns: string[] = [];
-        for (const schemaEntries of Object.values(schemas)) {
-            const tableInfo = schemaEntries.find(t => t.tableName === table.name);
-            if (tableInfo) {
-                tableColumns.push(...tableInfo.columns.map(c => c.name));
-                break;
-            }
-        }
+        const tableColumns: string[] = findTableInfo(schemas, table)?.columns.map(c => c.name) ?? [];
 
         // Determine which result column holds the PK ("id") for this table.
         // 1. Check parsed SELECT columns for an explicit "id" column from this table (by name or alias)
@@ -213,6 +239,13 @@ export interface PKMapping {
 
 export interface TableAndPKResult {
     tableName?: string;
+    /**
+     * The schema the query named for that table — `undefined` when it named
+     * none. Build the UPDATE with {@link quoteTableName}: a bare table name
+     * resolves through the search path, which is how editing a row of
+     * `archive.orders` used to update `public.orders`.
+     */
+    schemaName?: string;
     primaryKeys?: PKMapping[];
     error?: string;
 }
@@ -252,10 +285,10 @@ export function determineTableAndPK(sqlString: string, columnKey: string, schema
         const columnTableRef = resolvedColumn?.table; // e.g. "p" or "posts"
 
         // Resolve the table for the edited column
-        let resolvedTableName: string | null = null;
+        let resolvedTable: ExtractedTable | null = null;
 
         if (tables.length === 1) {
-            resolvedTableName = tables[0].name;
+            resolvedTable = tables[0];
         } else {
             // If the AST tells us which table, use that
             if (columnTableRef) {
@@ -263,24 +296,18 @@ export function determineTableAndPK(sqlString: string, columnKey: string, schema
                     t => t.alias === columnTableRef || t.name === columnTableRef
                 );
                 if (matchedTable) {
-                    resolvedTableName = matchedTable.name;
+                    resolvedTable = matchedTable;
                 }
             }
 
             // Otherwise, look up which schema table has this column
-            if (!resolvedTableName) {
-                const matchedTables = tables.filter(t => {
-                    for (const schema of Object.values(schemas)) {
-                        const tableInfo = schema.find(ti => ti.tableName === t.name);
-                        if (tableInfo && tableInfo.columns.some(c => c.name === actualDbColumnName)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
+            if (!resolvedTable) {
+                const matchedTables = tables.filter(t =>
+                    findTableInfo(schemas, t)?.columns.some(c => c.name === actualDbColumnName) ?? false
+                );
 
                 if (matchedTables.length === 1) {
-                    resolvedTableName = matchedTables[0].name;
+                    resolvedTable = matchedTables[0];
                 } else if (matchedTables.length > 1) {
                     return { error: `Ambiguous column "${columnKey}": Found in multiple queried tables.` };
                 } else {
@@ -289,29 +316,23 @@ export function determineTableAndPK(sqlString: string, columnKey: string, schema
             }
         }
 
-        if (!resolvedTableName) {
+        if (!resolvedTable) {
             return { error: "Could not resolve the target table." };
         }
+        const resolvedTableName = resolvedTable.name;
 
-        // Find the table's actual primary key columns from the schema
-        let pkDbColumns: string[] = [];
-        for (const schema of Object.values(schemas)) {
-            const tableInfo = schema.find(t => t.tableName === resolvedTableName);
-            if (tableInfo) {
-                pkDbColumns = tableInfo.columns
-                    .filter(c => c.isPrimaryKey)
-                    .map(c => c.name);
-                break;
-            }
-        }
+        // Find the table's actual primary key columns from the schema — the
+        // schema the query named, when it named one.
+        const pkDbColumns = (findTableInfo(schemas, resolvedTable)?.columns ?? [])
+            .filter(c => c.isPrimaryKey)
+            .map(c => c.name);
 
         if (pkDbColumns.length === 0) {
             return { error: `Table "${resolvedTableName}" has no primary key defined.` };
         }
 
-        // Find the table's alias in the query (for resolving PK result column names)
-        const tableEntry = tables.find(t => t.name === resolvedTableName);
-        const tableAlias = tableEntry?.alias;
+        // The table's alias in the query (for resolving PK result column names)
+        const tableAlias = resolvedTable.alias;
 
         // Map each PK db column to its result column name (resolving aliases)
         const primaryKeys: PKMapping[] = pkDbColumns.map(dbCol => {
@@ -327,6 +348,7 @@ export function determineTableAndPK(sqlString: string, columnKey: string, schema
         });
 
         return { tableName: resolvedTableName,
+schemaName: resolvedTable.schema,
 primaryKeys };
     } catch (e: unknown) {
         console.warn("Failed to parse SQL AST:", e);
