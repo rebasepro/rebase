@@ -55,14 +55,15 @@ export function BasicExportAction({
             additionalData: [],
             properties,
             propertiesOrder,
-            name: "export.csv",
+            // The writer appends the extension for the chosen format.
+            name: "export",
             flattenArrays,
             additionalHeaders: [],
             exportType,
             dateExportType
         });
         handleClose();
-    }, []);
+    }, [data, properties, propertiesOrder, flattenArrays, exportType, dateExportType, handleClose]);
 
     return <>
 
