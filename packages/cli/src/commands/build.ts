@@ -21,6 +21,7 @@ import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
+import { toolStdio } from "../utils/tool-stdio";
 import { buildableApps, findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import {
     buildBundle,
@@ -380,7 +381,10 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 }
             }
         } else if (app.type === "static") {
-            await buildAssetApp(projectRoot, name, app, manifest.rebase, args["--output"]);
+            await buildAssetApp(projectRoot, name, app, manifest.rebase, args["--output"]).catch((err: unknown) => {
+                console.error(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
+                process.exit(1);
+            });
         }
 
         console.log("");
@@ -396,36 +400,45 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
  * packages that output into a `static`-kind bundle — the same deployable shape as
  * a backend bundle, so a frontend or admin app deploys through the identical
  * path and runs on the identical image, just serving files instead of an API.
+ *
+ * Throws when the build fails or produces nothing usable, so the caller answers
+ * in its own way: `rebase build` with a red line, `rebase cloud deploy --json`
+ * with its JSON error.
  */
 export async function buildAssetApp(
     projectRoot: string,
     name: string,
     app: RebaseAppConfig,
     runtimeRange: string,
-    outOverride?: string
+    outOverride?: string,
+    /** `quietStdout`: every line, the build command's included, goes to stderr. See `toolStdio`. */
+    options: { quietStdout?: boolean } = {}
 ): Promise<string | undefined> {
     const asset = app as RebaseStaticAppConfig;
     const basePath = asset.path ?? "/";
+    const say = (line: string): void => {
+        if (options.quietStdout) console.error(line);
+        else console.log(line);
+    };
 
     if (!asset.build) {
-        console.log(chalk.dim("  no build command declared — skipping"));
+        say(chalk.dim("  no build command declared — skipping"));
         return undefined;
     }
 
     try {
         await execa(asset.build, {
             cwd: projectRoot,
-            stdio: "inherit",
+            stdio: toolStdio(options.quietStdout),
             shell: true,
             env: staticBuildEnv(basePath, name)
         });
     } catch {
-        console.error(chalk.red(`  ✗ build command failed for "${name}"`));
-        process.exit(1);
+        throw new Error(`build command failed for "${name}"`);
     }
 
     if (!asset.output) {
-        console.log(chalk.yellow("  no output directory declared — built, but nothing to bundle"));
+        say(chalk.yellow("  no output directory declared — built, but nothing to bundle"));
         return undefined;
     }
 
@@ -433,20 +446,14 @@ export async function buildAssetApp(
     if (!fs.existsSync(outputPath)) {
         // The command exited 0 but produced nothing where the manifest says it
         // should. Bundling that would ship an empty site.
-        console.error(chalk.red(`  ✗ declared output "${asset.output}" does not exist after building`));
-        process.exit(1);
+        throw new Error(`declared output "${asset.output}" does not exist after building`);
     }
 
     // The assets were built for `basePath`; refusing here is the difference
     // between a build error and a blank page nobody can diagnose.
     const indexHtml = path.join(outputPath, "index.html");
     if (fs.existsSync(indexHtml)) {
-        try {
-            assertBuiltForPath(fs.readFileSync(indexHtml, "utf8"), basePath, name);
-        } catch (err) {
-            console.error(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
-            process.exit(1);
-        }
+        assertBuiltForPath(fs.readFileSync(indexHtml, "utf8"), basePath, name);
     }
 
     // Per-app bundle directory, so a project's several static apps do not clobber
@@ -465,7 +472,7 @@ export async function buildAssetApp(
         cms: asset.cms
     });
     const rel = path.relative(projectRoot, result.outDir);
-    console.log(
+    say(
         chalk.green(`  ✓ static bundle → ${rel}/`) +
         chalk.dim(` (${result.fileCount} file(s) → served at ${basePath})`)
     );

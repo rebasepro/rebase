@@ -17,6 +17,7 @@ import path from "path";
 import { spawn, execFileSync } from "child_process";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 import type { RebuildSource } from "./rebuild-source";
+import { toolStdio } from "../../utils/tool-stdio";
 
 /** Read and shallow-validate a built bundle's manifest. */
 export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
@@ -55,7 +56,8 @@ export function packBundle(bundleDir: string, outPath: string): Promise<void> {
             // which GNU tar on the runtime image then warns about once per file.
             // Harmless, but it buries real extraction errors in noise.
             ["-czf", outPath, "--no-xattrs", "--exclude", "node_modules", "-C", bundleDir, "."],
-            { stdio: "inherit",
+            // Only a deploy packs a bundle, and a deploy's stdout may be its JSON result.
+            { stdio: toolStdio(true),
 env: { ...process.env,
 COPYFILE_DISABLE: "1" } }
         );

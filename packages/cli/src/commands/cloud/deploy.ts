@@ -226,12 +226,19 @@ async function deployBundle(opts: {
             // same endpoint — and differs only in what it builds and in the
             // `kind` its manifest carries. The control plane routes on that.
             progress(chalk.gray(`  Building static app "${target.name}"...`));
-            const staticDir = await buildAssetApp(
-                projectRoot,
-                target.name,
-                target.app,
-                loaded.manifest.rebase
-            );
+            let staticDir: string | undefined;
+            try {
+                staticDir = await buildAssetApp(
+                    projectRoot,
+                    target.name,
+                    target.app,
+                    loaded.manifest.rebase,
+                    undefined,
+                    { quietStdout: isJsonMode() }
+                );
+            } catch (err) {
+                fail(err instanceof Error ? err.message : String(err));
+            }
             if (!staticDir) {
                 fail(
                     `App "${target.name}" produced no bundle.`,
@@ -273,7 +280,8 @@ app: target.app as RebaseBackendAppConfig };
             runtimeRange: loaded.manifest.rebase,
             resources: resourceGraph,
             skipTypeCheck: opts.skipTypeCheck,
-            log: (m: string) => progress(chalk.gray(m))
+            log: (m: string) => progress(chalk.gray(m)),
+            quietStdout: isJsonMode()
         });
         bundleDir = result.outDir;
 
@@ -288,7 +296,8 @@ app: target.app as RebaseBackendAppConfig };
                 projectRoot,
                 manifest: loaded.manifest as never,
                 bundleDir,
-                log: (m: string) => progress(m)
+                log: (m: string) => progress(m),
+                quietStdout: isJsonMode()
             });
             for (const outcome of folded) {
                 progress(chalk.gray(

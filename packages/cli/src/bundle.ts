@@ -34,6 +34,7 @@ import {
 } from "@rebasepro/types";
 import { resolveBackendPaths } from "./manifest";
 import { cliVersion } from "./utils/version";
+import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
 import {
     getActiveBackendPlugin,
@@ -81,6 +82,11 @@ export interface BuildBundleOptions {
     skipSchema?: boolean;
     /** Emit progress. */
     log?: (message: string) => void;
+    /**
+     * Keep stdout for the caller's result: the compiler's output, and every
+     * warning the build prints, go to stderr. See `toolStdio`.
+     */
+    quietStdout?: boolean;
 }
 
 export interface BuildBundleResult {
@@ -132,6 +138,16 @@ const RUNTIME_PROVIDED = new Set([
 
 function log(options: BuildBundleOptions, message: string): void {
     (options.log ?? ((m: string) => console.log(m)))(message);
+}
+
+/**
+ * A line the build says to the person running it — a warning, or what it left
+ * out — which progress callbacks may drop and this does not: stdout, or stderr
+ * when stdout carries the caller's result.
+ */
+function say(options: BuildBundleOptions, line: string): void {
+    if (options.quietStdout) console.error(line);
+    else console.log(line);
 }
 
 /**
@@ -264,8 +280,9 @@ async function writeBundleTsconfig(
     projectRoot: string,
     outDir: string,
     includes: string[],
-    skipTypeCheck: boolean
+    options: BuildBundleOptions
 ): Promise<string> {
+    const skipTypeCheck = options.skipTypeCheck === true;
     // Paths written *here* resolve against this file's directory. Posix
     // separators, because tsconfig wants them on every platform.
     const tsconfigDir = path.join(projectRoot, ".rebase");
@@ -297,7 +314,7 @@ async function writeBundleTsconfig(
         pathOverrides = { baseUrl: fromTsconfig("."),
 paths: kept };
         if (dropped.length > 0) {
-            console.log(chalk.dim(
+            say(options, chalk.dim(
                 `    ignoring ${dropped.length} path alias(es) pointing outside the project ` +
                 `(${dropped.join(", ")}) — resolving those from node_modules instead`
             ));
@@ -1293,18 +1310,18 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
             "the schema"
         ];
         const compiled = `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-        console.log(chalk.yellow(`  ⚠ ${unusedEntry} is not the bundle's entry point — it is not compiled or shipped.`));
-        console.log(chalk.dim(`      The runtime boots the bundle itself and mounts ${compiled}.`));
-        console.log(chalk.dim(`      Routes defined there will not exist once deployed: move them to ${paths.functions}/,`));
-        console.log(chalk.dim("      or run `rebase eject`, which writes an entrypoint of its own and owns"));
-        console.log(chalk.dim("      the image — it does not adopt this file, and will not replace it"));
-        console.log(chalk.dim("      without --force."));
+        say(options, chalk.yellow(`  ⚠ ${unusedEntry} is not the bundle's entry point — it is not compiled or shipped.`));
+        say(options, chalk.dim(`      The runtime boots the bundle itself and mounts ${compiled}.`));
+        say(options, chalk.dim(`      Routes defined there will not exist once deployed: move them to ${paths.functions}/,`));
+        say(options, chalk.dim("      or run `rebase eject`, which writes an entrypoint of its own and owns"));
+        say(options, chalk.dim("      the image — it does not adopt this file, and will not replace it"));
+        say(options, chalk.dim("      without --force."));
     }
 
     log(options, chalk.dim(`  compiling ${includes.length} source group(s) → ${path.relative(projectRoot, outDir)}/`));
 
     cleanOutDir(projectRoot, outDir);
-    const tsconfigPath = await writeBundleTsconfig(projectRoot, outDir, includes, options.skipTypeCheck === true);
+    const tsconfigPath = await writeBundleTsconfig(projectRoot, outDir, includes, options);
 
     const tsc = resolveLocalBin(projectRoot, "tsc");
     if (!tsc) {
@@ -1315,7 +1332,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
 
     try {
         await execa(tsc, ["-p", tsconfigPath], { cwd: projectRoot,
-stdio: "inherit" });
+stdio: toolStdio(options.quietStdout) });
     } catch {
         throw new Error("TypeScript compilation failed — the bundle was not written.");
     }
@@ -1326,14 +1343,14 @@ stdio: "inherit" });
         log(options, chalk.dim(`  resolved ${normalized.rewritten} relative import(s) for Node ESM`));
     }
     if (normalized.unresolved.length > 0) {
-        console.log(chalk.yellow(
+        say(options, chalk.yellow(
             `  ⚠ ${normalized.unresolved.length} import(s) could not be resolved to a file:`
         ));
         for (const item of normalized.unresolved.slice(0, 5)) {
-            console.log(chalk.dim(`      ${item}`));
+            say(options, chalk.dim(`      ${item}`));
         }
         if (normalized.unresolved.length > 5) {
-            console.log(chalk.dim(`      … and ${normalized.unresolved.length - 5} more`));
+            say(options, chalk.dim(`      … and ${normalized.unresolved.length - 5} more`));
         }
     }
 
@@ -1413,7 +1430,7 @@ stdio: "inherit" });
     });
 
     for (const line of summarisePortability(functionReports)) {
-        console.log(line.trimStart().startsWith("⚠") ? chalk.yellow(line) : chalk.dim(line));
+        say(options, line.trimStart().startsWith("⚠") ? chalk.yellow(line) : chalk.dim(line));
     }
 
     const manifest = composeBundleManifest({

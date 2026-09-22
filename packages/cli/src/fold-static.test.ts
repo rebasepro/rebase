@@ -1,5 +1,7 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { afterEach, describe, expect, it } from "vitest";
 import { assertBuiltForPath, foldableApps, staticBuildEnv } from "./fold-static";
@@ -215,5 +217,51 @@ describe("the environment every static app is built with", () => {
             const expected = file === "fold-static.ts" ? 1 : 0;
             expect(assignments.length, `${file} builds its own env`).toBe(expected);
         }
+    });
+});
+
+/**
+ * `rebase cloud deploy` in JSON mode — which is every piped run, so every CI
+ * job and agent — owes stdout exactly one JSON value. The static builds it runs
+ * inherited stdout, so a stock scaffold's deploy printed `vite v6 building…`
+ * ahead of the result and `JSON.parse(stdout)` failed.
+ *
+ * A child writes to the file descriptor itself, past any spy, so this runs the
+ * two static-build drivers in a process of their own and reads its real stdout.
+ */
+describe("a caller whose stdout carries a JSON result", () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const tsx = path.resolve(here, "../node_modules/.bin/tsx");
+    let root: string;
+
+    afterEach(() => {
+        if (root) fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("gets the static builds' output on stderr, and nothing but its result on stdout", () => {
+        root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-quiet-stdout-")));
+        fs.mkdirSync(path.join(root, "dist-bundle"));
+        fs.writeFileSync(path.join(root, "dist-bundle", "manifest.json"), JSON.stringify({ bundleFormat: 2, entry: {} }));
+        const build = "mkdir -p frontend/dist && echo '<html></html>' > frontend/dist/index.html"
+            + " && echo 'vite v6 building for production...'";
+        const script = path.join(root, "run.mts");
+        fs.writeFileSync(script, `
+            import { foldFrontendIntoBundle } from ${JSON.stringify(path.join(here, "fold-static.ts"))};
+            import { buildAssetApp } from ${JSON.stringify(path.join(here, "commands", "build.ts"))};
+            const root = ${JSON.stringify(root)};
+            const admin = { type: "static", root: "frontend", build: ${JSON.stringify(build)}, output: "frontend/dist", path: "/" } as const;
+            const manifest = { rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" }, admin } };
+            await foldFrontendIntoBundle({ projectRoot: root, manifest, bundleDir: root + "/dist-bundle", log: () => undefined, quietStdout: true });
+            await buildAssetApp(root, "admin", admin, "^1", undefined, { quietStdout: true });
+            process.stdout.write(JSON.stringify({ success: true }) + "\\n");
+        `);
+
+        const run = spawnSync(tsx, [script], { cwd: root, encoding: "utf8" });
+
+        expect(run.status, run.stderr).toBe(0);
+        expect(run.stdout).toBe("{\"success\":true}\n");
+        // Both drivers' builds, and the static bundle's own summary line.
+        expect(run.stderr.match(/vite v6 building/g)).toHaveLength(2);
+        expect(run.stderr).toContain("static bundle →");
     });
 });

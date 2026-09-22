@@ -23,6 +23,7 @@ import path from "path";
 import { execa } from "execa";
 import chalk from "chalk";
 import { foldStaticIntoBundle } from "./bundle";
+import { toolStdio } from "./utils/tool-stdio";
 
 /** The apps section of a project manifest, as much of it as folding needs. */
 export interface FoldableManifest {
@@ -44,6 +45,8 @@ export interface FoldOptions {
     /** Skip running each app's own build command; fold what is already built. */
     skipBuild?: boolean;
     log?: (message: string) => void;
+    /** Send each app's build output to stderr: the caller's stdout carries a result. See `toolStdio`. */
+    quietStdout?: boolean;
 }
 
 export interface FoldOutcome {
@@ -219,7 +222,7 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
         if (app.build && !skipBuild) {
             await execa(app.build, {
                 cwd: projectRoot,
-                stdio: "inherit",
+                stdio: toolStdio(options.quietStdout),
                 shell: true,
                 env: staticBuildEnv(app.path, app.name)
             });

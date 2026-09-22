@@ -327,6 +327,40 @@ describe("a --source deploy", () => {
     });
 });
 
+/**
+ * In JSON mode stdout carries one value, and a deploy that fails still owes it:
+ * a static app whose build command failed exited 1 with a red line on stderr
+ * and nothing at all on stdout, so a CI step had no error object to read.
+ */
+describe("a static app deploy in JSON mode", () => {
+    it("answers a failed build with the JSON error, and nothing else on stdout", async () => {
+        write(project, "rebase.json", JSON.stringify({
+            rebase: "^1",
+            apps: { web: { type: "static", root: "frontend", build: "exit 3", output: "frontend/dist", path: "/" } }
+        }));
+        controlPlane();
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await expect(deployCommand(["node", "rebase", "cloud", "deploy", "web", "--no-follow"], "shop"))
+                .rejects.toMatchObject({ code: 1 });
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        expect(JSON.parse(stdout.join(""))).toMatchObject({
+            error: { message: expect.stringContaining("build command failed for \"web\"") }
+        });
+        expect(said.join("\n")).not.toContain("build command failed");
+        expect(requests).toEqual([]);
+    });
+});
+
 describe("contradictory flags", () => {
     it("refuses --source with --no-source before anything is uploaded", async () => {
         controlPlane();
