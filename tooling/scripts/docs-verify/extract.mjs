@@ -29,10 +29,18 @@ const CHECKED_LANGS = new Set(["ts", "typescript", "tsx", "js", "javascript", "j
  *     + const rows = await rebase.dataAsAdmin.projects.find();
  *     ```
  *
+ * or, the way Starlight's own syntax highlights a diff, as `lang="ts"`:
+ *
+ *     ```diff lang="ts"
+ *
+ * The second form was not recognised, and it is the one the upgrade guides
+ * use — so their migration diffs, the code a reader copies while their build
+ * is already broken, were skipped by every stage that reads a snippet.
+ *
  * Untagged ```diff fences stay skipped, because plenty of them are env files,
  * YAML or shell.
  */
-const DIFF_LANG_IN_META = /(^|\s)(ts|typescript|tsx|js|javascript|jsx)(\s|$)/;
+const DIFF_LANG_IN_META = /(?:^|\s)(?:lang=(["']?))?(ts|typescript|tsx|js|javascript|jsx)\1(?=\s|$)/;
 
 /**
  * Reduce a diff body to the code it is telling the reader to end up with.
