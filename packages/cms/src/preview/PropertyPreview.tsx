@@ -29,6 +29,7 @@ import { RelationPreview } from "./components/RelationPreview";
 import { InlineEntityListPreview } from "./components/InlineEntityListPreview";
 import { useIsNestedEntityPreview } from "../components/EntityPreviewNesting";
 import { markdownToPlainText } from "./compact_text";
+import { getDatePropertyMode, getDatePropertyTimezone } from "./util";
 import { UserPreview } from "./components/UserPreview";
 
 /**
@@ -210,7 +211,8 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         if (date) {
             content = <DatePreview
                 date={date}
-                mode={property.mode}
+                mode={getDatePropertyMode(property)}
+                timezone={getDatePropertyTimezone(property)}
             />;
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);

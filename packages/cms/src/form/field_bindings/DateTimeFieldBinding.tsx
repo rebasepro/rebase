@@ -10,6 +10,7 @@ import { useCustomizationController } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { DateTimeField } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
+import { getDatePropertyMode, getDatePropertyTimezone } from "../../preview/util";
 
 type DateTimeFieldProps = FieldProps<DateProperty>;
 
@@ -54,7 +55,8 @@ export function DateTimeFieldBinding({
                 size={size}
                 value={internalValue}
                 onChange={(dateValue) => setValue(dateValue)}
-                mode={property.mode}
+                mode={getDatePropertyMode(property)}
+                timezone={getDatePropertyTimezone(property)}
                 clearable={property.admin?.clearable}
                 locale={locale}
                 error={showError}

@@ -70,7 +70,10 @@ export function DatePreview({
             timeZoneName: "short"
         });
         const parts = tzFormatter.formatToParts(date);
-        const tzAbbrev = parts.find(p => p.type === "timeZoneName")?.value ?? "";
+        // A day on its own has no time for a zone to qualify.
+        const tzAbbrev = mode === "date_time"
+            ? parts.find(p => p.type === "timeZoneName")?.value ?? ""
+            : "";
 
         return (
             // A date is a measured value: the mono tier, tabular, so a column of

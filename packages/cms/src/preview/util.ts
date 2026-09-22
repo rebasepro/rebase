@@ -1,4 +1,5 @@
 import { CollectionSize } from "@rebasepro/cms-types";
+import type { DateProperty } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 /**
  * The schemes a preview link may use — everything else becomes `about:blank`.
@@ -77,4 +78,28 @@ export function getPreviewSizeFrom(size: CollectionSize): PreviewSize {
         default:
             throw Error("Missing mapping value in getPreviewSizeFrom: " + size);
     }
+}
+
+/**
+ * The zone a date property is shown and entered in.
+ *
+ * A `columnType: "date"` column holds a calendar day with no zone. It travels
+ * as that day's UTC midnight, and Postgres keeps the date part of whatever it
+ * is given, so it is read and written in UTC. In the browser's own zone a
+ * stored 15th showed as the 14th west of Greenwich, and a 15th picked east of
+ * it was stored as the 14th.
+ *
+ * Any other date is shown in the property's declared `timezone`, or the
+ * browser's when it declares none.
+ */
+export function getDatePropertyTimezone(property: DateProperty): string | undefined {
+    return property.columnType === "date" ? "UTC" : property.timezone;
+}
+
+/**
+ * Whether a date property is picked and shown as a day or a day and a time. A
+ * `date` column holds no time, so it is a day whatever `mode` says.
+ */
+export function getDatePropertyMode(property: DateProperty): "date" | "date_time" | undefined {
+    return property.columnType === "date" ? "date" : property.mode;
 }
