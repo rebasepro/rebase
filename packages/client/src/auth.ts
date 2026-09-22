@@ -102,6 +102,17 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const REFRESH_RETRY_MAX_MS = 30000;
 
     let currentSession: RebaseSession | null = null;
+    /**
+     * Which sign-in `currentSession` belongs to. Bumped whenever the session
+     * is replaced by anything other than its own refresh — a sign-in, a
+     * sign-out, a revocation, a local abandon — so a refresh already in flight
+     * can tell, when its answer lands, that the session it was refreshing has
+     * ended. Its answer is then dropped: adopting it put a signed-out session
+     * back in memory, in storage and on the transport, announced
+     * TOKEN_REFRESHED after SIGNED_OUT, and overwrote whoever had signed in
+     * since.
+     */
+    let sessionEpoch = 0;
     const listeners = new Set<(event: AuthChangeEvent, session: RebaseSession | null) => void>();
     let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
     // De-dupe concurrent refreshes. On boot (esp. cookie mode + React StrictMode)
@@ -109,6 +120,8 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     // server rotates the refresh token twice and the browser can end up with a
     // cookie the DB no longer matches. A single in-flight promise is shared.
     let inFlightRefresh: Promise<RebaseSession> | null = null;
+    /** The `sessionEpoch` the in-flight refresh was started for. */
+    let inFlightEpoch = -1;
     let resolveInitialized: (value: void | PromiseLike<void>) => void;
     const isInitialized = new Promise<void>((resolve) => {
         resolveInitialized = resolve;
@@ -197,6 +210,12 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * being signed out — the exact failure this work exists to remove.
      */
     function abandonSessionLocally() {
+        endSession();
+    }
+
+    /** Drop the session from memory, storage and the transport, and say so. */
+    function endSession() {
+        sessionEpoch++;
         currentSession = null;
         clearStoredSession();
         if (refreshTimeout) {
@@ -234,11 +253,15 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
             return false;
         }
 
+        const epoch = sessionEpoch;
         try {
             await refreshSession();
-            return true;
+            // Retry only as the session the request was refused for. If it
+            // ended while the refresh was in flight, re-sending the request
+            // would send it as whoever signed in since — or as nobody.
+            return epoch === sessionEpoch;
         } catch (err) {
-            if (isFatalRefreshError(err)) {
+            if (epoch === sessionEpoch && isFatalRefreshError(err)) {
                 abandonSessionLocally();
             }
             return false;
@@ -246,10 +269,15 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     }
 
     async function attemptScheduledRefresh(attempt: number) {
+        const epoch = sessionEpoch;
         try {
             await refreshSession();
             // On success, refreshSession() re-schedules the next refresh itself.
         } catch (err) {
+            // The session this was refreshing has ended — signed out, or
+            // replaced by a sign-in that schedules its own. Retrying would
+            // refresh nothing, and giving up would sign out a second time.
+            if (epoch !== sessionEpoch) return;
             if (isFatalRefreshError(err)) {
                 abandonSessionLocally();
                 return;
@@ -318,6 +346,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     }
 
     function handleAuthResponse(data: { tokens: AuthTokens, user: Record<string, unknown> }, event?: AuthChangeEvent): RebaseSession {
+        sessionEpoch++;
         const user: User = mapRawUser(data.user);
         const session: RebaseSession = {
             accessToken: data.tokens.accessToken,
@@ -487,6 +516,9 @@ redirectUri });
     }
 
     async function signOut() {
+        // The sign-out takes effect when it is asked for, not when /logout
+        // answers: a refresh landing in between must not be adopted.
+        sessionEpoch++;
         const fetchFn = getFetch();
         try {
             if (authFlowMode === "cookie" || currentSession?.refreshToken) {
@@ -498,14 +530,7 @@ redirectUri });
                 } as RequestInit);
             }
         } catch (e) { /* ignore */ }
-        currentSession = null;
-        clearStoredSession();
-        if (refreshTimeout) {
-            clearTimeout(refreshTimeout);
-            refreshTimeout = null;
-        }
-        transport.setToken(null);
-        emit("SIGNED_OUT", null);
+        endSession();
     }
 
     /**
@@ -551,15 +576,46 @@ redirectUri });
     }
 
     function refreshSession(): Promise<RebaseSession> {
-        // Share a single in-flight refresh across concurrent callers.
-        if (inFlightRefresh) return inFlightRefresh;
-        inFlightRefresh = withRefreshLock(() => doRefreshSession()).finally(() => {
-            inFlightRefresh = null;
+        // Share a single in-flight refresh across concurrent callers — of the
+        // same session. One started for a session that has since ended answers
+        // with nothing of use to the session that replaced it.
+        if (inFlightRefresh && inFlightEpoch === sessionEpoch) return inFlightRefresh;
+        const refresh = withRefreshLock(() => doRefreshSession()).finally(() => {
+            if (inFlightRefresh === refresh) inFlightRefresh = null;
         });
-        return inFlightRefresh;
+        inFlightRefresh = refresh;
+        inFlightEpoch = sessionEpoch;
+        return refresh;
+    }
+
+    /**
+     * What a refresh answers when its session ended while it was in flight.
+     *
+     * The tokens it received belong to a session this client no longer holds,
+     * so they are dropped, and so is any error it hit: a refusal of the old
+     * session's token says nothing about the new one, and acting on it signed
+     * out whoever had signed in since. The caller gets the session there is
+     * now — or, if there is none, is told so.
+     */
+    function supersededRefresh(): RebaseSession {
+        if (currentSession) return currentSession;
+        throw new RebaseClientError(
+            "The session was signed out while it was being refreshed.",
+            { code: "NOT_SIGNED_IN" }
+        );
     }
 
     async function doRefreshSession(): Promise<RebaseSession> {
+        const epoch = sessionEpoch;
+        try {
+            return await requestRefresh(epoch);
+        } catch (err) {
+            if (epoch !== sessionEpoch) return supersededRefresh();
+            throw err;
+        }
+    }
+
+    async function requestRefresh(epoch: number): Promise<RebaseSession> {
         if (authFlowMode !== "cookie" && !currentSession?.refreshToken) {
             // A `RebaseClientError`, not a bare `Error`: the SDK documents one
             // class a `catch` block has to check for, and this is raised before
@@ -578,6 +634,7 @@ redirectUri });
             credentials: authFlowMode === "cookie" ? "include" : undefined
         } as RequestInit);
         const body = await res.json().catch(() => ({}));
+        if (epoch !== sessionEpoch) return supersededRefresh();
         if (!res.ok) throwApiError(res.status, body, res.statusText);
 
         const accessToken = body.tokens.accessToken;
@@ -596,6 +653,9 @@ redirectUri });
             try {
                 user = await getUser();
             } catch { /* fall through to the empty stub below */ }
+            // Whoever ended the session meanwhile has already set the
+            // transport's token; nothing of this refresh is kept.
+            if (epoch !== sessionEpoch) return supersededRefresh();
         }
 
         const session: RebaseSession = {
@@ -956,14 +1016,7 @@ refreshToken: session.refreshToken };
         const result = await transport.request<{ success: boolean }>(authPath + "/sessions", {
             method: "DELETE"
         });
-        currentSession = null;
-        clearStoredSession();
-        if (refreshTimeout) {
-            clearTimeout(refreshTimeout);
-            refreshTimeout = null;
-        }
-        transport.setToken(null);
-        emit("SIGNED_OUT", null);
+        endSession();
         return result;
     }
 
