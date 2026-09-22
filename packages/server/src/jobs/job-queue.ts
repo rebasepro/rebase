@@ -30,6 +30,20 @@ export function defaultBackoff(attempt: number): number {
  */
 const REAP_INTERVAL_FACTOR = 0.25;
 
+/**
+ * Thrown by a handler for a failure no retry can change — a destination that
+ * is refused, a receiver that redirects. The job is dead-lettered on this
+ * attempt, with the message as its `last_error`, instead of spending its
+ * remaining attempts proving the same thing. Returning normally is not the
+ * alternative: that records the job as succeeded.
+ */
+export class PermanentJobError extends Error {
+    constructor(message: string, options?: { cause?: unknown }) {
+        super(message, options);
+        this.name = "PermanentJobError";
+    }
+}
+
 export interface JobQueue extends JobQueueClient {
     start(): void;
     /**
@@ -113,7 +127,8 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             await store.complete(job.id);
         } catch (error) {
             const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
-            const willRetry = job.attempts < job.maxAttempts;
+            const permanent = error instanceof PermanentJobError;
+            const willRetry = !permanent && job.attempts < job.maxAttempts;
 
             // Truncated, because `last_error` holds a stack and a queue that
             // accumulates megabytes of them is its own outage.
@@ -121,6 +136,8 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
 
             if (willRetry) {
                 logger.warn(`[jobs] "${job.task}" failed on attempt ${job.attempts}/${job.maxAttempts}; retrying`, { jobId: job.id });
+            } else if (permanent) {
+                logger.error(`[jobs] "${job.task}" failed permanently on attempt ${job.attempts}; not retrying`, { jobId: job.id, error: message });
             } else {
                 // The last attempt is an error, not a warning: nothing else will
                 // touch this job, and if nobody looks at the table it is simply

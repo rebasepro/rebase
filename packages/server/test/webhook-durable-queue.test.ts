@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK } from "../src/services/webhook-service";
-import type { JobQueueClient } from "../src/jobs";
+import { createJobQueue } from "../src/jobs";
+import type { JobContext, JobQueueClient, JobRecord, JobStore } from "../src/jobs";
 import { setAmbientTransactionResolver } from "../src/db/ambient-transaction";
 
 /**
@@ -32,6 +33,56 @@ const WEBHOOK = {
     table: "orders",
     enabled: true
 };
+
+/** A real worker over an in-memory store, running deliveries the documented way. */
+function deliveryQueue(dispatcher: WebhookDispatcher) {
+    const jobs: JobRecord[] = [];
+    const store: JobStore & { jobs: JobRecord[] } = {
+        jobs,
+        ensureTable: async () => undefined,
+        async insert(job) {
+            const now = new Date().toISOString();
+            jobs.push({
+                id: String(jobs.length + 1), task: job.task, payload: job.payload, status: "pending",
+                runAt: job.runAt.toISOString(), attempts: 0, maxAttempts: job.maxAttempts, lastError: null,
+                createdAt: now, updatedAt: now
+            });
+            return String(jobs.length);
+        },
+        async claim(limit, _workerId, tasks) {
+            const claimed = jobs
+                .filter(j => j.status === "pending" && Date.parse(j.runAt) <= Date.now())
+                .filter(j => tasks === undefined || tasks.includes(j.task))
+                .slice(0, limit);
+            for (const job of claimed) {
+                job.status = "running";
+                job.attempts += 1;
+            }
+            return claimed.map(j => ({ ...j }));
+        },
+        async complete(id) {
+            const job = jobs.find(j => j.id === id);
+            if (job) job.status = "succeeded";
+        },
+        async fail(id, error, retryAt) {
+            const job = jobs.find(j => j.id === id);
+            if (!job) return;
+            job.lastError = error;
+            job.status = retryAt ? "pending" : "failed";
+            if (retryAt) job.runAt = retryAt.toISOString();
+        },
+        reapExpired: async () => 0,
+        fetch: async (id) => jobs.find(j => j.id === id) ?? null
+    };
+    const queue = createJobQueue(store, {
+        backoff: () => 0,
+        tasks: {
+            [WEBHOOK_DELIVERY_TASK]: (ctx: JobContext<{ webhookId: string; event: string; payload: Record<string, unknown> }>) =>
+                dispatcher.deliverQueuedJob(ctx.payload)
+        }
+    });
+    return { store, queue };
+}
 
 function fakeQueue() {
     const enqueued: { task: string; payload: unknown }[] = [];
@@ -165,17 +216,44 @@ describe("running a queued delivery", () => {
         })).rejects.toThrow(/wh-1/);
     });
 
-    it("does not throw on a terminal failure, so a refused destination is not retried", async () => {
+    it("fails a refused destination permanently, so it is dead-lettered and not retried", async () => {
         // A blocked destination fails identically every time. Three more
-        // worker slots reach the same answer.
+        // worker slots reach the same answer — but returning normally marked
+        // the job succeeded, with no error, which is worse than retrying it.
         const dispatcher = new WebhookDispatcher({ allowPrivateNetworks: false });
         dispatcher.setWebhooks([{ ...WEBHOOK, url: "http://127.0.0.1:9/blocked" }]);
+        const { store, queue } = deliveryQueue(dispatcher);
 
-        await expect(dispatcher.deliverQueuedJob({
-            webhookId: "wh-1",
-            event: "INSERT",
-            payload: { type: "INSERT" }
-        })).resolves.toBeUndefined();
+        await queue.enqueue(WEBHOOK_DELIVERY_TASK, { webhookId: "wh-1", event: "INSERT", payload: { type: "INSERT" } });
+        await queue.runOnce();
+
+        const row = store.jobs[0];
+        expect(row.status).toBe("failed");
+        expect(row.attempts).toBe(1);
+        expect(row.lastError).toContain("wh-1");
+    });
+
+    it("fails a redirecting receiver permanently, with the reason on the row", async () => {
+        const fetchSpy = jest.spyOn(globalThis, "fetch" as never).mockResolvedValue(
+            new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } }) as never
+        );
+        try {
+            const dispatcher = new WebhookDispatcher({ allowPrivateNetworks: true });
+            dispatcher.setWebhooks([WEBHOOK]);
+            const { store, queue } = deliveryQueue(dispatcher);
+
+            await queue.enqueue(WEBHOOK_DELIVERY_TASK, { webhookId: "wh-1", event: "INSERT", payload: { type: "INSERT" } });
+            await queue.runOnce();
+            await queue.runOnce();
+
+            const row = store.jobs[0];
+            expect(row.status).toBe("failed");
+            expect(row.attempts).toBe(1);
+            expect(row.lastError).toContain("must not redirect");
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        } finally {
+            fetchSpy.mockRestore();
+        }
     });
 
     it("makes exactly one HTTP attempt, leaving retries to the queue", async () => {

@@ -3,6 +3,7 @@ import { assertAllowedOutboundUrl, BlockedUrlError } from "./outbound-url-guard"
 import { logger } from "../utils/logger";
 import { currentAmbientTransaction } from "../db/ambient-transaction";
 import type { JobQueueClient } from "../jobs/types";
+import { PermanentJobError } from "../jobs/job-queue";
 
 /**
  * The task name a queued webhook delivery is stored under.
@@ -239,11 +240,11 @@ export class WebhookDispatcher {
             // A refused destination or a redirect fails identically every time.
             // Retrying it costs three more worker slots to reach the same
             // answer, so it is dead-lettered on the spot — with the reason,
-            // which is the part somebody will need.
-            logger.error(
-                `[webhooks] "${webhook.id}" failed permanently: ${result.responseBody.slice(0, 200)}`
+            // which is the part somebody will need. Thrown, not returned: a
+            // normal return is how a job succeeds.
+            throw new PermanentJobError(
+                `Webhook "${webhook.id}" failed permanently: ${result.responseBody.slice(0, 200)}`
             );
-            return;
         }
 
         throw new Error(

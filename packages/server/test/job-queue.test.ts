@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createJobQueue, defaultBackoff } from "../src/jobs";
+import { createJobQueue, defaultBackoff, PermanentJobError } from "../src/jobs";
 import type { JobRecord } from "../src/jobs";
 import type { JobStore } from "../src/jobs";
 
@@ -201,6 +201,25 @@ describe("a job that throws", () => {
         expect(job?.status).toBe("failed");
         expect(job?.attempts).toBe(2);
         expect(job?.lastError).toContain("still nope");
+    });
+
+    it("is dead-lettered on the spot when it throws a PermanentJobError", async () => {
+        // A failure no retry can change — a refused destination, a redirect —
+        // must not spend the remaining attempts proving it, nor be reported as
+        // a success because the handler chose not to throw.
+        const store = fakeStore();
+        const handler = jest.fn(() => { throw new PermanentJobError("the receiver redirects"); });
+        const queue = createJobQueue(store, { backoff: () => 0, tasks: { deliver: handler as never } });
+
+        await queue.enqueue("deliver", null, { maxAttempts: 5 });
+        await queue.runOnce();
+        await queue.runOnce();
+
+        const job = await store.fetch("1");
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(job?.status).toBe("failed");
+        expect(job?.attempts).toBe(1);
+        expect(job?.lastError).toContain("the receiver redirects");
     });
 
     it("records a non-Error throw rather than losing it", async () => {
