@@ -6,8 +6,9 @@ import { resolveListLimitParam } from "../api/rest/query-parser";
 import { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 import { httpMethodToOperation, isOperationAllowed } from "../auth/api-keys/api-key-permission-guard";
-import { restrictedFieldNames } from "@rebasepro/common";
+import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
+import { assertNoClosedFields } from "../api/rest/write-validation";
 
 /**
  * A history entry, with the fields this caller cannot read taken out of its
@@ -21,10 +22,9 @@ import { requestViewer } from "../api/rest/field-access-query";
  *
  * The snapshot is rewritten rather than the entry dropped: the caller is
  * entitled to know that a version exists, who made it and when. Only the
- * withheld columns leave. Reverting is unaffected — the revert route reads the
- * stored entry through the history service, not through this projection — so a
- * caller can still restore a version whose every field they cannot see, exactly
- * as they can already overwrite one.
+ * withheld columns leave. The revert route reads the stored entry through the
+ * history service, not through this projection; what it may write back is
+ * {@link restorableValues}'s question.
  */
 function stripHistoryValues(
     entries: Record<string, unknown>[],
@@ -44,6 +44,82 @@ function stripHistoryValues(
         return { ...entry, values: kept };
     });
 }
+/**
+ * The part of a stored version a revert writes, under the field write rules
+ * every other write door applies.
+ *
+ * A revert is a write, so `access.write` and `excludeFromApi` hold through it:
+ * without this, a caller refused `PATCH { discountPercent: 50 }` could set the
+ * same value by reverting to a version that carried it, and a server-owned
+ * column went back to whatever the snapshot held.
+ *
+ * The snapshot is the whole row, though, not a request body. It names every
+ * restricted field whether the version changed it or not, so refusing on the
+ * mere presence of one would make every revert on such a collection a 400 for
+ * anyone without the role. The question is asked of what the revert would
+ * actually change:
+ *
+ *  - a field closed to the caller whose stored value differs from the row's
+ *    current one refuses the revert, with the error the PATCH would have got —
+ *    never a silent partial revert that reports success;
+ *  - one whose value is unchanged is left out of the write, which is the same
+ *    row either way;
+ *  - one the caller cannot read is left as it is. The history list strips it
+ *    from their view of the version, so it is not part of what they chose to
+ *    restore, and `current` — read through their scoped driver — does not carry
+ *    it to compare against. `excludeFromApi` columns fall here for everyone.
+ */
+function restorableValues(
+    stored: Record<string, unknown>,
+    current: Record<string, unknown>,
+    collection: CollectionConfig,
+    viewer: FieldViewer
+): Record<string, unknown> {
+    const closed = restrictedFieldNames(collection, viewer, "write").refused;
+    if (closed.size === 0) return stored;
+    const unreadable = restrictedFieldNames(collection, viewer, "read").refused;
+
+    const restorable: Record<string, unknown> = {};
+    const changed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(stored)) {
+        if (!closed.has(key)) {
+            restorable[key] = value;
+        } else if (!unreadable.has(key) && !sameStoredValue(value, current[key])) {
+            changed[key] = value;
+        }
+    }
+    assertNoClosedFields(changed, collection, "Cannot revert to this version: ", viewer);
+    return restorable;
+}
+
+/**
+ * Whether a value from a stored snapshot and one from the live row are the same.
+ *
+ * The snapshot went through `jsonb`, so both are compared in that form: a
+ * `Date` is its ISO string, and an object's keys are unordered — `jsonb` hands
+ * them back in its own order, not the one they were written in. A value the
+ * live row does not carry is `null`, as it would be in the snapshot.
+ */
+function sameStoredValue(stored: unknown, live: unknown): boolean {
+    return canonicalJson(stored) === canonicalJson(live);
+}
+
+function canonicalJson(value: unknown): string {
+    return JSON.stringify(value ?? null, (_key, item: unknown) => {
+        if (typeof item === "bigint") return item.toString();
+        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+            return Object.fromEntries(
+                Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+            );
+        }
+        return item;
+    });
+}
+
+function isPlainValues(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /**
  * Create Hono routes for entity history.
  * Mounted at `{basePath}/data/:slug/:id/history`.
@@ -105,7 +181,7 @@ export function createHistoryRoutes(params: {
         c: Context<HonoEnv>,
         collection: CollectionConfig,
         id: string
-    ): Promise<void> {
+    ): Promise<Record<string, unknown>> {
         const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
         const operation = httpMethodToOperation(c.req.method);
         if (apiKey && !isOperationAllowed(apiKey.permissions, collection.slug, operation)) {
@@ -122,6 +198,7 @@ export function createHistoryRoutes(params: {
         if (!row) {
             throw ApiError.notFound(`Entity '${id}' not found in collection '${collection.slug}'`);
         }
+        return row;
     }
 
     /**
@@ -212,7 +289,7 @@ export function createHistoryRoutes(params: {
         // Before looking the entry up at all: the lookup is by history id alone,
         // across every table, so answering "no such entry" vs "not yours" for an
         // id the caller cannot see is itself a read of the history table.
-        await authorizeEntityRead(c, collection, id);
+        const current = await authorizeEntityRead(c, collection, id);
 
         // Fetch the history entry
         const historyEntry = await historyService.fetchHistoryEntry(historyId);
@@ -227,9 +304,10 @@ export function createHistoryRoutes(params: {
             throw ApiError.badRequest("History entry does not belong to this entity");
         }
 
-        if (!historyEntry.values) {
+        if (!isPlainValues(historyEntry.values)) {
             throw ApiError.badRequest("Cannot revert: history entry has no stored values");
         }
+        const values = restorableValues(historyEntry.values, current, collection, requestViewer(c));
 
         // Revert by saving through the normal driver path — this will
         // itself create another history entry, giving a full audit trail.
@@ -247,7 +325,7 @@ export function createHistoryRoutes(params: {
         const savedEntity = await authDriver.save({
             path,
             id: String(id),
-            values: historyEntry.values,
+            values,
             collection,
             status: "existing"
         });

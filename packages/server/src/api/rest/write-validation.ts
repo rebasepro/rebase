@@ -116,8 +116,12 @@ function closedWriteNames(
  * and regardless of `strictWrites`. The framework's own auth paths do not come
  * through here — `prepareUserCreation` builds the row itself — so what is left
  * is callers the rule was written to exclude.
+ *
+ * Exported for the history revert, which writes a stored version rather than a
+ * body and so asks this question of the fields the revert would change, not of
+ * every key the snapshot holds. `where` prefixes the message.
  */
-function assertNoClosedFields(
+export function assertNoClosedFields(
     values: Record<string, unknown>,
     collection: CollectionConfig,
     where: string,
