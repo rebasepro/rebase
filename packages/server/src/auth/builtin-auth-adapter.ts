@@ -200,6 +200,11 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 // custom-claims hook cannot reach it. Reaches the database as
                 // `rebase.is_anonymous()` — see the claim's own note.
                 isAnonymous: payload.isAnonymous === true,
+                // What `customizeAccessToken` put on the token. Rebuilt
+                // without it, a claim-tenanted collection had no tenant to read
+                // — `rebase.jwt() ->> 'org_id'` was NULL on every backend with
+                // a `config.auth` object, which is every one that runs this.
+                ...(payload.claims ? { claims: payload.claims } : {}),
                 rawToken: token
             };
         },
@@ -262,6 +267,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 // custom-claims hook cannot reach it. Reaches the database as
                 // `rebase.is_anonymous()` — see the claim's own note.
                 isAnonymous: payload.isAnonymous === true,
+                // The socket's tenancy reads a claim too — see verifyRequest.
+                ...(payload.claims ? { claims: payload.claims } : {}),
                 rawToken: token
             };
         },

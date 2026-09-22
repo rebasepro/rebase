@@ -97,7 +97,12 @@ driver });
                     // A guest is a signed-in caller with no account behind
                     // them. Absent from an adapter that has no such concept,
                     // and absent reads as "not a guest".
-                    isAnonymous: authenticatedUser.isAnonymous === true
+                    isAnonymous: authenticatedUser.isAnonymous === true,
+                    // The token's custom claims, as `createAuthMiddleware`
+                    // passes them: `rebase.jwt()` and claim-form tenancy read
+                    // them. The identity keys are written over them when the
+                    // driver builds the database identity.
+                    ...(authenticatedUser.claims ? { claims: authenticatedUser.claims } : {})
                 }));
             } catch (error) {
                 logger.error("[AUTH-ADAPTER] RLS scoping failed for authenticated user", { error: error });

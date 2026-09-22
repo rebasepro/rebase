@@ -338,7 +338,12 @@ channelWindowStart: Date.now() });
                                     // subscribed as an account. Absent from an
                                     // adapter with no such concept, and absent
                                     // reads as "not a guest".
-                                    isAnonymous: adapterUser.isAnonymous === true
+                                    isAnonymous: adapterUser.isAnonymous === true,
+                                    // Kept, as the JWT branch keeps them: the
+                                    // built-in auth is an adapter, so dropping
+                                    // them here left every claim-tenanted
+                                    // collection with no tenant on the socket.
+                                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {})
                                 };
                             }
                         } catch {
