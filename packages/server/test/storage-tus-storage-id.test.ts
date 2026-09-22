@@ -140,6 +140,33 @@ describe("TUS authorizes the storage source it writes to", () => {
         expect(await exists(path.join(defaultDir, "default", "logo.png"))).toBe(false);
     });
 
+    it("refuses a named source on a backend that has only the default one", async () => {
+        // No registry: one controller, and it is the default source. The REST
+        // routes refuse a named `storageId` here; TUS asked the hook about the
+        // name and wrote the bytes to the one controller anyway.
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/api/storage", createStorageRoutes({
+            controller: new LocalStorageController({ basePath: defaultDir }),
+            requireAuth: false,
+            authorize: async (ctx: StorageAuthorizeContext) => {
+                seen.push(ctx.storageId);
+                return true;
+            }
+        }));
+
+        const { create } = await upload(
+            "http://localhost/api/storage/tus",
+            { key: "logo.png", storageId: "assets" },
+            "hello"
+        );
+
+        expect(create.status).toBe(400);
+        expect(await create.json()).toMatchObject({ error: { code: "UNKNOWN_STORAGE_SOURCE" } });
+        expect(seen).toEqual([]);
+        expect(await exists(path.join(defaultDir, "default", "logo.png"))).toBe(false);
+    });
+
     it("still writes an allowed upload to the default source", async () => {
         const { create, patch } = await upload(
             "http://localhost/api/storage/tus",

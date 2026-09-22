@@ -310,12 +310,18 @@ export class TusHandler {
         // after the client has uploaded every byte — and before this check the
         // resolution silently fell back to the default source, so the hook was
         // asked about one bucket and the object landed in another.
-        if (storageId !== undefined && this.storageRegistry && !this.storageRegistry.has(canonicalStorageId(storageId))) {
+        //
+        // A backend with no registry has one source, the default one, so any
+        // other name is unknown there too — as the REST routes answer it.
+        // Honouring it would ask the hook about that source and write the
+        // bytes to the one controller there is.
+        const knownSources = this.storageRegistry ? this.storageRegistry.list() : [DEFAULT_STORAGE_SOURCE_KEY];
+        if (storageId !== undefined && !knownSources.includes(canonicalStorageId(storageId))) {
             throw new ApiError(
                 400,
                 "UNKNOWN_STORAGE_SOURCE",
                 `Unknown storage source "${storageId}". ` +
-                `Available: ${this.storageRegistry.list().map((k) => `"${k}"`).join(", ") || "(none)"}.`,
+                `Available: ${knownSources.map((k) => `"${k}"`).join(", ") || "(none)"}.`,
                 undefined,
                 true
             );
@@ -327,7 +333,7 @@ export class TusHandler {
         // shape was any bucket the deployment's credentials reach.
         const target = this.storageRegistry ? this.storageRegistry.get(storageId) : this.storageController;
         if (target) {
-            writableBucketOrRefuse(bucket, target, this.storageRegistry?.list() ?? [DEFAULT_STORAGE_SOURCE_KEY]);
+            writableBucketOrRefuse(bucket, target, knownSources);
         }
 
         // Gate before any temp file exists, so a denied upload leaves nothing
