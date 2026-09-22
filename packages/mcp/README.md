@@ -54,7 +54,7 @@ The server reads configuration from environment variables and `.env` files:
 | `REBASE_API_TOKEN` / `REBASE_TOKEN` | (empty) | Auth token for API calls |
 | `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Allow destructive tools to run against non-local targets (see below) |
 
-The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_PROJECT_DIR/app/.env`.
+The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_PROJECT_DIR/app/.env`. Those values configure the server itself. They are not passed on to the CLI or the dev server it spawns: those read the active project's own `.env`, and a variable handed down would outrank it, and the branch the checkout is switched to, as if you had exported it in your shell.
 
 ## Destructive-Tool Safety Gate
 
@@ -69,7 +69,7 @@ The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_P
 
 The two targets are not interchangeable: CLI tools never see `baseUrl`, so a localhost backend sitting next to a production `DATABASE_URL` is checked against the database, not the backend. `create_user` and `update_user` set `roles`, so they can mint an admin; `invoke_function` calls any function with any HTTP method; `cron_toggle_job` disables a scheduled backup silently. None of those is recoverable in the sense "additive" suggests, which is why the list is now the other way round.
 
-The `DATABASE_URL` the gate checks is resolved the way the spawned CLI resolves it — ambient environment first, then `<root>/.env`, `<root>/backend/.env`, `DOTENV_CONFIG_PATH` and the parent directory, including the `ADMIN_CONNECTION_STRING` fallback the branch commands accept. **If no connection string can be resolved at all, the DB tools are refused**: an unverifiable target is not a safe one, and the child does its own resolution from files this process may not see.
+The `DATABASE_URL` the gate checks is resolved the way the spawned CLI resolves it. A `DATABASE_URL` exported in the shell the server was started from wins outright. Otherwise the gate reads every `DATABASE_URL` and `ADMIN_CONNECTION_STRING` (the fallback the branch commands accept) in `<root>/.env`, `<root>/backend/.env`, `DOTENV_CONFIG_PATH` and the parent directory's `.env`, parsing each file with dotenv as the CLI does, and refuses if **any** of them is remote. **If no connection string can be resolved at all, the DB tools are refused**: an unverifiable target is not a safe one, and the child does its own resolution from files this process may not see.
 
 Only loopback (`localhost` and `*.localhost`, `127.0.0.0/8`, `::1`, `0.0.0.0`) counts as local — private ranges like `10.x` and `192.168.x` do not, since those are as likely to be a shared staging cluster as a laptop.
 

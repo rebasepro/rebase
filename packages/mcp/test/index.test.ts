@@ -11,7 +11,8 @@ import {
     assertValidBranchName,
     gatedTargetFor,
     gatedToolTargets,
-    resolveCliDatabaseUrl,
+    resolveCliDatabaseUrls,
+    childProcessEnv,
     READ_ONLY_TOOLS,
     LOCAL_ONLY_TOOLS,
     findBackendDir,
@@ -599,7 +600,7 @@ describe("branch tools never hand a shell anything", () => {
     });
 });
 
-describe("resolveCliDatabaseUrl", () => {
+describe("resolveCliDatabaseUrls", () => {
     let projectDir: string;
     const originalDatabaseUrl = process.env.DATABASE_URL;
     const originalAdminUrl = process.env.ADMIN_CONNECTION_STRING;
@@ -624,6 +625,8 @@ describe("resolveCliDatabaseUrl", () => {
         }
     });
 
+    const urlsFor = (dir: string) => resolveCliDatabaseUrls(dir).map((target) => target.url);
+
     const asProjectRoot = (dir: string) => {
         mkdirSync(dir, { recursive: true });
         writeFileSync(join(dir, "rebase.json"), "{}");
@@ -638,7 +641,15 @@ describe("resolveCliDatabaseUrl", () => {
         writeFileSync(join(projectDir, ".env"), "DATABASE_URL=postgresql://u:p@localhost:5432/app\n");
         process.env.DATABASE_URL = "postgresql://u:p@db.prod.example.com:5432/app";
 
-        expect(resolveCliDatabaseUrl(projectDir)).toContain("db.prod.example.com");
+        expect(urlsFor(projectDir)).toEqual(["postgresql://u:p@db.prod.example.com:5432/app"]);
+    });
+
+    it("parses each file with dotenv, so a comment or quotes are not part of the value", () => {
+        asProjectRoot(projectDir);
+        writeFileSync(join(projectDir, ".env"), "DATABASE_URL=\"postgresql://u:p@localhost:5432/app\" # local\n");
+        expect(resolveCliDatabaseUrls(projectDir)).toEqual([
+            { url: "postgresql://u:p@localhost:5432/app", source: join(projectDir, ".env") }
+        ]);
     });
 
     it("finds the .env one level above the project root", () => {
@@ -646,32 +657,53 @@ describe("resolveCliDatabaseUrl", () => {
         // used to look only at <projectDir>/.env and <projectDir>/app/.env and
         // conclude there was no target to protect.
         const root = asProjectRoot(join(projectDir, "myapp"));
-        expect(resolveCliDatabaseUrl(root)).toBeUndefined();
+        expect(urlsFor(root)).toEqual([]);
         writeFileSync(join(projectDir, ".env"), "DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n");
-        expect(resolveCliDatabaseUrl(root)).toContain("db.prod.example.com");
+        expect(urlsFor(root).join(" ")).toContain("db.prod.example.com");
     });
 
     it("finds backend/.env, which the CLI hands over as DOTENV_CONFIG_PATH", () => {
         asProjectRoot(projectDir);
         mkdirSync(join(projectDir, "backend"), { recursive: true });
         writeFileSync(join(projectDir, "backend", ".env"), "DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n");
-        expect(resolveCliDatabaseUrl(projectDir)).toContain("db.prod.example.com");
+        expect(urlsFor(projectDir).join(" ")).toContain("db.prod.example.com");
     });
 
     it("honours DOTENV_CONFIG_PATH", () => {
         const elsewhere = join(projectDir, "shared.env");
         writeFileSync(elsewhere, "DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n");
         process.env.DOTENV_CONFIG_PATH = elsewhere;
-        expect(resolveCliDatabaseUrl(projectDir)).toContain("db.prod.example.com");
+        expect(urlsFor(projectDir).join(" ")).toContain("db.prod.example.com");
     });
 
     it("knows about the ADMIN_CONNECTION_STRING fallback the branch commands accept", () => {
         process.env.ADMIN_CONNECTION_STRING = "postgresql://u:p@db.prod.example.com:5432/postgres";
-        expect(resolveCliDatabaseUrl(projectDir)).toContain("db.prod.example.com");
+        expect(urlsFor(projectDir).join(" ")).toContain("db.prod.example.com");
     });
 
-    it("returns undefined when nothing anywhere declares one", () => {
-        expect(resolveCliDatabaseUrl(projectDir)).toBeUndefined();
+    it("returns nothing when nothing anywhere declares one", () => {
+        expect(urlsFor(projectDir)).toEqual([]);
+    });
+});
+
+describe("childProcessEnv", () => {
+    it("leaves out what the startup .env load added", () => {
+        const startup = new Map([["DATABASE_URL", "postgresql://u:p@localhost:5432/a"]]);
+        const env = { PATH: "/usr/bin", DATABASE_URL: "postgresql://u:p@localhost:5432/a" };
+        expect(childProcessEnv(env, startup)).toEqual({ PATH: "/usr/bin" });
+    });
+
+    it("keeps a variable whose value changed after the load", () => {
+        const startup = new Map([["DATABASE_URL", "postgresql://u:p@localhost:5432/a"]]);
+        const env = { DATABASE_URL: "postgresql://u:p@127.0.0.1:5432/set-later" };
+        expect(childProcessEnv(env, startup)).toEqual(env);
+    });
+
+    it("does not modify the environment it is given", () => {
+        const startup = new Map([["X", "1"]]);
+        const env = { X: "1" };
+        childProcessEnv(env, startup);
+        expect(env).toEqual({ X: "1" });
     });
 });
 
@@ -901,6 +933,213 @@ describe("the db gate checks the DSN the child would actually use", () => {
 
         expect(result.isError).toBeFalsy();
         expect(spawn).toHaveBeenCalled();
+    });
+
+    // The child reads every `.env` with dotenv. A gate that reads them any
+    // other way clears one value while the child connects with another.
+    const pushResult = async () => handler()({
+        method: "tools/call",
+        params: { name: "rebase_db_push", arguments: {} }
+    });
+
+    it("reads a key set twice the way dotenv does: the last line wins", async () => {
+        mkdirSync(join(projectDir, "backend"), { recursive: true });
+        writeFileSync(
+            join(projectDir, "backend", ".env"),
+            "DATABASE_URL=postgresql://u:p@localhost:5432/app\n" +
+            "DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n"
+        );
+        await useProject(projectDir);
+
+        const result = await pushResult();
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("db.prod.example.com");
+        expect(spawn).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["an `export` line", "export DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n"],
+        ["an indented line", "   DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n"]
+    ])("reads %s in the file the CLI picks, instead of moving on to a local one", async (_label, rootEnv) => {
+        // The CLI picks `<root>/.env` over `<root>/backend/.env`. The old regex
+        // matched neither line shape, so it went on to the local backend file.
+        writeFileSync(join(projectDir, ".env"), rootEnv);
+        mkdirSync(join(projectDir, "backend"), { recursive: true });
+        writeFileSync(join(projectDir, "backend", ".env"), "DATABASE_URL=postgresql://u:p@localhost:5432/app\n");
+        await useProject(projectDir);
+
+        const result = await pushResult();
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("db.prod.example.com");
+        expect(spawn).not.toHaveBeenCalled();
+    });
+
+    it("refuses when any file the chain can reach names a remote database, not only the first", async () => {
+        // The driver falls back to `<root>/backend/.env` and to the parent's
+        // `.env` whenever the file before them is missing. A local value in
+        // one file says nothing about the others.
+        writeFileSync(join(projectDir, ".env"), "DATABASE_URL=postgresql://u:p@localhost:5432/app\n");
+        mkdirSync(join(projectDir, "backend"), { recursive: true });
+        writeFileSync(join(projectDir, "backend", ".env"), "DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n");
+        await useProject(projectDir);
+
+        const result = await pushResult();
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("db.prod.example.com");
+        expect(result.content[0].text).toContain(join(projectDir, "backend", ".env"));
+    });
+
+    it("checks a file's DATABASE_URL even when a local ADMIN_CONNECTION_STRING is in the shell", async () => {
+        // The driver reads `DATABASE_URL || ADMIN_CONNECTION_STRING`, so the
+        // admin string is a fallback, never a reason to stop looking.
+        const originalAdmin = process.env.ADMIN_CONNECTION_STRING;
+        process.env.ADMIN_CONNECTION_STRING = "postgresql://u:p@localhost:5432/postgres";
+        try {
+            writeFileSync(join(projectDir, ".env"), "DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/app\n");
+            await useProject(projectDir);
+
+            const result = await pushResult();
+
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("db.prod.example.com");
+        } finally {
+            if (originalAdmin === undefined) delete process.env.ADMIN_CONNECTION_STRING;
+            else process.env.ADMIN_CONNECTION_STRING = originalAdmin;
+        }
+    });
+});
+
+describe("a child is not handed the startup .env as if it were the shell", () => {
+    /**
+     * The server loads the startup project's `.env` into its own
+     * `process.env`, and every child used to inherit that whole. To the CLI a
+     * variable in its environment is one the person exported in the shell, and
+     * that outranks both the branch pointer and the `.env` of whichever project
+     * is active now. So `rebase_db_branch_switch` changed nothing, and after
+     * `rebase_project_switch` project B's schema was pushed into project A's
+     * database.
+     */
+    const home = join(tmpdir(), "rebase-mcp-test-home");
+    const registryPath = join(home, ".rebase", "projects.json");
+    const touched = ["DATABASE_URL", "ADMIN_CONNECTION_STRING", "STARTUP_ONLY_SETTING", "REBASE_MCP_ALLOW_REMOTE_WRITES"];
+    const original = Object.fromEntries(touched.map((key) => [key, process.env[key]]));
+    let saved: string | null = null;
+    let dirs: string[] = [];
+
+    beforeEach(() => {
+        mkdirSync(join(home, ".rebase"), { recursive: true });
+        saved = existsSync(registryPath) ? readFileSync(registryPath, "utf8") : null;
+        writeFileSync(registryPath, JSON.stringify({ projects: {}, activeProject: null }));
+        for (const key of touched) delete process.env[key];
+    });
+
+    afterEach(() => {
+        if (saved === null) rmSync(registryPath, { force: true });
+        else writeFileSync(registryPath, saved);
+        // The re-imported server loaded a `.env` into this very process.
+        for (const key of touched) {
+            if (original[key] === undefined) delete process.env[key];
+            else process.env[key] = original[key];
+        }
+        for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
+        dirs = [];
+        vi.useRealTimers();
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    const projectWithEnv = (envFile: string): string => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-child-env-"));
+        dirs.push(dir);
+        writeFileSync(join(dir, "rebase.json"), "{}");
+        writeFileSync(join(dir, ".env"), envFile);
+        return dir;
+    };
+
+    /** Re-import the server as if it had been started in `dir`. */
+    async function bootIn(dir: string) {
+        for (const key of ["REBASE_BASE_URL", "REBASE_API_TOKEN", "REBASE_TOKEN"]) vi.stubEnv(key, "");
+        vi.stubEnv("REBASE_PROJECT_DIR", dir);
+        vi.resetModules();
+        const mod = await import("../src/index");
+        const childProcess = await import("node:child_process");
+        const spawned = vi.mocked(childProcess.spawn);
+        spawned.mockClear();
+        mockSpawn.stdout.on.mockImplementation(() => mockSpawn.stdout);
+        mockSpawn.on.mockImplementation((event: string, callback: any) => {
+            if (event === "close") setTimeout(() => callback(0), 0);
+            return mockSpawn;
+        });
+        const call = (name: string, args: Record<string, unknown> = {}) =>
+            (mod.server as any)._requestHandlers.get("tools/call")({
+                method: "tools/call",
+                params: { name, arguments: args }
+            });
+        const lastEnv = (): NodeJS.ProcessEnv => {
+            const options = spawned.mock.calls.at(-1)?.[2];
+            if (!options?.env) throw new Error("nothing was spawned with an env");
+            return options.env;
+        };
+        return { mod, call, spawned, lastEnv };
+    }
+
+    it("does not pass the startup project's .env values to the CLI as shell variables", async () => {
+        const dir = projectWithEnv(
+            "DATABASE_URL=postgresql://u:p@localhost:5432/app\nSTARTUP_ONLY_SETTING=from-dotenv\n"
+        );
+        const { call, lastEnv } = await bootIn(dir);
+        // The load itself still happens: the server reads its own settings
+        // out of that file.
+        expect(process.env.STARTUP_ONLY_SETTING).toBe("from-dotenv");
+
+        const result = await call("rebase_db_push");
+
+        expect(result.isError).toBeFalsy();
+        expect(lastEnv().DATABASE_URL).toBeUndefined();
+        expect(lastEnv().STARTUP_ONLY_SETTING).toBeUndefined();
+    });
+
+    it("still passes what the shell really exported", async () => {
+        process.env.DATABASE_URL = "postgresql://u:p@127.0.0.1:5432/from_the_shell";
+        const dir = projectWithEnv("DATABASE_URL=postgresql://u:p@localhost:5432/app\n");
+        const { call, lastEnv } = await bootIn(dir);
+
+        await call("rebase_db_push");
+
+        expect(lastEnv().DATABASE_URL).toBe("postgresql://u:p@127.0.0.1:5432/from_the_shell");
+    });
+
+    it("does not pass them to the dev server either", async () => {
+        const dir = projectWithEnv("DATABASE_URL=postgresql://u:p@localhost:5432/app\n");
+        const { call, lastEnv } = await bootIn(dir);
+        vi.useFakeTimers({ toFake: ["setTimeout"] });
+
+        // The tool waits two seconds for the server's first output.
+        let settled = false;
+        const started = call("rebase_dev_start").finally(() => { settled = true; });
+        while (!settled) await vi.advanceTimersByTimeAsync(500);
+        await started;
+
+        expect(lastEnv().DATABASE_URL).toBeUndefined();
+    });
+
+    it("gates a switched-to project on its own .env, not on the one loaded at startup", async () => {
+        const projectA = projectWithEnv("DATABASE_URL=postgresql://u:p@localhost:5432/a\n");
+        const projectB = projectWithEnv("DATABASE_URL=postgresql://u:p@db.prod.example.com:5432/b\n");
+        const { call, spawned } = await bootIn(projectA);
+        await call("rebase_project_add", {
+            name: "b", baseUrl: "http://localhost:3002", projectDir: projectB, token: "t"
+        });
+        await call("rebase_project_switch", { name: "b" });
+
+        const result = await call("rebase_db_push");
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("db.prod.example.com");
+        expect(spawned).not.toHaveBeenCalled();
     });
 });
 

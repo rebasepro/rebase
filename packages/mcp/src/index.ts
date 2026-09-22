@@ -7,7 +7,7 @@ import {
     ReadResourceRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, type ChildProcess } from "node:child_process";
-import { config as loadDotenv } from "dotenv";
+import { config as loadDotenv, parse as parseDotenv } from "dotenv";
 import { resolve, join, dirname, delimiter } from "node:path";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
@@ -362,13 +362,20 @@ function readEnvVarFromProject(
     return undefined;
 }
 
-/** Read one variable out of one `.env` file, or undefined if it isn't there. */
+/**
+ * Read one variable out of one `.env` file, or undefined if it isn't there.
+ *
+ * Parsed with `dotenv`, because that is what the CLI, the driver and the
+ * server parse the same file with. A reader of its own disagrees with them on
+ * exactly the lines people write: a key set twice (dotenv keeps the last
+ * one), `export KEY=…`, an indented line. For the destructive-tool gate a
+ * disagreement is not cosmetic: it cleared the local value it read while the
+ * CLI connected with the remote one it did not.
+ */
 function readEnvVarFromFile(envPath: string, name: string): string | undefined {
-    const pattern = new RegExp(`^${name}\\s*=\\s*["']?([^"'\\n\\r]+)["']?`, "m");
     try {
         if (!existsSync(envPath)) return undefined;
-        const match = readFileSync(envPath, "utf-8").match(pattern);
-        return match?.[1]?.trim() || undefined;
+        return parseDotenv(readFileSync(envPath, "utf-8"))[name]?.trim() || undefined;
     } catch {
         return undefined;
     }
@@ -396,15 +403,55 @@ const ENV_PROJECT_DIR = resolve(process.env.REBASE_PROJECT_DIR || process.cwd())
 /** `true` when the server's working directory is itself a Rebase project. */
 const CWD_IS_PROJECT = existsSync(resolve(process.cwd(), "rebase.json"));
 
+/**
+ * The variables the startup `.env` load below added to `process.env`, with
+ * the values it added. See {@link childProcessEnv}.
+ */
+const STARTUP_DOTENV_VARS = new Map<string, string>();
+
 // Try to load .env from the project directory
 for (const envPath of [
     resolve(ENV_PROJECT_DIR, ".env"),
     resolve(ENV_PROJECT_DIR, "app", ".env")
 ]) {
     if (existsSync(envPath)) {
-        loadDotenv({ path: envPath, quiet: true });
+        // dotenv leaves a variable that is already set alone, so what it added
+        // is exactly the keys that were absent before the call.
+        const before = new Set(Object.keys(process.env));
+        const { parsed } = loadDotenv({ path: envPath, quiet: true });
+        for (const [key, value] of Object.entries(parsed ?? {})) {
+            if (!before.has(key)) STARTUP_DOTENV_VARS.set(key, value);
+        }
         break;
     }
+}
+
+/**
+ * The environment a spawned child inherits: this process's, minus what the
+ * startup `.env` load put into it.
+ *
+ * The load is for this server's own settings. To a child, though, a variable
+ * in its environment is one the person exported in their shell, and the CLI
+ * ranks that above everything but a flag: above the branch this checkout is
+ * switched to, and above the `.env` of the project it runs in. Handing the
+ * startup file down therefore overruled both. `rebase_db_branch_switch` said
+ * "every rebase command in this checkout now uses it" and the next
+ * `rebase_db_push` went to the main database; after `rebase_project_switch`
+ * every CLI tool ran project B against project A's `DATABASE_URL`. The child
+ * reads its own project's `.env` itself, so leaving these out loses nothing.
+ *
+ * A variable the shell really set is kept, and so is one whose value has
+ * changed since the load.
+ */
+export function childProcessEnv(
+    env: NodeJS.ProcessEnv = process.env,
+    startupDotenv: ReadonlyMap<string, string> = STARTUP_DOTENV_VARS
+): NodeJS.ProcessEnv {
+    const out: NodeJS.ProcessEnv = { ...env };
+    for (const [key, value] of startupDotenv) {
+        if (out[key] === value) delete out[key];
+    }
+    return out;
 }
 
 const ENV_BASE_URL = process.env.REBASE_BASE_URL || "";
@@ -829,63 +876,75 @@ function findCliProjectRoot(startDir: string): string | null {
     }
 }
 
+/** A connection string the spawned CLI could connect with, and where it was found. */
+export interface CliDatabaseTarget {
+    url: string;
+    /** `"the environment"`, or the path of the `.env` file that names it. */
+    source: string;
+}
+
 /**
- * Resolve the connection string the spawned CLI would actually connect with.
+ * Every connection string the spawned CLI could connect with.
  *
  * The point of this function is that it is *not* an independent guess. The gate
  * used to read `<projectDir>/.env` first and only then `process.env`, which is
  * the opposite of what the child does, and it looked in two files the child
  * never reads while missing the ones it does. Both divergences end the same
  * way: the gate clears a target the child does not use, and the DDL lands
- * somewhere else. So this mirrors the child's chain, in the child's order:
+ * somewhere else. So this follows the child's chain:
  *
- *   1. Ambient env wins. `rebase db …` and the Atlas path both fill a variable
- *      only when it is `undefined` (`packages/server-postgres/src/cli.ts:32-58`
- *      and `:765-790`), and `runRebaseCmd` hands the child the whole of
- *      `process.env` — including whatever `.env` this process loaded at
- *      startup, which is the project that was active *then*, not necessarily
- *      the one active now.
- *   2. `ADMIN_CONNECTION_STRING`, which `branchCommand` accepts as a fallback
- *      (`cli.ts:562`).
- *   3. The `.env` files, in the order the chain reaches them: the CLI hands the
+ *   1. A `DATABASE_URL` in the child's environment wins outright, and is then
+ *      the only target. `rebase db …` and the Atlas path both fill a variable
+ *      only when it is `undefined` (`packages/server-postgres/src/cli.ts`
+ *      `loadEnv`), and the CLI ranks it above the branch pointer and `.env`.
+ *      The child's environment is {@link childProcessEnv}, not `process.env`:
+ *      the `.env` this process loaded at startup is not handed down.
+ *   2. Otherwise every `DATABASE_URL` and `ADMIN_CONNECTION_STRING` (the
+ *      driver's `DATABASE_URL || ADMIN_CONNECTION_STRING` fallback) in the
+ *      environment and in each `.env` the chain can reach: the CLI hands the
  *      driver `DOTENV_CONFIG_PATH` = `<root>/.env` or `<root>/backend/.env`
- *      (`packages/cli/src/commands/db.ts:43-47`), and the driver otherwise
- *      falls back to its own cwd (`<root>/backend`) and two parents up.
+ *      (`packages/cli/src/utils/project.ts` `findEnvFile`), and the driver
+ *      otherwise falls back to its own cwd (`<root>/backend`) and two parents
+ *      up. A branch this checkout is switched to is a database on the same
+ *      server as `DATABASE_URL`, so it has no host of its own to check.
  *
- * Scanning continues past a file that has no `DATABASE_URL` even though the
- * child stops at the first `.env` it finds: finding *more* candidate targets
- * can only make the gate refuse more often, and the case it would otherwise
- * miss — a second file naming production — is exactly the one worth catching.
+ * Every file is read, not only the first that has a value, and the gate
+ * refuses if *any* target is remote. Which file the child stops at depends on
+ * which files exist at the moment it runs; a local value in one says nothing
+ * about the others, and a second file naming production is exactly the case
+ * worth catching. Each file is parsed with `dotenv`, as the child parses it.
  */
-export function resolveCliDatabaseUrl(projectDir: string): string | undefined {
-    for (const name of ["DATABASE_URL", "ADMIN_CONNECTION_STRING"]) {
-        const ambient = process.env[name];
-        if (ambient) return ambient;
+export function resolveCliDatabaseUrls(
+    projectDir: string,
+    env: NodeJS.ProcessEnv = childProcessEnv()
+): CliDatabaseTarget[] {
+    if (env.DATABASE_URL) return [{ url: env.DATABASE_URL, source: "the environment" }];
+
+    const targets: CliDatabaseTarget[] = [];
+    if (env.ADMIN_CONNECTION_STRING) {
+        targets.push({ url: env.ADMIN_CONNECTION_STRING, source: "the environment" });
     }
 
     const root = findCliProjectRoot(projectDir);
     const candidates = [
         root && join(root, ".env"),
         root && join(root, "backend", ".env"),
-        process.env.DOTENV_CONFIG_PATH,
+        env.DOTENV_CONFIG_PATH,
         root && join(dirname(root), ".env"),
         // The layouts this gate covered before, kept so the change can only
         // widen what it inspects.
         join(projectDir, ".env"),
         join(projectDir, "app", ".env"),
         join(projectDir, "app", "backend", ".env")
-    ].filter(Boolean) as string[];
+    ].filter((path): path is string => Boolean(path));
 
-    const seen = new Set<string>();
-    for (const envPath of candidates) {
-        if (seen.has(envPath)) continue;
-        seen.add(envPath);
+    for (const envPath of new Set(candidates.map((path) => resolve(path)))) {
         for (const name of ["DATABASE_URL", "ADMIN_CONNECTION_STRING"]) {
             const value = readEnvVarFromFile(envPath, name);
-            if (value) return value;
+            if (value) targets.push({ url: value, source: envPath });
         }
     }
-    return undefined;
+    return targets;
 }
 
 /**
@@ -917,25 +976,26 @@ export function assertDestructiveTargetIsLocal(toolName: string): void {
 
     // "db" — the CLI connects with DATABASE_URL and never sees baseUrl.
     const projectDir = project.projectDir || ENV_PROJECT_DIR;
-    const databaseUrl = resolveCliDatabaseUrl(projectDir);
+    const targets = resolveCliDatabaseUrls(projectDir);
 
     // Nothing found anywhere is not "nothing to protect": it is an unverified
     // target, and `isLocalTarget` already treats unverifiable as remote. The
     // child resolves its own connection string, from files and variables this
     // process cannot see all of, so "I found none" says nothing about what it
     // will find.
-    if (!databaseUrl) {
+    if (targets.length === 0) {
         throw new Error(
             `Refusing to run "${toolName}": no DATABASE_URL could be resolved for project ` +
             `"${project.name}", so the database it would connect to cannot be verified as local. ` +
             `Set DATABASE_URL in the project's .env, or ${optOut.charAt(0).toLowerCase()}${optOut.slice(1)}`
         );
     }
-    if (isLocalTarget(databaseUrl)) return;
+    const remote = targets.find((target) => !isLocalTarget(target.url));
+    if (!remote) return;
 
     throw new Error(
         `Refusing to run "${toolName}": DATABASE_URL for project "${project.name}" points at ` +
-        `${redactUrl(databaseUrl)}, which is not local. ${optOut}`
+        `${redactUrl(remote.url)} (from ${remote.source}), which is not local. ${optOut}`
     );
 }
 
@@ -1520,7 +1580,7 @@ function runRebaseCmd(commandArgs: string[]): Promise<{ output: string; code: nu
             cwd: projectDir,
             shell: false,
             env: {
-                ...process.env,
+                ...childProcessEnv(),
                 PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
             }
         });
@@ -2169,7 +2229,7 @@ roles });
             devProcess = spawn(resolvePackageManagerBinary(runCmd, projectDir), [...runArgs, "dev"], {
                 cwd: findDevDir(),
                 shell: false,
-                env: { ...process.env }
+                env: childProcessEnv()
             });
             // Without this, a spawn failure — a missing directory, a package
             // manager that is not installed — is an unhandled 'error' event.
