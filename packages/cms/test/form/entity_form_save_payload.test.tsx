@@ -231,3 +231,40 @@ describe("EntityForm: a record changed elsewhere while the form is open", () => 
     });
 
 });
+
+describe("EntityForm: a string transform reaches the save", () => {
+
+    it("sends the trimmed, lowercased value validation passed", async () => {
+        const stored: Post = { slug: "old" };
+        const { payloads, onSubmit } = recordingSubmit(() => stored);
+        render(<EntityForm<Post>
+            path="posts"
+            entityId="1"
+            collection={{
+                slug: "posts",
+                name: "Posts",
+                properties: {
+                    slug: {
+                        type: "string",
+                        name: "Slug",
+                        validation: { trim: true, lowercase: true, matches: /^[a-z0-9-]+$/ }
+                    }
+                }
+            } as never}
+            entity={entityOf(stored)}
+            initialStatus="existing"
+            Builder={CaptureContext}
+            onSubmit={onSubmit}
+            computedInitialValues={stored}/>);
+
+        await act(async () => {
+            context.setFieldValue("slug", "  My-Slug ");
+        });
+        await act(async () => {
+            await context.submit();
+        });
+
+        expect(payloads).toEqual([{ slug: "my-slug" }]);
+    });
+
+});

@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import {
+    applyValueTransforms,
     getEntitySchema,
     mapPropertyToZod,
     getZodMapObjectSchema
@@ -1011,5 +1012,75 @@ describe("bound messages name the bound that failed", () => {
             new Date("2027-06-01T00:00:00Z")
         );
         expect(message).toEqual(`Due must be before ${max}`);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// trim, lowercase, uppercase: transforms of the value that is written
+// ---------------------------------------------------------------------------
+
+/**
+ * `trim`, `lowercase` and `uppercase` are documented as changing the value
+ * that is written. Validation judged the transformed value and the form then
+ * submitted the one typed: "  My-Slug " passed a `matches: /^[a-z0-9-]+$/`
+ * check in the form, was sent as typed, and the server refused it.
+ */
+describe("applyValueTransforms", () => {
+    const slug = {
+        type: "string",
+        name: "Slug",
+        validation: { trim: true, lowercase: true, matches: /^[a-z0-9-]+$/ }
+    } as StringProperty;
+
+    it("writes the value validation judged", async () => {
+        const values = applyValueTransforms({ slug: "  My-Slug ", title: "  Keep  " }, {
+            slug,
+            title: { type: "string" } as StringProperty
+        } as Properties);
+        expect(values).toEqual({ slug: "my-slug", title: "  Keep  " });
+        expect((await mapPropertyToZod({ property: slug }).safeParseAsync(values.slug)).success).toBe(true);
+    });
+
+    it("uppercases", () => {
+        expect(applyValueTransforms({ code: "ita" }, {
+            code: { type: "string", validation: { uppercase: true } } as StringProperty
+        } as Properties)).toEqual({ code: "ITA" });
+    });
+
+    it("reaches strings inside a map and an array", () => {
+        const properties = {
+            seo: { type: "map", properties: { slug } } as MapProperty,
+            tags: { type: "array", of: { type: "string", validation: { trim: true } } } as ArrayProperty,
+            pair: { type: "array", of: [slug, { type: "number" }] } as ArrayProperty
+        } as Properties;
+        expect(applyValueTransforms({
+            seo: { slug: " A-B ", other: 1 },
+            tags: [" news ", "sport"],
+            pair: [" C-D ", 3]
+        }, properties)).toEqual({
+            seo: { slug: "a-b", other: 1 },
+            tags: ["news", "sport"],
+            pair: ["c-d", 3]
+        });
+    });
+
+    it("returns the values themselves when there is nothing to change", () => {
+        const values = { slug: "my-slug", title: "x" };
+        expect(applyValueTransforms(values, { slug } as Properties)).toBe(values);
+    });
+});
+
+describe("string length", () => {
+    const code = { type: "string", name: "Country", validation: { length: 2 } } as StringProperty;
+
+    it("refuses a value of another length", async () => {
+        const result = await mapPropertyToZod({ property: code }).safeParseAsync("ITA");
+        expect(result.success).toBe(false);
+        expect(result.success ? "" : result.error.issues[0].message).toEqual("Country must be exactly 2 characters long");
+    });
+
+    it("accepts a value of that length, and no value", async () => {
+        expect((await mapPropertyToZod({ property: code }).safeParseAsync("IT")).success).toBe(true);
+        expect((await mapPropertyToZod({ property: code }).safeParseAsync(null)).success).toBe(true);
     });
 });

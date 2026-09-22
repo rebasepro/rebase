@@ -25,7 +25,7 @@ import { useRailVisible } from "./components/useRailVisible";
 import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
-import { CustomFieldValidator, getEntitySchema } from "./validation";
+import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "./validation";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
@@ -281,9 +281,12 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const lastSavedValues = useRef<EntityValues<M> | undefined>(entity?.values);
     const save = async (values: EntityValues<M>): Promise<Entity<M> | void> => {
+        // The string transforms a property declares change what is written;
+        // validation has already judged the transformed value.
+        const writtenValues = applyValueTransforms(values, collection.properties);
         const valuesToSave = status === "existing"
-            ? getChangedProperties<M>(values, entity?.values || {}) as EntityValues<M>
-            : values;
+            ? getChangedProperties<M>(writtenValues, entity?.values || {}) as EntityValues<M>
+            : writtenValues;
 
         if (status === "existing" && Object.keys(valuesToSave).length === 0 && entity) {
             return Promise.resolve(entity);

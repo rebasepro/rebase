@@ -1,9 +1,9 @@
 import type { Properties } from "@rebasepro/types";
-import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, StringPropertyValidationSchema, VectorProperty, BinaryProperty } from "@rebasepro/types";
 ;
 import { z, ZodTypeAny } from "zod";
 import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
-import { getValueInPath, hydrateRegExp, prettifyIdentifier } from "@rebasepro/utils";
+import { getValueInPath, hydrateRegExp, isPlainObject, prettifyIdentifier } from "@rebasepro/utils";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 /**
@@ -209,9 +209,14 @@ function getZodStringSchema({
                 );
             }
         }
-        if (validation.trim) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.trim() : v, schema);
-        if (validation.lowercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toLowerCase() : v, schema);
-        if (validation.uppercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toUpperCase() : v, schema);
+        if (validation.length !== undefined) schema = schema.refine(
+            (value: unknown) => value == null || (typeof value === "string" && value.length === validation.length),
+            { message: `${fieldLabel(property, name)} must be exactly ${validation.length} characters long` }
+        );
+        if (validation.trim || validation.lowercase || validation.uppercase) schema = z.preprocess(
+            (v: unknown) => typeof v === "string" ? transformString(v, validation) : v,
+            schema
+        );
     }
 
     // Checked the way the server checks them: on every string that declares
@@ -241,6 +246,64 @@ function getZodStringSchema({
         }
     }
     return schema;
+}
+
+/**
+ * A string's declared transforms — `trim`, `lowercase`, `uppercase` — applied.
+ * The one definition of them: validation judges its result, and
+ * {@link applyValueTransforms} writes it.
+ */
+function transformString(value: string, validation: StringPropertyValidationSchema): string {
+    let result = value;
+    if (validation.trim) result = result.trim();
+    if (validation.lowercase) result = result.toLowerCase();
+    if (validation.uppercase) result = result.toUpperCase();
+    return result;
+}
+
+/**
+ * The values as they are to be written: every `trim`, `lowercase` and
+ * `uppercase` a string property declares applied to its value, inside maps and
+ * arrays too.
+ *
+ * They are documented as changing the value that is written, and only the
+ * panel applies them — the server checks what it receives. Validation judges
+ * the transformed value, so without this the form passed "my-slug" and sent
+ * "  My-Slug ", which a `matches` on the server then refused.
+ *
+ * Returns `values` itself when nothing changes.
+ */
+export function applyValueTransforms<M extends Record<string, unknown>>(values: M, properties: Properties): M {
+    let result: M = values;
+    for (const [key, property] of Object.entries(properties)) {
+        if (!(key in values)) continue;
+        const transformed = transformValue(property, values[key]);
+        if (transformed !== values[key]) {
+            result = { ...result, [key]: transformed };
+        }
+    }
+    return result;
+}
+
+function transformValue(property: Property, value: unknown): unknown {
+    if (!property || typeof property !== "object") return value;
+    if (property.type === "string") {
+        return typeof value === "string" && property.validation
+            ? transformString(value, property.validation)
+            : value;
+    }
+    if (property.type === "map" && property.properties && isPlainObject(value)) {
+        return applyValueTransforms(value, property.properties);
+    }
+    if (property.type === "array" && property.of && Array.isArray(value)) {
+        const of = property.of;
+        const items = value.map((item, index) => {
+            const itemProperty = Array.isArray(of) ? of[index] : of;
+            return itemProperty ? transformValue(itemProperty, item) : item;
+        });
+        return items.some((item, index) => item !== value[index]) ? items : value;
+    }
+    return value;
 }
 
 function getZodNumberSchema({
