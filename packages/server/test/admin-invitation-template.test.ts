@@ -77,6 +77,24 @@ describe("finalizeAdminUserCreation — the invited user's email", () => {
         expect(sent[0].html).toContain("https://app.example.com/reset-password?token=");
     });
 
+    it("says the link lasts as long as the token it carries", async () => {
+        // The template said "1 hour" while the token was minted for 24, so an
+        // invitee who read the email the next morning believed the link was
+        // dead and asked for another account.
+        const { ctx, sent } = makeContext();
+        const before = Date.now();
+
+        await finalizeAdminUserCreation(newUser, "temp-password", ctx);
+
+        const [, , expiresAt] = (ctx.authRepo.createPasswordResetToken as jest.Mock).mock.calls[0] as [string, string, Date];
+        const tokenHours = Math.round((expiresAt.getTime() - before) / (60 * 60 * 1000));
+        for (const body of [sent[0].html, sent[0].text ?? ""]) {
+            const stated = body.match(/expire in (\d+) hours?/);
+            expect(stated).not.toBeNull();
+            expect(Number(stated![1])).toBe(tokenHours);
+        }
+    });
+
     it("honours a configured userInvitation template", async () => {
         // The slot existing but being unread is what made this reachable at
         // all: a developer who set it saw no change and no error.

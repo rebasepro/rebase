@@ -21,7 +21,7 @@ import type {
     UserCreationFinalizeResult,
     UserCreationPrepareResult
 } from "@rebasepro/types";
-import { getUserInvitationTemplate, resolveEmailBranding } from "../email/templates";
+import { getUserInvitationTemplate, resolveEmailBranding, USER_INVITATION_LINK_TTL_MS } from "../email/templates";
 import { logger } from "../utils/logger";
 
 // ─── Shared Crypto Utilities ────────────────────────────────────────────────
@@ -207,7 +207,8 @@ export async function finalizeAdminUserCreation(
         try {
             const token = generateSecureToken();
             const tokenHash = hashToken(token);
-            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+            // The TTL the invitation email states, from the same constant.
+            const expiresAt = new Date(Date.now() + USER_INVITATION_LINK_TTL_MS);
 
             await ctx.authRepo.createPasswordResetToken(entity.id, tokenHash, expiresAt);
 

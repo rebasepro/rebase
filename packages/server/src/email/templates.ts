@@ -353,6 +353,18 @@ text };
 }
 
 /**
+ * How long an invitation's set-password link stays valid.
+ *
+ * One number for both halves: `finalizeAdminUserCreation` mints the token for
+ * this long and the template below tells the invitee this long. They were two
+ * literals, and the email said "1 hour" for a token that lived 24 — so an
+ * invitee who opened it the next morning believed the link was dead.
+ */
+export const USER_INVITATION_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+
+const USER_INVITATION_LINK_TTL_HOURS = USER_INVITATION_LINK_TTL_MS / (60 * 60 * 1000);
+
+/**
  * Default user invitation email template
  * Sent when an admin creates a new user account
  */
@@ -400,7 +412,7 @@ export function getUserInvitationTemplate(
             </p>
             
             <div style="${styles.warning}">
-                ⏰ This link will expire in 1 hour for security reasons.
+                ⏰ This link will expire in ${USER_INVITATION_LINK_TTL_HOURS} hours for security reasons.
             </div>
             
             <div style="${styles.footer}">
@@ -424,7 +436,7 @@ An account has been created for you on ${appName}.
 Click this link to set your password and get started:
 ${setPasswordUrl}
 
-This link will expire in 1 hour for security reasons.
+This link will expire in ${USER_INVITATION_LINK_TTL_HOURS} hours for security reasons.
 
 If you weren't expecting this invitation, you can safely ignore this email.
     `.trim();
