@@ -41,4 +41,17 @@ describe("password hashing", () => {
         expect(await verifyPassword("x", "not-a-hash")).toBe(false);
         expect(await verifyPassword("x", "")).toBe(false);
     });
+
+    /**
+     * The shape check above stopped at "has a colon". Past it, the stored key
+     * went straight into `timingSafeEqual`, which throws when the two buffers
+     * differ in length — so any `salt:key` whose key is not 64 bytes made
+     * login and change-password answer 500 instead of 401. A user imported
+     * from a system that hashed with a 32-byte key hits exactly this.
+     */
+    it("refuses a stored key of the wrong length rather than throwing", async () => {
+        expect(await verifyPassword("x", "abcd:ef")).toBe(false);
+        expect(await verifyPassword("x", "aa".repeat(16) + ":" + "bb".repeat(32))).toBe(false);
+        expect(await verifyPassword("x", "aa".repeat(32) + ":" + "not-hex")).toBe(false);
+    });
 });

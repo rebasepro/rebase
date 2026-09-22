@@ -82,6 +82,13 @@ export async function verifyPassword(password: string, storedHash: string): Prom
 
     const salt = Buffer.from(saltHex, "hex");
     const storedKey = Buffer.from(hashHex, "hex");
+    // `timingSafeEqual` throws on buffers of different lengths, which turned
+    // a stored key that is not ours — imported with another key length, or
+    // not hex at all — into a 500 at login rather than a wrong password.
+    // The length is not a secret: every hash this module writes has the same.
+    if (storedKey.length !== KEY_LENGTH) {
+        return false;
+    }
 
     const derivedKey = await scryptAsync(password, salt, KEY_LENGTH, SCRYPT_PARAMS);
 
