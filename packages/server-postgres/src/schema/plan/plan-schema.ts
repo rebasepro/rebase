@@ -820,6 +820,10 @@ function planCollectionTable(
     // half a rule cannot express: the column is NOT NULL, and it is indexed.
     const tenantIndexes = applyTenantColumnEffects(collection, columns, schema, table);
 
+    // Last among the columns, because it reads a nullability the two passes
+    // above can still change.
+    settleDefaultOnDelete(collection, columns, relations);
+
     return {
         schema,
         table,
@@ -1004,7 +1008,12 @@ function findTenantColumn(
     columns: ColumnPlan[],
     field: string
 ): ColumnPlan | undefined {
-    const direct = columns.find(c => c.key === field);
+    // Only columns that are created. A relation whose column a declared
+    // property owns keeps an entry for its constraint alone, under the same key
+    // and column; when the relation was declared first, NOT NULL landed on that
+    // entry, nothing rendered it, and the tenant column stayed nullable.
+    const created = columns.filter(c => !c.columnOwnedByProperty);
+    const direct = created.find(c => c.key === field);
     if (direct) return direct;
 
     const prop = collection.properties?.[field] as Property | undefined;
@@ -1012,14 +1021,63 @@ function findTenantColumn(
         const relations = resolveCollectionRelations(collection);
         const relation = findRelation(relations, (prop as RelationProperty).relation?.relationName ?? field);
         if (relation?.kind === "belongsTo" && relation.localKey) {
-            return columns.find(c => c.column === relation.localKey);
+            return created.find(c => c.column === relation.localKey);
         }
         return undefined;
     }
     if (!prop) return undefined;
     const columnName = resolveColumnName(field, prop);
-    return columns.find(c => c.column === columnName);
+    return created.find(c => c.column === columnName);
 }
+
+/**
+ * The `ON DELETE` a link gets when the author did not say, decided from the
+ * column as it will be created.
+ *
+ * {@link planRelationColumn} and {@link planReferenceColumn} see only their own
+ * property's `required`, and two later facts change the premise: `tenant` makes
+ * its column NOT NULL, and a declared property that owns a relation's column
+ * decides that column's nullability itself. Defaulting before either produced
+ * `NOT NULL … ON DELETE SET NULL` — a parent's delete that can only fail, and
+ * fails with 23502 naming the child's column rather than as the foreign-key
+ * refusal it is. An `onDelete` the author wrote is theirs and is kept.
+ */
+function settleDefaultOnDelete(
+    collection: CollectionConfig,
+    columns: ColumnPlan[],
+    relations: Record<string, ResolvedRelation>
+): void {
+    for (const column of columns) {
+        const fk = column.foreignKey;
+        if (!fk || declaresOnDelete(collection, relations, column)) continue;
+        const created = columns.find(c => c.column === column.column && !c.columnOwnedByProperty) ?? column;
+        const onDelete = defaultBelongsToOnDelete(!created.nullable);
+        if (onDelete === fk.onDelete) continue;
+        column.foreignKey = foreignKeyPlan({
+            schema: fk.schema,
+            table: fk.table,
+            column: fk.column,
+            targetSchema: fk.targetSchema,
+            targetTable: fk.targetTable,
+            targetColumn: fk.targetColumn,
+            onDelete,
+            onUpdate: fk.onUpdate
+        });
+    }
+}
+
+/** Whether the author wrote this link's `onDelete`. A `reference` has none to write. */
+const declaresOnDelete = (
+    collection: CollectionConfig,
+    relations: Record<string, ResolvedRelation>,
+    column: ColumnPlan
+): boolean => {
+    const propName = column.source.propName;
+    if (column.source.kind !== "relation" || !propName) return false;
+    const prop = collection.properties?.[propName] as RelationProperty | undefined;
+    const relation = findRelation(relations, prop?.relation?.relationName ?? propName);
+    return relation?.kind === "belongsTo" && relation.onDelete !== undefined;
+};
 
 /**
  * The column a `belongsTo` relation owns, or `undefined` when the relation puts
