@@ -173,6 +173,19 @@ createdAt: now };
                 age: 30
             });
         });
+
+        /**
+         * A unique index refusing a write is the caller's to fix, and names the
+         * field — not the 500 an uncaught E11000 was, and not the value.
+         */
+        it("answers a duplicate value on a unique index as a 409 naming the field", async () => {
+            await db.collection("users").createIndex({ email: 1 }, { unique: true });
+            await dataService.save("users", { email: "taken@example.com" });
+
+            const refusal = dataService.save("users", { email: "taken@example.com" });
+            await expect(refusal).rejects.toMatchObject({ statusCode: 409, details: { fields: ["email"] } });
+            await expect(refusal).rejects.not.toThrow(/taken@example\.com/);
+        });
     });
 
     describe("EntityReference round-trip", () => {

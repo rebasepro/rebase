@@ -420,11 +420,15 @@ propertyCallbacks: undefined };
         }
 
         try {
+            // The status decides the write, not the presence of an id: a create
+            // that names an id is an insert, and one naming a taken id is a
+            // 409 — see `MongoDataService.save`.
             let savedRow = await this.dataService.save<M>(
                 path,
                 updatedValues,
                 id,
-                resolvedCollection?.databaseId
+                resolvedCollection?.databaseId,
+                status === "existing" ? "update" : "create"
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {

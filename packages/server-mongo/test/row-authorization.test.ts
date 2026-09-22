@@ -146,6 +146,73 @@ collection: notes });
 
             expect(await db.collection("notes").countDocuments()).toBe(2);
         });
+
+        /**
+         * A create that names an id is checked as an insert — against the
+         * values sent, which Bob controls — and was then written as an upsert
+         * with `$set`. Naming Alice's id turned it into an update of her row
+         * that no update rule ever saw: the row changed hands, and history
+         * recorded it as a create.
+         */
+        it.each(["new", "copy", undefined] as const)(
+            "refuses a create (status %s) that names someone else's id, and writes nothing",
+            async (status) => {
+                const scoped = await driver.withAuth(bob);
+                await expect(scoped.save({
+                    path: "notes",
+                    id: aliceNoteId,
+                    values: { title: "Taken", owner_id: "bob" },
+                    collection: notes,
+                    // A socket frame can omit the status; the type cannot.
+                    status: status as "new"
+                })).rejects.toMatchObject({ statusCode: 409 });
+
+                const stored = await db.collection("notes").findOne({ _id: new ObjectId(aliceNoteId) });
+                expect(stored).toMatchObject({ title: "Alice's", owner_id: "alice" });
+            }
+        );
+
+        it("still creates a row under a fresh id the caller chose", async () => {
+            const scoped = await driver.withAuth(bob);
+            const freshId = new ObjectId().toString();
+            const saved = await scoped.save({
+                path: "notes",
+                id: freshId,
+                values: { title: "Bob's second", owner_id: "bob" },
+                collection: notes,
+                status: "new"
+            });
+            expect(saved.id).toBe(freshId);
+            expect(await db.collection("notes").countDocuments()).toBe(3);
+        });
+    });
+
+    describe("the base driver keeps create and update apart", () => {
+        it("answers 409 for a create whose id is taken, and leaves the row alone", async () => {
+            await expect(driver.save({
+                path: "notes",
+                id: aliceNoteId,
+                values: { title: "Overwritten" },
+                collection: notes,
+                status: "new"
+            })).rejects.toMatchObject({ statusCode: 409 });
+
+            const stored = await db.collection("notes").findOne({ _id: new ObjectId(aliceNoteId) });
+            expect(stored?.title).toBe("Alice's");
+        });
+
+        it("answers 404 for an update of a row that does not exist, and creates nothing", async () => {
+            const missingId = new ObjectId().toString();
+            await expect(driver.save({
+                path: "notes",
+                id: missingId,
+                values: { title: "Conjured" },
+                collection: notes,
+                status: "existing"
+            })).rejects.toMatchObject({ statusCode: 404 });
+
+            expect(await db.collection("notes").countDocuments()).toBe(2);
+        });
     });
 
     describe("WITH CHECK runs before the write, not after it", () => {

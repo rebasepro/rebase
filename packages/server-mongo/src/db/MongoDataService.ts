@@ -5,7 +5,7 @@
  * Provides all CRUD operations for rows.
  */
 
-import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
+import { Db, ObjectId, Collection, Document, FindOptions, Filter, MongoServerError } from "mongodb";
 import { FilterValues, DataRepository, CollectionConfig, EntityReference, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
 import { ApiError } from "@rebasepro/server";
@@ -305,37 +305,54 @@ export class MongoDataService implements DataRepository {
      * partial row everywhere it went: the REST response, `afterSave`, the
      * history entry a revert restores from, and the row pushed to realtime
      * subscribers. Postgres returns the whole row here (`RETURNING *`).
+     *
+     * `mode` is which write the caller means when it names an `id`:
+     *
+     * - `"create"` inserts under that id, and a taken id is a 409. The driver
+     *   authorizes a create as an insert, against the values sent — so a
+     *   create that could land on an existing row is an update no update rule
+     *   ever saw. It was one: an upsert with `$set`, which let a caller name
+     *   another user's id with `status: "new"` and rewrite their row.
+     * - `"update"` updates that row and nothing else, and a missing one is a
+     *   404 — never a row conjured under an id nobody created.
+     * - absent, the repository's own "create or update": an upsert. Only the
+     *   repository's direct callers reach it; the driver always says which.
      */
     async save<M extends Record<string, any>>(
         collectionPath: string,
         values: Partial<M>,
         id?: string | number,
-        _databaseId?: string
+        _databaseId?: string,
+        mode?: "create" | "update"
     ): Promise<Record<string, unknown>> {
         const collection = this.getCollection(collectionPath);
         const mongoValues = this.convertToMongoValues(values as Record<string, any>);
 
         if (id) {
-            // Still an upsert: this is also the call that creates a row with a
-            // client-chosen id. Addressing an id that does not exist is caught
-            // above — the REST `PUT` 404s and the authenticated driver refuses
-            // — so the upsert only ever lands as the create it is meant to be.
             const objectId = this.toObjectId(id);
-            await collection.updateOne(
-                { _id: objectId } as Filter<Document>,
-                { $set: mongoValues },
-                { upsert: true }
-            );
+            if (mode === "create") {
+                await refuseDuplicateKey(collectionPath, id, () =>
+                    collection.insertOne({ ...mongoValues, _id: objectId } as Document));
+            } else {
+                const result = await refuseDuplicateKey(collectionPath, id, () => collection.updateOne(
+                    { _id: objectId } as Filter<Document>,
+                    { $set: mongoValues },
+                    { upsert: mode !== "update" }
+                ));
+                if (mode === "update" && result.matchedCount === 0) {
+                    throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to update.`);
+                }
+            }
 
             return await this.readBack(collectionPath, objectId, { ...values,
 id: id.toString() });
         } else {
             // Create new row
             const newId = new ObjectId();
-            await collection.insertOne({
+            await refuseDuplicateKey(collectionPath, undefined, () => collection.insertOne({
                 _id: newId,
                 ...mongoValues
-            });
+            }));
 
             return await this.readBack(collectionPath, newId, { ...values,
 id: newId.toString() });
@@ -408,5 +425,36 @@ id: newId.toString() });
      */
     generateId(): string {
         return new ObjectId().toString();
+    }
+}
+
+/**
+ * Run a write, answering a duplicate key (E11000) as the 409 it is.
+ *
+ * A unique index refusing a write is the request's fault, not the server's —
+ * Postgres answers its `23505` the same way. On `_id` it means the row a
+ * create named is already there; on any other index it names the fields that
+ * collided, never the values.
+ */
+async function refuseDuplicateKey<T>(
+    collectionPath: string,
+    id: string | number | undefined,
+    write: () => Promise<T>
+): Promise<T> {
+    try {
+        return await write();
+    } catch (error) {
+        if (!(error instanceof MongoServerError) || error.code !== 11000) throw error;
+        const pattern: unknown = error.keyPattern;
+        const fields = pattern && typeof pattern === "object" ? Object.keys(pattern) : [];
+        if (id !== undefined && (fields.length === 0 || fields.includes("_id"))) {
+            throw ApiError.conflict(`A row "${id}" already exists in "${collectionPath}".`);
+        }
+        throw ApiError.conflict(
+            `This write to "${collectionPath}" would duplicate a value that must be unique` +
+            (fields.length > 0 ? ` (${fields.join(", ")}).` : "."),
+            "CONFLICT",
+            fields.length > 0 ? { fields } : undefined
+        );
     }
 }
