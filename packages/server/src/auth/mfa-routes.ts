@@ -22,6 +22,7 @@ import {
 import type { AuthModuleConfig } from "./routes";
 import type { AuthRepository } from "./interfaces";
 import { redactRefreshToken } from "./cookie-utils";
+import { isAccessTokenRevoked } from "./token-revocation";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
@@ -85,6 +86,8 @@ interface StepUpPrincipal {
     uid: string;
     aal: "aal1" | "aal2";
     pending: boolean;
+    /** When the presented credential was issued, for the revocation check. */
+    iat?: number;
 }
 
 /**
@@ -138,7 +141,8 @@ async function resolveStepUpPrincipal(c: Context<HonoEnv>): Promise<StepUpPrinci
     if (existing?.uid) {
         return { uid: existing.uid,
 aal: existing.aal === "aal2" ? "aal2" : "aal1",
-pending: false };
+pending: false,
+iat: existing.iat };
     }
 
     const token = extractBearerToken(c.req.header("authorization"));
@@ -148,14 +152,16 @@ pending: false };
     if (session) {
         return { uid: session.uid,
 aal: session.aal === "aal2" ? "aal2" : "aal1",
-pending: false };
+pending: false,
+iat: session.iat };
     }
 
     const pending = await verifyMfaPendingToken(token);
     if (pending) {
         return { uid: pending.uid,
 aal: "aal1",
-pending: true };
+pending: true,
+iat: pending.iat };
     }
 
     return null;
@@ -180,6 +186,31 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
     const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession } = opts;
     const authRepo = config.authRepo;
     const emailConfig = config.emailConfig;
+
+    /**
+     * The caller of a challenge route, refused if the user has since ended
+     * every session.
+     *
+     * These two routes resolve their own caller, because a sign-in that
+     * answered `MFA_REQUIRED` has no session yet, and so they skipped the
+     * revocation mark that `requireLiveSession` checks everywhere else. A
+     * stolen access token that had enrolled its own factor (allowed at `aal1`
+     * while the account had none) kept working here after the victim signed
+     * out everywhere or changed their password, and the verify route then
+     * minted it a new session dated after the mark, which the mark could not
+     * reach. The pending token is a first factor accepted at its `iat`, so it
+     * is held to the same mark.
+     */
+    async function resolveLiveStepUpPrincipal(c: Context<HonoEnv>): Promise<StepUpPrincipal> {
+        const principal = await resolveStepUpPrincipal(c);
+        if (!principal) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+        if (await isAccessTokenRevoked(authRepo, principal)) {
+            throw ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
+        }
+        return principal;
+    }
 
     /**
      * Changing which factors an account trusts is itself a privileged act.
@@ -331,10 +362,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * `MFA_REQUIRED`, or to step an existing session up to `aal2`.
      */
     router.post("/mfa/challenge", strictAuthLimiter, async (c) => {
-        const principal = await resolveStepUpPrincipal(c);
-        if (!principal) {
-            throw ApiError.unauthorized("Not authenticated");
-        }
+        const principal = await resolveLiveStepUpPrincipal(c);
 
         const challengeSchema = z.object({
             factorId: z.string().min(1, "Factor ID is required")
@@ -367,10 +395,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * minted, at `aal2`.
      */
     router.post("/mfa/challenge/verify", strictAuthLimiter, mfaVerificationLimiter, async (c) => {
-        const principal = await resolveStepUpPrincipal(c);
-        if (!principal) {
-            throw ApiError.unauthorized("Not authenticated");
-        }
+        const principal = await resolveLiveStepUpPrincipal(c);
 
         const challengeVerifySchema = z.object({
             challengeId: z.string().min(1, "Challenge ID is required"),

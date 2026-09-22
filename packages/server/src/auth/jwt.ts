@@ -541,16 +541,20 @@ export async function generateMfaPendingToken(uid: string, expiresInSeconds = 30
  *
  * Returns `null` for anything else — including a perfectly valid *access*
  * token, which must not be interchangeable with this one in either direction.
+ *
+ * `iat` comes back with the uid because this token is a first factor that was
+ * accepted at that instant, and a sign-out everywhere after it has to void it
+ * the way it voids an access token — see `isAccessTokenRevoked`.
  */
-export async function verifyMfaPendingToken(token: string): Promise<{ uid: string } | null> {
+export async function verifyMfaPendingToken(token: string): Promise<{ uid: string; iat?: number } | null> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
     try {
-        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string };
+        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string; iat?: number };
         if (decoded.purpose !== MFA_PENDING_PURPOSE || !decoded.uid) return null;
-        return { uid: decoded.uid };
+        return { uid: decoded.uid, iat: typeof decoded.iat === "number" ? decoded.iat : undefined };
     } catch {
         return null;
     }

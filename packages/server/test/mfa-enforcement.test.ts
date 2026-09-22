@@ -583,4 +583,89 @@ code: "000000" },
             expect(statuses).toContain(429);
         });
     });
+
+    // ── The challenge pair after "sign out everywhere" ──────────────────
+    describe("a revoked credential opens no challenge and mints no session", () => {
+        /**
+         * Mint with the clock a minute back, so the token predates the
+         * revocation mark set below by more than the second `iat` is rounded to.
+         */
+        async function aMinuteAgo<T>(mint: () => Promise<T>): Promise<T> {
+            const clock = jest.spyOn(Date, "now").mockReturnValue(Date.now() - 60_000);
+            try {
+                return await mint();
+            } finally {
+                clock.mockRestore();
+            }
+        }
+
+        /** The user signed out everywhere (or changed their password) thirty seconds ago. */
+        function revokeEverything(h: Harness): void {
+            (h.repo.getTokensValidAfter as jest.Mock).mockResolvedValue(new Date(Date.now() - 30_000));
+        }
+
+        it("refuses a revoked access token on both routes", async () => {
+            // The persistence path: a stolen token enrolled its own factor
+            // while the account had none. Signing out everywhere must end it,
+            // and the challenge pair was the one door that still took it.
+            const h = createHarness({ uid: "revoked-session", enrolled: true });
+            const stolen = { Authorization: `Bearer ${await aMinuteAgo(() => generateAccessToken("revoked-session", ["editor"]))}` };
+            revokeEverything(h);
+
+            const opened = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, stolen));
+            expect(opened.status).toBe(401);
+            expect((await opened.json() as { error: { code: string } }).error.code).toBe("SESSION_REVOKED");
+            expect(h.state.challenges.size).toBe(0);
+
+            // A challenge opened before the revocation does not help either.
+            const earlier = await h.repo.createMfaChallenge(h.factorId);
+            const verified = await h.app.request(
+                "/auth/mfa/challenge/verify",
+                post({ challengeId: earlier.id, code: await currentCode(h.totpSecret) }, stolen)
+            );
+            expect(verified.status).toBe(401);
+            expect((await verified.json() as { error: { code: string } }).error.code).toBe("SESSION_REVOKED");
+            expect(h.state.refreshTokens).toHaveLength(0);
+        });
+
+        it("refuses a sign-in's pending token issued before the revocation", async () => {
+            const h = createHarness({ uid: "revoked-pending", enrolled: true });
+            const login = await aMinuteAgo(async () => h.app.request(
+                "/auth/login",
+                post({ email: h.email, password: "correct-horse" })
+            ));
+            const { error } = await login.json() as { error: { details: { mfaToken: string } } };
+            const pending = { Authorization: `Bearer ${error.details.mfaToken}` };
+            revokeEverything(h);
+
+            const opened = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, pending));
+            expect(opened.status).toBe(401);
+            expect((await opened.json() as { error: { code: string } }).error.code).toBe("SESSION_REVOKED");
+
+            const earlier = await h.repo.createMfaChallenge(h.factorId);
+            const verified = await h.app.request(
+                "/auth/mfa/challenge/verify",
+                post({ challengeId: earlier.id, code: await currentCode(h.totpSecret) }, pending)
+            );
+            expect(verified.status).toBe(401);
+            expect(h.state.refreshTokens).toHaveLength(0);
+        });
+
+        it("still steps up a session that began after the revocation", async () => {
+            // Non-vacuity: the mark refuses what predates it, not everything.
+            const h = createHarness({ uid: "revoked-then-fresh", enrolled: true });
+            revokeEverything(h);
+            const fresh = { Authorization: `Bearer ${await generateAccessToken("revoked-then-fresh", ["editor"])}` };
+
+            const opened = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, fresh));
+            expect(opened.status).toBe(200);
+            const { challengeId } = await opened.json() as { challengeId: string };
+            const verified = await h.app.request(
+                "/auth/mfa/challenge/verify",
+                post({ challengeId, code: await currentCode(h.totpSecret) }, fresh)
+            );
+            expect(verified.status).toBe(200);
+            expect(h.state.refreshTokens).toHaveLength(1);
+        });
+    });
 });
