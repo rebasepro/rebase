@@ -42,9 +42,12 @@ export interface CronStore {
      * caller wins the insert against the unique constraint and executes;
      * the rest skip.
      *
-     * Fails open (returns true) on unexpected store errors, so a broken
-     * claims table degrades to uncoordinated execution rather than silently
-     * never running jobs.
+     * Throws when the store cannot tell — a missing or unreadable claims
+     * table, a dropped connection. What that means is the caller's decision,
+     * and the scheduler's two callers decide differently: a scheduled run
+     * fails open, so a broken claims table degrades to uncoordinated execution
+     * rather than silently never running jobs; a catch-up fails closed, so it
+     * does not re-run the last slot on every boot of every replica.
      *
      * Optional so custom stores written against the pre-claims interface
      * keep working — the scheduler treats a missing implementation as
@@ -304,10 +307,11 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                     // Another instance won the race for this slot
                     return false;
                 }
-                // Fail open: better to risk a duplicate run than to have a
-                // broken claims table silently stop all cron execution.
-                logger.warn(`[cron-store] Claim check failed for "${jobId}" — running uncoordinated`, { error: err });
-                return true;
+                // Neither won nor lost: the store does not know, and says so.
+                // Answering `true` here would decide "fail open" for every
+                // caller, including the catch-up, whose whole safety rests on
+                // failing closed.
+                throw err;
             }
         }
     };

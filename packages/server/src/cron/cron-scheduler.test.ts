@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { CronScheduler, validateCronExpression, findMostRecentSlot } from "./cron-scheduler";
-import type { CronJobDefinition, CronJobLogEntry } from "@rebasepro/types";
+import { createCronStore } from "./cron-store";
+import type { CronJobDefinition, CronJobLogEntry, DataDriver } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -827,6 +828,27 @@ lastRunAt: "2026-01-01T00:00:00Z" });
             expect(scheduler.getJob("throwing-claim")?.nextRunAt).toBeDefined();
         });
 
+        it("fails open with the real store when the claims table is unreadable", async () => {
+            // The scheduled run is an obligation, not a recovery: a store that
+            // cannot answer must not silently stop every job.
+            const store = createCronStore({
+                admin: {
+                    executeSql: async (sql: string) => {
+                        if (sql.includes("cron_claims")) throw new Error("connection terminated unexpectedly");
+                        return [];
+                    }
+                }
+            } as unknown as DataDriver)!;
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("scheduled-despite-store", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(executed).toBe(true);
+        });
+
         it("runs without a store (uncoordinated fallback)", async () => {
             let executed = false;
             scheduler.registerJobs([makeJob("storeless", {
@@ -1004,6 +1026,38 @@ catchUpWindowSeconds: 3600,
             await settle();
 
             expect(executed).toBe(false);
+        });
+
+        it("fails closed with the real store when the claims table is unreadable", async () => {
+            // The mock above throws; the store that ships used to answer `true`
+            // on every error but a unique violation, so with a missing or
+            // unreadable `cron_claims` every boot of every replica re-ran the
+            // last slot.
+            const claimAttempts: string[] = [];
+            const store = createCronStore({
+                admin: {
+                    executeSql: async (sql: string) => {
+                        if (sql.includes("cron_claims")) {
+                            claimAttempts.push(sql);
+                            throw new Error("Failed query", {
+                                cause: Object.assign(new Error('relation "rebase.cron_claims" does not exist'), { code: "42P01" })
+                            });
+                        }
+                        return [];
+                    }
+                }
+            } as unknown as DataDriver)!;
+            let runs = 0;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("claims-table-gone", {
+                handler: async () => { runs++; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            // It asked, and on not getting an answer, did nothing.
+            expect(claimAttempts).toHaveLength(1);
+            expect(runs).toBe(0);
         });
 
         it("does not catch up a disabled job", async () => {

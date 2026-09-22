@@ -252,9 +252,16 @@ describe("createCronStore", () => {
             await expect(store.tryClaimRun("j1", SLOT)).resolves.toBe(false);
         });
 
-        it("fails open (returns true) on unrelated store errors", async () => {
-            const store = createCronStore(makeDriver(async () => { throw new Error("connection refused"); }))!;
-            await expect(store.tryClaimRun("j1", SLOT)).resolves.toBe(true);
+        it("throws on an unrelated store error, so the caller decides what an unknown means", async () => {
+            // Not `true`. The store cannot tell whether the slot already ran,
+            // and the scheduler's two callers want opposite answers to that:
+            // a scheduled run fails open, a catch-up fails closed. Answering
+            // `true` here decided for both, and made the catch-up's fail-closed
+            // branch unreachable.
+            const store = createCronStore(makeDriver(async () => {
+                throw drizzleError("42P01", 'relation "rebase.cron_claims" does not exist');
+            }))!;
+            await expect(store.tryClaimRun("j1", SLOT)).rejects.toThrow("Failed query");
         });
     });
 });
