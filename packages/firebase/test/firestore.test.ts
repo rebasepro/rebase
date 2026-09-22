@@ -1,6 +1,7 @@
-import { expect, it } from "@jest/globals";
-import { Timestamp } from "@firebase/firestore";
-import type { Firestore } from "@firebase/firestore";
+import { afterAll, describe, expect, it } from "@jest/globals";
+import { deleteApp, initializeApp } from "firebase/app";
+import { deleteField, doc, DocumentData, getFirestore, terminate, Timestamp, writeBatch } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
 import { rebaseToFirestoreModel, firestoreToRebaseModel, resolveOffsetWindow } from "../src/hooks/useFirestoreDriver";
 
 it("rebaseToFirestoreModel", () => {
@@ -103,4 +104,58 @@ it("skips without a limit", () => {
         fetchLimit: undefined,
         skip: 20
     });
+});
+
+describe("undefined values", () => {
+
+    const app = initializeApp({
+        projectId: "demo-firestore-model",
+        apiKey: "offline",
+        appId: "offline"
+    }, "firestore-model-test");
+    const firestore = getFirestore(app);
+
+    afterAll(() => terminate(firestore).then(() => deleteApp(app)));
+
+    /** What Firestore would be asked to write, checked by its own validator. */
+    function validateWrite(values: unknown): void {
+        if (typeof values !== "object" || values === null || Array.isArray(values)) {
+            throw new Error("a save converts to a map");
+        }
+        const data: DocumentData = Object.fromEntries(Object.entries(values));
+        // A batch parses and validates on `set`, and sends nothing until
+        // `commit()` — so this needs no server.
+        writeBatch(firestore).set(doc(firestore, "posts", "p1"), data, { merge: true });
+    }
+
+    it("drops an undefined key in a map inside an array", () => {
+        // Firestore cannot delete a field inside an array element, so a
+        // `deleteField()` there made it refuse the whole save: "deleteField()
+        // is not currently supported inside arrays". An array element is
+        // written whole, so the key is simply left out.
+        const converted = rebaseToFirestoreModel({
+            title: "t",
+            blocks: [{ kind: "text", caption: undefined, meta: { note: undefined, lang: "en" } }]
+        }, firestore);
+
+        expect(converted).toStrictEqual({
+            title: "t",
+            blocks: [{ kind: "text", meta: { lang: "en" } }]
+        });
+        expect(() => validateWrite(converted)).not.toThrow();
+    });
+
+    it("still deletes an undefined field of the document or of one of its maps", () => {
+        const converted = rebaseToFirestoreModel({
+            subtitle: undefined,
+            address: { street: undefined, city: "Madrid" }
+        }, firestore);
+
+        expect(converted).toStrictEqual({
+            subtitle: deleteField(),
+            address: { street: deleteField(), city: "Madrid" }
+        });
+        expect(() => validateWrite(converted)).not.toThrow();
+    });
+
 });

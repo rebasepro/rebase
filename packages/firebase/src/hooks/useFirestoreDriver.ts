@@ -767,7 +767,10 @@ function getCMSPathFromFirestorePath(fsPath: string): string {
 
 export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inArray = false): unknown {
     if (data === undefined) {
-        return deleteField();
+        // `deleteField()` removes a field of the document or of one of its
+        // maps. Firestore refuses it anywhere inside an array — the element is
+        // written whole — so there the key is left out instead.
+        return inArray ? undefined : deleteField();
     } else if (data === null) {
         return null;
     } else if (Array.isArray(data)) {
@@ -788,7 +791,7 @@ export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inAr
     } else if (data && typeof data === "object") {
         return Object.entries(data)
             .map(([key, v]) => {
-                const firestoreModel = rebaseToFirestoreModel(v, firestore);
+                const firestoreModel = rebaseToFirestoreModel(v, firestore, inArray);
                 if (firestoreModel !== undefined)
                     return ({ [key]: firestoreModel });
                 else
