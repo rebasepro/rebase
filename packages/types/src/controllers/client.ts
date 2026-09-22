@@ -110,6 +110,20 @@ export interface AuthClient {
      * supply it; treat a missing implementation as "unknown, go ahead and ask".
      */
     canRestoreSession?: () => boolean;
+
+    /**
+     * Resolves once the client has finished restoring a session on its own —
+     * from storage, or by a silent refresh on boot.
+     *
+     * Until then {@link getSession} is provisional: a stored session whose
+     * access token has expired is held while its refresh runs, and dropped
+     * when that refresh is rejected. A caller that renders from the session
+     * waits for this and reads it again.
+     *
+     * Optional so that alternative {@link AuthClient} implementations need not
+     * supply it; without it the first `getSession()` is taken as final.
+     */
+    isInitialized?: () => Promise<void>;
 }
 
 // ─── Admin API ───────────────────────────────────────────────────────────────

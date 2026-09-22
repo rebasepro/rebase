@@ -51,6 +51,39 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
      */
     const [initialLoading, setInitialLoading] = useState(!currentSession && mayHaveRestorableSession);
 
+    /**
+     * `true` until the client has finished restoring a session on its own.
+     *
+     * The first `getSession()` above is provisional while that runs: the SDK
+     * holds an expired stored session during its boot refresh, and when the
+     * refresh is rejected it drops the session without emitting anything. So
+     * the user is read again once the restore settles, and the app does not
+     * render as signed in before then.
+     */
+    const [restoring, setRestoring] = useState(Boolean(authClient?.isInitialized));
+
+    useEffect(() => {
+        if (!authClient?.isInitialized) {
+            setRestoring(false);
+            return;
+        }
+        let cancelled = false;
+        setRestoring(true);
+        authClient.isInitialized()
+            .catch(() => {
+                // A restore that failed has left no session behind; reading
+                // the session below is still the answer.
+            })
+            .then(() => {
+                if (cancelled) return;
+                setUser(adoptUser(authClient.getSession()?.user ?? null));
+                setRestoring(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [authClient]);
+
     useEffect(() => {
         if (!authClient) return;
         // If we don't have a session initially, try to get user which restores session if a persistent token exists
@@ -129,7 +162,7 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
 
     return useMemo(() => ({
         user,
-        initialLoading: authClient ? initialLoading : false,
+        initialLoading: authClient ? initialLoading || restoring : false,
         authLoading,
         signOut,
         authError,
@@ -138,7 +171,7 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
         extra,
         setExtra
     } as AuthController), [
-        user, initialLoading, authLoading, signOut, authError,
+        user, initialLoading, restoring, authLoading, signOut, authError,
         getAuthToken, loginSkipped, extra, setExtra, authClient
     ]);
 }
