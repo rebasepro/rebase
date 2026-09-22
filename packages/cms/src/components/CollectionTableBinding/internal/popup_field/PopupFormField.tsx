@@ -8,7 +8,7 @@ import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@r
 
 import { Entity, EntityValues } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/app";
-import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
+import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";
 import { CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
 import { useWindowSize } from "./useWindowSize";
@@ -236,7 +236,9 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         setSavingError(null);
         if (collection && entity && onCellValueChange && propertyKey) {
             return onCellValueChange({
-                value: values[propertyKey as string],
+                // By path: a spread map's child is `address.street`, which is
+                // nested in the form values, not a key of them.
+                value: getIn(values, propertyKey as string),
                 propertyKey: propertyKey as string,
                 data: entity,
                 setError: setSavingError,
