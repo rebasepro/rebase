@@ -29,7 +29,12 @@ import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { canonicalStorageId } from "./keys";
-import { canonicalKeyOrBadRequest, canonicalBucketOrBadRequest } from "./request-keys";
+import {
+    canonicalKeyOrBadRequest,
+    canonicalBucketOrBadRequest,
+    servedBucketOrRefuse,
+    writableBucketOrRefuse
+} from "./request-keys";
 import { compileStorageTriggers, triggerUser, type StorageTrigger, type StorageTriggerDispatcher } from "./triggers";
 import {
     createDurableRenditionCache,
@@ -488,50 +493,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         throw new Error("No storage controller or registry available");
     };
 
-    /**
-     * A bucket this deployment does not serve is a 404, not a missing file.
-     *
-     * `getSignedUrl("x.txt", "no-such-bucket")` answered `{ url: null,
-     * fileNotFound: true }` — byte for byte what a real key that does not exist
-     * answers — so there was no way to learn the second argument was wrong.
-     * Worse on S3, where an unrecognised bucket name went straight to the
-     * provider: the request parameter was a way to address any bucket the
-     * deployment's credentials can reach.
-     *
-     * Only checked against a controller that says what it serves
-     * ({@link StorageController.knownBuckets}); a custom implementation that
-     * does not is handed whatever the caller wrote, as before.
-     *
-     * `UNKNOWN_STORAGE_SOURCE` rather than a code of its own: to a caller,
-     * "media" being a bucket and "media" being a storage source are the same
-     * mistake with the same fix — look at `GET /api/storage/sources` — and one
-     * code they can branch on beats two they have to learn apart.
-     */
-    const refuseUnknownBucket = (bucket: string, resolved: StorageController): never => {
-        const served = resolved.knownBuckets?.() ?? [];
-        const sources = registry ? registry.list() : [DEFAULT_STORAGE_SOURCE_KEY];
-        throw new ApiError(
-            404,
-            "UNKNOWN_STORAGE_SOURCE",
-            `Unknown storage bucket "${bucket}". This deployment serves ` +
-            `${served.map(b => `"${b}"`).join(", ")} on this source. ` +
-            `Storage sources: ${sources.map(k => `"${k}"`).join(", ")} — a second store is a ` +
-            "second source (`?storageId=`), not a second bucket.",
-            { bucket, knownBuckets: served, storageSources: sources },
-            true
-        );
-    };
-
-    /** The bucket a request may use, or a refusal naming what is served. */
-    const bucketOrRefuse = (
-        bucket: string | undefined,
-        resolved: StorageController
-    ): string | undefined => {
-        if (bucket === undefined) return undefined;
-        const served = resolved.knownBuckets?.();
-        if (!served || served.includes(bucket)) return bucket;
-        return refuseUnknownBucket(bucket, resolved);
-    };
+    /** The storage sources a bucket refusal names, so it says where a second store lives. */
+    const sourceKeys = (): string[] => registry ? registry.list() : [DEFAULT_STORAGE_SOURCE_KEY];
 
     /** Get the default controller (used for TUS and base-path derivation). */
     const getDefaultController = (): StorageController => {
@@ -599,11 +562,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         const key = typeof body["key"] === "string" ? body["key"] : "";
         const storageId = typeof body["storageId"] === "string" ? body["storageId"] : c.req.query("storageId");
-        // Not `bucketOrRefuse`: a write may bring a bucket into existence. On
-        // local storage `putObject({ bucket: "media" })` creates `<root>/media`,
-        // which is deliberate and tested — so only the *shape* is checked here,
-        // and a read is what has something to compare against.
-        const bucket = canonicalBucketOrBadRequest(typeof body["bucket"] === "string" ? body["bucket"] : undefined);
+        const resolved = resolveController(storageId);
+        const bucket = writableBucketOrRefuse(
+            canonicalBucketOrBadRequest(typeof body["bucket"] === "string" ? body["bucket"] : undefined),
+            resolved,
+            sourceKeys()
+        );
 
         const finalKey = canonicalKeyOrBadRequest(key || uploadedFile.name || "unnamed");
 
@@ -631,7 +595,6 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         await checkAuthorized(c, "write", finalKey, bucket ?? "default", storageId);
 
-        const resolved = resolveController(storageId);
         const result = await resolved.putObject({
             file: uploadedFile,
             key: finalKey,
@@ -999,7 +962,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const pageToken = c.req.query("pageToken");
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
-        const bucket = bucketOrRefuse(canonicalBucketOrBadRequest(c.req.query("bucket")), resolved);
+        const bucket = servedBucketOrRefuse(canonicalBucketOrBadRequest(c.req.query("bucket")), resolved, sourceKeys());
 
         // The prefix is the "object" being asked about — a listing is how you
         // discover keys you were never told, so leaving it ungated would hand
@@ -1047,8 +1010,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // bucket has — "this route's multipart body, the `?bucket=` query, and
         // the TUS `Upload-Metadata` header". This body was the fourth, missing
         // from the list and from the code.
-        // A write, so no `bucketOrRefuse` — see the upload route.
-        const bucket = canonicalBucketOrBadRequest(typeof body.bucket === "string" ? body.bucket : undefined);
+        const bucket = writableBucketOrRefuse(
+            canonicalBucketOrBadRequest(typeof body.bucket === "string" ? body.bucket : undefined),
+            resolved,
+            sourceKeys()
+        );
 
         if (!resolvedPath || resolvedPath.trim() === "") {
             throw ApiError.badRequest("Invalid folder path");

@@ -7,12 +7,13 @@
  * these on its own is how one of them came to canonicalize a key without
  * refusing the reserved rendition prefix — which made TUS the way to write the
  * bytes a later transform serves. One module both doors import keeps every
- * write path's idea of an acceptable key the same.
+ * write path's idea of an acceptable key and bucket the same.
  */
 
 import { ApiError } from "../api/errors";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
 import { isRenditionKey, RENDITION_PREFIX } from "./rendition-cache";
+import type { StorageController } from "./types";
 
 /**
  * Canonicalize a caller-supplied storage key, answering 400 when it names
@@ -67,4 +68,75 @@ export function canonicalBucketOrBadRequest(bucket: string | undefined | null): 
             err instanceof InvalidStorageBucketError ? err.message : "Invalid storage bucket"
         );
     }
+}
+
+/**
+ * A bucket this deployment does not serve is a 404, not a missing file.
+ *
+ * `getSignedUrl("x.txt", "no-such-bucket")` answered `{ url: null,
+ * fileNotFound: true }` — byte for byte what a real key that does not exist
+ * answers — so there was no way to learn the second argument was wrong.
+ * Worse on S3, where an unrecognised bucket name went straight to the
+ * provider: the request parameter was a way to address any bucket the
+ * deployment's credentials can reach.
+ *
+ * `UNKNOWN_STORAGE_SOURCE` rather than a code of its own: to a caller,
+ * "media" being a bucket and "media" being a storage source are the same
+ * mistake with the same fix — look at `GET /api/storage/sources` — and one
+ * code they can branch on beats two they have to learn apart.
+ *
+ * @param sources the storage sources this deployment serves, named in the
+ * message because a second store is a second source, not a second bucket.
+ */
+function refuseUnknownBucket(bucket: string, controller: StorageController, sources: string[]): never {
+    const served = controller.knownBuckets?.() ?? [];
+    throw new ApiError(
+        404,
+        "UNKNOWN_STORAGE_SOURCE",
+        `Unknown storage bucket "${bucket}". This deployment serves ` +
+        `${served.map(b => `"${b}"`).join(", ")} on this source. ` +
+        `Storage sources: ${sources.map(k => `"${k}"`).join(", ")} — a second store is a ` +
+        "second source (`?storageId=`), not a second bucket.",
+        { bucket, knownBuckets: served, storageSources: sources },
+        true
+    );
+}
+
+/**
+ * The bucket a read or a listing may use, or a refusal naming what is served.
+ *
+ * Only checked against a controller that says what it serves
+ * ({@link StorageController.knownBuckets}); a custom implementation that does
+ * not is handed whatever the caller wrote.
+ */
+export function servedBucketOrRefuse(
+    bucket: string | undefined,
+    controller: StorageController,
+    sources: string[]
+): string | undefined {
+    if (bucket === undefined) return undefined;
+    const served = controller.knownBuckets?.();
+    if (!served || served.includes(bucket)) return bucket;
+    return refuseUnknownBucket(bucket, controller, sources);
+}
+
+/**
+ * The bucket a write may use, or a refusal naming what is served.
+ *
+ * On local storage a write may bring a bucket into existence:
+ * `putObject({ bucket: "media" })` creates `<root>/media`, which is deliberate,
+ * so only the *shape* of the name is checked there (by
+ * {@link canonicalBucketOrBadRequest}, inside the storage root). That reasoning
+ * is local's alone. An object store's bucket is not created by a write — the
+ * name goes to the provider as given — so on every other controller a write is
+ * held to the same list a read is, or `bucket=prod-db-backups` on an upload
+ * writes into any bucket the deployment's credentials reach.
+ */
+export function writableBucketOrRefuse(
+    bucket: string | undefined,
+    controller: StorageController,
+    sources: string[]
+): string | undefined {
+    if (bucket === undefined || controller.getType() === "local") return bucket;
+    return servedBucketOrRefuse(bucket, controller, sources);
 }

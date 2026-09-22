@@ -13,13 +13,14 @@ import { writeFile, unlink, stat, mkdir, open } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
+import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import type { StorageController } from "./types";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
 import { triggerUser } from "./triggers";
 import { canonicalStorageId } from "./keys";
-import { canonicalKeyOrBadRequest, canonicalBucketOrBadRequest } from "./request-keys";
+import { canonicalKeyOrBadRequest, canonicalBucketOrBadRequest, writableBucketOrRefuse } from "./request-keys";
 import {
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
@@ -303,6 +304,15 @@ export class TusHandler {
                 undefined,
                 true
             );
+        }
+
+        // The bucket, held to what the destination serves — the check
+        // `POST /upload` makes, from the same module. On an object store the
+        // name goes to the provider as given, so a bucket checked only for its
+        // shape was any bucket the deployment's credentials reach.
+        const target = this.storageRegistry ? this.storageRegistry.get(storageId) : this.storageController;
+        if (target) {
+            writableBucketOrRefuse(bucket, target, this.storageRegistry?.list() ?? [DEFAULT_STORAGE_SOURCE_KEY]);
         }
 
         // Gate before any temp file exists, so a denied upload leaves nothing
