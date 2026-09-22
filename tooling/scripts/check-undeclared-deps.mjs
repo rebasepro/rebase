@@ -79,20 +79,37 @@ function walk(dir, opts = {}, out = []) {
     return out;
 }
 
-/** Bare specifiers a file imports for their *value*, via the real parser. */
-function valueImports(file) {
+/**
+ * Bare specifiers a file imports for their *value*, via the real parser.
+ *
+ * @param {string} file
+ * @param {string} [text] the file's source; read from disk when omitted
+ */
+export function valueImports(file, text = readFileSync(file, "utf8")) {
     const kind = file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-    const src = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, kind);
+    const src = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind);
     const out = new Set();
     const visit = (n) => {
         if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) {
             const c = n.importClause;
+            // A default import is a value whatever the named bindings beside
+            // it are: `import chalk, { type ChalkInstance } from "chalk"` was
+            // read as type-only because every NAMED binding was.
             const typeOnly = c?.isTypeOnly
-                || (c?.namedBindings
+                || (!c?.name
+                    && c?.namedBindings
                     && ts.isNamedImports(c.namedBindings)
                     && c.namedBindings.elements.length > 0
                     && c.namedBindings.elements.every((el) => el.isTypeOnly));
             if (!typeOnly) out.add(n.moduleSpecifier.text);
+        } else if (
+            // `import pg = require("pg")` — a require, in TypeScript's own syntax.
+            ts.isImportEqualsDeclaration(n)
+            && !n.isTypeOnly
+            && ts.isExternalModuleReference(n.moduleReference)
+            && ts.isStringLiteral(n.moduleReference.expression)
+        ) {
+            out.add(n.moduleReference.expression.text);
         } else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
             if (!n.isTypeOnly) out.add(n.moduleSpecifier.text);
         } else if (
@@ -183,128 +200,132 @@ function disjointMajorRanges() {
     return clashes;
 }
 
-const versionClashes = disjointMajorRanges();
+function main() {
+    const versionClashes = disjointMajorRanges();
 
-const findings = [];
-const usedAllowances = new Set();
+    const findings = [];
+    const usedAllowances = new Set();
 
-for (const d of readdirSync(path.join(ROOT, "packages")).sort()) {
-    const pkgPath = path.join(ROOT, "packages", d, "package.json");
-    if (!existsSync(pkgPath)) continue;
-    const j = JSON.parse(readFileSync(pkgPath, "utf8"));
-    if (j.private) continue;
-    const src = path.join(ROOT, "packages", d, "src");
-    if (!existsSync(src)) continue;
+    for (const d of readdirSync(path.join(ROOT, "packages")).sort()) {
+        const pkgPath = path.join(ROOT, "packages", d, "package.json");
+        if (!existsSync(pkgPath)) continue;
+        const j = JSON.parse(readFileSync(pkgPath, "utf8"));
+        if (j.private) continue;
+        const src = path.join(ROOT, "packages", d, "src");
+        if (!existsSync(src)) continue;
 
-    const runtime = new Set([
-        ...Object.keys(j.dependencies || {}),
-        ...Object.keys(j.peerDependencies || {}),
-        ...Object.keys(j.optionalDependencies || {})
-    ]);
-    const dev = new Set(Object.keys(j.devDependencies || {}));
+        const runtime = new Set([
+            ...Object.keys(j.dependencies || {}),
+            ...Object.keys(j.peerDependencies || {}),
+            ...Object.keys(j.optionalDependencies || {})
+        ]);
+        const dev = new Set(Object.keys(j.devDependencies || {}));
 
-    // Test directories, checked against dependencies *and* devDependencies.
-    //
-    // A test may import a dev-only package — that is what devDependencies are
-    // for — but it may not import one the package never declares at all. That
-    // hole was real: `packages/cms/test/form/undoable_discard.test.tsx` imported
-    // `notistack`, which only `@rebasepro/app` declared, so the suite resolved
-    // it by hoisting on some layouts and failed with "Cannot find module" on
-    // pnpm's isolated one. `Tests: 823 passed` alongside `Test Suites: 1 failed`
-    // is what that looks like, and it is easy to read past.
-    const testRoots = ["test", "tests", "__tests__"]
-        .map((dir) => path.join(ROOT, "packages", d, dir))
-        .filter(existsSync);
+        // Test directories, checked against dependencies *and* devDependencies.
+        //
+        // A test may import a dev-only package — that is what devDependencies are
+        // for — but it may not import one the package never declares at all. That
+        // hole was real: `packages/cms/test/form/undoable_discard.test.tsx` imported
+        // `notistack`, which only `@rebasepro/app` declared, so the suite resolved
+        // it by hoisting on some layouts and failed with "Cannot find module" on
+        // pnpm's isolated one. `Tests: 823 passed` alongside `Test Suites: 1 failed`
+        // is what that looks like, and it is easy to read past.
+        const testRoots = ["test", "tests", "__tests__"]
+            .map((dir) => path.join(ROOT, "packages", d, dir))
+            .filter(existsSync);
 
-    for (const root of testRoots) {
-        for (const file of walk(root, { includeTests: true })) {
+        for (const root of testRoots) {
+            for (const file of walk(root, { includeTests: true })) {
+                for (const spec of valueImports(file)) {
+                    if (spec.startsWith(".") || spec.startsWith("/")) continue;
+                    if (BUILTIN.has(spec) || spec.startsWith("node:")) continue;
+                    if (!VALID.test(spec)) continue;
+                    const pkg = spec.split("/").slice(0, spec.startsWith("@") ? 2 : 1).join("/");
+                    if (pkg === j.name || runtime.has(pkg) || dev.has(pkg)) continue;
+                    const key = `${j.name}::${pkg}`;
+                    if (ALLOWED.has(key)) { usedAllowances.add(key); continue; }
+                    findings.push({
+                        pkg: j.name,
+                        dep: pkg,
+                        where: "not declared at all (imported from a test)",
+                        file: path.relative(ROOT, file)
+                    });
+                }
+            }
+        }
+
+        for (const file of walk(src)) {
             for (const spec of valueImports(file)) {
                 if (spec.startsWith(".") || spec.startsWith("/")) continue;
                 if (BUILTIN.has(spec) || spec.startsWith("node:")) continue;
                 if (!VALID.test(spec)) continue;
                 const pkg = spec.split("/").slice(0, spec.startsWith("@") ? 2 : 1).join("/");
-                if (pkg === j.name || runtime.has(pkg) || dev.has(pkg)) continue;
+                if (pkg === j.name || runtime.has(pkg)) continue;
                 const key = `${j.name}::${pkg}`;
                 if (ALLOWED.has(key)) { usedAllowances.add(key); continue; }
                 findings.push({
                     pkg: j.name,
                     dep: pkg,
-                    where: "not declared at all (imported from a test)",
+                    where: dev.has(pkg) ? "devDependencies only" : "not declared at all",
                     file: path.relative(ROOT, file)
                 });
             }
         }
     }
 
-    for (const file of walk(src)) {
-        for (const spec of valueImports(file)) {
-            if (spec.startsWith(".") || spec.startsWith("/")) continue;
-            if (BUILTIN.has(spec) || spec.startsWith("node:")) continue;
-            if (!VALID.test(spec)) continue;
-            const pkg = spec.split("/").slice(0, spec.startsWith("@") ? 2 : 1).join("/");
-            if (pkg === j.name || runtime.has(pkg)) continue;
-            const key = `${j.name}::${pkg}`;
-            if (ALLOWED.has(key)) { usedAllowances.add(key); continue; }
-            findings.push({
-                pkg: j.name,
-                dep: pkg,
-                where: dev.has(pkg) ? "devDependencies only" : "not declared at all",
-                file: path.relative(ROOT, file)
-            });
+    // A stale allowance is a quiet hole in the gate.
+    const stale = [...ALLOWED.keys()].filter((k) => !usedAllowances.has(k));
+
+    if (findings.length === 0 && stale.length === 0 && versionClashes.length === 0) {
+        console.log(
+            `${GREEN}✓ Every published package declares what it imports, and no two ask for `
+            + `majors a user cannot install together.${NC}`
+        );
+        process.exit(0);
+    }
+
+    if (versionClashes.length) {
+        console.error(`${RED}✗ ${versionClashes.length} dependency major(s) no single install can satisfy:${NC}\n`);
+        for (const { dep, a, b } of versionClashes) {
+            console.error(`  ${dep}`);
+            console.error(`    ${a.range} ${DIM}(${a.pkg})${NC}`);
+            console.error(`    ${b.range} ${DIM}(${b.pkg})${NC}`);
         }
+        console.error(
+            `\n${DIM}A user installing both gets two copies in node_modules — or, for a peer`
+            + `\nrange, an install that cannot be satisfied at all. Move them onto one major.${NC}`
+        );
     }
-}
 
-// A stale allowance is a quiet hole in the gate.
-const stale = [...ALLOWED.keys()].filter((k) => !usedAllowances.has(k));
-
-if (findings.length === 0 && stale.length === 0 && versionClashes.length === 0) {
-    console.log(
-        `${GREEN}✓ Every published package declares what it imports, and no two ask for `
-        + `majors a user cannot install together.${NC}`
-    );
-    process.exit(0);
-}
-
-if (versionClashes.length) {
-    console.error(`${RED}✗ ${versionClashes.length} dependency major(s) no single install can satisfy:${NC}\n`);
-    for (const { dep, a, b } of versionClashes) {
-        console.error(`  ${dep}`);
-        console.error(`    ${a.range} ${DIM}(${a.pkg})${NC}`);
-        console.error(`    ${b.range} ${DIM}(${b.pkg})${NC}`);
-    }
-    console.error(
-        `\n${DIM}A user installing both gets two copies in node_modules — or, for a peer`
-        + `\nrange, an install that cannot be satisfied at all. Move them onto one major.${NC}`
-    );
-}
-
-if (findings.length) {
-    console.error(`${RED}✗ ${findings.length} undeclared runtime import(s):${NC}\n`);
-    const byPkg = new Map();
-    for (const f of findings) {
-        if (!byPkg.has(f.pkg)) byPkg.set(f.pkg, []);
-        byPkg.get(f.pkg).push(f);
-    }
-    for (const [pkg, fs_] of byPkg) {
-        console.error(`  ${pkg}`);
-        const seen = new Set();
-        for (const f of fs_) {
-            if (seen.has(f.dep)) continue;
-            seen.add(f.dep);
-            console.error(`    ${f.dep} ${DIM}(${f.where})${NC}`);
-            console.error(`      ${DIM}${f.file}${NC}`);
+    if (findings.length) {
+        console.error(`${RED}✗ ${findings.length} undeclared runtime import(s):${NC}\n`);
+        const byPkg = new Map();
+        for (const f of findings) {
+            if (!byPkg.has(f.pkg)) byPkg.set(f.pkg, []);
+            byPkg.get(f.pkg).push(f);
         }
+        for (const [pkg, fs_] of byPkg) {
+            console.error(`  ${pkg}`);
+            const seen = new Set();
+            for (const f of fs_) {
+                if (seen.has(f.dep)) continue;
+                seen.add(f.dep);
+                console.error(`    ${f.dep} ${DIM}(${f.where})${NC}`);
+                console.error(`      ${DIM}${f.file}${NC}`);
+            }
+        }
+        console.error(
+            `\n${DIM}These resolve here and under npm/yarn hoisting, and fail under pnpm's`
+            + `\nisolated layout. Declare them as a dependency or peerDependency — or, if a`
+            + `\nparent package already covers them, import its public entry point instead.${NC}`
+        );
     }
-    console.error(
-        `\n${DIM}These resolve here and under npm/yarn hoisting, and fail under pnpm's`
-        + `\nisolated layout. Declare them as a dependency or peerDependency — or, if a`
-        + `\nparent package already covers them, import its public entry point instead.${NC}`
-    );
+
+    for (const k of stale) {
+        console.error(`${RED}✗ Stale allowance in ${path.basename(fileURLToPath(import.meta.url))}: ${k} no longer imports it — remove the entry.${NC}`);
+    }
+
+    process.exit(1);
 }
 
-for (const k of stale) {
-    console.error(`${RED}✗ Stale allowance in ${path.basename(fileURLToPath(import.meta.url))}: ${k} no longer imports it — remove the entry.${NC}`);
-}
-
-process.exit(1);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
