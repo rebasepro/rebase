@@ -205,7 +205,10 @@ path: slug,
 properties: {} } as unknown as CollectionConfig;
     }
 
-    function createApp(permissions: ApiKeyPermission[]): Hono {
+    const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string) =>
+        ({ type: "relation", relation: { kind: "hasMany", target, foreignKeyOnTarget } });
+
+    function createApp(permissions: ApiKeyPermission[]): { app: Hono; driver: DataDriver } {
         const driver = createMockDriver();
         const parent = new Hono<HonoEnv>();
         parent.onError(errorHandler);
@@ -218,18 +221,28 @@ permissions } as unknown as ApiKeyMasked);
         const posts = createTestCollection("posts");
         const authors = {
             ...createTestCollection("authors"),
-            properties: {
-                posts: { type: "relation", relation: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" } }
-            }
+            properties: { posts: hasMany(() => posts, "author_id") }
         } as unknown as CollectionConfig;
-        const generator = new RestApiGenerator([authors, posts], driver);
+        // A relation named after one collection that targets another: the
+        // name in the URL is `notes`, the rows are `internal_notes`.
+        const notes = createTestCollection("notes");
+        const internalNotes = createTestCollection("internal_notes");
+        const projects = {
+            ...createTestCollection("projects"),
+            properties: { notes: hasMany(() => internalNotes, "project_id") }
+        } as unknown as CollectionConfig;
+        const generator = new RestApiGenerator([authors, posts, projects, notes, internalNotes], driver);
         parent.route("/", generator.generateRoutes());
-        return parent as unknown as Hono;
+        return { app: parent as unknown as Hono, driver };
     }
 
-    it("allows /authors/1/posts for a key scoped to the target (posts)", async () => {
-        const app = createApp([{ collection: "posts",
-operations: ["read", "write"] }]);
+    const refusal = async (res: Response) => (await res.json() as { error: { code: string; message: string } }).error;
+
+    it("allows /authors/1/posts for a key that may use the target and read the parent", async () => {
+        const { app } = createApp([
+            { collection: "posts", operations: ["read", "write"] },
+            { collection: "authors", operations: ["read"] }
+        ]);
         expect((await app.request("/authors/1/posts")).status).toBe(200);
         expect((await app.request("/authors/1/posts", {
             method: "POST",
@@ -239,7 +252,7 @@ operations: ["read", "write"] }]);
     });
 
     it("rejects /authors/1/posts for a key scoped only to the parent (authors)", async () => {
-        const app = createApp([{ collection: "authors",
+        const { app } = createApp([{ collection: "authors",
 operations: ["read", "write", "delete"] }]);
         const res = await app.request("/authors/1/posts");
         expect(res.status).toBe(403);
@@ -247,8 +260,65 @@ operations: ["read", "write", "delete"] }]);
         expect(body.error.code).toBe("API_KEY_FORBIDDEN");
     });
 
+    it("rejects /authors/1/posts for a key that may not read the parent", async () => {
+        // The path addresses "the posts of author 1": reaching them goes
+        // through a row of a collection this key was never granted.
+        const { app, driver } = createApp([{ collection: "posts", operations: ["read", "write"] }]);
+
+        const read = await app.request("/authors/1/posts");
+        expect(read.status).toBe(403);
+        expect((await refusal(read)).message).toContain('"read" permission for collection "authors"');
+
+        const write = await app.request("/authors/1/posts", {
+            method: "POST",
+            body: JSON.stringify({ title: "hi" }),
+            headers: { "Content-Type": "application/json" }
+        });
+        expect(write.status).toBe(403);
+        expect(driver.save).not.toHaveBeenCalled();
+    });
+
+    it("checks the collection a relation targets, not the relation's name", async () => {
+        // A key for `notes` is not a key for `internal_notes`, whatever the
+        // relation that reaches them happens to be called.
+        const { app, driver } = createApp([
+            { collection: "notes", operations: ["read"] },
+            { collection: "projects", operations: ["read"] }
+        ]);
+
+        const res = await app.request("/projects/1/notes");
+
+        expect(res.status).toBe(403);
+        expect((await refusal(res)).message).toContain('collection "internal_notes"');
+        expect(driver.fetchCollection).not.toHaveBeenCalled();
+    });
+
+    it("allows the same path for a key scoped to the target collection", async () => {
+        const { app } = createApp([
+            { collection: "internal_notes", operations: ["read"] },
+            { collection: "projects", operations: ["read"] }
+        ]);
+
+        expect((await app.request("/projects/1/notes")).status).toBe(200);
+    });
+
+    it("asks the target for the route's own operation, and the parent only for read", async () => {
+        // A delete through a parent removes a row of the target; the parent row
+        // is only read to get there. The 404 is the mock having no such row —
+        // the request got past the key.
+        const { app } = createApp([
+            { collection: "posts", operations: ["delete"] },
+            { collection: "authors", operations: ["read"] }
+        ]);
+
+        const res = await app.request("/authors/1/posts/5", { method: "DELETE" });
+
+        expect(res.status).toBe(404);
+        expect((await refusal(res)).code).toBe("NOT_FOUND");
+    });
+
     it("still rejects the direct parent route for a child-scoped key", async () => {
-        const app = createApp([{ collection: "posts",
+        const { app } = createApp([{ collection: "posts",
 operations: ["read"] }]);
         expect((await app.request("/authors")).status).toBe(403);
     });

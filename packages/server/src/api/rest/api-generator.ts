@@ -480,18 +480,27 @@ export class RestApiGenerator {
     }
 
     /**
-     * API key permission check for nested paths. The operation targets the
-     * LAST collection in the path (e.g. "posts" for /authors/1/posts), so
-     * that is the slug the key must hold permission for — checking the
-     * parent instead would let a key scoped to "authors" write "posts".
-     * `parseSubPath` always yields a collectionPath ending in a collection
-     * slug, never an id.
+     * API key permission check for nested paths.
+     *
+     * The operation lands on the collection the path addresses — the target
+     * of its last relation — so that is the collection the key must hold the
+     * route's operation for; checking only the parent would let a key scoped
+     * to `authors` write `posts`. The *collection*, not the path segment: a
+     * relation's name is not its target's slug, and a key for `notes` read
+     * `internal_notes` through `projects/1/notes` because the check read the
+     * name off the URL.
+     *
+     * Every collection the path passes through is addressed as well — "the
+     * posts of author 1" goes through a row of `authors` — so the key must be
+     * able to read each of them.
      */
     private enforceSubcollectionApiKeyPermission(
         c: { get: (key: string) => unknown; req: { method: string } },
-        collectionPath: string
+        nested: NestedPath
     ): void {
-        this.enforceApiKeyPermission(c, collectionPath.split("/").pop()!);
+        const target = nested.chain[nested.chain.length - 1];
+        this.enforceApiKeyPermission(c, target.slug);
+        nested.chain.slice(0, -1).forEach(parent => this.enforceApiKeyPermission(c, parent.slug, "read"));
     }
 
     /**
@@ -1476,7 +1485,7 @@ id };
             const nestedCollection = nested.chain[nested.chain.length - 1];
             const nestedAccess = { collection: nestedCollection, c };
 
-            this.enforceSubcollectionApiKeyPermission(c, nested.path);
+            this.enforceSubcollectionApiKeyPermission(c, nested);
 
             if (parsed.id === "count") {
                 // GET /parent/:parentId/child/count — count child entities
@@ -1568,7 +1577,7 @@ id: parsed.id });
             const nested = this.resolveNestedPath(parsed.collectionPath);
             const targetCollection = nested.chain[nested.chain.length - 1];
 
-            this.enforceSubcollectionApiKeyPermission(c, nested.path);
+            this.enforceSubcollectionApiKeyPermission(c, nested);
             const body = await parseJsonBody(c);
 
             assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
@@ -1601,7 +1610,7 @@ id: parsed.id });
             const nested = this.resolveNestedPath(parsed.collectionPath);
             const targetCollection = nested.chain[nested.chain.length - 1];
 
-            this.enforceSubcollectionApiKeyPermission(c, nested.path);
+            this.enforceSubcollectionApiKeyPermission(c, nested);
 
             const body = await parseJsonBody(c);
 
@@ -1655,7 +1664,7 @@ id: parsed.id });
 
             const nested = this.resolveNestedPath(parsed.collectionPath);
 
-            this.enforceSubcollectionApiKeyPermission(c, nested.path);
+            this.enforceSubcollectionApiKeyPermission(c, nested);
 
             // `?hard=true` — a real DELETE on a soft-delete collection. Same
             // permission as the delete it replaces; see `soft-delete-params.ts`.
