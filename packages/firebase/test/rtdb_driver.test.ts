@@ -217,4 +217,50 @@ describe("useFirebaseRTDBDelegate", () => {
 
     });
 
+    describe("listenOne", () => {
+
+        it("reports a missing row as null, not as an error", async () => {
+            seed("listened_users", { u1: { name: "bob" } });
+            const { listenOne } = driver;
+            if (!listenOne) throw new Error("the delegate cannot listen");
+
+            const updates: (Record<string, unknown> | null)[] = [];
+            const errors: Error[] = [];
+            const unsubscribe = listenOne({
+                path: "listened_users",
+                id: "ghost",
+                onUpdate: (row) => updates.push(row),
+                onError: (error) => errors.push(error)
+            });
+            await settle();
+            unsubscribe();
+
+            expect(errors).toEqual([]);
+            expect(updates).toEqual([null]);
+        });
+
+        it("reports a row deleted while listened to as null", async () => {
+            seed("deleted_users", { u1: { name: "bob" } });
+            const { listenOne } = driver;
+            if (!listenOne) throw new Error("the delegate cannot listen");
+
+            const updates: (Record<string, unknown> | null)[] = [];
+            const errors: Error[] = [];
+            const unsubscribe = listenOne({
+                path: "deleted_users",
+                id: "u1",
+                onUpdate: (row) => updates.push(row),
+                onError: (error) => errors.push(error)
+            });
+            await settle();
+            await driver.delete({ row: { path: "deleted_users", id: "u1" } });
+            await settle();
+            unsubscribe();
+
+            expect(errors).toEqual([]);
+            expect(updates).toEqual([{ id: "u1", name: "bob" }, null]);
+        });
+
+    });
+
 });

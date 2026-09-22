@@ -271,16 +271,18 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         const database = getDatabase(firebaseApp);
 
         const dbRef = ref(database, `${path}/${id}`);
+        // A row that is not there — never created, or deleted while open — is
+        // `null`, as `ListenOneProps.onUpdate` declares, not an error: a
+        // listener that treats absence as failure shows an error for a delete.
+        // A read the database refuses is the error.
         const unsubscribe = onValue(dbRef, (entity) => {
-            if (entity.exists()) {
-                onUpdate({
+            onUpdate(entity.exists()
+                ? {
                     ...(delegateToCMSModel(entity.val()) as Record<string, unknown>),
                     id: id
-                });
-            } else {
-                onError?.(new Error("Entity does not exist"));
-            }
-        });
+                }
+                : null);
+        }, (error) => onError?.(error));
 
         return () => unsubscribe();
     }, [firebaseApp]);
