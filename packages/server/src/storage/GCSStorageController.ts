@@ -117,7 +117,16 @@ export class GCSStorageController implements StorageController {
         };
     }
 
-    async getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig> {
+    /**
+     * Read the object's metadata and nothing else — no signing.
+     *
+     * Signing needs a private key. With `keyFilename` or `credentials` the
+     * client has one; on Cloud Run, GKE or GCE it has only the metadata
+     * server's token, and falls back to the IAM Credentials `signBlob` API,
+     * which the runtime account may call on itself only when it holds
+     * `iam.serviceAccounts.signBlob` there. That is not a default grant.
+     */
+    async getMetadata(key: string, bucket?: string): Promise<DownloadMetadata | null> {
         // Handle gs:// and s3:// URLs
         let resolvedPath = key;
         let resolvedBucket = this.getBucket(bucket);
@@ -135,19 +144,9 @@ export class GCSStorageController implements StorageController {
 
         try {
             const client = await this.getClient();
-            const gcsFile = client.bucket(resolvedBucket).file(resolvedPath);
+            const [fileMetadata] = await client.bucket(resolvedBucket).file(resolvedPath).getMetadata();
 
-            // Get metadata first to check existence and populate response
-            const [fileMetadata] = await gcsFile.getMetadata();
-
-            // Generate a signed URL
-            const expiresIn = this.config.signedUrlExpiration ?? 3600;
-            const [url] = await gcsFile.getSignedUrl({
-                action: "read",
-                expires: Date.now() + expiresIn * 1000
-            });
-
-            const metadata: DownloadMetadata = {
+            return {
                 bucket: resolvedBucket,
                 fullPath: resolvedPath,
                 name: resolvedPath.split("/").pop() || resolvedPath,
@@ -155,20 +154,35 @@ export class GCSStorageController implements StorageController {
                 contentType: fileMetadata.contentType || "application/octet-stream",
                 customMetadata: (fileMetadata.metadata as Record<string, string> | undefined) || {}
             };
-
-            return {
-                url,
-                metadata
-            };
         } catch (error: unknown) {
             if (isNotFoundError(error)) {
-                return {
-                    url: null,
-                    fileNotFound: true
-                };
+                return null;
             }
             throw error;
         }
+    }
+
+    async getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig> {
+        // Metadata first, to check existence and populate the response.
+        const metadata = await this.getMetadata(key, bucket);
+        if (!metadata) {
+            return {
+                url: null,
+                fileNotFound: true
+            };
+        }
+
+        const client = await this.getClient();
+        const expiresIn = this.config.signedUrlExpiration ?? 3600;
+        const [url] = await client.bucket(metadata.bucket).file(metadata.fullPath).getSignedUrl({
+            action: "read",
+            expires: Date.now() + expiresIn * 1000
+        });
+
+        return {
+            url,
+            metadata
+        };
     }
 
     async getObject(key: string, bucket?: string): Promise<File | null> {

@@ -14,7 +14,7 @@ import type { Stats } from "node:fs";
 import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
@@ -974,7 +974,17 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // "reject full-access JWTs on file routes" did not close the gap.
         await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
 
-        const downloadConfig = await resolved.getSignedUrl(resolvedPath, bucket);
+        // Only the metadata goes back — the client builds the `/file/*` URL
+        // itself — so a controller that can describe an object without signing
+        // a URL for it is asked to. On GCS without a key file, signing is a
+        // `signBlob` call the runtime account is usually not allowed to make.
+        let downloadConfig: DownloadConfig;
+        if (resolved.getMetadata) {
+            const metadata = await resolved.getMetadata(resolvedPath, bucket);
+            downloadConfig = metadata ? { url: null, metadata } : { url: null, fileNotFound: true };
+        } else {
+            downloadConfig = await resolved.getSignedUrl(resolvedPath, bucket);
+        }
 
         if (downloadConfig.fileNotFound) {
             throw ApiError.notFound("File not found");

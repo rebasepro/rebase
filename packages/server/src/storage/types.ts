@@ -2,7 +2,7 @@
  * Storage configuration and types for Rebase backend
  */
 
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, StorageReference } from "@rebasepro/types";
+import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, DownloadMetadata, StorageListResult, StorageReference } from "@rebasepro/types";
 
 /**
  * Local filesystem storage configuration
@@ -110,6 +110,23 @@ export interface StorageController {
      * Get a download URL (signed URL equivalent) for an object
      */
     getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig>;
+
+    /**
+     * Describe an object — size, type, custom metadata — without producing a
+     * URL for it, or `null` when there is no such object.
+     *
+     * `GET /metadata/*` wants only this: the client builds its own `/file/*`
+     * URL and spends the download token the route mints. Asking
+     * `getSignedUrl` for it made every metadata read sign a URL nobody used,
+     * and on GCS signing is not free — without a key file the client asks the
+     * IAM Credentials API to sign, which needs `iam.serviceAccounts.signBlob`
+     * on the runtime account itself. Cloud Run does not grant that, so every
+     * private object answered 500 there.
+     *
+     * A controller that does not implement this keeps the old behaviour: the
+     * route falls back to `getSignedUrl` and reads its `metadata`.
+     */
+    getMetadata?(key: string, bucket?: string): Promise<DownloadMetadata | null>;
 
     /**
      * Get object as a File
