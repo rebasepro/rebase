@@ -82,6 +82,10 @@ export interface RlsAuditConfig {
      *
      * The thing being watched is a schema, which changes on deploys, not on
      * traffic — so this is a daily safety net, not a monitor.
+     *
+     * Must be a positive number; anything else leaves the audit off, with the
+     * reason in its status. An interval longer than a Node timer can hold
+     * (about 24.8 days) is honoured.
      */
     intervalMs?: number;
     /** Run once at startup as well as on the interval. Default true. */
@@ -143,6 +147,14 @@ export interface RlsAudit {
 }
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The longest delay a Node timer honours. A longer one is not refused: it fires
+ * after 1 ms, with a warning — so a monthly interval handed straight to a timer
+ * would scan about a thousand times a second.
+ */
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
 
 /** One line naming what the run found, at the right level to be noticed. */
@@ -198,9 +210,22 @@ export function createRlsAudit(config: RlsAuditConfig): RlsAudit {
     const connectionString = config.connectionString ?? process.env.DATABASE_URL;
 
     let timer: NodeJS.Timeout | undefined;
+    let inFlight: Promise<void> | undefined;
     let status: RlsAuditStatus = { enabled };
 
-    if (enabled && !config.scan) {
+    // A timer takes `0`, a negative number and `NaN` without complaint and
+    // fires every millisecond, so an interval that is not a positive number is
+    // a configuration error — the same kind of refusal as a missing scanner.
+    const validInterval = Number.isFinite(intervalMs) && intervalMs > 0;
+
+    if (enabled && !validInterval) {
+        status = {
+            enabled: false,
+            reason:
+                "The scheduled RLS audit is enabled but `rlsAudit.intervalMs` is not a positive number " +
+                `of milliseconds (got ${intervalMs}). Leave it unset for the daily default.`
+        };
+    } else if (enabled && !config.scan) {
         status = {
             enabled: false,
             reason:
@@ -216,10 +241,9 @@ export function createRlsAudit(config: RlsAuditConfig): RlsAudit {
         };
     }
 
-    const runnable = enabled && !!connectionString && !!config.scan;
+    const runnable = enabled && validInterval && !!connectionString && !!config.scan;
 
-    const run = async (): Promise<void> => {
-        if (!runnable) return;
+    const scanOnce = async (): Promise<void> => {
         try {
             const result = await config.scan!({
                 connectionString: connectionString!,
@@ -241,6 +265,35 @@ export function createRlsAudit(config: RlsAuditConfig): RlsAudit {
         }
     };
 
+    // One scan at a time. Each opens its own connection and walks the whole
+    // catalogue, so a tick that lands while the last scan is still running — a
+    // slow database, a short interval — is skipped, and `runNow` joins the scan
+    // in progress rather than starting a second.
+    const run = (): Promise<void> => {
+        if (!runnable) return Promise.resolve();
+        inFlight ??= scanOnce().finally(() => { inFlight = undefined; });
+        return inFlight;
+    };
+
+    // A chain of timeouts rather than `setInterval`, so an interval above what
+    // one timer can hold is waited out in hops of at most MAX_TIMER_DELAY_MS.
+    // Each tick schedules the next before scanning, so the cadence does not
+    // drift by the length of a scan.
+    const schedule = (delay: number): void => {
+        const hop = Math.min(delay, MAX_TIMER_DELAY_MS);
+        timer = setTimeout(() => {
+            if (delay > hop) {
+                schedule(delay - hop);
+                return;
+            }
+            schedule(intervalMs);
+            void run();
+        }, hop);
+        // `unref` so a scheduled audit never holds the process open. A server
+        // that would otherwise have exited should exit.
+        timer.unref?.();
+    };
+
     return {
         start() {
             if (!runnable) {
@@ -249,10 +302,7 @@ export function createRlsAudit(config: RlsAuditConfig): RlsAudit {
             }
             if (timer) return;
 
-            // `unref` so a scheduled audit never holds the process open. A
-            // server that would otherwise have exited should exit.
-            timer = setInterval(() => { void run(); }, intervalMs);
-            timer.unref?.();
+            schedule(intervalMs);
 
             if (config.runOnBoot !== false) {
                 // Not awaited: boot does not wait on an audit, and a slow
@@ -261,7 +311,7 @@ export function createRlsAudit(config: RlsAuditConfig): RlsAudit {
             }
         },
         stop() {
-            if (timer) clearInterval(timer);
+            if (timer) clearTimeout(timer);
             timer = undefined;
         },
         runNow: run,

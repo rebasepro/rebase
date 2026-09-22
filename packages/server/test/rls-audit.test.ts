@@ -101,7 +101,9 @@ describe("createRlsAudit", () => {
         await Promise.resolve();
         expect(scan).toHaveBeenCalledTimes(1);
 
-        jest.advanceTimersByTime(3000);
+        // Async, so each scan settles before the next tick — as it does in real
+        // time. A tick that lands on a scan still running is skipped; see below.
+        await jest.advanceTimersByTimeAsync(3000);
         expect(scan).toHaveBeenCalledTimes(4);
         audit.stop();
     });
@@ -196,12 +198,82 @@ describe("createRlsAudit", () => {
         });
         audit.start();
 
-        jest.advanceTimersByTime(1000);
-        await Promise.resolve();
-        jest.advanceTimersByTime(1000);
-        await Promise.resolve();
+        await jest.advanceTimersByTimeAsync(1000);
+        await jest.advanceTimersByTimeAsync(1000);
 
         expect(calls).toBe(2);
+        audit.stop();
+    });
+
+    /**
+     * The interval is a timer delay, and a Node timer does not refuse a bad one:
+     * `0` or `NaN` fires every millisecond, and anything above 2^31-1 ms (about
+     * 24.8 days) overflows to 1 ms with a warning. Each scan opens its own
+     * connection and walks the catalogue, so a monthly audit, or a typo, was
+     * about a thousand overlapping scans a second.
+     */
+    it.each([0, -1000, NaN, Infinity])("refuses an intervalMs of %s rather than scanning every millisecond", async (intervalMs) => {
+        // Real timers: a fake clock does not turn `0` into a 1 ms interval the
+        // way Node does — it spins on the same instant and never returns.
+        jest.useRealTimers();
+        const scan = scanner();
+        const audit = createRlsAudit({
+            enabled: true, scan, connectionString: "postgres://x/y", runOnBoot: false, intervalMs
+        });
+        audit.start();
+        await new Promise(resolve => setTimeout(resolve, 30));
+
+        expect(scan).not.toHaveBeenCalled();
+        expect(audit.status().enabled).toBe(false);
+        expect(audit.status().reason).toContain("intervalMs");
+        audit.stop();
+    });
+
+    it("honours an interval longer than a timer can hold", async () => {
+        const day = 24 * 60 * 60 * 1000;
+        const scan = scanner();
+        const audit = createRlsAudit({
+            enabled: true, scan, connectionString: "postgres://x/y", runOnBoot: false, intervalMs: 31 * day
+        });
+        audit.start();
+
+        // Checked early and in a small step first: an overflowed timer fires
+        // every millisecond, and stepping a month through that never returns.
+        await jest.advanceTimersByTimeAsync(50);
+        expect(scan).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(30 * day - 50);
+        expect(scan).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(day);
+        expect(scan).toHaveBeenCalledTimes(1);
+
+        await jest.advanceTimersByTimeAsync(31 * day);
+        expect(scan).toHaveBeenCalledTimes(2);
+        audit.stop();
+    });
+
+    it("runs one scan at a time: a tick that lands on a running scan is skipped", async () => {
+        let finish: () => void = () => {};
+        const scan = jest.fn(() => new Promise<RlsScanResult>(resolve => {
+            finish = () => resolve(result());
+        })) as unknown as RlsScanner;
+        const audit = createRlsAudit({
+            enabled: true, scan, connectionString: "postgres://x/y", runOnBoot: false, intervalMs: 1000
+        });
+        audit.start();
+
+        await jest.advanceTimersByTimeAsync(5000);
+        expect(scan).toHaveBeenCalledTimes(1);
+
+        // A manual run joins the one in progress rather than opening another.
+        const joined = audit.runNow();
+        expect(scan).toHaveBeenCalledTimes(1);
+
+        finish();
+        await joined;
+        await jest.advanceTimersByTimeAsync(1000);
+        expect(scan).toHaveBeenCalledTimes(2);
         audit.stop();
     });
 
