@@ -2,7 +2,7 @@
 import type { OrderByTuple, Properties, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityAction, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, EntityAction, EntityActionClickProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
 import {
     ArrowDownIcon,
     ArrowUpIcon,
@@ -1175,27 +1175,33 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="flex items-center justify-end gap-0.5 flex-shrink-0 ml-auto"
                     style={{ minWidth: actionsWidth }}
                     onClick={(e) => e.stopPropagation()}>
-                    {listViewActions.map((action, index) => (
-                        <Tooltip key={action.key ?? index} title={action.name} asChild>
-                            <IconButton
-                                size="small"
-                                onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    action.onClick({
-                                        view: "collection",
-                                        entity,
-                                        path,
-                                        collection,
-                                        context: context!,
-                                        sidePanelController: context?.sidePanelController,
-                                        selectionController,
-                                        openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
-                                    });
-                                }}>
-                                {getIcon(action.icon, undefined, undefined, "smallest")}
-                            </IconButton>
-                        </Tooltip>
-                    ))}
+                    {listViewActions.map((action, index) => {
+                        const clickProps: EntityActionClickProps<Record<string, unknown>> = {
+                            view: "collection",
+                            entity,
+                            path,
+                            collection,
+                            context: context!,
+                            sidePanelController: context?.sidePanelController,
+                            selectionController,
+                            openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
+                        };
+                        // Asked here as the record's own action bar asks it.
+                        const enabled = !action.isEnabled || action.isEnabled(clickProps);
+                        return (
+                            <Tooltip key={action.key ?? index} title={action.name} asChild>
+                                <IconButton
+                                    size="small"
+                                    disabled={!enabled}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        action.onClick(clickProps);
+                                    }}>
+                                    {getIcon(action.icon, undefined, undefined, "smallest")}
+                                </IconButton>
+                            </Tooltip>
+                        );
+                    })}
                 </div>
             )}
         </div>

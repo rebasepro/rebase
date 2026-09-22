@@ -1,5 +1,5 @@
 
-import type { EntityAction, AdminCollection } from "@rebasepro/cms-types";
+import type { EntityAction, EntityActionClickProps, AdminCollection } from "@rebasepro/cms-types";
 import React, { MouseEvent, useCallback } from "react";
 
 import { Entity } from "@rebasepro/types";
@@ -112,6 +112,24 @@ export const CollectionRowActions = function CollectionRowActions({
     const hasDraft = enableLocalChangesBackup ? getEntityFromCache(path + "/" + entity.id) : false;
     const iconSize = "small" as const;
 
+    // What every action on this row is called with, and asked `isEnabled`
+    // with — the same question the record's own action bar asks, so an action
+    // its record does not allow is disabled here too.
+    const clickProps: EntityActionClickProps<Record<string, unknown>> = {
+        view: "collection",
+        entity,
+        path,
+        collection,
+        context,
+        sidePanelController: sidePanelCtrl,
+        selectionController,
+        highlightEntity,
+        unhighlightEntity,
+        onCollectionChange,
+        openEntityMode: openEntityMode ?? collection?.openEntityMode
+    };
+    const isActionEnabled = (action: EntityAction) => !action.isEnabled || action.isEnabled(clickProps);
+
     const content = (
         <div
             className={cls(
@@ -147,21 +165,10 @@ export const CollectionRowActions = function CollectionRowActions({
                         const tooltip = isEditAction && hasDraft ? t("unsaved_local_changes") : action.name;
 
                         let iconButton = <IconButton
+                            disabled={!isActionEnabled(action)}
                             onClick={(event: MouseEvent) => {
                                 event.stopPropagation();
-                                action.onClick({
-                                    view: "collection",
-                                    entity,
-                                    path,
-                                    collection,
-                                    context,
-                                    sidePanelController: sidePanelCtrl,
-                                    selectionController,
-                                    highlightEntity,
-                                    unhighlightEntity,
-                                    onCollectionChange,
-                                    openEntityMode: openEntityMode ?? collection?.openEntityMode
-                                });
+                                action.onClick(clickProps);
                             }}
                             size={iconSize}>
                             {getIcon(action.icon, undefined, undefined, "smallest")}
@@ -193,21 +200,10 @@ export const CollectionRowActions = function CollectionRowActions({
                             {collapsedActions.map((action, index) => (
                                 <MenuItem
                                     key={index}
+                                    disabled={!isActionEnabled(action)}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        action.onClick({
-                                            view: "collection",
-                                            entity,
-                                            path,
-                                            collection,
-                                            context,
-                                            sidePanelController: sidePanelCtrl,
-                                            selectionController,
-                                            highlightEntity,
-                                            unhighlightEntity,
-                                            onCollectionChange,
-                                            openEntityMode: openEntityMode ?? collection?.openEntityMode
-                                        });
+                                        action.onClick(clickProps);
                                     }}>
                                     {getIcon(action.icon, undefined, undefined, "smallest")}
                                     {action.name}
