@@ -124,6 +124,10 @@ export interface AuthHooks {
     /**
      * Called before a new user is created (registration or admin creation).
      *
+     * Also called when a guest becomes an account through
+     * `POST /auth/anonymous/link`, with the email and password hash it is
+     * getting; the guest itself was created with `isAnonymous: true`.
+     *
      * Return modified data to alter what gets stored, or throw an error
      * to reject the creation entirely.
      *

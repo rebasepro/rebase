@@ -85,6 +85,11 @@ export interface CaptchaConfig {
     timeoutMs?: number;
 }
 
+/**
+ * A protectable auth route. `register` guards both ways an account is made
+ * with a password: `POST /auth/register`, and `POST /auth/anonymous/link`,
+ * which turns a guest into one.
+ */
 export type CaptchaRoute = "register" | "login" | "forgotPassword" | "magicLink" | "emailOtp";
 
 export const DEFAULT_CAPTCHA_ROUTES: CaptchaRoute[] = ["register", "forgotPassword", "magicLink", "emailOtp"];

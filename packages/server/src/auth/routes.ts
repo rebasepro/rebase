@@ -1340,7 +1340,8 @@ aal: sessionAal };
         buildAuthResponse,
         createSessionAndTokens,
         applyTransformHook,
-        requireLiveSession
+        requireLiveSession,
+        registerCaptcha: captcha.register
     });
 
     // ═══════════════════════════════════════════════════════════════════════

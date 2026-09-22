@@ -49,10 +49,17 @@ interface SessionRoutesConfig {
         request: Request,
         uid: string
     ) => Promise<AuthResponsePayload>;
+    /**
+     * The `register` captcha, built by the caller so a misconfiguration fails
+     * the boot once. `/anonymous/link` is registration — it is where a guest
+     * becomes an account — so it is guarded by the same challenge as
+     * `/register`. Absent when captcha is off or `register` is not protected.
+     */
+    registerCaptcha?: MiddlewareHandler<HonoEnv>;
 }
 
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession } = opts;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha } = opts;
     const authRepo = config.authRepo;
 
     /**
@@ -397,8 +404,15 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
     /**
      * POST /auth/anonymous/link
      * Upgrade an anonymous user to a permanent account with email/password
+     *
+     * This is registration: before it the row is a guest, after it an account
+     * that signs in with a password. So it answers to registration's controls,
+     * the `register` captcha and `beforeUserCreate` on the credentials the
+     * account is getting. `/anonymous` carries neither, deliberately, because
+     * apps mint guests on page load; the two in a row used to be a way to make
+     * an account that passed neither.
      */
-    router.post("/anonymous/link", strictAuthLimiter, requireLiveSession, async (c) => {
+    router.post("/anonymous/link", strictAuthLimiter, requireLiveSession, ...(registerCaptcha ? [registerCaptcha] : []), async (c) => {
         // Gated on the same predicate as `/anonymous`, not on registration: this
         // route cannot create an account, only put credentials on one that
         // `/anonymous` already made. If anonymous auth is off, any session
@@ -433,10 +447,24 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         // Hash password
         const passwordHash = await ops.hashPassword(password);
 
-        // Update user: set email, password, remove anonymous flag
-        const updatedUser = await authRepo.updateUser(user.id, {
+        // The hook sees what `/register` would hand it, and may refuse the
+        // address or change what is stored, as it does there.
+        let linkData: CreateUserData = {
             email: normalizeEmail(email),
-            passwordHash,
+            passwordHash
+        };
+        if (ops.beforeUserCreate) {
+            linkData = await ops.beforeUserCreate(linkData);
+        }
+
+        // Update user: set email, password, remove anonymous flag. The hash is
+        // named rather than left to the spread, because this is the one
+        // `updateUser` that writes a password and the check in
+        // `password-change-revokes-sessions.test.ts` reads it by name.
+        const updatedUser = await authRepo.updateUser(user.id, {
+            ...linkData,
+            email: normalizeEmail(linkData.email),
+            passwordHash: linkData.passwordHash,
             isAnonymous: false
         });
 
