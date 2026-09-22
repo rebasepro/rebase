@@ -222,10 +222,9 @@ accessExpiresIn: "7d" });
             expect(getAccessTokenExpiryMs()).toBe(7 * 24 * 60 * 60 * 1000);
         });
 
-        it("defaults to 1h for unparseable duration", () => {
-            configureJwt({ secret: STRONG_SECRET,
-accessExpiresIn: "invalid" });
-            expect(getAccessTokenExpiryMs()).toBe(3600000);
+        it("refuses an unparseable duration instead of reporting 1h", () => {
+            expect(() => configureJwt({ secret: STRONG_SECRET,
+accessExpiresIn: "invalid" })).toThrow(/accessExpiresIn/);
         });
 
         it("refresh expiry is in the future", () => {

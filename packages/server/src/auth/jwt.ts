@@ -214,9 +214,31 @@ export function configureJwt(config: JwtConfig): void {
         }
     }
 
+    // Checked here, at boot, because both readers of these values fail
+    // quietly: `jsonwebtoken` would sign with what it could make of them, and
+    // the TTL arithmetic below used to fall back to a default for anything it
+    // could not. An unset one keeps the lifetime already configured — spread
+    // as `undefined`, it replaced it, and an access token signed with no
+    // `expiresIn` carries no `exp` at all.
+    const lifetimes: Pick<JwtConfig, "accessExpiresIn" | "refreshExpiresIn"> = {};
+    for (const key of ["accessExpiresIn", "refreshExpiresIn"] as const) {
+        const value = config[key];
+        if (value === undefined) continue;
+        if (parseDurationMs(value) === null) {
+            throw new Error(
+                `auth.${key} is "${value}", which is not a lifetime. Give a positive number and a unit — ` +
+                "\"15m\", \"1h\", \"30d\", \"1w\", \"2 weeks\" — in the grammar the token signer reads (vercel/ms). " +
+                "A bare number is refused: the signer reads it as milliseconds."
+            );
+        }
+        lifetimes[key] = value;
+    }
+
     jwtConfig = {
         ...jwtConfig,
-        ...config
+        ...config,
+        accessExpiresIn: lifetimes.accessExpiresIn ?? jwtConfig.accessExpiresIn,
+        refreshExpiresIn: lifetimes.refreshExpiresIn ?? jwtConfig.refreshExpiresIn
     };
     signingKeys = resolved;
     activeSigningKey = active;
@@ -320,24 +342,37 @@ export async function generateAccessToken(
  * Get the expiration time of an access token in milliseconds from now
  */
 export function getAccessTokenExpiryMs(): number {
-    const duration = jwtConfig.accessExpiresIn || "1h";
-    const match = duration.match(/^(\d+)([dhms])$/);
+    return parseDurationMs(jwtConfig.accessExpiresIn || "1h") ?? 60 * 60 * 1000;
+}
 
-    if (!match) {
-        // Default to 1 hour
-        return 60 * 60 * 1000;
-    }
+const DURATION_UNIT_MS: Readonly<Record<string, number>> = {
+    ms: 1, msec: 1, msecs: 1, millisecond: 1, milliseconds: 1,
+    s: 1000, sec: 1000, secs: 1000, second: 1000, seconds: 1000,
+    m: 60_000, min: 60_000, mins: 60_000, minute: 60_000, minutes: 60_000,
+    h: 3_600_000, hr: 3_600_000, hrs: 3_600_000, hour: 3_600_000, hours: 3_600_000,
+    d: 86_400_000, day: 86_400_000, days: 86_400_000,
+    w: 604_800_000, week: 604_800_000, weeks: 604_800_000,
+    y: 31_557_600_000, yr: 31_557_600_000, yrs: 31_557_600_000, year: 31_557_600_000, years: 31_557_600_000
+};
 
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
-
-    switch (unit) {
-        case "d": return value * 24 * 60 * 60 * 1000;
-        case "h": return value * 60 * 60 * 1000;
-        case "m": return value * 60 * 1000;
-        case "s": return value * 1000;
-        default: return 60 * 60 * 1000;
-    }
+/**
+ * A lifetime setting in milliseconds, or null when it is not one.
+ *
+ * The grammar is vercel/ms, because that is what `jsonwebtoken` reads
+ * `expiresIn` with: the token's `exp` and the expiry this module reports
+ * have to come from one reading of the same string, and they used to come
+ * from two — ours understood `<integer><d|h|m|s>` and nothing else.
+ *
+ * Stricter than ms in two ways, both about values nobody means: a bare number
+ * (ms reads "3600" as 3.6 seconds) and a lifetime of zero or less.
+ */
+export function parseDurationMs(value: string): number | null {
+    const match = /^(\d+(?:\.\d+)?|\.\d+) *([a-z]+)$/i.exec(value);
+    if (!match) return null;
+    const unit = DURATION_UNIT_MS[match[2].toLowerCase()];
+    if (unit === undefined) return null;
+    const ms = parseFloat(match[1]) * unit;
+    return ms > 0 && Number.isFinite(ms) ? ms : null;
 }
 
 /**
@@ -447,7 +482,7 @@ export function hashRefreshToken(token: string): Promise<string> {
  */
 export const MAX_COOKIE_AGE_MS = 400 * 24 * 60 * 60 * 1000;
 
-/** Fallback when `refreshExpiresIn` is unset or unparseable. */
+/** Fallback when `refreshExpiresIn` is unset. {@link configureJwt} refuses an unparseable one. */
 const DEFAULT_REFRESH_TTL_MS = MAX_COOKIE_AGE_MS;
 
 /**
@@ -461,17 +496,7 @@ const DEFAULT_REFRESH_TTL_MS = MAX_COOKIE_AGE_MS;
  */
 export function getRefreshTokenTtlMs(): number {
     const duration = jwtConfig.refreshExpiresIn;
-    const match = duration?.match(/^(\d+)([dhms])$/);
-    if (!match) return DEFAULT_REFRESH_TTL_MS;
-
-    const value = parseInt(match[1], 10);
-    switch (match[2]) {
-        case "d": return value * 24 * 60 * 60 * 1000;
-        case "h": return value * 60 * 60 * 1000;
-        case "m": return value * 60 * 1000;
-        case "s": return value * 1000;
-        default: return DEFAULT_REFRESH_TTL_MS;
-    }
+    return (duration ? parseDurationMs(duration) : null) ?? DEFAULT_REFRESH_TTL_MS;
 }
 
 /**

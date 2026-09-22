@@ -189,10 +189,83 @@ accessExpiresIn: "300s" });
             expect(getAccessTokenExpiryMs()).toBe(300 * 1000);
         });
 
-        it("should default to 1 hour for invalid format", () => {
-            configureJwt({ secret: testSecret,
-accessExpiresIn: "invalid" });
+        it("refuses an unparseable format and keeps the lifetime it had", () => {
+            expect(() => configureJwt({ secret: testSecret,
+accessExpiresIn: "invalid" })).toThrow(/accessExpiresIn.*"invalid"/);
             expect(getAccessTokenExpiryMs()).toBe(60 * 60 * 1000);
+        });
+    });
+
+    /**
+     * The lifetimes are read by two parsers: `jsonwebtoken` reads the access
+     * lifetime to stamp `exp`, and this module read both to compute the
+     * expiry it reports and the refresh row's TTL. Ours only understood
+     * `<integer><d|h|m|s>`; theirs is vercel/ms. Everything in between fell
+     * back silently — a refresh lifetime of "1w" meant to be SHORTER became
+     * 400 days, and an access lifetime of "15 minutes" produced a token that
+     * really expired in 15 minutes while `accessTokenExpiresAt` told the
+     * client an hour, so it refreshed 45 minutes too late.
+     */
+    describe("lifetime settings", () => {
+        const S = 1000, M = 60 * S, H = 60 * M, D = 24 * H;
+
+        it.each([
+            ["1w", 7 * D],
+            ["2 weeks", 14 * D],
+            ["1.5h", 1.5 * H],
+            ["30 days", 30 * D],
+            ["7D", 7 * D],
+            ["15 minutes", 15 * M],
+            ["90 mins", 90 * M],
+            ["300 sec", 300 * S],
+            ["1y", 365.25 * D]
+        ])("reads %s the way the signer does", async (value, expected) => {
+            configureJwt({ secret: testSecret, accessExpiresIn: value, refreshExpiresIn: value });
+            expect(getRefreshTokenTtlMs()).toBe(expected);
+            expect(getAccessTokenExpiryMs()).toBe(expected);
+
+            // The reported expiry and the token's own `exp` are one number.
+            const claims = jwt.decode(await generateAccessToken("user-1", [])) as { iat: number; exp: number };
+            expect(claims.exp - claims.iat).toBe(Math.floor(expected / 1000));
+        });
+
+        // Every value the docs, the env schema and the scaffolds show.
+        it.each([["1h", H], ["30d", 30 * D], ["400d", 400 * D], ["15m", 15 * M], ["7d", 7 * D], ["24h", 24 * H], ["3600s", 3600 * S]])(
+            "still reads the documented %s",
+            (value, expected) => {
+                configureJwt({ secret: testSecret, accessExpiresIn: value, refreshExpiresIn: value });
+                expect(getAccessTokenExpiryMs()).toBe(expected);
+                expect(getRefreshTokenTtlMs()).toBe(expected);
+            }
+        );
+
+        it.each([
+            ["invalid"],
+            ["1 fortnight"],
+            [""],
+            // `jsonwebtoken` reads a bare number string as milliseconds: "3600"
+            // is 3.6 seconds, which nobody who wrote it meant.
+            ["3600"],
+            ["-1h"],
+            ["0s"],
+            // The signer does not trim either, so this would be a 500 at login.
+            [" 1h"]
+        ])("refuses %p for either lifetime, naming the setting", (value) => {
+            expect(() => configureJwt({ secret: testSecret, accessExpiresIn: value })).toThrow(/accessExpiresIn/);
+            expect(() => configureJwt({ secret: testSecret, refreshExpiresIn: value })).toThrow(/refreshExpiresIn/);
+            // Nothing half-applied: the lifetimes set before still stand.
+            expect(getAccessTokenExpiryMs()).toBe(H);
+            expect(getRefreshTokenTtlMs()).toBe(30 * D);
+        });
+
+        it("keeps the lifetime it had when one is passed as undefined", async () => {
+            // Spread over the config, an explicit `undefined` used to replace
+            // the access lifetime — and a token signed with no `expiresIn`
+            // carries no `exp` at all.
+            configureJwt({ secret: testSecret, accessExpiresIn: undefined, refreshExpiresIn: undefined });
+            expect(getRefreshTokenTtlMs()).toBe(30 * D);
+            const claims = jwt.decode(await generateAccessToken("user-1", [])) as { iat: number; exp?: number };
+            expect(claims.exp! - claims.iat).toBe(3600);
         });
     });
 
@@ -266,11 +339,11 @@ refreshExpiresIn: "3600s" });
             expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
         });
 
-        it("should default to the 400-day cookie ceiling for invalid refresh format", () => {
-            configureJwt({ secret: testSecret,
-refreshExpiresIn: "invalid" });
+        it("refuses an unparseable refresh format rather than falling back to 400 days", () => {
+            expect(() => configureJwt({ secret: testSecret,
+refreshExpiresIn: "invalid" })).toThrow(/refreshExpiresIn.*"invalid"/);
             const expiry = getRefreshTokenExpiry();
-            const expected = Date.now() + (400 * 24 * 60 * 60 * 1000);
+            const expected = Date.now() + (30 * 24 * 60 * 60 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
             expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
         });
