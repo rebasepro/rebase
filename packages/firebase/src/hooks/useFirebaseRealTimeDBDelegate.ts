@@ -341,21 +341,31 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         }
         const database = getDatabase(firebaseApp);
 
-        // Simplified example; the Realtime Database does not support querying with "not equal" conditions
-        const dbRef = query(ref(database, slug), orderByChild(name), startAt(value as string | number | boolean | null), limitToFirst(1));
-        const entity = await get(dbRef);
-
-        if (!entity.exists()) {
+        // Compared the way it is stored: a date is saved as its ISO string.
+        const stored = cmsToRTDBModel(value, database);
+        // An empty value collides with nothing — and `equalTo(null)` would
+        // match every row that lacks the child.
+        if (stored === null) {
             return true;
         }
-
-        // Check if the found entity is the same as the one being checked
-        const [key, entityValue] = Object.entries(entity.val())[0];
-        if (entityValue && typeof entityValue === "object" && (entityValue as Record<string, unknown>)[name] === value && key === id) {
-            return true;
+        if (!isRTDBValue(stored)) {
+            throw new Error(`${RTDB}: cannot check \`${name}\` for uniqueness by a ${Array.isArray(stored) ? "array" : typeof stored} value; the Realtime Database compares strings, numbers and booleans.`);
         }
 
-        return false;
+        // `equalTo`, not `startAt`: a lower bound matched the first row sorting
+        // after the value, so any value below an existing one was "taken".
+        // Two rows are enough to decide — if one is the row being edited, the
+        // other is the collision.
+        const matches = await get(query(ref(database, slug), orderByChild(name), equalTo(stored), limitToFirst(2)));
+        let unique = true;
+        matches.forEach((child) => {
+            if (id === undefined || child.key !== String(id)) {
+                unique = false;
+                return true;
+            }
+            return undefined;
+        });
+        return unique;
     }, [firebaseApp]);
 
     const isFilterCombinationValid = useCallback(({

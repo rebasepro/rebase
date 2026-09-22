@@ -180,4 +180,41 @@ describe("useFirebaseRTDBDelegate", () => {
 
     });
 
+    describe("checkUniqueField", () => {
+
+        seed("unique_users", {
+            u1: { email: "bob@x.io" },
+            u2: { email: "zoe@x.io" },
+            u3: { email: "dup@x.io" },
+            u4: { email: "dup@x.io" }
+        });
+
+        const isUnique = (value: unknown, id?: string) => {
+            const { checkUniqueField } = driver;
+            if (!checkUniqueField) throw new Error("the delegate cannot check uniqueness");
+            return checkUniqueField("unique_users", "email", value, id);
+        };
+
+        it("a value no row has is unique", async () => {
+            // `startAt` found bob@x.io — the first value sorting after
+            // alice@x.io — and answered "taken".
+            expect(await isUnique("alice@x.io")).toBe(true);
+        });
+
+        it("a value another row has is not", async () => {
+            expect(await isUnique("bob@x.io")).toBe(false);
+            expect(await isUnique("bob@x.io", "u2")).toBe(false);
+        });
+
+        it("the row being edited does not collide with itself", async () => {
+            expect(await isUnique("bob@x.io", "u1")).toBe(true);
+        });
+
+        it("the row being edited does not hide a second row with its value", async () => {
+            expect(await isUnique("dup@x.io", "u3")).toBe(false);
+            expect(await isUnique("dup@x.io", "u4")).toBe(false);
+        });
+
+    });
+
 });
