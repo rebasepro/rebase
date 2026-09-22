@@ -12,7 +12,7 @@ class CollectionConfigError { hint }
 class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
-class GCSStorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
+class GCSStorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
 class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
 class MetricsRegistry { incrementCounter, recordRequest, render, setGauge, startedAt }
 class RawHtml { toString, value }
@@ -342,7 +342,7 @@ interface SingleSubscriptionConfig { clientId, id, path }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { collection }
 interface StorageAuthorizeUser { email, roles, uid }
-interface StorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
+interface StorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
