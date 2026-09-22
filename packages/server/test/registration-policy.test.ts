@@ -29,7 +29,8 @@ import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { isBootstrapWindowOpen, isRegistrationOpen, isSteadyStateRegistrationOpen } from "../src/auth/registration-policy";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { AuthRepository, OAuthProvider } from "../src/auth/interfaces";
+import { z } from "zod";
 import { configureJwt } from "../src/auth/jwt";
 
 jest.mock("../src/auth/password");
@@ -460,5 +461,72 @@ describe("anonymous sign-in obeys the registration gates", () => {
             allowAnonymous: true
         });
         expect((await killed.adapter.getCapabilities()).anonymousLogin).toBe(false);
+    });
+});
+
+/**
+ * "Is this the first user?" reads at most two rows.
+ *
+ * Every successful `/register` and every first OAuth sign-up answered it with
+ * `authRepo.listUsers()` — the whole users table, password hashes included —
+ * to compare its length with one. Registration is open to anyone, so that was
+ * a full-table fetch per sign-up (quadratic over a deployment's life), and one
+ * a bot flood could multiply.
+ */
+describe("the first-user check", () => {
+    const fakeProvider: OAuthProvider<{ code: string }> = {
+        id: "fake",
+        schema: z.object({ code: z.string() }),
+        verify: async ({ code }) => ({ providerId: `fake-${code}`, email: `${code}@test.dev`, emailVerified: true })
+    };
+
+    function buildWith(existingUsers: number) {
+        configureJwt({ secret: TEST_SECRET, accessExpiresIn: "15m", refreshExpiresIn: "7d" });
+        (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true, errors: [] });
+        (hashPassword as jest.Mock).mockResolvedValue("hashed-pw");
+        const { repo } = createRepo(existingUsers);
+        (repo.listUsers as jest.Mock).mockImplementation(async () => {
+            throw new Error("listUsers() fetches the whole table");
+        });
+        const adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: true, oauthProviders: [fakeProvider] });
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/auth", adapter.createAuthRoutes()!);
+        const post = (path: string, body: unknown) => app.request(path, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        return { repo, post };
+    }
+
+    const pageSizes = (repo: AuthRepository) =>
+        (repo.listUsersPaginated as jest.Mock).mock.calls.map(([options]) => (options as { limit?: number } | undefined)?.limit);
+
+    it.each([
+        ["/auth/register", { email: "first@test.dev", password: "a-sufficiently-long-password" }],
+        ["/auth/fake", { code: "first" }]
+    ])("%s promotes the first user without listing the table", async (path, body) => {
+        const { repo, post } = buildWith(0);
+
+        const res = await post(path, body);
+
+        expect(res.status).toBeLessThan(400);
+        expect(repo.setUserRoles).toHaveBeenCalledWith(expect.any(String), ["admin"]);
+        expect(repo.listUsers).not.toHaveBeenCalled();
+        expect(pageSizes(repo).every(limit => limit !== undefined && limit <= 2)).toBe(true);
+    });
+
+    it.each([
+        ["/auth/register", { email: "second@test.dev", password: "a-sufficiently-long-password" }],
+        ["/auth/fake", { code: "second" }]
+    ])("%s leaves a later user unpromoted, still without listing the table", async (path, body) => {
+        const { repo, post } = buildWith(1);
+
+        const res = await post(path, body);
+
+        expect(res.status).toBeLessThan(400);
+        expect(repo.setUserRoles).not.toHaveBeenCalled();
+        expect(repo.listUsers).not.toHaveBeenCalled();
     });
 });

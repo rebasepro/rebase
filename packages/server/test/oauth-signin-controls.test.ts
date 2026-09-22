@@ -223,8 +223,9 @@ describe("POST /auth/<provider> — registration policy", () => {
 
     it("admits the very first user on an empty database and promotes them to admin", async () => {
         const app = createApp({ allowRegistration: false });
-        repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
-        repo.listUsers.mockResolvedValue([mockUser({ id: "new-user" })]);
+        repo.listUsersPaginated
+            .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 })
+            .mockResolvedValueOnce({ users: [mockUser({ id: "new-user" })], total: 1, limit: 2, offset: 0 });
 
         const res = await signIn(app);
 
@@ -234,9 +235,11 @@ describe("POST /auth/<provider> — registration policy", () => {
 
     it("undoes the account when two sign-ups race through the empty-table check", async () => {
         const app = createApp({ allowRegistration: false });
-        repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
-        // Somebody else won the race: the table is no longer a table of one.
-        repo.listUsers.mockResolvedValue([mockUser({ id: "someone-else" }), mockUser({ id: "new-user" })]);
+        // Somebody else won the race: by the post-create check the table is
+        // no longer a table of one.
+        repo.listUsersPaginated
+            .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 })
+            .mockResolvedValueOnce({ users: [mockUser({ id: "someone-else" }), mockUser({ id: "new-user" })], total: 2, limit: 2, offset: 0 });
 
         const res = await signIn(app);
 
@@ -251,15 +254,13 @@ describe("POST /auth/<provider> — registration policy", () => {
         try {
             const closed = createApp({ allowRegistration: false });
             repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
-            repo.listUsers.mockResolvedValue([mockUser({ id: "new-user" })]);
             const refused = await signIn(closed);
             expect(refused.status).toBe(403);
             expect((await refused.json() as { error: { code: string } }).error.code).toBe("SETUP_REQUIRED");
             expect(repo.setUserRoles).not.toHaveBeenCalled();
 
             const open = createApp({ allowRegistration: true });
-            repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
-            repo.listUsers.mockResolvedValue([mockUser({ id: "new-user" })]);
+            repo.listUsersPaginated.mockResolvedValue({ users: [mockUser({ id: "new-user" })], total: 1, limit: 2, offset: 0 });
             const admitted = await signIn(open);
             expect(admitted.status).toBe(200);
             expect(repo.setUserRoles).not.toHaveBeenCalled();

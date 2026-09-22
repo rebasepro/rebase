@@ -346,6 +346,19 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
+     * Is the account just created the only one there is?
+     *
+     * Two rows at most: the total says whether anyone else exists, and the
+     * one row left when nobody does says whether it is this account. It used
+     * to be `listUsers()` — the whole users table, password hashes included,
+     * on every sign-up, to compare its length with one.
+     */
+    async function isOnlyUser(uid: string): Promise<boolean> {
+        const { users, total } = await authRepo.listUsersPaginated({ limit: 2 });
+        return total === 1 && users[0]?.id === uid;
+    }
+
+    /**
      * Helper to generate and store session tokens.
      *
      * Every route that signs somebody in comes through here — password login,
@@ -480,8 +493,7 @@ refreshToken };
         // Auto-bootstrap: if this is the very first user in the system, promote to admin.
         // This avoids the chicken-and-egg problem where the first user has no permissions
         // and no way to access the bootstrap endpoint from the UI.
-        const existingUsers = await authRepo.listUsers();
-        const isFirstUser = existingUsers.length === 1 && existingUsers[0].id === user.id;
+        const isFirstUser = await isOnlyUser(user.id);
 
         if (bootstrapRegistration && !isFirstUser) {
             // Two registrations raced through the empty-table check. Only the
@@ -756,8 +768,7 @@ displayName: user.displayName });
                         }
 
                         // Auto-bootstrap: first user in the system gets admin
-                        const allUsers = await authRepo.listUsers();
-                        const isFirstUser = allUsers.length === 1 && allUsers[0].id === user.id;
+                        const isFirstUser = await isOnlyUser(user.id);
 
                         if (bootstrapRegistration && !isFirstUser) {
                             // Two sign-ups raced through the empty-table check;

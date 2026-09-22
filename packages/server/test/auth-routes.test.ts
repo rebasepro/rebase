@@ -369,9 +369,11 @@ password: "StrongPass1" }));
             const bootUser = mockUser({ id: "boot-1",
 email: "first@test.com" });
             mockAuthRepo.createUser.mockResolvedValueOnce(bootUser as any);
-            // the gate's paginated count sees an empty table (default mock),
-            // and the post-create check confirms they really are the first
-            mockAuthRepo.listUsers.mockResolvedValueOnce([bootUser] as any);
+            // the gate's paginated count sees an empty table, and the
+            // post-create check confirms they really are the first
+            mockAuthRepo.listUsersPaginated
+                .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 } as any)
+                .mockResolvedValueOnce({ users: [bootUser], total: 1, limit: 2, offset: 0 } as any);
 
             const res = await app.request("/auth/register", json({ email: "first@test.com",
 password: "StrongPass1" }));
@@ -389,9 +391,11 @@ email: "second@test.com" });
             const winner = mockUser({ id: "winner-1",
 email: "first@test.com" });
             mockAuthRepo.createUser.mockResolvedValueOnce(loser as any);
-            // the gate's paginated count saw an empty table (default mock),
-            // but another registration landed before the post-create check
-            mockAuthRepo.listUsers.mockResolvedValueOnce([winner, loser] as any);
+            // the gate's paginated count saw an empty table, but another
+            // registration landed before the post-create check
+            mockAuthRepo.listUsersPaginated
+                .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 } as any)
+                .mockResolvedValueOnce({ users: [winner, loser], total: 2, limit: 2, offset: 0 } as any);
 
             const res = await app.request("/auth/register", json({ email: "second@test.com",
 password: "StrongPass1" }));
@@ -1601,7 +1605,7 @@ verified: true });
             const app = createApp({ allowRegistration: true });
             const first = mockUser({ id: "boot-1", email: "first@test.com" });
             mockAuthRepo.createUser.mockResolvedValueOnce(first as never);
-            mockAuthRepo.listUsers.mockResolvedValueOnce([first] as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ users: [first], total: 1, limit: 2, offset: 0 } as never);
 
             const res = await app.request("/auth/register", json({
                 email: "first@test.com",
@@ -1615,7 +1619,7 @@ verified: true });
         it("never promotes a registration that is not the first user", async () => {
             const app = createApp({ allowRegistration: true });
             // Somebody is already there, so this registrant is not the first.
-            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",
@@ -1631,7 +1635,7 @@ verified: true });
             const app = createApp({ allowRegistration: true });
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
-            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
 
             // 200, not 404: a 404 here would mean no provider was injected and
             // the escalation path was never reached, which is how a test like
@@ -1645,7 +1649,7 @@ verified: true });
         it("produces at most one admin across concurrent registrations", async () => {
             const app = createApp({ allowRegistration: true });
             // The table is no longer empty by the time these land.
-            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
 
             const responses = await Promise.all(
                 Array.from({ length: 5 }, (_, i) =>
@@ -1667,7 +1671,7 @@ verified: true });
 
         it("assigns only the configured default role, never admin alongside it", async () => {
             const app = createApp({ allowRegistration: true, defaultRole: "viewer" });
-            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
 
             await app.request("/auth/register", json({
                 email: "new@test.com",
