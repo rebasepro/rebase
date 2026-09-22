@@ -106,6 +106,87 @@ export function resolveOffsetWindow(
 }
 
 /**
+ * The rows for the ids a text search returned, read once: in the order the
+ * search ranked them, windowed by `limit` and `offset`. An id whose document is
+ * gone is left out.
+ */
+export async function readSearchResults({
+    ids,
+    limit,
+    offset,
+    readOne
+}: {
+    ids: readonly string[],
+    limit?: number,
+    offset?: number,
+    readOne: (id: string) => Promise<Record<string, unknown> | undefined>
+}): Promise<Record<string, unknown>[]> {
+    const { fetchLimit, skip } = resolveOffsetWindow(limit, offset);
+    const rows = await Promise.all(ids.slice(skip, fetchLimit).map(readOne));
+    return rows.filter((row): row is Record<string, unknown> => row !== undefined);
+}
+
+/**
+ * The rows for the ids a text search returned, kept live: one document
+ * listener per id in the `limit`/`offset` window, and every change delivered
+ * as the whole list, in the order the search ranked the ids.
+ *
+ * The returned function cancels all of it, a search still in flight included:
+ * its listeners are then never opened.
+ */
+export function listenToSearchResults({
+    ids,
+    limit,
+    offset,
+    listenOne,
+    onUpdate,
+    onError
+}: {
+    ids: Promise<readonly string[] | undefined>,
+    limit?: number,
+    offset?: number,
+    listenOne: (
+        id: string,
+        onRow: (row: Record<string, unknown> | null) => void,
+        onError?: (error: Error) => void
+    ) => () => void,
+    onUpdate: (rows: Record<string, unknown>[]) => void,
+    onError?: (error: Error) => void
+}): () => void {
+    let cancelled = false;
+    let subscriptions: (() => void)[] = [];
+
+    ids.then((found) => {
+        if (cancelled) return;
+        const { fetchLimit, skip } = resolveOffsetWindow(limit, offset);
+        const windowIds = (found ?? []).slice(skip, fetchLimit);
+        if (windowIds.length === 0) {
+            onUpdate([]);
+            return;
+        }
+        // Keyed by id, so an update replaces the row and a delete removes it.
+        const rows = new Map<string, Record<string, unknown>>();
+        const emit = () => onUpdate(windowIds.flatMap((id) => {
+            const row = rows.get(id);
+            return row ? [row] : [];
+        }));
+        subscriptions = windowIds.map((id) => listenOne(id, (row) => {
+            if (row) rows.set(id, row);
+            else rows.delete(id);
+            emit();
+        }, onError));
+    }).catch((error: unknown) => {
+        if (cancelled) return;
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+    });
+
+    return () => {
+        cancelled = true;
+        subscriptions.forEach((unsubscribe) => unsubscribe());
+    };
+}
+
+/**
  * Use this hook to build a {@link DataDriver} based on Firestore
  * @param firebaseApp
  * @param textSearchControllerBuilder
@@ -236,26 +317,18 @@ export function useFirestoreDriver({
         );
     }, [firebaseApp]);
 
-    const performTextSearch = useCallback(<M extends Record<string, any>>({
-        path,
-        databaseId,
-        searchString,
-        onUpdate
-    }: {
+    /** The ids the text search controller finds for `searchString` under `path`. */
+    const searchIds = useCallback((
         path: string,
-        databaseId?: string,
-        searchString: string;
-        onUpdate: (rows: Record<string, unknown>[]) => void,
-    }): () => void => {
+        searchString: string,
+        databaseId?: string
+    ): Promise<readonly string[] | undefined> => {
 
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
         const textSearchController = searchControllerRef.current;
         if (!textSearchController)
             throw Error("Trying to make text search without specifying a FirestoreTextSearchController");
-
-        let subscriptions: (() => void)[] = [];
-
 
         const auth = getAuth(firebaseApp);
         const currentUser = auth?.currentUser;
@@ -270,43 +343,43 @@ export function useFirestoreDriver({
         if (!search) {
             throw Error("The current path is not supported by the specified FirestoreTextSearchController");
         }
+        return search;
+    }, [firebaseApp]);
 
-        search.then((ids) => {
-            if (!ids || ids.length === 0) {
-                subscriptions = [];
-                onUpdate([]);
-            }
-
-            const rows: Record<string, unknown>[] = [];
-            const addedEntitiesSet = new Set<string | number>();
-            subscriptions = (ids ?? [])
-                .map((id) => {
-                    return listenOne({
-                        path,
-                        id,
-                        onUpdate: (row: Record<string, unknown> | null) => {
-                            const incomingId = row?.id as string | number | undefined;
-                            if (row && incomingId !== undefined) {
-                                if (!addedEntitiesSet.has(incomingId)) {
-                                    addedEntitiesSet.add(incomingId);
-                                    rows.push(row);
-                                    onUpdate(rows);
-                                }
-                            } else {
-                                addedEntitiesSet.delete(id);
-                                onUpdate([...rows.filter(r => r.id !== id)])
-                            }
-                        }
-                    })
-                }
-                );
+    const performTextSearch = useCallback(<M extends Record<string, any>>({
+        path,
+        collection,
+        searchString,
+        limit,
+        offset,
+        onUpdate,
+        onError
+    }: {
+        path: string,
+        collection?: CollectionConfig<M>,
+        searchString: string;
+        limit?: number,
+        offset?: number,
+        onUpdate: (rows: Record<string, unknown>[]) => void,
+        onError?: (error: Error) => void
+    }): () => void => {
+        return listenToSearchResults({
+            ids: searchIds(path, searchString, collection?.databaseId),
+            limit,
+            offset,
+            listenOne: (id, onRow, onRowError) => listenOne<M>({
+                path,
+                id,
+                // Carries `databaseId`: without it every hit was read from the
+                // default database.
+                collection,
+                onUpdate: onRow,
+                onError: onRowError
+            }),
+            onUpdate,
+            onError
         });
-
-        return () => {
-            subscriptions.forEach((p) => p());
-        }
-
-    }, [firebaseApp, listenOne]);
+    }, [searchIds, listenOne]);
 
     const initTextSearch = useCallback(async (props: {
         path: string,
@@ -368,6 +441,17 @@ export function useFirestoreDriver({
             order
         });
         // Firestore has no `offset()`; see resolveOffsetWindow.
+        if (searchString) {
+            // The same search a live list runs. Ignoring `searchString` here
+            // answered a search with the whole collection.
+            return readSearchResults({
+                ids: await searchIds(resolvedPath, searchString, databaseId) ?? [],
+                limit,
+                offset,
+                readOne: (id) => getAndBuildEntity(resolvedPath, id, databaseId)
+            });
+        }
+
         const {
             fetchLimit,
             skip
@@ -376,7 +460,7 @@ export function useFirestoreDriver({
 
         const entity = await getDocs(query);
         return entity.docs.slice(skip).map((doc) => createRowFromDocument(doc));
-    }, [buildQuery]);
+    }, [buildQuery, searchIds, getAndBuildEntity]);
 
     /**
      * Listen to a entities in a given path
@@ -399,6 +483,7 @@ export function useFirestoreDriver({
             path,
             filter,
             limit,
+            offset,
             startAfter,
             searchString,
             orderBy,
@@ -429,9 +514,12 @@ export function useFirestoreDriver({
         if (searchString) {
             return performTextSearch<M>({
                 path,
+                collection,
                 searchString,
+                limit,
+                offset,
                 onUpdate,
-                databaseId
+                onError
             });
         }
 
@@ -440,12 +528,17 @@ export function useFirestoreDriver({
             path,
             resolvedPath
         });
-        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, limit, databaseId);
+        // The same window `fetchCollection` reads: without it, a live list
+        // past page one was served page one.
+        const {
+            fetchLimit,
+            skip
+        } = resolveOffsetWindow(limit, offset);
+        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId);
         return onSnapshot(query,
             {
                 next: (entity) => {
-                    if (!searchString)
-                        onUpdate(entity.docs.map((doc) => createRowFromDocument(doc)));
+                    onUpdate(entity.docs.slice(skip).map((doc) => createRowFromDocument(doc)));
                 },
                 error: onError
             }
@@ -595,15 +688,20 @@ export function useFirestoreDriver({
         filter,
         order,
         orderBy,
+        searchString,
         collection
     }: FetchCollectionProps<any>): Promise<number> => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
         const databaseId = collection?.databaseId;
         const resolvedPath = path;
+        if (searchString) {
+            // What `fetchCollection` pages over for the same search.
+            return (await searchIds(resolvedPath, searchString, databaseId) ?? []).length;
+        }
         const query = buildQuery(resolvedPath, filter, orderBy, order, undefined, undefined, databaseId);
         const entity = await getCountFromServer(query);
         return entity.data().count;
-    }, [firebaseApp]);
+    }, [firebaseApp, buildQuery, searchIds]);
 
     const isFilterCombinationValid = useCallback(({
         path,
