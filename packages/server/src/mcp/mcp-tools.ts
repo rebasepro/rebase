@@ -22,9 +22,12 @@
  */
 import type { CollectionConfig, DataDriver, FilterValues } from "@rebasepro/types";
 import { getCollectionDataPath } from "@rebasepro/types";
+import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
+import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field-ops.js";
+import { assertQueryFieldsReadable } from "../api/rest/field-access-query.js";
 import { logger } from "../utils/logger.js";
 import { scopeAllows } from "./oauth-metadata.js";
 
@@ -89,6 +92,33 @@ async function scopedDriver(ctx: McpToolContext): Promise<DataDriver> {
 }
 
 /**
+ * The caller every field rule on a tool call is judged against.
+ *
+ * Their roles from the verified token, never `undefined`: that is the trusted
+ * server plane, which satisfies every non-empty role list.
+ */
+function viewerOf(ctx: McpToolContext): FieldViewer {
+    return { roles: ctx.caller.roles };
+}
+
+/**
+ * Run one of the REST boundary's checks, handing its refusal to the model.
+ *
+ * The checks throw `ApiError`, whose message names the field and the rule —
+ * exactly what the REST 400 says, and what the model needs to correct the call.
+ * Re-thrown as a {@link McpToolError} so it reaches the model instead of the
+ * generic "the call failed" every other error is reduced to.
+ */
+function asToolError(check: () => void): void {
+    try {
+        check();
+    } catch (error) {
+        if (error instanceof ApiError) throw new McpToolError(error.message);
+        throw error;
+    }
+}
+
+/**
  * The `values` of a write, checked the way every other write door checks them.
  *
  * RLS decides which *rows* a caller may write, not which *fields*: `access.write`
@@ -98,8 +128,9 @@ async function scopedDriver(ctx: McpToolContext): Promise<DataDriver> {
  * — without it, a field their roles cannot set through the app was one they
  * could set by asking the model to.
  *
- * The refusal is re-thrown as a {@link McpToolError} so its message reaches the
- * model, which can correct the call; it names the field, as the REST 400 does.
+ * Field operations (`{ views: { $inc: 1 } }`) reach the driver through here as
+ * they do through `PATCH`, so they get `PATCH`'s type check, and `POST`'s
+ * refusal on a create.
  */
 function writableValues(
     raw: unknown,
@@ -111,12 +142,11 @@ function writableValues(
         throw new McpToolError("`values` must be an object of field names to values.");
     }
     const values = raw as Record<string, unknown>;
-    try {
-        assertWriteRequestValid(values, collection, { status, viewer: { roles: ctx.caller.roles } });
-    } catch (error) {
-        if (error instanceof ApiError) throw new McpToolError(error.message);
-        throw error;
-    }
+    asToolError(() => {
+        assertWriteRequestValid(values, collection, { status, viewer: viewerOf(ctx) });
+        if (status === "new") assertNoFieldOpsOnCreate(values, "A create");
+        else assertFieldOpsValid(values, collection);
+    });
     return values;
 }
 
@@ -151,12 +181,16 @@ function clampOffset(raw: unknown): number {
  * `id` is admitted alongside the declared properties because every collection
  * has one and none of them declare it.
  */
-function assertKnownField(collection: CollectionConfig, field: string, what: string): string {
+function assertKnownField(collection: CollectionConfig, field: string, what: string, viewer: FieldViewer): string {
     const properties = collection.properties ?? {};
     if (field !== "id" && !(field in properties)) {
+        // The list is an offer, so it leaves out what this caller cannot read:
+        // naming a field the next call would refuse sends the model round again.
+        const unreadable = new Set(restrictedFieldNames(collection, viewer, "read").declared);
+        const offered = Object.keys(properties).filter(name => !unreadable.has(name));
         throw new McpToolError(
             `"${field}" is not a field of ${collectionPath(collection)}, so it cannot be used to ${what}. `
-            + `Known fields: ${["id", ...Object.keys(properties)].join(", ")}.`
+            + `Known fields: ${["id", ...offered].join(", ")}.`
         );
     }
     return field;
@@ -171,7 +205,7 @@ function assertKnownField(collection: CollectionConfig, field: string, what: str
  * unpaid invoices" into "show me every invoice", which is a worse answer than
  * an error and looks like a correct one.
  */
-function buildFilter(collection: CollectionConfig, raw: unknown): FilterValues<string> | undefined {
+function buildFilter(collection: CollectionConfig, raw: unknown, viewer: FieldViewer): FilterValues<string> | undefined {
     if (raw == null) return undefined;
     if (typeof raw !== "object" || Array.isArray(raw)) {
         throw new McpToolError("filter must be an object of { field: [operator, value] }.");
@@ -180,7 +214,7 @@ function buildFilter(collection: CollectionConfig, raw: unknown): FilterValues<s
     const filter: Record<string, [string, unknown]> = {};
 
     for (const [field, condition] of Object.entries(raw as Record<string, unknown>)) {
-        assertKnownField(collection, field, "filter");
+        assertKnownField(collection, field, "filter", viewer);
         if (!Array.isArray(condition) || condition.length !== 2 || typeof condition[0] !== "string") {
             throw new McpToolError(`filter.${field} must be [operator, value], e.g. ["==", "paid"].`);
         }
@@ -254,21 +288,33 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
+            const viewer = viewerOf(ctx);
+            const filter = buildFilter(collection, args.filter, viewer);
+            const sortField = args.orderBy
+                ? assertKnownField(collection, String(args.orderBy), "sort", viewer)
+                : undefined;
+
+            // The driver keeps a withheld value out of the rows; this keeps it
+            // out of the question. A filter on a field the caller cannot read
+            // answers "which rows have salary > 100000" one call at a time, and
+            // a sort on one ranks by it — so both are refused, by the check the
+            // REST list route runs on the same parameters.
+            asToolError(() => assertQueryFieldsReadable(
+                { where: filter, orderBy: sortField ? [{ field: sortField }] : undefined },
+                collection,
+                viewer
+            ));
+
             const driver = await scopedDriver(ctx);
             const limit = clampLimit(args.limit);
 
             const rows = await driver.fetchCollection({
                 path: collectionPath(collection),
                 collection,
-                filter: buildFilter(collection, args.filter),
+                filter,
                 limit,
                 offset: clampOffset(args.offset),
-                orderBy: args.orderBy
-                    ? [[
-                        assertKnownField(collection, String(args.orderBy), "sort"),
-                        args.order === "desc" ? "desc" : "asc"
-                    ]]
-                    : undefined
+                orderBy: sortField ? [[sortField, args.order === "desc" ? "desc" : "asc"]] : undefined
             } as Parameters<DataDriver["fetchCollection"]>[0]);
 
             return {

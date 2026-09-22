@@ -568,6 +568,89 @@ describe("the mutating tools apply the field write rules", () => {
         expect(body.result?.isError).toBeUndefined();
         expect(saves).toHaveLength(1);
     });
+
+    it("checks a field operation's type, as PATCH does, before the driver compiles it", async () => {
+        const { body, saves } = await call(
+            "update_document", { collection: "candidates", id: "c1", values: { name: { $inc: 1 } } }
+        );
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("$inc is not defined on 'name', which is a string property");
+        expect(saves).toHaveLength(0);
+    });
+
+    it("refuses a field operation on a create, as POST does", async () => {
+        const { body, saves } = await call(
+            "create_document", { collection: "candidates", values: { name: "X", rating: { $inc: 1 } } }, ["hiring_manager"]
+        );
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("cannot carry field operations ('rating')");
+        expect(saves).toHaveLength(0);
+    });
+});
+
+/* ── Field read rules on the query tool ────────────────────────────── */
+
+describe("query_collection applies the field read rules to what it filters and sorts on", () => {
+    // The strip keeps a withheld value off the wire; this is the other half.
+    // `filter: { salary: [">", 100000] }` returns the rows whose hidden salary is
+    // above 100k, and bisecting the bound reads it out one call at a time — the
+    // exact oracle `GET /api/data/...?salary=gt.100000` answers 400 for.
+    const guarded = [{
+        slug: "candidates",
+        name: "Candidates",
+        properties: {
+            name: { type: "string", name: "Name" },
+            salary: { type: "number", name: "Salary", access: { read: ["hr"] } },
+            inviteToken: { type: "string", name: "Invite", columnName: "invite_token", excludeFromApi: true }
+        }
+    }] as unknown as CollectionConfig[];
+
+    async function query(args: Record<string, unknown>, roles = ["recruiter"]) {
+        const { driver, calls } = stubDriver();
+        const { app } = buildApp({ driver, collections: guarded });
+        const { accessToken } = await connectedClient(app, { scope: "mcp:read", roles });
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "query_collection", arguments: { collection: "candidates", ...args } }
+        });
+        const body = await res.json() as { result?: { isError?: boolean; content: { text: string }[] } };
+        return { body, fetches: calls.filter(call => call.method === "fetchCollection") };
+    }
+
+    it("refuses a filter on a field the caller's roles cannot read", async () => {
+        const { body, fetches } = await query({ filter: { salary: [">", 100000] } });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("'salary' is not readable on 'candidates' with your roles");
+        expect(fetches).toHaveLength(0);
+    });
+
+    it("refuses a sort on one", async () => {
+        const { body, fetches } = await query({ orderBy: "salary", order: "desc" });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("cannot be used in `orderBy`");
+        expect(fetches).toHaveLength(0);
+    });
+
+    it("refuses an `excludeFromApi` column in either position, for any role", async () => {
+        for (const args of [{ filter: { inviteToken: ["==", "t"] } }, { orderBy: "inviteToken" }]) {
+            const { body, fetches } = await query(args, ["admin"]);
+            expect(body.result?.isError).toBe(true);
+            expect(body.result?.content[0].text).toContain("'inviteToken' is not readable");
+            expect(fetches).toHaveLength(0);
+        }
+    });
+
+    it("does not offer an unreadable field in the list of known ones", async () => {
+        const { body } = await query({ orderBy: "nmae" });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("Known fields: id, name.");
+    });
+
+    it("lets a caller holding the role filter and sort on it", async () => {
+        const { body, fetches } = await query({ filter: { salary: [">", 100000] }, orderBy: "salary" }, ["hr"]);
+        expect(body.result?.isError).toBeUndefined();
+        expect(fetches).toHaveLength(1);
+    });
 });
 
 /* ── The authorize endpoint under bad input ───────────────────────── */
