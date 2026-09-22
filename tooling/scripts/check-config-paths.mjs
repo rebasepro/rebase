@@ -91,6 +91,18 @@ function hasOwnCheckout(dir) {
     return fs.existsSync(path.join(dir, ".git"));
 }
 
+/**
+ * `vite.config.ts`, and a named second config beside it —
+ * `vite.config.functions.ts` builds `@rebasepro/server/functions`, and the
+ * bare-name pattern this replaced never loaded it. A declaration file is not
+ * a config.
+ *
+ * @param {string} name a file name
+ */
+export function isViteConfig(name) {
+    return /^vite\.config\.(?:(?!d\.)[\w-]+\.)?[cm]?[jt]s$/.test(name);
+}
+
 function findConfigs(dir, out = []) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
@@ -98,7 +110,7 @@ function findConfigs(dir, out = []) {
             const full = path.join(dir, entry.name);
             if (hasOwnCheckout(full)) continue;
             findConfigs(full, out);
-        } else if (/^vite\.config\.[cm]?[jt]s$/.test(entry.name)) {
+        } else if (isViteConfig(entry.name)) {
             const rel = path.relative(ROOT, path.join(dir, entry.name));
             if (!UNLOADABLE.some((prefix) => rel.startsWith(prefix))) out.push(path.join(dir, entry.name));
         }
@@ -121,45 +133,49 @@ function aliasEntries(config) {
     return found;
 }
 
-const failures = [];
-let aliasCount = 0;
-let configCount = 0;
+async function main() {
+    const failures = [];
+    let aliasCount = 0;
+    let configCount = 0;
 
-for (const file of findConfigs(ROOT)) {
-    const rel = path.relative(ROOT, file);
-    let loaded;
-    try {
-        loaded = await loadConfigFromFile({ command: "build", mode: "production" }, file);
-    } catch (err) {
-        // A config this repository cannot load is a finding in its own right:
-        // every one of them is loaded by a real build.
-        failures.push({ rel, alias: "(whole file)", target: `failed to load — ${err.message.split("\n")[0]}` });
-        continue;
-    }
-    if (!loaded?.config) continue;
-    configCount++;
+    for (const file of findConfigs(ROOT)) {
+        const rel = path.relative(ROOT, file);
+        let loaded;
+        try {
+            loaded = await loadConfigFromFile({ command: "build", mode: "production" }, file);
+        } catch (err) {
+            // A config this repository cannot load is a finding in its own right:
+            // every one of them is loaded by a real build.
+            failures.push({ rel, alias: "(whole file)", target: `failed to load — ${err.message.split("\n")[0]}` });
+            continue;
+        }
+        if (!loaded?.config) continue;
+        configCount++;
 
-    for (const [find, replacement] of aliasEntries(loaded.config)) {
-        if (typeof replacement !== "string" || !path.isAbsolute(replacement)) continue;
-        aliasCount++;
-        if (!fs.existsSync(replacement)) {
-            failures.push({ rel, alias: find, target: path.relative(ROOT, replacement) });
+        for (const [find, replacement] of aliasEntries(loaded.config)) {
+            if (typeof replacement !== "string" || !path.isAbsolute(replacement)) continue;
+            aliasCount++;
+            if (!fs.existsSync(replacement)) {
+                failures.push({ rel, alias: find, target: path.relative(ROOT, replacement) });
+            }
         }
     }
-}
 
-if (failures.length > 0) {
-    console.error(red(`✗ ${failures.length} config path(s) point at nothing:\n`));
-    for (const f of failures) {
-        console.error(`  ${f.rel}`);
-        console.error(`    ${f.alias}  ->  ${f.target}`);
+    if (failures.length > 0) {
+        console.error(red(`✗ ${failures.length} config path(s) point at nothing:\n`));
+        for (const f of failures) {
+            console.error(`  ${f.rel}`);
+            console.error(`    ${f.alias}  ->  ${f.target}`);
+        }
+        console.error(`
+      An alias whose target is missing is usually dead rather than broken — an
+      earlier entry claims the specifier first, so nothing resolves through it.
+      Delete it. If it is genuinely needed, point it at the file that exists.
+    `);
+        process.exit(1);
     }
-    console.error(`
-  An alias whose target is missing is usually dead rather than broken — an
-  earlier entry claims the specifier first, so nothing resolves through it.
-  Delete it. If it is genuinely needed, point it at the file that exists.
-`);
-    process.exit(1);
+
+    console.log(green(`✓ ${aliasCount} alias target(s) across ${configCount} build config(s) exist.`));
 }
 
-console.log(green(`✓ ${aliasCount} alias target(s) across ${configCount} build config(s) exist.`));
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
