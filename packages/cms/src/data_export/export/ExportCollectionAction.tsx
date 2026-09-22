@@ -30,25 +30,10 @@ import {
 } from "@rebasepro/ui";
 import { downloadEntitiesExport } from "./export";
 import { fetchAllEntitiesForExport, MAX_EXPORT_ROWS } from "./fetch_export_data";
+import { resolveAdditionalExportValues } from "./additional_fields";
 import { resolveSelection, selectionQueryToFindParams } from "../../selection";
 
 const DOCS_LIMIT = 500;
-
-/**
- * Additional-field builders run per row and may do I/O, so a `Promise.all` over
- * the whole export is one request per row all at once. That was bounded only by
- * the 50-row cap the export used to have; now that the read is paginated, it is
- * bounded here instead.
- */
-const ADDITIONAL_FIELDS_CONCURRENCY = 50;
-
-async function mapInChunks<T, R>(items: T[], fn: (item: T) => Promise<R>, chunkSize = ADDITIONAL_FIELDS_CONCURRENCY): Promise<R[]> {
-    const results: R[] = [];
-    for (let i = 0; i < items.length; i += chunkSize) {
-        results.push(...await Promise.all(items.slice(i, i + chunkSize).map(fn)));
-    }
-    return results;
-}
 
 export function ExportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
@@ -116,43 +101,12 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setOpen(false);
     }, [setOpen]);
 
-    const fetchAdditionalFields = useCallback(async (entities: Entity<M>[]) => {
-
-        const additionalExportFields = exportConfig?.additionalFields;
-        const additionalFields = collection.additionalFields;
-
-        const resolvedExportColumnsValues: Record<string, any>[] = additionalExportFields
-            ? await mapInChunks(entities, async (entity) => {
-                return (await Promise.all(additionalExportFields.map(async (column) => {
-                    return {
-                        [column.key]: await column.builder({
-                            entity,
-                            context: context as RebaseContext
-                        })
-                    };
-                }))).reduce((a, b) => ({ ...a,
-...b }), {});
-            })
-            : [];
-
-        const resolvedColumnsValues: Record<string, any>[] = additionalFields
-            ? await mapInChunks(entities, async (entity) => {
-                return (await Promise.all(additionalFields
-                    .map(async (field) => {
-                        if (!field.value)
-                            return {};
-                        return {
-                            [field.key]: await field.value({
-                                entity,
-                                context: context as RebaseContext
-                            })
-                        };
-                    }))).reduce((a, b) => ({ ...a,
-...b }), {});
-            })
-            : [];
-        return [...resolvedExportColumnsValues, ...resolvedColumnsValues];
-    }, [exportConfig?.additionalFields]);
+    const fetchAdditionalFields = useCallback((entities: Entity<M>[]) => resolveAdditionalExportValues({
+        entities,
+        exportFields: exportConfig?.additionalFields,
+        additionalFields: collection.additionalFields,
+        context: context as RebaseContext
+    }), [exportConfig?.additionalFields, collection.additionalFields, context]);
 
     const doDownload = useCallback(async (collection: AdminCollection<M>,
         exportConfig: ExportConfig<any> | undefined): Promise<boolean> => {
