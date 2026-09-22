@@ -917,6 +917,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             sortBy={tableController.sortBy}
             searchString={tableController.searchString}
             onCountChange={setDocsCount}
+            refreshKey={lastDeleteTimestamp}
         />;
 
         // What "select all matching" would stand for right now. `docsCount` is
@@ -1462,7 +1463,8 @@ export function EntitiesCount({
     filter,
     sortBy,
     searchString,
-    onCountChange
+    onCountChange,
+    refreshKey
 }: {
     path: string,
     collection: AdminCollection,
@@ -1477,6 +1479,12 @@ export function EntitiesCount({
      */
     searchString: string | undefined,
     onCountChange?: (count: number | null | undefined) => void,
+    /**
+     * Counts again whenever this changes. The count is one read, not a
+     * subscription: after a delete the toolbar kept the old total, and "select
+     * all matching" offered it over the rows that were left.
+     */
+    refreshKey?: number,
 }) {
 
     const dataClient = useData();
@@ -1514,7 +1522,9 @@ export function EntitiesCount({
         // cache is module-level and outlives an unmount, so a key that omits it
         // does not merely lose precision — it answers one search with a
         // different search's total.
-        const cacheKey = `${path}|${filterKey}|${sortKey}|${searchString ?? ""}`;
+        // The refresh key too: a count still in flight from before a delete
+        // must not answer the one asked after it.
+        const cacheKey = `${path}|${filterKey}|${sortKey}|${searchString ?? ""}|${refreshKey ?? ""}`;
         let countPromise = inflightCountRequests.get(cacheKey);
         if (!countPromise) {
             countPromise = accessor.count({
@@ -1542,7 +1552,7 @@ export function EntitiesCount({
         // fire a count request per render. The keys change exactly when the
         // values do, which is the condition this effect actually wants.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [path, filterKey, sortKey, searchString]);
+    }, [path, filterKey, sortKey, searchString, refreshKey]);
 
     // The toolbar renders the count; this component only fetches and reports it
     return null;

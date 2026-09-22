@@ -84,3 +84,45 @@ describe("EntitiesCount", () => {
         expect(count).toHaveBeenCalledTimes(1);
     });
 });
+
+/**
+ * The count is one read, not a subscription, so nothing re-read it after rows
+ * went away: bulk-delete all 100 matching rows and the toolbar still said 100,
+ * and the selection menu offered "All 100 products" over an empty list.
+ * `refreshKey` is the collection view's delete timestamp.
+ */
+describe("EntitiesCount — after a delete", () => {
+    beforeEach(() => {
+        count.mockReset();
+    });
+
+    it("counts again when the refresh key changes", async () => {
+        count.mockResolvedValueOnce(100).mockResolvedValueOnce(0);
+        const onCountChange = jest.fn();
+        const props = { path: "products", collection, searchString: undefined, onCountChange };
+        const { rerender } = render(<EntitiesCount {...props} refreshKey={0}/>);
+        await waitFor(() => expect(onCountChange).toHaveBeenLastCalledWith(100));
+
+        rerender(<EntitiesCount {...props} refreshKey={1_700_000_000_000}/>);
+
+        await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(onCountChange).toHaveBeenLastCalledWith(0));
+    });
+
+    it("is not answered by a count still in flight from before the delete", async () => {
+        let resolveFirst: (value: number) => void = () => undefined;
+        count.mockReturnValueOnce(new Promise<number>(resolve => { resolveFirst = resolve; }))
+            .mockResolvedValueOnce(0);
+        const onCountChange = jest.fn();
+        const props = { path: "products", collection, searchString: undefined, onCountChange };
+        const { rerender } = render(<EntitiesCount {...props} refreshKey={0}/>);
+        await waitFor(() => expect(count).toHaveBeenCalledTimes(1));
+
+        rerender(<EntitiesCount {...props} refreshKey={1}/>);
+        await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
+        resolveFirst(100);
+
+        await waitFor(() => expect(onCountChange).toHaveBeenLastCalledWith(0));
+        expect(onCountChange).not.toHaveBeenCalledWith(100);
+    });
+});
