@@ -25,8 +25,11 @@
  *      instead of passing on an empty database.
  *
  *   3. Exit codes a pipeline can read: 0 clean, 1 findings, 2 the scan did not
- *      happen. Never conflated — a DNS failure must not read as a clean bill of
- *      health.
+ *      happen — or happened only in part, because a catalogue read failed and
+ *      the checks that depended on it saw nothing. Never conflated — a DNS
+ *      failure must not read as a clean bill of health.
+ *
+ * The verdict itself is `rls-gate.mjs`, a pure function with its own tests.
  *
  * Usage:
  *
@@ -43,26 +46,24 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Types only, so erased at runtime: the by-path rule below is about which CODE runs.
+import type { DbPolicy, Finding, ScanResult, Severity } from "../../packages/rls-check/src/types.ts";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RLS_CHECK = path.join(ROOT, "packages", "rls-check", "src");
 
-const { explainError, scan } = await import(`${RLS_CHECK}/cli.ts`);
+const { explainError, selectCheckIds } = await import(`${RLS_CHECK}/cli.ts`);
+const { introspectWithDiagnostics } = await import(`${RLS_CHECK}/introspect.ts`);
+const { runChecks } = await import(`${RLS_CHECK}/checks/index.ts`);
 const { exceedsThreshold, formatTarget, renderReport } = await import(`${RLS_CHECK}/report.ts`);
 const { formatEndpoint, parseConnectionString } = await import(`${RLS_CHECK}/redact.ts`);
-
-type Severity = "info" | "low" | "medium" | "high" | "critical";
-
-interface Finding {
-    id: string;
-    severity: Severity;
-    title: string;
-    target: { schema: string; table?: string; policy?: string; view?: string; routine?: string; column?: string };
-    confidence: "certain" | "heuristic";
-}
+const { findingKey, verdict } = await import("./rls-gate.mjs");
 
 interface BaselineEntry {
     check: string;
     target: string;
+    /** The policy's command, for a finding about a policy. See `findingKey` in rls-gate.mjs. */
+    command?: string;
     reason: string;
 }
 
@@ -149,29 +150,8 @@ if (!Number.isFinite(minTables) || !Number.isFinite(minPolicies)) {
 
 // ── Baseline ─────────────────────────────────────────────────────────────────
 
-/**
- * The key a baseline entry matches on: check id plus the object, WITHOUT the
- * policy name.
- *
- * Deliberate. A generated policy's name ends in a hash of the rule's own
- * semantics (`authors_select_841c287`), so keying on the name would invalidate
- * every entry the moment an unrelated rule was edited, and the fix for a broken
- * build would be "paste the new hash in" — which is how a baseline stops being
- * read. The intent being recorded lives at the table level: "this table is
- * public on purpose".
- */
-function findingKey(finding: Finding): string {
-    const t = finding.target;
-    const object = t.table
-        ? `${t.schema}.${t.table}`
-        : t.view
-            ? `${t.schema}.${t.view}`
-            : t.routine
-                ? `${t.schema}.${t.routine}`
-                : t.schema;
-
-    return `${finding.id} ${object}`;
-}
+// How an entry matches a finding — check, object and, for a policy, its
+// command — is `findingKey` in rls-gate.mjs.
 
 let baseline: BaselineEntry[] = [];
 if (baselinePath !== null) {
@@ -194,19 +174,44 @@ if (baselinePath !== null) {
     }
 }
 
-const accepted = new Map(baseline.map((entry) => [`${entry.check} ${entry.target}`, entry]));
-
 // ── Scan ─────────────────────────────────────────────────────────────────────
 
 const target = parseConnectionString(connectionString);
 const endpoint = formatEndpoint(target);
 
-let result: {
-    stats: { tables: number; policies: number; schemas: number; checksRun: number };
-    findings: Finding[];
-};
+// Not rls-check's `scan()`: its result drops the snapshot, and the baseline
+// key needs each finding's policy command, which only the snapshot has. The
+// rest is what `scan()` does — introspect with diagnostics, run every check,
+// and assemble the result the report renders.
+let result: ScanResult;
+let policies: DbPolicy[];
 try {
-    result = await scan({ connectionString, schemas });
+    const { snapshot, diagnostics } = await introspectWithDiagnostics({
+        connectionString,
+        schemas: schemas.length > 0 ? schemas : undefined,
+        statementTimeoutMs: 15_000
+    });
+    const tables = snapshot.relations.filter(
+        (relation: { kind: string }) => relation.kind === "table" || relation.kind === "partitioned_table"
+    );
+    policies = snapshot.policies;
+    result = {
+        scannedAt: new Date().toISOString(),
+        database: { host: target?.host ?? "unknown", name: target?.database || "unknown" },
+        serverVersion: snapshot.serverVersion,
+        platform: snapshot.platform,
+        scannerIsPrivileged: snapshot.scannerIsPrivileged,
+        exposedRoles: snapshot.exposedRoles,
+        stats: {
+            schemas: snapshot.schemas.length,
+            tables: tables.length,
+            policies: snapshot.policies.length,
+            tablesWithoutRls: tables.filter((relation: { rlsEnabled: boolean }) => !relation.rlsEnabled).length,
+            checksRun: selectCheckIds({}).length
+        },
+        findings: runChecks(snapshot),
+        diagnostics
+    };
 } catch (error) {
     const friendly = explainError(error, { endpoint, timeoutMs: 15_000, connectionString });
     console.error(`\nrls-check could not scan ${endpoint}.`);
@@ -216,7 +221,7 @@ try {
     process.exit(2);
 }
 
-console.log(`\nrls:check  ${endpoint}  ·  ${(result as { serverVersion?: string }).serverVersion ?? "PostgreSQL"}`);
+console.log(`\nrls:check  ${endpoint}  ·  ${result.serverVersion}`);
 console.log("─".repeat(88));
 // `quiet` drops rls-check's own header and summary — including its "Exit code 1"
 // line, which is about ITS threshold, not this gate's verdict, and reading a
@@ -224,7 +229,7 @@ console.log("─".repeat(88));
 // and the privilege caveat (which survives --quiet by design) are what matter
 // here; the verdict is printed below, once.
 console.log(
-    renderReport(result as never, {
+    renderReport(result, {
         color: false,
         quiet: true,
         failOn,
@@ -234,61 +239,72 @@ console.log(
     })
 );
 
-// ── The vacuity guard, before any verdict ────────────────────────────────────
-//
-// Runs first and exits 2, not 1: "nothing was there to check" is a broken
-// pipeline, not a clean database, and the two must never render the same.
+// ── Verdict ──────────────────────────────────────────────────────────────────
 
-const shortfall: string[] = [];
-if (result.stats.tables < minTables) {
-    shortfall.push(`${result.stats.tables} table(s), expected at least ${minTables}`);
-}
-if (result.stats.policies < minPolicies) {
-    shortfall.push(`${result.stats.policies} policy/policies, expected at least ${minPolicies}`);
-}
-if (shortfall.length > 0) {
-    console.error(`\n✗ Refusing to report a clean scan: ${endpoint} has ${shortfall.join(" and ")}.`);
+const outcome = verdict({
+    stats: result.stats,
+    findings: result.findings,
+    diagnostics: result.diagnostics,
+    policies,
+    baseline,
+    isGating: (finding: Finding) => exceedsThreshold([finding], failOn),
+    minTables,
+    minPolicies
+});
+
+// The vacuity guard, before any verdict. Exits 2, not 1: "nothing was there to
+// check" is a broken pipeline, not a clean database, and the two must never
+// render the same.
+if (outcome.shortfall.length > 0) {
+    console.error(`\n✗ Refusing to report a clean scan: ${endpoint} has ${outcome.shortfall.join(" and ")}.`);
     console.error("  A scan of a database whose schema was never applied proves nothing, so this is a");
     console.error("  setup failure (exit 2), not a pass. Check the step that pushes the schema.");
     process.exit(2);
 }
 
-// ── Verdict ──────────────────────────────────────────────────────────────────
-
-const gating = (result.findings as Finding[]).filter((finding) => exceedsThreshold([finding] as never, failOn));
-const unexpected = gating.filter((finding) => !accepted.has(findingKey(finding)));
-const matched = new Set(gating.map((finding) => findingKey(finding)));
-const stale = baseline.filter((entry) => !matched.has(`${entry.check} ${entry.target}`));
+// Same exit, same reason: a check whose catalogue read failed returns no
+// findings, so "none unexpected" would be an answer to a question the scan
+// never managed to ask. rls-check's own CLI exits 2 here too.
+if (outcome.degraded.length > 0) {
+    console.error(`\n✗ Refusing to report a clean scan: ${outcome.degraded.length} catalogue read(s) failed on ${endpoint}.`);
+    for (const { what, error } of outcome.degraded) console.error(`  · ${what}: ${error}`);
+    console.error("  The checks that depend on them saw nothing, which is not the same as finding nothing.");
+    process.exit(2);
+}
 
 console.log("─".repeat(88));
 console.log(
     `Gate  ${result.stats.checksRun} checks · ${result.stats.tables} tables · ${result.stats.policies} policies · ` +
-    `${gating.length} finding(s) at or above "${failOn}" · ${accepted.size} baselined`
+    `${outcome.gating.length} finding(s) at or above "${failOn}" · ${baseline.length} baselined`
 );
 
-if (stale.length > 0) {
+if (outcome.stale.length > 0) {
     // A warning, not a failure: a baseline entry that no longer matches means
     // the database got SAFER (or the table is gone). Failing the build for that
     // would make a security improvement look like a regression.
     console.log("\nStale baseline entries — nothing matches these any more, so delete them:");
-    for (const entry of stale) console.log(`  · ${entry.check} on ${entry.target}`);
+    for (const entry of outcome.stale) {
+        console.log(`  · ${entry.check} on ${entry.target}${entry.command ? ` (${entry.command})` : ""}`);
+    }
 }
 
-if (unexpected.length === 0) {
+if (outcome.code === 0) {
     console.log(`\n✓ No unexpected RLS findings at or above "${failOn}".`);
     process.exit(0);
 }
 
-console.error(`\n✗ ${unexpected.length} RLS finding(s) at or above "${failOn}" are not in the baseline:\n`);
-for (const finding of unexpected) {
+console.error(`\n✗ ${outcome.unexpected.length} RLS finding(s) at or above "${failOn}" are not in the baseline:\n`);
+for (const finding of outcome.unexpected) {
     console.error(`  [${finding.severity}] ${finding.id}  ${formatTarget(finding.target)}`);
     console.error(`      ${finding.title}`);
+    console.error(`      baseline key: ${findingKey(finding, policies)}`);
 }
 console.error(`
   Each one is either a real defect in the generated policies or an access level
   the collections declare on purpose. If it is deliberate, add it to
   ${path.relative(ROOT, baselinePath ?? DEFAULT_BASELINE)} with a reason — the reason is the
-  point of the file. If it is not, fix the collection or the generator.
+  point of the file — and, for a policy, its "command". If it is not, fix the
+  collection or the generator.
 `);
 process.exit(1);
 
