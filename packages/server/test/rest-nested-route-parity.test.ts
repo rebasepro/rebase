@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { CollectionRegistry } from "@rebasepro/common";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import { rowETag } from "../src/api/rest/etag";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
 
@@ -186,5 +187,82 @@ describe("a nested path that names nothing", () => {
 
         expect(res.status).toBe(404);
         expect(calls).toHaveLength(0);
+    });
+});
+
+describe("a nested write", () => {
+    // The root routes' pipeline, reached through a parent: conditional
+    // writes, field operations and the `Prefer` header mean what they mean at
+    // `/comments/7`. The nested routes re-listed two of the root's checks by
+    // hand and skipped the rest.
+
+    it("refuses an update whose If-Match names a version the row has moved on from", async () => {
+        const { app, writes } = createHarness();
+
+        const res = await send(app, "PATCH", "/blog_posts/1/comments/7", { body: "x" }, { "If-Match": "\"stale\"" });
+
+        expect(res.status).toBe(412);
+        expect(await errorCode(res)).toBe("PRECONDITION_FAILED");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("refuses a delete whose If-Match names a version the row has moved on from", async () => {
+        const { app, writes } = createHarness();
+
+        const res = await send(app, "DELETE", "/blog_posts/1/comments/7", undefined, { "If-Match": "\"stale\"" });
+
+        expect(res.status).toBe(412);
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("applies an update whose If-Match is the row's current tag", async () => {
+        const { app, writes } = createHarness();
+        const current = await rowETag({ id: 7, body: "hello", views: 1 }, comments);
+
+        const res = await send(app, "PATCH", "/blog_posts/1/comments/7", { body: "x" }, { "If-Match": current! });
+
+        expect(res.status).toBe(200);
+        expect(writes()).toEqual([["save", expect.objectContaining({ path: "blog_posts/1/comments", id: "7" })]]);
+    });
+
+    it("refuses a field operation the target's property cannot take", async () => {
+        const { app, writes } = createHarness();
+
+        const res = await send(app, "PATCH", "/blog_posts/1/comments/7", { body: { $inc: 1 } });
+
+        expect(res.status).toBe(400);
+        expect(await errorCode(res)).toBe("INVALID_FIELD_OPERATION");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("refuses a field operation on a create", async () => {
+        const { app, writes } = createHarness();
+
+        const res = await send(app, "POST", "/blog_posts/1/comments", { views: { $inc: 1 } });
+
+        expect(res.status).toBe(400);
+        expect(await errorCode(res)).toBe("INVALID_FIELD_OPERATION");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("honours Prefer: return=minimal", async () => {
+        const { app } = createHarness();
+
+        const res = await send(app, "POST", "/blog_posts/1/comments", { body: "x" }, { Prefer: "return=minimal" });
+
+        expect(res.status).toBe(204);
+        expect(res.headers.get("Preference-Applied")).toBe("return=minimal");
+    });
+
+    it("refuses `on_conflict` rather than inserting as if it were not there", async () => {
+        // An upsert through a parent would reparent the row it matched, which
+        // an update through a parent refuses to do. It is an upsert at the
+        // collection's own address, or none.
+        const { app, writes } = createHarness();
+
+        const res = await send(app, "POST", "/blog_posts/1/comments?on_conflict=body", { body: "x" });
+
+        expect(res.status).toBe(400);
+        expect(writes()).toHaveLength(0);
     });
 });

@@ -129,6 +129,32 @@ interface NestedPath {
 }
 
 /**
+ * The row a single-row write addresses, as its route found it.
+ *
+ * `/comments/7` and `/posts/1/comments/7` address the same kind of row — a row
+ * of `comments` — two ways, and a write to it is one operation whichever way
+ * it arrived: the same body checks, the same `If-Match`, the same
+ * `Idempotency-Key`, the same answer. It was two pipelines, and the nested one
+ * re-listed two of the root's checks by hand and skipped the rest.
+ */
+interface RowAddress {
+    /** The collection the row belongs to: what a body is checked against and an `ETag` computed for. */
+    collection: CollectionConfig;
+    /**
+     * The path the driver reads and writes at: the collection's own, or a
+     * nested one, which the driver resolves and scopes to its parent row.
+     */
+    path: string;
+    /**
+     * Handed to the driver beside `path`. Unset for a nested path, whose
+     * collection the driver resolves from the path itself.
+     */
+    driverCollection?: CollectionConfig;
+    /** What a 404 calls the address. */
+    name: string;
+}
+
+/**
  * The synthetic collection standing in for the junction a relation reaches
  * through, or `undefined` when it is not a `manyToMany` carrying
  * `through.properties`.
@@ -776,6 +802,255 @@ export class RestApiGenerator {
     }
 
     /**
+     * Create one row: `POST /<collection>`, and the same create reached through
+     * a parent, `POST /<parent>/<id>/<relation>`.
+     *
+     * Errors from here are deliberately not re-classified. This layer cannot
+     * tell a constraint violation from an unreachable database, and it used to
+     * call both `BAD_REQUEST` — a claim that the caller sent something wrong and
+     * should not retry. The driver holds the SQLSTATE and raises an `ApiError`
+     * for what is genuinely the request's fault; anything still unclassified
+     * here is ours, and that is a 500.
+     */
+    private async createRow(
+        c: Context<HonoEnv>,
+        driver: DataDriver,
+        address: RowAddress,
+        body: Record<string, unknown>
+    ): Promise<Response> {
+        const { collection, path } = address;
+
+        // `?on_conflict=email` turns the create into an upsert on a natural
+        // key. A query parameter rather than a body field because the body
+        // is the row: mixing a directive into it would collide with a
+        // column of the same name the day someone declares one.
+        const onConflict = resolveConflictTarget(
+            c.req.query("on_conflict"),
+            collection,
+            { where: "`on_conflict`" }
+        );
+
+        const isAuth = collection.auth;
+        const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+
+        const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
+
+        // Auth signups carry credential fields (`password`, provider
+        // bits) that the users collection does not declare as columns —
+        // `prepareUserCreation` turns them into what the table has. The
+        // adapter says which those are, so the body can still be checked
+        // for everything else. Skipping the check outright (as this used
+        // to) meant a typo on the users table was silently dropped and
+        // answered 201, while the same typo on `posts` was a 400.
+        if (!isAuthCollection) {
+            assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
+            assertWriteValuesValid(body, collection, { status: "new" });
+            assertNoFieldOpsOnCreate(body, "A create");
+        } else {
+            const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
+            if (contract?.validate) {
+                assertKnownWriteFields(body, collection, {
+                    extraKnownFields: contract.extraFields,
+                    viewer: requestViewer(c)
+                });
+                // Same condition as the key check above: with a custom
+                // `onCreateUser` the adapter owns the body's shape, so the
+                // collection's constraints do not describe what arrived.
+                assertWriteValuesValid(body, collection);
+            }
+        }
+
+        if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
+            const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
+
+            const entity = await driver.save({
+                path,
+                values: prepared.values,
+                collection: address.driverCollection,
+                status: "new"
+            });
+
+            // `POST /admin/users` goes through the same step, so the two
+            // doors agree on whether a create hook already delivered the
+            // credentials.
+            const finalize = this.authAdapter.finalizeUserCreation?.bind(this.authAdapter);
+            const delivery = await completeUserCreation(prepared, finalize && (clearPassword => finalize(
+                // `driver.save` returns the flat row — the row IS the
+                // values. Reading `entity.values` here (an Entity-era
+                // leftover) handed the adapter `undefined`, whose
+                // `.email` threw inside the invite-email try block —
+                // reported as "email delivery failed", so no
+                // invitation was ever sent.
+                { id: entity.id as string,
+values: entity as Record<string, unknown> },
+                clearPassword
+            )));
+
+            const response = this.formatResponse(entity) as Record<string, unknown>;
+
+            return c.json({ ...response, ...delivery }, 201);
+        }
+
+        // Deliberately not applied to the auth-signup branch above: that
+        // response can carry a temporary password, and handing it out
+        // again on a replayed key is a credential disclosure the plain
+        // data path has no equivalent of.
+        return this.runIdempotent(c, body, async () => {
+            const entity = await driver.save({
+                path,
+                values: body,
+                collection: address.driverCollection,
+                status: "new",
+                // An upsert only when a target was named. Left off, this is
+                // the plain insert it has always been, and a duplicate key
+                // still raises — which is the answer a create should give.
+                ...(onConflict ? { upsert: true, onConflict } : {})
+            });
+            return this.formatResponse(entity);
+        }, (result) => prefersMinimal(c)
+            ? minimalResponse()
+            : c.json(result as never, 201));
+    }
+
+    /**
+     * Update one row: `PATCH /<collection>/<id>`, and the same row reached
+     * through a parent. Errors are not re-classified; see {@link createRow}.
+     */
+    private async updateRow(
+        c: Context<HonoEnv>,
+        driver: DataDriver,
+        address: RowAddress,
+        id: string,
+        body: Record<string, unknown>
+    ): Promise<Response> {
+        const { collection, path } = address;
+
+        assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
+        assertWriteValuesValid(body, collection);
+        // `{ views: { $inc: 1 } }` and the rest. Validated here, against the
+        // collection's own property types, so a `$push` on a number is a
+        // 400 naming the field rather than a Postgres type error raised
+        // from inside the driver's transaction.
+        assertFieldOpsValid(body, collection);
+
+        // The SDK has sent `Idempotency-Key` on `update()` since the option
+        // existed; this route read it off no request at all. A `PATCH` is
+        // not naturally idempotent — the field operations above make it
+        // emphatically not — so a retry after a lost ACK applied the edit
+        // twice, and `$inc` twice is a number nobody asked for.
+        //
+        // The existence read is *inside* the claim, so a replay is answered
+        // by the key rather than by re-reading. Outside it, a replay sent
+        // after the row was deleted in the meantime would 404 for an edit
+        // that had already committed — the same class of lie the delete
+        // route exists to stop. A 404 or a failed precondition throws,
+        // which releases the key, so neither burns it.
+        return this.runIdempotent(c, body, async () => {
+            const existingEntity = await driver.fetchOne({
+                path,
+                id,
+                collection: address.driverCollection
+            });
+
+            if (!existingEntity) {
+                throw this.entityNotFound(address.name, id);
+            }
+
+            const ifMatch = c.req.header(IF_MATCH_HEADER);
+            if (ifMatch) {
+                await assertIfMatch(
+                    ifMatch,
+                    await this.rowForETag(driver, collection, id, existingEntity),
+                    collection,
+                    { collection: collection.slug, id }
+                );
+            }
+
+            const entity = await driver.save({
+                path,
+                id,
+                values: body,
+                collection: address.driverCollection,
+                status: "existing"
+            });
+            return this.formatResponse(entity);
+        }, (result) => prefersMinimal(c)
+            ? minimalResponse()
+            : c.json(result as never));
+    }
+
+    /**
+     * Delete one row: `DELETE /<collection>/<id>`, and the same row reached
+     * through a parent.
+     */
+    private async deleteRow(
+        c: Context<HonoEnv>,
+        driver: DataDriver,
+        address: RowAddress,
+        id: string
+    ): Promise<Response> {
+        const { collection, path } = address;
+
+        // The header the SDK sends and this route ignored.
+        //
+        // The existence read is inside the claim, and on this route that is
+        // the entire mechanism: a delete replayed after the first attempt
+        // committed finds the row gone and answers 404 — which an offline
+        // queue reads as a permanent failure, and reports to the user as an
+        // error, for a delete that in fact succeeded. Under a key the
+        // replay is answered from the key and the row is never read again.
+        return this.runIdempotent(c, { id }, async () => {
+            // `?hard=true` — a real DELETE on a soft-delete collection. Same
+            // permission as the delete it replaces; see `soft-delete-params.ts`.
+            const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
+            const existingEntity = await driver.fetchOne({
+                path,
+                id,
+                collection: address.driverCollection,
+                // `withDeleted` when the caller asked to purge: a hard delete of an
+                // ALREADY soft-deleted row is the "empty trash" operation, and the
+                // default read hides exactly the rows it is meant to remove. Without
+                // this the route answered 404 for a row `?deleted=only` was listing a
+                // moment earlier, so a trashed row could never be purged at all.
+                withDeleted: hardDelete ? true : undefined
+            });
+
+            if (!existingEntity) {
+                throw this.entityNotFound(address.name, id);
+            }
+
+            const ifMatch = c.req.header(IF_MATCH_HEADER);
+            if (ifMatch) {
+                // A conditional delete is the one that matters most:
+                // "remove the row I read" is a different instruction from
+                // "remove whatever is there now", and only the first is
+                // safe once somebody else has edited it in between.
+                await assertIfMatch(
+                    ifMatch,
+                    await this.rowForETag(driver, collection, id, existingEntity),
+                    collection,
+                    { collection: collection.slug, id }
+                );
+            }
+
+            await driver.delete({
+                hard: hardDelete,
+                row: {
+                    // The address is the one in the URL, not something read
+                    // back off the row: a row is only its columns, so
+                    // `existingEntity.id` is undefined for any table not
+                    // keyed on `id` — and the delete went looking for a row
+                    // called "undefined". The row itself the driver reads.
+                    id,
+                    path
+                },
+                collection: address.driverCollection
+            });
+            return null;
+        }, () => new Response(null, { status: 204 }));
+    }
+
+    /**
      * Create REST routes for a collection using existing Rebase patterns
      */
     private createCollectionRoutes(collection: CollectionConfig): void {
@@ -1126,180 +1401,31 @@ export class RestApiGenerator {
             }, (result) => c.json(result as never));
         });
 
+        // This collection's rows at their own address. The nested routes reach
+        // the same rows through a parent, and write them through the same
+        // methods.
+        const ownRow = (path: string): RowAddress => ({
+            collection: resolvedCollection,
+            path,
+            driverCollection: resolvedCollection,
+            name: collection.slug
+        });
+
         // POST /collection - Create entity
         this.router.post(basePath, async (c) => {
-            // Errors from here are deliberately not re-classified. This layer
-            // cannot tell a constraint violation from an unreachable database, and
-            // it used to call both `BAD_REQUEST` — a claim that the caller sent
-            // something wrong and should not retry. The driver holds the SQLSTATE
-            // and raises an `ApiError` for what is genuinely the request's fault;
-            // anything still unclassified here is ours, and that is a 500.
             this.enforceApiKeyPermission(c, collection.slug);
             const driver = this.getScopedDriver(c);
-            const path = collection.slug;
-
-
             const body = await parseJsonBody(c);
-
-            // `?on_conflict=email` turns the create into an upsert on a natural
-            // key. A query parameter rather than a body field because the body
-            // is the row: mixing a directive into it would collide with a
-            // column of the same name the day someone declares one.
-            const onConflict = resolveConflictTarget(
-                c.req.query("on_conflict"),
-                resolvedCollection,
-                { where: "`on_conflict`" }
-            );
-
-            const isAuth = collection.auth;
-            const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
-
-            const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
-
-            // Auth signups carry credential fields (`password`, provider
-            // bits) that the users collection does not declare as columns —
-            // `prepareUserCreation` turns them into what the table has. The
-            // adapter says which those are, so the body can still be checked
-            // for everything else. Skipping the check outright (as this used
-            // to) meant a typo on the users table was silently dropped and
-            // answered 201, while the same typo on `posts` was a 400.
-            if (!isAuthCollection) {
-                assertKnownWriteFields(body, resolvedCollection, { viewer: requestViewer(c) });
-                assertWriteValuesValid(body, resolvedCollection, { status: "new" });
-                assertNoFieldOpsOnCreate(body, "A create");
-            } else {
-                const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
-                if (contract?.validate) {
-                    assertKnownWriteFields(body, resolvedCollection, {
-                        extraKnownFields: contract.extraFields,
-                        viewer: requestViewer(c)
-                    });
-                    // Same condition as the key check above: with a custom
-                    // `onCreateUser` the adapter owns the body's shape, so the
-                    // collection's constraints do not describe what arrived.
-                    assertWriteValuesValid(body, resolvedCollection);
-                }
-            }
-
-            if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
-                const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
-
-                const entity = await driver.save({
-                    path,
-                    values: prepared.values,
-                    collection: resolvedCollection,
-                    status: "new"
-                });
-
-                // `POST /admin/users` goes through the same step, so the two
-                // doors agree on whether a create hook already delivered the
-                // credentials.
-                const finalize = this.authAdapter.finalizeUserCreation?.bind(this.authAdapter);
-                const delivery = await completeUserCreation(prepared, finalize && (clearPassword => finalize(
-                    // `driver.save` returns the flat row — the row IS the
-                    // values. Reading `entity.values` here (an Entity-era
-                    // leftover) handed the adapter `undefined`, whose
-                    // `.email` threw inside the invite-email try block —
-                    // reported as "email delivery failed", so no
-                    // invitation was ever sent.
-                    { id: entity.id as string,
-values: entity as Record<string, unknown> },
-                    clearPassword
-                )));
-
-                const response = this.formatResponse(entity) as Record<string, unknown>;
-
-                return c.json({ ...response, ...delivery }, 201);
-            }
-
-            // Deliberately not applied to the auth-signup branch above: that
-            // response can carry a temporary password, and handing it out
-            // again on a replayed key is a credential disclosure the plain
-            // data path has no equivalent of.
-            return this.runIdempotent(c, body, async () => {
-                const entity = await driver.save({
-                    path,
-                    values: body,
-                    collection: resolvedCollection,
-                    status: "new",
-                    // An upsert only when a target was named. Left off, this is
-                    // the plain insert it has always been, and a duplicate key
-                    // still raises — which is the answer a create should give.
-                    ...(onConflict ? { upsert: true, onConflict } : {})
-                });
-                return this.formatResponse(entity);
-            }, (result) => prefersMinimal(c)
-                ? minimalResponse()
-                : c.json(result as never, 201));
+            return this.createRow(c, driver, ownRow(collection.slug), body);
         });
 
         // PATCH /collection/:id — partial update. PUT is mounted on the same
         // handler for compatibility; see the note on `updateEntity` below.
         const updateEntity = async (c: Context<HonoEnv>) => {
-            // Errors from here are deliberately not re-classified. This layer
-            // cannot tell a constraint violation from an unreachable database, and
-            // it used to call both `BAD_REQUEST` — a claim that the caller sent
-            // something wrong and should not retry. The driver holds the SQLSTATE
-            // and raises an `ApiError` for what is genuinely the request's fault;
-            // anything still unclassified here is ours, and that is a 500.
             this.enforceApiKeyPermission(c, collection.slug);
-            const id = c.req.param("id");
             const driver = this.getScopedDriver(c);
-
-
             const body = await parseJsonBody(c);
-            assertKnownWriteFields(body, resolvedCollection, { viewer: requestViewer(c) });
-            assertWriteValuesValid(body, resolvedCollection);
-            // `{ views: { $inc: 1 } }` and the rest. Validated here, against the
-            // collection's own property types, so a `$push` on a number is a
-            // 400 naming the field rather than a Postgres type error raised
-            // from inside the driver's transaction.
-            assertFieldOpsValid(body, resolvedCollection);
-
-            // The SDK has sent `Idempotency-Key` on `update()` since the option
-            // existed; this route read it off no request at all. A `PATCH` is
-            // not naturally idempotent — the field operations above make it
-            // emphatically not — so a retry after a lost ACK applied the edit
-            // twice, and `$inc` twice is a number nobody asked for.
-            //
-            // The existence read is *inside* the claim, so a replay is answered
-            // by the key rather than by re-reading. Outside it, a replay sent
-            // after the row was deleted in the meantime would 404 for an edit
-            // that had already committed — the same class of lie the delete
-            // route below exists to stop. A 404 or a failed precondition throws,
-            // which releases the key, so neither burns it.
-            return this.runIdempotent(c, body, async () => {
-                const existingEntity = await driver.fetchOne({
-                    path: getCollectionDataPath(collection),
-                    id: String(id),
-                    collection: resolvedCollection
-                });
-
-                if (!existingEntity) {
-                    throw this.entityNotFound(collection.slug, String(id));
-                }
-
-                const ifMatch = c.req.header(IF_MATCH_HEADER);
-                if (ifMatch) {
-                    await assertIfMatch(
-                        ifMatch,
-                        await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
-                        resolvedCollection,
-                        { collection: collection.slug, id: String(id) }
-                    );
-                }
-
-                const entity = await driver.save({
-                    path: getCollectionDataPath(collection),
-                    id: String(id),
-                    values: body,
-                    collection: resolvedCollection,
-                    status: "existing"
-                });
-                return this.formatResponse(entity);
-            }, (result) => prefersMinimal(c)
-                ? minimalResponse()
-                : c.json(result as never));
+            return this.updateRow(c, driver, ownRow(getCollectionDataPath(collection)), String(c.req.param("id")), body);
         };
 
         /**
@@ -1346,67 +1472,8 @@ values: entity as Record<string, unknown> },
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const id = c.req.param("id");
             const driver = this.getScopedDriver(c);
-
-
-            // The header the SDK sends and this route ignored.
-            //
-            // The existence read is inside the claim, and on this route that is
-            // the entire mechanism: a delete replayed after the first attempt
-            // committed finds the row gone and answers 404 — which an offline
-            // queue reads as a permanent failure, and reports to the user as an
-            // error, for a delete that in fact succeeded. Under a key the
-            // replay is answered from the key and the row is never read again.
-            return this.runIdempotent(c, { id: String(id) }, async () => {
-                const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
-                const existingEntity = await driver.fetchOne({
-                    path: getCollectionDataPath(collection),
-                    id: String(id),
-                    collection: resolvedCollection,
-                    // `withDeleted` when the caller asked to purge: a hard delete of an
-                    // ALREADY soft-deleted row is the "empty trash" operation, and the
-                    // default read hides exactly the rows it is meant to remove. Without
-                    // this the route answered 404 for a row `?deleted=only` was listing a
-                    // moment earlier, so a trashed row could never be purged at all.
-                    withDeleted: hardDelete ? true : undefined
-                });
-
-                if (!existingEntity) {
-                    throw this.entityNotFound(collection.slug, String(id));
-                }
-
-                const ifMatch = c.req.header(IF_MATCH_HEADER);
-                if (ifMatch) {
-                    // A conditional delete is the one that matters most:
-                    // "remove the row I read" is a different instruction from
-                    // "remove whatever is there now", and only the first is
-                    // safe once somebody else has edited it in between.
-                    await assertIfMatch(
-                        ifMatch,
-                        await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
-                        resolvedCollection,
-                        { collection: collection.slug, id: String(id) }
-                    );
-                }
-
-                await driver.delete({
-                    // `?hard=true` — a real DELETE on a soft-delete collection. Same
-                    // permission as the delete it replaces; see `soft-delete-params.ts`.
-                    hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
-                    row: {
-                        // The address is the one in the URL, not something read
-                        // back off the row: a row is only its columns, so
-                        // `existingEntity.id` is undefined for any table not
-                        // keyed on `id` — and the delete went looking for a row
-                        // called "undefined". The row itself the driver reads.
-                        id: String(id),
-                        path: getCollectionDataPath(collection)
-                    },
-                    collection: resolvedCollection
-                });
-                return null;
-            }, () => new Response(null, { status: 204 }));
+            return this.deleteRow(c, driver, ownRow(getCollectionDataPath(collection)), String(c.req.param("id")));
         });
     }
 
@@ -1465,6 +1532,16 @@ values: entity as Record<string, unknown> },
 id };
             }
         };
+
+        // The row a nested path addresses, written through the same methods as
+        // the root routes. No `driverCollection`: the driver resolves the
+        // collection from the path, which is also what scopes the row to its
+        // parent.
+        const nestedRow = (nested: NestedPath): RowAddress => ({
+            collection: nested.chain[nested.chain.length - 1],
+            path: nested.path,
+            name: nested.path
+        });
 
         // GET /<subcollection-path> — list or get single entity
         // Use :rest{.+} instead of * because Hono v4's wildcard doesn't
@@ -1575,25 +1652,23 @@ id: parsed.id });
             const driver = this.getScopedDriver(c);
 
             const nested = this.resolveNestedPath(parsed.collectionPath);
-            const targetCollection = nested.chain[nested.chain.length - 1];
 
             this.enforceSubcollectionApiKeyPermission(c, nested);
+            const row = nestedRow(nested);
             const body = await parseJsonBody(c);
 
-            assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
-            assertWriteValuesValid(body, targetCollection, { status: "new" });
+            // Refused rather than ignored. An upsert through a parent would
+            // match a row wherever it lives and write this parent's key onto
+            // it — the reparenting an update through a parent refuses to do.
+            if (c.req.query("on_conflict") !== undefined) {
+                throw ApiError.badRequest(
+                    "`on_conflict` is not accepted on a nested path: a row it matched would be moved " +
+                    `under this parent. Send the upsert to '${row.collection.slug}' directly.`,
+                    "INVALID_CONFLICT_TARGET"
+                );
+            }
 
-            const entity = await driver.save({
-                path: nested.path,
-                values: body,
-                status: "new"
-            });
-
-            const response = this.formatResponse(entity);
-
-
-
-            return c.json(response, 201);
+            return this.createRow(c, driver, row, body);
         });
 
         // PATCH /<subcollection-path>/:id — update entity. PUT is mounted on the
@@ -1608,7 +1683,6 @@ id: parsed.id });
             const driver = this.getScopedDriver(c);
 
             const nested = this.resolveNestedPath(parsed.collectionPath);
-            const targetCollection = nested.chain[nested.chain.length - 1];
 
             this.enforceSubcollectionApiKeyPermission(c, nested);
 
@@ -1628,21 +1702,7 @@ id: parsed.id });
                 return this.updateRelationPivotFromBody(c, driver, nested, parsed.id, body);
             }
 
-            assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
-            assertWriteValuesValid(body, targetCollection);
-
-            const entity = await driver.save({
-                path: nested.path,
-                id: parsed.id,
-                values: body,
-                status: "existing"
-            });
-
-            const response = this.formatResponse(entity);
-
-
-
-            return c.json(response);
+            return this.updateRow(c, driver, nestedRow(nested), parsed.id, body);
         };
 
         this.router.patch("/:parent/:parentId/:rest{.+}", updateNested);
@@ -1666,36 +1726,7 @@ id: parsed.id });
 
             this.enforceSubcollectionApiKeyPermission(c, nested);
 
-            // `?hard=true` — a real DELETE on a soft-delete collection. Same
-            // permission as the delete it replaces; see `soft-delete-params.ts`.
-            const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
-
-            const existingEntity = await driver.fetchOne({
-                path: nested.path,
-                id: parsed.id,
-                // `withDeleted` when the caller asked to purge: a hard delete of an
-                // ALREADY soft-deleted row is the "empty trash" operation, and the
-                // default read hides exactly the rows it is meant to remove. Without
-                // this the route answered 404 for a row `?deleted=only` was listing a
-                // moment earlier, so a trashed row could never be purged at all.
-                withDeleted: hardDelete ? true : undefined
-            });
-
-            if (!existingEntity) throw this.entityNotFound(nested.path, parsed.id);
-
-            await driver.delete({
-                hard: hardDelete,
-                row: {
-                    // The address from the path, for the same reason as the
-                    // collection-level delete above: a row carries no id.
-                    id: parsed.id,
-                    path: nested.path
-                }
-            });
-
-
-
-            return new Response(null, { status: 204 });
+            return this.deleteRow(c, driver, nestedRow(nested), parsed.id);
         });
     }
 

@@ -271,6 +271,10 @@ status: "new" })
 
         it("update subcollection entity - PUT /authors/123/posts/456", async () => {
             const app = createFlatApp();
+            // Read first, through the parent, exactly as the root update reads
+            // the row it is about to write: a missing one is a 404, and an
+            // `If-Match` has a version to compare against.
+            mockDriver.fetchOne.mockResolvedValue({ id: "456", title: "Hello" } as any);
             mockDriver.save.mockResolvedValue(
                 { id: "456",
 title: "Updated" } as any
@@ -283,6 +287,9 @@ title: "Updated" } as any
             });
 
             expect(res.status).toBe(200);
+            expect(mockDriver.fetchOne).toHaveBeenCalledWith(
+                expect.objectContaining({ path: "authors/123/posts", id: "456" })
+            );
             expect(mockDriver.save).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "authors/123/posts",

@@ -71,6 +71,18 @@ function createKeyStore() {
     };
 }
 
+const comments = {
+    slug: "comments",
+    name: "Comments",
+    singularName: "Comment",
+    table: "comments",
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        title: { name: "Title", type: "string" },
+        views: { name: "Views", type: "number" }
+    }
+} as unknown as CollectionConfig;
+
 const posts = {
     slug: "posts",
     name: "Posts",
@@ -79,7 +91,12 @@ const posts = {
     properties: {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" },
-        views: { name: "Views", type: "number" }
+        views: { name: "Views", type: "number" },
+        comments: {
+            name: "Comments",
+            type: "relation",
+            relation: { kind: "hasMany", target: () => comments, foreignKeyOnTarget: "post_id" }
+        }
     }
 } as unknown as CollectionConfig;
 
@@ -118,7 +135,7 @@ function createHarness(options?: { gateFirstWrite?: boolean; failFirstWrite?: bo
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([posts], driver).generateRoutes());
+    app.route("/", new RestApiGenerator([posts, comments], driver).generateRoutes());
     return { app, saves, deletes, writeCount: () => writes };
 }
 
@@ -239,5 +256,46 @@ describe("DELETE with an Idempotency-Key", () => {
 
         expect((await del(app)).status).toBe(204);
         expect((await del(app)).status).toBe(404);
+    });
+});
+
+describe("an Idempotency-Key on a nested path", () => {
+    // The same row reached through its parent is the same write, so the key
+    // means the same thing: these routes read no header at all.
+    const nested = (app: Hono, method: string, path: string, key: string, body?: unknown) =>
+        app.request(path, {
+            method,
+            headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+            ...(body === undefined ? {} : { body: JSON.stringify(body) })
+        });
+
+    it("replays an update instead of applying it again", async () => {
+        const { app, saves } = createHarness();
+
+        const first = await nested(app, "PATCH", "/posts/p1/comments/c1", "mut-1", { views: { $inc: 1 } });
+        const second = await nested(app, "PATCH", "/posts/p1/comments/c1", "mut-1", { views: { $inc: 1 } });
+
+        expect([first.status, second.status]).toEqual([200, 200]);
+        expect(saves).toHaveLength(1);
+    });
+
+    it("replays a create instead of inserting a second row", async () => {
+        const { app, saves } = createHarness();
+
+        const first = await nested(app, "POST", "/posts/p1/comments", "mut-1", { title: "hi" });
+        const second = await nested(app, "POST", "/posts/p1/comments", "mut-1", { title: "hi" });
+
+        expect([first.status, second.status]).toEqual([201, 201]);
+        expect(saves).toHaveLength(1);
+    });
+
+    it("replays a delete's 204 rather than 404ing on the row it removed", async () => {
+        const { app, deletes } = createHarness();
+
+        const first = await nested(app, "DELETE", "/posts/p1/comments/c1", "mut-1");
+        const second = await nested(app, "DELETE", "/posts/p1/comments/c1", "mut-1");
+
+        expect([first.status, second.status]).toEqual([204, 204]);
+        expect(deletes).toEqual(["c1"]);
     });
 });
