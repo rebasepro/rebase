@@ -48,7 +48,21 @@ export function checkChangelogSections(root = DEFAULT_ROOT) {
     const lines = readFileSync(path.join(root, CHANGELOG), "utf8").split("\n");
     const start = lines.findIndex(l => l.startsWith("## [Unreleased]"));
     const findings = [];
-    if (start === -1) return { findings, sections: [] };
+    // Not "nothing to check". `prepare-changelog.mjs` always leaves a fresh
+    // `## [Unreleased]` at the top, so a changelog without one has a heading
+    // someone misspelt — and the release cut refuses on it, at release time.
+    // Returning clean here called the one section this exists for fine
+    // because it was gone.
+    if (start === -1) {
+        findings.push({
+            file: CHANGELOG,
+            line: 1,
+            message:
+                "no `## [Unreleased]` section — it is where every change is written until a release " +
+                "promotes it, and `prepare-changelog.mjs` refuses to cut a release without one."
+        });
+        return { findings, sections: [] };
+    }
     let end = lines.length;
     for (let i = start + 1; i < lines.length; i++) {
         if (lines[i].startsWith("## [")) { end = i; break; }
