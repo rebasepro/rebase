@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { buildExplainSql, determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -281,5 +281,22 @@ describe("buildExplainSql", () => {
 
     it("refuses an empty buffer", () => {
         expect(buildExplainSql("  ;  ")).toBeNull();
+    });
+});
+
+describe("acceptsAutoLimit", () => {
+    it("accepts one SELECT with no limit of its own", () => {
+        expect(acceptsAutoLimit("SELECT * FROM users;")).toBe(true);
+        expect(acceptsAutoLimit("SELECT * FROM users LIMIT 5")).toBe(false);
+    });
+
+    it("refuses a write that contains a SELECT", () => {
+        expect(acceptsAutoLimit("INSERT INTO archive SELECT * FROM users")).toBe(false);
+        expect(acceptsAutoLimit("WITH gone AS (DELETE FROM users RETURNING *) SELECT * FROM gone")).toBe(false);
+    });
+
+    it("refuses a script, and text it cannot parse", () => {
+        expect(acceptsAutoLimit("SELECT 1; DELETE FROM users WHERE id = 1")).toBe(false);
+        expect(acceptsAutoLimit("CREATE TABLE copy AS SELECT * FROM users")).toBe(false);
     });
 });

@@ -30,6 +30,23 @@ export function buildExplainSql(sqlText: string): string | null {
 }
 
 /**
+ * Whether the console's automatic `LIMIT` may be appended to `sqlText`: one
+ * top-level SELECT that has no limit of its own.
+ *
+ * Decided on the parsed statement, not the text. A search for the word SELECT
+ * also found it inside `INSERT INTO … SELECT` and `CREATE TABLE … AS SELECT`,
+ * which then copied a thousand rows and reported success, and at the start of
+ * a script whose last statement the appended `LIMIT` turned into a syntax
+ * error. Text the parser cannot read is left as written.
+ */
+export function acceptsAutoLimit(sqlText: string): boolean {
+    const statements = parseStatements(sqlText);
+    if (!statements || statements.length !== 1) return false;
+    const [statement] = statements;
+    return statement.type === "select" && !statement.limit;
+}
+
+/**
  * A table extracted from a SQL query's FROM/JOIN clauses.
  */
 export interface ExtractedTable {

@@ -47,7 +47,7 @@ import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeSto
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { parseFirst } from "pgsql-ast-parser";
-import { buildExplainSql, determineTableAndPK, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
+import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -821,12 +821,10 @@ execTime: Math.round(performance.now() - start) });
 
     const executeRun = useCallback(async (sqlOverride?: string) => {
         let sqlToRun = sqlOverride || activeTab.sql;
-        const upperSql = sqlToRun.toUpperCase();
 
         const isAggregate = /\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i.test(sqlToRun);
-        const isExplain = /\bEXPLAIN\b/i.test(sqlToRun);
 
-        if (autoLimit && upperSql.includes("SELECT") && !upperSql.includes("LIMIT") && !isAggregate && !isExplain) {
+        if (autoLimit && acceptsAutoLimit(sqlToRun) && !isAggregate) {
             // Remove trailing semicolon if present to safely append LIMIT
             sqlToRun = sqlToRun.trim().replace(/;$/, "");
             sqlToRun = `${sqlToRun} LIMIT 1000;`;

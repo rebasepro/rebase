@@ -125,3 +125,35 @@ describe("explaining a query", () => {
         expect(sent()[0]).toBe("EXPLAIN (FORMAT JSON) SELECT * FROM posts");
     });
 });
+
+/**
+ * The "Limit 1000" toggle (on by default) appended `LIMIT 1000` to any text
+ * containing the word SELECT. `INSERT INTO archive SELECT * FROM posts` and
+ * `CREATE TABLE copy AS SELECT …` copied a thousand rows and reported success;
+ * `SELECT 1; DELETE … WHERE id = 1` became a syntax error.
+ */
+describe("the automatic LIMIT", () => {
+    async function run(text: string): Promise<string> {
+        render(<SQLEditor/>);
+        await typeSql(text);
+        fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
+        await waitFor(() => expect(sent()).toHaveLength(1));
+        return sent()[0];
+    }
+
+    it("limits a plain SELECT", async () => {
+        expect(await run("SELECT * FROM posts")).toBe("SELECT * FROM posts LIMIT 1000;");
+    });
+
+    it("leaves an INSERT … SELECT whole", async () => {
+        expect(await run("INSERT INTO archive SELECT * FROM posts")).toBe("INSERT INTO archive SELECT * FROM posts");
+    });
+
+    it("leaves a CREATE TABLE … AS SELECT whole", async () => {
+        expect(await run("CREATE TABLE copy AS SELECT * FROM posts")).toBe("CREATE TABLE copy AS SELECT * FROM posts");
+    });
+
+    it("leaves a script of several statements whole", async () => {
+        expect(await run("SELECT 1; DELETE FROM posts WHERE id = 1")).toBe("SELECT 1; DELETE FROM posts WHERE id = 1");
+    });
+});
