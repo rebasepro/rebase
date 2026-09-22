@@ -55,8 +55,9 @@ const postgresResources = createPostgresDatabaseConnection(env.DATABASE_URL, und
 async function startServer() {
     const server = createServer(getRequestListener(app.fetch));
 
-    if (isProduction && !env.FORCE_LOCAL_STORAGE) {
-        logger.warn("Using local file storage in production! Uploaded files will be lost if the container restarts. Set FORCE_LOCAL_STORAGE=true to suppress this warning, or configure an S3/GCS adapter.");
+    // Local disk is what `storage` below falls back to for anything but s3.
+    if (isProduction && env.STORAGE_TYPE !== "s3" && !env.FORCE_LOCAL_STORAGE) {
+        logger.warn("Using local file storage in production! Uploaded files will be lost if the container restarts. Set FORCE_LOCAL_STORAGE=true to suppress this warning, or set STORAGE_TYPE=s3.");
     }
 
     const backend = await initializeRebaseBackend({
