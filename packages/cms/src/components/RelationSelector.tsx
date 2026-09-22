@@ -260,7 +260,14 @@ export const RelationSelector = React.forwardRef<
 
             // FAST PATH: If the incoming IDs match what we just set locally via user interaction,
             // our selectedItems already have the correct data — no re-resolution needed.
-            if (localSelectionIdsRef.current !== null && incomingIds === localSelectionIdsRef.current) {
+            //
+            // The fingerprint answers for one echo only, and is dropped on the
+            // first incoming value whether it matches or not. Kept, it also
+            // matched a *later* return to the same ids — pick A, discard to B,
+            // undo back to A — and the chip went on showing B.
+            const localSelectionIds = localSelectionIdsRef.current;
+            localSelectionIdsRef.current = null;
+            if (localSelectionIds !== null && incomingIds === localSelectionIds) {
                 resolvedIdsRef.current = incomingIds;
                 hasResolvedItemsRef.current = true;
                 // Do NOT call setSelectedItems or setIsLoadingSelectedItems — they are already correct.
