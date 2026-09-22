@@ -61,7 +61,11 @@ export interface CronStore {
 const TABLE = "rebase.cron_logs";
 const CLAIMS_TABLE = "rebase.cron_claims";
 
-/** Claims older than this are garbage-collected on startup. */
+/**
+ * Claims older than this are garbage-collected on startup — all but each
+ * job's most recent one, which is kept however old it is; see the sweep in
+ * `ensureTable`.
+ */
 const CLAIM_RETENTION_DAYS = 7;
 
 /**
@@ -154,15 +158,6 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
             ]);
 
             if (claimsReady) {
-                // Garbage-collect old claims — they are only needed while
-                // instances could still contend on the same slot.
-                await ddl.step("Claim retention sweep", async () => {
-                    await exec(
-                        `DELETE FROM ${CLAIMS_TABLE} WHERE claimed_at < now() - make_interval(days => $1)`,
-                        { params: [CLAIM_RETENTION_DAYS] }
-                    );
-                });
-
                 // Drop claims for slots that have not happened yet. A slot is
                 // claimed at the moment it fires, so a future one can only come
                 // from a timer that woke early — and because claims are
@@ -186,6 +181,30 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                             "otherwise have skipped that run"
                         );
                     }
+                });
+
+                // Garbage-collect old claims — except each job's most recent
+                // one. A claim is also the record that a slot already ran, and
+                // the catch-up at boot asks exactly that about the job's latest
+                // slot, as far back as its `catchUpWindowSeconds` reaches —
+                // which can be a month. Sweeping that claim after seven days
+                // would make the boot that swept it re-run the slot. A claim
+                // behind the latest answers for a slot no catch-up looks at,
+                // since a catch-up considers only the most recent one.
+                //
+                // After the future-slot sweep, not before: a stranded future
+                // claim would otherwise count as the job's latest, and the real
+                // one behind it would be swept here and then released there.
+                await ddl.step("Claim retention sweep", async () => {
+                    await exec(
+                        `DELETE FROM ${CLAIMS_TABLE} AS c
+                         WHERE c.claimed_at < now() - make_interval(days => $1)
+                           AND c.slot < (
+                               SELECT max(latest.slot) FROM ${CLAIMS_TABLE} AS latest
+                               WHERE latest.job_id = c.job_id
+                           )`,
+                        { params: [CLAIM_RETENTION_DAYS] }
+                    );
                 });
             }
 
