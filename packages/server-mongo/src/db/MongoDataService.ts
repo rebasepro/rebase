@@ -8,7 +8,7 @@
 import { Db, ObjectId, Collection, Document, FindOptions, Filter, MongoServerError } from "mongodb";
 import { FilterValues, DataRepository, CollectionConfig, EntityReference, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
-import { ApiError } from "@rebasepro/server";
+import { ApiError, splitFieldOps, type ParsedFieldOp } from "@rebasepro/server";
 
 /**
  * MongoDB Row Service
@@ -317,6 +317,13 @@ export class MongoDataService implements DataRepository {
      *   404 — never a row conjured under an id nobody created.
      * - absent, the repository's own "create or update": an upsert. Only the
      *   repository's direct callers reach it; the driver always says which.
+     *
+     * `values` may carry field operations (`{ views: { $inc: 1 } }`), which
+     * change the stored value in the same write rather than replace it — see
+     * {@link compileFieldOp}. They were written into the document as literal
+     * objects, so a counter became `{ "$inc": 1 }` behind a 200. Only an
+     * update can carry one: there is no stored value for an insert to act on,
+     * and an upsert may be an insert.
      */
     async save<M extends Record<string, any>>(
         collectionPath: string,
@@ -326,7 +333,17 @@ export class MongoDataService implements DataRepository {
         mode?: "create" | "update"
     ): Promise<Record<string, unknown>> {
         const collection = this.getCollection(collectionPath);
-        const mongoValues = this.convertToMongoValues(values as Record<string, any>);
+        const { values: plainValues, fieldOps } = splitFieldOps(values as Record<string, unknown>);
+        const opFields = Object.keys(fieldOps);
+        if (opFields.length > 0 && !(id && mode === "update")) {
+            throw ApiError.badRequest(
+                `Field operations (${opFields.map(k => `'${k}'`).join(", ")}) need an existing row to act on, ` +
+                `and this write to "${collectionPath}" ${id && mode === undefined ? "may be" : "is"} an insert. ` +
+                "Send the value itself instead.",
+                "INVALID_FIELD_OPERATION"
+            );
+        }
+        const mongoValues = this.convertToMongoValues(plainValues);
 
         if (id) {
             const objectId = this.toObjectId(id);
@@ -334,9 +351,22 @@ export class MongoDataService implements DataRepository {
                 await refuseDuplicateKey(collectionPath, id, () =>
                     collection.insertOne({ ...mongoValues, _id: objectId } as Document));
             } else {
+                // With an operation in it the write is an update pipeline, so
+                // each operation can read the value it changes inside the one
+                // statement — two concurrent increments both land. A pipeline
+                // reads every string starting with `$` as a field path, so the
+                // plain values ride in `$literal`.
+                const update = opFields.length > 0
+                    ? [{
+                        $set: {
+                            ...Object.fromEntries(Object.entries(mongoValues).map(([key, value]) => [key, { $literal: value }])),
+                            ...Object.fromEntries(opFields.map(key => [key, this.compileFieldOp(key, fieldOps[key])]))
+                        }
+                    }]
+                    : { $set: mongoValues };
                 const result = await refuseDuplicateKey(collectionPath, id, () => collection.updateOne(
                     { _id: objectId } as Filter<Document>,
-                    { $set: mongoValues },
+                    update,
                     { upsert: mode !== "update" }
                 ));
                 if (mode === "update" && result.matchedCount === 0) {
@@ -356,6 +386,39 @@ id: id.toString() });
 
             return await this.readBack(collectionPath, newId, { ...values,
 id: newId.toString() });
+        }
+    }
+
+    /**
+     * The aggregation expression one field operation compiles to, in an update
+     * pipeline's `$set`.
+     *
+     * The same meaning the Postgres compiler gives each one, NULL-safety
+     * included: an unset or null counter increments from zero and an absent
+     * array is pushed onto as an empty one, rather than the write failing on
+     * the first use of a field. `$push` and `$pull` take a value or a list of
+     * values, `$pull` removes every occurrence, and `$merge` is shallow — a
+     * nested object replaces, it is not merged into.
+     */
+    private compileFieldOp(field: string, op: ParsedFieldOp): Document {
+        const current = `$${field}`;
+        const operand = this.convertToMongoValue(op.operand);
+        const asList = (value: unknown): unknown[] => Array.isArray(value) ? value : [value];
+        switch (op.operator) {
+            case "$inc":
+                return { $add: [{ $ifNull: [current, 0] }, { $literal: operand }] };
+            case "$push":
+                return { $concatArrays: [{ $ifNull: [current, []] }, { $literal: asList(operand) }] };
+            case "$pull":
+                return {
+                    $filter: {
+                        input: { $ifNull: [current, []] },
+                        as: "element",
+                        cond: { $not: [{ $in: ["$$element", { $literal: asList(operand) }] }] }
+                    }
+                };
+            case "$merge":
+                return { $mergeObjects: [{ $ifNull: [current, {}] }, { $literal: operand }] };
         }
     }
 
