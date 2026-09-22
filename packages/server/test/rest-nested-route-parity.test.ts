@@ -266,3 +266,20 @@ describe("a nested write", () => {
         expect(writes()).toHaveLength(0);
     });
 });
+
+describe("a nested count", () => {
+    it("counts what the listing beside it serves, soft-deleted rows included when asked", async () => {
+        // The root count and both listings forward `?deleted=`; this one
+        // dropped it, so a trash view's count reported the live rows.
+        const { app, calls } = createHarness();
+
+        const res = await app.request("/blog_posts/1/comments/count?deleted=only");
+
+        expect(res.status).toBe(200);
+        expect(calls).toEqual([["count", expect.objectContaining({
+            path: "blog_posts/1/comments",
+            withDeleted: "only",
+            collection: comments
+        })]]);
+    });
+});

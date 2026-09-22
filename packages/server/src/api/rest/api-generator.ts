@@ -1587,16 +1587,14 @@ id };
                 const queryOptions = this.parseQuery(queryDict, nestedAccess);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
-                const total = driver.count ? await driver.count({
-                    path: nested.path,
-                    filter: queryOptions.where,
-                    // The two sibling counts in this file forward the group and
-                    // this one did not, so a nested `/count?or=(…)` answered
-                    // with the unnarrowed total beside a narrowed list.
-                    logical: queryOptions.logical,
-                    searchString,
-                    vectorSearch: queryOptions.vectorSearch
-                }) : 0;
+                // The count the root route and both listings take, not a copy
+                // of its option list. This one kept its own, and each option
+                // added to the others was missed here in turn — the logical
+                // group first, then `?deleted=`, so a trash view's count
+                // reported the live rows.
+                const total = await this.countRawEntities(
+                    driver, nestedCollection, queryOptions, searchString, nested.path
+                );
 
                 return c.json({ count: total });
             } else if (parsed.id) {
