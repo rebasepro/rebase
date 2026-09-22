@@ -30,10 +30,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 /**
  * Extensions this gate covers: the ones a human writes and a human greps.
  * Binary assets and lockfiles are none of its business.
+ *
+ * The first list stopped at the obvious ones and left out `.mts` (the gate
+ * scripts themselves), shell, Terraform, the `.txt` API-surface contracts,
+ * SVG and the `.env.example` files — each one somewhere a NUL would make grep
+ * go quiet exactly as this gate exists to prevent.
  */
 const TEXT_EXTENSIONS = new Set([
-    ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-    ".md", ".mdx", ".json", ".yml", ".yaml", ".css", ".html", ".astro", ".sql"
+    ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs",
+    ".md", ".mdx", ".json", ".yml", ".yaml", ".toml", ".css", ".html", ".astro", ".svg", ".sql",
+    ".sh", ".tf", ".tpl", ".txt", ".example", ".template"
 ]);
 
 /**
@@ -60,52 +66,61 @@ const TEXT_EXTENSIONS = new Set([
 // eslint-disable-next-line no-control-regex
 const FORBIDDEN = /[\x00-\x08\x0b\x0c\x0e-\x1a\x1c-\x1f\x7f]/;
 
+/** @param {string} rel a tracked path */
+export function isScanned(rel) {
+    return TEXT_EXTENSIONS.has(path.extname(rel));
+}
+
 function trackedFiles() {
     const out = execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 });
     return out.toString("utf-8").split("\0").filter(Boolean);
 }
 
-const offenders = [];
+function main() {
+    const offenders = [];
 
-for (const rel of trackedFiles()) {
-    if (!TEXT_EXTENSIONS.has(path.extname(rel))) continue;
+    for (const rel of trackedFiles()) {
+        if (!isScanned(rel)) continue;
 
-    const abs = path.join(ROOT, rel);
-    // A tracked path can be absent in a sparse or partial checkout.
-    if (!fs.existsSync(abs)) continue;
+        const abs = path.join(ROOT, rel);
+        // A tracked path can be absent in a sparse or partial checkout.
+        if (!fs.existsSync(abs)) continue;
 
-    // Read as latin1 so every byte maps to exactly one char and nothing is
-    // replaced: decoding as UTF-8 first would turn an invalid sequence into
-    // U+FFFD and could mask the very byte being looked for.
-    const text = fs.readFileSync(abs, "latin1");
-    if (!FORBIDDEN.test(text)) continue;
+        // Read as latin1 so every byte maps to exactly one char and nothing is
+        // replaced: decoding as UTF-8 first would turn an invalid sequence into
+        // U+FFFD and could mask the very byte being looked for.
+        const text = fs.readFileSync(abs, "latin1");
+        if (!FORBIDDEN.test(text)) continue;
 
-    const lines = text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-        const match = FORBIDDEN.exec(lines[i]);
-        if (!match) continue;
-        const code = match[0].charCodeAt(0);
-        offenders.push({
-            file: rel,
-            line: i + 1,
-            column: match.index + 1,
-            escape: `\\x${code.toString(16).padStart(2, "0")}`
-        });
+        const lines = text.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const match = FORBIDDEN.exec(lines[i]);
+            if (!match) continue;
+            const code = match[0].charCodeAt(0);
+            offenders.push({
+                file: rel,
+                line: i + 1,
+                column: match.index + 1,
+                escape: `\\x${code.toString(16).padStart(2, "0")}`
+            });
+        }
     }
+
+    if (offenders.length > 0) {
+        console.error(`✗ ${offenders.length} raw control character(s) in tracked sources:\n`);
+        for (const o of offenders) {
+            console.error(`  ${o.file}:${o.line}:${o.column}  ${o.escape}`);
+        }
+        console.error(
+            "\n  A file containing one of these is treated as binary by grep and ripgrep," +
+            "\n  which then skip it in silence — searches over it return nothing, and that" +
+            "\n  reads exactly like 'no matches'." +
+            "\n\n  Write the escape instead (\\0, \\u0000, \\x1b). Same value, greppable source.\n"
+        );
+        process.exit(1);
+    }
+
+    console.log("✓ no raw control characters in tracked sources");
 }
 
-if (offenders.length > 0) {
-    console.error(`✗ ${offenders.length} raw control character(s) in tracked sources:\n`);
-    for (const o of offenders) {
-        console.error(`  ${o.file}:${o.line}:${o.column}  ${o.escape}`);
-    }
-    console.error(
-        "\n  A file containing one of these is treated as binary by grep and ripgrep," +
-        "\n  which then skip it in silence — searches over it return nothing, and that" +
-        "\n  reads exactly like 'no matches'." +
-        "\n\n  Write the escape instead (\\0, \\u0000, \\x1b). Same value, greppable source.\n"
-    );
-    process.exit(1);
-}
-
-console.log("✓ no raw control characters in tracked sources");
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
