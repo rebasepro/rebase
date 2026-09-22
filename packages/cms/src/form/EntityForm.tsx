@@ -33,7 +33,7 @@ import { useUndoableDiscard } from "./useUndoableDiscard";
 
 import { mergeDeep } from "@rebasepro/utils";
 import {
-    getChanges,
+    getChangedProperties,
     zodToFormErrors
 } from "./form_utils";
 
@@ -275,7 +275,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     const lastSavedValues = useRef<EntityValues<M> | undefined>(entity?.values);
     const save = async (values: EntityValues<M>): Promise<Entity<M> | void> => {
         const valuesToSave = status === "existing"
-            ? getChanges(values, entity?.values || {}) as EntityValues<M>
+            ? getChangedProperties<M>(values, entity?.values || {}) as EntityValues<M>
             : values;
 
         if (status === "existing" && Object.keys(valuesToSave).length === 0 && entity) {

@@ -5,7 +5,7 @@ import type { AuthController } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
 import { getDefaultValuesFor } from "@rebasepro/common";
-import { isObject, mergeDeep } from "@rebasepro/utils";
+import { isPlainObject, mergeDeep } from "@rebasepro/utils";
 import { z } from "zod";
 
 // extract touched values for nested touched trees and map to current values
@@ -101,7 +101,11 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
             if (hasChanges) {
                 (changes as Record<string, unknown>)[key] = sourceValue;
             }
-        } else if (isObject(sourceValue) && sourceValue && isObject(comparisonValue) && comparisonValue) {
+        } else if (isPlainObject(sourceValue) && isPlainObject(comparisonValue)) {
+            // Plain objects only. A `Date` has no keys of its own, so walking
+            // into two different dates finds nothing and loses the edit; a
+            // class instance (a relation) would come back as a bare `{ id }`
+            // that no longer says what it is.
             const nestedChanges = getChanges(sourceValue, comparisonValue);
             if (Object.keys(nestedChanges).length > 0) {
                 (changes as Record<string, unknown>)[key] = nestedChanges;
@@ -111,6 +115,32 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
         }
     }
 
+    return changes;
+}
+
+/**
+ * What an update of a stored record sends: every top-level property whose value
+ * differs from the stored one — whole.
+ *
+ * Whole, because that is the unit an update replaces. It sets each property it
+ * carries, so the value sent *is* the property's new value: a map sent as the
+ * one key that changed would erase every key left out, a key-value map with a
+ * key removed would arrive empty, and a geopoint with one coordinate moved is
+ * refused for lacking the other. {@link getChanges} walks into plain objects to
+ * find what changed inside them, which is right for comparing a draft with the
+ * form and wrong for a write.
+ */
+export function getChangedProperties<M extends Record<string, unknown>>(
+    values: Partial<M>,
+    storedValues: Partial<M>
+): Partial<M> {
+    const changes: Partial<M> = {};
+    const keys = new Set([...Object.keys(values), ...Object.keys(storedValues)]);
+    for (const key of keys) {
+        if (!equal(values[key], storedValues[key])) {
+            (changes as Record<string, unknown>)[key] = values[key];
+        }
+    }
     return changes;
 }
 
