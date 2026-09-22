@@ -2,6 +2,16 @@ import { Entity, FilterValues } from "@rebasepro/types";
 
 const collectionScrollCache = new Map<string, { scrollOffset: number, data: Entity<any>[] }>();
 
+/**
+ * Forget every collection's scroll position and the rows kept with it.
+ *
+ * The rows are what the signed-in user was allowed to read, and a table seeds
+ * its first render from them, so they must not outlive that user's session.
+ */
+export function clearCollectionScrollCache(): void {
+    collectionScrollCache.clear();
+}
+
 export type ScrollRestorationController = {
 
     getCollectionScroll: (path: string,

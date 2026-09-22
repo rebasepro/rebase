@@ -33,6 +33,27 @@ export function entityDisplayKey(
     return `${role} ${path} ${entityId ?? ""}`;
 }
 
+/**
+ * One shared store, so every surface agrees on a record and resolves it once.
+ *
+ * Module-level rather than a provider: two app instances on one page share a
+ * cache keyed by collection path and record id, which *is* the same record.
+ * A resolved title is what the signed-in user was allowed to read, though, so
+ * the store is emptied with the rest of the session's caches when that user
+ * signs out (`clearSessionCaches`).
+ *
+ * Built on first use rather than at module scope. Importing a module should not
+ * construct anything: it runs during SSR where there is nothing to cache, and it
+ * made the modules that read this store unimportable from any test that stubs
+ * `@rebasepro/app`.
+ */
+let sharedCache: EntityDisplayCache | undefined;
+
+export function getSharedEntityDisplayCache(): EntityDisplayCache {
+    if (!sharedCache) sharedCache = new EntityDisplayCache();
+    return sharedCache;
+}
+
 export class EntityDisplayCache {
 
     private readonly entries = new Map<EntityDisplayKey, CacheEntry>();

@@ -154,6 +154,33 @@ export function getEntityFromMemoryCache(path: string): object | undefined {
     return entityCache.get(path);
 }
 
+/**
+ * Drops every edit in flight. They were parked by a user who is no longer
+ * signed in, so nobody is taking them over.
+ */
+export function clearEntityMemoryCache(): void {
+    entityCache.clear();
+}
+
+/**
+ * Drops the whole local-changes backup: every draft in `sessionStorage`, for
+ * every record. For when the drafts belong to somebody other than the user now
+ * signed in.
+ */
+export function clearEntityDrafts(): void {
+    if (!isSessionStorageAvailable) return;
+    try {
+        const keys: string[] = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key?.startsWith(LOCAL_STORAGE_PREFIX)) keys.push(key);
+        }
+        for (const key of keys) sessionStorage.removeItem(key);
+    } catch (error) {
+        console.error("Failed to clear the local-changes backup from sessionStorage:", error);
+    }
+}
+
 
 /**
  * Retrieves a entity from the local-changes backup in `sessionStorage`.

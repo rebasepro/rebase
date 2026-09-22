@@ -1,12 +1,23 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { AuthClient, User } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
+import { bindSessionCachesToUser, clearSessionCaches } from "../auth/session_caches";
+
+/**
+ * Sets the user, first making sure the tab's caches were filled for them.
+ * Before the state update, not in an effect: the views read those caches in
+ * the very render the new user arrives in.
+ */
+function adoptUser(user: User | null): User | null {
+    if (user) bindSessionCachesToUser(user.uid);
+    return user;
+}
 
 export function useAuthSubscription(authClient?: AuthClient): AuthController {
 
     // Check initial state
     const currentSession = authClient?.getSession();
-    const [user, setUser] = useState<User | null>(currentSession?.user ?? null);
+    const [user, setUser] = useState<User | null>(() => adoptUser(currentSession?.user ?? null));
 
     const [authLoading, setAuthLoading] = useState(false);
     const [authError, setAuthError] = useState<Error>();
@@ -48,7 +59,7 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
             authClient.getUser()
                 .then(user => {
                     if (user) {
-                        setUser(user);
+                        setUser(adoptUser(user));
                     }
                     setAuthError(undefined);
                 })
@@ -80,8 +91,11 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
         if (!authClient) return;
         const unsubscribe = authClient.onAuthStateChange((event, session) => {
             if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
-                setUser(session?.user ?? null);
+                setUser(adoptUser(session?.user ?? null));
             } else if (event === "SIGNED_OUT") {
+                // See `clearSessionCaches`: what this session read must not be
+                // what the next user in the tab is shown first.
+                clearSessionCaches();
                 setUser(null);
             }
         });

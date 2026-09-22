@@ -3,8 +3,9 @@ import type { Entity, Property } from "@rebasepro/types";
 import { ENTITY_DISPLAY_ROLES } from "@rebasepro/cms-types";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import {
-    EntityDisplayCache,
+    type EntityDisplayCache,
     entityDisplayKey,
+    getSharedEntityDisplayCache,
     getDisplayPropertyKey,
     getDisplayResolver,
     getPropertyInPath,
@@ -46,26 +47,14 @@ export interface ResolvedDisplayValue<T = unknown> {
 }
 
 /**
- * One shared store, so every surface agrees on a record and resolves it once.
- *
- * Module-level rather than a provider: two app instances on one page share a
- * cache keyed by collection path and record id, which *is* the same record.
- * Nothing here is user-specific — a resolver that reads per-user data must
- * invalidate on sign-out, which {@link useEntityDisplayCache} exposes.
- */
-let sharedCache: EntityDisplayCache | undefined;
-
-/**
  * The store behind {@link useEntityDisplay}, for invalidating after a write.
  *
- * Built on first use rather than at module scope. Importing a module should not
- * construct anything: it runs during SSR where there is nothing to cache, and it
- * made this module unimportable from any test that stubs `@rebasepro/app` —
- * which several do, and which is a legitimate thing for them to do.
+ * The app's one shared store, so every surface agrees on a record and resolves
+ * it once, and so it is emptied with the rest of the session's caches when the
+ * user signs out.
  */
 export function useEntityDisplayCache(): EntityDisplayCache {
-    if (!sharedCache) sharedCache = new EntityDisplayCache();
-    return sharedCache;
+    return getSharedEntityDisplayCache();
 }
 
 export interface UseEntityDisplayParams<M extends Record<string, unknown>> {
