@@ -73,26 +73,45 @@ export const assertSinglePrimaryKey = (collection: CollectionConfig): void => {
     );
 };
 
-export const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
-    if (collection.properties) {
-        const idPropEntry = idPropertyEntries(collection)[0];
-        if (idPropEntry) {
-            const prop = idPropEntry[1];
-            const isUuid = prop.type === "string" && "isId" in prop && (prop as StringProperty).isId === "uuid";
-            return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
-        }
+/**
+ * A collection's primary key, by both of its names.
+ *
+ * `name` is the property key — what the generated Drizzle table is keyed by,
+ * so it is what a relation's `references` names. `column` is the SQL
+ * identifier, so it is what a foreign key's `REFERENCES` names. They differ
+ * whenever the key is camelCase or carries a `columnName` (`authorId` is
+ * `author_id`, and every table `rebase schema introspect` adopts is spelled
+ * that way), and a constraint written with the key named a column that does
+ * not exist: `db push` could not build its desired state, and boot failed the
+ * constraint on every start.
+ */
+export interface PrimaryKey {
+    /** Property key: the Drizzle object key and the JSON field. */
+    name: string;
+    /** SQL column. */
+    column: string;
+    /** The declaring property; absent for the implicit `id TEXT` of a collection that declares none. */
+    prop?: Property;
+}
+
+export const getPrimaryKeyProp = (collection: CollectionConfig): PrimaryKey => {
+    const idPropEntry = idPropertyEntries(collection)[0];
+    if (idPropEntry) {
+        const [name, prop] = idPropEntry;
+        return { name, column: resolveColumnName(name, prop), prop };
     }
     // Fallback: a collection that declares no `isId` gets an implicit `id`.
     const idProp = collection.properties?.["id"] as Property | undefined;
-    if (idProp?.type === "number") {
-        return { name: "id", type: "number", isUuid: false };
-    }
-    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as StringProperty).isId === "uuid";
-    return { name: "id", type: "string", isUuid: isUuid ?? false };
+    return { name: "id", column: resolveColumnName("id", idProp), prop: idProp };
 };
 
+/** The primary key's property key. What a Drizzle relation's `references` names. */
 export const getPrimaryKeyName = (collection: CollectionConfig): string =>
     getPrimaryKeyProp(collection).name;
+
+/** The primary key's column. What a foreign key's `REFERENCES` names. */
+export const getPrimaryKeyColumn = (collection: CollectionConfig): string =>
+    getPrimaryKeyProp(collection).column;
 
 export const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;

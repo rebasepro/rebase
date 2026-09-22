@@ -418,6 +418,27 @@ export function diffPlanAgainstCatalogue(
         && !existing.populatedTables.has(table.qualified);
 
     /**
+     * The column is there and holds a different kind of value than the
+     * collection says it does. Reported, never altered: an unattended `ALTER
+     * COLUMN … TYPE` over customer data is not a thing to do quietly, and the
+     * *quiet* is what this fixes. A deploy that changed a `columnType` used to
+     * report success while the column stayed as it was, and the divergence
+     * surfaced later as every write failing. A column whose definition is owned
+     * elsewhere (auth, or a generated search column) is not compared: the
+     * declaration there is a rendered string rather than a type, and auth's own
+     * reconcile owns it.
+     */
+    const reportTypeDrift = (table: TablePlan, column: ColumnPlan): void => {
+        const key = `${table.qualified}.${column.column}`;
+        if (existing.tables.get(table.qualified)?.has(column.column) !== true || column.sqlDefinition) return;
+        const declaredType = renderPgType(column.type);
+        const actualType = existing.columnTypes?.get(key);
+        if (actualType && !typesAgree(declaredType, actualType)) {
+            columnTypeDrift.push({ table: table.qualified, column: column.column, declared: declaredType, actual: actualType });
+        }
+    };
+
+    /**
      * Plan one column, with the constraints this database can safely take.
      *
      * The definition comes from the same renderer `schema.sql` uses, minus the
@@ -432,20 +453,7 @@ export function diffPlanAgainstCatalogue(
         const required = !column.nullable;
         const hasDefault = column.default !== undefined;
 
-        // The column is there and holds a different kind of value than the
-        // collection says it does. Reported, never altered: an unattended
-        // `ALTER COLUMN … TYPE` over customer data is not a thing to do
-        // quietly, and the *quiet* is what this fixes. A deploy that changed a
-        // `columnType` used to report success while the column stayed as it
-        // was, and the divergence surfaced later as every write failing.
-        // A column whose definition is owned elsewhere (auth, or a generated
-        // search column) is not compared: the declaration there is a rendered
-        // string rather than a type, and auth's own reconcile owns it.
-        const declaredType = renderPgType(column.type);
-        const actualType = existing.columnTypes?.get(key);
-        if (columnExists && !column.sqlDefinition && actualType && !typesAgree(declaredType, actualType)) {
-            columnTypeDrift.push({ table: table.qualified, column: column.column, declared: declaredType, actual: actualType });
-        }
+        reportTypeDrift(table, column);
 
         // A table this run is creating has no rows yet, so the constraints
         // `db push` writes are free to apply. On a table that already exists
@@ -627,6 +635,10 @@ export function diffPlanAgainstCatalogue(
                 planColumn(table, column);
                 continue;
             }
+            // A key column whose type is not its endpoint's key type is a
+            // foreign key that can never be added (42804) — said, like any
+            // other column's drift, rather than failed on every boot.
+            reportTypeDrift(table, column);
             addColumn(table, column.column, renderPgType(column.type));
         }
     }

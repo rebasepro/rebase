@@ -69,6 +69,7 @@ import {
     assertSinglePrimaryKey,
     declaresEnumType,
     enumLabelsOf,
+    getPrimaryKeyColumn,
     getPrimaryKeyName,
     getPrimaryKeyProp,
     idColumnDefault,
@@ -173,14 +174,34 @@ const foreignKeyPlan = (
  * The type a column pointing at this collection's primary key must have — a
  * junction endpoint, a `belongsTo` foreign key, a `reference`.
  *
- * One function because it was three: the ladder was spelled inline in
- * `generatePostgresDdl`, again in `planJunctionTables` and a third time in the
- * Drizzle generator.
+ * The key's own column type, from the same functions that typed the key: a
+ * foreign key only holds between compatible types, so any second reading of
+ * the key is a constraint waiting to fail. This used to look at the id
+ * strategy alone, so `id: { isId: true, columnType: "uuid" }` was referenced by
+ * TEXT columns (42804 — the constraint was never created) and a `bigint` key by
+ * INTEGER ones, which overflow at 2^31.
+ *
+ * One exception: a `serial` key owns a sequence, and a column pointing at it is
+ * the plain integer of the same width — `SERIAL` there would give every
+ * referencing column a sequence of its own.
  */
 export const primaryKeyPgType = (collection: CollectionConfig): PgType => {
-    const pk = getPrimaryKeyProp(collection);
-    if (pk.type === "number") return { kind: "integer" };
-    return pk.isUuid ? { kind: "uuid" } : { kind: "text" };
+    const { name, prop } = getPrimaryKeyProp(collection);
+    if (prop?.type === "number") {
+        return withoutSequence(numberType(name, prop as NumberProperty, collection, true));
+    }
+    if (prop?.type === "string") return stringType(name, prop as StringProperty, collection);
+    // The implicit `id TEXT PRIMARY KEY` of a collection that declares no key.
+    return { kind: "text" };
+};
+
+const withoutSequence = (type: PgType): PgType => {
+    switch (type.kind) {
+        case "smallserial": return { kind: "smallint" };
+        case "serial": return { kind: "integer" };
+        case "bigserial": return { kind: "bigint" };
+        default: return type;
+    }
 };
 
 /** The `columnType`s a `number` property may name, and what each one is. */
@@ -204,11 +225,10 @@ const NUMBER_COLUMN_TYPES: Record<string, PgType> = {
 
 const numberType = (propName: string, prop: NumberProperty, collection: CollectionConfig, isId: boolean): PgType => {
     // An identity column is INTEGER, and `columnType` is not read beside it, on
-    // purpose. Every column that points at a numeric primary key is INTEGER
-    // (`primaryKeyPgType`), so a BIGINT identity would be referenced by int4
-    // foreign keys — the int8/int4 truncation this repo has already been bitten
-    // by. The Drizzle generator used to honour `columnType` here while the DDL
-    // one ignored it, so the same property was int8 in `schema.generated.ts` and
+    // purpose: it is the type every identity key in the field was created with,
+    // and every column pointing at one takes it too (`primaryKeyPgType`). The
+    // Drizzle generator used to honour `columnType` here while the DDL one
+    // ignored it, so the same property was int8 in `schema.generated.ts` and
     // int4 in the database; with `columnType: "bigserial"` the emitted
     // `.generatedByDefaultAsIdentity()` is not a method that exists, so the file
     // did not compile at all.
@@ -1043,7 +1063,7 @@ function planRelationColumn(
             column: relation.localKey,
             targetSchema: schemaOf(target),
             targetTable: bareTableName(getTableName(target)),
-            targetColumn: getPrimaryKeyName(target),
+            targetColumn: getPrimaryKeyColumn(target),
             onDelete: relation.onDelete ?? defaultBelongsToOnDelete(required),
             onUpdate: relation.onUpdate
         }),
@@ -1083,7 +1103,7 @@ function planReferenceColumn(
                 column,
                 targetSchema: schemaOf(target),
                 targetTable: bareTableName(getTableName(target)),
-                targetColumn: getPrimaryKeyName(target),
+                targetColumn: getPrimaryKeyColumn(target),
                 // The same rule as `belongsTo`, from the same function. A
                 // `reference` carries no `onDelete` of its own to override it.
                 onDelete: defaultBelongsToOnDelete(required)
@@ -1173,7 +1193,7 @@ function planJunctionTable(
             column,
             targetSchema: schemaOf(collection),
             targetTable: bareTableName(getTableName(collection)),
-            targetColumn: getPrimaryKeyName(collection),
+            targetColumn: getPrimaryKeyColumn(collection),
             onDelete
         }),
         source: { kind: "junction-key" }
