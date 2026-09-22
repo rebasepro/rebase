@@ -43,6 +43,11 @@ import { fileURLToPath } from "node:url";
 import { ejectCommand } from "../../packages/cli/src/commands/eject";
 import { loadManifest } from "../../packages/cli/src/manifest";
 import { commentSpans, normalizeEsmSpecifiers } from "../../packages/cli/src/bundle";
+// The release's parser, not a second one. This file had its own, which stopped
+// at the first line in `packages:` that was not a list item — so a comment
+// between two globs hid every glob after it, and the Dockerfile checks over
+// them passed without looking.
+import { workspaceGlobs } from "./publishable-packages.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
@@ -255,21 +260,6 @@ function copyInstructions(dockerfile: string): { from?: string; sources: string[
     return copies;
 }
 
-/** The workspace globs of a pnpm-workspace.yaml, which is flat enough to read by line. */
-function workspaceGlobs(file: string): string[] {
-    const globs: string[] = [];
-    let inPackages = false;
-    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-        if (/^packages:\s*$/.test(line)) { inPackages = true; continue; }
-        if (inPackages) {
-            const item = /^\s+-\s+"?([^"\s]+)"?\s*$/.exec(line);
-            if (item) { globs.push(item[1]); continue; }
-            if (line.trim() !== "") inPackages = false;
-        }
-    }
-    return globs;
-}
-
 // ─── The checks ──────────────────────────────────────────────────────
 
 /**
@@ -301,7 +291,7 @@ function checkDockerfile(projectRoot: string, flavour: "cms" | "baas"): void {
     // the workspaces it can see. A workspace declared but not copied is a
     // lockfile mismatch, which is a failed build; a workspace copied but not
     // installed is a module that resolves nowhere at boot.
-    for (const glob of workspaceGlobs(path.join(projectRoot, "pnpm-workspace.yaml"))) {
+    for (const glob of workspaceGlobs(projectRoot)) {
         check(
             builder.includes(glob),
             `${label}: pnpm-workspace.yaml declares the "${glob}" workspace, which no builder-stage COPY brings into the image`
@@ -335,7 +325,7 @@ function checkDockerfile(projectRoot: string, flavour: "cms" | "baas"): void {
     // template rename makes it match nothing, and pnpm treats "no package
     // matched" as success — so the image builds green with nothing compiled.
     const names = new Map<string, Record<string, string>>();
-    for (const glob of workspaceGlobs(path.join(projectRoot, "pnpm-workspace.yaml"))) {
+    for (const glob of workspaceGlobs(projectRoot)) {
         const manifest = path.join(projectRoot, glob, "package.json");
         if (!fs.existsSync(manifest)) continue;
         const parsed = JSON.parse(fs.readFileSync(manifest, "utf8"));

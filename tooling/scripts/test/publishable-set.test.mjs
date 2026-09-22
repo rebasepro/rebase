@@ -73,6 +73,18 @@ test("workspaceGlobs reads the packages block and stops at the next key", () => 
     assert.deepEqual(workspaceGlobs(root), ["packages/*", "tooling/thing", "app"]);
 });
 
+test("workspaceGlobs reads past a comment inside the packages block", () => {
+    // `check-eject.mts` had a parser of its own that stopped at the first
+    // non-item line, so a comment between two globs hid every glob after it
+    // and the check over them passed vacuously. It uses this one now.
+    const root = workspace({});
+    fs.writeFileSync(
+        path.join(root, "pnpm-workspace.yaml"),
+        "packages:\n  - \"frontend\"\n  # the API\n  - 'backend'\n\n  - config  # shared\nallowBuilds:\n  esbuild: true\n"
+    );
+    assert.deepEqual(workspaceGlobs(root), ["frontend", "backend", "config"]);
+});
+
 test("workspaceGlobs refuses a shape it might misread rather than guessing", () => {
     const root = workspace({});
     fs.writeFileSync(
