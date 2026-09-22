@@ -364,6 +364,112 @@ describe("the batch", () => {
     });
 });
 
+/** Resolves once `condition` holds, or rejects after `ms` saying what never happened. */
+async function waitFor(condition: () => boolean, what: string, ms = 2_000): Promise<void> {
+    const deadline = Date.now() + ms;
+    while (!condition()) {
+        if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
+        await new Promise(resolve => setTimeout(resolve, 5));
+    }
+}
+
+/**
+ * The running loop, with a handler that never settles.
+ *
+ * A worker that waits for its whole batch before claiming again is held by its
+ * slowest job: one handler awaiting a socket that never answers stopped every
+ * other slot on the instance, the reaper with them — it only ran from inside
+ * the poll — and then `stop()`, which waited for the same batch.
+ */
+describe("a job that never finishes", () => {
+    const hang = () => new Promise<void>(() => { /* never settles */ });
+
+    it("does not stop the worker claiming for its other slots", async () => {
+        const store = fakeStore();
+        const done: string[] = [];
+        const queue = createJobQueue(store, {
+            concurrency: 3,
+            pollIntervalMs: 10,
+            tasks: { stuck: hang, quick: (ctx) => { done.push(ctx.id); } }
+        });
+
+        await queue.enqueue("stuck");
+        for (let i = 0; i < 6; i++) await queue.enqueue("quick");
+        queue.start();
+        try {
+            // The first claim takes the stuck job and two quick ones; the other
+            // four can only run if the two slots that came free are refilled.
+            await waitFor(() => done.length === 6, "every quick job to run");
+        } finally {
+            void queue.stop(0);
+        }
+        expect(store.jobs.filter(j => j.task === "quick").every(j => j.status === "succeeded")).toBe(true);
+        expect(store.jobs.find(j => j.task === "stuck")?.status).toBe("running");
+    });
+
+    it("does not stop the reaper", async () => {
+        const store = fakeStore();
+        let reaps = 0;
+        const reapExpired = store.reapExpired.bind(store);
+        store.reapExpired = async (ms) => { reaps++; return reapExpired(ms); };
+        const queue = createJobQueue(store, {
+            concurrency: 1,
+            pollIntervalMs: 10,
+            // A quarter of this is the reaper's cadence: every 25ms.
+            visibilityTimeoutMs: 100,
+            tasks: { stuck: hang }
+        });
+
+        await queue.enqueue("stuck");
+        queue.start();
+        try {
+            await waitFor(() => reaps >= 3, "the reaper to run while a handler hangs");
+        } finally {
+            void queue.stop(0);
+        }
+    });
+
+    it("does not hold stop() past the budget it is given", async () => {
+        const store = fakeStore();
+        const queue = createJobQueue(store, { pollIntervalMs: 10, tasks: { stuck: hang } });
+
+        await queue.enqueue("stuck");
+        queue.start();
+        await waitFor(() => store.jobs[0].status === "running", "the job to be claimed");
+
+        const started = Date.now();
+        const outcome = await Promise.race([
+            queue.stop(50).then(() => "stopped"),
+            new Promise(resolve => setTimeout(() => resolve("still waiting"), 1_000))
+        ]);
+
+        expect(outcome).toBe("stopped");
+        expect(Date.now() - started).toBeLessThan(1_000);
+        // Left claimed, for the visibility timeout to recover.
+        expect(store.jobs[0].status).toBe("running");
+    });
+
+    it("still waits for a job that does finish inside the budget", async () => {
+        const store = fakeStore();
+        let release: () => void = () => undefined;
+        const queue = createJobQueue(store, {
+            pollIntervalMs: 10,
+            tasks: { slow: () => new Promise<void>(resolve => { release = resolve; }) }
+        });
+
+        await queue.enqueue("slow");
+        queue.start();
+        await waitFor(() => store.jobs[0].status === "running", "the job to be claimed");
+
+        const stopping = queue.stop(5_000);
+        setTimeout(() => release(), 30);
+        await stopping;
+
+        // Recorded before stop() returned — the point of waiting at all.
+        expect(store.jobs[0].status).toBe("succeeded");
+    });
+});
+
 describe("backoff", () => {
     it("widens with each attempt", () => {
         expect(defaultBackoff(1)).toBe(1_000);

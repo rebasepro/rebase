@@ -7,7 +7,7 @@ interface ShutdownConfig {
     server: Server;
     cronScheduler?: { stop(): void };
     /** Structural, for the same no-circular-imports reason as the backend below. */
-    jobQueue?: { stop(): Promise<void> };
+    jobQueue?: { stop(timeoutMs?: number): Promise<void> };
     /** Structural, same reason. */
     rlsAudit?: { stop(): void };
     realtimeServices: Record<string, RealtimeProvider>;
@@ -124,9 +124,34 @@ export function installShutdownHandlers(
     };
 }
 
+/**
+ * The share of the shutdown budget spent waiting for work in flight — jobs
+ * and `waitUntil()` tasks. The rest is kept for the teardown after it, so a
+ * handler that never settles costs the work it was doing, not the realtime
+ * teardown and the HTTP server's close.
+ */
+const WORK_DRAIN_SHARE = 2 / 3;
+
 export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => Promise<void> {
     return (timeoutMs = 15_000): Promise<void> => {
         return new Promise<void>((resolve) => {
+            // Force-resolve after the timeout (unless disabled with 0). Armed
+            // before anything is awaited: it bounds the whole sequence, and a
+            // step that hangs must not be what decides when it starts counting.
+            const forceTimer = timeoutMs > 0
+                ? setTimeout(() => {
+                    logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
+                    resolve();
+                }, timeoutMs)
+                : undefined;
+            forceTimer?.unref();
+
+            // Until when waiting for work in flight is worth it. Unbounded only
+            // when the caller disabled the timeout.
+            const workDeadline = timeoutMs > 0 ? Date.now() + Math.floor(timeoutMs * WORK_DRAIN_SHARE) : undefined;
+            const workBudget = (): number | undefined =>
+                workDeadline === undefined ? undefined : Math.max(0, workDeadline - Date.now());
+
             (async () => {
                 logger.info("Shutting down Rebase Backend...");
 
@@ -149,9 +174,10 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 // executing at this point keep their claim, so anything this
                 // misses is recovered by the visibility timeout rather than
                 // lost — but waiting here is what stops a deploy from running
-                // the tail of a batch twice.
+                // the tail of a batch twice. Bounded: a job still running when
+                // the budget runs out is left to the visibility timeout.
                 if (config.jobQueue) {
-                    await config.jobQueue.stop();
+                    await config.jobQueue.stop(workBudget());
                     logger.info("Job queue stopped");
                 }
 
@@ -169,7 +195,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 // Bounded well inside the overall budget: outstanding work is
                 // worth waiting for, but not worth turning a rolling deploy
                 // into a stall.
-                const drainBudget = timeoutMs > 0 ? Math.min(5_000, timeoutMs) : 5_000;
+                const drainBudget = Math.min(5_000, workBudget() ?? 5_000);
                 const stillPending = await drainBackgroundWork(drainBudget);
                 if (stillPending > 0) {
                     logger.warn(
@@ -199,16 +225,9 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 // 3. Close the HTTP server (stop accepting, drain in-flight)
                 config.server.close(() => {
                     logger.info("HTTP server closed");
+                    clearTimeout(forceTimer);
                     resolve();
                 });
-
-                // 4. Force-resolve after timeout (unless disabled with 0)
-                if (timeoutMs > 0) {
-                    setTimeout(() => {
-                        logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
-                        resolve();
-                    }, timeoutMs).unref();
-                }
             })();
         });
     };
