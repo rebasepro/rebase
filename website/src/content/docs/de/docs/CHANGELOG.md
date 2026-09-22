@@ -11,6 +11,20 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `beforeQuery` scope now refuses a write to a row it excludes, instead of
+  reporting a 500.** An update addressed at a row outside the hook's scope
+  reached the write and then failed on the post-save read-back — which is
+  narrowed like every other read — with `Could not fetch row after save.`: a 500
+  naming an internal step, for a row the caller was never allowed to address. On
+  the request path the surrounding transaction rolled the write back, so the data
+  was safe and only the report was wrong; an in-process save through the base
+  driver has no such transaction, and there the write stayed. The row is now
+  checked before the write and answered with the same `404` `delete` has always
+  given. Collections that declare no `beforeQuery` are unaffected: the pre-read
+  there stays best-effort history enrichment.
+
 ## [0.22.0] - 2026-09-21
 
 ### Added

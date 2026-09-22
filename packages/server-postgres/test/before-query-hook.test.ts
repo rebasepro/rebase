@@ -301,3 +301,77 @@ describe("beforeQuery refuses rather than widening", () => {
             .rejects.toThrow(/neither `filter` nor `logical`/);
     });
 });
+
+describe("beforeQuery gates a write at the row it addresses", () => {
+    /** The authenticated driver — the one every request from outside reaches. */
+    async function authed(user: User = TENANT_USER) {
+        const base = driverOver(db, user);
+        return await base.withAuth(user) as unknown as {
+            save: (props: Record<string, unknown>) => Promise<Record<string, unknown>>;
+            delete: (props: Record<string, unknown>) => Promise<void>;
+        };
+    }
+
+    const titleOf = async (id: number): Promise<string | undefined> =>
+        (await db.query<{ title: string }>("SELECT title FROM docs WHERE id = $1", [id])).rows[0]?.title;
+
+    it("refuses an update to a row the hook excludes, with a 404 rather than a 500", async () => {
+        // It used to reach the write, land it, and *then* fail on the narrowed
+        // read-back with "Could not fetch row after save." — a 500 naming an
+        // internal step, for a row the caller was never allowed to address.
+        const driver = await authed();
+        const [hidden] = await tenantBIds();
+
+        await expect(driver.save({ path: "docs", id: hidden, values: { title: "hacked" }, status: "existing" }))
+            .rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it("leaves that row exactly as it was", async () => {
+        const driver = await authed();
+        const [hidden] = await tenantBIds();
+
+        await expect(driver.save({ path: "docs", id: hidden, values: { title: "hacked" }, status: "existing" }))
+            .rejects.toThrow();
+
+        expect(await titleOf(hidden)).toBe("gamma report");
+    });
+
+    it("still saves a row inside the scope", async () => {
+        const driver = await authed();
+        const { rows } = await db.query<{ id: number }>("SELECT id FROM docs WHERE tenant = 'a' ORDER BY id");
+
+        await driver.save({ path: "docs", id: rows[0].id, values: { title: "edited" }, status: "existing" });
+
+        expect(await titleOf(rows[0].id)).toBe("edited");
+    });
+
+    it("answers the same 404 for a delete, which is where the wording comes from", async () => {
+        const driver = await authed();
+        const [hidden] = await tenantBIds();
+
+        await expect(driver.delete({ row: { id: hidden, path: "docs" }, path: "docs" }))
+            .rejects.toMatchObject({ statusCode: 404 });
+        expect(await titleOf(hidden)).toBe("gamma report");
+    });
+
+    it("still deletes a row inside the scope", async () => {
+        const driver = await authed();
+        const { rows } = await db.query<{ id: number }>("SELECT id FROM docs WHERE tenant = 'a' ORDER BY id");
+
+        await driver.delete({ row: { id: rows[0].id, path: "docs" }, path: "docs" });
+
+        expect(await titleOf(rows[0].id)).toBeUndefined();
+    });
+
+    it("changes nothing for a collection that declares no hook", async () => {
+        // The gate is deliberately conditional on the hook: without one, the
+        // pre-read stays best-effort history enrichment, and a read that cannot
+        // resolve a key is still not a reason to fail a write.
+        const driver = await authed();
+
+        await driver.save({ path: "owners", id: 1, values: { name: "Ada Lovelace" }, status: "existing" });
+
+        const { rows } = await db.query<{ name: string }>("SELECT name FROM owners WHERE id = 1");
+        expect(rows[0].name).toBe("Ada Lovelace");
+    });
+});

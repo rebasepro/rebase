@@ -1,4 +1,5 @@
 import { DataService } from "./services/dataService";
+import { hasBeforeQuery } from "./services/read-scope";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
@@ -923,14 +924,38 @@ export class PostgresBackendDriver implements DataDriver {
         // happened.
         let previousValuesForHistory: Partial<M> | undefined;
         if (status === "existing" && id) {
+            // A row this caller's `beforeQuery` excludes is not a row they may
+            // update, and the refusal belongs *here* — before the write —
+            // rather than at the read-back below.
+            //
+            // Without this the update lands and the post-save walk, which is
+            // narrowed like every other read, then finds nothing and throws
+            // "Could not fetch row after save.": a 500 quoting an internal step,
+            // for a row the caller was never allowed to address. On the request
+            // path the surrounding transaction rolls the write back, so the data
+            // was safe and the report was wrong; on an in-process save through
+            // the base driver there is no transaction to roll back, and the
+            // write stayed. `delete` has always answered a clean 404 here, and
+            // this is the same answer to the same question.
+            //
+            // Gated on the hook being declared so that nothing changes for a
+            // collection without one: the read below stays best-effort history
+            // enrichment, and a `fetchOneForRest` that cannot resolve a key is
+            // still not a reason to fail a write.
+            const gateOnScope = hasBeforeQuery(this.registry, resolvedCollection);
             try {
                 const existing = await this.dataService.getFetchService()
                     .fetchOneForRest(path, id, undefined, resolvedCollection?.databaseId);
+                if (!existing && gateOnScope) {
+                    throw ApiError.notFound(`No row "${id}" in "${path}" to update.`);
+                }
                 if (existing) {
                     const { id: _existingId, ...existingValues } = existing;
                     previousValuesForHistory = existingValues as Partial<M>;
                 }
             } catch (err) {
+                // The refusal above is the answer, not a failed enrichment.
+                if (err instanceof ApiError) throw err;
                 // Best-effort enrichment: callbacks and history run without
                 // previous values rather than the save failing on a read the
                 // write itself does not need (e.g. a collection whose key the

@@ -2762,6 +2762,20 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Fixed
+
+- **A `beforeQuery` scope now refuses a write to a row it excludes, instead of
+  reporting a 500.** An update addressed at a row outside the hook's scope
+  reached the write and then failed on the post-save read-back — which is
+  narrowed like every other read — with `Could not fetch row after save.`: a 500
+  naming an internal step, for a row the caller was never allowed to address. On
+  the request path the surrounding transaction rolled the write back, so the data
+  was safe and only the report was wrong; an in-process save through the base
+  driver has no such transaction, and there the write stayed. The row is now
+  checked before the write and answered with the same `404` `delete` has always
+  given. Collections that declare no `beforeQuery` are unaffected: the pre-read
+  there stays best-effort history enrichment.
+
 ### [0.22.0] - 2026-09-21
 
 #### Added
@@ -12866,6 +12880,11 @@ are worth knowing:
   because those are the target's rows.
 - **A filter it cannot compile refuses the request.** Naming a column the table
   does not have is a 400, never a dropped condition.
+- **A write to a row it excludes is a 404.** An update or a delete addressed at
+  a row outside the scope is refused before the write, with the same "no row …"
+  answer a read gives — so a scope is a scope for writes too, not only for
+  reads. What it does *not* gate is the values being written: refusing a write
+  on its contents is `beforeSave`.
 
 One read is deliberately not narrowed: the uniqueness check behind
 `validation: { unique: true }`. It asks whether a value exists anywhere in the
@@ -14426,6 +14445,11 @@ Three properties are worth knowing before you rely on it:
 - **A filter it cannot compile refuses the request.** Naming a column the table
   does not have is a 400, not a dropped condition, whatever
   `configureUnknownFilterFields` is set to.
+- **A write to a row it excludes is a 404.** An update or a delete addressed at
+  a row outside the scope is refused before the write, with the same "no row …"
+  answer a read gives — so a scope is a scope for writes too, not only for
+  reads. What it does *not* gate is the values being written: refusing a write
+  on its contents is `beforeSave`.
 
 One read is deliberately *not* narrowed: the uniqueness check behind
 `validation: { unique: true }`. It asks whether a value exists anywhere in the

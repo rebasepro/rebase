@@ -161,6 +161,11 @@ are worth knowing:
   because those are the target's rows.
 - **A filter it cannot compile refuses the request.** Naming a column the table
   does not have is a 400, never a dropped condition.
+- **A write to a row it excludes is a 404.** An update or a delete addressed at
+  a row outside the scope is refused before the write, with the same "no row …"
+  answer a read gives — so a scope is a scope for writes too, not only for
+  reads. What it does *not* gate is the values being written: refusing a write
+  on its contents is `beforeSave`.
 
 One read is deliberately not narrowed: the uniqueness check behind
 `validation: { unique: true }`. It asks whether a value exists anywhere in the
