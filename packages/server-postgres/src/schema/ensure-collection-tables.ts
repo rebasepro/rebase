@@ -31,6 +31,7 @@ import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/s
 import { SEARCH_STAMP_PREFIX } from "./search-column";
 import { vectorExtensionHint } from "./vector-index";
 import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
+import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
 import {
     assertSafeIdentifier,
@@ -221,13 +222,15 @@ export async function readExistingSchema(
          JOIN pg_namespace n ON c.relnamespace = n.oid
          WHERE c.relkind IN ('r', 'p') AND n.nspname IN (${inList})`
     );
+    // The names come from `pg_class`, not from the configuration, so on an
+    // adopted database they include tables nobody declared — `2024_archive`,
+    // `order-items`, `Sales Data`. Those are quoted, not refused: refusing a
+    // name here refuses the boot over a table Rebase will never touch.
     if (realTables.length > 0) {
-        const probes = realTables.map(row => {
-            const schema = assertSafeIdentifier(row.schema, "schema name");
-            const table = assertSafeIdentifier(row.name, "table name");
-            return `SELECT ${quoteSqlLiteral(`${schema}.${table}`)} AS key, ` +
-                `EXISTS(SELECT 1 FROM "${schema}"."${table}" LIMIT 1) AS populated`;
-        });
+        const probes = realTables.map(row =>
+            `SELECT ${quoteSqlLiteral(`${row.schema}.${row.name}`)} AS key, ` +
+            `EXISTS(SELECT 1 FROM ${quoteRelation(row.schema, row.name)} LIMIT 1) AS populated`
+        );
         const { rows: populationRows } = await client.query<{ key: string; populated: boolean }>(
             probes.join(" UNION ALL ")
         );
