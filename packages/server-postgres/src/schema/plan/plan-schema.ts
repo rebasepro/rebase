@@ -542,8 +542,15 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // same column — land on the same type. `CREATE TYPE` has no IF NOT EXISTS,
     // so emitting it twice aborts the whole file; deduplicated by name here,
     // once, for every renderer.
+    //
+    // Deduplicated by the name *Postgres* holds, which is the first 63 bytes,
+    // and only for the same column. Two different columns deriving one name —
+    // `orders.item_status` and `orders_item.status`, or two long names that
+    // share their first 63 bytes — cannot share a type: the second column would
+    // be typed with the first one's labels and reject its own. The name is
+    // frozen once a database holds it, so this refuses rather than renaming.
     const enums: EnumPlan[] = [];
-    const seenEnums = new Set<string>();
+    const enumOwners = new Map<string, { table: string; column: string; owner: string }>();
     /**
      * Every enum type one table's properties declare, appended once.
      *
@@ -569,10 +576,23 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
             const labels = enumLabelsOf(propName, prop, collection);
             if (!declaresEnumType(prop)) continue;
             const schema = schemaOf(collection);
-            const name = `${getTableName(collection)}_${resolveColumnName(propName, prop)}`;
-            const qualified = `${schema}.${name}`;
-            if (seenEnums.has(qualified)) continue;
-            seenEnums.add(qualified);
+            const table = getTableName(collection);
+            const column = resolveColumnName(propName, prop);
+            const name = `${table}_${column}`;
+            const qualified = `${schema}.${toPostgresIdentifier(name)}`;
+            const owner = `property "${propName}" of collection "${describe(collection)}"`;
+            const claimed = enumOwners.get(qualified);
+            if (claimed) {
+                if (claimed.table === table && claimed.column === column) continue;
+                throw new Error(
+                    `The enum ${owner} and the enum ${claimed.owner} both derive the Postgres type ` +
+                    `"${schema}"."${toPostgresIdentifier(name)}" (an enum type is named <table>_<column>, ` +
+                    "and Postgres keeps the first 63 bytes). One type cannot hold both columns' values, and a " +
+                    "type's name cannot change once a database holds it. Give one of the two columns another " +
+                    "name with `columnName`, or its collection another `table` or `schema`."
+                );
+            }
+            enumOwners.set(qualified, { table, column, owner });
             enums.push({
                 schema,
                 name,

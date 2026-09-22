@@ -250,7 +250,12 @@ export interface EnumPlan {
     schema: string;
     /** Type name, unqualified: `<table>_<column>`. A frozen derived name. */
     name: string;
-    /** `schema.name` — the key `readExistingSchema` returns. */
+    /**
+     * `schema.name`, with the name cut to the 63 bytes Postgres keeps — the key
+     * `readExistingSchema` returns. `name` itself is emitted in full, and
+     * Postgres truncates it the same way; comparing the full name against the
+     * catalogue found a long one missing on every boot.
+     */
     qualified: string;
     /**
      * The schema the collection *declared*, before the `public` fallback.
