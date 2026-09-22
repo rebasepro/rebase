@@ -854,11 +854,17 @@ export class PostgresBackendDriver implements DataDriver {
         const { collection: slug, userField, tenantField } = tenant.from.membership;
         const cap = PostgresBackendDriver.TENANT_MEMBERSHIP_CAP;
         try {
-            const rows = await this.dataService.fetchCollection(slug, {
+            // Read on the trusted plane for its fields — the database still
+            // scopes the rows to the caller. This is the server deciding a
+            // write, not a read served to anyone, and the caller's `access.read`
+            // rules describe what they may receive: applied here, a tenant
+            // column members may not read would leave every member in no
+            // tenant at all.
+            const rows = await withFieldViewer(undefined, () => this.dataService.fetchCollection(slug, {
                 filter: { [userField]: ["==", uid] } as never,
                 limit: cap + 1,
                 databaseId: collection?.databaseId
-            });
+            }));
             const tenants = Array.from(new Set(
                 rows.slice(0, cap)
                     .map(row => (row as Record<string, unknown>)[tenantField])

@@ -21,7 +21,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toFlatRow, toRestRow, toRestValues, isJunctionRelation } from "./row-pipeline";
+import { toFlatRow, toRestRow, toRestValues, isJunctionRelation, stripUnreadable } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
@@ -1421,6 +1421,11 @@ idColumn };
 
         await Promise.all(relationPromises);
 
+        // The primary path strips inside `toFlatRow`; this one parses the row
+        // itself, so it strips itself. Without it a fetch that fell back served
+        // every declared column, `excludeFromApi` ones included.
+        stripUnreadable(values, collection);
+
         return {
             ...values,
             id: id.toString()
@@ -1537,6 +1542,14 @@ idColumn };
         if (include) {
             await this.loadIncludes(values, collection, collectionPath, include);
         }
+
+        // Last, once the includes have read the key columns they group by: the
+        // fields this caller may not read. The REST list strips in `toRestRow`
+        // and the single get in `toFlatRow`; this parse is the third exit from
+        // the pipeline and it is what the socket's `FETCH_COLLECTION`, a text
+        // search and the MCP tools are served from. Without it every one of
+        // them handed a plain user each row's password hash.
+        for (const row of values) stripUnreadable(row, collection);
 
         // Columns only — the address is the consumer's to derive.
         return values;
