@@ -344,13 +344,23 @@ export class UserService implements UserRepository {
         const updatedAtKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
         payload[updatedAtKey] = new Date();
 
-        const [row] = await this.withServerContext(async (db) =>
-            (await db
-                .update(this.usersTable)
-                .set(payload)
-                .where(eq(idCol, id))
-                .returning()) as Record<string, unknown>[]
-        );
+        let row: Record<string, unknown> | undefined;
+        try {
+            [row] = await this.withServerContext(async (db) =>
+                (await db
+                    .update(this.usersTable)
+                    .set(payload)
+                    .where(eq(idCol, id))
+                    .returning()) as Record<string, unknown>[]
+            );
+        } catch (error) {
+            // The unique index `createUser` maps, reached by an email change
+            // onto an address another account holds — the same 409.
+            if (extractPgError(error)?.code === "23505") {
+                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+            throw error;
+        }
         return row ? this.mapRowToUser(row) : null;
     }
 

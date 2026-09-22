@@ -335,6 +335,24 @@ name: "Auditor" });
         });
     });
 
+    /**
+     * `PUT /admin/users/:uid` changing an email to one another account holds
+     * reached the unique index as an unmapped `E11000` — a 500 "Internal
+     * Server Error" — where `createUser` already answers the same collision
+     * with a 409.
+     */
+    it("answers an email change onto another account's address with a 409", async () => {
+        const repo = new MongoAuthRepository(db);
+        await repo.createUser({ email: "taken@rebase.pro" });
+        const mover = await repo.createUser({ email: "mover@rebase.pro" });
+
+        await expect(repo.updateUser(mover.id, { email: "Taken@Rebase.pro" })).rejects.toMatchObject({
+            statusCode: 409,
+            code: "EMAIL_EXISTS"
+        });
+        expect((await repo.getUserById(mover.id))?.email).toBe("mover@rebase.pro");
+    });
+
     describe("MongoAuthRepository", () => {
         it("should implement aggregate auth operations", async () => {
             const repo = new MongoAuthRepository(db);

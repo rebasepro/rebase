@@ -457,6 +457,36 @@ email: "test@example.com" }));
 
                 expect(result).toBeNull();
             });
+
+            /**
+             * The same unique index `createUser` maps, reached by the other
+             * write: `PUT /admin/users/:uid` or `/auth/anonymous/link` moving
+             * an account onto an address another one holds. Unmapped, the
+             * 23505 was a 500 "Internal Server Error".
+             */
+            it("answers an email change onto another account's address with a 409", async () => {
+                const wrapped = Object.assign(new Error("update failed"), {
+                    cause: Object.assign(new Error("duplicate key value violates unique constraint"), {
+                        code: "23505",
+                        constraint: "users_email_lower_key"
+                    })
+                });
+                mockUpdateReturning.mockRejectedValueOnce(wrapped);
+
+                await expect(userService.updateUser("user-123", { email: "taken@example.com" })).rejects.toMatchObject({
+                    statusCode: 409,
+                    code: "EMAIL_EXISTS"
+                });
+            });
+
+            it("lets every other update failure through unchanged", async () => {
+                const wrapped = Object.assign(new Error("update failed"), {
+                    cause: Object.assign(new Error("connection terminated"), { code: "08006" })
+                });
+                mockUpdateReturning.mockRejectedValueOnce(wrapped);
+
+                await expect(userService.updateUser("user-123", { email: "x@example.com" })).rejects.toThrow(/update failed/);
+            });
         });
 
         describe("deleteUser", () => {

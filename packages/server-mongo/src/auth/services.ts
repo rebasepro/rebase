@@ -164,7 +164,16 @@ providerId },
 updatedAt: new Date() };
         if (typeof updateData.email === "string") updateData.email = normalizeEmail(updateData.email);
 
-        await this.collection.updateOne({ id }, { $set: updateData });
+        try {
+            await this.collection.updateOne({ id }, { $set: updateData });
+        } catch (error) {
+            // An email change onto an address another account holds. Without
+            // this it reached the client as a 500.
+            if (isDuplicateKey(error)) {
+                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+            throw error;
+        }
         return this.getUserById(id);
     }
 

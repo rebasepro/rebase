@@ -344,7 +344,17 @@ values: prepResult.values },
         }
 
         const updates: Record<string, unknown> = {};
-        if (email !== undefined) updates.email = normalizeEmail(email);
+        if (email !== undefined) {
+            updates.email = normalizeEmail(email);
+            // The same 409 `POST /users` and registration give. Both engines
+            // also map the unique index behind it, which covers the race; the
+            // check is what answers for a custom repository that does not —
+            // unchecked, a plain collision was a 500.
+            const holder = await authRepo.getUserByEmail(normalizeEmail(email));
+            if (holder && holder.id !== uid) {
+                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+        }
         if (displayName !== undefined) updates.displayName = displayName;
 
         let passwordHash: string | undefined;

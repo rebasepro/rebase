@@ -11,6 +11,7 @@
  *   guest claim and `/auth/anonymous/link` answered `NOT_ANONYMOUS` to all.
  * - A user deleted by `DELETE /admin/users/:uid` kept refreshing: Postgres
  *   cascades the refresh tokens away, Mongo left them.
+ * - `PUT /admin/users/:uid` onto an email another account held was a 500.
  */
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, type Db } from "mongodb";
@@ -116,5 +117,20 @@ describe("DELETE /admin/users/:uid on Mongo", () => {
         const refresh = await send(root, "POST", "/auth/refresh", { refreshToken: reg.tokens.refreshToken });
         expect(refresh.status).toBe(401);
         expect(await repo.listRefreshTokensForUser(reg.user.uid)).toEqual([]);
+    });
+});
+
+describe("PUT /admin/users/:uid on Mongo", () => {
+    it("answers an email another account holds with 409, and changes nothing", async () => {
+        const repo = new MongoAuthRepository(db);
+        const root = app(repo);
+        const adminToken = await admin(repo);
+        await repo.createUser({ email: "taken@example.test" });
+        const mover = await repo.createUser({ email: "mover@example.test" });
+
+        const res = await send(root, "PUT", `/admin/users/${mover.id}`, { email: "taken@example.test" }, adminToken);
+        expect(res.status).toBe(409);
+        expect((await res.json()).error.code).toBe("EMAIL_EXISTS");
+        expect((await repo.getUserById(mover.id))?.email).toBe("mover@example.test");
     });
 });
