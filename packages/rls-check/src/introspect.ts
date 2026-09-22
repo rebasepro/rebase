@@ -119,6 +119,25 @@ export class UnknownRoleError extends Error {
     }
 }
 
+/**
+ * A `--schema` that is not in `pg_namespace`.
+ *
+ * The same failure as an unknown `--role`, and worse: a typo such as
+ * `--schema pubic`, or `--schema Public` for a schema named `public`, scanned
+ * nothing at all. Zero tables, "No findings", exit 0, for as long as the typo
+ * sat in a CI job. A name that matches nothing only ever narrows the scan, so
+ * it is an error.
+ */
+export class UnknownSchemaError extends Error {
+    readonly schemas: string[];
+
+    constructor(schemas: string[]) {
+        super(`Unknown schema${schemas.length === 1 ? "" : "s"}: ${schemas.join(", ")}.`);
+        this.name = "UnknownSchemaError";
+        this.schemas = schemas;
+    }
+}
+
 const SYSTEM_SCHEMAS = ["pg_catalog", "information_schema", "pg_toast"];
 
 /**
@@ -510,6 +529,14 @@ export function selectSchemas(
         SYSTEM_SCHEMAS.includes(s) || /^pg_temp(_\d+)?$/.test(s) || /^pg_toast_temp(_\d+)?$/.test(s);
 
     if (requested && requested.length > 0) {
+        // Checked against the catalogue unless the catalogue could not be
+        // read, where every name would look unknown and the refusal would send
+        // the reader after their flag instead of the failed read.
+        if (!diagnostics.degraded.some((entry) => entry.what === "schema list")) {
+            const present = new Set(all);
+            const unknown = [...new Set(requested.filter((schema) => !present.has(schema)))];
+            if (unknown.length > 0) throw new UnknownSchemaError(unknown);
+        }
         const wanted = new Set(requested);
         const kept: string[] = [];
         for (const schema of all) {

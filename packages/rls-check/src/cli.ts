@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
-import { introspectWithDiagnostics, UnknownRoleError, unsupportedConnectionKeywords } from "./introspect";
+import { introspectWithDiagnostics, UnknownRoleError, UnknownSchemaError, unsupportedConnectionKeywords } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
 import { renderHtml } from "./report-html";
@@ -912,6 +912,19 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                         {
                             headline: `No such role on this database: ${error.roles.join(", ")}.`,
                             hint: "Check the spelling against `SELECT rolname FROM pg_roles`. This is an error rather than a warning for the same reason an unknown --skip id is: a name that matches nothing silently narrows the scan, and the run then prints a clean report of a database nobody looked at."
+                        },
+                        color
+                    )
+                );
+
+                return EXIT_ERROR;
+            }
+            if (error instanceof UnknownSchemaError) {
+                io.stderr(
+                    formatFriendlyError(
+                        {
+                            headline: `No such schema on this database: ${error.schemas.join(", ")}.`,
+                            hint: "Schema names are case-sensitive; check the spelling against `SELECT nspname FROM pg_namespace`. A --schema that matches nothing would scan nothing and report it as clean, so it is refused."
                         },
                         color
                     )

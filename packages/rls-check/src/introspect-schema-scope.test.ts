@@ -12,7 +12,7 @@
  * diff nobody reads.
  */
 import { describe, it, expect } from "vitest";
-import { selectSchemas } from "./introspect";
+import { selectSchemas, UnknownSchemaError } from "./introspect";
 import type { IntrospectDiagnostics } from "./introspect";
 
 const diagnostics = (): IntrospectDiagnostics => ({
@@ -47,5 +47,32 @@ describe("default schema scope", () => {
         const kept = selectSchemas(["public", "rebase", "storage"], ["storage"], d);
         expect(kept).toEqual(["storage"]);
         expect(d.excludedSchemas.map(e => e.schema).sort()).toEqual(["public", "rebase"]);
+    });
+});
+
+/**
+ * An unknown `--schema` used to scan nothing: 0 tables, "No findings", exit 0,
+ * for as long as the typo sat in CI. `--role`, `--only` and `--skip` refuse a
+ * name that matches nothing for exactly this reason, and so does `--schema`.
+ */
+describe("a requested schema that does not exist", () => {
+    it("is refused, not quietly dropped", () => {
+        expect(() => selectSchemas(["public", "app"], ["pubic"], diagnostics())).toThrow(UnknownSchemaError);
+    });
+
+    it("names every unknown schema, and only those", () => {
+        try {
+            selectSchemas(["public", "app"], ["app", "Public", "pubic"], diagnostics());
+            throw new Error("expected a refusal");
+        } catch (error) {
+            expect(error).toBeInstanceOf(UnknownSchemaError);
+            expect((error as UnknownSchemaError).schemas).toEqual(["Public", "pubic"]);
+        }
+    });
+
+    it("is not claimed when the schema list itself could not be read", () => {
+        const d = diagnostics();
+        d.degraded.push({ what: "schema list", error: "permission denied" });
+        expect(selectSchemas([], ["public"], d)).toEqual([]);
     });
 });
