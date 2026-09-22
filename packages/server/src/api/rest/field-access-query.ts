@@ -47,14 +47,15 @@ export function requestViewer(c: { get: (key: never) => unknown }): FieldViewer 
 const ANON_ROLES: readonly string[] = Object.freeze(["anon"]);
 
 /** Which query parameter a refused field arrived in, for the message. */
-type Where = "filter" | "orderBy" | "fields" | "select" | "groupBy";
+type Where = "filter" | "orderBy" | "fields" | "select" | "groupBy" | "vector_search";
 
 const WHERE_LABEL: Record<Where, string> = {
     filter: "a filter",
     orderBy: "`orderBy`",
     fields: "`fields`",
     select: "`select`",
-    groupBy: "`groupBy`"
+    groupBy: "`groupBy`",
+    vector_search: "`vector_search`"
 };
 
 /** Every column a logical group compares, however deeply nested. */
@@ -133,6 +134,7 @@ export function assertQueryFieldsReadable(
         orderBy?: { field: string }[];
         fields?: string[];
         include?: IncludeSpec;
+        vectorSearch?: { property: string };
     },
     collection: CollectionConfig,
     viewer: FieldViewer | undefined
@@ -148,6 +150,14 @@ export function assertQueryFieldsReadable(
     );
 
     assertReadableFields(options.fields ?? [], collection, viewer, "fields");
+
+    // A similarity search reads the vector it ranks by: `_distance` from a
+    // point the caller chose is a measurement of it, enough of them locate it,
+    // and `vector_threshold` alone answers "is it within r of here".
+    assertReadableFields(
+        options.vectorSearch ? [options.vectorSearch.property] : [],
+        collection, viewer, "vector_search"
+    );
 
     const include = options.include !== undefined ? normalizeInclude(options.include) : undefined;
     if (include) assertIncludeFieldsReadable(include.tree, collection, viewer);

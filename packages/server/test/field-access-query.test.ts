@@ -121,6 +121,52 @@ describe("sort keys that are not columns", () => {
     });
 });
 
+describe("a vector search", () => {
+    /**
+     * `?vector_search=embedding&vector=[…]` ranks rows by their distance from a
+     * vector the caller chose and returns `_distance` with each — which is a
+     * reading of the withheld vector: enough probes place it, and
+     * `vector_threshold` alone answers "is it within r of this point". So the
+     * searched property is a field the query reads, like a sort key.
+     */
+    const docs = {
+        slug: "docs",
+        name: "Docs",
+        table: "docs",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            title: { type: "string" },
+            embedding: { type: "vector", dimensions: 3 },
+            secretEmbedding: { type: "vector", dimensions: 3, columnName: "secret_embedding", access: { read: ["admin"] } },
+            internalEmbedding: { type: "vector", dimensions: 3, excludeFromApi: true }
+        }
+    } as unknown as CollectionConfig;
+    const search = (property: string) => ({ vector_search: property, vector: "[1,0,0]", vector_distance: "l2" });
+
+    it("refuses a property the caller cannot read", () => {
+        const error = refusal(() => parseQueryOptions(search("secretEmbedding"), {}, { collection: docs, viewer: { roles: ["user"] } }));
+        expect(error.code).toBe("FIELD_NOT_READABLE");
+        expect(error.message).toContain("'secretEmbedding'");
+        expect(error.message).toContain("`vector_search`");
+    });
+
+    it("refuses one under its column name too", () => {
+        expect(refusal(() => parseQueryOptions(search("secret_embedding"), {}, { collection: docs, viewer: { roles: ["user"] } })).code)
+            .toBe("FIELD_NOT_READABLE");
+    });
+
+    it("refuses an `excludeFromApi` property, even for admin", () => {
+        expect(refusal(() => parseQueryOptions(search("internalEmbedding"), {}, { collection: docs, viewer: { roles: ["admin"] } })).code)
+            .toBe("FIELD_NOT_READABLE");
+    });
+
+    it("answers a caller who may read it", () => {
+        expect(parseQueryOptions(search("secretEmbedding"), {}, { collection: docs, viewer: { roles: ["admin"] } }).vectorSearch?.property)
+            .toBe("secretEmbedding");
+        expect(() => parseQueryOptions(search("embedding"), {}, { collection: docs, viewer: { roles: ["user"] } })).not.toThrow();
+    });
+});
+
 describe("a relation an include loads", () => {
     /**
      * An include's own `where`, `logical`, `orderBy` and `fields` read the
