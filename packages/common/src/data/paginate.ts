@@ -140,12 +140,22 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         pageSize,
         cursor,
         maxPages,
+        // The window is the walk's, but where it starts is the caller's. Left
+        // in `rest`, these rode along on every page beside the walk's own: a
+        // caller's `after` went out next to `offset=0`, which the server
+        // refuses outright (CURSOR_WITH_OFFSET), and a caller's `offset` was
+        // overwritten by that `0`, so the walk silently started over from the
+        // top. `IterateParams` omits `offset` and `page`, but the query builder
+        // hands its whole state to `iterate()`, `.offset(40)` included.
+        after: startAfter,
+        offset: startOffset,
+        page: startPage,
         ...rest
-    } = (params ?? {}) as IterateParams<M> & Record<string, unknown>;
+    } = (params ?? {}) as IterateParams<M> & Pick<FindParams<M>, "offset" | "page">;
 
     const findParams = { ...rest } as FindParams<M>;
-    const size = normalizePageSize(pageSize as number | undefined);
-    const pageCap = normalizeMaxPages(maxPages as number | undefined);
+    const size = normalizePageSize(pageSize);
+    const pageCap = normalizeMaxPages(maxPages);
 
     // ── Cursor (keyset) setup ────────────────────────────────────────────────
     //
@@ -160,8 +170,12 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
     // server issues `meta.nextCursor` and the walk hands it back as `after`.
     // Multi-key sorts and nullable keys work because the comparison is the
     // driver's, and there is one of it.
-    const seekRequested = cursor !== undefined && cursor !== null;
-    if (seekRequested) {
+    //
+    // A caller's own `after` is a request for seeking too: it is a cursor
+    // issued for this query's sort, so the walk continues from it by the same
+    // handoff.
+    const seekRequested = (cursor !== undefined && cursor !== null) || !!startAfter;
+    if (cursor !== undefined && cursor !== null) {
         // A named column still means "sort by this and seek along it", which is
         // what every existing caller wrote. It is an `orderBy` now rather than
         // a second pagination mode — the seeking itself needs no column named,
@@ -177,9 +191,11 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         }
     }
 
-    let offset = 0;
+    // `page` counts in pages of this walk's size, by the one rule every read
+    // resolves it with.
+    let offset = resolveFindWindow({ limit: size, offset: startOffset, page: startPage }).offset;
     let pages = 0;
-    let after: string | undefined;
+    let after: string | undefined = startAfter || undefined;
 
     for (;;) {
         if (pages >= pageCap) {

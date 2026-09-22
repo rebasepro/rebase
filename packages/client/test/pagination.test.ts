@@ -297,6 +297,75 @@ describe("CollectionClient.iterate", () => {
             })()).rejects.toMatchObject({ code: "cursor-stalled" });
         });
     });
+
+    // ── Starting somewhere other than the top ─────────────────────────────────
+    /**
+     * The walk owns the window, but where it *starts* is the caller's. A
+     * cursor from a previous `find()` rode along into every page beside the
+     * walk's own `offset=0`, and the server refuses the pair outright
+     * (CURSOR_WITH_OFFSET) — so `iterate({ after })` and `.after(c).iterate()`
+     * failed on the first request. `.offset(40).iterate()` was quieter and
+     * worse: the walk's `offset=0` replaced the caller's, and it started over
+     * from the top.
+     */
+    describe("from where the caller left off", () => {
+        const drain = async (walk: AsyncIterable<JobModel>) => {
+            const seen: number[] = [];
+            for await (const row of walk) seen.push(row.id);
+            return seen;
+        };
+        const urls = () => mockRequest.mock.calls.map((c) => String(c[0]));
+
+        it("continues from a cursor, seeking rather than offsetting", async () => {
+            const client = createCollectionClient<JobModel>(transport, "jobs");
+            mockRequest
+                .mockResolvedValueOnce(page(rows(21, 2), { total: 23, limit: 2, offset: 0, hasMore: true, nextCursor: "C22" }))
+                .mockResolvedValueOnce(page(rows(23, 1), { total: 23, limit: 2, offset: 0, hasMore: false }));
+
+            const seen = await drain(client.iterate({ pageSize: 2, after: "C20" }));
+
+            expect(seen).toEqual([21, 22, 23]);
+            const [first, second] = urls();
+            expect(first).toContain("after=C20");
+            expect(second).toContain("after=C22");
+            expect(urls().join(" ")).not.toContain("offset=");
+        });
+
+        it("continues from a cursor given to the builder", async () => {
+            const client = createCollectionClient<JobModel>(transport, "jobs");
+            mockRequest.mockResolvedValueOnce(page(rows(21, 1), { total: 21, limit: 200, offset: 0, hasMore: false }));
+
+            await drain(client.after("C20").iterate());
+
+            expect(urls()).toHaveLength(1);
+            expect(urls()[0]).toContain("after=C20");
+            expect(urls()[0]).not.toContain("offset=");
+        });
+
+        it("starts at the builder's offset and walks on from it", async () => {
+            const client = createCollectionClient<JobModel>(transport, "jobs");
+            mockRequest
+                .mockResolvedValueOnce(page(rows(41, 2), { total: 43, limit: 2, offset: 40, hasMore: true }))
+                .mockResolvedValueOnce(page(rows(43, 1), { total: 43, limit: 2, offset: 42, hasMore: false }));
+
+            const seen = await drain(client.offset(40).limit(2).iterate());
+
+            expect(seen).toEqual([41, 42, 43]);
+            const [first, second] = urls();
+            expect(first).toContain("offset=40");
+            expect(second).toContain("offset=42");
+        });
+
+        it("findAll() starts from the cursor too", async () => {
+            const client = createCollectionClient<JobModel>(transport, "jobs");
+            mockRequest.mockResolvedValueOnce(page(rows(21, 1), { total: 21, limit: 200, offset: 0, hasMore: false }));
+
+            await client.findAll({ after: "C20" });
+
+            expect(urls()[0]).toContain("after=C20");
+            expect(urls()[0]).not.toContain("offset=");
+        });
+    });
 });
 
 describe("CollectionClient.findAll", () => {

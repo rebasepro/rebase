@@ -256,4 +256,40 @@ describe("in-process accessor pagination", () => {
             for await (const _row of jobsOf(data).iterate({ cursor: "id", pageSize: 2 })) { /* drain */ }
         })()).rejects.toMatchObject({ code: "cursor-missing" });
     });
+
+    /**
+     * Where the walk starts is the caller's. Their `after` used to ride along
+     * beside the walk's own `offset: 0`, and their `offset` was overwritten by
+     * it — the walk started over from the top.
+     */
+    it("continues from the caller's cursor, by seeking", async () => {
+        const calls: FetchCollectionProps[] = [];
+        const driver = createSeekingDriver(5, calls);
+        const after = encodeCursor([["id", "asc"]], { id: 2 }, 2)!;
+
+        const seen: number[] = [];
+        for await (const row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2, orderBy: ["id", "asc"], after })) {
+            seen.push(row.id as number);
+        }
+
+        expect(seen).toEqual([3, 4, 5]);
+        expect(calls[0].startAfter).toMatchObject({ id: 2 });
+        expect(calls.every((c) => c.offset === undefined)).toBe(true);
+    });
+
+    it("starts at the caller's offset", async () => {
+        const calls: FetchCollectionProps[] = [];
+        const data = buildSdkData(createPagedDriver(7, calls));
+
+        const seen: number[] = [];
+        // Not a literal at the call: `IterateParams` omits `offset`, and the
+        // query builder is what hands one over, as part of its whole state.
+        const params = { pageSize: 2, offset: 4 };
+        for await (const row of jobsOf(data).iterate(params)) {
+            seen.push(row.id as number);
+        }
+
+        expect(seen).toEqual([5, 6, 7]);
+        expect(calls.map((c) => c.offset)).toEqual([4, 6]);
+    });
 });
