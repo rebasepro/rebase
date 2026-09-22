@@ -42,9 +42,16 @@ import { normalizeToEntityRelation } from "../util/entities";
  * Relation values (`EntityRelation` instances or `{ __type: "relation", id, path }`
  * objects) are serialized as their raw id — the wire format only carries the
  * value to compare against the FK column.
+ *
+ * A `Date` is its ISO 8601 instant — what JSON makes of it on the socket and
+ * in-process, so one filter names one instant through every door. `String()`
+ * gave the viewer's local zone, no milliseconds and a parenthesised zone name
+ * Postgres cannot parse. An invalid date keeps its "Invalid Date" spelling for
+ * the server to refuse, rather than throwing a `RangeError` from here.
  */
 function stringifyValue(value: unknown): string {
     if (value === null) return "null";
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
     const relation = normalizeToEntityRelation(value);
     if (relation) return String(relation.id);
     return String(value);

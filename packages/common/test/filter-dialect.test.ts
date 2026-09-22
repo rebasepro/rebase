@@ -309,6 +309,37 @@ describe("serializeLogicalCondition", () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Dates
+// ---------------------------------------------------------------------------
+/**
+ * A `Date` in a filter went out as `String(date)` — "Sun Sep 20 2026 12:15:30
+ * GMT+0200 (Central European Summer Time)": the viewer's local zone, no
+ * milliseconds, and a parenthesised name Postgres cannot parse. The socket and
+ * the in-process accessor carry the same filter as JSON, which is ISO 8601, so
+ * one query compared against a different instant (or failed) depending on the
+ * door it went through.
+ */
+describe("Date values", () => {
+    const instant = new Date("2026-09-20T10:15:30.456Z");
+
+    it("serializes as the ISO instant JSON gives it", () => {
+        expect(serializeFilter({ created_at: [">=", instant] })).toEqual({
+            created_at: "gte.2026-09-20T10:15:30.456Z"
+        });
+    });
+
+    it("does the same inside a list and a logical group", () => {
+        expect(serializeFilter({ created_at: ["in", [instant]] })).toEqual({
+            created_at: "in.(2026-09-20T10:15:30.456Z)"
+        });
+        expect(serializeLogicalCondition({
+            type: "or",
+            conditions: [{ column: "created_at", operator: "<", value: instant }]
+        })).toBe("or(created_at.lt.2026-09-20T10:15:30.456Z)");
+    });
+});
+
 describe("deserializeLogicalCondition", () => {
     it("deserializes a simple filter condition", () => {
         const result = deserializeLogicalCondition("status.eq.active");
