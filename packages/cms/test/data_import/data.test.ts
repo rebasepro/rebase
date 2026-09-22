@@ -207,5 +207,68 @@ describe("Data Import Utility Functions", () => {
                 isActive: true
             });
         });
+
+        /**
+         * The mapping step writes `headersMapping` flat — one key per column in
+         * the file, dotted or not — and `null` for "Do not import this
+         * property". It was read back with `getIn`, which splits a dotted key
+         * into a path, and with `?? key`, which turns `null` into the column's
+         * own name.
+         */
+        describe("honours the column mapping the user chose", () => {
+            const properties: Properties = {
+                name: { type: "string" },
+                price: { type: "number" },
+                address: {
+                    type: "map",
+                    properties: {
+                        street: { type: "string" },
+                        city: { type: "string" }
+                    }
+                }
+            };
+
+            const convert = (data: Record<string, unknown>, headersMapping: Record<string, string | null>) =>
+                convertDataToEntity(mockAuth, mockNavigation, data, undefined, headersMapping, properties, "products", {}).values;
+
+            test("a column marked \"Do not import\" is not imported", () => {
+                expect(convert({ name: "A", price: 10 }, { name: "name", price: null }))
+                    .toEqual({ name: "A" });
+            });
+
+            test("a remapped column wins over a column that has the target's name, in either order", () => {
+                // Remapping `cost` onto `price` sets the `price` column to null.
+                const headersMapping = { name: "name", price: null, cost: "price" };
+                expect(convert({ name: "A", price: 10, cost: 99 }, headersMapping))
+                    .toEqual({ name: "A", price: 99 });
+                expect(convert({ name: "A", cost: 99, price: 10 }, headersMapping))
+                    .toEqual({ name: "A", price: 99 });
+            });
+
+            test("a nested column goes where it was remapped to", () => {
+                expect(convert({ address: { street: "Main" } }, { "address.street": "address.city", address: "address" }))
+                    .toEqual({ address: { city: "Main" } });
+            });
+
+            test("a nested column marked \"Do not import\" is not imported", () => {
+                expect(convert({ name: "A", address: { street: "Main", city: "Rome" } },
+                    { name: "name", "address.street": null, "address.city": "address.city", address: "address" }))
+                    .toEqual({ name: "A", address: { city: "Rome" } });
+            });
+
+            test("a column the mapping does not mention keeps its own name", () => {
+                expect(convert({ name: "A", price: 3 }, { name: "name" }))
+                    .toEqual({ name: "A", price: 3 });
+            });
+
+            // `getIn(headersMapping, "toString")` found `Object.prototype.toString`
+            // and handed a function on as the target key, which threw.
+            test("a column named after an Object.prototype member is read as a column, not through the prototype", () => {
+                expect(convert({ name: "A", toString: "x", valueOf: "y" }, { name: "name", toString: "name" }))
+                    .toEqual({ name: "x" });
+                expect(convert({ name: "A", toString: "x", valueOf: "y" }, { name: "name" }))
+                    .toEqual({ name: "A" });
+            });
+        });
     });
 });

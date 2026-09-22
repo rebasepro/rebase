@@ -3,7 +3,6 @@ import { Entity, EntityReference, CollectionRegistryController, Properties, Prop
 import { AuthController, AdminCollection } from "@rebasepro/cms-types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./transforms";
-import { getIn } from "@rebasepro/forms";
 import { inferTypeFromValue } from "@rebasepro/inference";
 import { isPrototypePollutingKey, mergeDeep } from "@rebasepro/utils";
 
@@ -20,10 +19,20 @@ export function convertDataToEntity(authController: AuthController,
         delete flatObject[idColumn];
     const mappedKeysObject = Object.entries(flatObject)
         .map(([key, value]) => {
-            const mappedKey = (getIn(headersMapping, key) as string | undefined) ?? key;
+            // The mapping is keyed by the column's flat name — `address.street`
+            // is one key, not a path — and `null` is "Do not import this
+            // property". A column the mapping does not mention keeps its name.
+            const mappedKey = Object.prototype.hasOwnProperty.call(headersMapping, key)
+                ? headersMapping[key]
+                : key;
+            if (mappedKey === null) {
+                return {};
+            }
 
             const mappedProperty = getPropertyInPath(properties, mappedKey);
-            if (!mappedProperty) {
+            // `getPropertyInPath` answers `in`, so a `toString` column finds
+            // `Object.prototype.toString`: a declared property is an object.
+            if (!mappedProperty || typeof mappedProperty !== "object") {
                 return {};
             }
             const processedValue = processValueMapping(authController, value, navigation, mappedProperty);
