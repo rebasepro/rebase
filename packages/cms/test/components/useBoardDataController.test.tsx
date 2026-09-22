@@ -402,6 +402,88 @@ function latestUpdateFor(column: string): (entities: unknown[]) => void {
 }
 
 /**
+ * Refresh has to reach the database. `refreshAll` and `refreshColumn` reset the
+ * per-column item counts to one page, and the only thing that re-subscribed a
+ * column was a count going *up* — so a refresh after the first page did
+ * nothing at all, and neither did the error banner's refresh button.
+ *
+ * And a card moved by a drag whose save was refused stayed where it was
+ * dropped for good: the optimistic entry is dropped only when the database
+ * "catches up" to it, which a refused write never does.
+ */
+describe("useBoardDataController — refresh", () => {
+
+    beforeEach(() => {
+        listen.mockReset();
+        find.mockReset();
+        count.mockReset();
+        listen.mockReturnValue(() => undefined);
+        count.mockResolvedValue(0);
+    });
+
+    function renderBoard(pageSize = 30) {
+        return renderHook(() => useBoardDataController<Task, "todo" | "done">({
+            fullPath: "tasks",
+            collection,
+            columnProperty: "status",
+            columns: ["todo", "done"],
+            pageSize
+        } as never));
+    }
+
+    it("refreshAll re-subscribes every column and re-counts them", async () => {
+        const { result } = renderBoard();
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
+        listen.mockClear();
+        count.mockClear();
+
+        act(() => result.current.refreshAll());
+
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        expect(listen.mock.calls.map(([params]: any[]) => params.where.status[1]).sort()).toEqual(["done", "todo"]);
+        await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
+    });
+
+    it("refreshColumn re-subscribes that column with one page, after a load-more", async () => {
+        const { result } = renderBoard(2);
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        act(() => result.current.loadMoreColumn("todo"));
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(3));
+        listen.mockClear();
+
+        act(() => result.current.refreshColumn("todo"));
+
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(1));
+        expect(listen.mock.calls[0][0]).toMatchObject({ where: { status: ["==", "todo"] }, limit: 2 });
+    });
+
+    it("a move whose save failed goes back where the database says once the board refreshes", async () => {
+        const { result } = renderBoard();
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        await act(async () => {
+            latestUpdateFor("todo")([entity("1", { status: "todo" })]);
+            latestUpdateFor("done")([]);
+        });
+
+        act(() => result.current.moveItemOptimistically("1", "todo", "done", { status: "done" }));
+        expect(result.current.columnData.done.entities.map(e => e.id)).toEqual(["1"]);
+
+        // The save was refused; the drag handler refreshes the board.
+        listen.mockClear();
+        act(() => result.current.refreshAll());
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        await act(async () => {
+            latestUpdateFor("todo")([entity("1", { status: "todo" })]);
+            latestUpdateFor("done")([]);
+        });
+
+        expect(result.current.columnData.todo.entities.map(e => e.id)).toEqual(["1"]);
+        expect(result.current.columnData.done.entities).toHaveLength(0);
+    });
+});
+
+/**
  * With no realtime, each column reads once per search. Nothing cancelled a read
  * that a newer search had superseded: the one guard was a single flag the next
  * subscription set straight back, so whichever answer arrived *last* won — and

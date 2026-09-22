@@ -667,21 +667,55 @@ values: { ...e.values,
         }));
     }, [pageSize]);
 
+    /**
+     * Drop the optimistic overlay for the moves matching `predicate`.
+     *
+     * An entry is otherwise released only when the database "catches up" to
+     * it, which a refused write never does: the card would stay where it was
+     * dropped, on top of whatever the database re-delivers. A refresh is a
+     * request for what the database says, so it lets go of them.
+     */
+    const dropPendingMoves = useCallback((predicate: (expectedValues: Record<string, any>) => boolean) => {
+        const pendingMap = pendingItemsRef.current;
+        for (const [id, pending] of Object.entries(pendingMap)) {
+            if (predicate(pending.expectedValues)) delete pendingMap[id];
+        }
+    }, []);
+
     const refreshColumn = useCallback((column: COLUMN) => {
-        // Force re-subscribe by resetting to initial count
+        dropPendingMoves(expected => expected[columnPropertyRef.current] === column);
+        // Back to one page, and re-subscribed here: the load-more effect only
+        // re-subscribes a column whose count went *up*, so resetting the count
+        // alone reached nothing.
         setColumnItemCounts(prev => ({
             ...prev,
             [column]: pageSize
         }));
-    }, [pageSize]);
+        prevColumnItemCountsRef.current = { ...prevColumnItemCountsRef.current, [column]: pageSize };
+        const unsubscribe = unsubscribersRef.current[column];
+        delete unsubscribersRef.current[column];
+        try {
+            unsubscribe?.();
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+        setTimeout(() => {
+            if (!isCleaningUpRef.current) {
+                subscribeToColumn(column, pageSize);
+            }
+        }, 0);
+    }, [pageSize, subscribeToColumn, dropPendingMoves]);
 
     const refreshAll = useCallback(() => {
+        dropPendingMoves(() => true);
         const reset: Record<string, number> = {};
         columns.forEach(col => {
             reset[col] = pageSize;
         });
         setColumnItemCounts(reset);
-    }, [columns, pageSize]);
+        // A new subscription version re-subscribes and re-counts every column.
+        setSubscriptionVersion(v => v + 1);
+    }, [columns, pageSize, dropPendingMoves]);
 
     // Optimistic update for when moving an item
     const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, newIndex?: number) => {

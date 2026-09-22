@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/forms";
 import { RebaseData, Entity } from "@rebasepro/types";
 import { RebaseContext, AnalyticsController, AdminCollection } from "@rebasepro/cms-types";
-import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps } from "@rebasepro/app";
+import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps, useSnackbarController, useTranslation } from "@rebasepro/app";
 import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";
@@ -64,6 +64,9 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
     boardDataController,
     analyticsController
 }: UseKanbanDragAndDropParams<M>) {
+
+    const snackbarController = useSnackbarController();
+    const { t } = useTranslation();
 
     // Handle item reorder and column changes.
     // Uses string-based fractional indexing via `generateKeyBetween`
@@ -155,27 +158,28 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
             status: "existing"
         };
 
+        // `saveEntityWithCallbacks` reports a failure to `afterSaveError` and
+        // then rethrows it, so it is handled once, here. The card was moved
+        // before the save: refreshing drops that optimistic move and paints
+        // the column the database still has it in, and the snackbar says why
+        // it went back.
         try {
             await saveEntityWithCallbacks({
                 ...saveProps,
                 collection,
                 data: dataClient,
-                context,
-                afterSave: () => {},
-                afterSaveError: (e: Error) => {
-                    console.error("Failed to save entity after reorder:", e);
-                    if (boardDataController.refreshAll) {
-                        boardDataController.refreshAll();
-                    }
-                }
+                context
             });
         } catch (e) {
-            console.error("Error saving entity:", e);
-            if (boardDataController.refreshAll) {
-                boardDataController.refreshAll();
-            }
+            console.error("Failed to save entity after reorder:", e);
+            snackbarController.open({
+                type: "error",
+                title: t("error_saving_entity"),
+                message: e instanceof Error ? e.message : String(e)
+            });
+            boardDataController.refreshAll();
         }
-    }, [collection, columnProperty, orderProperty, context, dataClient, boardDataController, analyticsController, fullPath]);
+    }, [collection, columnProperty, orderProperty, context, dataClient, boardDataController, analyticsController, fullPath, snackbarController, t]);
 
     return useMemo(() => ({ handleItemsReorder }), [handleItemsReorder]);
 }
