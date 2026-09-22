@@ -8,6 +8,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { isRebaseIndexName } from "./schema/collection-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
+import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { out, outWarn } from "./cli-output";
 import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
@@ -583,6 +584,22 @@ export async function queryGeneratedColumnDependencies(
               AND NOT dep.attisdropped;
         `);
         return res.rows as GeneratedColumnDependency[];
+    } finally {
+        await client.end();
+    }
+}
+
+/**
+ * Every column in the database with its current type, for the destructive
+ * gate to tell a widening `ALTER COLUMN … TYPE` from one that loses data.
+ */
+export async function queryColumnTypes(databaseUrl: string): Promise<ExistingColumnType[]> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        const res = await client.query<ExistingColumnType>(COLUMN_TYPES_SQL);
+        return res.rows;
     } finally {
         await client.end();
     }

@@ -32,6 +32,7 @@ import {
     ExcludeIntrospectionError,
     promptConfirm,
     queryGeneratedColumnDependencies,
+    queryColumnTypes,
     dropGeneratedColumns,
     loadCollectionsForCli
 } from "./cli-helpers";
@@ -520,7 +521,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 collectionsPath,
                 { captureStdout: true }
             );
-            const destructive = detectDestructiveStatements(plan);
+            // The columns' current types, because an `ALTER COLUMN … TYPE`
+            // loses data or does not depending on what the column is now.
+            // Without them every type change is gated.
+            const destructive = detectDestructiveStatements(
+                plan,
+                databaseUrl ? await queryColumnTypes(databaseUrl) : []
+            );
 
             // A generated column makes every column it reads immutable to
             // Atlas: PostgreSQL refuses `ALTER COLUMN … TYPE` and `DROP COLUMN`
@@ -582,7 +589,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 if (destructive.length > 0) {
                     outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those DESTROY data:`));
                     for (const d of destructive) {
-                        outWarn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+                        outWarn(chalk.red(`       ${d.kind}${d.detail ? ` (${d.detail})` : ""}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
                     }
                     outWarn("");
                     outWarn(chalk.yellow("  Applying them needs `rebase db push --allow-destructive`. Back up first: rebase db backup"));
@@ -612,7 +619,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} destructive change(s) that will DESTROY data:`));
                 outWarn("");
                 for (const d of destructive) {
-                    outWarn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+                    outWarn(chalk.red(`       ${d.kind}${d.detail ? ` (${d.detail})` : ""}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
                 }
                 outWarn("");
                 outWarn(chalk.yellow("  Full planned changes:"));
