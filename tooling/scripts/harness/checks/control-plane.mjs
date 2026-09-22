@@ -50,9 +50,39 @@ export const title = "Deploy targets the plane that actually serves prod";
  * **Separators.** The gap excludes `|`, `;` and `&`, so `kubectl get pods |
  * grep delete` is a read. It keeps newlines, so a backslash-continued command
  * still matches.
+ *
+ * **Prefixes.** "Starts a command" is not "is the first word". A shell runs the
+ * same command behind environment assignments (`KUBECONFIG=… kubectl`), by an
+ * absolute path (`/opt/homebrew/bin/kubectl`), or under a wrapper that execs
+ * its arguments (`env`, `timeout 60`, `xargs`, `nice -n 10`, …). The rule used
+ * to allow only `sudo`, so every one of those was "not deploy-shaped" and went
+ * through unchecked. A wrapper is only recognised by name, with its own flags
+ * and assignments after it, so a sentence that merely contains `env` or `time`
+ * before the word `kubectl` is still prose.
  */
-const KUBECTL_VERB =
-    /(?:^|[;&|\n('"`])\s*(?:sudo\s+)?kubectl\b[^|;&]*?\s(apply|delete|set\s+image|rollout\s+restart)\b/;
+/** `NAME=value`, with the value bare or quoted. */
+const ASSIGN = String.raw`[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s;&|]*)`;
+/** Commands that exec the rest of their arguments. */
+const WRAPPER_NAME = String.raw`(?:sudo|doas|env|command|exec|nohup|nice|ionice|time|timeout|stdbuf|xargs|watch)`;
+/**
+ * A wrapper's flag, perhaps with a separate value (`-n 10`, `-u ops`, `-I{}`).
+ *
+ * Every token has exactly one reading. A flag's value is never a wrapper's
+ * name, and assignments after a wrapper (`env A=1`) are left to the outer
+ * loop. Where two readings of a token exist, a nested repetition backtracks
+ * exponentially on a long command that does not match — and this runs before
+ * every Bash call.
+ */
+const OPT = String.raw`-{1,2}[^\s;&|]+(?:\s+(?!${WRAPPER_NAME}\s)[^\s;&|=-][^\s;&|=]*)?`;
+/** A wrapper and its flags. `timeout` takes a duration after its flags. */
+const WRAPPER =
+    String.raw`(?:(?!timeout\s)${WRAPPER_NAME}|timeout(?:\s+${OPT})*\s+\d+(?:\.\d+)?[smhd]?)(?:\s+${OPT})*`;
+/** Where a `kubectl` command starts, with everything a shell allows in front of it. */
+const KUBECTL_START =
+    String.raw`(?:^|[;&|\n('"\`])\s*(?:(?:${ASSIGN}|${WRAPPER})\s+)*(?:[^\s;&|'"\`()]*/)?kubectl\b[^|;&]*?\s`;
+
+const KUBECTL_VERB = new RegExp(`${KUBECTL_START}(apply|delete|set\\s+image|rollout\\s+restart)\\b`);
+const KUBECTL_DELETE = new RegExp(`${KUBECTL_START}delete\\b`);
 
 /** Commands that put code or config somewhere real. */
 const DEPLOY_SHAPED = [
@@ -100,8 +130,8 @@ export function run(_ctx, { command = "" } = {}) {
 
     // The same adjacency bug as KUBECTL_VERB, and the one that mattered: this
     // is the rule that BLOCKS, and it only ever saw the two words side by side.
-    // Same command-start requirement, for the same reason.
-    if (/(?:^|[;&|\n('"`])\s*(?:sudo\s+)?kubectl\b[^|;&]*?\sdelete\b/.test(command)) {
+    // Same command-start requirement (prefixes included), for the same reason.
+    if (KUBECTL_DELETE.test(command)) {
         found.push(
             finding(
                 id,

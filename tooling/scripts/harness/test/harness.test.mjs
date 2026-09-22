@@ -131,6 +131,55 @@ test("control-plane catches a destructive verb wherever a command can start", ()
     }
 });
 
+/**
+ * A command does not have to start with the bare word `kubectl`. An environment
+ * assignment, an absolute path or a wrapper (`env`, `timeout`, `xargs`, …) in
+ * front of it is still the same command, and each of these used to be
+ * classified "not deploy-shaped" and let through.
+ */
+test("control-plane blocks a destructive verb behind an assignment, a path or a wrapper", () => {
+    const prefixed = [
+        "KUBECONFIG=~/.kube/prod kubectl delete ns tenant-42",
+        "KUBECONFIG=\"/Users/me/.kube/prod config\" kubectl -n prod delete pvc data-0",
+        "/opt/homebrew/bin/kubectl delete ns tenant-42",
+        "~/bin/kubectl -n prod delete pvc data-0",
+        "timeout 60 kubectl delete ns tenant-42",
+        "timeout -s KILL 5m kubectl -n prod delete pvc data-0",
+        "env A=1 kubectl delete ns tenant-42",
+        "env -u KUBECONFIG kubectl -n prod delete pvc data-0",
+        "kubectl get ns -o name | xargs kubectl delete",
+        "kubectl get ns -o name | xargs -I{} kubectl delete {}",
+        "command kubectl delete ns tenant-42",
+        "nice -n 10 kubectl delete ns tenant-42",
+        "time kubectl delete ns tenant-42",
+        "sudo -u ops kubectl delete ns tenant-42",
+        "cd /repo && KUBECONFIG=prod timeout 60 /usr/local/bin/kubectl -n prod delete pvc data-0",
+        "bash -c 'KUBECONFIG=prod kubectl delete ns tenant-42'"
+    ];
+    for (const command of prefixed) {
+        assert.ok(controlPlane.isDeployShaped(command), `must be deploy-shaped: ${JSON.stringify(command)}`);
+        assert.ok(blocking(controlPlane.run(null, { command })), `must block: ${JSON.stringify(command)}`);
+    }
+
+    // The other verbs sit behind the same prefix rule.
+    for (const command of [
+        "KUBECONFIG=prod kubectl apply -f svc.yaml",
+        "/usr/local/bin/kubectl -n prod set image deploy/api api=img:2",
+        "timeout 60 kubectl -n prod rollout restart deploy/api"
+    ]) {
+        assert.ok(controlPlane.isDeployShaped(command), `must be deploy-shaped: ${JSON.stringify(command)}`);
+    }
+
+    // A prefix does not turn a read into a write, or prose into a command.
+    for (const command of [
+        "KUBECONFIG=prod kubectl get pods | grep delete",
+        "timeout 60 kubectl -n prod get pvc",
+        "echo 'the env we use for kubectl can delete things'"
+    ]) {
+        assert.equal(controlPlane.isDeployShaped(command), false, `must not be deploy-shaped: ${JSON.stringify(command)}`);
+    }
+});
+
 test("lockfile check only fires inside a worktree", () => {
     const inWorktree = { isWorktree: true, changed: ["pnpm-lock.yaml"], root: "/wt", primaryRoot: "/primary" };
     assert.ok(blocking(lockfileWorktree.run(inWorktree)));
