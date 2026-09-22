@@ -24,7 +24,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { affectsDeclarations, extractSurface, renderAll, staleTargets } from "../api-surface.mjs";
-import { checkApiSurface } from "../check-api-surface.mjs";
+import { checkApiSurface, classify } from "../check-api-surface.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const FIXTURES = "tooling/scripts/test/fixtures/api-surface";
@@ -127,6 +127,50 @@ test("a gained member fails too, so the baseline cannot drift a member at a time
     assert.equal(code, 1);
     assert.match(messages.join("\n"), /const rebase — gained email/);
     assert.match(messages.join("\n"), /Additions only — no contract break/);
+});
+
+/**
+ * The same name exported by two tracked packages is two entries, not one.
+ *
+ * The parser skipped the `## <pkg>` headers and keyed every line on
+ * `kind Name` alone, so the second package's line overwrote the first's. With
+ * `const rebase` in both `@rebasepro/server` and `@rebasepro/server/functions`,
+ * deleting it from `/functions` — the entry point tenant functions import —
+ * printed "API surface unchanged". The real baseline has ~90 such names.
+ */
+test("a removal from one package is not hidden by the same export in another", () => {
+    const surface = (functionsLines) =>
+        "## @fixture/server\nconst rebase { auth, email }\nfunction getUser\n" +
+        `\n## @fixture/server/functions\n${functionsLines.join("\n")}\n`;
+    const before = surface(["const rebase { auth, email }", "function getUser"]);
+
+    const gone = classify(before, surface(["function getUser"]));
+    assert.deepEqual(gone.removed, ["@fixture/server/functions: const rebase"]);
+
+    const lost = classify(before, surface(["const rebase { auth }", "function getUser"]));
+    assert.deepEqual(lost.changed, ["@fixture/server/functions: const rebase — lost email"]);
+
+    // Moving an export between packages is a removal from the one it left: a
+    // bundle importing it from there is already built.
+    const moved = classify(
+        "## @fixture/a\nfunction helper\n\n## @fixture/b\n",
+        "## @fixture/a\n\n## @fixture/b\nfunction helper\n"
+    );
+    assert.deepEqual(moved.removed, ["@fixture/a: function helper"]);
+    assert.deepEqual(moved.added, ["@fixture/b: function helper"]);
+});
+
+test("the committed baseline reports a removal from @rebasepro/server/functions", () => {
+    const baseline = fs.readFileSync(path.join(ROOT, "contracts/server.api.txt"), "utf8");
+    const section = baseline.indexOf("\n## @rebasepro/server/functions\n");
+    assert.ok(section > 0, "the baseline tracks the functions entry point");
+    const line = baseline.slice(section).split("\n").find(l => l.startsWith("const rebase"));
+    assert.ok(line, "the functions entry point exports the singleton");
+    assert.ok(baseline.slice(0, section).split("\n").some(l => l.startsWith("const rebase")),
+        "and so does @rebasepro/server — the duplicate this test is about");
+
+    const without = baseline.slice(0, section) + baseline.slice(section).replace(`\n${line}\n`, "\n");
+    assert.deepEqual(classify(baseline, without).removed, ["@rebasepro/server/functions: const rebase"]);
 });
 
 test("mustHaveMembers refuses a render that went blind again", () => {

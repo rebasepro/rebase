@@ -35,18 +35,31 @@ import { renderAll, BASELINE, TRACKED, staleTargets, staleDistMessage } from "./
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const rel = p => path.relative(ROOT, p);
 
-/** `kind Name { a, b }` → key `kind Name`, members [a, b]. Comments and blanks drop out. */
+/**
+ * `kind Name { a, b }` under `## @pkg` → key `@pkg: kind Name`, members [a, b].
+ * Comments and blanks drop out.
+ *
+ * The package is part of the key. Without it, a name two tracked packages both
+ * export was one entry, the later section's line overwrote the earlier's, and
+ * removing `const rebase` from `@rebasepro/server/functions` — or a member from
+ * either copy — diffed as "unchanged" for as long as the other package still
+ * had it. The baseline has ~90 such names.
+ */
 function parse(text) {
     const entries = new Map();
+    let section = null;
     for (const line of text.split("\n")) {
         const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("##")) continue;
-        const withMembers = trimmed.match(/^(.*?)\s*\{\s*(.*?)\s*\}$/);
-        if (withMembers) {
-            entries.set(withMembers[1], withMembers[2].split(",").map(s => s.trim()).filter(Boolean));
-        } else {
-            entries.set(trimmed, []);
+        const header = trimmed.match(/^##\s+(\S+)/);
+        if (header) {
+            section = header[1];
+            continue;
         }
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const withMembers = trimmed.match(/^(.*?)\s*\{\s*(.*?)\s*\}$/);
+        const name = withMembers ? withMembers[1] : trimmed;
+        const key = section ? `${section}: ${name}` : name;
+        entries.set(key, withMembers ? withMembers[2].split(",").map(s => s.trim()).filter(Boolean) : []);
     }
     return entries;
 }
