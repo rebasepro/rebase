@@ -20,7 +20,7 @@ import {
 import { unknownCommand } from "../utils/unknown-command";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-const AUTH_SUBCOMMANDS = ["reset-password"] as const;
+export const AUTH_SUBCOMMANDS = ["reset-password"] as const;
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 
 /** A user as the admin API returns it, reduced to what this command needs. */

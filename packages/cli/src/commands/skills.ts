@@ -355,7 +355,7 @@ export function installForAgent(
 }
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-const SKILLS_SUBCOMMANDS = ["install"] as const;
+export const SKILLS_SUBCOMMANDS = ["install"] as const;
 
 export async function skillsCommand(subcommand: string | undefined, rawArgs: string[]) {
     // `--help` cannot reach `skillsInstall`. `cli.ts` only rewrites the

@@ -118,6 +118,9 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
     }
 };
 
+/** Every subcommand the family dispatches — the help table's keys. */
+export const SCHEMA_SUBCOMMANDS = Object.keys(SCHEMA_ACTION_HELP);
+
 function printSchemaHelp(action?: string) {
     const entry = action ? SCHEMA_ACTION_HELP[action] : undefined;
     if (entry) {

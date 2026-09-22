@@ -45,7 +45,7 @@ ${chalk.bold("Options")}
 }
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-const APPS_SUBCOMMANDS = ["list", "init", "config"] as const;
+export const APPS_SUBCOMMANDS = ["list", "init", "config"] as const;
 
 export async function appsCommand(subcommand: string | undefined, rawArgs: string[] = []): Promise<void> {
     // Help is answered before parsing, so `rebase apps config --help` prints the

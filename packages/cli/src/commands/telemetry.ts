@@ -14,7 +14,7 @@ import { unknownCommand } from "../utils/unknown-command";
  * a documentation comment that quietly fell out of date two releases ago.
  */
 /** Everything the switch below dispatches, for the did-you-mean. */
-const TELEMETRY_SUBCOMMANDS = ["status", "show", "enable", "disable"] as const;
+export const TELEMETRY_SUBCOMMANDS = ["status", "show", "enable", "disable"] as const;
 
 export async function telemetryCommand(rawArgs: string[]): Promise<void> {
     // Checked before parsing, because `--help` is answered by the dispatcher

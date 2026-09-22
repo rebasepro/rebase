@@ -1311,6 +1311,9 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     }
 };
 
+/** Every subcommand the family dispatches — the help table's keys. */
+export const DB_SUBCOMMANDS = Object.keys(DB_ACTION_HELP);
+
 function printDbHelp(action?: string) {
     const entry = action ? DB_ACTION_HELP[action] : undefined;
     if (entry) {

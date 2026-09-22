@@ -14,7 +14,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ROOT_FLAGS, entry, printHelp } from "./cli";
+import { ROOT_FLAGS, entry, printHelp, telemetryCommandWords } from "./cli";
 import { UsageError } from "./utils/args";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -106,6 +106,19 @@ vi.mock("./commands/status", () => ({
     }
 }));
 
+vi.mock("./commands/cloud", async importOriginal => ({
+    ...await importOriginal<typeof import("./commands/cloud")>(),
+    cloudCommand: async () => {
+        throw thrown;
+    }
+}));
+
+vi.mock("./commands/init", () => ({
+    createRebaseApp: async () => {
+        throw thrown;
+    }
+}));
+
 let thrown: unknown;
 
 describe("the failure telemetry records", () => {
@@ -147,5 +160,51 @@ describe("the failure telemetry records", () => {
 
         const serialized = JSON.stringify(telemetry.recorded.at(-1)?.properties);
         expect(serialized).not.toMatch(/127\.0\.0\.1|5432|DATABASE_URL/);
+    });
+});
+
+/**
+ * The command words `cli.error` carries.
+ *
+ * They were the raw words typed, and a word typed after a command is as often
+ * a project name, a slug or a typo as it is a subcommand: `rebase init
+ * acme-payroll-internal --headles` sent `subcommand: "acme-payroll-internal"`
+ * — the one thing the consent screen says is never sent. `sanitize` could not
+ * catch it, because a project name has no separator in it.
+ */
+describe("the command words the failure telemetry records", () => {
+    beforeEach(() => {
+        telemetry.recorded.length = 0;
+        thrown = new UsageError("unknown or unexpected option: --headles");
+    });
+
+    it("does not send a positional that is not a subcommand", async () => {
+        await expect(entry(["node", "rebase", "init", "acme-payroll-internal", "--headles"])).rejects.toThrow(UsageError);
+
+        const properties = telemetry.recorded.at(-1)?.properties;
+        expect(properties?.command).toBe("init");
+        expect(properties?.subcommand).toBe("other");
+        expect(JSON.stringify(properties)).not.toContain("acme");
+    });
+
+    it("does not send a mistyped subcommand or command, which are free text", () => {
+        // These two exit through `unknownCommand` today, before the catch that
+        // records — but the mapping is what makes that an accident of routing
+        // rather than the only thing standing between a typo and the payload.
+        expect(telemetryCommandWords("db", "acme-payroll-internal")).toEqual({ command: "db", subcommand: "other" });
+        expect(telemetryCommandWords("acme-payroll-internal", undefined)).toEqual({ command: "other", subcommand: "none" });
+        expect(telemetryCommandWords("acme-payroll-internal", "push")).toEqual({ command: "other", subcommand: "other" });
+    });
+
+    it("still names a subcommand the command dispatches", async () => {
+        // Through a cloud group alias too: `database` is `db`'s other spelling.
+        await expect(entry(["node", "rebase", "cloud", "database", "acme-payroll-internal", "--bogus"])).rejects.toThrow(UsageError);
+        expect(telemetry.recorded.at(-1)?.properties).toMatchObject({ command: "cloud", subcommand: "db" });
+
+        await expect(entry(["node", "rebase", "status"])).rejects.toThrow(UsageError);
+        expect(telemetry.recorded.at(-1)?.properties).toMatchObject({ command: "status", subcommand: "none" });
+
+        expect(telemetryCommandWords("db", "push")).toEqual({ command: "db", subcommand: "push" });
+        expect(telemetryCommandWords("schema", "--help")).toEqual({ command: "schema", subcommand: "--help" });
     });
 });

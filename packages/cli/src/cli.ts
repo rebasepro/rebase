@@ -2,23 +2,23 @@ import chalk from "chalk";
 import arg from "arg";
 import { createRebaseApp } from "./commands/init";
 import { generateSdkCommand } from "./commands/generate_sdk";
-import { schemaCommand } from "./commands/schema";
-import { dbCommand } from "./commands/db";
+import { SCHEMA_SUBCOMMANDS, schemaCommand } from "./commands/schema";
+import { DB_SUBCOMMANDS, dbCommand } from "./commands/db";
 import { devCommand } from "./commands/dev";
 import { buildCommand } from "./commands/build";
 import { ejectCommand } from "./commands/eject";
 import { startCommand } from "./commands/start";
-import { authCommand } from "./commands/auth";
+import { AUTH_SUBCOMMANDS, authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
 import { resourcesCommand } from "./commands/resources";
 import { statusCommand } from "./commands/status";
 import { normalizeImportsCommand } from "./commands/normalize-imports";
-import { skillsCommand } from "./commands/skills";
-import { apiKeysCommand } from "./commands/api-keys";
-import { telemetryCommand } from "./commands/telemetry";
+import { SKILLS_SUBCOMMANDS, skillsCommand } from "./commands/skills";
+import { API_KEYS_SUBCOMMANDS, apiKeysCommand } from "./commands/api-keys";
+import { TELEMETRY_SUBCOMMANDS, telemetryCommand } from "./commands/telemetry";
 import { errorClass, isEnabled, recordEvent } from "./telemetry";
-import { cloudCommand } from "./commands/cloud";
-import { appsCommand } from "./commands/apps";
+import { CLOUD_GROUP_NAMES, GROUP_ALIASES, cloudCommand } from "./commands/cloud";
+import { APPS_SUBCOMMANDS, appsCommand } from "./commands/apps";
 import { upgradeCommand } from "./commands/upgrade";
 import { requireProjectRoot } from "./utils/project";
 import { parseCommandArgs } from "./utils/args";
@@ -67,6 +67,59 @@ export const ROOT_FLAGS = {
     "-h": "--help"
 } as const;
 
+/**
+ * Every command the dispatch below answers and the help lists. Declared as a
+ * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
+ * and the docs verifier read it out of this file's source.
+ */
+const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade"];
+
+/**
+ * The subcommands each command group dispatches, from the lists those groups
+ * dispatch on. A command absent from here takes no subcommand.
+ */
+function knownSubcommands(command: string): readonly string[] {
+    switch (command) {
+        case "schema": return SCHEMA_SUBCOMMANDS;
+        case "db": return DB_SUBCOMMANDS;
+        case "auth": return AUTH_SUBCOMMANDS;
+        case "skills": return SKILLS_SUBCOMMANDS;
+        case "api-keys": return API_KEYS_SUBCOMMANDS;
+        case "apps": return APPS_SUBCOMMANDS;
+        case "telemetry": return TELEMETRY_SUBCOMMANDS;
+        case "cloud": return CLOUD_GROUP_NAMES;
+        default: return [];
+    }
+}
+
+/**
+ * The command and subcommand words as `cli.error` may send them: each one is a
+ * word this CLI dispatches, `"none"` when nothing was typed, or `"other"`.
+ *
+ * The words come from what was typed, and what is typed after a command is
+ * only sometimes a subcommand. `rebase init acme-payroll-internal`, `rebase
+ * cloud --project acme-prod deploy` and `rebase db psuh` put a project name, a
+ * slug and a typo in the subcommand's position — the consent screen promises
+ * "never project names", and `sanitize` cannot tell one of those from a
+ * subcommand because neither has a separator in it. So the words are held
+ * against the vocabulary here, where it is known, and nothing else survives.
+ *
+ * Exported for `cli.test.ts`.
+ */
+export function telemetryCommandWords(
+    command: string | undefined,
+    subcommand: string | undefined
+): { command: string; subcommand: string } {
+    if (!command) return { command: "none", subcommand: "none" };
+    const dispatched = namespacedCommands.includes(command) || command === "normalize-imports" || command === "__dev-db-daemon";
+    if (!dispatched) return { command: "other", subcommand: subcommand ? "other" : "none" };
+
+    if (!subcommand) return { command, subcommand: "none" };
+    if (subcommand === "--help") return { command, subcommand };
+    const canonical = command === "cloud" ? GROUP_ALIASES[subcommand] ?? subcommand : subcommand;
+    return { command, subcommand: knownSubcommands(command).includes(canonical) ? canonical : "other" };
+}
+
 export async function entry(args: string[]) {
     silenceDotenvBanner();
 
@@ -100,7 +153,6 @@ export async function entry(args: string[]) {
     const subcommand = words[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -143,9 +195,12 @@ export async function entry(args: string[]) {
         // is awaited so a short-lived CLI does not exit before the request is
         // made. The error is re-thrown untouched — `bin/rebase.js` owns how a
         // failure is printed and what the exit code is.
+        //
+        // The command words go through `telemetryCommandWords`, never raw: a
+        // word typed after a command is as often a project name or a typo as a
+        // subcommand, and neither has a separator for `sanitize` to catch.
         await recordEvent("cli.error", {
-            command: command ?? "none",
-            subcommand: effectiveSubcommand ?? "none",
+            ...telemetryCommandWords(command, effectiveSubcommand),
             error_type: errorClass(error),
             usage: Boolean(error && typeof error === "object" && (error as { isUsageError?: unknown }).isUsageError)
         }, { projectRoot: process.cwd() });

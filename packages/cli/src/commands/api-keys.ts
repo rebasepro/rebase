@@ -17,7 +17,7 @@ import fs from "fs";
 import path from "path";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-const API_KEYS_SUBCOMMANDS = ["list", "create", "revoke"] as const;
+export const API_KEYS_SUBCOMMANDS = ["list", "create", "revoke"] as const;
 
 /* ═══════════════════════════════════════════════════════════════
    Env helper — reads SERVICE_KEY and PORT from .env
