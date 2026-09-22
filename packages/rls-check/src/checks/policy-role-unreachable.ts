@@ -87,7 +87,7 @@ export const policyRoleUnreachable: Check = {
                         : `-- Point the policies at the role your requests actually arrive as. Confirm it with:\n` +
                         `--     SELECT current_user;   -- run this from your application's connection\n` +
                         `ALTER POLICY ${qi(policies[0].name)} ON ${qrel(rel.schema, rel.name)} TO <that role>;\n` +
-                        `-- Alternatively, if ${named[0]} is meant to be reachable, grant membership:\n` +
+                        `-- Alternatively, if ${qi(named[0])} is meant to be reachable, grant membership:\n` +
                         `-- GRANT ${qi(named[0])} TO <your login role>;`
                 })
             );

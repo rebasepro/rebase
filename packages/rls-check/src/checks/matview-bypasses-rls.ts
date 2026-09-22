@@ -30,8 +30,9 @@ export const matviewBypassesRls: Check = {
             const rel = relationAt(snapshot, view.schema, view.name);
             if (rel?.kind !== "materialized_view") continue;
 
-            const bases = protectedBaseTables(snapshot, view);
-            if (bases.length === 0) continue;
+            const baseTables = protectedBaseTables(snapshot, view);
+            if (baseTables.length === 0) continue;
+            const bases = baseTables.map((r) => `${r.schema}.${r.name}`);
 
             const exposed = exposedGrantees(snapshot, view.schema, view.name, ["SELECT"]);
             if (exposed.length === 0) continue;
@@ -63,7 +64,7 @@ export const matviewBypassesRls: Check = {
                         `-- and, if callers need this data, expose it through a view that applies the\n` +
                         `-- caller's own privileges:\n` +
                         `-- CREATE VIEW ${qrel(view.schema, `${view.name}_scoped`)} WITH (security_invoker = true)\n` +
-                        `--     AS SELECT * FROM ${bases[0].split(".").map((p) => `"${p}"`).join(".")} WHERE ...;`
+                        `--     AS SELECT * FROM ${qrel(baseTables[0].schema, baseTables[0].name)} WHERE ...;`
                 })
             );
         }

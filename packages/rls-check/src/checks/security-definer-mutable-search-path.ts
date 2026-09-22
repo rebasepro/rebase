@@ -55,18 +55,19 @@ export const securityDefinerMutableSearchPath: Check = {
                         `(commonly PUBLIC on \`public\` in older databases).`,
                     fix:
                         `-- Pin the search_path on every overload of this routine:\n` +
-                        `DO $$\n` +
-                        `DECLARE r record;\n` +
-                        `BEGIN\n` +
-                        `    FOR r IN\n` +
-                        `        SELECT p.oid::regprocedure AS sig\n` +
-                        `        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace\n` +
-                        `        WHERE n.nspname = ${literal(routine.schema)} AND p.proname = ${literal(routine.name)}\n` +
-                        `    LOOP\n` +
-                        `        EXECUTE format('ALTER ROUTINE %s SET search_path = pg_catalog, pg_temp', r.sig);\n` +
-                        `    END LOOP;\n` +
-                        `END $$;\n` +
-                        `-- Then schema-qualify every identifier in the body, since nothing but\n` +
+                        dollarQuotedDo(
+                            `DECLARE r record;\n` +
+                            `BEGIN\n` +
+                            `    FOR r IN\n` +
+                            `        SELECT p.oid::regprocedure AS sig\n` +
+                            `        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace\n` +
+                            `        WHERE n.nspname = ${literal(routine.schema)} AND p.proname = ${literal(routine.name)}\n` +
+                            `    LOOP\n` +
+                            `        EXECUTE format('ALTER ROUTINE %s SET search_path = pg_catalog, pg_temp', r.sig);\n` +
+                            `    END LOOP;\n` +
+                            `END`
+                        ) +
+                        `\n-- Then schema-qualify every identifier in the body, since nothing but\n` +
                         `-- pg_catalog is on the path any more.`
                 })
             );
@@ -77,3 +78,17 @@ export const securityDefinerMutableSearchPath: Check = {
 };
 
 const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+
+/**
+ * `DO $$ … $$;`, with a dollar-quote tag the body does not contain.
+ *
+ * The body carries the routine's schema and name as string literals, and a
+ * routine can be named anything, `$$` included. A `$$` in the name ended the
+ * body there and ran the rest of the name as SQL, whatever the quotes around
+ * it said: nothing inside a dollar-quoted string is special except its tag.
+ */
+function dollarQuotedDo(body: string): string {
+    let tag = "$$";
+    for (let i = 0; body.includes(tag); i++) tag = `$fix${i === 0 ? "" : i}$`;
+    return `DO ${tag}\n${body} ${tag};`;
+}

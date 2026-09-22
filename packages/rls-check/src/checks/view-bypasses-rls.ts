@@ -1,15 +1,14 @@
-import type { Check, DbSnapshot, DbView, Finding } from "../types";
+import type { Check, DbRelation, DbSnapshot, DbView, Finding } from "../types";
 
-import { exposedGrantees, finding, listAnd, qrel, qrole, relationAt } from "./util";
+import { exposedGrantees, finding, listAnd, qi, qrel, qrole, relationAt } from "./util";
 
 const ID = "view-bypasses-rls";
 
 /** Base relations of `view` that have RLS turned on. */
-export function protectedBaseTables(snapshot: DbSnapshot, view: DbView): string[] {
+export function protectedBaseTables(snapshot: DbSnapshot, view: DbView): DbRelation[] {
     return view.dependsOn
         .map((d) => relationAt(snapshot, d.schema, d.table))
-        .filter((r): r is NonNullable<typeof r> => Boolean(r?.rlsEnabled))
-        .map((r) => `${r.schema}.${r.name}`);
+        .filter((r): r is DbRelation => Boolean(r?.rlsEnabled));
 }
 
 /**
@@ -46,8 +45,9 @@ export const viewBypassesRls: Check = {
 
             if (view.securityInvoker === true) continue;
 
-            const bases = protectedBaseTables(snapshot, view);
-            if (bases.length === 0) continue;
+            const baseTables = protectedBaseTables(snapshot, view);
+            if (baseTables.length === 0) continue;
+            const bases = baseTables.map((r) => `${r.schema}.${r.name}`);
 
             const exposed = exposedGrantees(snapshot, view.schema, view.name, ["SELECT"]);
             if (exposed.length === 0) continue;
@@ -85,9 +85,10 @@ export const viewBypassesRls: Check = {
                           `--   1. revoke access and let callers query the base table directly:\n` +
                           `REVOKE SELECT ON ${qrel(view.schema, view.name)} FROM ${qrole(roles[0])};\n` +
                           `--   2. or set FORCE ROW LEVEL SECURITY on the base tables and add policies\n` +
-                          `--      that apply to ${view.owner}, so the view's own execution is filtered.`
+                          `--      that apply to ${qi(view.owner)}, so the view's own execution is filtered.`
                         : `ALTER VIEW ${qrel(view.schema, view.name)} SET (security_invoker = true);\n` +
-                          `-- Callers then need their own SELECT privilege on ${listAnd(bases)}, and the\n` +
+                          `-- Callers then need their own SELECT privilege on ` +
+                          `${listAnd(baseTables.map((r) => qrel(r.schema, r.name)))}, and the\n` +
                           `-- policies there apply to them.`
                 })
             );

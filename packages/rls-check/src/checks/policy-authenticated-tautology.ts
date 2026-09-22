@@ -99,7 +99,7 @@ export const policyAuthenticatedTautology: Check = {
                         "-- Or, where members of a shared group really may see each other's rows, say\n" +
                         "-- which group:\n" +
                         `--     USING (EXISTS (SELECT 1 FROM memberships m\n` +
-                        `--                    WHERE m.org_id = ${policy.table}.org_id AND m.user_id = ${uidCall}));\n` +
+                        `--                    WHERE m.org_id = ${qi(policy.table)}.org_id AND m.user_id = ${uidCall}));\n` +
                         "-- If the table genuinely is readable by every account, keep this policy and\n" +
                         `-- skip the finding: rls-check --skip ${ID}`
                 })

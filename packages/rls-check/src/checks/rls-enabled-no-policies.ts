@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { callerIdCall, finding, policiesFor, qrel, scannedTables } from "./util";
+import { callerIdCall, finding, policiesFor, qi, qrel, scannedTables } from "./util";
 
 const ID = "rls-enabled-no-policies";
 
@@ -47,7 +47,7 @@ export const rlsEnabledNoPolicies: Check = {
                         `an empty result is indistinguishable from a correctly filtered one.`,
                     fix:
                         `-- Either define the policy you intended:\n` +
-                        `CREATE POLICY ${JSON.stringify(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
+                        `CREATE POLICY ${qi(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
                         `    FOR SELECT TO authenticated USING (user_id = ${uidCall});\n` +
                         `-- or, if this table is genuinely meant to be unreadable, drop the grants\n` +
                         `-- instead of relying on an empty policy set:\n` +

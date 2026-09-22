@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding, Severity } from "../types";
 
-import { finding, qrel, sameRole, scannedTables } from "./util";
+import { finding, qi, qrel, sameRole, scannedTables } from "./util";
 
 const ID = "rls-enabled-not-forced";
 
@@ -51,7 +51,7 @@ export const rlsEnabledNotForced: Check = {
                     `only if an application connects with it.`;
                 fix =
                     `-- FORCE cannot constrain this role. Connect your application as a role that is\n` +
-                    `-- neither the owner nor BYPASSRLS, and keep ${rel.owner} for migrations only.\n` +
+                    `-- neither the owner nor BYPASSRLS, and keep ${qi(rel.owner)} for migrations only.\n` +
                     `ALTER TABLE ${qrel(rel.schema, rel.name)} FORCE ROW LEVEL SECURITY; -- still worth setting`;
             } else if (canLogin) {
                 severity = "high";

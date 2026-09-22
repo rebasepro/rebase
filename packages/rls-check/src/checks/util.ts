@@ -135,7 +135,35 @@ export function rowsPhrase(rel: DbRelation | undefined): string {
 // SQL rendering for the `fix` field
 // ---------------------------------------------------------------------------
 
-export const qi = (ident: string): string => `"${ident.replace(/"/g, '""')}"`;
+/**
+ * Characters that cannot sit inside a fix as themselves: a line break would
+ * end the `--` comment a suggestion is printed in and run the rest of the name
+ * as SQL, and the other controls are invisible or rewrite the terminal. The
+ * control characters are the point, so the lint rule that objects to them is
+ * off for this line.
+ */
+// eslint-disable-next-line no-control-regex
+const UNPRINTABLE =/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+const UNPRINTABLE_ALL = new RegExp(UNPRINTABLE.source, "g");
+
+/**
+ * A quoted identifier that is one printable token wherever a fix puts it.
+ *
+ * Every name here comes out of the catalog, which means out of whoever could
+ * create a table, a role or a policy, and every fix is printed to be pasted
+ * into psql. Doubling `"` keeps a name inside its quotes; a name with a line
+ * break in it is written as a Unicode-escape identifier (`U&"a\000Ab"`), which
+ * names the same object and has no line break to escape a comment with.
+ */
+export function qi(ident: string): string {
+    const doubled = ident.replace(/"/g, '""');
+    if (!UNPRINTABLE.test(ident)) return `"${doubled}"`;
+    const escaped = doubled
+        .replace(/\\/g, "\\\\")
+        .replace(UNPRINTABLE_ALL, (ch) => `\\${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`);
+    return `U&"${escaped}"`;
+}
+
 export const qrel = (schema: string, name: string): string => `${qi(schema)}.${qi(name)}`;
 /** PUBLIC is a keyword, not an identifier — quoting it changes what it means. */
 export const qrole = (role: string): string => (isPublicRole(role) ? "PUBLIC" : qi(role));

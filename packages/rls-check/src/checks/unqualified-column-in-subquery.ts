@@ -69,8 +69,10 @@ export const unqualifiedColumnInSubquery: Check = {
 interface Ambiguity {
     /** The bare name as written. */
     column: string;
-    /** The relation Postgres binds it to. */
+    /** The relation Postgres binds it to, as `schema.name` for prose. */
     inner: string;
+    /** The same relation, for SQL. */
+    innerRelation: { schema: string; name: string };
     /** What it is compared against, for the report. */
     comparedTo: string;
 }
@@ -135,7 +137,12 @@ function scanExpression(snapshot: DbSnapshot, outer: DbRelation, expr: string): 
             if (seen.has(key)) continue;
             seen.add(key);
 
-            out.push({ column: token.value, inner: `${inner.schema}.${inner.name}`, comparedTo: partner });
+            out.push({
+                column: token.value,
+                inner: `${inner.schema}.${inner.name}`,
+                innerRelation: { schema: inner.schema, name: inner.name },
+                comparedTo: partner
+            });
         }
     }
 
@@ -302,6 +309,7 @@ function buildFinding(
     clause: "USING" | "WITH CHECK",
     hit: Ambiguity
 ): Finding {
+    const innerSql = qrel(hit.innerRelation.schema, hit.innerRelation.name);
     return finding({
         id: ID,
         severity: "high",
@@ -341,9 +349,9 @@ function buildFinding(
             : `-- Qualify every reference so the binding is explicit:\n` +
             `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
             `    ${clause === "USING" ? "USING" : "WITH CHECK"} (EXISTS (\n` +
-            `        SELECT 1 FROM ${hit.inner}\n` +
-            `        WHERE ${hit.inner}.${hit.comparedTo.includes(".") ? hit.comparedTo.split(".").pop() : hit.comparedTo}\n` +
-            `            = ${policy.table}.${hit.column}\n` +
+            `        SELECT 1 FROM ${innerSql}\n` +
+            `        WHERE ${innerSql}.${qi(hit.comparedTo.split(".").pop() ?? hit.comparedTo)}\n` +
+            `            = ${qi(policy.table)}.${qi(hit.column)}\n` +
             `    ));\n` +
             `-- Verify the intended direction first — this rewrite assumes the outer row was meant.`
     });

@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { callerIdCall, DML, exposedGrantees, finding, listAnd, qrel, qrole, rowsPhrase, scannedTables } from "./util";
+import { callerIdCall, DML, exposedGrantees, finding, listAnd, qi, qrel, qrole, rowsPhrase, scannedTables } from "./util";
 
 const ID = "rls-disabled";
 
@@ -58,7 +58,7 @@ export const rlsDisabled: Check = {
                         `ALTER TABLE ${qrel(rel.schema, rel.name)} ENABLE ROW LEVEL SECURITY;\n` +
                         `-- Enabling RLS with no policies denies every row to everyone but the owner,\n` +
                         `-- so add the policy you intend in the same migration, for example:\n` +
-                        `-- CREATE POLICY ${JSON.stringify(`${rel.name}_owner_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
+                        `-- CREATE POLICY ${qi(`${rel.name}_owner_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
                         `--     FOR SELECT TO ${qrole(roles[0])} USING (user_id = ${uidCall});`
                 })
             );

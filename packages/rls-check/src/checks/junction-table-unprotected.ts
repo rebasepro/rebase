@@ -1,6 +1,6 @@
 import type { Check, DbRelation, DbSnapshot, Finding } from "../types";
 
-import { finding, qrel, relationAt, scannedTables } from "./util";
+import { finding, qi, qrel, relationAt, scannedTables } from "./util";
 
 const ID = "junction-table-unprotected";
 
@@ -74,10 +74,10 @@ export const junctionTableUnprotected: Check = {
                     fix:
                         `ALTER TABLE ${qrel(rel.schema, rel.name)} ENABLE ROW LEVEL SECURITY;\n` +
                         `-- A join table's policy normally follows its endpoints, e.g.:\n` +
-                        `-- CREATE POLICY ${JSON.stringify(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
+                        `-- CREATE POLICY ${qi(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
                         `--     FOR SELECT USING (EXISTS (\n` +
-                        `--         SELECT 1 FROM ${endpoints[0]} e\n` +
-                        `--         WHERE e.id = ${qrel(rel.schema, rel.name)}.${fks[0].columns[0]}\n` +
+                        `--         SELECT 1 FROM ${qrel(fks[0].refSchema, fks[0].refTable)} e\n` +
+                        `--         WHERE e.id = ${qrel(rel.schema, rel.name)}.${qi(fks[0].columns[0])}\n` +
                         `--     ));`
                 })
             );
