@@ -1,4 +1,5 @@
 import { isPrototypePollutingKey } from "@rebasepro/utils";
+import { unescapeCsvFormula } from "../../data_export/export/export";
 
 /**
  * Delimiters sniffed from the header row, most common first.
@@ -13,8 +14,9 @@ const CANDIDATE_DELIMITERS = [",", ";", "\t"];
  * Split CSV text into rows of raw cells, RFC 4180 style.
  *
  * Quoted fields may contain the delimiter, newlines and doubled quotes; this is
- * the exact inverse of what the export's `entryToCSVRow` writes, so a file this
- * admin produced reads back into the cells it was built from.
+ * the exact inverse of the quoting the export's `entryToCSVRow` writes, and
+ * `parseCsvToObjects` undoes its formula escape, so a file this admin produced
+ * reads back into the cells it was built from.
  */
 export function parseCsvRows(text: string, delimiter = ","): string[][] {
     const rows: string[][] = [];
@@ -133,7 +135,9 @@ export function parseCsvToObjects(text: string): ParsedCsv {
             data: [] };
     }
 
-    const headers = rows[0].map((header, index) => header.trim() || `Column${index + 1}`);
+    // The export writes every cell, headers included, through its formula
+    // escape; reading one back undoes it.
+    const headers = rows[0].map((header, index) => unescapeCsvFormula(header).trim() || `Column${index + 1}`);
 
     const data = rows.slice(1).map((cells) => {
         const obj: Record<string, string> = {};
@@ -143,7 +147,7 @@ export function parseCsvToObjects(text: string): ParsedCsv {
             if (isPrototypePollutingKey(header)) return;
             const cell = cells[index];
             if (cell === undefined) return;
-            obj[header] = cell;
+            obj[header] = unescapeCsvFormula(cell);
         });
         return obj;
     });

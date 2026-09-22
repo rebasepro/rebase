@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
 import { detectCsvDelimiter, parseCsvRows, parseCsvToObjects } from "../../src/data_import/utils/csv";
 import { convertFileToJson } from "../../src/data_import/utils/file_to_json";
+import { entryToCSVRow } from "../../src/data_export/export/export";
 
 describe("parseCsvRows", () => {
 
@@ -65,6 +66,37 @@ describe("parseCsvToObjects", () => {
         expect(data).toEqual([{ id: "1",
             Column2: "spacer",
             name: "Alice" }]);
+    });
+});
+
+/**
+ * The export prefixes a cell a spreadsheet would evaluate — one starting with
+ * `=`, `+`, `-`, `@`, a tab or a carriage return — with an apostrophe. A
+ * spreadsheet consumes it; the import has to as well, or `@john` comes back as
+ * `'@john`.
+ */
+describe("the export's formula escape reads back", () => {
+
+    const values = ["@john", "+1 555 0100", "-- draft", "=SUM(A1)", "-1+1", "\tindented", "\rreturn"];
+
+    test("an escaped cell reads back as the value that was exported", () => {
+        const csv = entryToCSVRow(values.map((_, i) => `c${i}`)) + entryToCSVRow(values);
+        const { data } = parseCsvToObjects(csv);
+
+        expect(data).toEqual([Object.fromEntries(values.map((v, i) => [`c${i}`, v]))]);
+    });
+
+    test("through the whole file reader too", async () => {
+        const csv = entryToCSVRow(["handle", "phone", "note"]) + entryToCSVRow(["@john", "+1 555 0100", "-- draft"]);
+        const { data } = await convertFileToJson(new File([csv], "people.csv", { type: "text/csv" }));
+
+        expect(data).toEqual([{ handle: "@john", phone: "+1 555 0100", note: "-- draft" }]);
+    });
+
+    test("an apostrophe that is not an escape is kept", () => {
+        const { data } = parseCsvToObjects("a,b,c\n'quoted',it's,''=x\n");
+
+        expect(data).toEqual([{ a: "'quoted'", b: "it's", c: "''=x" }]);
     });
 });
 

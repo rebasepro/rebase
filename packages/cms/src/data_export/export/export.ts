@@ -284,6 +284,17 @@ export function escapeCsvFormula(value: string): string {
     return "'" + value;
 }
 
+/**
+ * The inverse of {@link escapeCsvFormula}, for a file read back in: a cell that
+ * is an apostrophe followed by a formula trigger loses the apostrophe, as it
+ * does when a spreadsheet reads it. Any other apostrophe is text.
+ */
+export function unescapeCsvFormula(value: string): string {
+    return value.charAt(0) === "'" && FORMULA_TRIGGERS.includes(value.charAt(1))
+        ? value.slice(1)
+        : value;
+}
+
 function toCSVCell(v: unknown): string {
     if (v === null || v === undefined) return "";
     // An array or object (a geopoint, a value no property declares) is written
