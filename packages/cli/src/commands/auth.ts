@@ -297,7 +297,80 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         env.REBASE_RESET_PASSWORD = newPassword;
         env.REBASE_ENV_FILE_PATH = envFile || path.join(projectRoot, ".env");
 
-        const scriptContent = `
+        // The database the `db` family would use, resolved the same way. A
+        // stock scaffold leaves DATABASE_URL commented out and runs on the
+        // managed database, which only exists in a child's environment when
+        // something puts it there — without this the script connected with
+        // libpq's defaults, localhost:5432 as the OS user. An external
+        // DATABASE_URL adds nothing here: the child already reads it.
+        const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+        const prepared = await prepareDatabaseEnv(projectRoot, {
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        });
+        Object.assign(env, prepared.env);
+
+        const scriptContent = resetPasswordScript(wasGenerated);
+
+        const tmpScriptPath = path.join(backendDir, ".tmp-reset-password.ts");
+        fs.writeFileSync(tmpScriptPath, scriptContent, "utf-8");
+
+        console.log("");
+        console.log(chalk.bold("  🔑 Rebase Auth — Reset Password (Direct DB Fallback)"));
+        console.log("");
+        console.log(`  ${chalk.gray("Email:")} ${email}`);
+        console.log(`  ${chalk.gray("Database:")} ${prepared.description}`);
+        if (!wasGenerated) {
+            console.log(`  ${chalk.gray("Password:")} ${"*".repeat(newPassword.length)}`);
+        }
+        console.log("");
+
+        const child = spawn(tsxBin, [tmpScriptPath], {
+            cwd: backendDir,
+            stdio: "inherit",
+            env
+        });
+
+        // The script is written into the user's backend directory, so every
+        // exit has to remove it. Without an `error` handler a failed spawn
+        // raises an unhandled event, the process dies before `close`, and
+        // `.tmp-reset-password.ts` is left behind to be committed.
+        const cleanup = () => {
+            try { fs.unlinkSync(tmpScriptPath); } catch { /* already gone */ }
+        };
+
+        return new Promise((resolve) => {
+            child.on("error", (err) => {
+                cleanup();
+                console.error(chalk.red("✗ Could not run the reset script."));
+                console.error(chalk.gray(`  ${err.message}`));
+                process.exit(1);
+            });
+            child.on("close", (code) => {
+                cleanup();
+                if (code !== 0) {
+                    process.exit(code ?? 1);
+                }
+                resolve();
+            });
+        });
+    } catch (err) {
+        console.error(chalk.red("✗ Direct database update failed."));
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+    }
+}
+
+/**
+ * The script the direct-database fallback runs under the project's own tsx, so
+ * it resolves the project's `@rebasepro/server-postgres` and schema.
+ *
+ * It exits 0 only when a row was updated: a missing user and a thrown error are
+ * both exit 1. `echoPassword` prints the new password, for a generated one.
+ *
+ * Exported so its tests can run it.
+ */
+export function resetPasswordScript(echoPassword: boolean): string {
+    return `
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { hashPassword } from "@rebasepro/server";
 import { eq } from "drizzle-orm";
@@ -342,7 +415,7 @@ async function resetPassword() {
 
     if (result.length > 0) {
         console.log("✅ Password reset for: " + result[0].email);
-        ${wasGenerated ? 'console.log("   New password: " + newPassword);' : ""}
+        ${echoPassword ? 'console.log("   New password: " + newPassword);' : ""}
         process.exit(0);
     }
     // Nothing was updated, so nothing was reset. Exiting 0 here reported
@@ -351,55 +424,13 @@ async function resetPassword() {
     process.exit(1);
 }
 
-resetPassword().catch(console.error);
+// A thrown error is a failed reset, and exits like one — a refused connection
+// that exits 0 reads as a reset to anything checking the exit code.
+resetPassword().catch((error) => {
+    console.error(error);
+    process.exit(1);
+});
 `;
-
-        const tmpScriptPath = path.join(backendDir, ".tmp-reset-password.ts");
-        fs.writeFileSync(tmpScriptPath, scriptContent, "utf-8");
-
-        console.log("");
-        console.log(chalk.bold("  🔑 Rebase Auth — Reset Password (Direct DB Fallback)"));
-        console.log("");
-        console.log(`  ${chalk.gray("Email:")} ${email}`);
-        if (!wasGenerated) {
-            console.log(`  ${chalk.gray("Password:")} ${"*".repeat(newPassword.length)}`);
-        }
-        console.log("");
-
-        const child = spawn(tsxBin, [tmpScriptPath], {
-            cwd: backendDir,
-            stdio: "inherit",
-            env
-        });
-
-        // The script is written into the user's backend directory, so every
-        // exit has to remove it. Without an `error` handler a failed spawn
-        // raises an unhandled event, the process dies before `close`, and
-        // `.tmp-reset-password.ts` is left behind to be committed.
-        const cleanup = () => {
-            try { fs.unlinkSync(tmpScriptPath); } catch { /* already gone */ }
-        };
-
-        return new Promise((resolve) => {
-            child.on("error", (err) => {
-                cleanup();
-                console.error(chalk.red("✗ Could not run the reset script."));
-                console.error(chalk.gray(`  ${err.message}`));
-                process.exit(1);
-            });
-            child.on("close", (code) => {
-                cleanup();
-                if (code !== 0) {
-                    process.exit(code ?? 1);
-                }
-                resolve();
-            });
-        });
-    } catch (err) {
-        console.error(chalk.red("✗ Direct database update failed."));
-        console.error(err instanceof Error ? err.message : String(err));
-        process.exit(1);
-    }
 }
 
 function printAuthHelp() {
