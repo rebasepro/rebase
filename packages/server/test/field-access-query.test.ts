@@ -121,6 +121,97 @@ describe("sort keys that are not columns", () => {
     });
 });
 
+describe("a relation an include loads", () => {
+    /**
+     * An include's own `where`, `logical`, `orderBy` and `fields` read the
+     * *target's* columns. `?include={"staff":{"where":{"salary":[">",100000]}}}`
+     * answers which departments employ someone earning over 100k — and with
+     * `orderBy` and `limit: 1` it names the best paid — while `?salary=gt.100000`
+     * on `staff` itself is refused. The rule is the target's, so it is judged
+     * against the target, at every level of the tree.
+     */
+    const withManager = {
+        ...staff,
+        properties: {
+            ...staff.properties,
+            manager: {
+                type: "relation",
+                relation: { kind: "belongsTo", target: () => withManager, localKey: "manager_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+    const departments = {
+        slug: "departments",
+        name: "Departments",
+        table: "departments",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            name: { type: "string" },
+            staff: {
+                type: "relation",
+                relation: { kind: "hasMany", target: () => withManager, foreignKeyOnTarget: "department_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+    const as = (roles: string[]) => ({ collection: departments, viewer: { roles } });
+    const include = (spec: unknown) => ({ include: JSON.stringify(spec) });
+
+    it("refuses a filter on a field of the target the caller cannot read", () => {
+        const error = refusal(() => parseQueryOptions(
+            include({ staff: { where: { salary: [">", 100000] } } }), {}, as(["staff"])
+        ));
+        expect(error.code).toBe("FIELD_NOT_READABLE");
+        expect(error.statusCode).toBe(400);
+        expect(error.message).toContain("'salary' is not readable on 'staff'");
+    });
+
+    it("refuses a logical group over one", () => {
+        expect(refusal(() => parseQueryOptions(include({
+            staff: { logical: { type: "or", conditions: [
+                { column: "name", operator: "==", value: "ada" },
+                { type: "and", conditions: [{ column: "salary", operator: ">", value: 1 }] }
+            ] } }
+        }), {}, as(["staff"]))).code).toBe("FIELD_NOT_READABLE");
+    });
+
+    it("refuses an orderBy that ranks the related rows by one", () => {
+        expect(refusal(() => parseQueryOptions(
+            include({ staff: { orderBy: "salary:desc", limit: 1 } }), {}, as(["staff"])
+        )).code).toBe("FIELD_NOT_READABLE");
+    });
+
+    it("refuses a fields projection naming one", () => {
+        expect(refusal(() => parseQueryOptions(
+            include({ staff: { fields: ["name", "passwordHash"] } }), {}, as(["admin"])
+        )).code).toBe("FIELD_NOT_READABLE");
+    });
+
+    it("checks a nested include against its own target", () => {
+        expect(refusal(() => parseQueryOptions(
+            include({ staff: { include: { manager: { where: { salary: [">", 1] } } } } }), {}, as(["staff"])
+        )).code).toBe("FIELD_NOT_READABLE");
+    });
+
+    it("answers the same include for a caller who holds the role", () => {
+        expect(() => parseQueryOptions(
+            include({ staff: { where: { salary: [">", 1] }, orderBy: "salary:desc", include: { manager: { where: { salary: [">", 1] } } } } }),
+            {}, as(["hr"])
+        )).not.toThrow();
+    });
+
+    it("answers an include that reads nothing withheld", () => {
+        expect(() => parseQueryOptions({ include: "staff,staff.manager" }, {}, as(["staff"]))).not.toThrow();
+        expect(() => parseQueryOptions(
+            include({ staff: { where: { name: ["==", "ada"] }, orderBy: "name", fields: ["name"] } }), {}, as(["staff"])
+        )).not.toThrow();
+    });
+
+    it("leaves a relation the collection does not have to the driver's own 400", () => {
+        expect(() => parseQueryOptions(include({ nope: { where: { salary: [">", 1] } } }), {}, as(["staff"])))
+            .not.toThrow();
+    });
+});
+
 describe("assertReadableFields, which the aggregate route calls directly", () => {
     it("refuses an aggregate over a withheld column", () => {
         const error = refusal(() =>

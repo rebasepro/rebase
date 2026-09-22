@@ -1,6 +1,6 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, IncludeSpec } from "@rebasepro/types";
 import type { FilterCondition, LogicalCondition } from "@rebasepro/types";
-import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
+import { type FieldViewer, type IncludeNode, normalizeInclude, resolveCollectionRelations, restrictedFieldNames } from "@rebasepro/common";
 import { ApiError } from "../errors";
 
 /**
@@ -132,6 +132,7 @@ export function assertQueryFieldsReadable(
         logical?: LogicalCondition;
         orderBy?: { field: string }[];
         fields?: string[];
+        include?: IncludeSpec;
     },
     collection: CollectionConfig,
     viewer: FieldViewer | undefined
@@ -147,4 +148,41 @@ export function assertQueryFieldsReadable(
     );
 
     assertReadableFields(options.fields ?? [], collection, viewer, "fields");
+
+    const include = options.include !== undefined ? normalizeInclude(options.include) : undefined;
+    if (include) assertIncludeFieldsReadable(include.tree, collection, viewer);
+}
+
+/**
+ * Every relation an `include` loads, judged like the read it is part of.
+ *
+ * An include's own `where`, `logical`, `orderBy` and `fields` read the columns
+ * of the relation's *target*: `?include={"staff":{"where":{"salary":[">",100000]}}}`
+ * answers which departments employ someone paid over 100k, and `orderBy` with a
+ * `limit` of one names who — while `?salary=gt.100000` on `staff` itself is
+ * refused. So each node is checked against its target's rules, level by level.
+ *
+ * A name that is not a relation of the collection is skipped rather than
+ * refused here: the driver refuses it with a 400 naming the relations there
+ * are, and loads nothing for it. Looked up by exact key, as the driver does, so
+ * both judge the same relation.
+ */
+function assertIncludeFieldsReadable(
+    tree: Record<string, IncludeNode>,
+    collection: CollectionConfig,
+    viewer: FieldViewer | undefined
+): void {
+    const relations = resolveCollectionRelations(collection);
+    for (const [key, node] of Object.entries(tree)) {
+        const relation = relations[key];
+        if (!relation) continue;
+        const target = relation.target();
+        assertQueryFieldsReadable({
+            where: node.where,
+            logical: node.logical,
+            orderBy: node.orderBy?.map(([field]) => ({ field })),
+            fields: node.fields
+        }, target, viewer);
+        assertIncludeFieldsReadable(node.children, target, viewer);
+    }
 }
