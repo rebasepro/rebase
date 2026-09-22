@@ -299,3 +299,37 @@ describe("an Idempotency-Key on a nested path", () => {
         expect(deletes).toEqual(["c1"]);
     });
 });
+
+describe("what a key is claimed for", () => {
+    const keyed = (app: Hono, method: string, url: string, key: string, body?: unknown) =>
+        app.request(url, {
+            method,
+            headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+            ...(body === undefined ? {} : { body: JSON.stringify(body) })
+        });
+
+    it("includes the query string: a purge is not a replay of the soft delete", async () => {
+        // `?hard=true` is a different instruction at the same path. Replaying
+        // the soft delete's 204 for it reported a purge that never happened.
+        const { app, deletes } = createHarness();
+
+        const soft = await keyed(app, "DELETE", "/posts/p1", "mut-1");
+        const purge = await keyed(app, "DELETE", "/posts/p1?hard=true", "mut-1");
+
+        expect(soft.status).toBe(204);
+        expect(purge.status).toBe(422);
+        expect((await purge.json() as { error: { code: string } }).error.code).toBe("IDEMPOTENCY_KEY_REUSED");
+        expect(deletes).toEqual(["p1"]);
+    });
+
+    it("does not depend on the order the parameters were written in", async () => {
+        // A retry that rebuilt its URL from a map is the same request.
+        const { app, saves } = createHarness();
+
+        const first = await keyed(app, "PATCH", "/posts/p1?a=1&b=2", "mut-1", { title: "x" });
+        const retry = await keyed(app, "PATCH", "/posts/p1?b=2&a=1", "mut-1", { title: "x" });
+
+        expect([first.status, retry.status]).toEqual([200, 200]);
+        expect(saves).toHaveLength(1);
+    });
+});

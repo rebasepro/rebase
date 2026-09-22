@@ -97,6 +97,18 @@ function stableStringify(value: unknown): string {
 }
 
 /**
+ * A query string with its parameters in a fixed order, so one request written
+ * two ways is one request. Sorted by name only: the sort is stable, so a
+ * repeated parameter keeps the order its values were sent in.
+ */
+function canonicalQuery(query: URLSearchParams): string {
+    return [...query.entries()]
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
+        .join("&");
+}
+
+/**
  * What a key was claimed *for*, so presenting it on a different request is
  * caught instead of silently replaying the first one's answer.
  *
@@ -107,9 +119,21 @@ function stableStringify(value: unknown): string {
  * carrying corrected rows from the retry of an unanswered one, which is the
  * difference between "here is your earlier answer" and silently discarding a
  * correction.
+ *
+ * The query string separates instructions sent to one path: `?hard=true` purges
+ * where the same `DELETE` without it soft-deletes, and `?on_conflict=` makes a
+ * create an upsert. Left out, a purge sent under the soft delete's key was
+ * answered with that delete's `204` and never ran. A request with no query
+ * string fingerprints exactly as it did before one could enter.
  */
-export function requestFingerprint(method: string, path: string, body: unknown): Promise<string> {
-    return sha256Hex(`${method.toUpperCase()} ${path}\n${stableStringify(body)}`);
+export function requestFingerprint(
+    method: string,
+    path: string,
+    body: unknown,
+    query?: URLSearchParams
+): Promise<string> {
+    const search = query ? canonicalQuery(query) : "";
+    return sha256Hex(`${method.toUpperCase()} ${path}${search ? `?${search}` : ""}\n${stableStringify(body)}`);
 }
 
 /**

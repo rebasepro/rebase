@@ -733,7 +733,11 @@ export class RestApiGenerator {
         // Claimed before the write, not after: the two-step recall-then-write
         // let concurrent replays of one key both through.
         const claimed = idempotencyKey && store
-            ? await store.claim(idempotencyKey, uid, await requestFingerprint(c.req.method, c.req.path, body))
+            ? await store.claim(
+                idempotencyKey,
+                uid,
+                await requestFingerprint(c.req.method, c.req.path, body, new URL(c.req.url).searchParams)
+            )
             : undefined;
         if (claimed?.status === "replay") {
             return respond(claimed.response);
