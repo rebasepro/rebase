@@ -229,6 +229,73 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
             expect(defineRolesFor).toHaveBeenCalledWith(expect.objectContaining({ uid: "123" }));
             expect(result.current.user?.roles).toEqual(["admin", "editor"]);
         });
+
+        /**
+         * `defineRolesFor` is usually a fetch, so the user it was asked about
+         * can be gone by the time it answers. The answer used to be applied
+         * anyway: a sign-out that landed while roles were in flight was undone
+         * when they resolved, leaving the admin rendered as a signed-in admin
+         * with no session in the SDK — and nothing left to emit SIGNED_OUT.
+         */
+        it("does not bring back a user who signed out while their roles were resolving", async () => {
+            mockAuth.getSession.mockReturnValue(mockSession);
+            mockAuth.isInitialized.mockReturnValue(new Promise(() => undefined));
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
+            let resolveRoles!: (roles: string[]) => void;
+            const defineRolesFor = jest.fn(() => new Promise<string[]>(resolve => { resolveRoles = resolve; }));
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient, defineRolesFor }));
+
+            await act(async () => {
+                authListener("SIGNED_OUT", null);
+                await Promise.resolve();
+            });
+            expect(result.current.user).toBeNull();
+
+            await act(async () => {
+                resolveRoles(["admin"]);
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.user).toBeNull();
+        });
+
+        it("applies the roles of the latest user when an earlier user's resolve finishes last", async () => {
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
+            const pending = new Map<string, (roles: string[]) => void>();
+            const defineRolesFor = jest.fn((user: { uid: string }) =>
+                new Promise<string[]>(resolve => { pending.set(user.uid, resolve); }));
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient, defineRolesFor }));
+            await act(async () => { await Promise.resolve(); });
+
+            await act(async () => {
+                authListener("SIGNED_IN", mockSession);
+                authListener("SIGNED_IN", { ...mockSession, user: { ...mockUser, uid: "456" } });
+                await Promise.resolve();
+            });
+            await act(async () => {
+                pending.get("456")!(["viewer"]);
+                await Promise.resolve();
+            });
+            await act(async () => {
+                pending.get("123")!(["admin"]);
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.user?.uid).toBe("456");
+            expect(result.current.user?.roles).toEqual(["viewer"]);
+        });
     });
 
     // ─── Delegation to SDK ───────────────────────────────────────────

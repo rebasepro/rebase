@@ -54,8 +54,15 @@ export function useRebaseAuthController(
 
         isMountedRef.current = true;
 
+        // `defineRolesFor` is usually a fetch, so updates can finish out of
+        // order. Only the latest one may set the user: an earlier call that
+        // resolves last would otherwise bring back a user who has since signed
+        // out, or overwrite the one who signed in after them.
+        let latestUpdate = 0;
+
         const updateState = async (session: RebaseSession | null) => {
             if (!isMountedRef.current) return;
+            const update = ++latestUpdate;
 
             let userToSet = session?.user ?? null;
             const defineRolesFor = defineRolesForRef.current;
@@ -70,6 +77,7 @@ export function useRebaseAuthController(
                 }
             }
 
+            if (update !== latestUpdate) return;
             if (isMountedRef.current) {
                 if (userToSet) bindSessionCachesToUser(userToSet.uid);
                 setUser(userToSet);
