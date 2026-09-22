@@ -23,6 +23,8 @@
 import type { CollectionConfig, DataDriver, FilterValues } from "@rebasepro/types";
 import { getCollectionDataPath } from "@rebasepro/types";
 import { scopeDataDriver } from "../auth/rls-scope.js";
+import { ApiError } from "../api/errors.js";
+import { assertWriteRequestValid } from "../api/rest/write-validation.js";
 import { logger } from "../utils/logger.js";
 import { scopeAllows } from "./oauth-metadata.js";
 
@@ -84,6 +86,38 @@ async function scopedDriver(ctx: McpToolContext): Promise<DataDriver> {
         roles: ctx.caller.roles,
         isAnonymous: false
     });
+}
+
+/**
+ * The `values` of a write, checked the way every other write door checks them.
+ *
+ * RLS decides which *rows* a caller may write, not which *fields*: `access.write`
+ * and `excludeFromApi` are enforced where a caller's body arrives, which for REST
+ * and the socket's SAVE is `assertWriteRequestValid`. A tool call is the same
+ * kind of body from the same person, so it runs the same check with their roles
+ * — without it, a field their roles cannot set through the app was one they
+ * could set by asking the model to.
+ *
+ * The refusal is re-thrown as a {@link McpToolError} so its message reaches the
+ * model, which can correct the call; it names the field, as the REST 400 does.
+ */
+function writableValues(
+    raw: unknown,
+    collection: CollectionConfig,
+    ctx: McpToolContext,
+    status: "new" | "existing"
+): Record<string, unknown> {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        throw new McpToolError("`values` must be an object of field names to values.");
+    }
+    const values = raw as Record<string, unknown>;
+    try {
+        assertWriteRequestValid(values, collection, { status, viewer: { roles: ctx.caller.roles } });
+    } catch (error) {
+        if (error instanceof ApiError) throw new McpToolError(error.message);
+        throw error;
+    }
+    return values;
 }
 
 function collectionPath(collection: CollectionConfig): string {
@@ -297,11 +331,12 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
+            const values = writableValues(args.values, collection, ctx, "new");
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
                 path: collectionPath(collection),
                 collection,
-                values: args.values as Record<string, unknown>,
+                values,
                 id: args.id ? String(args.id) : undefined,
                 status: "new"
             });
@@ -328,11 +363,12 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
+            const values = writableValues(args.values, collection, ctx, "existing");
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
                 path: collectionPath(collection),
                 collection,
-                values: args.values as Record<string, unknown>,
+                values,
                 id: String(args.id),
                 status: "existing"
             });

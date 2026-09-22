@@ -500,6 +500,76 @@ describe("tool inputs", () => {
     });
 });
 
+/* ── Field write rules on the mutating tools ───────────────────────── */
+
+describe("the mutating tools apply the field write rules", () => {
+    // `access.write` and `excludeFromApi` are enforced where a caller's body
+    // arrives, not in the driver — RLS decides which rows, not which fields. The
+    // REST routes and the socket's SAVE check them; these two tools took `values`
+    // straight to `driver.save`, so a recruiter refused `PATCH { rating: 5 }`
+    // could set it by asking the model to.
+    const guarded = [{
+        slug: "candidates",
+        name: "Candidates",
+        properties: {
+            name: { type: "string", name: "Name" },
+            rating: { type: "number", name: "Rating", access: { write: ["hiring_manager"] } },
+            inviteToken: { type: "string", name: "Invite", columnName: "invite_token", excludeFromApi: true }
+        }
+    }] as unknown as CollectionConfig[];
+
+    async function call(name: string, args: Record<string, unknown>, roles = ["recruiter"]) {
+        const { driver, calls } = stubDriver();
+        const { app } = buildApp({ driver, collections: guarded });
+        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write", roles });
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args }
+        });
+        const body = await res.json() as { result?: { isError?: boolean; content: { text: string }[] } };
+        return { body, saves: calls.filter(call => call.method === "save") };
+    }
+
+    it.each([
+        ["update_document", { collection: "candidates", id: "c1", values: { rating: 5 } }],
+        ["create_document", { collection: "candidates", values: { name: "X", rating: 5 } }]
+    ])("%s refuses a field the caller's roles cannot write, and says why", async (tool, args) => {
+        const { body, saves } = await call(tool, args);
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("'rating' on 'candidates' is not writable with your roles");
+        expect(saves).toHaveLength(0);
+    });
+
+    it("refuses an `excludeFromApi` column under either spelling, for any role", async () => {
+        for (const values of [{ inviteToken: "t" }, { invite_token: "t" }]) {
+            const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", values }, ["admin"]);
+            expect(body.result?.isError).toBe(true);
+            expect(body.result?.content[0].text).toContain("excluded from the API");
+            expect(saves).toHaveLength(0);
+        }
+    });
+
+    it("refuses a field the collection does not have", async () => {
+        const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", values: { nmae: "Y" } });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("has no field 'nmae'");
+        expect(saves).toHaveLength(0);
+    });
+
+    it("refuses `values` that is not an object", async () => {
+        const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", values: "rating=5" });
+        expect(body.result?.isError).toBe(true);
+        expect(saves).toHaveLength(0);
+    });
+
+    it("writes the field for a caller holding the role", async () => {
+        const { body, saves } = await call(
+            "update_document", { collection: "candidates", id: "c1", values: { rating: 5 } }, ["hiring_manager"]
+        );
+        expect(body.result?.isError).toBeUndefined();
+        expect(saves).toHaveLength(1);
+    });
+});
+
 /* ── The authorize endpoint under bad input ───────────────────────── */
 
 describe("authorize parameter handling", () => {
