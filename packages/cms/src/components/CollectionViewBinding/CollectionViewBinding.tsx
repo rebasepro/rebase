@@ -505,7 +505,9 @@ const CollectionViewBindingInner = React.memo(
             // otherwise the picker could only ever show rows already linked.
             path: linkedTargetSlug ?? false,
             multiselect: true,
-            onMultipleEntitiesSelected: linkExistingEntities
+            // On Done, not on every tick: linking is a write, and a row ticked
+            // and then unticked must not end up linked.
+            onSelectionDone: linkExistingEntities
         });
 
         const openNewDocument = useCallback((defaultValues?: Record<string, unknown>) => {

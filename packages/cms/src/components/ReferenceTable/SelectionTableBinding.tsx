@@ -76,6 +76,19 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     onMultipleEntitiesSelected?(entities: Entity<any>[]): void;
 
     /**
+     * Called once, with the final selection, when the user presses Done.
+     *
+     * `onMultipleEntitiesSelected` reports every tick as it happens, which is
+     * right when the selection *is* the value (a reference field). Use this
+     * one instead when acting on the selection writes something — linking
+     * rows, say — so a row ticked and then unticked, or a selection cleared,
+     * is never acted on.
+     * @param entities
+     * @callback
+     */
+    onSelectionDone?(entities: Entity<M>[]): void;
+
+    /**
      * Allow selection of entities that pass the given filter only.
      */
     fixedFilter?: FilterValues<string>;
@@ -111,6 +124,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     {
         onSingleEntitySelected,
         onMultipleEntitiesSelected,
+        onSelectionDone,
         multiselect,
         collection,
         path: pathInput,
@@ -285,8 +299,9 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
 
     const onDone = useCallback((event: React.SyntheticEvent) => {
         event.stopPropagation();
+        onSelectionDone?.(selectedEntities);
         sideDialogContext.close(false);
-    }, [sideDialogContext]);
+    }, [sideDialogContext, onSelectionDone, selectedEntities]);
 
     const displayedColumnIds = useColumnIds(collection, false);
 
