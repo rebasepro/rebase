@@ -314,4 +314,48 @@ describe("POST /tus enforces the same limits, before the first chunk", () => {
         const res = await create(2048, { filename: "anything.exe", filetype: "application/x-msdownload" });
         expect(res.status).toBe(201);
     });
+
+    /**
+     * The metadata can carry a type twice — `filetype` (the tus-js-client
+     * convention) and `contentType` — and the check read them in one order
+     * while `finalize` stored them in the other. So a property that accepts
+     * only images judged `filetype: image/png` and stored `contentType:
+     * text/html`.
+     */
+    it("judges the content type it will store, when the metadata names two", async () => {
+        const res = await create(10, {
+            filename: "ok.png",
+            filetype: "image/png",
+            contentType: "text/html",
+            collection: "posts",
+            property: "cover"
+        });
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: { code: "STORAGE_FILE_TYPE_REFUSED" } });
+    });
+
+    it("stores the content type it judged", async () => {
+        const created = await create(2, {
+            key: "covers/ok.png",
+            filetype: "text/html",
+            contentType: "image/png",
+            collection: "posts",
+            property: "cover"
+        });
+        expect(created.status).toBe(201);
+
+        const patched = await app.fetch(new Request(created.headers.get("Location")!, {
+            method: "PATCH",
+            headers: { "Upload-Offset": "0", "Content-Type": "application/offset+octet-stream" },
+            body: "hi"
+        }));
+        expect(patched.status).toBe(204);
+
+        const stored = JSON.parse(await fs.promises.readFile(
+            path.join(tempDir, "default", "covers", "ok.png.metadata.json"),
+            "utf-8"
+        )) as { contentType: string };
+        expect(stored.contentType).toBe("image/png");
+    });
 });

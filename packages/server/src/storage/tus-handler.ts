@@ -71,6 +71,12 @@ interface TusUpload {
      * sanitizer could have brought them together.
      */
     key: string;
+    /**
+     * The content type the object is stored with, resolved at creation. Same
+     * discipline as {@link TusUpload.key}: the property limits judged this
+     * value, so `finalize` writes this value and does not re-derive it.
+     */
+    contentType?: string;
     /** Whether the upload has been fully received and finalized. */
     completed: boolean;
     /**
@@ -256,6 +262,13 @@ export class TusHandler {
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
 
+        // The type the object will be stored with, resolved once and carried
+        // on the upload like the key is. The metadata can name it twice —
+        // `contentType`, and tus-js-client's `filetype` — and the check below
+        // used to prefer one while `finalize` stored the other, so a property
+        // that accepts only images judged `image/png` and stored `text/html`.
+        const contentType = metadata.contentType || metadata.filetype || undefined;
+
         // The property's own limits, judged from the declared length and the
         // metadata's filename/type — before a single chunk is accepted. The
         // controller's own check runs at finalize, which is an hour of the
@@ -266,7 +279,7 @@ export class TusHandler {
                 this.uploadConstraints(uploadContext.collection, uploadContext.property),
                 {
                     size: uploadLength,
-                    type: metadata.filetype || metadata.contentType,
+                    type: contentType,
                     name: metadata.filename || metadata.key
                 }
             );
@@ -357,6 +370,7 @@ export class TusHandler {
             bucket,
             storageId,
             key,
+            contentType,
             completed: false,
             user: triggerUser(c.get("user"))
         };
@@ -571,7 +585,7 @@ export class TusHandler {
             // land somewhere the hook was never asked about; the destination is
             // decided in `create`, where it is authorized.
             const fileName = upload.key;
-            const mimeType = upload.metadata.contentType || upload.metadata.filetype || "application/octet-stream";
+            const mimeType = upload.contentType || "application/octet-stream";
 
             const file = new File([blob], fileName, { type: mimeType });
 
