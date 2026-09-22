@@ -817,6 +817,7 @@ export const de: RebaseTranslations = {
     studio_sql_execution_not_supported: "Die aktuelle Datenquelle unterstützt keine SQL-Ausführung.",
     studio_sql_error_executing: "Beim Ausführen der Abfrage ist ein Fehler aufgetreten.",
     studio_sql_error_explaining: "Beim Erklären der Abfrage ist ein Fehler aufgetreten.",
+    studio_sql_explain_single_statement: "Explain erklärt jeweils nur eine Anweisung. Markieren Sie die Anweisung, die erklärt werden soll, und versuchen Sie es erneut.",
     studio_sql_save_first_to_favorite: "Bitte speichern Sie das Snippet, bevor Sie es zu den Favoriten hinzufügen.",
     studio_sql_collections_label: "Collections:",
     studio_sql_admin_collections_tooltip: "Tables in this query that are mapped as admin collections",

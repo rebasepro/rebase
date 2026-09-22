@@ -817,6 +817,7 @@ export const fr: RebaseTranslations = {
     studio_sql_execution_not_supported: "La source de données actuelle ne prend pas en charge l'exécution de SQL.",
     studio_sql_error_executing: "Une erreur s'est produite lors de l'exécution de la requête.",
     studio_sql_error_explaining: "Une erreur s'est produite lors de l'analyse de la requête.",
+    studio_sql_explain_single_statement: "Explain ne traite qu'une instruction à la fois. Sélectionnez l'instruction à expliquer et réessayez.",
     studio_sql_save_first_to_favorite: "Enregistrez l'extrait avant de l'ajouter aux favoris.",
     studio_sql_collections_label: "Collections:",
     studio_sql_admin_collections_tooltip: "Tables in this query that are mapped as admin collections",

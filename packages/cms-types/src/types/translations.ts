@@ -900,6 +900,7 @@ export interface RebaseTranslations {
     studio_sql_execution_not_supported?: string;
     studio_sql_error_executing?: string;
     studio_sql_error_explaining?: string;
+    studio_sql_explain_single_statement?: string;
     studio_sql_save_first_to_favorite?: string;
     studio_sql_collections_label?: string;
     studio_sql_admin_collections_tooltip?: string;

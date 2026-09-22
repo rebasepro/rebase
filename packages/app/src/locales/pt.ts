@@ -822,6 +822,7 @@ export const pt: RebaseTranslations = {
     studio_sql_execution_not_supported: "A fonte de dados atual não suporta a execução de SQL.",
     studio_sql_error_executing: "Ocorreu um erro ao executar a consulta.",
     studio_sql_error_explaining: "Ocorreu um erro ao explicar a consulta.",
+    studio_sql_explain_single_statement: "O Explain funciona com uma instrução de cada vez. Selecione a instrução a explicar e tente novamente.",
     studio_sql_save_first_to_favorite: "Guarde o excerto antes de o marcar como favorito.",
     studio_sql_collections_label: "Collections:",
     studio_sql_admin_collections_tooltip: "Tables in this query that are mapped as admin collections",

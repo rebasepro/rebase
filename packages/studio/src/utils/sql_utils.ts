@@ -1,5 +1,33 @@
-import { parseFirst } from "pgsql-ast-parser";
+import { parse, parseFirst, type Statement } from "pgsql-ast-parser";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
+
+/** The statements in `sqlText`, or `null` when the parser cannot read it. */
+function parseStatements(sqlText: string): Statement[] | null {
+    try {
+        return parse(sqlText);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The `EXPLAIN` for one statement, or `null` when `sqlText` is not exactly one.
+ *
+ * Never `ANALYZE`: that executes the statement to time it, so explaining a
+ * `DELETE` deleted the rows — without the confirmation "Run" asks for.
+ *
+ * And never more than one statement. Sent as one simple query, `EXPLAIN (…)
+ * SELECT 1; DELETE …` explains the SELECT and *runs* the DELETE. Text the
+ * parser cannot read is still explained, as long as no `;` could be hiding a
+ * second statement in it.
+ */
+export function buildExplainSql(sqlText: string): string | null {
+    const statement = sqlText.trim().replace(/;+$/, "").trim();
+    if (!statement) return null;
+    const statements = parseStatements(statement);
+    const single = statements ? statements.length === 1 : !statement.includes(";");
+    return single ? `EXPLAIN (FORMAT JSON) ${statement}` : null;
+}
 
 /**
  * A table extracted from a SQL query's FROM/JOIN clauses.

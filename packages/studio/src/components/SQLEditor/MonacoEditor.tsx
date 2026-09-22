@@ -1,10 +1,30 @@
-import React, { useRef } from "react";
+import React, { useImperativeHandle, useRef } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor, Position, IRange } from "monaco-editor";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { useModeController } from "@rebasepro/app";
 
+/**
+ * What a host can ask of the editor outside its own key bindings.
+ *
+ * The toolbar's buttons need the selection that Cmd+Enter already reads: a
+ * button that runs the whole buffer while the shortcut beside it runs only the
+ * highlighted statement is two answers to one question.
+ */
+export interface MonacoEditorHandle {
+    /** The selected text, trimmed — `undefined` when nothing is selected. */
+    getSelectedText: () => string | undefined;
+}
+
+/** The editor's selection, trimmed — `undefined` when there is none. */
+function selectedTextOf(instance: editor.IStandaloneCodeEditor): string | undefined {
+    const selection = instance.getSelection();
+    if (!selection || selection.isEmpty()) return undefined;
+    return instance.getModel()?.getValueInRange(selection)?.trim() || undefined;
+}
+
 export type MonacoEditorProps = {
+    ref?: React.Ref<MonacoEditorHandle>;
     value: string;
     onChange: (value: string | undefined) => void;
     onRun?: (selectedText?: string) => void;
@@ -15,6 +35,7 @@ export type MonacoEditorProps = {
 };
 
 export const MonacoEditor = ({
+    ref,
     value,
     onChange,
     onRun,
@@ -32,6 +53,10 @@ export const MonacoEditor = ({
     const schemasRef = useRef(schemas);
     schemasRef.current = schemas;
 
+    useImperativeHandle(ref, () => ({
+        getSelectedText: () => (editorRef.current ? selectedTextOf(editorRef.current) : undefined)
+    }), []);
+
     const handleEditorOnMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
         monacoRef.current = monaco;
@@ -43,14 +68,7 @@ export const MonacoEditor = ({
             contextMenuGroupId: "operation",
             contextMenuOrder: 0,
             run: () => {
-                if (onRunRef.current) {
-                    const selection = editor.getSelection();
-                    let selectedText: string | undefined = undefined;
-                    if (selection && !selection.isEmpty()) {
-                        selectedText = editor.getModel()?.getValueInRange(selection)?.trim();
-                    }
-                    onRunRef.current(selectedText || undefined);
-                }
+                onRunRef.current?.(selectedTextOf(editor));
             }
         });
 

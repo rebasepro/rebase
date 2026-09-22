@@ -825,6 +825,7 @@ export const en: RebaseTranslations = {
     studio_sql_execution_not_supported: "SQL execution is not supported by the current data source.",
     studio_sql_error_executing: "An error occurred while executing the query.",
     studio_sql_error_explaining: "An error occurred while explaining the query.",
+    studio_sql_explain_single_statement: "Explain works on one statement at a time. Select the statement to explain and try again.",
     studio_sql_save_first_to_favorite: "Please save the snippet first before favoriting.",
     studio_sql_collections_label: "Collections:",
     studio_sql_admin_collections_tooltip: "Tables in this query that are mapped to collections",

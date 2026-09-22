@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
+import { buildExplainSql, determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -263,3 +263,23 @@ describe("resolveQueryCollections", () => {
     });
 });
 
+
+describe("buildExplainSql", () => {
+    it("plans one statement, without ANALYZE", () => {
+        expect(buildExplainSql("DELETE FROM users WHERE id = 1;")).toBe("EXPLAIN (FORMAT JSON) DELETE FROM users WHERE id = 1");
+    });
+
+    it("refuses more than one statement", () => {
+        expect(buildExplainSql("SELECT 1; DELETE FROM users")).toBeNull();
+    });
+
+    it("refuses text it cannot parse when a semicolon could hide a second statement", () => {
+        // `CREATE TABLE … AS` is beyond the parser, so only the `;` can tell.
+        expect(buildExplainSql("CREATE TABLE x AS SELECT 1; DROP TABLE users")).toBeNull();
+        expect(buildExplainSql("CREATE TABLE x AS SELECT 1")).toBe("EXPLAIN (FORMAT JSON) CREATE TABLE x AS SELECT 1");
+    });
+
+    it("refuses an empty buffer", () => {
+        expect(buildExplainSql("  ;  ")).toBeNull();
+    });
+});

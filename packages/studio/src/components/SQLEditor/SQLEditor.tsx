@@ -44,10 +44,10 @@ import {
 
 import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
-import { MonacoEditor } from "./MonacoEditor";
+import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { parseFirst } from "pgsql-ast-parser";
-import { determineTableAndPK, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
+import { buildExplainSql, determineTableAndPK, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -788,8 +788,18 @@ role: selectedRole });
         setSql(formatted);
     };
 
+    /** The editor, for the selection the toolbar's buttons act on. */
+    const editorHandle = useRef<MonacoEditorHandle>(null);
+
     const handleExplain = async () => {
-        const explainSql = `EXPLAIN (FORMAT JSON, ANALYZE) ${activeTab.sql}`;
+        // The selected statement when there is one, as Cmd+Enter runs it; and
+        // planned, never executed — see `buildExplainSql`.
+        const explainSql = buildExplainSql(editorHandle.current?.getSelectedText() ?? activeTab.sql);
+        if (!explainSql) {
+            updateActiveTab({ results: null,
+error: t("studio_sql_explain_single_statement") });
+            return;
+        }
         updateActiveTab({ loading: true,
 error: null,
 results: null });
@@ -1469,6 +1479,7 @@ isFavorite: !s.isFavorite } : s));
                             firstPanel={
                                 <div className="h-full w-full relative flex flex-col min-h-0">
                                     <MonacoEditor
+                                        ref={editorHandle}
                                         value={sql}
                                         onChange={(v) => setSql(v || "")}
                                         onRun={handleRun}

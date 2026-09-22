@@ -817,6 +817,7 @@ export const it: RebaseTranslations = {
     studio_sql_execution_not_supported: "L'origine dati attuale non supporta l'esecuzione di SQL.",
     studio_sql_error_executing: "Si è verificato un errore durante l'esecuzione della query.",
     studio_sql_error_explaining: "Si è verificato un errore durante l'analisi della query.",
+    studio_sql_explain_single_statement: "Explain funziona su una sola istruzione alla volta. Seleziona l'istruzione da spiegare e riprova.",
     studio_sql_save_first_to_favorite: "Salva il frammento prima di aggiungerlo ai preferiti.",
     studio_sql_collections_label: "Collections:",
     studio_sql_admin_collections_tooltip: "Tables in this query that are mapped as admin collections",

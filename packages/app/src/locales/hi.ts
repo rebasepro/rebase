@@ -817,6 +817,7 @@ export const hi: RebaseTranslations = {
     studio_sql_execution_not_supported: "वर्तमान डेटा स्रोत SQL निष्पादन का समर्थन नहीं करता।",
     studio_sql_error_executing: "क्वेरी चलाते समय एक त्रुटि हुई।",
     studio_sql_error_explaining: "क्वेरी का विश्लेषण करते समय एक त्रुटि हुई।",
+    studio_sql_explain_single_statement: "Explain एक बार में केवल एक स्टेटमेंट पर काम करता है। जिस स्टेटमेंट को समझाना है उसे चुनें और फिर से प्रयास करें।",
     studio_sql_save_first_to_favorite: "पसंदीदा में जोड़ने से पहले स्निपेट सहेजें।",
     studio_sql_collections_label: "Collections:",
     studio_sql_admin_collections_tooltip: "Tables in this query that are mapped as admin collections",
