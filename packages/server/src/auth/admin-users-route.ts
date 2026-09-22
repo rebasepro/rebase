@@ -129,7 +129,12 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         // bootstrap. It worked with `disableSelfRegistration: true` as well,
         // the flag whose docblock promises "an empty backend has no
         // self-service path in at all".
-        if (isAnonymousUid(uid)) {
+        //
+        // A guest is recognised by its row's `isAnonymous` flag. The route
+        // mints guests with random ids, so the reserved uids `isAnonymousUid`
+        // knows never match one; checking only those left this guard matching
+        // nothing a real guest could present.
+        const refuseAnonymousCaller = (): never => {
             logger.warn("[Security Audit] Bootstrap denied: anonymous caller", {
                 eventType: "auth.bootstrap.denied.anonymous",
                 callerId: uid
@@ -139,11 +144,13 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
                 "account and bootstrap from it, or assign the admin role using the service key.",
                 "BOOTSTRAP_ANONYMOUS"
             );
-        }
+        };
+        if (isAnonymousUid(uid)) refuseAnonymousCaller();
         const caller = await authRepo.getUserById(uid);
         if (!caller) {
             throw ApiError.notFound("Authenticated user does not exist in the database.", "USER_NOT_FOUND");
         }
+        if (caller.isAnonymous === true) refuseAnonymousCaller();
 
         // Even while no admin exists, only the earliest-registered user may claim
         // the initial admin role. The common paths already auto-promote the first
@@ -157,7 +164,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         // same reason they cannot bootstrap: they are sessions, not
         // registrations. Leaving them in would also let an anonymous row that
         // happens to predate the real first user block that user forever.
-        const registeredUsers = users.filter(u => !isAnonymousUid(u.id));
+        const registeredUsers = users.filter(u => u.isAnonymous !== true && !isAnonymousUid(u.id));
         if (registeredUsers.length > 0) {
             const earliest = registeredUsers.reduce((a, b) => {
                 const at = new Date(a.createdAt).getTime();

@@ -7,9 +7,18 @@
  */
 
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
+import { Hono } from "hono";
+import type { HonoEnv } from "../src/api/types";
+import { errorHandler } from "../src/api/errors";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
+import { createAuthRoutes } from "../src/auth/routes";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { MemoryAuthStore } from "./helpers/memory-auth-store";
+
+jest.mock("../src/utils/logger", () => ({
+    logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
+}));
 
 const TEST_SECRET = "test-secret-key-for-admin-bootstrap-testing-1234567890";
 
@@ -183,6 +192,71 @@ describe("POST /bootstrap", () => {
 
             expect(res.status).toBe(200);
             expect(setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
+        });
+    });
+
+    /**
+     * The same two requests, with a guest the way `POST /auth/anonymous`
+     * really makes one.
+     *
+     * The cases above model a guest as the literal uid `"anonymous"`, which
+     * `isAnonymousUid` recognises. The route mints guests with random ids and
+     * flags the row instead, so against a real guest the guard matched
+     * nothing: the guest claimed admin, and a guest minted on page load before
+     * the developer registered was the "earliest registered user" that locked
+     * the developer out.
+     */
+    describe("a guest from POST /auth/anonymous", () => {
+        async function world() {
+            const store = new MemoryAuthStore();
+            const app = new Hono<HonoEnv>();
+            app.onError(errorHandler);
+            app.route("/auth", createAuthRoutes({
+                authRepo: store.repo(),
+                allowAnonymous: true,
+                allowRegistration: true,
+                authHooks: { hashPassword: async (p: string) => `hashed:${p}`, verifyPassword: async (p: string, h: string) => h === `hashed:${p}` }
+            }));
+            app.route("/admin", createAdminUsersRoute({ authRepo: store.repo() }));
+            const signIn = async (path: string, body?: Record<string, unknown>) => {
+                const res = await app.request(`/auth${path}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: body === undefined ? undefined : JSON.stringify(body)
+                });
+                return await res.json() as { user: { uid: string }; tokens: { accessToken: string } };
+            };
+            const bootstrap = (accessToken: string) => app.request("/admin/bootstrap", {
+                method: "POST",
+                headers: { authorization: `Bearer ${accessToken}` }
+            });
+            return { store, signIn, bootstrap };
+        }
+
+        it("cannot claim the initial admin role on an empty backend", async () => {
+            const { store, signIn, bootstrap } = await world();
+            const guest = await signIn("/anonymous");
+
+            const res = await bootstrap(guest.tokens.accessToken);
+
+            expect(res.status).toBe(403);
+            expect((await res.json() as { error: { code: string } }).error.code).toBe("BOOTSTRAP_ANONYMOUS");
+            expect(store.roles.get(guest.user.uid) ?? []).not.toContain("admin");
+        });
+
+        it("does not lock out the developer who registers after it", async () => {
+            // An app that signs visitors in as guests on load: the guest row
+            // exists before the developer's, so registration does not promote
+            // the developer, and bootstrap is how they become admin.
+            const { store, signIn, bootstrap } = await world();
+            await signIn("/anonymous");
+            const developer = await signIn("/register", { email: "dev@example.com", password: "Str0ng-Passw0rd!" });
+            expect(store.roles.get(developer.user.uid) ?? []).not.toContain("admin");
+
+            const res = await bootstrap(developer.tokens.accessToken);
+
+            expect(res.status).toBe(200);
+            expect(store.roles.get(developer.user.uid)).toEqual(["admin"]);
         });
     });
 
