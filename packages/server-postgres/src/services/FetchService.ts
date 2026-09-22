@@ -1,8 +1,8 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
@@ -16,12 +16,12 @@ import {
     buildCompositeId,
     COMPOSITE_ID_SEPARATOR
 } from "./collection-helpers";
-import { parseDataFromServer, normalizeDbValues } from "../data-transformer";
+import { parseDataFromServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toFlatRow, toRestRow, toRestValues, isJunctionRelation, stripUnreadable } from "./row-pipeline";
+import { toFlatRow, toRestRow, toRestValues, stripUnreadable } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
@@ -571,70 +571,6 @@ target });
         );
     }
 
-    /**
-     * Build the `with` config for Drizzle's relational query API.
-     * Converts collection relations to a Drizzle-compatible `with` object.
-     *
-     * When `include` is provided, only those relations are loaded.
-     * When `include` is absent, ALL relations are loaded (the admin path).
-     *
-     * Automatically detects many-to-many junction tables and nests
-     * the target relation so actual row data is returned.
-     */
-    private buildWithConfig(
-        collection: CollectionConfig,
-        include?: string[]
-    ): Record<string, boolean | { with: Record<string, boolean> }> {
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const withConfig: Record<string, boolean | { with: Record<string, boolean> }> = {};
-
-        const shouldInclude = (key: string) =>
-            !include || include.length === 0 || include[0] === "*" || include.includes(key);
-
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
-            if (!shouldInclude(key)) continue;
-
-            const drizzleRelName = relation.relationName || key;
-
-            // Skip relations that use joinPath as they are not mapped in Drizzle schemas
-            if (relation.kind === "via") {
-                continue;
-            }
-
-            // Detect many-to-many junction tables:
-            // If the relation goes through a junction table (relation.through exists or
-            // the Drizzle schema maps to a junction table), we need two-level with.
-            if (relation.cardinality === "many" && isJunctionRelation(relation)) {
-                // The Drizzle relation points to the junction table.
-                // We need: { [junctionRelName]: { with: { [targetFkName]: true } } }
-                // The target FK name is the relation on the junction table that points to the actual target.
-                const targetFkName = this.getJunctionTargetRelationName(relation, collection);
-                if (targetFkName) {
-                    withConfig[drizzleRelName] = { with: { [targetFkName]: true } };
-                } else {
-                    withConfig[drizzleRelName] = true;
-                }
-            } else {
-                withConfig[drizzleRelName] = true;
-            }
-        }
-
-        return withConfig;
-    }
-
-    /**
-     * Get the Drizzle relation name on the junction table that points to the actual target row.
-     * For example, for posts_tags junction, this returns "tag_id" (the relation pointing to tags).
-     */
-    private getJunctionTargetRelationName(relation: ResolvedRelation, _collection: CollectionConfig): string | null {
-        if (isManyToMany(relation)) {
-            // The junction relation on the junction table pointing to the target
-            // uses the targetColumn name as the Drizzle relation name
-            return relation.through.targetColumn.replace(/_id$/, "_id");
-        }
-        return null;
-    }
-
     // =============================================================
     // THE INCLUDE PIPELINE
     //
@@ -1000,52 +936,53 @@ target });
     }
 
     /**
-     * Post-fetch joinPath relations for a single flat row.
-     * joinPath relations cannot be expressed via Drizzle's `with` config,
-     * so they must be loaded separately after the primary query.
+     * Every relation of one row, as the refs the admin renders, attached in
+     * place.
+     *
+     * Loaded by the batched loaders an `include` takes, so a target reached from
+     * this row is read as the caller may see it: its `beforeQuery` scope and its
+     * soft delete applied, its unreadable fields stripped. Populated through
+     * drizzle's relational `with`, the single get knew neither, and a
+     * tenant-scoped user fetching an owner was handed another tenant's docs —
+     * and the trashed ones — under a relation `?include=` answered correctly.
+     *
+     * A to-many relation that reaches nothing is `[]`; a to-one is left off. A
+     * relation that fails for a reason other than the database is logged and
+     * left off, as on the include path, rather than failing the whole row.
      */
-    private async resolveJoinPathRelations<M extends Record<string, unknown>>(
+    private async loadRelationRefs(
         row: Record<string, unknown>,
+        address: string,
         collection: CollectionConfig,
-        collectionPath: string,
-        parsedId: string | number,
-        _databaseId?: string
+        collectionPath: string
     ): Promise<void> {
-        const resolvedRelations = resolveCollectionRelations(collection);
-
-        const promises = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => relation.kind === "via")
-            .map(async ([key, relation]) => {
-                try {
-                    const relatedRows = await this.relationService.fetchRelatedEntities(
-                        collectionPath,
-                        parsedId,
-                        key,
-                        { limit: relation.cardinality === "one" ? 1 : undefined }
-                    );
-
-                    if (relation.cardinality === "one" && relatedRows.length > 0) {
-                        const e = relatedRows[0];
-                        row[key] = createRelationRefWithData(e.id, e.path, e);
-                    } else if (relation.cardinality === "many") {
-                        row[key] = relatedRows.map(e =>
-                            createRelationRefWithData(e.id, e.path, e)
-                        );
-                    }
-                } catch (e) {
-                    // A relation that failed to load is not a relation that is absent.
-                    // Without this the request answers 200 with the field quietly
-                    // missing — and because a Postgres error poisons the surrounding
-                    // transaction, every later relation in the same request is
-                    // swallowed too, so one failure becomes a response missing
-                    // several fields. Same guard the four other catches in this file
-                    // already use.
-                    if (reachedDatabase(e)) throw e;
-                    logger.warn(`Could not resolve joinPath relation '${key}'`, { error: e });
-                }
+        if (!address) return;
+        const toRef = (related: { id: string | number; path: string; values: Record<string, unknown> }) =>
+            createRelationRefWithData(related.id, related.path, {
+                id: related.id,
+                path: related.path,
+                values: related.values
             });
 
-        await Promise.all(promises);
+        for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
+            try {
+                if (relation.cardinality === "one") {
+                    const related = (await this.relationService.batchFetchRelatedEntities(
+                        collectionPath, [address], key, relation
+                    )).get(address);
+                    if (related) row[key] = toRef(related);
+                } else {
+                    const related = (await this.relationService.batchFetchRelatedEntitiesMany(
+                        collectionPath, [address], key, relation
+                    )).get(address) ?? [];
+                    row[key] = related.map(toRef);
+                }
+            } catch (e) {
+                if (e instanceof ApiError) throw e;
+                if (reachedDatabase(e)) throw e;
+                logger.warn(`[FetchService] Could not load relation '${key}' on ${collectionPath}`, { error: e });
+            }
+        }
     }
 
     /**
@@ -1312,10 +1249,8 @@ idColumn };
         const parsedIdObj = parseIdValues(id, idInfoArray);
         const parsedId = parsedIdObj[idInfo.fieldName];
 
-        // Resolved once, before either path builds its WHERE: `db.query` and the
-        // `db.select` fallback below both serve this request, so a row the hook
-        // excludes has to be absent down both — which is what happened to the
-        // soft-delete condition when each path grew its own filter.
+        // Part of the identity, so a row the hook excludes is absent here
+        // exactly as it is from the listing.
         const narrowing = await this.narrowReadCondition(
             collectionPath, collection, table, "get", {}
         );
@@ -1323,45 +1258,41 @@ idColumn };
             ? and(eq(idField, parsedId), narrowing) as SQL
             : eq(idField, parsedId);
 
-        // Primary path: use db.query.findFirst with relation loading
-
+        // Primary path: db.query.findFirst for the row, then its relations
         const tableName = getTableName(table);
 
         const qb = this.getQueryBuilder(tableName);
         if (qb) {
+            // `null` until the query answers: `undefined` is its answer for a
+            // row that is not there.
+            let row: Record<string, unknown> | undefined | null = null;
             try {
-                const withConfig = this.buildWithConfig(collection);
-
                 const hidden = hiddenColumnsOption(getTableColumns(table), collection);
 
-                const row = await qb.findFirst({
+                row = await qb.findFirst({
                     // Soft delete: a stamped row answers 404 like any other
                     // absent one, so `findById` and `find` agree about which
                     // rows exist.
                     where: andSoftDelete(identity, collection, table, withDeleted),
-                    with: withConfig,
                     ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
-
-                if (!row) return undefined;
-
-                const flatRow = toFlatRow(row, collection, this.registry);
-
-                // Post-fetch joinPath relations that Drizzle's `with` can't express
-                await this.resolveJoinPathRelations<M>(flatRow, collection, collectionPath, parsedId, databaseId);
-
-                return flatRow;
             } catch (e) {
-                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
-                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
-                }
                 if (reachedDatabase(e)) throw e;
                 logger.warn(`[FetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select`, { error: e });
             }
+
+            if (row === undefined) return undefined;
+            if (row !== null) {
+                const flatRow = toFlatRow(row, collection, this.registry);
+                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), collection, collectionPath);
+
+                // Again, now the relations are on the row: a relation property
+                // the caller may not read is withheld like any other field.
+                return stripUnreadable(flatRow, collection);
+            }
         }
 
-        // Fallback: db.select + N+1 relation loading
+        // Fallback: db.select, then the same relation loader
         const visibleOne = visibleColumnProjection(getTableColumns(table), collection);
         const result = await this.db
             .select(visibleOne as never)
@@ -1372,54 +1303,11 @@ idColumn };
         if (result.length === 0) return undefined;
 
         const raw = result[0] as M;
-        const values = await parseDataFromServer(raw, collection, this.db, this.registry) as Record<string, unknown>;
-
-        // Load relations based on cardinality (N+1 — only used in fallback)
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties));
-
-        const relationPromises = Object.entries(resolvedRelations)
-            .filter(([key]) => propertyKeys.has(key))
-            .map(async ([key, relation]) => {
-                if (relation.cardinality === "many") {
-                    const relatedRows = await this.relationService.fetchRelatedEntities(
-                        collectionPath,
-                        parsedId,
-                        key,
-                        {}
-                    );
-                    values[key] = relatedRows.map(e =>
-                        createRelationRef(e.id, e.path)
-                    );
-                } else if (relation.cardinality === "one") {
-                    if (values[key] == null) {
-                        try {
-                            const relatedRows = await this.relationService.fetchRelatedEntities(
-                                collectionPath,
-                                parsedId,
-                                key,
-                                { limit: 1 }
-                            );
-                            if (relatedRows.length > 0) {
-                                const e = relatedRows[0];
-                                values[key] = createRelationRef(e.id, e.path);
-                            }
-                        } catch (e) {
-                            // A relation that failed to load is not a relation that is absent.
-                            // Without this the request answers 200 with the field quietly
-                            // missing — and because a Postgres error poisons the surrounding
-                            // transaction, every later relation in the same request is
-                            // swallowed too, so one failure becomes a response missing
-                            // several fields. Same guard the four other catches in this file
-                            // already use.
-                            if (reachedDatabase(e)) throw e;
-                            logger.warn(`Could not resolve one-to-one relation property: ${key}`, { error: e });
-                        }
-                    }
-                }
-            });
-
-        await Promise.all(relationPromises);
+        // Without `db`/`registry`: the parse only types the columns and turns an
+        // owned foreign key into a ref. Given them, it queried each inverse
+        // relation itself, with neither the target's scope nor its soft delete.
+        const values = await parseDataFromServer(raw, collection) as Record<string, unknown>;
+        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath);
 
         // The primary path strips inside `toFlatRow`; this one parses the row
         // itself, so it strips itself. Without it a fetch that fell back served

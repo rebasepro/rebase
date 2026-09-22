@@ -555,9 +555,14 @@ export class RelationService {
                 currentTable = joinTable;
             }
 
-            // Add where condition for the parent row
+            // Add where condition for the parent row, and the target's own
+            // soft delete beside its scope — the other branch below carries
+            // both, and a join path is only another way to reach the same rows.
             const parentIdField = parentTable[requirePrimaryKeys(parentCollection, this.registry)[0].fieldName as keyof typeof parentTable] as AnyPgColumn;
-            query = query.where(narrowed(eq(parentIdField, parsedParentId), relatedNarrowing));
+            query = query.where(narrowed(
+                eq(parentIdField, parsedParentId),
+                andSoftDelete(relatedNarrowing, targetCollection, targetTable)
+            ));
 
             if (options.limit) {
                 query = query.limit(options.limit);
