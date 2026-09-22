@@ -1,4 +1,12 @@
-import { buildAggregateQueryString, buildQueryString, FindParams, RebaseApiError, Transport, type ResponseMeta } from "./transport";
+import {
+    assertNoUndefinedFilterValues,
+    buildAggregateQueryString,
+    buildQueryString,
+    FindParams,
+    RebaseApiError,
+    Transport,
+    type ResponseMeta
+} from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import {
     FindAllParams,
@@ -21,7 +29,8 @@ import {
     unsupportedMethod,
     type ComputedSortField,
     type FieldPath,
-    type RelationAggregateSort
+    type RelationAggregateSort,
+    RebaseClientError
 } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
@@ -37,6 +46,39 @@ import { SDKQueryBuilder } from "./sdk_query_builder";
 const NO_SOCKET =
     "Listen is only available when RebaseClient is configured with a websocketUrl, "
     + "and not when it was created with realtime: false.";
+
+/**
+ * Why a live query cannot be opened for these parameters, or `undefined` when
+ * it can.
+ *
+ * A `listen()` is the same query as the `find()` beside it, so what `find()`
+ * refuses it refuses too. The socket would not: a frame is JSON, where an
+ * `undefined` filter value becomes `null`, so `["!=", uid]` with `uid` unset
+ * subscribed to every row whose column is NOT NULL — an ownership filter
+ * widened instead of refused. And `after` names a place in one run of the
+ * query, which a subscription re-runs on every write; the server keeps no
+ * cursor for one, so it was dropped, and page one streamed to a caller who had
+ * asked for page two.
+ */
+function listenRefusal(params: FindParams | undefined): RebaseClientError | undefined {
+    if (params?.where) {
+        try {
+            assertNoUndefinedFilterValues(params.where);
+        } catch (error) {
+            if (error instanceof RebaseClientError) return error;
+            throw error;
+        }
+    }
+    if (params?.after) {
+        return new RebaseClientError(
+            "listen() cannot continue from a cursor: a subscription re-runs its query on every write, and "
+            + "`after` names a place in one run of it. Use `offset` or `page` for a live window, or "
+            + "`find({ after })` to read the page once.",
+            { code: "CURSOR_NOT_LIVE" }
+        );
+    }
+    return undefined;
+}
 
 /**
  * Counts currently in flight, **per client**, keyed by the exact request they
@@ -487,13 +529,30 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 onResult({ ...result, fromCache: false, hasPendingWrites: false, partial: false });
             };
 
+            // `observe()` degrades to the single fetch below rather than
+            // throwing, so it asks the capability question explicitly — the
+            // method itself is always there now.
+            const wantsLive = options?.realtime !== false && !isUnsupported(client.listen);
+
+            // A query the live half would refuse is refused whole, and once.
+            // Left to each half, an undefined filter value was reported twice
+            // — by `find()` and again by `listen()` — and a cursor was served
+            // once and then never kept current, which is not what this
+            // promises.
+            const refusal = wantsLive ? listenRefusal(params) : undefined;
+            if (refusal) {
+                queueMicrotask(() => {
+                    if (!closed) onError?.(refusal);
+                });
+                return () => {
+                    closed = true;
+                };
+            }
+
             client.find(params).then((result) => deliver(result, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
-            // `observe()` degrades to the single fetch above rather than
-            // throwing, so it asks the capability question explicitly — the
-            // method itself is always there now.
-            const live = options?.realtime !== false && !isUnsupported(client.listen)
+            const live = wantsLive
                 ? client.listen(params, (result) => deliver(result, true), onError)
                 : undefined;
             return () => {
@@ -609,6 +668,19 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     if (ws) {
         client.listen = (params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void) => {
             let active = true;
+            // Refused before anything opens, and through `onError` — where the
+            // server's own refusals of a subscription (a vector search, a limit
+            // over the ceiling) arrive — rather than thrown into the effect
+            // that called this.
+            const refusal = listenRefusal(params);
+            if (refusal) {
+                queueMicrotask(() => {
+                    if (active) onError?.(refusal);
+                });
+                return () => {
+                    active = false;
+                };
+            }
             let lastUpdateId = 0;
             // The last total a `count()` actually returned. A later count that
             // fails says nothing about how big the collection is, so it must

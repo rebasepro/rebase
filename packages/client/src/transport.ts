@@ -175,7 +175,7 @@ export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown
  * filter, or use `["is-null", null]` to match SQL NULL (which still
  * serializes — `null` is a value, `undefined` is the absence of one).
  */
-function assertNoUndefinedFilterValues(where: Record<string, unknown>): void {
+export function assertNoUndefinedFilterValues(where: Record<string, unknown>): void {
     const reject = (field: string, op: unknown): never => {
         throw new RebaseClientError(
             `Filter on "${field}" has an undefined value (["${String(op)}", undefined]). `

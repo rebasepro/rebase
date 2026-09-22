@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { createCollectionClient } from "./collection";
 import type { Transport } from "./transport";
+import { RebaseClientError } from "@rebasepro/types";
 
 function createMockTransport(): Transport {
     return {
@@ -290,6 +291,99 @@ deliver: () => emit!(rows) };
             expect(updates[0].meta.total).toBe(2);
             // A full page with no authoritative total: assume there is more.
             expect(updates[0].meta.hasMore).toBe(true);
+        });
+    });
+
+    /**
+     * A `listen()` is the same query as the `find()` beside it, and the two
+     * used to disagree about what a query may say. `find()` refuses an
+     * `undefined` filter value; the socket serialised it as JSON, where it
+     * becomes `null` — so `["!=", uid]` with `uid` unset subscribed to every
+     * row whose owner is NOT NULL, the ownership filter widened instead of
+     * refused. And `after`, the keyset cursor, was dropped without a word: the
+     * subscription streamed page one to a caller who had asked for page two.
+     */
+    describe("listen() refuses what it cannot ask for", () => {
+        const mockWs = () => ({ listenCollection: jest.fn(() => () => undefined) });
+        const flush = () => new Promise(r => setImmediate(r));
+
+        it("refuses an undefined filter value, as find() does, and opens nothing", async () => {
+            const ws = mockWs();
+            const client = createCollectionClient(transport, "posts", ws as any);
+            const onError = jest.fn<(error: Error) => void>();
+
+            client.listen!({ where: { owner_id: ["!=", undefined] } as never }, jest.fn(), onError);
+            await flush();
+
+            expect(ws.listenCollection).not.toHaveBeenCalled();
+            expect(onError).toHaveBeenCalledTimes(1);
+            const error = onError.mock.calls[0][0] as RebaseClientError;
+            expect(error).toBeInstanceOf(RebaseClientError);
+            expect(error.code).toBe("INVALID_FILTER");
+            expect((error.details as { field?: string }).field).toBe("owner_id");
+        });
+
+        it("refuses a hole in an `in` list", async () => {
+            const ws = mockWs();
+            const client = createCollectionClient(transport, "posts", ws as any);
+            const onError = jest.fn<(error: Error) => void>();
+
+            client.listen!({ where: { id: ["in", ["a", undefined]] } as never }, jest.fn(), onError);
+            await flush();
+
+            expect(ws.listenCollection).not.toHaveBeenCalled();
+            expect((onError.mock.calls[0][0] as RebaseClientError).code).toBe("INVALID_FILTER");
+        });
+
+        it("refuses a cursor, which a subscription cannot continue from", async () => {
+            const ws = mockWs();
+            const client = createCollectionClient(transport, "posts", ws as any);
+            const onError = jest.fn<(error: Error) => void>();
+
+            client.listen!({ orderBy: ["created_at", "desc"], limit: 20, after: "eyJrIjpbMV19" }, jest.fn(), onError);
+            await flush();
+
+            expect(ws.listenCollection).not.toHaveBeenCalled();
+            expect(onError).toHaveBeenCalledTimes(1);
+            expect((onError.mock.calls[0][0] as RebaseClientError).code).toBe("CURSOR_NOT_LIVE");
+        });
+
+        it("says nothing to a listener that already left", async () => {
+            const client = createCollectionClient(transport, "posts", mockWs() as any);
+            const onError = jest.fn();
+
+            const stop = client.listen!({ after: "eyJrIjpbMV19" }, jest.fn(), onError);
+            stop();
+            await flush();
+
+            expect(onError).not.toHaveBeenCalled();
+        });
+
+        it("observe() reports the refusal once, not once per half", async () => {
+            const ws = mockWs();
+            const client = createCollectionClient(transport, "posts", ws as any);
+            const onError = jest.fn<(error: Error) => void>();
+
+            client.observe({ where: { owner_id: ["==", undefined] } as never }, jest.fn(), onError);
+            await flush();
+
+            expect(ws.listenCollection).not.toHaveBeenCalled();
+            expect(transport.request).not.toHaveBeenCalled();
+            expect(onError).toHaveBeenCalledTimes(1);
+            expect((onError.mock.calls[0][0] as RebaseClientError).code).toBe("INVALID_FILTER");
+        });
+
+        it("observe() without the live half still pages by cursor", async () => {
+            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ data: [], meta: {} });
+            const ws = mockWs();
+            const client = createCollectionClient(transport, "posts", ws as any);
+            const onError = jest.fn();
+
+            client.observe({ after: "eyJrIjpbMV19" }, jest.fn(), onError, { realtime: false });
+            await flush();
+
+            expect(onError).not.toHaveBeenCalled();
+            expect((transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0]).toContain("after=eyJrIjpbMV19");
         });
     });
 });
