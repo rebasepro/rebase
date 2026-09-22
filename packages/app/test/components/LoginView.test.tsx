@@ -424,4 +424,25 @@ enabledProviders: ["github"] }
             expect(screen.queryByText(/popup_closed/)).not.toBeInTheDocument();
         });
     });
+
+    describe("returning from an OAuth redirect", () => {
+        afterEach(() => {
+            window.history.replaceState(null, "", "/");
+        });
+
+        it("strips the callback parameters without erasing the router's entry state", () => {
+            // react-router keeps `{ usr, key, idx }` on every history entry and
+            // computes Back from `idx`. Replacing it with `{}` left the entry
+            // with no index, so the next Back was a POP the router could not
+            // measure — and a POP with no delta walks past every unsaved-changes
+            // blocker in the admin for the rest of the session.
+            const routerState = { usr: null, key: "k1", idx: 4 };
+            window.history.replaceState(routerState, "", "/login?error=access_denied&state=s1");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(window.location.search).toBe("");
+            expect(window.history.state).toEqual(routerState);
+        });
+    });
 });

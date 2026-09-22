@@ -341,9 +341,12 @@ export function LoginView({
         const result = consumeOAuthCallback(window.location.search);
         if (result.status === "none") return;
 
-        // Clear URL search params without page reload
+        // Clear URL search params without page reload. The entry's state is
+        // kept as it is: it is the router's `{ usr, key, idx }`, and an entry
+        // without its index makes the next Back a navigation the router cannot
+        // measure, which it lets through past every unsaved-changes blocker.
         const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
+        window.history.replaceState(window.history.state, document.title, cleanUrl);
 
         if (result.status === "error") {
             console.error(`OAuth sign-in failed: ${result.error}`);
