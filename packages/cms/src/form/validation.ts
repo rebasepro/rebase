@@ -453,41 +453,38 @@ function getZodArraySchema({
 
     if (property.of) {
         if (Array.isArray(property.of)) {
-            const zodProperties: Record<string, ZodTypeAny> = {};
-            (property.of as Property[]).forEach((p, index) => {
+            // One property per position: the value is a tuple, and item `i`
+            // answers to `of[i]` alone. Checked against every position, a
+            // mixed tuple failed its own declaration and could never be saved.
+            const positionSchemas: ZodTypeAny[] = (property.of as Property[]).map((p, index) => {
                 try {
-                    zodProperties[`${name}[${index}]`] = mapPropertyToZod({
+                    return mapPropertyToZod({
                         property: p as Property,
                         parentProperty: property,
                         entityId
                     });
                 } catch (e: unknown) {
                     console.error(`Error creating validation schema for array item ${index}:`, e);
-                    zodProperties[`${name}[${index}]`] = z.any().refine(
+                    return z.any().refine(
                         () => false,
                         { message: `Validation error: ${e instanceof Error ? e.message : "Unknown error"}` }
                     );
                 }
             });
-            arraySchema = z.array(
-                z.any().superRefine(async (object, ctx) => {
-                    // In Zod v4, ctx.path is not available in superRefine.
-                    // Instead, iterate all zodProperties and validate against each.
-                    for (const [key, zodProperty] of Object.entries(zodProperties)) {
-                        if (zodProperty) {
-                            const result = await (zodProperty as ZodTypeAny).safeParseAsync(object);
-                            if (!result.success) {
-                                result.error.issues.forEach((issue) => {
-                                    ctx.addIssue({
-                                        code: "custom",
-                                        message: issue.message
-                                    });
-                                });
-                            }
-                        }
+            arraySchema = z.array(z.any()).superRefine(async (items, ctx) => {
+                for (let index = 0; index < items.length && index < positionSchemas.length; index++) {
+                    const result = await positionSchemas[index].safeParseAsync(items[index]);
+                    if (!result.success) {
+                        result.error.issues.forEach((issue) => {
+                            ctx.addIssue({
+                                code: "custom",
+                                message: issue.message,
+                                path: [index, ...issue.path]
+                            });
+                        });
                     }
-                })
-            ).nullable().optional();
+                }
+            }).nullable().optional();
         } else {
             try {
                 const ofSchema = mapPropertyToZod({

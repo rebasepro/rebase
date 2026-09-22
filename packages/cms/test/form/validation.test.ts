@@ -886,3 +886,53 @@ describe("validation messages name the field", () => {
             .toContain("Unit Price");
     });
 });
+
+// ---------------------------------------------------------------------------
+// A custom-shaped array: one property per position
+// ---------------------------------------------------------------------------
+
+/**
+ * `of: [propA, propB]` declares one property per position — the value is a
+ * tuple. Every item used to be checked against every position's schema, so a
+ * filled mixed-type tuple failed its own declaration ("Must be a number" for
+ * the string, "expected string" for the number) and could never be saved.
+ */
+describe("custom-shaped array validation", () => {
+    const pair = (of: Property[]) => ({ type: "array", name: "Pair", of } as ArrayProperty);
+
+    it("accepts a tuple whose items match their own positions", async () => {
+        const schema = mapPropertyToZod({ property: pair([{ type: "string" } as Property, { type: "number" } as Property]) });
+        const result = await schema.safeParseAsync(["x", 3]);
+        expect(result.success).toBe(true);
+    });
+
+    it("reports a wrong item at its own position only", async () => {
+        const schema = mapPropertyToZod({ property: pair([{ type: "string" } as Property, { type: "number" } as Property]) });
+        const result = await schema.safeParseAsync(["x", "three"]);
+        expect(result.success).toBe(false);
+        const paths = result.success ? [] : result.error.issues.map(issue => issue.path.join("."));
+        expect(paths).toEqual(["1"]);
+    });
+
+    it("holds a required position to its own item", async () => {
+        const schema = mapPropertyToZod({
+            property: pair([
+                { type: "string", validation: { required: true } } as Property,
+                { type: "string" } as Property
+            ])
+        });
+        expect((await schema.safeParseAsync(["x", ""])).success).toBe(true);
+        const missing = await schema.safeParseAsync(["", "y"]);
+        expect(missing.success).toBe(false);
+        expect(missing.success ? [] : missing.error.issues.map(issue => issue.path.join("."))).toEqual(["0"]);
+    });
+
+    it("reports the error on the form field of that position", async () => {
+        const schema = getEntitySchema("e1", {
+            pair: pair([{ type: "string" } as Property, { type: "number" } as Property])
+        } as Properties);
+        const result = await schema.safeParseAsync({ pair: ["x", "three"] });
+        expect(result.success).toBe(false);
+        expect(result.success ? [] : result.error.issues.map(issue => issue.path.join("."))).toEqual(["pair.1"]);
+    });
+});
