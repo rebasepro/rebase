@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { LoginView } from "../../src/components/LoginView/LoginView";
+import { appAddressOfEmailLink } from "../../src/components/LoginView/email-link";
 import "@testing-library/jest-dom";
 
 // Polyfill TextEncoder/TextDecoder for JSDOM
@@ -422,6 +423,107 @@ enabledProviders: ["github"] }
             google.fire({ error: "popup_closed" });
 
             expect(screen.queryByText(/popup_closed/)).not.toBeInTheDocument();
+        });
+    });
+
+    /**
+     * The server emails `<frontend>/reset-password?token=…` for a forgotten
+     * password, an admin's "send reset email" and every invitation, and
+     * `<frontend>/verify-email?token=…` to confirm an address. The login view
+     * ignored both and showed the ordinary sign-in buttons, so the links led
+     * nowhere: a forgotten password could not be changed, and an invited user
+     * — created without a password — could never sign in.
+     */
+    describe("links from an auth email", () => {
+        afterEach(() => {
+            window.history.replaceState(null, "", "/");
+        });
+
+        function openLink(url: string) {
+            window.history.replaceState(null, "", url);
+        }
+
+        async function fillNewPassword(password: string, confirmation: string) {
+            fireEvent.change(await screen.findByLabelText("new_password"), { target: { value: password } });
+            fireEvent.change(screen.getByLabelText("confirm_password"), { target: { value: confirmation } });
+        }
+
+        it("sets a new password with the token from a reset link", async () => {
+            mockAuthController.resetPassword = jest.fn().mockResolvedValue(undefined);
+            openLink("/reset-password?token=reset-token-1");
+
+            render(<LoginView authController={mockAuthController}/>);
+            await fillNewPassword("N3wPassword!", "N3wPassword!");
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: "auth_set_password" }));
+            });
+
+            expect(mockAuthController.resetPassword).toHaveBeenCalledWith("reset-token-1", "N3wPassword!");
+            expect(await screen.findByText("auth_password_changed_title")).toBeInTheDocument();
+        });
+
+        it("finds the link under a base path", async () => {
+            mockAuthController.resetPassword = jest.fn().mockResolvedValue(undefined);
+            openLink("/admin/reset-password?token=reset-token-2");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByLabelText("new_password")).toBeInTheDocument();
+        });
+
+        it("does not submit two passwords that differ", async () => {
+            mockAuthController.resetPassword = jest.fn().mockResolvedValue(undefined);
+            openLink("/reset-password?token=reset-token-1");
+
+            render(<LoginView authController={mockAuthController}/>);
+            await fillNewPassword("N3wPassword!", "N3wPassword?");
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: "auth_set_password" }));
+            });
+
+            expect(mockAuthController.resetPassword).not.toHaveBeenCalled();
+            expect(screen.getByText("passwords_dont_match")).toBeInTheDocument();
+        });
+
+        it("says so when the link has expired, and keeps the form", async () => {
+            mockAuthController.resetPassword = jest.fn().mockRejectedValue(
+                Object.assign(new Error("Invalid or expired reset token"), { code: "INVALID_TOKEN" }));
+            openLink("/reset-password?token=spent");
+
+            render(<LoginView authController={mockAuthController}/>);
+            await fillNewPassword("N3wPassword!", "N3wPassword!");
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: "auth_set_password" }));
+            });
+
+            expect(screen.getByText("auth_link_invalid_or_expired")).toBeInTheDocument();
+            expect(screen.getByLabelText("new_password")).toBeInTheDocument();
+        });
+
+        it("confirms the address from a verification link", async () => {
+            mockAuthController.verifyEmail = jest.fn().mockResolvedValue(undefined);
+            openLink("/verify-email?token=verify-token-1");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByText("auth_email_verified_title")).toBeInTheDocument();
+            expect(mockAuthController.verifyEmail).toHaveBeenCalledTimes(1);
+            expect(mockAuthController.verifyEmail).toHaveBeenCalledWith("verify-token-1");
+        });
+
+        it("leaves the link for the app's own address, base path kept", () => {
+            expect(appAddressOfEmailLink({ origin: "https://example.com", pathname: "/admin/reset-password" }))
+                .toBe("https://example.com/admin/");
+            expect(appAddressOfEmailLink({ origin: "https://example.com", pathname: "/verify-email" }))
+                .toBe("https://example.com/");
+        });
+
+        it("shows the sign-in screen for a path that only looks similar", () => {
+            openLink("/users/reset-passwords?token=x");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(screen.getByRole("button", { name: /Sign in with email/i })).toBeInTheDocument();
         });
     });
 

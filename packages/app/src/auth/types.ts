@@ -35,6 +35,8 @@ export type RebaseAuthController = AuthController & {
     forgotPassword: (email: string) => Promise<void>;
     /** Reset password using token from email */
     resetPassword: (token: string, password: string) => Promise<void>;
+    /** Confirm an email address using the token from a verification email */
+    verifyEmail: (token: string) => Promise<void>;
     /** Change password for authenticated user */
     changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
     /** Update user profile */
@@ -71,6 +73,8 @@ export interface ClientAuth {
     signInWithOAuth(providerId: string, payload: Record<string, unknown>): Promise<unknown>;
     resetPasswordForEmail(email: string): Promise<unknown>;
     resetPassword(token: string, password: string): Promise<unknown>;
+    /** Optional so a hand-built auth client need not implement it. */
+    verifyEmail?(token: string): Promise<unknown>;
     changePassword(oldPassword: string, newPassword: string): Promise<unknown>;
     updateUser(updates: { displayName?: string; photoURL?: string }): Promise<User>;
     getSessions(): Promise<DeviceSession[]>;

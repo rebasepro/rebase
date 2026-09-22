@@ -21,7 +21,9 @@ declare global {
 import {
     ArrowLeftIcon,
     Button,
+    CheckCircle2Icon,
     Checkbox,
+    CircularProgress,
     cls,
     IconButton,
     iconSize,
@@ -43,6 +45,7 @@ import { LanguageToggle } from "../LanguageToggle";
 import { useModeController, useTranslation } from "../../hooks";
 import { consumeOAuthCallback, startOAuthRedirect } from "./oauth-redirect-flow";
 import { authErrorMessage } from "./auth-error-message";
+import { appAddressOfEmailLink, readEmailLinkAction } from "./email-link";
 
 /**
  * Props for the generic LoginView.
@@ -162,7 +165,7 @@ export interface LoginViewProps {
     onNewsletterOptIn?: (email: string) => void;
 }
 
-type AuthMode = "buttons" | "login" | "register" | "forgot";
+type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" | "verify-email";
 
 /**
  * The shared field background mixin (`dark:bg-black/30`) is invisible on the
@@ -246,7 +249,11 @@ export function LoginView({
     const { mode: colorMode, setMode: setColorMode } = modeState;
     const { t } = useTranslation();
 
-    const [mode, setMode] = useState<AuthMode>("buttons");
+    // A link from an auth email opens this screen on its own step: setting a
+    // new password (a reset, or an invitation's first password) or confirming
+    // an address. Read once — the token is spent by the step it opens.
+    const [emailLink] = useState(() => typeof window === "undefined" ? null : readEmailLinkAction(window.location));
+    const [mode, setMode] = useState<AuthMode>(emailLink?.kind ?? "buttons");
     const [fadeIn, setFadeIn] = useState(false);
     const [viewVisible, setViewVisible] = useState(true);
     // Failures that never reach the auth controller: a provider that answers the
@@ -619,6 +626,24 @@ export function LoginView({
                                 <ForgotPasswordForm
                                     authController={authController}
                                     onClose={() => switchMode("login")}
+                                />
+                            )}
+
+                            {/* Opened from a reset or invitation email */}
+                            {mode === "reset-password" && emailLink?.kind === "reset-password" && (
+                                <ResetPasswordForm
+                                    token={emailLink.token}
+                                    authController={authController}
+                                    onDone={leaveEmailLink}
+                                />
+                            )}
+
+                            {/* Opened from a verification email */}
+                            {mode === "verify-email" && emailLink?.kind === "verify-email" && (
+                                <VerifyEmailView
+                                    token={emailLink.token}
+                                    authController={authController}
+                                    onDone={leaveEmailLink}
                                 />
                             )}
                         </>
@@ -1103,6 +1128,243 @@ function LoginForm({
                 </div>
             )}
         </form>
+    );
+}
+
+/**
+ * Leave an email link for the app's own address, with a fresh load.
+ *
+ * The router, when there is one, still stands on `/reset-password`: rewriting
+ * the address under it would leave it rendering a route that does not exist
+ * the moment the user signs in. A load starts it where the app starts, and the
+ * spent token leaves the address bar and the history entry with it.
+ */
+function leaveEmailLink() {
+    window.location.replace(appAddressOfEmailLink(window.location));
+}
+
+/** What to say about a refused email-link token, or any other failure. */
+function emailLinkErrorMessage(error: unknown, t: (key: string) => string): string {
+    if (error instanceof Error && "code" in error && error.code === "INVALID_TOKEN") {
+        return t("auth_link_invalid_or_expired");
+    }
+    return authErrorMessage(error, t);
+}
+
+/**
+ * The step a reset link opens: a new password for the account the token was
+ * issued to. An invitation sends the same link, so this is also where an
+ * invited user — created without a password — sets their first one.
+ */
+function ResetPasswordForm({
+    token,
+    authController,
+    onDone
+}: {
+    token: string,
+    authController: AuthControllerExtended,
+    /** Back to the app's own address, and the sign-in screen. */
+    onDone: () => void
+}) {
+    const { t } = useTranslation();
+    const passwordId = useId();
+    const confirmationId = useId();
+    const [password, setPassword] = useState("");
+    const [confirmation, setConfirmation] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [changed, setChanged] = useState(false);
+
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setError(null);
+
+        if (!authController.resetPassword) {
+            setError(t("auth_password_reset_unavailable"));
+            return;
+        }
+        if (password !== confirmation) {
+            setError(t("passwords_dont_match"));
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await authController.resetPassword(token, password);
+            setChanged(true);
+        } catch (err: unknown) {
+            setError(emailLinkErrorMessage(err, t));
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (changed) {
+        return (
+            <div className="flex flex-col w-full gap-4 mt-2">
+                <div className="flex flex-col items-center text-center rounded-xl p-6 bg-surface-raised">
+                    <CheckCircle2Icon size={iconSize.large} className="mb-3 text-primary"/>
+                    <Typography variant="subtitle1" className="mb-2">
+                        {t("auth_password_changed_title")}
+                    </Typography>
+                    <Typography variant="body2" color="secondary">
+                        {t("auth_password_changed_body")}
+                    </Typography>
+                </div>
+
+                <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
+                    {t("auth_continue_to_sign_in")}
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
+            <div className="w-full mb-2 -ml-2.5">
+                <IconButton onClick={onDone} aria-label={t("back")}>
+                    <ArrowLeftIcon/>
+                </IconButton>
+            </div>
+
+            <Typography variant="h6" className="mb-0.5">
+                {t("auth_new_password_title")}
+            </Typography>
+            <Typography variant="body2" color="secondary" className="mb-5">
+                {t("auth_new_password_subtitle")}
+            </Typography>
+
+            {error && (
+                <div className="w-full mb-3">
+                    <ErrorView error={error}/>
+                </div>
+            )}
+
+            <div className="w-full mb-3">
+                <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={passwordId}>
+                    {t("new_password")}
+                </Typography>
+                <TextField
+                    id={passwordId}
+                    className={loginFieldClasses}
+                    autoFocus
+                    autoComplete="new-password"
+                    value={password}
+                    type="password"
+                    size="medium"
+                    onChange={(event) => setPassword(event.target.value)}
+                />
+            </div>
+
+            <div className="w-full mb-1">
+                <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={confirmationId}>
+                    {t("confirm_password")}
+                </Typography>
+                <TextField
+                    id={confirmationId}
+                    className={loginFieldClasses}
+                    autoComplete="new-password"
+                    value={confirmation}
+                    type="password"
+                    size="medium"
+                    onChange={(event) => setConfirmation(event.target.value)}
+                />
+            </div>
+
+            <Typography variant="caption" color="secondary" className="mb-3">
+                {t("auth_password_requirements")}
+            </Typography>
+
+            <LoadingButton
+                type="submit"
+                variant="filled"
+                color="primary"
+                className="w-full mt-1"
+                size="large"
+                loading={submitting}
+                disabled={submitting || !password || !confirmation}
+            >
+                {t("auth_set_password")}
+            </LoadingButton>
+        </form>
+    );
+}
+
+/**
+ * The step a verification link opens. There is nothing to ask: the token is
+ * spent as soon as the screen opens, and the result is what it shows.
+ */
+function VerifyEmailView({
+    token,
+    authController,
+    onDone
+}: {
+    token: string,
+    authController: AuthControllerExtended,
+    onDone: () => void
+}) {
+    const { t } = useTranslation();
+    const [status, setStatus] = useState<"verifying" | "verified" | "failed">("verifying");
+    const [error, setError] = useState<string | null>(null);
+    // Once per token. The server spends it on the first call, so a second one —
+    // a development double-mount, say — would answer "invalid" and overwrite
+    // the success the first one reported.
+    const requestedRef = useRef(false);
+
+    useEffect(() => {
+        if (requestedRef.current) return;
+        requestedRef.current = true;
+        if (!authController.verifyEmail) {
+            setError(t("auth_email_verification_unavailable"));
+            setStatus("failed");
+            return;
+        }
+        authController.verifyEmail(token)
+            .then(() => setStatus("verified"))
+            .catch((err: unknown) => {
+                setError(emailLinkErrorMessage(err, t));
+                setStatus("failed");
+            });
+    }, [authController, token, t]);
+
+    if (status === "verifying") {
+        return (
+            <div className="flex flex-col items-center w-full gap-4 mt-6 mb-4">
+                <CircularProgress size="small"/>
+                <Typography variant="body2" color="secondary">
+                    {t("auth_verifying_email")}
+                </Typography>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col w-full gap-4 mt-2">
+            {status === "verified"
+                ? (
+                    <div className="flex flex-col items-center text-center rounded-xl p-6 bg-surface-raised">
+                        <CheckCircle2Icon size={iconSize.large} className="mb-3 text-primary"/>
+                        <Typography variant="subtitle1" className="mb-2">
+                            {t("auth_email_verified_title")}
+                        </Typography>
+                        <Typography variant="body2" color="secondary">
+                            {t("auth_email_verified_body")}
+                        </Typography>
+                    </div>
+                )
+                : (
+                    <>
+                        <Typography variant="h6" className="mb-0.5">
+                            {t("auth_email_verification_failed_title")}
+                        </Typography>
+                        {error && <ErrorView error={error}/>}
+                    </>
+                )}
+
+            <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
+                {t("auth_continue_to_sign_in")}
+            </Button>
+        </div>
     );
 }
 

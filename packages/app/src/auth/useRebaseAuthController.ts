@@ -260,6 +260,11 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
+    const verifyEmail = useCallback(async (token: string) => {
+        if (!auth?.verifyEmail) throw new Error("Rebase client with email verification is required");
+        await auth.verifyEmail(token);
+    }, [auth]);
+
     const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
         if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
@@ -327,6 +332,7 @@ export function useRebaseAuthController(
         skipLogin,
         forgotPassword,
         resetPassword,
+        verifyEmail,
         changePassword,
         updateProfile,
         fetchSessions,

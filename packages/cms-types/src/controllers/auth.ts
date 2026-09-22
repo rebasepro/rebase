@@ -115,6 +115,8 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     forgotPassword?(email: string): Promise<void>;
     /** Reset password using a token */
     resetPassword?(token: string, password: string): Promise<void>;
+    /** Confirm an email address using the token from a verification email */
+    verifyEmail?(token: string): Promise<void>;
     /** Change password for the authenticated user */
     changePassword?(oldPassword: string, newPassword: string): Promise<void>;
     /** Update user profile */

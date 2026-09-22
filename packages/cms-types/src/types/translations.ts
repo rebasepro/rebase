@@ -715,6 +715,20 @@ export interface RebaseTranslations {
     auth_have_account: string;
     auth_sign_in: string;
     auth_sign_up: string;
+    auth_new_password_title: string;
+    auth_new_password_subtitle: string;
+    auth_password_requirements: string;
+    auth_set_password: string;
+    auth_password_changed_title: string;
+    auth_password_changed_body: string;
+    auth_continue_to_sign_in: string;
+    auth_link_invalid_or_expired: string;
+    auth_password_reset_unavailable: string;
+    auth_verifying_email: string;
+    auth_email_verified_title: string;
+    auth_email_verified_body: string;
+    auth_email_verification_failed_title: string;
+    auth_email_verification_unavailable: string;
 
     auto_setup_collections_button: string;
     auto_setup_collections_title: string;
