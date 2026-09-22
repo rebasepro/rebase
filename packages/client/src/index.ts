@@ -437,13 +437,36 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             onUnauthorized: wsOnUnauthorized
         });
 
+        // The account the socket's server-side state belongs to. The server
+        // keeps each subscription's principal from when it was made and never
+        // revisits it, so re-authenticating a socket as somebody else leaves
+        // every subscription reading as the previous account.
+        let realtimeUid: string | null = auth.getSession()?.user?.uid ?? null;
+
         auth.onAuthStateChange((event, session) => {
             if (!ws) return;
             if (event === "SIGNED_OUT") {
+                realtimeUid = null;
                 // Not permanent: the client stays usable, and a later subscribe
-                // should reconnect anonymously.
+                // should reconnect anonymously. It also drops what the socket
+                // cached, so none of it is replayed to whoever comes next.
                 ws.disconnect();
             } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+                const uid = session?.user?.uid ?? null;
+                if (uid !== realtimeUid) {
+                    // A different account — signed in over a session (which
+                    // emits no SIGNED_OUT), or a visitor signing in. Rebuild
+                    // the socket rather than re-authenticate it: a new socket
+                    // starts with nothing on the server, authenticates as this
+                    // account on open, and re-sends every live subscription and
+                    // channel as it. Only when there was a socket, for the same
+                    // reason as below.
+                    realtimeUid = uid;
+                    const hadSocket = ws.hasSocket;
+                    ws.disconnect();
+                    if (hadSocket) ws.ensureConnected();
+                    return;
+                }
                 // Only re-authenticate a socket that already exists. Signing in
                 // is not a request for realtime, and dialling here would undo
                 // lazy connect for every app with a login. A socket opened
