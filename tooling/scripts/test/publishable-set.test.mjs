@@ -174,6 +174,25 @@ test("a path filter in the workflow is a finding even when versions agree", () =
     assert.match(found[0], /selects packages by path/);
 });
 
+test("a path filter is a finding however it is quoted or joined", () => {
+    // Only `--filter '<path>'` in single quotes was matched, so the same filter
+    // written any other way pnpm accepts passed.
+    const root = workspace({ "packages/cli": ok("@rebasepro/cli") });
+    for (const filter of [
+        "--filter \"./packages/*\"",
+        "--filter ./packages/cli",
+        "--filter=./packages/cli",
+        "--filter='./packages/cli'",
+        "--filter  './rebase-agent-skills'"
+    ]) {
+        const found = messages(root, `
+        run: pnpm ${filter} -r publish
+        run: node tooling/scripts/publishable-packages.mjs --set-version "$V"
+    `);
+        assert.deepEqual(found, [`${WORKFLOW} selects packages by path (1 filter(s)).`], filter);
+    }
+});
+
 test("a hand-written loop is a finding whatever the variable is called", () => {
     // publish.yml looped on `pkg_dir`; the workspace-protocol validator looped
     // on `pkg_json`. Matching only the first name would let the second through,
@@ -242,6 +261,28 @@ test("a version read out of the tag namespace is a finding", () => {
         "git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1"
     ));
     assert.deepEqual(found, ["1 release step(s) read a version out of the tag namespace."]);
+});
+
+test("a tag-namespace scan is a finding however the assignment is written", () => {
+    // Only a bare `VAR=$(git tag …)` at the start of a line was read, so a quoted
+    // substitution or an `export`/`local` in front of it was not a derivation at
+    // all — neither checked for the namespace scan nor compared with the others.
+    const root = workspace({ "packages/cli": ok("@rebasepro/cli") });
+    const scan = "git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1";
+    for (const assignment of [
+        `LATEST_TAG="$(${scan})"`,
+        `export LATEST_TAG=$(${scan})`,
+        `local LATEST_TAG="$(${scan})"`,
+        `readonly LATEST_TAG=$( ${scan} )`
+    ]) {
+        const found = messages(root, GOOD_WORKFLOW.replace(`LATEST_TAG=$(${DERIVATION})`, assignment));
+        assert.deepEqual(found, ["1 release step(s) read a version out of the tag namespace."], assignment);
+    }
+});
+
+test("a quoted derivation is still the derivation", () => {
+    const root = workspace({ "packages/cli": ok("@rebasepro/cli") });
+    assert.deepEqual(messages(root, GOOD_WORKFLOW.replace(`LATEST_TAG=$(${DERIVATION})`, `export LATEST_TAG="$(${DERIVATION})"`)), []);
 });
 
 test("two release files deriving the version differently is a finding", () => {

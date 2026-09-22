@@ -131,7 +131,12 @@ export function checkPublishableSet({ root = ROOT, sources } = {}) {
         // A `--filter` naming a PATH is the shape that broke: it silently
         // matches nothing when the path moves. A `--filter` by package name is
         // sturdier, but a release should not be naming either — so both go.
-        const pathFilters = [...text.matchAll(/--filter\s+'([^']*\/[^']*)'/g)].map(m => m[1]);
+        // Every spelling pnpm accepts: `--filter x`, `--filter=x`, and the
+        // value bare, single- or double-quoted. Only `--filter '<path>'` used
+        // to match, so `--filter ./packages/cli` passed.
+        const pathFilters = [...text.matchAll(/--filter(?:\s+|=)(?:'([^']*)'|"([^"]*)"|([^\s'"]+))/g)]
+            .map(m => m[1] ?? m[2] ?? m[3])
+            .filter(value => value.includes("/"));
         if (pathFilters.length > 0) {
             fail(
                 `${file} selects packages by path (${pathFilters.length} filter(s)).`,
@@ -187,10 +192,14 @@ export function checkPublishableSet({ root = ROOT, sources } = {}) {
     const derivations = new Map();
     const namespaceScans = [];
 
+    // Any assignment shell allows: bare, behind `export`/`local`/`readonly`/
+    // `declare`, and with the substitution quoted. Only the bare, unquoted
+    // form used to count, so `LATEST="$(git tag … | head -n1)"` was not a
+    // derivation at all — never checked for a namespace scan.
     for (const file of RELEASE_FILES) {
         const text = sources?.[file] ?? readRelease(root, file);
         for (const [, variable, command] of text.matchAll(
-            /^\s*([A-Za-z_]\w*)=\$\(\s*(git\s+(?:tag|describe)[^)]*)\)/gm
+            /^\s*(?:(?:export|local|readonly|declare(?:\s+-\w+)*)\s+)?([A-Za-z_]\w*)="?\$\(\s*(git\s+(?:tag|describe)[^)]*)\)/gm
         )) {
             const expression = command.trim().replace(/\s+/g, " ");
             if (!/^git describe --tags --abbrev=0 --match /.test(expression)) {
