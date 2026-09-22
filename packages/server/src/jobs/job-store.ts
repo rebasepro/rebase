@@ -95,8 +95,13 @@ export interface JobStore {
         maxAttempts: number;
         idempotencyKey?: string;
     }): Promise<string | null>;
-    /** Atomically take up to `limit` runnable jobs for this worker. */
-    claim(limit: number, workerId: string): Promise<JobRecord[]>;
+    /**
+     * Atomically take up to `limit` runnable jobs for this worker — only jobs
+     * whose task is in `tasks`, when it is given. A worker never claims work it
+     * cannot run: a claim spends an attempt, so an instance running older code
+     * during a rollout would otherwise dead-letter the newer code's jobs.
+     */
+    claim(limit: number, workerId: string, tasks?: readonly string[]): Promise<JobRecord[]>;
     complete(id: string): Promise<void>;
     /** Back to `pending` with a later `runAt`, or `failed` when out of attempts. */
     fail(id: string, error: string, retryAt: Date | null): Promise<void>;
@@ -285,7 +290,13 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
             }
         },
 
-        async claim(limit: number, workerId: string): Promise<JobRecord[]> {
+        async claim(limit: number, workerId: string, tasks?: readonly string[]): Promise<JobRecord[]> {
+            if (tasks && tasks.length === 0) return [];
+            // One placeholder per task rather than an array parameter: every
+            // driver binds a string, and not every driver binds an array.
+            const taskFilter = tasks
+                ? `AND task IN (${tasks.map((_, i) => `$${i + 3}`).join(", ")})`
+                : "";
             // `FOR UPDATE SKIP LOCKED` is the whole design. The inner select
             // takes row locks on the jobs it picks and *skips* any a concurrent
             // worker already holds, so N workers polling the same table divide
@@ -306,13 +317,13 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                     updated_at = now()
                  WHERE id IN (
                      SELECT id FROM ${TABLE}
-                     WHERE status = 'pending' AND run_at <= now()
+                     WHERE status = 'pending' AND run_at <= now() ${taskFilter}
                      ORDER BY run_at, created_at
                      LIMIT $1
                      FOR UPDATE SKIP LOCKED
                  )
                  RETURNING *`,
-                [limit, workerId]
+                [limit, workerId, ...(tasks ?? [])]
             );
             return sqlRows<JobRow>(rows).map(toRecord);
         },

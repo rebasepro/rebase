@@ -13,10 +13,10 @@ import type { JobStore } from "../src/jobs";
  *
  *  - a handler that throws with attempts left is a *retry*, and one without is
  *    a dead letter that stays in the table;
- *  - an unknown task is neither. During a rolling deploy the instance running
- *    old code will be handed jobs belonging to new code, and failing them
- *    outright would dead-letter work the fleet is minutes away from being able
- *    to run;
+ *  - an unknown task is neither: it is never claimed. During a rolling deploy
+ *    the instance running old code shares the table with jobs belonging to new
+ *    code, and a claim spends an attempt, so claiming them would dead-letter
+ *    work the fleet is minutes away from being able to run;
  *  - a job whose worker was killed is invisible to all of this — it reports
  *    nothing, ever — so only a timeout recovers it.
  */
@@ -53,10 +53,11 @@ function fakeStore() {
             } as never);
             return id;
         },
-        async claim(limit) {
+        async claim(limit, _workerId, tasks) {
             const now = Date.now();
             const claimed = jobs
                 .filter(j => j.status === "pending" && Date.parse(j.runAt) <= now)
+                .filter(j => tasks === undefined || tasks.includes(j.task))
                 .slice(0, limit);
             for (const job of claimed) {
                 job.status = "running";
@@ -214,16 +215,36 @@ describe("a job that throws", () => {
 });
 
 describe("a task this instance does not know", () => {
-    it("is returned to the queue rather than failed", async () => {
+    it("is never claimed, so none of its attempts are spent", async () => {
         // The rolling-deploy case: this pod has not been updated yet, and the
-        // job belongs to code its peers are already running.
+        // job belongs to code its peers are already running. Claiming it here
+        // spent an attempt each time, and an old pod polling through a
+        // rollout dead-lettered the new code's jobs with "No handler
+        // registered" before any updated peer got to them.
         const store = fakeStore();
-        const queue = createJobQueue(store, { backoff: () => 0, tasks: {} });
+        const queue = createJobQueue(store, { backoff: () => 0, tasks: { known: () => undefined } });
 
-        await queue.enqueue("from-the-future");
-        await queue.runOnce();
+        await queue.enqueue("from-the-future", null, { maxAttempts: 3 });
+        for (let i = 0; i < 5; i++) await queue.runOnce();
 
-        expect((await store.fetch("1"))?.status).toBe("pending");
+        const job = await store.fetch("1");
+        expect(job?.status).toBe("pending");
+        expect(job?.attempts).toBe(0);
+        expect(job?.lastError).toBeNull();
+    });
+
+    it("is left for a peer that has the handler", async () => {
+        const store = fakeStore();
+        const oldPod = createJobQueue(store, { backoff: () => 0, tasks: {} });
+        const ran: string[] = [];
+        const newPod = createJobQueue(store, { tasks: { "from-the-future": (ctx) => { ran.push(ctx.id); } } });
+
+        await oldPod.enqueue("from-the-future");
+        await oldPod.runOnce();
+        await newPod.runOnce();
+
+        expect(ran).toEqual(["1"]);
+        expect((await store.fetch("1"))?.attempts).toBe(1);
     });
 
     it("runs as soon as a handler is registered", async () => {
@@ -240,17 +261,17 @@ describe("a task this instance does not know", () => {
         expect((await store.fetch("1"))?.status).toBe("succeeded");
     });
 
-    it("still dead-letters eventually, so it cannot cycle forever", async () => {
+    it("does not crowd out the tasks this instance does know", async () => {
+        // Queued first, so an unfiltered claim of one would take it every time.
         const store = fakeStore();
-        const queue = createJobQueue(store, { backoff: () => 0, tasks: {} });
+        const ran = jest.fn();
+        const queue = createJobQueue(store, { concurrency: 1, tasks: { known: ran as never } });
 
-        await queue.enqueue("nobody-implements-this", null, { maxAttempts: 2 });
-        await queue.runOnce();
-        await queue.runOnce();
+        await queue.enqueue("from-the-future");
+        await queue.enqueue("known");
 
-        const job = await store.fetch("1");
-        expect(job?.status).toBe("failed");
-        expect(job?.lastError).toContain("No handler registered");
+        expect(await queue.runOnce()).toBe(1);
+        expect(ran).toHaveBeenCalledTimes(1);
     });
 });
 

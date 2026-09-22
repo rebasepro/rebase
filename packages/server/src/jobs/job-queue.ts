@@ -87,15 +87,12 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         const handler = handlers.get(job.task);
 
         if (!handler) {
-            // Not a failure. A rolling deploy runs old and new code at once, and
-            // an instance that has not been updated yet must not burn the
-            // attempts of a job belonging to one that has. Give the row back
-            // and let a peer — or this process after its next deploy — take it.
-            //
-            // The attempt increment from the claim is deliberately not undone:
-            // a task nobody in the fleet implements would otherwise cycle
-            // forever, and this way it dead-letters after `maxAttempts` with an
-            // error naming the task.
+            // Only reachable through a store that ignores the `tasks` filter on
+            // `claim` — the one that ships never hands this worker a task it
+            // has no handler for. Give the row back for a peer that has one.
+            // The attempt the claim spent is not undone, so a task nobody in
+            // the fleet implements dead-letters with an error naming it rather
+            // than cycling through such a store forever.
             logger.warn(`[jobs] No handler registered for task "${job.task}" — returning the job to the queue`);
             await store.fail(
                 job.id,
@@ -155,7 +152,13 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         const free = concurrency - active.size;
         if (free <= 0) return [];
 
-        const jobs = await store.claim(free, workerId);
+        // Only the tasks this worker can run. During a rolling deploy an
+        // instance on older code shares the table with jobs whose task only
+        // the newer code implements, and a claim spends an attempt: claiming
+        // them here would dead-letter them before an updated peer got to them.
+        // A handler registered after `start()` joins the next claim.
+        if (handlers.size === 0) return [];
+        const jobs = await store.claim(free, workerId, [...handlers.keys()]);
         backlog = jobs.length >= free;
 
         return jobs.map((job) => {
