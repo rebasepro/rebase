@@ -27,6 +27,7 @@ export { ImportSaveInProgress } from "../data_import/components/ImportSaveInProg
 export { useImportConfig } from "../data_import/hooks/useImportConfig";
 export { getInferenceType } from "../data_import/utils/get_import_inference_type";
 export { convertDataToEntity } from "../data_import/utils/data";
+export { guessIdColumn } from "../data_import/utils/id_column";
 export type { ImportConfig } from "../data_import/types";
 
 // Data import components

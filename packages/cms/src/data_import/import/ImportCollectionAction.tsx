@@ -31,6 +31,7 @@ import {
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { useImportConfig } from "../hooks";
 import { convertDataToEntity, getInferenceType } from "../utils";
+import { guessIdColumn } from "../utils/id_column";
 import { DataNewPropertiesMapping } from "../components/DataNewPropertiesMapping";
 import { ImportFileUpload } from "../components/ImportFileUpload";
 import { ImportSaveInProgress } from "../components/ImportSaveInProgress";
@@ -85,10 +86,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
             const headersMapping = buildHeadersMappingFromData(data, collection?.properties);
             importConfig.setHeadersMapping(headersMapping);
-            const firstKey = Object.keys(headersMapping)?.[0];
-            if (firstKey?.includes("id") || firstKey?.includes("key")) {
-                importConfig.setIdColumn(firstKey);
-            }
+            importConfig.setIdColumn(guessIdColumn(Object.keys(headersMapping), headersMapping, collection?.properties));
         }
         setTimeout(() => {
             onAnalyticsEvent?.("import_data_added");

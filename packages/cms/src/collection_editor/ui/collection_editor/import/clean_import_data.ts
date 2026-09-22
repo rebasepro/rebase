@@ -1,5 +1,5 @@
 import { Properties } from "@rebasepro/types";
-import { ImportConfig } from "../../../_cms_internals";
+import { guessIdColumn, ImportConfig } from "../../../_cms_internals";
 import { slugify } from "@rebasepro/utils";
 
 export function cleanPropertiesFromImport(properties: Properties, parentSlug = ""): {
@@ -44,14 +44,8 @@ export function cleanPropertiesFromImport(properties: Properties, parentSlug = "
     }, { headersMapping: {},
 properties: {} });
 
-    const firstKey = Object.keys(result.headersMapping)?.[0];
-    let idColumn: string | undefined;
-    if (firstKey?.includes("id") || firstKey?.includes("key")) {
-        idColumn = firstKey;
-    }
-
     return {
         ...result,
-        idColumn
+        idColumn: guessIdColumn(Object.keys(result.headersMapping), result.headersMapping, result.properties)
     };
 }
