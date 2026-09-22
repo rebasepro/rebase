@@ -127,7 +127,9 @@ keep: kind === "#" ? shape[name] === true : shape[name] !== true };
     }
 
     if (open) throw new Error(`Eject template: {{#${open.name}}} was never closed.`);
-    return out.join("\n").replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+    // A replacer function: the name is read from package.json unchecked, and a
+    // replacement string would expand any `$&`, `$'` or `$$` in it.
+    return out.join("\n").replace(/\{\{PROJECT_NAME\}\}/g, () => projectName);
 }
 
 /** Files the eject payload contributes, as `<source> → <destination>`. */

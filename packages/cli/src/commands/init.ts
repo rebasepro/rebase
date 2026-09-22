@@ -1398,9 +1398,13 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             // to `${DATABASE_PASSWORD:-changeme}`. Omitting it here shipped a
             // compose stack whose database password was literally "changeme",
             // on a service that publishes a host port by default.
+            //
+            // A replacer function, not a replacement string: in a string, `$$`,
+            // `$&` and `$'` are patterns, and a password is free to contain
+            // them — `pa$$w0rd` reached .env as `pa$w0rd`.
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
-                `DATABASE_URL=${pinnedUrl}\nDATABASE_PASSWORD=${dbPassword}`
+                () => `DATABASE_URL=${pinnedUrl}\nDATABASE_PASSWORD=${dbPassword}`
             );
         } else {
             const dbPort = await findAvailablePort(5432);

@@ -570,6 +570,12 @@ frontend: true };
     it("refuses an unterminated block", () => {
         expect(() => renderPayload("// {{#frontend}}\nx\n", shape, "app")).toThrow(/never closed/);
     });
+
+    it("writes the project name as it is, `$` patterns and all", () => {
+        // The name comes from package.json unvalidated, and a `String.replace`
+        // replacement string expands `$&`, `$'` and `$$`.
+        expect(renderPayload("name: {{PROJECT_NAME}}", shape, "a$&b$'c$$d")).toBe("name: a$&b$'c$$d");
+    });
 });
 
 describe("an entrypoint that is already there", () => {

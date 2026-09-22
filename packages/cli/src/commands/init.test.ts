@@ -1147,6 +1147,24 @@ describe(".env.example", () => {
         expect(envContent.match(/^DATABASE_URL=(.*)$/m)![1]).toBe(customDbUrl);
     });
 
+    it("configureEnvFile writes a password with `$` in it exactly as given", async () => {
+        // The URL was a `String.replace` replacement string, where `$$`, `$&`,
+        // `` $` `` and `$'` are patterns: `pa$$w0rd` reached .env as `pa$w0rd`,
+        // so the first `rebase dev` failed authentication, and `$'` spliced
+        // the rest of the file into the URL.
+        const { pinSearchPath } = await import("@rebasepro/server-postgres");
+        for (const [name, customDbUrl] of [
+            ["env-dollar-db-app", "postgresql://app:pa$$w0rd@db.example.com:5432/app"],
+            ["env-dollar-quote-db-app", "postgresql://app:x$'y$&z@db.example.com:5432/app"]
+        ]) {
+            const targetDir = await simulateInit(name);
+            await configureEnvFile(targetDir, customDbUrl);
+
+            const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+            expect(envContent.match(/^DATABASE_URL=(.*)$/m)![1]).toBe(pinSearchPath(customDbUrl));
+        }
+    });
+
     it("configureEnvFile throws an error if a multiline databaseUrl is provided", async () => {
         const targetDir = await simulateInit("env-malicious-db-app");
         const maliciousDbUrl = "postgresql://user:pass@remote:5432/db\nINJECTED_VAR=dangerous";
