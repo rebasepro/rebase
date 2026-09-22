@@ -2,7 +2,7 @@ import { ANONYMOUS_USER_ID, RealtimeProvider, DataDriver, FetchCollectionProps, 
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, ApiError, declaredErrorAnswer } from "@rebasepro/server";
+import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, ApiError, declaredErrorAnswer } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
@@ -289,7 +289,17 @@ roles: verifiedUser.roles } }));
                     if (!path || !values || typeof values !== "object") return;
                     const collection = driver.registry?.getCollectionByPath(path);
                     if (!collection) return;
-                    assertWriteRequestValid(values as Record<string, unknown>, collection);
+                    // The roles this socket's driver is scoped with — `["anon"]`
+                    // for one with no session. Never `undefined`: that is the
+                    // trusted server plane, which satisfies every `access.write`
+                    // list, so omitting it let any caller write any field.
+                    assertWriteRequestValid(values as Record<string, unknown>, collection, {
+                        viewer: { roles: sessionUser(clientSessions.get(clientId)).roles ?? [] }
+                    });
+                    // `$push` on a number is the caller's mistake, answered here
+                    // as the 400 `PATCH` gives it — the same check the Postgres
+                    // socket runs at this door.
+                    assertFieldOpsValid(values as Record<string, unknown>, collection);
                 };
 
                 // Always scoped. A failure to scope propagates to the frame's

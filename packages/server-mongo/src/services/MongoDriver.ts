@@ -10,6 +10,7 @@ import {
     DataDriver,
     DeleteProps,
     Entity,
+    LogicalCondition,
     CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
@@ -28,7 +29,19 @@ import {
 import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService, type SubscriptionAuthContext } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, buildSdkData, callbackRefusal, checkOperation, PolicyClauses, requireCallbackClient, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import {
+    buildPropertyCallbacks,
+    buildSdkData,
+    callbackRefusal,
+    checkOperation,
+    type FieldViewer,
+    normalizeDriverOrderBy,
+    PolicyClauses,
+    requireCallbackClient,
+    restrictedFieldNames,
+    toCallbackError,
+    updateDateAutoValues
+} from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server";
@@ -758,6 +771,8 @@ export class AuthenticatedMongoDriver implements DataDriver {
 
     async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
+        const viewer = this.viewer();
+        assertQueryFieldsReadable(props, resolvedCollection, viewer);
         const rlsFilter = buildMongoFilterFromSecurityRules(resolvedCollection, this.user, "select");
         if (rlsFilter === null) {
             return [];
@@ -771,7 +786,8 @@ export class AuthenticatedMongoDriver implements DataDriver {
             filter: props.filter,
             logical: props.logical,
             searchString: props.searchString,
-            properties: resolvedCollection?.properties
+            properties: resolvedCollection?.properties,
+            viewer
         });
 
         const combinedQuery = Object.keys(rlsFilter).length > 0
@@ -815,11 +831,11 @@ export class AuthenticatedMongoDriver implements DataDriver {
                         context: contextForCallback
                     }) ?? fetched;
                 }
-                return fetched;
+                return stripUnreadable(fetched, resolvedCollection, viewer);
             }));
         }
 
-        return rows;
+        return rows.map(row => stripUnreadable(row, resolvedCollection, viewer));
     }
 
     listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
@@ -843,6 +859,17 @@ export class AuthenticatedMongoDriver implements DataDriver {
             roles: this.user.roles ?? [],
             isAnonymous: this.user.isAnonymous === true
         };
+    }
+
+    /**
+     * The caller per-field `access` is judged against.
+     *
+     * Never `undefined`: that is the trusted server plane, which satisfies
+     * every non-empty role list, and every call through this driver is made
+     * for a user — an anonymous one included, as `roles: ["anon"]`.
+     */
+    private viewer(): FieldViewer {
+        return { roles: this.user.roles ?? [] };
     }
 
     /**
@@ -870,7 +897,7 @@ clauses });
         if (row && !this.authorize(resolvedCollection, rowToEntityForCheck(row, props.path), "select")) {
             return undefined;
         }
-        return row;
+        return row && stripUnreadable(row, resolvedCollection, this.viewer());
     }
 
     listenOne<M extends Record<string, any>>(props: ListenOneProps<M>): () => void {
@@ -916,10 +943,11 @@ values: props.values } as Entity;
             }
         }
 
-        return this.delegate.save({
+        const saved = await this.delegate.save({
             ...props,
             collection: resolvedCollection
         });
+        return stripUnreadable(saved, resolvedCollection, this.viewer());
     }
 
     async delete<M extends Record<string, any>>(props: DeleteProps<M>): Promise<void> {
@@ -952,6 +980,8 @@ collection: resolvedCollection });
 
     async count<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
+        const viewer = this.viewer();
+        assertQueryFieldsReadable(props, resolvedCollection, viewer);
         const rlsFilter = buildMongoFilterFromSecurityRules(resolvedCollection, this.user, "select");
         if (rlsFilter === null) {
             return 0;
@@ -963,7 +993,8 @@ collection: resolvedCollection });
             filter: props.filter,
             logical: props.logical,
             searchString: props.searchString,
-            properties: resolvedCollection?.properties
+            properties: resolvedCollection?.properties,
+            viewer
         });
 
         const combinedQuery = Object.keys(rlsFilter).length > 0
@@ -980,6 +1011,73 @@ collection: resolvedCollection });
     isReady(): boolean {
         return this.delegate.isReady();
     }
+}
+
+/**
+ * Drop every field `viewer` may not read — what the Postgres row pipeline's
+ * `stripUnreadable` does, applied where rows leave this driver for a caller.
+ *
+ * `excludeFromApi` needs no branch of its own: `restrictedFieldNames` reads it
+ * as `read: []`, which no caller satisfies. Deleted, never nulled — a withheld
+ * value that arrives as `null` is indistinguishable from a stored one, and an
+ * update that echoes the row back would overwrite the real value with it.
+ */
+function stripUnreadable(
+    row: Record<string, unknown>,
+    collection: CollectionConfig | undefined,
+    viewer: FieldViewer
+): Record<string, unknown> {
+    if (!collection) return row;
+    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    if (refused.size === 0) return row;
+    const visible = { ...row };
+    for (const name of refused) delete visible[name];
+    return visible;
+}
+
+/**
+ * Refuse a read that filters or sorts on a field the caller cannot read.
+ *
+ * The strip keeps the value off the wire; this keeps it from being read a bit
+ * at a time — `salary > 100000` returns exactly the rows whose withheld salary
+ * is above it, and a sort on it returns them in its order. REST refuses the
+ * same request before it reaches a driver; the socket and subscriptions reach
+ * this driver directly, so the rule is applied here too, in the same words.
+ */
+function assertQueryFieldsReadable(
+    props: Pick<FetchCollectionProps, "filter" | "logical" | "orderBy" | "order">,
+    collection: CollectionConfig | undefined,
+    viewer: FieldViewer
+): void {
+    if (!collection) return;
+    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    if (refused.size === 0) return;
+
+    const named = new Set<string>();
+    const consider = (field: unknown) => {
+        if (typeof field === "string" && refused.has(field)) named.add(field);
+    };
+    Object.keys(props.filter ?? {}).forEach(consider);
+    const walk = (logical: LogicalCondition | undefined) => {
+        for (const entry of logical?.conditions ?? []) {
+            if (entry && "conditions" in entry) walk(entry);
+            else consider(entry?.column);
+        }
+    };
+    walk(props.logical);
+    for (const key of normalizeDriverOrderBy(props.orderBy, props.order) ?? []) {
+        consider(Array.isArray(key) ? key[0] : key);
+    }
+    if (named.size === 0) return;
+
+    const fields = [...named];
+    throw ApiError.badRequest(
+        `${fields.map(f => `'${f}'`).join(", ")} ${fields.length > 1 ? "are" : "is"} not readable ` +
+        `on '${collection.slug}' with your roles, so ${fields.length > 1 ? "they" : "it"} cannot be used ` +
+        "to filter or sort.",
+        "FIELD_NOT_READABLE",
+        { collection: collection.slug, fields }
+    );
 }
 
 /**

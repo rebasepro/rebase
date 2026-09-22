@@ -4,8 +4,8 @@
  * Translates Rebase filter conditions to MongoDB query operators.
  */
 
-import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, OrderByTuple, WhereFilterOp } from "@rebasepro/types";
-import { normalizeDriverOrderBy, toFilterTuples } from "@rebasepro/common";
+import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, OrderByTuple, Property, WhereFilterOp } from "@rebasepro/types";
+import { canReadField, type FieldViewer, normalizeDriverOrderBy, toFilterTuples } from "@rebasepro/common";
 import { splitSearchTerms } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError, logger } from "@rebasepro/server";
@@ -185,6 +185,12 @@ export class MongoConditionBuilder {
      *
      * @param searchString - Text to search for
      * @param properties - The collection's properties, searched for string fields
+     * @param viewer - Who the search is for. A field they cannot read is not
+     *   one they may search: the strip keeps its value out of the response, and
+     *   without this the value is still recoverable a substring at a time by
+     *   watching which searches return the row. Absent is the trusted server
+     *   plane, which still does not search an `excludeFromApi` field — the same
+     *   answer the Postgres builder gives.
      * @returns At most one MongoDB filter — callers OR what they get back, which
      *   is right across fields and wrong across terms, so the AND is built here
      */
@@ -194,14 +200,20 @@ export class MongoConditionBuilder {
         // type is what let the `dataType` bug below survive: a caller — and,
         // more to the point, a test fixture — could invent any key it liked and
         // nothing checked it against a property a user can actually declare.
-        properties: CollectionConfig["properties"]
+        properties: CollectionConfig["properties"],
+        viewer?: FieldViewer
     ): Filter<Document>[] {
         if (!searchString) return [];
 
         // Build regex conditions for each searchable string property
         const searchableFields: string[] = [];
+        let withheldStringFields = 0;
 
         for (const [key, prop] of Object.entries(properties)) {
+            if (prop?.type === "string" && !canReadField(prop as Property, viewer)) {
+                withheldStringFields++;
+                continue;
+            }
             // `type`, not `dataType`. No property in `@rebasepro/types` has ever
             // had a `dataType` field — a real collection carries `type:
             // "string"` — so this matched nothing for every collection a user
@@ -215,6 +227,13 @@ export class MongoConditionBuilder {
             if (prop?.type === "string" || typeof prop === "string") {
                 searchableFields.push(key);
             }
+        }
+
+        // Every string field is one this caller may not read: nothing is left
+        // to search, and falling through to `$text` would search the index
+        // over exactly those fields.
+        if (searchableFields.length === 0 && withheldStringFields > 0) {
+            return [{ _id: { $exists: false } }];
         }
 
         // If no properties to search, use MongoDB text search
@@ -277,6 +296,8 @@ export class MongoConditionBuilder {
         logical?: LogicalCondition;
         searchString?: string;
         properties?: CollectionConfig["properties"];
+        /** Who the query is for — see {@link buildSearchConditions}. */
+        viewer?: FieldViewer;
     }): Filter<Document> {
         const conditions: Filter<Document>[] = [];
 
@@ -293,7 +314,8 @@ export class MongoConditionBuilder {
         if (options.searchString && options.properties) {
             const searchConditions = this.buildSearchConditions(
                 options.searchString,
-                options.properties
+                options.properties,
+                options.viewer
             );
             if (searchConditions.length > 0) {
                 // Search conditions are OR'd together
