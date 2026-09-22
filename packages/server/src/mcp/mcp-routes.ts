@@ -22,10 +22,14 @@
  */
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { createMiddleware } from "hono/factory";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types.js";
 import { logger } from "../utils/logger.js";
 import { verifyMcpAccessToken } from "../auth/jwt.js";
+import { createDataRateLimiter, type DataRateLimitConfig } from "../auth/rate-limiter.js";
+import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../deploy/pod-contract.js";
 import {
     canonicalResourceUri,
     bearerChallenge,
@@ -54,6 +58,18 @@ const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
 
+/**
+ * The most messages one JSON-RPC batch may carry.
+ *
+ * A batch is many tool calls behind one request: one body, one tick of the
+ * rate limiter, run one after another. Uncapped, a single POST was a thousand
+ * queries for the price of one. Twenty is far above what a client batches —
+ * the 2025-06-18 revision dropped batching altogether — and a batch over it is
+ * refused whole rather than truncated, so nothing runs that the client will
+ * not hear about.
+ */
+export const MAX_BATCH_MESSAGES = 20;
+
 export interface McpRoutesConfig {
     /** The externally reachable origin. */
     publicUrl: string;
@@ -66,6 +82,16 @@ export interface McpRoutesConfig {
     getCollections(): CollectionConfig[];
     /** The server's own name and version, for `initialize`. */
     serverInfo: { name: string; version: string };
+    /**
+     * The largest request body accepted, in bytes; `0` or less for none.
+     * Defaults to the server-wide limit. See {@link createMcpRoutes}.
+     */
+    maxBodySize?: number;
+    /**
+     * The data API's per-caller limits, or undefined when the deployment has
+     * rate limiting off. See {@link createMcpRoutes}.
+     */
+    rateLimit?: DataRateLimitConfig;
 }
 
 /**
@@ -100,10 +126,36 @@ export function createMcpWellKnownRoutes(config: McpRoutesConfig): Hono<HonoEnv>
     return wellKnown;
 }
 
-/** The MCP endpoint itself. */
+/** The caller a request was authenticated as, handed from the gate to the handler. */
+type McpCallerEnv = HonoEnv & { Variables: { mcpCaller: McpCaller } };
+
+/**
+ * The MCP endpoint itself.
+ *
+ * It carries its own body limit and rate limit because it is mounted at the
+ * origin, outside `basePath`, and the server-wide ones are registered on
+ * `${basePath}/*` — so neither ever saw it. The limit is the data API's, bucketed
+ * by the person the token acts for and shared with their other requests: one
+ * caller's budget, spent wherever they like.
+ */
 export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const canonicalResource = canonicalResourceUri(config.publicUrl, config.mcpPath);
+
+    const maxBodySize = config.maxBodySize ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
+    if (maxBodySize > 0) {
+        router.use("/*", bodyLimit({
+            maxSize: maxBodySize,
+            onError: (c) => c.json({
+                error: "payload_too_large",
+                error_description: `Request body too large. Maximum size is ${maxBodySize} bytes.`
+            }, 413)
+        }));
+    }
+
+    const rateLimited = config.rateLimit
+        ? createDataRateLimiter(config.rateLimit)
+        : createMiddleware<HonoEnv>((_c, next) => next());
 
     /**
      * Nothing is served without a token bound to THIS resource.
@@ -113,7 +165,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
      * into an authorization server, a registration endpoint and a consent
      * screen. Omitting it makes a protected server look like a broken one.
      */
-    async function authenticate(c: Context<HonoEnv>): Promise<McpCaller | Response> {
+    async function authenticate(c: Context<McpCallerEnv>): Promise<McpCaller | Response> {
         const header = c.req.header("authorization") ?? "";
         if (!header.toLowerCase().startsWith("bearer ")) {
             return c.json(
@@ -144,9 +196,26 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         };
     }
 
-    router.post("/", async (c) => {
+    /**
+     * The token gate, as middleware, so the rate limiter after it knows whom
+     * to count.
+     *
+     * The data limiter buckets a request by its `user`, and reads a bearer
+     * token itself only when it is a session token — which an MCP token is, by
+     * design, not. Left to that, every MCP caller is bucketed by address, and
+     * every person using a hosted client arrives from that client's few egress
+     * addresses: one busy session would spend everyone's allowance.
+     */
+    const authenticated = createMiddleware<McpCallerEnv>(async (c, next) => {
         const caller = await authenticate(c);
         if (caller instanceof Response) return caller;
+        c.set("mcpCaller", caller);
+        c.set("user", { uid: caller.uid, roles: caller.roles });
+        return next();
+    });
+
+    router.post("/", authenticated, rateLimited, async (c) => {
+        const caller = c.get("mcpCaller");
 
         let message: unknown;
         try {
@@ -158,6 +227,10 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         // A batch is a JSON array. Answering each in order and dropping the
         // notifications' empty slots is all a batch means here.
         if (Array.isArray(message)) {
+            if (message.length > MAX_BATCH_MESSAGES) {
+                return c.json(rpcError(null, INVALID_REQUEST,
+                    `A batch may carry at most ${MAX_BATCH_MESSAGES} messages; this one has ${message.length}.`), 400);
+            }
             const replies = [];
             for (const item of message) {
                 const reply = await dispatch(c, item, caller);
@@ -179,16 +252,13 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
      * is 405 with `Allow`, not an SSE stream that stays silent forever and
      * leaves the client waiting on a heartbeat that is not coming.
      */
-    router.get("/", async (c) => {
-        // Authenticated the same way POST is, not by the mere PRESENCE of a
-        // header. The first version checked only that `Authorization` was set,
-        // so an expired or forged token was answered 405 — telling an
-        // unauthenticated caller that the endpoint exists and what it accepts,
-        // and telling a client with a stale token "wrong method" instead of the
-        // challenge that would let it refresh.
-        const caller = await authenticate(c);
-        if (caller instanceof Response) return caller;
-
+    // Authenticated the same way POST is, not by the mere PRESENCE of a header.
+    // The first version checked only that `Authorization` was set, so an
+    // expired or forged token was answered 405 — telling an unauthenticated
+    // caller that the endpoint exists and what it accepts, and telling a client
+    // with a stale token "wrong method" instead of the challenge that would let
+    // it refresh.
+    router.get("/", authenticated, rateLimited, async (c) => {
         return c.json(
             { error: "method_not_allowed", error_description: "This server does not open server-initiated streams." },
             405,
@@ -200,7 +270,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     router.delete("/", (c) => c.body(null, 204));
 
     async function dispatch(
-        c: Context<HonoEnv>,
+        c: Context<McpCallerEnv>,
         message: unknown,
         caller: McpCaller
     ): Promise<Record<string, unknown> | null> {
@@ -270,7 +340,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     }
 
     async function callTool(
-        c: Context<HonoEnv>,
+        c: Context<McpCallerEnv>,
         id: string | number | null,
         params: Record<string, unknown> | undefined,
         caller: McpCaller

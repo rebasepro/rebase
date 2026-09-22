@@ -191,6 +191,11 @@ thief, so both lose.
   site can navigate a browser to.
 - **No server-initiated stream.** `GET /mcp` answers 405. Nothing here pushes
   messages, and an SSE stream that stays silent forever is worse than a refusal.
+- **`/mcp` has the data API's limits, per person.** It is mounted at the origin,
+  outside `basePath`, so it carries the server-wide body limit (`maxBodySize`)
+  and the data API's rate limit (`rateLimit`) itself, bucketed by the person the
+  token acts for and shared with their other requests. A JSON-RPC batch carries
+  at most 20 messages; a larger one is refused whole.
 - **Revocation cannot reach an issued access token.** See above.
 
 ## Where the tests are

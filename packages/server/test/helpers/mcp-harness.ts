@@ -25,6 +25,7 @@ import type {
     OAuthStore, OAuthClient, AuthorizationCodeRecord, RefreshTokenRecord
 } from "../../src/mcp/oauth-store";
 import type { McpGrantIdentity } from "../../src/mcp/oauth-routes";
+import type { DataRateLimitConfig } from "../../src/auth/rate-limiter";
 
 export const PUBLIC_URL = "https://talent.sustentalent.com";
 export const RESOURCE = "https://talent.sustentalent.com/mcp";
@@ -195,6 +196,8 @@ export interface HarnessOptions {
     driver?: DataDriver;
     collections?: CollectionConfig[];
     identity?: McpGrantIdentity;
+    maxBodySize?: number;
+    rateLimit?: DataRateLimitConfig;
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -207,7 +210,9 @@ export function buildApp(options: HarnessOptions = {}) {
         oauthBasePath: "/api/oauth",
         getDriver: () => driver,
         getCollections: () => options.collections ?? COLLECTIONS,
-        serverInfo: { name: "rebase", version: "test" }
+        serverInfo: { name: "rebase", version: "test" },
+        maxBodySize: options.maxBodySize,
+        rateLimit: options.rateLimit
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));

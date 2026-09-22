@@ -1972,7 +1972,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         serverInfo: {
                             name: "rebase",
                             version: readRuntimeVersion([process.cwd()]) ?? "unknown"
-                        }
+                        },
+                        // Mounted at the origin, outside `basePath`, so the
+                        // server-wide body limit and the data rate limiter do
+                        // not reach it; it carries both itself.
+                        maxBodySize: config.maxBodySize,
+                        rateLimit: rateLimitConfig
                     };
 
                     config.app.route("/", createMcpWellKnownRoutes(mcpConfig));

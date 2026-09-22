@@ -218,12 +218,33 @@ describe("JSON-RPC framing", () => {
         expect(res.status).toBe(202);
     });
 
-    it("survives a large batch without falling over", async () => {
+    it("answers a batch at the cap in full", async () => {
         const { app, accessToken } = await withToken();
-        const batch = Array.from({ length: 500 }, (_, i) => ({ jsonrpc: "2.0", id: i, method: "ping" }));
+        const batch = Array.from({ length: 20 }, (_, i) => ({ jsonrpc: "2.0", id: i, method: "ping" }));
         const res = await rpc(app, accessToken, batch);
         expect(res.status).toBe(200);
-        expect((await res.json() as unknown[]).length).toBe(500);
+        expect((await res.json() as unknown[]).length).toBe(20);
+    });
+
+    it("refuses a batch over the cap before running any of it", async () => {
+        // Every message in a batch is a tool call behind ONE request — one body,
+        // one tick of the rate limiter — and they run one after another. A
+        // thousand queries for the price of one is the amplification.
+        const { driver, calls } = stubDriver();
+        const { app } = buildApp({ driver });
+        const { accessToken } = await connectedClient(app);
+        const batch = Array.from({ length: 21 }, (_, i) => ({
+            jsonrpc: "2.0", id: i, method: "tools/call",
+            params: { name: "query_collection", arguments: { collection: "candidates" } }
+        }));
+
+        const res = await rpc(app, accessToken, batch);
+        expect(res.status).toBe(400);
+        const body = await res.json() as { id: unknown; error: { code: number; message: string } };
+        expect(body.id).toBeNull();
+        expect(body.error.code).toBe(-32600);
+        expect(body.error.message).toContain("at most 20");
+        expect(calls).toHaveLength(0);
     });
 
     it("answers an empty batch with 202 rather than an empty array", async () => {
@@ -497,6 +518,61 @@ describe("tool inputs", () => {
             const body = await res.json() as { error?: { message: string } };
             expect(body.error?.message ?? "").not.toMatch(/scope|Unknown tool/);
         }
+    });
+});
+
+/* ── The endpoint's own request limits ────────────────────────────── */
+
+describe("the endpoint carries its own body limit and rate limit", () => {
+    // `/mcp` is mounted at the origin, outside `basePath`, so the server-wide
+    // body limit and the data API's rate limiter — both registered on
+    // `${basePath}/*` — never saw it.
+
+    it("refuses a body over the limit, before reading it", async () => {
+        const { driver, calls } = stubDriver();
+        const { app } = buildApp({ driver, maxBodySize: 1024 });
+        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "create_document", arguments: { collection: "candidates", values: { name: "x".repeat(4096) } } }
+        });
+        expect(res.status).toBe(413);
+        expect(calls).toHaveLength(0);
+    });
+
+    it("has a body limit when none is configured", async () => {
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app);
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "ping", padding: "x".repeat(11 * 1024 * 1024)
+        });
+        expect(res.status).toBe(413);
+    });
+
+    it("limits each caller to the data API's allowance", async () => {
+        const { app } = buildApp({ rateLimit: { user: 2 } });
+        const { accessToken } = await connectedClient(app);
+        const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+
+        expect((await rpc(app, accessToken, ping)).status).toBe(200);
+        expect((await rpc(app, accessToken, ping)).status).toBe(200);
+        expect((await rpc(app, accessToken, ping)).status).toBe(429);
+    });
+
+    it("buckets by the person, not the address every hosted client shares", async () => {
+        // Every Claude.ai user of a deployment arrives from the same few egress
+        // addresses. Bucketed by IP — which is where an MCP token lands with a
+        // limiter that only recognises session tokens — one person's session
+        // would spend everyone's allowance.
+        const { app } = buildApp({ rateLimit: { user: 1, anonymous: 1 } });
+        const first = await connectedClient(app, { uid: "user-1" });
+        const second = await connectedClient(app, { uid: "user-2" });
+        const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+
+        expect((await rpc(app, first.accessToken, ping)).status).toBe(200);
+        expect((await rpc(app, first.accessToken, ping)).status).toBe(429);
+        expect((await rpc(app, second.accessToken, ping)).status).toBe(200);
     });
 });
 
