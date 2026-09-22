@@ -28,6 +28,12 @@ export function convertDataToEntity(authController: AuthController,
             if (mappedKey === null) {
                 return {};
             }
+            // A blank cell is a value nobody filled in, not an empty one: it
+            // sets nothing, so the default chosen for the property applies. An
+            // empty spreadsheet cell already arrives without a key.
+            if (value === "") {
+                return {};
+            }
 
             const mappedProperty = getPropertyInPath(properties, mappedKey);
             // `getPropertyInPath` answers `in`, so a `toString` column finds
@@ -112,6 +118,16 @@ export function processValueMapping(authController: AuthController, value: any, 
         return value;
     }
 
+    if (from === "string" && to === "array" && typeof value === "string") {
+        return processValueMapping(authController, splitListCell(value), navigation, usedProperty);
+    } else if (from === "string" && to === "boolean" && typeof value === "string") {
+        return readBooleanCell(value);
+    } else if (from === "array" && to === "string") {
+        // A CSV cell only arrives as an array when its text was the canonical
+        // JSON of one (`mapJsonParse`), so this is that text again.
+        return JSON.stringify(value);
+    }
+
     if (from === "array" && to === "array" && Array.isArray(value) && usedProperty.of && !Array.isArray(usedProperty.of) && !isPropertyBuilder(usedProperty.of)) {
         return value.map(v => processValueMapping(authController, v, navigation, usedProperty.of as Property));
     } else if (from === "string" && to === "number" && typeof value === "string") {
@@ -124,10 +140,6 @@ export function processValueMapping(authController: AuthController, value: any, 
         if (trimmed === "") return null;
         const num = Number(trimmed);
         return Number.isNaN(num) ? null : num;
-    } else if (from === "string" && to === "array" && typeof value === "string" && usedProperty.of && !Array.isArray(usedProperty.of) && !isPropertyBuilder(usedProperty.of)) {
-        return value.split(",").map((v: string) => processValueMapping(authController, v, navigation, usedProperty.of as Property));
-    } else if (from === "string" && to === "boolean") {
-        return value === "true";
     } else if (from === "number" && to === "boolean") {
         return value === 1;
     } else if (from === "boolean" && to === "number") {
@@ -136,8 +148,6 @@ export function processValueMapping(authController: AuthController, value: any, 
         return value ? "true" : "false";
     } else if (from === "number" && to === "string" && typeof value === "number") {
         return value.toString();
-    } else if (from === "string" && to === "array" && typeof value === "string") {
-        return value.split(",").map((v: string) => v.trim());
     } else if (from === "string" && to === "date" && typeof value === "string") {
         try {
             return new Date(value);
@@ -182,9 +192,41 @@ databaseId });
 
     } else if (from === to) {
         return value;
-    } else if (from === "array" && to === "string" && Array.isArray(value)) {
-        return value.join(",");
     }
 
     return value;
+}
+
+/**
+ * The items of a list cell: a JSON array as written (the export writes lists
+ * that way), otherwise the text split on commas. Each item is trimmed and an
+ * empty one dropped, so `news, sports` is two tags rather than one with a
+ * leading space, and a blank cell is no tags rather than one empty tag.
+ */
+function splitListCell(cell: string): unknown[] {
+    const trimmed = cell.trim();
+    if (trimmed.startsWith("[")) {
+        try {
+            const parsed: unknown = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+            // Not JSON after all: a list that happens to start with a bracket.
+        }
+    }
+    return trimmed.split(",")
+        .map(item => item.trim())
+        .filter(item => item !== "");
+}
+
+/**
+ * A boolean cell as spreadsheets and people write it: Excel and Sheets export
+ * `TRUE`/`FALSE`, and `yes`/`no` and `1`/`0` are common by hand. Anything
+ * unreadable is absent — `null`, as a number cell is — rather than a confident
+ * `false`.
+ */
+function readBooleanCell(cell: string): boolean | null {
+    const normalised = cell.trim().toLowerCase();
+    if (["true", "1", "yes"].includes(normalised)) return true;
+    if (["false", "0", "no"].includes(normalised)) return false;
+    return null;
 }

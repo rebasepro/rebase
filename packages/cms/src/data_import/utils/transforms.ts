@@ -52,6 +52,32 @@ export function unflattenObject(flatObj: { [key: string]: any }) {
     }, {} as { [key: string]: any });
 }
 
+/**
+ * Read a text cell as the number, boolean or array it spells, when it spells
+ * one exactly — so the type inference sees `12`, `true` and the export's
+ * `["a","b"]` for what they are.
+ *
+ * Only a cell that is the canonical JSON of its value is read: `JSON.stringify`
+ * of the result must give back the cell's text. That makes the read lossless,
+ * and the import coerces each value against the property it lands in only
+ * later — a string property turns it back into exactly the text in the file.
+ * Anything else stays the text it was: `1.10`, `00123`, `1E3`, a twenty-digit
+ * SKU that a double cannot hold, the word `null`, and a cell with quotes in it.
+ * So does an object: the import flattens objects into `a.b` columns, which
+ * would scatter a string property's JSON text into columns that do not exist.
+ */
+function parseCanonicalJsonCell(cell: unknown): unknown {
+    if (typeof cell !== "string") return cell;
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(cell);
+    } catch (e) {
+        return cell;
+    }
+    const readable = typeof parsed === "number" || typeof parsed === "boolean" || Array.isArray(parsed);
+    return readable && JSON.stringify(parsed) === cell ? parsed : cell;
+}
+
 export function mapJsonParse(obj: Record<string, any>) {
     return Object.keys(obj).reduce((acc: Record<string, any>, key) => {
         // Same header row, same setter: `acc["__proto__"] = value` replaces the
@@ -60,11 +86,7 @@ export function mapJsonParse(obj: Record<string, any>) {
             console.warn(`Skipping column "${key}": a header may not reach the prototype chain`);
             return acc;
         }
-        try {
-            acc[key] = JSON.parse(obj[key]);
-        } catch (e) {
-            acc[key] = obj[key];
-        }
+        acc[key] = parseCanonicalJsonCell(obj[key]);
         return acc;
     }, {});
 }
