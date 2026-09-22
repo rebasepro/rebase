@@ -600,6 +600,29 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             return c.json({ error: "invalid_grant", error_description: "Refresh token was not issued to this client." }, 400);
         }
 
+        // A refresh may narrow the scope but never widen it (RFC 6749 §6). The
+        // intersection is taken rather than refusing, so a client repeating its
+        // original request keeps working.
+        const held = new Set(record.scope.split(" ").filter(Boolean));
+        let scope = record.scope;
+        if (form.scope) {
+            const asked = narrowScope(String(form.scope)).split(" ").filter(Boolean);
+            const granted = asked.filter(s => held.has(s));
+            // An empty intersection must NOT fall back to the held scope. The
+            // first version of this line ended `|| record.scope`, which meant a
+            // client holding `mcp:write` and asking for `mcp:read` was handed
+            // `mcp:write` — a refresh that WIDENS the grant, which is precisely
+            // what RFC 6749 §6 forbids. Asking for nothing you hold is a bad
+            // request, not a request for everything.
+            if (granted.length === 0) {
+                return c.json({
+                    error: "invalid_scope",
+                    error_description: "The requested scope is not a subset of the scope originally granted."
+                }, 400);
+            }
+            scope = granted.join(" ");
+        }
+
         // "Sign out everywhere" and every password change stamp a watermark
         // on the account; a refresh token minted before it is void, as a
         // session's is. The whole family goes, not just this token.
@@ -629,29 +652,6 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         // racing this one between the read and here loses, and the store
         // treats the loser as the replay it is.
         if (!await store.consumeRefreshToken(presented)) return invalid();
-
-        // A refresh may narrow the scope but never widen it (RFC 6749 §6). The
-        // intersection is taken rather than refusing, so a client repeating its
-        // original request keeps working.
-        const held = new Set(record.scope.split(" ").filter(Boolean));
-        let scope = record.scope;
-        if (form.scope) {
-            const asked = narrowScope(String(form.scope)).split(" ").filter(Boolean);
-            const granted = asked.filter(s => held.has(s));
-            // An empty intersection must NOT fall back to the held scope. The
-            // first version of this line ended `|| record.scope`, which meant a
-            // client holding `mcp:write` and asking for `mcp:read` was handed
-            // `mcp:write` — a refresh that WIDENS the grant, which is precisely
-            // what RFC 6749 §6 forbids. Asking for nothing you hold is a bad
-            // request, not a request for everything.
-            if (granted.length === 0) {
-                return c.json({
-                    error: "invalid_scope",
-                    error_description: "The requested scope is not a subset of the scope originally granted."
-                }, 400);
-            }
-            scope = granted.join(" ");
-        }
 
         // The account's roles as they are now — see `rolesNow`. A demotion
         // reaches the grant at its next refresh, within one access-token

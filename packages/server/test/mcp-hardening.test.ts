@@ -1019,6 +1019,20 @@ describe("a refresh can narrow the grant but never widen it", () => {
         expect((await res.json() as { error: string }).error).toBe("invalid_scope");
     });
 
+    it("leaves the refresh token unspent when it refuses the scope", async () => {
+        // The refusal used to come after the token was spent. The grant was then
+        // dead, and the client's retry with the same token — the only one it
+        // holds — read as a replay and revoked the whole family.
+        const { app } = buildApp();
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read" });
+
+        expect((await refreshWith(app, clientId, refreshToken, { scope: "mcp:write" })).status).toBe(400);
+
+        const retried = await refreshWith(app, clientId, refreshToken);
+        expect(retried.status).toBe(200);
+        expect((await retried.json() as { scope: string }).scope).toBe("mcp:read");
+    });
+
     it("narrows to the intersection when one is asked for", async () => {
         const { app } = buildApp();
         const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
