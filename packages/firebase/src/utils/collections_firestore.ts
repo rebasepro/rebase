@@ -25,8 +25,12 @@ export const docsToCollectionTree = (docs: DocumentSnapshot[]): CollectionConfig
         if (id.includes(COLLECTION_PATH_SEPARATOR)) {
             const parentId = id.split(COLLECTION_PATH_SEPARATOR).slice(0, -1).join(COLLECTION_PATH_SEPARATOR);
             const parentCollection = collectionsMap[parentId];
-            if (parentCollection)
-                (parentCollection as FirebaseCollectionConfig).subcollections = () => [...((parentCollection as FirebaseCollectionConfig).subcollections?.() ?? []), collection];
+            if (parentCollection) {
+                // Captured now: read inside the thunk, `subcollections` is by
+                // then this very thunk, and calling it recursed without end.
+                const siblings = (parentCollection as FirebaseCollectionConfig).subcollections;
+                (parentCollection as FirebaseCollectionConfig).subcollections = () => [...(siblings?.() ?? []), collection];
+            }
             delete collectionsMap[id];
         }
     });
