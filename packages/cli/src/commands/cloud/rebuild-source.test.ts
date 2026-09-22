@@ -64,7 +64,18 @@ describe("neverUploaded", () => {
         ".git/config",
         "sub/.git/HEAD",
         "dist-bundle/manifest.json",
-        "dist-bundle-admin/index.html"
+        "dist-bundle-admin/index.html",
+        // A database dump carries every row, password hashes included.
+        "backups/prod-2026.dump",
+        "exports/nightly.dump",
+        // The CLI's own per-machine state: the development database lives in
+        // `.rebase/`, and `.rebase-dev-secrets.json` is the dev signing keys.
+        ".rebase/pgdata/base/1/1259",
+        ".rebase/cloud.json",
+        ".rebase-dev-secrets.json",
+        "backend/.rebase-dev-secrets.json",
+        ".rebase-dev-url",
+        ".rebase-dev-port"
     ])("never uploads %s", (relative) => {
         expect(neverUploaded(relative)).toBe(true);
     });
@@ -78,7 +89,10 @@ describe("neverUploaded", () => {
         "dist/app.js",
         "frontend/src/env.ts",
         "docs/.environment.md",
-        ".github/workflows/ci.yml"
+        ".github/workflows/ci.yml",
+        "src/features/backups/BackupList.tsx",
+        "docs/dump-format.md",
+        ".rebaserc"
     ])("uploads %s", (relative) => {
         expect(neverUploaded(relative)).toBe(false);
     });
@@ -122,6 +136,116 @@ describe("listSourceFiles outside a repository", () => {
     });
 });
 
+/**
+ * A scaffold made without `git init` — `rebase init --yes` makes one — still
+ * carries the stock `.gitignore`, and that file is the only statement of what is
+ * not source. The walk used to read none of it, so `backups/*.dump` (every row,
+ * password hashes included), `uploads/` and the dev secrets all went up.
+ */
+describe("listSourceFiles outside a repository, with ignore files", () => {
+    const scaffoldGitignore = path.resolve(__dirname, "../../../templates/template/gitignore");
+
+    it("leaves out everything the scaffold's .gitignore names", () => {
+        write(".gitignore", fs.readFileSync(scaffoldGitignore, "utf8"));
+        for (const file of [
+            "rebase.json",
+            "backend/src/index.ts",
+            "frontend/src/main.tsx",
+            // Ignored by the scaffold's .gitignore:
+            "backups/prod-2026.dump",
+            "backups/prod-2026.globals.sql",
+            "uploads/avatar.png",
+            "generated/sdk.ts",
+            "build/out.js",
+            ".idea/workspace.xml",
+            "drizzle/meta/_journal.json",
+            ".rebase-dev-url"
+        ]) write(file);
+
+        const listing = listSourceFiles(scratch);
+
+        expect(listing).toEqual({
+            root: scratch,
+            projectPath: "",
+            fromGit: false,
+            files: [".gitignore", "backend/src/index.ts", "frontend/src/main.tsx", "rebase.json"]
+        });
+    });
+
+    it("reads a nested .gitignore and a negation the way git does", () => {
+        write(".gitignore", "*.log\n!keep.log\n");
+        write("backend/.gitignore", "fixtures/\n");
+        for (const file of ["a.log", "keep.log", "backend/src/index.ts", "backend/fixtures/customers.csv", "frontend/fixtures/ok.json"]) write(file);
+
+        expect(listSourceFiles(scratch).files).toEqual([
+            ".gitignore",
+            "backend/.gitignore",
+            "backend/src/index.ts",
+            "frontend/fixtures/ok.json",
+            "keep.log"
+        ]);
+    });
+
+    it("still skips what is never source when nothing is ignored", () => {
+        for (const file of ["src/index.ts", "node_modules/hono/index.js", "dist/app.js", "coverage/lcov.info", ".env"]) write(file);
+        expect(listSourceFiles(scratch).files).toEqual(["src/index.ts"]);
+    });
+
+    it("carries a repository nested in the walked directory", () => {
+        write("src/index.ts");
+        const nested = path.join(scratch, "frontend");
+        fs.mkdirSync(nested);
+        git(nested, "init", "-q");
+        write("frontend/.gitignore", "dist/\n");
+        write("frontend/src/main.tsx");
+        write("frontend/dist/app.js");
+
+        expect(listSourceFiles(scratch).files).toEqual([
+            "frontend/.gitignore",
+            "frontend/src/main.tsx",
+            "src/index.ts"
+        ]);
+    });
+
+    it("refuses to walk past an ignore file it has no git to read", () => {
+        write(".gitignore", "uploads/\n");
+        write("uploads/avatar.png");
+        write("src/index.ts");
+
+        expect(() => listSourceFiles(scratch, notARepository)).toThrow(/\.gitignore.*git/);
+    });
+});
+
+/**
+ * A project inside a repository that ignores it, with no repository of its own:
+ * `~/work/company-repo/tmp/my-app` where the company repository ignores `tmp/`.
+ * Git's listing of that repository holds none of the project, and uploading it
+ * sent the company's files under a project path absent from the archive.
+ */
+describe("listSourceFiles in a repository that ignores the project", () => {
+    beforeEach(() => {
+        git(scratch, "init", "-q");
+        write(".gitignore", "tmp/\n");
+        write("src/internal.ts", "export const secret = 1;");
+        git(scratch, "add", "-A");
+        write("tmp/my-app/rebase.json", "{}");
+        write("tmp/my-app/backend/src/index.ts");
+        write("tmp/my-app/.gitignore", "uploads/\n");
+        write("tmp/my-app/uploads/avatar.png");
+    });
+
+    it("lists the project, walked with its own ignores, and none of the repository around it", () => {
+        const project = path.join(scratch, "tmp", "my-app");
+
+        expect(listSourceFiles(project)).toEqual({
+            root: project,
+            projectPath: "",
+            fromGit: false,
+            files: [".gitignore", "backend/src/index.ts", "rebase.json"]
+        });
+    });
+});
+
 describe("listSourceFiles in a repository", () => {
     beforeEach(() => {
         git(scratch, "init", "-q");
@@ -157,6 +281,16 @@ describe("listSourceFiles in a repository", () => {
             "app/rebase.json",
             "packages/editor/src/index.ts"
         ]);
+    });
+
+    it("keeps a committed dev secret and dump out, whatever git tracks", () => {
+        write("app/backend/.rebase-dev-secrets.json", "{}");
+        write("app/seed.dump", "PGDMP");
+        git(scratch, "add", "-A");
+
+        const listing = listSourceFiles(path.join(scratch, "app"));
+        expect(listing.files).not.toContain("app/backend/.rebase-dev-secrets.json");
+        expect(listing.files).not.toContain("app/seed.dump");
     });
 
     it("keeps a committed .env out, whatever git tracks", () => {

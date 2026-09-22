@@ -15,7 +15,8 @@
  *    the developer considers source: `.gitignore` honoured the way git honours
  *    it, and a sibling package the project links (`link:../../packages/editor`)
  *    included, because it is outside the project directory but inside the
- *    repository.
+ *    repository. Outside a repository — or inside one that ignores the project —
+ *    the project is walked, and its `.gitignore` files still decide.
  *  - **Secrets never leave the machine, whatever git says.** A committed `.env`
  *    is still a `.env`. {@link neverUploaded} is applied after git, not instead
  *    of it.
@@ -50,20 +51,33 @@ const ENV_TEMPLATES = new Set([".env.example", ".env.sample", ".env.template"]);
  * bundles are never source. Every `.env` and `.env.*` is excluded except the
  * three template names, and so is direnv's `.envrc`, which is the same thing
  * under another name.
+ *
+ * So is what the CLI keeps on this machine: `.rebase/`, which holds the
+ * development database, and the `.rebase-dev-*` files beside it, one of which
+ * is the development signing secrets. And so is a `*.dump`, which is what
+ * `rebase db backup` writes: every row of the database, `rebase.users`
+ * password hashes included.
  */
 export function neverUploaded(relativePath: string): boolean {
     const segments = relativePath.split("/");
-    if (segments.some(segment => segment === "node_modules" || segment === ".git" || segment.startsWith("dist-bundle"))) {
+    if (segments.some(segment =>
+        segment === "node_modules" || segment === ".git" || segment === ".rebase" || segment.startsWith("dist-bundle"))) {
         return true;
     }
     const base = segments[segments.length - 1];
-    if (base === ".envrc") return true;
+    if (base === ".envrc" || base.startsWith(".rebase-dev-") || base.endsWith(".dump")) return true;
     if ((base === ".env" || base.startsWith(".env.")) && !ENV_TEMPLATES.has(base)) return true;
     return false;
 }
 
 /** Directories the walk outside a repository never enters. */
 const WALK_SKIP = new Set(["node_modules", ".git", ".rebase", ".turbo", ".next", "coverage"]);
+
+/** The same directories as `ls-files` excludes, plus every `dist*` build directory. */
+const WALK_EXCLUDES = [...[...WALK_SKIP].map(name => `--exclude=${name}/`), "--exclude=dist*/"];
+
+/** The file that says what a directory's source is not, which a walk has to honour. */
+const IGNORE_FILE = ".gitignore";
 
 export interface SourceListing {
     /** The directory the archive is rooted at: the repository's top level, or the project root. */
@@ -108,9 +122,38 @@ interface SourceUnit {
     fromGit: boolean;
 }
 
+/** Split `-z` output into its entries. */
+function nulSeparated(output: string): string[] {
+    return [...new Set(output.split("\0").filter(Boolean))];
+}
+
+/**
+ * Run `fn` with the git directory of a throwaway, empty repository.
+ *
+ * `git ls-files` reads `.gitignore` files only inside a repository. Pointed at
+ * an empty one with `--git-dir`, and at a directory with `--work-tree`, it lists
+ * that directory's files the way git would — nested ignore files, negations and
+ * the user's global excludes included — without the directory being a
+ * repository, or `git init` touching it.
+ */
+function withScratchRepository<T>(git: GitRunner, fn: (gitDir: string) => T): T {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-ignore-"));
+    try {
+        git(scratch, ["init", "-q"]);
+        return fn(path.join(scratch, ".git"));
+    } finally {
+        fs.rmSync(scratch, { recursive: true, force: true });
+    }
+}
+
 /**
  * The files of the repository `dir` belongs to — tracked and unignored, the way
- * git sees them — or, outside any repository, `dir` walked with fixed excludes.
+ * git sees them — or, when no repository holds it, `dir` walked.
+ *
+ * A repository that lists nothing under `dir` does not hold it: a project in a
+ * directory the surrounding repository ignores (`tmp/my-app` under a repository
+ * ignoring `tmp/`) has no repository of its own. Uploading that repository sent
+ * everything except the project, so the project is walked instead.
  */
 function listUnit(dir: string, git: GitRunner): SourceUnit {
     try {
@@ -122,14 +165,62 @@ function listUnit(dir: string, git: GitRunner): SourceUnit {
             // and a file deleted from the working tree but still in the index;
             // the set and the disk check take care of both. Submodules and
             // symlinks are listed too, and are not regular files.
-            const files = [...new Set(listed.split("\0").filter(Boolean))]
+            const files = nulSeparated(listed)
                 .filter(relative => !neverUploaded(relative) && isRegularFile(path.join(root, relative)));
-            return { root, files, fromGit: true };
+            const inside = toPosix(path.relative(root, dir));
+            if (inside === "" || files.some(file => file.startsWith(`${inside}/`))) {
+                return { root, files, fromGit: true };
+            }
         }
     } catch {
         // Not a repository, no git, or git refusing the directory: the walk.
     }
+    return { root: dir, files: walkFiles(dir, git), fromGit: false };
+}
 
+/**
+ * `dir`'s files, walked, with its `.gitignore` files honoured.
+ *
+ * A scaffold made without `git init` still carries the stock `.gitignore`, and
+ * it is the only statement of what in the directory is not source: `backups/`
+ * with its database dumps, `uploads/` with the users' files. Git reads it,
+ * through a throwaway repository (see {@link withScratchRepository}); a
+ * repository nested in `dir` lists as one directory entry, and is listed as the
+ * repository it is.
+ *
+ * Without git the walk has fixed excludes alone, and those cannot read an
+ * ignore file. So a directory holding one is refused rather than walked past
+ * it — the developer wrote down what must stay on this machine.
+ */
+function walkFiles(dir: string, git: GitRunner): string[] {
+    let listed: string[];
+    try {
+        listed = withScratchRepository(git, gitDir => nulSeparated(git(dir, [
+            `--git-dir=${gitDir}`,
+            `--work-tree=${dir}`,
+            "ls-files", "-z", "--others", "--exclude-standard", ...WALK_EXCLUDES
+        ])));
+    } catch {
+        return walkWithoutGit(dir);
+    }
+
+    const files: string[] = [];
+    for (const relative of listed) {
+        if (relative.endsWith("/")) {
+            // A repository of its own inside the walked directory.
+            const nested = listUnit(path.join(dir, relative), git);
+            const prefix = toPosix(path.relative(dir, nested.root));
+            if (prefix.startsWith("..") || path.isAbsolute(prefix)) continue;
+            for (const file of nested.files) files.push(prefix ? `${prefix}/${file}` : file);
+        } else if (!neverUploaded(relative) && isRegularFile(path.join(dir, relative))) {
+            files.push(relative);
+        }
+    }
+    return files;
+}
+
+/** The walk with fixed excludes, for a machine with no git. Refuses a tree with an ignore file in it. */
+function walkWithoutGit(dir: string): string[] {
     const files: string[] = [];
     const walk = (current: string, prefix: string): void => {
         let entries: fs.Dirent[];
@@ -143,13 +234,17 @@ function listUnit(dir: string, git: GitRunner): SourceUnit {
             if (entry.isDirectory()) {
                 if (WALK_SKIP.has(entry.name) || entry.name.startsWith("dist")) continue;
                 walk(path.join(current, entry.name), relative);
+            } else if (entry.isFile() && entry.name === IGNORE_FILE) {
+                throw new Error(
+                    `${relative} says what is not source, and reading it takes git, which is not available here`
+                );
             } else if (entry.isFile() && !neverUploaded(relative)) {
                 files.push(relative);
             }
         }
     };
     walk(dir, "");
-    return { root: dir, files, fromGit: false };
+    return files;
 }
 
 /** Whether `candidate` is `dir` or inside it. */
