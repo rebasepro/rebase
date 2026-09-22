@@ -26,6 +26,66 @@ function read(root, rel) {
 }
 
 /**
+ * The `case "x":` labels of every `switch (<variable>)` in a file, each with
+ * the source of its body — those switches' own labels, at their own depth,
+ * and no nested switch's.
+ *
+ * Collecting every `case` in a file is what this replaced, and a command
+ * module has more than one switch: `apps.ts` also switches on `app.type`, and
+ * `cloud/index.ts` dispatches `cloud projects list` in a second function. So
+ * `rebase apps backend` and `rebase cloud list` read as subcommands, and a doc
+ * telling a reader to run them passed while both exit 1.
+ *
+ * @returns {Map<string, string>|null} label → body, or null when there is no such switch
+ */
+export function switchCases(source, variable) {
+    const opener = new RegExp(`\\bswitch\\s*\\(\\s*${variable.replace(/\./g, "\\.")}\\s*\\)\\s*\\{`, "g");
+    const label = /case\s+"([a-z][a-z0-9-]*)"\s*:/y;
+    const cases = new Map();
+    for (const open of source.matchAll(opener)) {
+        /** @type {{ name: string, start: number }[]} */
+        const labels = [];
+        let depth = 1;
+        let i = open.index + open[0].length;
+        for (; i < source.length && depth > 0; i++) {
+            const ch = source[i];
+            if (depth === 1 && ch === "c" && !/[\w$]/.test(source[i - 1] ?? "")) {
+                label.lastIndex = i;
+                const m = label.exec(source);
+                if (m) {
+                    labels.push({ name: m[1], start: label.lastIndex });
+                    i = label.lastIndex - 1;
+                    continue;
+                }
+            }
+            // Comments and strings can hold a brace; neither opens a block.
+            if (ch === "/" && source[i + 1] === "/") {
+                while (i < source.length && source[i] !== "\n") i++;
+                continue;
+            }
+            if (ch === "/" && source[i + 1] === "*") {
+                const close = source.indexOf("*/", i + 2);
+                if (close < 0) break;
+                i = close + 1;
+                continue;
+            }
+            if (ch === "\"" || ch === "'" || ch === "`") {
+                for (i++; i < source.length && source[i] !== ch; i++) if (source[i] === "\\") i++;
+                continue;
+            }
+            if (ch === "{") depth++;
+            else if (ch === "}") depth--;
+        }
+        const end = i;
+        labels.forEach(({ name, start }, n) => {
+            const body = source.slice(start, labels[n + 1]?.start ?? end);
+            cases.set(name, cases.has(name) ? `${cases.get(name)}\n${body}` : body);
+        });
+    }
+    return cases.size ? cases : null;
+}
+
+/**
  * @returns {{ top: Set<string>, sub: Map<string, Set<string>|null> }}
  *   A command whose module exposes no dispatch table gets `null`, meaning "top
  *   level is known, subcommands are not checked" — better than inventing a list.
@@ -39,10 +99,10 @@ export function loadCliCommands(root) {
     // Commands that take no subcommand still have to be recognised at the top.
     for (const name of ["init", "dev", "build", "start", "doctor", "eject", "generate-sdk"]) top.add(name);
 
-    /** `case "x":` — how the CLI's own command modules dispatch. */
-    const cases = source => {
-        const found = [...source.matchAll(/case\s+"([a-z][a-z0-9-]*)"\s*:/g)].map(m => m[1]);
-        return found.length ? new Set(found) : null;
+    /** The labels of one dispatch switch, as a set. */
+    const cases = (source, variable) => {
+        const found = switchCases(source, variable);
+        return found ? new Set(found.keys()) : null;
     };
 
     // …and so does `cli.ts` itself. `namespacedCommands` is the list of
@@ -50,15 +110,22 @@ export function loadCliCommands(root) {
     // `normalize-imports` dispatches, is in the global help, and is in neither
     // it nor the list above, so the npm README's command table was reported as
     // naming a command that "exits 1" when it runs fine.
-    for (const name of cases(cli) ?? []) top.add(name);
+    for (const name of cases(cli, "command") ?? []) top.add(name);
 
-    const sub = new Map([
-        ["auth", cases(read(root, "packages/cli/src/commands/auth.ts"))],
-        ["skills", cases(read(root, "packages/cli/src/commands/skills.ts"))],
-        ["api-keys", cases(read(root, "packages/cli/src/commands/api-keys.ts"))],
-        ["apps", cases(read(root, "packages/cli/src/commands/apps.ts"))],
-        ["cloud", cases(read(root, "packages/cli/src/commands/cloud/index.ts"))]
-    ]);
+    // Every command module that dispatches on its subcommand, found rather
+    // than listed: `telemetry` switches on one too, and a hand-written list of
+    // five had left it out, so `rebase telemetry frobnicate` passed.
+    /** @type {Map<string, Set<string>|null>} */
+    const sub = new Map();
+    for (const rel of globSync("packages/cli/src/commands/*.ts", { cwd: root })) {
+        const base = path.basename(rel, ".ts");
+        if (base.endsWith(".test")) continue;
+        const found = cases(read(root, rel), "subcommand");
+        if (found) sub.set(base.replace(/_/g, "-"), found);
+    }
+    // `cloud` names its first word a group, and dispatches each group's own
+    // actions in functions of their own, below the switch.
+    sub.set("cloud", cases(read(root, "packages/cli/src/commands/cloud/index.ts"), "group"));
 
     // `schema` and `db` do not dispatch themselves — they hand rawArgs to the
     // active database driver, so the real subcommand list lives there. `schema`
@@ -164,11 +231,13 @@ export function loadCliFlags(root) {
         argSpecs(source).flatMap(spec => [...spec.matchAll(/"(-{1,2}[A-Za-z][\w-]*)"\s*:/g)].map(m => m[1]));
 
     const flags = new Map();
+    // A spec that declares no flags is still a spec: `rebase telemetry` parses
+    // strictly with `spec: {}`, so it accepts none. Registering nothing for it
+    // left the command "not flag-checked", and every flag a doc gave it passed.
     const add = (command, source) => {
-        const found = keys(source);
-        if (!found.length) return;
+        if (argSpecs(source).length === 0) return;
         const set = flags.get(command) ?? new Set();
-        for (const f of found) set.add(f);
+        for (const f of keys(source)) set.add(f);
         flags.set(command, set);
     };
 
@@ -185,6 +254,14 @@ export function loadCliFlags(root) {
     for (const rel of globSync("packages/cli/src/commands/cloud/*.ts", { cwd: root })) {
         if (path.basename(rel).endsWith(".test.ts")) continue;
         add("cloud", read(root, rel));
+    }
+
+    // Commands `cli.ts` parses in its own dispatch, with no module of their
+    // own to read: `generate-sdk`'s strict spec is written inline in its
+    // `case`, so `rebase generate-sdk --ouput ./sdk` — the typo that spec
+    // exists to reject — passed here.
+    for (const [command, body] of switchCases(read(root, "packages/cli/src/cli.ts"), "command") ?? []) {
+        add(command, body);
     }
 
     const driver = read(root, "packages/server-postgres/src/cli.ts");

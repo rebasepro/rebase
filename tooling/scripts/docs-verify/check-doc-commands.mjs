@@ -163,10 +163,18 @@ function* invocations(text) {
         if (found) yield found;
     }
 
-    // Whole lines — how a fenced block writes a command.
+    // Whole lines — how a fenced block writes a command. Inside a fence the
+    // indentation is the list item's, not part of the command: a fence under
+    // `1. Deploy:` is indented three spaces, and reading its lines as written
+    // meant no command in one was ever checked.
     let offset = 0;
+    let fence = null;
     for (const line of text.split("\n")) {
-        const withoutComment = line.replace(/\s+#.*$/, "");
+        const marker = /^\s*(`{3,}|~{3,})/.exec(line);
+        if (marker && fence === null) fence = marker[1];
+        else if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = null;
+        const body = fence !== null && !marker ? line.replace(/^\s+/, "") : line;
+        const withoutComment = body.replace(/\s+#.*$/, "");
         const found = parse(withoutComment, offset);
         if (found) yield found;
         offset += line.length + 1;
