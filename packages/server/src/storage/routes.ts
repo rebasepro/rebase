@@ -33,7 +33,8 @@ import {
     canonicalKeyOrBadRequest,
     canonicalBucketOrBadRequest,
     servedBucketOrRefuse,
-    writableBucketOrRefuse
+    writableBucketOrRefuse,
+    noDefaultStorageSourceError
 } from "./request-keys";
 import { compileStorageTriggers, triggerUser, type StorageTrigger, type StorageTriggerDispatcher } from "./triggers";
 import {
@@ -471,6 +472,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
     const resolveController = (storageId?: string | null): StorageController => {
         if (registry) {
+            if (canonicalStorageId(storageId) === DEFAULT_STORAGE_SOURCE_KEY && !registry.has(DEFAULT_STORAGE_SOURCE_KEY)) {
+                throw noDefaultStorageSourceError(registry.list());
+            }
             try {
                 return registry.getOrDefault(storageId);
             } catch (err) {
@@ -496,12 +500,17 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     /** The storage sources a bucket refusal names, so it says where a second store lives. */
     const sourceKeys = (): string[] => registry ? registry.list() : [DEFAULT_STORAGE_SOURCE_KEY];
 
-    /** Get the default controller (used for TUS and base-path derivation). */
-    const getDefaultController = (): StorageController => {
-        if (registry) return registry.getDefault();
-        if (controller) return controller;
+    if (!registry && !controller) {
         throw new Error("No storage controller or registry available");
-    };
+    }
+
+    /**
+     * The default source's controller, when this deployment has one (used for
+     * TUS and base-path derivation). A registry may lack it — production drops
+     * a `local` default and keeps the named buckets — and the routes still
+     * serve those; only a request that names no source is refused.
+     */
+    const defaultCtrl: StorageController | undefined = registry ? registry.get(DEFAULT_STORAGE_SOURCE_KEY) : controller;
 
     // ── Auth middleware selection ────────────────────────────────────────
     // When an AuthAdapter is available, delegate token verification to it
@@ -1047,8 +1056,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     // TUS Resumable Uploads
     // -----------------------------------------------------------------------
 
-    const defaultCtrl = getDefaultController();
-    const tusBaseDir = defaultCtrl.getType() === "local"
+    const tusBaseDir = defaultCtrl?.getType() === "local"
         ? (defaultCtrl as LocalStorageController).getBasePath()
         : (process.env.STORAGE_PATH || "./uploads");
     const tusHandler = new TusHandler(
@@ -1123,7 +1131,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         } else {
             byKey.set(DEFAULT_STORAGE_SOURCE_KEY, {
                 key: DEFAULT_STORAGE_SOURCE_KEY,
-                engine: defaultCtrl.getType(),
+                engine: defaultCtrl?.getType() ?? "unknown",
                 transport: "server",
             });
         }

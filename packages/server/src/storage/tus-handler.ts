@@ -20,7 +20,12 @@ import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
 import { triggerUser } from "./triggers";
 import { canonicalStorageId } from "./keys";
-import { canonicalKeyOrBadRequest, canonicalBucketOrBadRequest, writableBucketOrRefuse } from "./request-keys";
+import {
+    canonicalKeyOrBadRequest,
+    canonicalBucketOrBadRequest,
+    writableBucketOrRefuse,
+    noDefaultStorageSourceError
+} from "./request-keys";
 import {
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
@@ -289,6 +294,16 @@ export class TusHandler {
         // `finalize` has always used — now the hook is asked about it too.
         const bucket = canonicalBucketOrBadRequest(metadata.bucket);
         const storageId = metadata.storageId || c.req.query("storageId") || undefined;
+
+        // No source named, and no default one to write to: refused per request,
+        // as `POST /upload` refuses it, rather than after every byte is in.
+        if (
+            this.storageRegistry &&
+            canonicalStorageId(storageId) === DEFAULT_STORAGE_SOURCE_KEY &&
+            !this.storageRegistry.has(DEFAULT_STORAGE_SOURCE_KEY)
+        ) {
+            throw noDefaultStorageSourceError(this.storageRegistry.list());
+        }
 
         // Refuse an unknown source now, while the request is cheap. `finalize`
         // resolves the controller again and would refuse there too, but that is

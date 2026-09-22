@@ -1,6 +1,6 @@
 /**
- * The checks a caller-supplied key and bucket go through before any storage
- * door acts on them, as HTTP answers.
+ * The checks a caller-supplied key, bucket and storage source go through
+ * before any storage door acts on them, as HTTP answers.
  *
  * Shared by the REST routes and the resumable (TUS) handler, which parses its
  * own `Upload-Metadata` and so cannot lean on the routes. Each door spelling
@@ -139,4 +139,27 @@ export function writableBucketOrRefuse(
 ): string | undefined {
     if (bucket === undefined || controller.getType() === "local") return bucket;
     return servedBucketOrRefuse(bucket, controller, sources);
+}
+
+/**
+ * A request that names no storage source, on a deployment with no default one.
+ *
+ * Reachable on purpose: production drops a `local` default rather than
+ * crash-looping, and keeps the named buckets that are bound. Those keep
+ * serving; only a request that names none has nowhere to go. 501 rather than
+ * 503 for the reason the no-storage stub gives — this is permanent until the
+ * project names a default, and the client's offline queue retries 503 forever.
+ *
+ * @param sources the storage sources this deployment does serve.
+ */
+export function noDefaultStorageSourceError(sources: string[]): ApiError {
+    return new ApiError(
+        501,
+        "STORAGE_NOT_CONFIGURED",
+        "No default storage source is configured on this deployment, so a request that names no " +
+        `storage source has nowhere to go. This deployment serves ${sources.map(k => `"${k}"`).join(", ")}: ` +
+        "name one with `storageId`, or give the project a default bucket in `config/resources.ts` — " +
+        `bucket("${sources[0]}", { default: true }), or export const uploads = bucket(); — and redeploy.`,
+        { storageSources: sources }
+    );
 }

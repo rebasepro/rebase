@@ -2389,7 +2389,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // config package, which depends on `@rebasepro/types` alone.
     const storageAuthorizeData: { current?: import("@rebasepro/types").StorageAuthorizeData } = {};
 
-    if (storageController) {
+    // Mounted whenever any source is live, not only a default one. Production
+    // drops a `local` default and keeps the named buckets that are bound; the
+    // routes serve those and answer a request that names no source with
+    // STORAGE_NOT_CONFIGURED, where the stub below would refuse all of them.
+    if (storageRegistry || storageController) {
         // `POST /upload` gets its own body limit, the storage config's
         // maxFileSize (default 50MB), in place of the global API body limit.
         // "In place of" takes the exemption at the mount below. Without it,
