@@ -28,12 +28,11 @@ import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
-import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
+import { canonicalStorageId } from "./keys";
+import { canonicalKeyOrBadRequest, canonicalBucketOrBadRequest } from "./request-keys";
 import { compileStorageTriggers, triggerUser, type StorageTrigger, type StorageTriggerDispatcher } from "./triggers";
 import {
     createDurableRenditionCache,
-    isRenditionKey,
-    RENDITION_PREFIX,
     type DurableRenditionCache,
     type RenditionCacheConfig
 } from "./rendition-cache";
@@ -278,61 +277,6 @@ export function extractWildcardPath(c: { req: { path: string; routePath: string 
     if (idx < 0) return "";
     // +1 to skip the '/' after the prefix
     return fullPath.substring(idx + prefix.length + 1);
-}
-
-/**
- * Canonicalize a caller-supplied storage key, answering 400 when it names
- * something other than what it says.
- *
- * The single place a request's key becomes canonical. Every route runs its key
- * through this before anything else touches it, so the authorize hook, the
- * storage controller and the minted download token are all looking at the same
- * string — which is the only thing that makes the hook's answer meaningful.
- * See `keys.ts` for why an unacceptable key is refused rather than repaired.
- */
-function canonicalKeyOrBadRequest(key: string): string {
-    try {
-        const canonical = canonicalStorageKey(key);
-        // The rendition space is not addressable by callers, in either
-        // direction. Reading one would serve a derivative of a source object
-        // without the source's key ever reaching `storageAuthorize` or the
-        // declarative policies — both of which reason about that key — and
-        // writing one would let a caller choose what a later transform serves.
-        if (isRenditionKey(canonical)) {
-            throw new InvalidStorageKeyError(
-                `"${RENDITION_PREFIX}" is reserved for derived image renditions and cannot be ` +
-                "read or written directly."
-            );
-        }
-        return canonical;
-    } catch (err) {
-        throw new ApiError(
-            400,
-            "INVALID_STORAGE_KEY",
-            err instanceof InvalidStorageKeyError ? err.message : "Invalid storage key"
-        );
-    }
-}
-
-/**
- * Canonicalize a caller-supplied bucket name, answering 400 when it is not one.
- *
- * The bucket's counterpart to {@link canonicalKeyOrBadRequest}, and it exists
- * for the same reason: the value routes a write, so it has to be checked where
- * it enters rather than where it is used. Applied at every entry point a bucket
- * has — this route's multipart body, the folder route's JSON body, the
- * `?bucket=` query, and the TUS `Upload-Metadata` header.
- */
-function canonicalBucketOrBadRequest(bucket: string | undefined | null): string | undefined {
-    try {
-        return canonicalStorageBucket(bucket);
-    } catch (err) {
-        throw new ApiError(
-            400,
-            "INVALID_STORAGE_BUCKET",
-            err instanceof InvalidStorageBucketError ? err.message : "Invalid storage bucket"
-        );
-    }
 }
 
 /**

@@ -26,6 +26,7 @@ import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { createStorageRoutes } from "../src/storage/routes";
 import { configureJwt } from "../src/auth/jwt";
 import * as imageTransform from "../src/storage/image-transform";
+import { parseTransformOptions, TransformCache } from "../src/storage/image-transform";
 import {
     RENDITION_PREFIX,
     isRenditionKey,
@@ -59,6 +60,18 @@ describe("rendition keys", () => {
     it("does not read a key from outside the reserved space", () => {
         expect(renditionKeyCandidates("../../etc/passwd").every(isRenditionKey)).toBe(true);
     });
+
+    it("names the reserved space in any case, and with either separator", () => {
+        // A case-insensitive filesystem (macOS, Windows) stores `_REBASE/…` in
+        // the directory `_rebase/…` names, and Windows reads `\` as a
+        // separator — so a spelling the check does not recognise is still a
+        // write into the rendition space.
+        expect(isRenditionKey("_REBASE/Renditions/x.webp")).toBe(true);
+        expect(isRenditionKey("_rebase\\renditions\\x.webp")).toBe(true);
+        expect(isRenditionKey("_rebase/renditions")).toBe(true);
+        expect(isRenditionKey("_rebase/renditions-archive/x.webp")).toBe(false);
+        expect(isRenditionKey("photos/_rebase/renditions/x.webp")).toBe(false);
+    });
 });
 
 describe("createDurableRenditionCache", () => {
@@ -78,6 +91,19 @@ describe("createDurableRenditionCache", () => {
         const cache = createDurableRenditionCache();
 
         await expect(cache.put(readOnly(), "k", undefined, rendition)).resolves.toBeUndefined();
+    });
+
+    it("ignores a stored rendition whose type is not the image its name says", async () => {
+        // Whatever sits at a rendition key is served under the transform URL of
+        // a source object. Only an image the encoder could have produced may be:
+        // anything else there was not written by this cache.
+        const cache = createDurableRenditionCache();
+        const planted = {
+            getObject: async (key: string) =>
+                new File(["<script>alert(1)</script>"], key.split("/").pop()!, { type: "text/html" })
+        } as unknown as StorageController;
+
+        await expect(cache.get(planted, "k", undefined)).resolves.toBeNull();
     });
 
     it("treats an unreachable bucket as a miss, not an error", async () => {
@@ -221,6 +247,57 @@ describe("GET /file/* with a durable rendition cache", () => {
 
         expect(response.status).toBe(400);
         expect(await response.json()).toMatchObject({ error: { code: "INVALID_STORAGE_KEY" } });
+    });
+
+    it("refuses to write into the reserved prefix through the resumable route", async () => {
+        // TUS is the second way to write an object. It canonicalized its key on
+        // its own and never asked whether that key was a rendition's.
+        const response = await routerOn(true).fetch(new Request("http://localhost/api/storage/tus", {
+            method: "POST",
+            headers: {
+                "Tus-Resumable": "1.0.0",
+                "Upload-Length": "3",
+                "Upload-Metadata": `key ${Buffer.from(`${RENDITION_PREFIX}anything.webp`).toString("base64")}`
+            }
+        }));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: { code: "INVALID_STORAGE_KEY" } });
+    });
+
+    it("refuses the reserved prefix whatever its case", async () => {
+        const form = new FormData();
+        form.append("file", new File([new Uint8Array([1, 2, 3])], "x.webp", { type: "image/webp" }));
+        form.append("key", "_REBASE/Renditions/anything.webp");
+
+        const response = await routerOn(true).fetch(new Request("http://localhost/api/storage/upload", {
+            method: "POST",
+            body: form
+        }));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: { code: "INVALID_STORAGE_KEY" } });
+    });
+
+    it("does not serve a non-image planted where a rendition would be", async () => {
+        // The key a transform will read is computable by anyone who can read
+        // the source: its path, its ETag and the query. Whatever the bucket
+        // holds there must not come back as the transform's response.
+        const plain = await routerOn(true).fetch(new Request(url("")));
+        const etag = plain.headers.get("ETag")!;
+        const options = parseTransformOptions({ width: "22", format: "webp" })!;
+        const cacheKey = new TransformCache().buildKey(`(default)/default/${sourceKey}@${etag}`, options);
+        const payload = "<script>alert(document.domain)</script>";
+        await controller.putObject({
+            file: new File([payload], "x.webp", { type: "text/html" }),
+            key: renditionKey(cacheKey, "image/webp")
+        });
+
+        const response = await routerOn(true).fetch(new Request(url("?width=22&format=webp")));
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("Content-Type")).toBe("image/webp");
+        expect(await response.text()).not.toBe(payload);
     });
 
     it("refuses to write into the reserved prefix", async () => {

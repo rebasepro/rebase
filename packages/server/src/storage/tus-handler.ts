@@ -18,7 +18,8 @@ import { UnknownStorageSourceError, type StorageRegistry } from "./storage-regis
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
 import { triggerUser } from "./triggers";
-import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
+import { canonicalStorageId } from "./keys";
+import { canonicalKeyOrBadRequest, canonicalBucketOrBadRequest } from "./request-keys";
 import {
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
@@ -274,33 +275,18 @@ export class TusHandler {
         // The `id` fallback (an upload that names no key at all) is resolved
         // here too, so the hook is asked about the key that will actually be
         // written instead of the empty string it used to see.
-        const rawKey = metadata.key || metadata.filename || "";
-        let key: string;
-        try {
-            key = canonicalStorageKey(rawKey) || id;
-        } catch (err) {
-            throw new ApiError(
-                400,
-                "INVALID_STORAGE_KEY",
-                err instanceof InvalidStorageKeyError ? err.message : "Invalid storage key"
-            );
-        }
+        //
+        // The same check `POST /upload` applies, from the same module, so the
+        // resumable route refuses what the multipart one refuses — the
+        // reserved rendition prefix included.
+        const key = canonicalKeyOrBadRequest(metadata.key || metadata.filename || "") || id;
 
         // The other two routing values, resolved here and stored on the upload
         // for the same reason the key is: `finalize` must not be able to reach
         // a destination the hook below was not asked about. The header wins
         // over the query string for `storageId` because the header is what
         // `finalize` has always used — now the hook is asked about it too.
-        let bucket: string | undefined;
-        try {
-            bucket = canonicalStorageBucket(metadata.bucket);
-        } catch (err) {
-            throw new ApiError(
-                400,
-                "INVALID_STORAGE_BUCKET",
-                err instanceof InvalidStorageBucketError ? err.message : "Invalid storage bucket"
-            );
-        }
+        const bucket = canonicalBucketOrBadRequest(metadata.bucket);
         const storageId = metadata.storageId || c.req.query("storageId") || undefined;
 
         // Refuse an unknown source now, while the request is cheap. `finalize`

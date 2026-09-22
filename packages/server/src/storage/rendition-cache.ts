@@ -56,9 +56,20 @@ import { logger } from "../utils/logger";
  */
 export const RENDITION_PREFIX = "_rebase/renditions/";
 
-/** True for a key that names the reserved rendition space. */
+/**
+ * True for a key that names the reserved rendition space — the prefix itself,
+ * or anything under it.
+ *
+ * Compared case-folded and with `\` read as a separator, because that is how
+ * the filesystem under a local bucket reads it: on macOS and Windows
+ * `_REBASE/Renditions/x.webp` is a file in the directory `_rebase/renditions/`
+ * names, and on Windows so is `_rebase\renditions\x.webp`. A check that only
+ * knew the one spelling refused the key and accepted the same file. NFKC
+ * folds the compatibility spellings (`ſ` for `s`) the filesystem folds too.
+ */
 export function isRenditionKey(key: string): boolean {
-    return key.startsWith(RENDITION_PREFIX);
+    const folded = key.replace(/\\/g, "/").normalize("NFKC").toLowerCase();
+    return folded.startsWith(RENDITION_PREFIX) || folded === RENDITION_PREFIX.slice(0, -1);
 }
 
 export interface RenditionCacheConfig {
@@ -133,6 +144,12 @@ export function renditionKeyCandidates(cacheKey: string, preferred?: string): st
     return ordered.map(extension => `${RENDITION_PREFIX}${digest}.${extension}`);
 }
 
+/** The content type a rendition key's extension names, or undefined. */
+function contentTypeForRenditionKey(key: string): string | undefined {
+    const extension = key.slice(key.lastIndexOf(".") + 1);
+    return Object.keys(EXTENSIONS).find(type => EXTENSIONS[type] === extension);
+}
+
 export function createDurableRenditionCache(): DurableRenditionCache {
     // Said once per process, not per request. A read-only bucket fails every
     // write, and a warning per transform would bury the log it is trying to be
@@ -145,12 +162,18 @@ export function createDurableRenditionCache(): DurableRenditionCache {
                 try {
                     const object = await controller.getObject(key, bucket);
                     if (!object) continue;
+                    // The response to a transform URL is whatever this returns,
+                    // served inline under the source object's address. So only
+                    // what `put` could have written counts as a hit: the image
+                    // type the key's own extension names. Anything else at a
+                    // rendition key was put there by something other than this
+                    // cache, and serving its stored type would let it choose
+                    // what the API origin renders — `text/html` included.
+                    const contentType = (object.type || "").split(";")[0].trim().toLowerCase();
+                    if (contentType !== contentTypeForRenditionKey(key)) continue;
                     return {
                         data: Buffer.from(await object.arrayBuffer()),
-                        // The type the rendition was written with. Falling back
-                        // to the extension would be guessing at the one fact
-                        // the object already carries.
-                        contentType: object.type || "application/octet-stream"
+                        contentType
                     };
                 } catch {
                     // A miss and an unreachable bucket are the same answer here:
