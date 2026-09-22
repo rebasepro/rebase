@@ -684,7 +684,7 @@ propertyCallbacks: undefined };
     async checkUniqueField(
         path: string,
         name: string,
-        value: any,
+        value: unknown,
         id?: string,
         collection?: CollectionConfig
     ): Promise<boolean> {
@@ -964,14 +964,31 @@ collection: resolvedCollection });
         return this.delegate.delete(props);
     }
 
+    /**
+     * Whether `value` is free in `name`, asked about a field this caller could
+     * have read — anything else is an oracle over a value the strip withholds,
+     * one guess at a time. A registered collection names its fields, so an
+     * undeclared name is refused rather than counted.
+     */
     async checkUniqueField(
         path: string,
         name: string,
-        value: any,
+        value: unknown,
         id?: string,
         collection?: CollectionConfig
     ): Promise<boolean> {
-        return this.delegate.checkUniqueField(path, name, value, id, collection);
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(collection, path);
+        if (resolvedCollection?.properties) {
+            if (typeof name !== "string" || !Object.prototype.hasOwnProperty.call(resolvedCollection.properties, name)) {
+                throw ApiError.badRequest(
+                    `'${String(name)}' is not a declared property of '${resolvedCollection.slug}', so it has no uniqueness to check.`,
+                    "INVALID_UNIQUE_CHECK",
+                    { field: name }
+                );
+            }
+            assertQueryFieldsReadable({ filter: { [name]: ["==", value] } }, resolvedCollection, this.viewer());
+        }
+        return this.delegate.checkUniqueField(path, name, value, id, resolvedCollection);
     }
 
     generateId(path: string, collection?: CollectionConfig): string {

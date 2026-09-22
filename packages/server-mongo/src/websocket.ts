@@ -361,10 +361,12 @@ requestId }));
                         break;
                     }
                     case "CHECK_UNIQUE_FIELD": {
-                        const { path, name, value, id, collection } = payload;
+                        const { path, name, value, id } = payload;
                         assertRegisteredPath(path);
                         const delegate = await getScopedDelegate();
-                        const isUnique = await delegate.checkUniqueField(path, name, value, id, collection);
+                        // The registry's collection, never the frame's: its
+                        // properties are what decides which names may be asked.
+                        const isUnique = await delegate.checkUniqueField(path, name, value, id, driver.registry?.getCollectionByPath(path));
                         ws.send(JSON.stringify({ type: "CHECK_UNIQUE_FIELD_SUCCESS",
 payload: { isUnique },
 requestId }));

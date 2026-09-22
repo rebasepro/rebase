@@ -398,18 +398,50 @@ id: newId.toString() });
     }
 
     /**
-     * Check if a field value is unique in a collection
+     * Check if a field value is unique in a collection.
+     *
+     * An equality test on one field, and nothing else a query can express. The
+     * name and the value arrive from a socket frame, and this used to be
+     * `countDocuments({ [name]: value })`: a value of `{ $regex: "^123" }`
+     * answered, one prefix at a time, what a field of a row the caller cannot
+     * see begins with, and a name of `$expr` evaluated an aggregation
+     * expression. So an operator name is refused, the value must be a scalar,
+     * and it is compared with `$eq` — which reads an object as a literal even
+     * if one got this far.
+     *
+     * An absent value is unique, as it is on Postgres: an empty optional field
+     * is not "taken" by every row that also left it empty.
      */
     async checkUniqueField(
         collectionPath: string,
         fieldName: string,
-        value: any,
+        value: unknown,
         excludeEntityId?: string,
         _databaseId?: string
     ): Promise<boolean> {
+        if (typeof fieldName !== "string" || fieldName === "" || fieldName.startsWith("$")) {
+            throw ApiError.badRequest(
+                `A uniqueness check names a field, and ${JSON.stringify(fieldName)} is not one.`,
+                "INVALID_UNIQUE_CHECK"
+            );
+        }
+        if (excludeEntityId !== undefined && typeof excludeEntityId !== "string" && typeof excludeEntityId !== "number") {
+            throw ApiError.badRequest("A uniqueness check excludes one row, named by its id.", "INVALID_UNIQUE_CHECK");
+        }
+        if (value === undefined || value === null) return true;
+        const scalar = typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value instanceof Date;
+        if (!scalar) {
+            throw ApiError.badRequest(
+                `A uniqueness check on '${fieldName}' compares one value — a string, number, boolean or date — ` +
+                "and was given something else.",
+                "INVALID_UNIQUE_CHECK",
+                { field: fieldName }
+            );
+        }
+
         const collection = this.getCollection(collectionPath);
 
-        const query: Filter<Document> = { [fieldName]: value };
+        const query: Filter<Document> = { [fieldName]: { $eq: value } };
 
         if (excludeEntityId) {
             const objectId = this.toObjectId(excludeEntityId);
