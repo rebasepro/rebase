@@ -153,7 +153,7 @@ Run `npx @rebasepro/rls-check --list-checks` for the catalog on your installed v
 | id | typical severity | confidence | what it looks for |
 | --- | --- | --- | --- |
 | `rls-disabled` | critical | certain | A table with RLS off that grants SELECT/INSERT/UPDATE/DELETE to a role an untrusted caller can reach. |
-| `policy-always-true` | critical | certain | A permissive policy whose `USING` or `WITH CHECK` expression is always true. Downgraded to medium, and to heuristic, when the policy sits behind an authentication gate. |
+| `policy-always-true` | critical | certain | A permissive policy whose `USING` or `WITH CHECK` expression is always true. Downgraded to medium, and to heuristic, when `RESTRICTIVE` policies on the same command apply to every role it reaches. |
 | `view-bypasses-rls` | critical | certain | A view granted to an untrusted role that selects from an RLS-protected table and runs with its owner's privileges. Heuristic on servers before PG15, where `security_invoker` does not exist. |
 | `policy-anonymous-tautology` | varies | heuristic | An `auth.uid() IS NOT NULL`-shaped policy: it separates signed-in from signed-out callers and scopes no rows. Critical on Supabase-shaped databases, lower elsewhere. |
 | `policy-authenticated-tautology` | high | heuristic | The corrected form of the above — `auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'` — which excludes signed-out callers and still scopes no rows. Every account reads every row; with open registration that is everybody. |
