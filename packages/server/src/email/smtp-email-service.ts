@@ -73,7 +73,18 @@ function normalizeMessageId(value: unknown): string | undefined {
 export class SMTPEmailService implements EmailService {
     private transporter: Transporter | null = null;
     private config: EmailConfig;
-    private _initialized = false;
+    /**
+     * The transporter being built, shared by every send that arrives while it
+     * is.
+     *
+     * A flag set before the `await` said "initialised" while nodemailer was
+     * still loading, so a second send in that window found no transporter and
+     * threw "Email service not configured" — the first burst of mail after a
+     * boot lost every message but one. Every caller awaits this one promise
+     * instead. Cleared on failure, so one bad moment is not remembered for the
+     * life of the process.
+     */
+    private transporterReady: Promise<void> | null = null;
 
     constructor(config: EmailConfig) {
         this.config = config;
@@ -82,10 +93,17 @@ export class SMTPEmailService implements EmailService {
     /**
      * Lazily initialize the SMTP transporter on first use
      */
-    private async ensureTransporter(): Promise<void> {
-        if (this._initialized) return;
-        this._initialized = true;
+    private ensureTransporter(): Promise<void> {
+        if (!this.transporterReady) {
+            this.transporterReady = this.buildTransporter().catch((error: unknown) => {
+                this.transporterReady = null;
+                throw error;
+            });
+        }
+        return this.transporterReady;
+    }
 
+    private async buildTransporter(): Promise<void> {
         if (this.config.smtp) {
             const nodemailer = await loadNodemailer();
 

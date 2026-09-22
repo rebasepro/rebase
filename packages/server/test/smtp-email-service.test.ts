@@ -172,4 +172,53 @@ describe("SMTPEmailService", () => {
         expect(verified).toBe(false);
         expect(mockTransporter.verify).toHaveBeenCalled();
     });
+
+    it("sends every one of several concurrent first messages through SMTP", async () => {
+        // The transporter is built on first use, behind an `await`. The second
+        // send of a fresh service arrived while the first was still inside that
+        // await, found the service already marked initialised, and threw "Email
+        // service not configured" — so a burst at boot (two sign-ups, a
+        // verification and a welcome) lost all but one message.
+        //
+        // A fresh copy of the module, so nodemailer has not been loaded yet and
+        // the first send really does wait on that import.
+        let FreshService: typeof SMTPEmailService | undefined;
+        await jest.isolateModulesAsync(async () => {
+            ({ SMTPEmailService: FreshService } = await import("../src/email/smtp-email-service"));
+        });
+        const service = new FreshService!({
+            from: "test@example.com",
+            smtp: {
+                host: "smtp.example.com",
+                port: 587
+            }
+        });
+        const mail = { to: "a@example.com", subject: "s", text: "t" };
+
+        const results = await Promise.allSettled([service.send(mail), service.send(mail), service.send(mail)]);
+
+        expect(results.map(r => r.status === "rejected" ? String(r.reason) : "sent")).toEqual(["sent", "sent", "sent"]);
+        expect(mockTransporter.sendMail).toHaveBeenCalledTimes(3);
+        expect(mockCreateTransport).toHaveBeenCalledTimes(1);
+    });
+
+    it("tries again on the next send when building the transporter failed", async () => {
+        // A memoised failure would make one bad moment permanent for the life
+        // of the process.
+        mockCreateTransport.mockImplementationOnce(() => {
+            throw new Error("transport exploded");
+        });
+        const service = new SMTPEmailService({
+            from: "test@example.com",
+            smtp: {
+                host: "smtp.example.com",
+                port: 587
+            }
+        });
+        const mail = { to: "a@example.com", subject: "s", text: "t" };
+
+        await expect(service.send(mail)).rejects.toThrow(/transport exploded/);
+        await expect(service.send(mail)).resolves.toBeDefined();
+        expect(mockTransporter.sendMail).toHaveBeenCalledTimes(1);
+    });
 });
