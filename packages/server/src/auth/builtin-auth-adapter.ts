@@ -43,6 +43,7 @@ import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
+import { ApiError } from "../api/errors";
 
 /**
  * Configuration for the built-in Rebase auth adapter.
@@ -132,6 +133,27 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
     const resolvedOps = resolveAuthHooks(authHooks);
 
+    /**
+     * The caller's roles as the database has them now.
+     *
+     * Read per request because the token's `roles` claim can be a whole
+     * access-token lifetime stale — a demoted admin still holds a token that
+     * says `admin`. So when the read fails, falling back to the claim hands
+     * that token exactly the access the lookup exists to take away; during a
+     * database blip it scoped a demoted admin with admin RLS. This refuses
+     * instead, with the 503 `createRequireAuth` already gives the admin
+     * routes: the adapter middleware answers with it, and the socket treats
+     * a throwing adapter as an invalid token.
+     */
+    async function resolveLiveRoles(uid: string): Promise<string[]> {
+        try {
+            return await authRepository.getUserRoleIds(uid);
+        } catch (error: unknown) {
+            logger.warn("[Auth] Could not resolve roles for a request; refusing it", { uid, error });
+            throw new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+        }
+    }
+
     const adapter: AuthAdapter = {
         id: "rebase-builtin",
 
@@ -180,13 +202,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
-            // Resolve roles from the repository
-            let roles: string[] = payload.roles || [];
-            try {
-                roles = await authRepository.getUserRoleIds(payload.uid);
-            } catch (err: unknown) {
-                logger.warn("Role lookup from repository failed, using token roles as fallback", { uid: payload.uid, error: err });
-            }
+            // Resolve roles from the repository. Never from the token when
+            // that fails — see `resolveLiveRoles`.
+            const roles = await resolveLiveRoles(payload.uid);
 
             const isAdmin = hasAdministrativeRole(roles);
 
@@ -248,12 +266,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
-            let roles: string[] = payload.roles || [];
-            try {
-                roles = await authRepository.getUserRoleIds(payload.uid);
-            } catch (err: unknown) {
-                logger.warn("Role lookup from repository failed, using token roles as fallback", { uid: payload.uid, error: err });
-            }
+            const roles = await resolveLiveRoles(payload.uid);
 
             const isAdmin = hasAdministrativeRole(roles);
 

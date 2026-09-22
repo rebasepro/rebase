@@ -78,8 +78,14 @@ driver });
         try {
             authenticatedUser = await adapter.verifyRequest(c.req.raw);
         } catch (error) {
-            // adapter.verifyRequest() threw — reject the request (fail closed)
-            return refuse(c, ApiError.unauthenticated("Unauthorized"));
+            // adapter.verifyRequest() threw — reject the request (fail closed).
+            // With the adapter's own answer when it gave one: the built-in
+            // adapter throws a 503 when it cannot read the caller's roles,
+            // and a 401 there would send the client to refresh a session that
+            // is fine.
+            return refuse(c, error instanceof ApiError && error.statusCode >= 400
+                ? error
+                : ApiError.unauthenticated("Unauthorized"));
         }
 
         if (authenticatedUser) {
