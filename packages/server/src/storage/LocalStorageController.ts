@@ -18,6 +18,7 @@ import {
     StorageListResult,
     StorageReference
 } from "@rebasepro/types";
+import { InvalidListOptionsError } from "./keys";
 
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
@@ -371,6 +372,20 @@ export class LocalStorageController implements StorageController {
         maxResults?: number;
         pageToken?: string;
     }): Promise<StorageListResult> {
+        // Checked before the directory is read, so a bad page is refused the
+        // same way whether or not there is anything to list. The token is this
+        // controller's own — the decimal index it hands back as
+        // `nextPageToken` — so anything else was not issued by it.
+        const maxResults = options?.maxResults ?? 1000;
+        if (!Number.isInteger(maxResults) || maxResults < 1) {
+            throw new InvalidListOptionsError(`maxResults must be a whole number of at least 1, got ${maxResults}.`);
+        }
+        const pageToken = options?.pageToken;
+        if (pageToken && !/^\d+$/.test(pageToken)) {
+            throw new InvalidListOptionsError(`"${pageToken}" is not a page token this listing issued.`);
+        }
+        const startIndex = pageToken ? parseInt(pageToken, 10) : 0;
+
         // Normalize path to handle leading/trailing slashes
         const normalizedPath = normalizeStoragePath(prefix);
         const fullPath = this.getFullPath(normalizedPath, options?.bucket);
@@ -382,8 +397,6 @@ export class LocalStorageController implements StorageController {
             const entries = await readdir(fullPath, { withFileTypes: true });
 
             let count = 0;
-            const maxResults = options?.maxResults ?? 1000;
-            const startIndex = options?.pageToken ? parseInt(options.pageToken, 10) : 0;
             // Cursor over `entries`, not over emitted results. Every stored
             // object has a `.metadata.json` sidecar that is skipped without
             // emitting anything, so a token derived from `count` could fail to

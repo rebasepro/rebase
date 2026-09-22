@@ -285,3 +285,19 @@ export function listingPrefix(rawPrefix: string): string | undefined {
 export function folderKey(rawPrefix: string): string {
     return rawPrefix.replace(/^\/+/, "").replace(/\/+$/, "");
 }
+
+/**
+ * A listing asked for paging a controller cannot honour: a page size below one,
+ * or a page token it never issued.
+ *
+ * Refused rather than coerced. A page size of 0 answered an empty page whose
+ * next token was the one it had been handed, so `while (pageToken)` never
+ * ended; a token of `-1` read before the first entry and crashed. The route
+ * turns this into a 400.
+ */
+export class InvalidListOptionsError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "InvalidListOptionsError";
+    }
+}

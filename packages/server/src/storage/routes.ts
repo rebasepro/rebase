@@ -28,7 +28,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
-import { canonicalStorageId } from "./keys";
+import { canonicalStorageId, InvalidListOptionsError } from "./keys";
 import {
     canonicalKeyOrBadRequest,
     canonicalBucketOrBadRequest,
@@ -283,6 +283,24 @@ export function extractWildcardPath(c: { req: { path: string; routePath: string 
     if (idx < 0) return "";
     // +1 to skip the '/' after the prefix
     return fullPath.substring(idx + prefix.length + 1);
+}
+
+/**
+ * Parse a listing's `maxResults`, answering 400 unless it is a whole number of
+ * at least 1.
+ *
+ * `parseInt` took `0`, `-1` and `abc` (as NaN) straight to the controller,
+ * where a page size below one answers an empty page and hands back the token
+ * it was given — a `while (pageToken)` that never ends — and a negative one
+ * reached S3 as `MaxKeys`. Absent or empty is the controller's default.
+ */
+function maxResultsOrBadRequest(raw: string | undefined): number | undefined {
+    if (raw === undefined || raw === "") return undefined;
+    const value = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+    if (!(value >= 1)) {
+        throw new ApiError(400, "INVALID_LIST_OPTIONS", `maxResults must be a whole number of at least 1, got "${raw}".`, undefined, true);
+    }
+    return value;
 }
 
 /**
@@ -967,8 +985,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // A listing is the read half of the same unvalidated parameter:
         // `?bucket=../../..` enumerated arbitrary directories on the pod,
         // including the TUS temp directory next to the buckets.
-        const maxResults = c.req.query("maxResults");
-        const pageToken = c.req.query("pageToken");
+        const maxResults = maxResultsOrBadRequest(c.req.query("maxResults"));
+        const pageToken = c.req.query("pageToken") || undefined;
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
         const bucket = servedBucketOrRefuse(canonicalBucketOrBadRequest(c.req.query("bucket")), resolved, sourceKeys());
@@ -982,10 +1000,17 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             storagePrefix,
             {
                 bucket: bucket ?? (resolved.getType() === "local" ? "default" : undefined),
-                maxResults: maxResults ? parseInt(maxResults, 10) : undefined,
+                maxResults,
                 pageToken
             }
-        );
+        ).catch((err: unknown) => {
+            // A page token is the controller's own format, so only it can say
+            // one is not its own.
+            if (err instanceof InvalidListOptionsError) {
+                throw new ApiError(400, "INVALID_LIST_OPTIONS", err.message, undefined, true);
+            }
+            throw err;
+        });
 
         return c.json({ data: result });
     });
