@@ -73,21 +73,10 @@ export class DataService implements DataRepository {
      */
     async fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
-        options: {
-            filter?: FilterValues<Extract<keyof M, string>>;
-            /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
-            logical?: LogicalCondition;
-            orderBy?: string | OrderByTuple[];
-            order?: "desc" | "asc";
-            limit?: number;
-            offset?: number;
-            startAfter?: Record<string, unknown>;
-            searchString?: string;
-            databaseId?: string;
-            vectorSearch?: VectorSearchParams;
-            /** See `FetchCollectionProps.withDeleted`. */
-            withDeleted?: WithDeleted;
-        } = {}
+        // The service's own options, rather than a second list of them: this
+        // facade re-listed eleven fields and the driver re-listed ten of those,
+        // so every option added to the fetch had two places to be dropped.
+        options: Parameters<FetchService["fetchCollection"]>[1] = {}
     ): Promise<Record<string, unknown>[]> {
         return this.fetchService.fetchCollection<M>(collectionPath, options);
     }

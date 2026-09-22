@@ -562,29 +562,19 @@ export class PostgresBackendDriver implements DataDriver {
         }));
     }
 
-    async fetchCollection<M extends Record<string, unknown>>({
-                                                                 path,
-                                                                 collection,
-                                                                 filter,
-                                                                 limit,
-                                                                 offset,
-                                                                 startAfter,
-                                                                 orderBy,
-                                                                 searchString,
-                                                                 order,
-                                                                 vectorSearch
-                                                             }: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
+    async fetchCollection<M extends Record<string, unknown>>(
+        // Forwarded whole rather than re-listed, as `listenCollection` does:
+        // the list named ten of the query's fields, so `logical`, `include`,
+        // `fields`, `distinct`, `withDeleted` and `searchExplain` were accepted
+        // and dropped — an `or(...)` read returned every row while `count`
+        // with the same group answered 1.
+        { path, collection, startAfter, ...query }: FetchCollectionProps<M>
+    ): Promise<Record<string, unknown>[]> {
 
         const rows = await this.dataService.fetchCollection<M>(path, {
-            filter,
-            orderBy,
-            order,
-            limit,
-            offset,
+            ...query,
             startAfter: startAfter as Record<string, unknown> | undefined,
-            databaseId: collection?.databaseId,
-            searchString,
-            vectorSearch
+            databaseId: collection?.databaseId
         });
 
         const {

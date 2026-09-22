@@ -1587,18 +1587,22 @@ idColumn };
             fields?: string[];
             /** `SELECT DISTINCT` over the projection. */
             distinct?: boolean;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         // A nested path is the target collection narrowed by a relation — the
         // same query, one condition heavier. It used to be a separate builder
         // that honoured `limit` and nothing else.
+        //
+        // `relatedTo` is always set, to `undefined` for a root path: these
+        // options arrive from a socket frame spread whole, and the scope is
+        // this method's to derive from the path, never the caller's to send.
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
-        if (hop) {
-            return this.fetchRowsWithConditions<M>(hop.targetCollection.slug, { ...options,
-relatedTo: hop });
-        }
-
-        return this.fetchRowsWithConditions<M>(collectionPath, options);
+        return this.fetchRowsWithConditions<M>(
+            hop ? hop.targetCollection.slug : collectionPath,
+            { ...options, relatedTo: hop }
+        );
     }
 
     /**
