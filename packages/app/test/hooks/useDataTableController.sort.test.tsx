@@ -84,6 +84,25 @@ fixedFilter: filter
         expect(result.current.sortBy).toEqual([["is_vip", "desc"], ["lifetime_value", "desc"]]);
     });
 
+    it("falls back to the default, not to no sort, when the URL drops it", () => {
+        // A navigation back to the bare collection URL — the split view's
+        // close did this — carries no `__sort`. Absent means "the default"
+        // on mount, and it has to mean the same thing afterwards: reading it as
+        // "no sort" re-subscribed the list with no `orderBy` at all.
+        const { result, rerender } = renderHook(() => useDataTableController({
+            path: "customers",
+collection,
+updateUrl: true
+        }));
+        mockLocation.search = "?__sort=email&__sort_order=desc";
+        rerender();
+        expect(result.current.sortBy).toEqual([["email", "desc"]]);
+
+        mockLocation.search = "?__view=list";
+        rerender();
+        expect(result.current.sortBy).toEqual([["is_vip", "desc"], ["lifetime_value", "desc"]]);
+    });
+
     it("still yields to an explicit sort in the URL", () => {
         mockLocation.search = "?__sort=email&__sort_order=desc";
         const { result } = renderHook(() => useDataTableController({

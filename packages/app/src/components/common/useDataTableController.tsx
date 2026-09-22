@@ -96,9 +96,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const [searchString, setSearchString] = React.useState<string | undefined>(() => {
         if (updateUrl) {
-            const params = new URLSearchParams(location.search);
-            const urlSearch = params.get("search");
-            return urlSearch ? decodeURIComponent(urlSearch) : undefined;
+            return parseSearchString(location.search);
         }
         return undefined;
     });
@@ -146,7 +144,17 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     // The visible symptom was a collection that ignored its own default sort: it
     // subscribed correctly, then immediately re-subscribed with no `orderBy` at
     // all, and the second answer replaced the first.
+    //
+    // Nor on a URL that only repeats what this hook wrote. Opening a record
+    // carries the address bar's query onto the record URL (`withListState`), so
+    // react-router reports a new `location.search` that is this hook's own
+    // state coming back. Parsing it into the live filter made every record
+    // click a round trip through the URL format, and the URL cannot say
+    // everything the state can: an absent filter param reads back as "the
+    // collection's default", so a default the user had cleared came straight
+    // back on the next click.
     const lastSyncedSearchRef = React.useRef<string>(location.search);
+    const lastWrittenListStateRef = React.useRef<string | undefined>(undefined);
     useEffect(() => {
         if (!updateUrl) return;
         // Unchanged URL — including the initial mount, where the state
@@ -156,22 +164,24 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         lastSyncedSearchRef.current = location.search;
 
         const { filterValues: urlFilterValues, sortBy: urlSortBy } = parseFilterAndSort(location.search);
+        const urlSearchString = parseSearchString(location.search);
+        if (encodeListState(urlFilterValues, urlSortBy, urlSearchString) === lastWrittenListStateRef.current) return;
+
         if (!fixedFilter) {
             setFilterValues((urlFilterValues ?? defaultFilter) as FilterValues<Extract<keyof M, string> | (string & {})> | undefined);
         }
         if (urlSortBy && fixedFilter && !checkFilterCombination(fixedFilter, urlSortBy)) {
             console.warn("URL sort is not compatible with the force filter.");
         } else {
-            setSortBy(urlSortBy as OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined);
+            // No `__sort` is the collection's default, the same reading the
+            // state initialiser gives it on mount — not "no sort at all".
+            setSortBy((urlSortBy ?? sortInternal) as OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined);
         }
 
-        // Sync search string from URL
-        const urlParams = new URLSearchParams(location.search);
-        const urlSearch = urlParams.get("search");
-        setSearchString(urlSearch ? decodeURIComponent(urlSearch) : undefined);
-    }, [location.search, updateUrl, fixedFilter, checkFilterCombination]);
+        setSearchString(urlSearchString);
+    }, [location.search, updateUrl, fixedFilter, checkFilterCombination, sortInternal]);
 
-    useUpdateUrl(filterValues, sortBy, searchString, updateUrl);
+    useUpdateUrl(filterValues, sortBy, searchString, updateUrl, lastWrittenListStateRef);
 
     const collectionScroll = scrollRestoration?.getCollectionScroll(path, filterValues);
     /**
@@ -410,7 +420,8 @@ function useUpdateUrl<M extends Record<string, any> = any>(
     filterValues: FilterValues<Extract<keyof M, string>> | undefined,
     sortBy: OrderByTuple<Extract<keyof M, string>>[] | undefined,
     searchString: string | undefined,
-    updateUrl: boolean | undefined
+    updateUrl: boolean | undefined,
+    lastWrittenListStateRef: React.MutableRefObject<string | undefined>
 ) {
 
     useEffect(() => {
@@ -426,12 +437,12 @@ function useUpdateUrl<M extends Record<string, any> = any>(
                 }
             });
 
-            const filterSortState = encodeFilterAndSort(filterValues, sortBy);
-            const search = searchString ? `search=${encodeURIComponent(searchString)}` : "";
+            const listState = encodeListState(filterValues, sortBy, searchString);
+            lastWrittenListStateRef.current = listState;
 
             // Combine preserved params with filter/sort state
             const preservedString = preservedParams.toString();
-            const parts = [preservedString, filterSortState, search].filter(Boolean);
+            const parts = [preservedString, listState].filter(Boolean);
             const state = parts.join("&");
 
             const hash = window.location.hash;
@@ -443,15 +454,36 @@ function useUpdateUrl<M extends Record<string, any> = any>(
     }, [filterValues, sortBy, searchString, updateUrl]);
 }
 
+/**
+ * The part of the query string this hook owns — filters, sort and search — in
+ * the one canonical spelling, so two states can be compared by what they would
+ * write.
+ */
+function encodeListState(filterValues: FilterValues<string> | undefined,
+    sortBy: OrderByTuple[] | undefined,
+    searchString: string | undefined): string {
+    const search = searchString ? `search=${encodeURIComponent(searchString)}` : "";
+    return [encodeFilterAndSort(filterValues, sortBy), search].filter(Boolean).join("&");
+}
+
+function parseSearchString(search: string): string | undefined {
+    // `URLSearchParams` has already decoded the value. Decoding it a second
+    // time threw on any search containing a `%` ("50% off").
+    return new URLSearchParams(search).get("search") || undefined;
+}
+
+const OP_SUFFIX = "_op";
+const VALUE_SUFFIX = "_value";
+
 function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: OrderByTuple[] | undefined) {
-    const entries: Record<string, string> = {};
+    const entries: [string, string][] = [];
     if (sortBy && sortBy.length > 0) {
         // Comma-separated, positionally paired. A single key encodes exactly as
         // it did before — `__sort=name&__sort_order=asc` — so links already out
         // in the world keep working, and a reload of a two-key sort no longer
         // silently comes back sorted by the first key alone.
-        entries["__sort"] = sortBy.map(([field]) => encodeURIComponent(field)).join(",");
-        entries["__sort_order"] = sortBy.map(([, direction]) => direction).join(",");
+        entries.push(["__sort", sortBy.map(([field]) => encodeURIComponent(field)).join(",")]);
+        entries.push(["__sort_order", sortBy.map(([, direction]) => direction).join(",")]);
     }
     if (filterValues) {
         Object.entries(filterValues).forEach(([key, value]) => {
@@ -460,8 +492,12 @@ function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: Order
                     ? (value as [WhereFilterOp, unknown][])
                     : [value as [WhereFilterOp, unknown]];
 
-                const [op, val] = conditions[0] || [];
-                if (op) {
+                // One `_op`/`_value` pair per condition, repeated for a field
+                // with several (`stock >= 5 AND stock < 10`). A single condition
+                // spells exactly as it always has, which is the format links
+                // composed outside the admin follow.
+                for (const [op, val] of conditions) {
+                    if (!op) continue;
                     let encodedValue: unknown = val;
                     try {
                         if (typeof val === "object") {
@@ -487,17 +523,18 @@ function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: Order
                         encodedValue = val;
                     }
                     if (encodedValue !== undefined) {
-                        entries[encodeURIComponent(`${key}_op`)] = encodeURIComponent(op);
-                        entries[encodeURIComponent(`${key}_value`)] = encodedValue ? encodeURIComponent(String(encodedValue)) : "null";
+                        entries.push([encodeURIComponent(`${key}${OP_SUFFIX}`), encodeURIComponent(op)]);
+                        // Only `null` is written as `null`. `false`, `0` and the
+                        // empty string are values: read back as `null` they
+                        // became an IS NULL filter on the server.
+                        entries.push([encodeURIComponent(`${key}${VALUE_SUFFIX}`),
+                            encodedValue === null ? "null" : encodeURIComponent(String(encodedValue))]);
                     }
                 }
             }
         });
     }
-    if (!Object.keys(entries).length) {
-        return "";
-    }
-    return Object.entries(entries).map(([key, value]) => `${key}=${value}`).join("&");
+    return entries.map(([key, value]) => `${key}=${value}`).join("&");
 }
 
 function parseFilterAndSort<M>(search: string): {
@@ -519,12 +556,21 @@ function parseFilterAndSort<M>(search: string): {
                 // reading `?orderBy=name` gets everywhere else.
                 .map((field, index): OrderByTuple => [field, directions[index] === "desc" ? "desc" : "asc"]);
             sortBy = keys.length > 0 ? keys : undefined;
-        } else if (key.endsWith("_op")) {
-            const field = key.replace("_op", "");
-            const filterOp = decodeURIComponent(value) as WhereFilterOp;
-            const filterValStr = entries.get(`${field}_value`);
-            if (filterValStr !== null) {
-                filterValues[field] = [filterOp, decodeString(filterValStr)];
+        } else if (key.endsWith(OP_SUFFIX) && !(key.slice(0, -OP_SUFFIX.length) in filterValues)) {
+            // The suffix, not the first `_op` in the name: `shop_open_op`
+            // belongs to `shop_open`.
+            const field = key.slice(0, -OP_SUFFIX.length);
+            const ops = entries.getAll(key);
+            const values = entries.getAll(`${field}${VALUE_SUFFIX}`);
+            // Paired by position. An operator with no value beside it is half a
+            // pair, and guessing the rest would invent a filter.
+            const conditions: [WhereFilterOp, unknown][] = ops
+                .slice(0, values.length)
+                .map((op, index) => [decodeURIComponent(op) as WhereFilterOp, decodeString(values[index])]);
+            if (conditions.length === 1) {
+                filterValues[field] = conditions[0];
+            } else if (conditions.length > 1) {
+                filterValues[field] = conditions;
             }
         }
     });
