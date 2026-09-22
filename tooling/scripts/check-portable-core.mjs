@@ -51,6 +51,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const baselinePath = path.join(repoRoot, "contracts", "portable-core.txt");
@@ -169,14 +171,6 @@ function stripComments(source) {
         .replace(/(^|[^:])\/\/[^\n]*/g, (match, lead) => lead + " ".repeat(match.length - lead.length));
 }
 
-/** Comments and string bodies, for scans that read identifiers not specifiers. */
-function stripNonCode(source) {
-    return stripComments(source)
-        .replace(/`(?:[^`\\]|\\.)*`/g, match => match.replace(/[^\n]/g, " "))
-        .replace(/"(?:[^"\\\n]|\\.)*"/g, match => `"${" ".repeat(Math.max(0, match.length - 2))}"`)
-        .replace(/'(?:[^'\\\n]|\\.)*'/g, match => `'${" ".repeat(Math.max(0, match.length - 2))}'`);
-}
-
 /**
  * Import specifiers, with whether the import is type-only.
  *
@@ -184,7 +178,7 @@ function stripNonCode(source) {
  * runtime. Counting it would put half the codebase in the baseline for
  * importing a `Stats` type, and train everyone to ignore the file.
  */
-function imports(source) {
+export function imports(source) {
     const found = [];
     const code = stripComments(source);
 
@@ -198,7 +192,7 @@ function imports(source) {
         found.push({
             specifier,
             line: code.slice(0, match.index).split("\n").length,
-            typeOnly: Boolean(typeKeyword) || /\{\s*type\s/.test(full)
+            typeOnly: Boolean(typeKeyword) || onlyTypesNamed(full)
         });
     }
 
@@ -207,14 +201,52 @@ function imports(source) {
     return found;
 }
 
-/** `process.env` read where the module is evaluated, not where it is called. */
-function moduleScopeEnvReads(source) {
-    const hits = [];
-    stripNonCode(source).split("\n").forEach((line, index) => {
-        if (/^\s/.test(line) || line.trim() === "") return;
-        if (/\bprocess\.env\b/.test(line)) hits.push(index + 1);
-    });
-    return hits;
+/**
+ * Whether an import statement's clause names types and nothing else:
+ * `{ type A, type B }`. The first specifier being `type` is not enough —
+ * `import { type Stats, readFileSync } from "node:fs"` imports `node:fs` at
+ * runtime, and `import def, { type A }` imports its default — and reading it
+ * that way skipped the Node import and never walked into a relative module
+ * imported alongside a type.
+ */
+function onlyTypesNamed(statement) {
+    const clause = statement.match(/(?:import|export)(?:\s+type)?\s+([\s\S]*?)\s*from\s*["']/)?.[1]?.trim() ?? "";
+    const braces = clause.match(/^\{([\s\S]*)\}$/);
+    if (!braces) return false;
+    const names = braces[1].split(",").map(name => name.trim()).filter(Boolean);
+    return names.length > 0 && names.every(name => /^type\s/.test(name));
+}
+
+/**
+ * `process.env` read where the module is evaluated, not where it is called.
+ *
+ * Read with the parser rather than by indentation. Only a line starting at
+ * column 0 used to count, so `const config = {\n    url: process.env.URL\n}`
+ * — evaluated the moment the module loads, which is the whole point of the
+ * rule — was missed, while a one-line function reading it at call time was
+ * caught. A read is deferred when it sits inside a function of any kind or an
+ * instance field (which runs at construction); a static field or a static
+ * block runs with the module.
+ *
+ * @returns {number[]} 1-based lines, ascending, one per line
+ */
+export function moduleScopeEnvReads(source) {
+    const file = ts.createSourceFile("module.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const lines = new Set();
+    const isStatic = node => (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Static) !== 0;
+    const visit = (node, deferred) => {
+        if (!deferred
+            && ts.isPropertyAccessExpression(node)
+            && node.name.text === "env"
+            && ((ts.isIdentifier(node.expression) && node.expression.text === "process")
+                || (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "process"))) {
+            lines.add(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1);
+        }
+        const defers = ts.isFunctionLike(node) || (ts.isPropertyDeclaration(node) && !isStatic(node));
+        ts.forEachChild(node, child => visit(child, deferred || defers));
+    };
+    visit(file, false);
+    return [...lines].sort((a, b) => a - b);
 }
 
 function packageOf(specifier) {
@@ -414,4 +446,4 @@ function main() {
     process.exit(1);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
