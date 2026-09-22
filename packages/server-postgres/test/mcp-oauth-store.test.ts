@@ -260,6 +260,46 @@ describe("refresh tokens", () => {
     });
 });
 
+describe("peekRefreshToken", () => {
+    // What the token endpoint reads before it decides to rotate. It must answer
+    // exactly what `consumeRefreshToken` would accept, and change nothing.
+
+    it("returns a live token's grant and when it was issued, without spending it", async () => {
+        const before = Date.now();
+        await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
+
+        const peeked = await store.peekRefreshToken("rt-1");
+        expect(peeked).toMatchObject(REFRESH_RECORD);
+        expect(peeked?.issuedAt).toBeInstanceOf(Date);
+        expect(Math.abs((peeked?.issuedAt.getTime() ?? 0) - before)).toBeLessThan(5_000);
+
+        expect(await store.consumeRefreshToken("rt-1")).toEqual(REFRESH_RECORD);
+    });
+
+    it("returns null for a spent, revoked, expired or unknown token", async () => {
+        await store.saveRefreshToken("spent", REFRESH_RECORD, soon());
+        await store.consumeRefreshToken("spent");
+        await store.saveRefreshToken("revoked", { ...REFRESH_RECORD, family: "fam-2" }, soon());
+        await store.revokeFamily("fam-2");
+        await store.saveRefreshToken("expired", { ...REFRESH_RECORD, family: "fam-3" }, past());
+
+        for (const token of ["spent", "revoked", "expired", "never-issued"]) {
+            expect(await store.peekRefreshToken(token)).toBeNull();
+        }
+    });
+
+    it("does not treat a look at a spent token as a replay", async () => {
+        // Replay detection belongs to the spend. A read that revoked the
+        // family would make a peek a way to destroy someone's grant.
+        await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
+        await store.consumeRefreshToken("rt-1");
+        await store.saveRefreshToken("rt-2", REFRESH_RECORD, soon());
+
+        expect(await store.peekRefreshToken("rt-1")).toBeNull();
+        expect(await store.consumeRefreshToken("rt-2")).not.toBeNull();
+    });
+});
+
 describe("consent and grants", () => {
     beforeEach(async () => {
         await store.registerClient(CLIENT);

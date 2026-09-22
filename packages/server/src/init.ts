@@ -112,7 +112,7 @@ import { createJwksRoutes } from "./auth/jwks-routes";
 import { readRuntimeVersion } from "./boot/version-skew";
 import { supportsRlsScoping } from "./auth/rls-scope";
 import { createOAuthStore } from "./mcp/oauth-store";
-import { createOAuthRoutes } from "./mcp/oauth-routes";
+import { createOAuthRoutes, grantIdentityFromRepository } from "./mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "./mcp/mcp-routes";
 import type { JwtSigningKeyConfig } from "./auth/jwt-keys";
 import type { JobQueueOptions } from "./jobs/types";
@@ -1981,7 +1981,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         // advance. A deployment that would rather pre-register can
                         // switch it off and issue IDs itself — with any spelling
                         // of no; `!== "false"` left it open on `=0`.
-                        allowDynamicRegistration: parseEnvBoolean(process.env.REBASE_MCP_OPEN_REGISTRATION) !== false
+                        allowDynamicRegistration: parseEnvBoolean(process.env.REBASE_MCP_OPEN_REGISTRATION) !== false,
+                        // The repository the admin gate re-reads from, so a
+                        // grant answers to the same revocation, roles and
+                        // account a session does — at consent and every refresh.
+                        identity: grantIdentityFromRepository(adminIdentityRepo)
                     }));
 
                     logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);

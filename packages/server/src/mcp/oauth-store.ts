@@ -68,25 +68,29 @@ export interface RefreshTokenRecord {
     clientId: string;
     uid: string;
     /**
-     * The roles the grant was made with.
+     * The roles the token was minted with.
      *
-     * Carried here because a refresh has no session to re-read them from, and
-     * an access token minted with an empty `roles` is not a smaller grant — it
-     * is a DIFFERENT identity to the database. Any policy written as "a row this
-     * user's role may see" evaluates against an empty list and returns nothing,
-     * so dropping them turns the first token refresh into an integration that
-     * silently stops seeing data.
-     *
-     * The consequence of storing them is that a role change does not reach an
-     * existing grant until the refresh token expires or the user revokes the
-     * client. That is stated in the docs, and it is the trade this design makes
-     * knowingly: the alternative is a user lookup on every refresh, which puts
-     * the auth adapter on a path that currently has no dependency on it.
+     * A refresh re-reads the account's roles when the routes are given an
+     * identity to ask (`McpGrantIdentity`), so these are what a grant falls
+     * back on when there is none — an auth adapter that exposes no user
+     * repository. The fallback is these rather than an empty list because an
+     * access token minted with no `roles` is not a smaller grant — it is a
+     * DIFFERENT identity to the database: any policy written as "a row this
+     * user's role may see" evaluates against an empty list and returns nothing.
      */
     roles: string[];
     scope: string;
     resource: string;
     family: string;
+}
+
+/** A refresh token that could be spent right now, and when it was minted. */
+export interface LiveRefreshToken extends RefreshTokenRecord {
+    /**
+     * When this token — not its family — was issued. Compared with the user's
+     * revocation watermark: a token minted before "sign out everywhere" is void.
+     */
+    issuedAt: Date;
 }
 
 export interface OAuthStore {
@@ -110,6 +114,19 @@ export interface OAuthStore {
      * the same family before returning null.
      */
     consumeRefreshToken(token: string): Promise<RefreshTokenRecord | null>;
+    /**
+     * A live refresh token's grant, WITHOUT spending it.
+     *
+     * What the token endpoint checks before it rotates: whose client it is,
+     * the scope asked for, and whether the account behind it still stands.
+     * Spending first and checking after means a refusal — or a database blip
+     * in the account lookup — leaves the holder with a spent token, and their
+     * retry reads as a replay that kills the family.
+     *
+     * Returns null for anything {@link consumeRefreshToken} would refuse, and
+     * writes nothing: a replayed token is detected when it is spent.
+     */
+    peekRefreshToken(token: string): Promise<LiveRefreshToken | null>;
     revokeFamily(family: string): Promise<void>;
     /**
      * Revoke the family a token belongs to, for RFC 7009 — without spending it.
@@ -442,6 +459,31 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
                 );
             }
             return null;
+        },
+
+        async peekRefreshToken(token) {
+            const rows = await exec(
+                `SELECT family, client_id, uid, roles, scope, resource, issued_at
+                   FROM ${REFRESH}
+                  WHERE token_hash = $1
+                    AND consumed_at IS NULL
+                    AND revoked_at IS NULL
+                    AND expires_at > now()`,
+                [await sha256Hex(token)]
+            );
+            const row = rows[0];
+            if (!row) return null;
+            return {
+                family: String(row.family),
+                clientId: String(row.client_id),
+                uid: String(row.uid),
+                roles: toStringArray(row.roles),
+                scope: String(row.scope),
+                resource: String(row.resource),
+                // A driver may hand a timestamptz back as a Date or as text;
+                // `String(date)` drops the milliseconds, so a Date stays one.
+                issuedAt: row.issued_at instanceof Date ? row.issued_at : new Date(String(row.issued_at))
+            };
         },
 
         async revokeFamily(family) {

@@ -33,8 +33,11 @@ import {
     verifyAccessToken,
     generateMcpAccessToken,
     signPurposeToken,
-    verifyPurposeToken
+    verifyPurposeToken,
+    type AccessTokenPayload
 } from "../auth/jwt.js";
+import type { AuthRepository } from "../auth/interfaces.js";
+import { isAccessTokenRevoked } from "../auth/token-revocation.js";
 import type { OAuthStore } from "./oauth-store.js";
 import { AUTHORIZATION_CODE_TTL_MS } from "./oauth-store.js";
 import {
@@ -79,6 +82,46 @@ export interface OAuthRoutesConfig {
     authBasePath: string;
     /** Whether open registration is permitted. */
     allowDynamicRegistration: boolean;
+    /**
+     * Who a grant's user is now. Absent when the auth adapter exposes no user
+     * repository, and then a grant carries the roles it was consented with.
+     */
+    identity?: McpGrantIdentity;
+}
+
+/**
+ * The account a grant acts for, read where a grant is issued or renewed.
+ *
+ * A refresh has no session to re-read anything from, so without this a grant
+ * is a snapshot of the moment of consent: the roles it was given, for an
+ * account that may since have been demoted, signed out everywhere, or deleted.
+ */
+export interface McpGrantIdentity {
+    /** The account's roles as they are now, or null when it no longer exists. */
+    currentRoles(uid: string): Promise<string[] | null>;
+    /** Where "sign out everywhere" and every password change leave their mark. */
+    revocation?: Pick<AuthRepository, "getTokensValidAfter">;
+}
+
+/**
+ * The grant identity the auth repository can answer, or undefined when the
+ * adapter exposes no repository that can say whether an account exists.
+ *
+ * The same repository the admin gate re-reads roles and the revocation
+ * watermark from, so a grant is held to what a session is held to.
+ */
+export function grantIdentityFromRepository(
+    repo: Partial<Pick<AuthRepository, "getUserById" | "getUserRoleIds" | "getTokensValidAfter">> | undefined
+): McpGrantIdentity | undefined {
+    const getUser = repo?.getUserById?.bind(repo);
+    const getRoles = repo?.getUserRoleIds?.bind(repo);
+    if (!repo || !getUser || !getRoles) return undefined;
+    return {
+        async currentRoles(uid) {
+            return await getUser(uid) ? getRoles(uid) : null;
+        },
+        revocation: repo
+    };
 }
 
 interface AuthorizeRequestClaims {
@@ -376,12 +419,25 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             );
         }
 
-        // Who is consenting is decided HERE, by the same verifier `/api/data`
-        // uses, and never by a form field naming a user.
-        const session = await verifyAccessToken(sessionToken);
+        // Who is consenting is decided HERE, by the same checks `/api/data`
+        // makes, and never by a form field naming a user.
+        const session = await verifiedSession(sessionToken);
         if (!session) {
             return c.redirect(
                 errorRedirect(request.redirectUri, "access_denied", "Not signed in.", request.state, issuer),
+                302
+            );
+        }
+
+        // A guest is a real uid, but not an account, and a grant outlives the
+        // sign-in that made it. The tools scope every call as an account
+        // (`isAnonymous: false`), so a guest's grant would pass every policy
+        // written as `NOT rebase.is_anonymous()`.
+        if (session.isAnonymous) {
+            return c.redirect(
+                errorRedirect(request.redirectUri, "access_denied",
+                    "A guest session cannot connect an application. Sign in with an account.",
+                    request.state, issuer),
                 302
             );
         }
@@ -500,10 +556,16 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             return c.json({ error: "invalid_target", error_description: "resource does not match the authorization request." }, 400);
         }
 
+        const roles = await rolesNow(c, record.uid, record.roles);
+        if (roles instanceof Response) return roles;
+        if (!roles) {
+            return c.json({ error: "invalid_grant", error_description: "The account this code was issued for no longer exists." }, 400);
+        }
+
         return issueTokens(c, {
             clientId: record.clientId,
             uid: record.uid,
-            roles: record.roles,
+            roles,
             scope: record.scope,
             resource: record.resource,
             family: randomHex(16)
@@ -520,16 +582,53 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             return c.json({ error: "invalid_request", error_description: "refresh_token is required." }, 400);
         }
 
-        // The store handles replay detection: a token used twice revokes its
-        // whole family, and this call returns null for the second use.
-        const record = await store.consumeRefreshToken(presented);
+        const invalid = () =>
+            c.json({ error: "invalid_grant", error_description: "Refresh token is invalid, expired or revoked." }, 400);
+
+        // Read, check, and only then spend — see `peekRefreshToken`. Every
+        // refusal below is decided before the token is touched.
+        const record = await store.peekRefreshToken(presented);
         if (!record) {
-            return c.json({ error: "invalid_grant", error_description: "Refresh token is invalid, expired or revoked." }, 400);
+            // Not live: unknown, expired, revoked — or already spent, which is
+            // a replay. Spending it is what runs the replay response, a rule
+            // the store owns; a token that is not live has nothing left to lose.
+            await store.consumeRefreshToken(presented);
+            return invalid();
         }
         if (record.clientId !== client.clientId) {
             await store.revokeFamily(record.family);
             return c.json({ error: "invalid_grant", error_description: "Refresh token was not issued to this client." }, 400);
         }
+
+        // "Sign out everywhere" and every password change stamp a watermark
+        // on the account; a refresh token minted before it is void, as a
+        // session's is. The whole family goes, not just this token.
+        const revocation = config.identity?.revocation;
+        if (revocation && await isAccessTokenRevoked(revocation, {
+            uid: record.uid,
+            iat: Math.floor(record.issuedAt.getTime() / 1000)
+        })) {
+            await store.revokeFamily(record.family);
+            logger.warn("[oauth] Refresh refused: the account revoked its sessions since this token was issued", {
+                uid: record.uid, clientId: record.clientId
+            });
+            return invalid();
+        }
+
+        const roles = await rolesNow(c, record.uid, record.roles);
+        if (roles instanceof Response) return roles;
+        if (!roles) {
+            await store.revokeFamily(record.family);
+            logger.warn("[oauth] Refresh refused: the account no longer exists", {
+                uid: record.uid, clientId: record.clientId
+            });
+            return invalid();
+        }
+
+        // Spent last, and still the single-use guarantee: a second refresh
+        // racing this one between the read and here loses, and the store
+        // treats the loser as the replay it is.
+        if (!await store.consumeRefreshToken(presented)) return invalid();
 
         // A refresh may narrow the scope but never widen it (RFC 6749 §6). The
         // intersection is taken rather than refusing, so a client repeating its
@@ -554,21 +653,45 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             scope = granted.join(" ");
         }
 
-        // The roles are the ones recorded when consent was given, carried on the
-        // refresh record. Minting with an empty list instead would not be a
-        // smaller grant — it is a different identity to the database, and every
-        // role-based policy would start returning nothing the moment a client
-        // first refreshed. The cost of carrying them is that a role change does
-        // not reach an existing grant until the refresh token expires or the
-        // user revokes the client; see `RefreshTokenRecord.roles`.
+        // The account's roles as they are now — see `rolesNow`. A demotion
+        // reaches the grant at its next refresh, within one access-token
+        // lifetime.
         return issueTokens(c, {
             clientId: record.clientId,
             uid: record.uid,
-            roles: record.roles,
+            roles,
             scope,
             resource: record.resource,
             family: record.family
         });
+    }
+
+    /**
+     * The roles a grant's next token carries: the account's own, read now.
+     *
+     * `null` when the account no longer exists. Without an identity to ask,
+     * the roles recorded with the grant — never an empty list, which is not a
+     * smaller grant but a different identity to every role-based policy.
+     *
+     * A lookup that fails answers 503 rather than falling back to the recorded
+     * roles, which may be the very ones a demotion took away; the refresh
+     * token has not been spent, so the client's retry works.
+     */
+    async function rolesNow(
+        c: Context<HonoEnv>,
+        uid: string,
+        recorded: string[]
+    ): Promise<string[] | null | Response> {
+        if (!config.identity) return recorded;
+        try {
+            return await config.identity.currentRoles(uid);
+        } catch (error) {
+            logger.error("[oauth] Could not read the account behind a grant", { uid, error });
+            return c.json({
+                error: "temporarily_unavailable",
+                error_description: "The account behind this grant could not be read. Try again."
+            }, 503);
+        }
     }
 
     async function issueTokens(
@@ -626,8 +749,22 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         // `verifyAccessToken` refuses any purpose-scoped token, so an MCP access
         // token fails here by construction rather than by a check that could be
         // forgotten.
-        const session = await verifyAccessToken(header.slice(7).trim());
+        const session = await verifiedSession(header.slice(7).trim());
         return session ? { uid: session.uid } : null;
+    }
+
+    /**
+     * An ordinary session token, verified as `/api/data` verifies one: the
+     * signature and expiry, then the account's revocation watermark. Without
+     * the second, a token "sign out everywhere" voided still consented here —
+     * minting a grant that outlives the session it was stolen from.
+     */
+    async function verifiedSession(token: string): Promise<AccessTokenPayload | null> {
+        const session = await verifyAccessToken(token);
+        if (!session) return null;
+        const revocation = config.identity?.revocation;
+        if (revocation && await isAccessTokenRevoked(revocation, session)) return null;
+        return session;
     }
 
     router.get("/grants", async (c) => {

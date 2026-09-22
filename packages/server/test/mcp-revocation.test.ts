@@ -20,6 +20,7 @@ import {
     buildApp, authorize, redeem, refreshWith, connectedClient,
     registerClient, PUBLIC_URL, REDIRECT, JWT_SECRET
 } from "./helpers/mcp-harness";
+import { grantIdentityFromRepository, type McpGrantIdentity } from "../src/mcp/oauth-routes";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
@@ -340,5 +341,195 @@ describe("the consent screen's promise", () => {
         const { app } = buildApp();
         const { html } = await authorize(app);
         expect(html).not.toContain(REDIRECT);
+    });
+});
+
+/* ── A grant follows the account it was made for ──────────────────── */
+
+describe("a grant follows the account it was made for", () => {
+    // A refresh has no session behind it, so everything a session is re-checked
+    // for — revocation, roles, the account still existing — has to be re-read
+    // from the account. Without that, a grant is a snapshot of consent: "sign out
+    // everywhere" and a password reset leave it renewing, a demoted admin keeps
+    // admin through `/mcp`, and a deleted account keeps acting.
+
+    /** An account store the grant can be re-checked against, mutable per test. */
+    function accounts() {
+        const roles = new Map<string, string[]>([["user-1", ["admin"]]]);
+        const validAfter = new Map<string, Date>();
+        let failLookups = 0;
+        const identity: McpGrantIdentity = {
+            async currentRoles(uid) {
+                if (failLookups > 0) {
+                    failLookups--;
+                    throw new Error("connection terminated");
+                }
+                return roles.get(uid) ?? null;
+            },
+            revocation: { async getTokensValidAfter(uid) { return validAfter.get(uid) ?? null; } }
+        };
+        return {
+            identity,
+            roles,
+            /** What `revokeAllSessions` stamps. A second ahead, so every token minted so far predates it. */
+            signOutEverywhere(uid: string) { validAfter.set(uid, new Date(Date.now() + 1000)); },
+            failNextLookup() { failLookups = 1; }
+        };
+    }
+
+    const tokenRoles = (accessToken: string) =>
+        (JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString()) as { roles: string[] }).roles;
+
+    async function refreshed(res: Response) {
+        return { status: res.status, body: await res.json() as Record<string, unknown> };
+    }
+
+    it("refuses a guest session at the consent hop", async () => {
+        // An anonymous sign-in is a real uid, but not an account: the tools run
+        // with `isAnonymous: false`, so a guest's grant would pass every policy
+        // written as `NOT rebase.is_anonymous()`.
+        const { app } = buildApp({ identity: accounts().identity });
+        const guest = await generateAccessToken("user-1", [], "aal1", undefined, true);
+        const { decision, code } = await authorize(app, { sessionToken: guest });
+
+        expect(decision.status).toBe(302);
+        expect(new URL(String(decision.headers.get("location"))).searchParams.get("error")).toBe("access_denied");
+        expect(code).toBe("");
+    });
+
+    it("refuses a session token that sign-out-everywhere revoked", async () => {
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const stolen = await sessionFor("user-1", ["admin"]);
+        account.signOutEverywhere("user-1");
+
+        const { decision, code } = await authorize(app, { sessionToken: stolen });
+        expect(new URL(String(decision.headers.get("location"))).searchParams.get("error")).toBe("access_denied");
+        expect(code).toBe("");
+    });
+
+    it("stops renewing after sign-out-everywhere, and the family stays dead", async () => {
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const { clientId, refreshToken } = await connectedClient(app, { roles: ["admin"] });
+
+        account.signOutEverywhere("user-1");
+        const refused = await refreshed(await refreshWith(app, clientId, refreshToken));
+        expect(refused.status).toBe(400);
+        expect(refused.body.error).toBe("invalid_grant");
+
+        // Not merely this attempt: the grant is gone even once the watermark
+        // would no longer say so.
+        account.identity.revocation = undefined;
+        expect((await refreshWith(app, clientId, refreshToken)).status).toBe(400);
+    });
+
+    it("mints each refreshed token with the roles the account has now", async () => {
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const { clientId, refreshToken, accessToken } = await connectedClient(app, { roles: ["admin"] });
+        expect(tokenRoles(accessToken)).toEqual(["admin"]);
+
+        account.roles.set("user-1", ["recruiter"]);
+        const renewed = await refreshed(await refreshWith(app, clientId, refreshToken));
+        expect(renewed.status).toBe(200);
+        expect(tokenRoles(String(renewed.body.access_token))).toEqual(["recruiter"]);
+    });
+
+    it("takes the roles from the account, not from the consenting session's token", async () => {
+        const account = accounts();
+        account.roles.set("user-1", ["recruiter"]);
+        const { app } = buildApp({ identity: account.identity });
+        // A session token minted before a demotion still says admin.
+        const { accessToken } = await connectedClient(app, { roles: ["admin"] });
+        expect(tokenRoles(accessToken)).toEqual(["recruiter"]);
+    });
+
+    it("stops renewing once the account is deleted", async () => {
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const { clientId, refreshToken } = await connectedClient(app, { roles: ["admin"] });
+
+        account.roles.delete("user-1");
+        const refused = await refreshed(await refreshWith(app, clientId, refreshToken));
+        expect(refused.status).toBe(400);
+        expect(refused.body.error).toBe("invalid_grant");
+
+        account.roles.set("user-1", ["admin"]);
+        expect((await refreshWith(app, clientId, refreshToken)).status).toBe(400);
+    });
+
+    it("refuses to redeem a code for an account deleted since consent", async () => {
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const { clientId, code, verifier } = await authorize(app, { roles: ["admin"] });
+
+        account.roles.delete("user-1");
+        const { res, body } = await redeem(app, clientId, code, verifier);
+        expect(res.status).toBe(400);
+        expect(body.error).toBe("invalid_grant");
+        expect(body.access_token).toBeUndefined();
+    });
+
+    it("does not spend the refresh token when the account lookup fails", async () => {
+        // Checked before the token is rotated. A lookup that fails after the
+        // spend leaves the client holding a spent token, and its retry reads as
+        // a replay that revokes the whole grant.
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const { clientId, refreshToken } = await connectedClient(app, { roles: ["admin"] });
+
+        account.failNextLookup();
+        const failed = await refreshWith(app, clientId, refreshToken);
+        expect(failed.status).toBe(503);
+
+        const retried = await refreshed(await refreshWith(app, clientId, refreshToken));
+        expect(retried.status).toBe(200);
+        expect(tokenRoles(String(retried.body.access_token))).toEqual(["admin"]);
+    });
+
+    it("refuses a revoked session on the connected-applications endpoints too", async () => {
+        const account = accounts();
+        const { app } = buildApp({ identity: account.identity });
+        const { clientId } = await connectedClient(app, { roles: ["admin"] });
+        const stolen = await sessionFor("user-1", ["admin"]);
+        account.signOutEverywhere("user-1");
+
+        const list = await app.request("/api/oauth/grants", { headers: { Authorization: `Bearer ${stolen}` } });
+        expect(list.status).toBe(401);
+        const revoke = await app.request(`/api/oauth/grants/${clientId}`, {
+            method: "DELETE", headers: { Authorization: `Bearer ${stolen}` }
+        });
+        expect(revoke.status).toBe(401);
+    });
+});
+
+describe("the grant identity read from the auth repository", () => {
+    /** Shaped like the Postgres repository: methods that need their `this`. */
+    class Repo {
+        private users = new Map<string, string[]>([["user-1", ["editor"]]]);
+        watermark: Date | null = null;
+        async getUserById(uid: string) { return this.users.has(uid) ? { id: uid } as never : null; }
+        async getUserRoleIds(uid: string) { return this.users.get(uid) ?? []; }
+        async getTokensValidAfter() { return this.watermark; }
+    }
+
+    it("answers the account's roles, and null for an account that is gone", async () => {
+        const identity = grantIdentityFromRepository(new Repo());
+        expect(await identity?.currentRoles("user-1")).toEqual(["editor"]);
+        // Not `[]`: the repository answers an empty role list for a missing
+        // row, and an empty list would mint a token for a deleted account.
+        expect(await identity?.currentRoles("user-2")).toBeNull();
+    });
+
+    it("carries the revocation watermark", async () => {
+        const repo = new Repo();
+        repo.watermark = new Date(0);
+        expect(await grantIdentityFromRepository(repo)?.revocation?.getTokensValidAfter?.("user-1")).toEqual(new Date(0));
+    });
+
+    it("is absent for an adapter that exposes no repository to ask", () => {
+        expect(grantIdentityFromRepository(undefined)).toBeUndefined();
+        expect(grantIdentityFromRepository({})).toBeUndefined();
     });
 });

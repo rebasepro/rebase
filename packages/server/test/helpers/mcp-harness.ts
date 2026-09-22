@@ -24,6 +24,7 @@ import { sha256Bytes } from "../../src/utils/portable-crypto";
 import type {
     OAuthStore, OAuthClient, AuthorizationCodeRecord, RefreshTokenRecord
 } from "../../src/mcp/oauth-store";
+import type { McpGrantIdentity } from "../../src/mcp/oauth-routes";
 
 export const PUBLIC_URL = "https://talent.sustentalent.com";
 export const RESOURCE = "https://talent.sustentalent.com/mcp";
@@ -33,7 +34,9 @@ export const JWT_SECRET = "test-secret-for-the-mcp-oauth-flow-0123456789";
 export function memoryStore(): OAuthStore {
     const clients = new Map<string, OAuthClient>();
     const codes = new Map<string, { record: AuthorizationCodeRecord; expiresAt: number; consumed: boolean }>();
-    const refresh = new Map<string, { record: RefreshTokenRecord; expiresAt: number; consumed: boolean; revoked: boolean }>();
+    const refresh = new Map<string, {
+        record: RefreshTokenRecord; issuedAt: number; expiresAt: number; consumed: boolean; revoked: boolean;
+    }>();
     const consents = new Map<string, { scope: string; grantedAt: string }>();
 
     return {
@@ -53,7 +56,14 @@ export function memoryStore(): OAuthStore {
         },
 
         async saveRefreshToken(token, record, expiresAt) {
-            refresh.set(token, { record, expiresAt: expiresAt.getTime(), consumed: false, revoked: false });
+            refresh.set(token, {
+                record, issuedAt: Date.now(), expiresAt: expiresAt.getTime(), consumed: false, revoked: false
+            });
+        },
+        async peekRefreshToken(token) {
+            const entry = refresh.get(token);
+            if (!entry || entry.consumed || entry.revoked || entry.expiresAt < Date.now()) return null;
+            return { ...entry.record, issuedAt: new Date(entry.issuedAt) };
         },
         async consumeRefreshToken(token) {
             const entry = refresh.get(token);
@@ -184,6 +194,7 @@ export interface HarnessOptions {
     allowDynamicRegistration?: boolean;
     driver?: DataDriver;
     collections?: CollectionConfig[];
+    identity?: McpGrantIdentity;
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -205,7 +216,8 @@ export function buildApp(options: HarnessOptions = {}) {
         publicUrl: PUBLIC_URL,
         mcpPath: "/mcp",
         authBasePath: "/api/auth",
-        allowDynamicRegistration: options.allowDynamicRegistration ?? true
+        allowDynamicRegistration: options.allowDynamicRegistration ?? true,
+        identity: options.identity
     }));
     return { app, store };
 }
@@ -231,7 +243,11 @@ export async function registerClient(app: Hono, body: Record<string, unknown> = 
 /** Register a client and walk the flow as far as an authorization code. */
 export async function authorize(
     app: Hono,
-    opts: { scope?: string; uid?: string; roles?: string[]; clientId?: string; verifier?: string } = {}
+    opts: {
+        scope?: string; uid?: string; roles?: string[]; clientId?: string; verifier?: string;
+        /** Consent with this session instead of a fresh one for `uid`/`roles`. */
+        sessionToken?: string;
+    } = {}
 ) {
     let clientId = opts.clientId;
     if (!clientId) {
@@ -253,7 +269,8 @@ export async function authorize(
     const html = await page.text();
     const requestToken = /name="request_token" value="([^"]+)"/.exec(html)?.[1] ?? "";
 
-    const sessionToken = await generateAccessToken(opts.uid ?? "user-1", opts.roles ?? ["recruiter"]);
+    const sessionToken = opts.sessionToken
+        ?? await generateAccessToken(opts.uid ?? "user-1", opts.roles ?? ["recruiter"]);
     const decision = await app.request("/api/oauth/authorize/decision", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },

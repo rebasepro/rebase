@@ -174,11 +174,15 @@ thief, so both lose.
 
 ## Known limits
 
-- **Roles are frozen at consent.** They ride on the refresh record, so a role
-  change does not reach an existing grant until the refresh token expires or the
-  user disconnects the client. The alternative is a user lookup on every
-  refresh, which would put the auth adapter on a path that has no dependency on
-  it today.
+- **A grant is re-checked against the account at every refresh, not every
+  call.** Each refresh re-reads the account's roles, refuses an account that no
+  longer exists, and refuses a token minted before the account's revocation
+  watermark — the one "sign out everywhere" and every password change stamp —
+  revoking the whole family. So a demotion, a deletion or a sign-out reaches a
+  grant within one access-token lifetime, at most an hour. With an auth
+  adapter that exposes no user repository there is nothing to re-read, and a
+  grant keeps the roles it was consented with. A guest (anonymous) session
+  cannot consent at all.
 - **The consent screen appears every time.** Consent is recorded but never read
   to skip the screen: skipping needs to know who the user is at `GET /authorize`,
   before they sign in, and the only thing available there is the refresh cookie —
