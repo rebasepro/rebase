@@ -203,7 +203,6 @@ function matchesCronFields(candidate: Date, fields: CronFields, zone?: string): 
         && fields.minutes.includes(wall.minute);
 }
 
-/** ~1 year in minutes — the walk bound for both search directions. */
 /**
  * How far forward to look for the next matching slot.
  *
@@ -213,6 +212,8 @@ function matchesCronFields(candidate: Date, fields: CronFields, zone?: string): 
  */
 const MAX_SLOT_SEARCH_MINUTES = 4 * 525960 + 1440;
 
+const MINUTE_MS = 60_000;
+
 /**
  * Calculate the next Date after `after` that matches the cron expression.
  * Throws on invalid expressions.
@@ -220,16 +221,21 @@ const MAX_SLOT_SEARCH_MINUTES = 4 * 525960 + 1440;
 export function parseCronExpression(expression: string, after: Date, timezone?: string): Date {
     const fields = parseCronFields(expression);
 
-    // Forward-search from `after + 1 minute`
+    // Forward-search from `after + 1 minute`, stepping real minutes. The local
+    // setters step wall-clock minutes, and across a daylight-saving change
+    // those are not the same: falling back, `setMinutes(+1)` from 02:59 summer
+    // time lands on 03:00 winter time, skipping the repeated hour, and inside
+    // it the result can be an hour in the past. Only the matching reads the
+    // wall clock.
     const candidate = new Date(after);
-    candidate.setSeconds(0, 0);
-    candidate.setMinutes(candidate.getMinutes() + 1);
+    candidate.setUTCSeconds(0, 0);
+    candidate.setTime(candidate.getTime() + MINUTE_MS);
 
     for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES; i++) {
         if (matchesCronFields(candidate, fields, timezone)) {
             return candidate;
         }
-        candidate.setMinutes(candidate.getMinutes() + 1);
+        candidate.setTime(candidate.getTime() + MINUTE_MS);
     }
 
     // No slot inside the window. Refuse rather than invent one.
@@ -269,14 +275,17 @@ export function parseCronExpression(expression: string, after: Date, timezone?: 
 export function findMostRecentSlot(expression: string, from: Date, to: Date, timezone?: string): Date | undefined {
     const fields = parseCronFields(expression);
 
+    // Real minutes, as in `parseCronExpression`: a local-time step back from
+    // 02:00 winter time lands on 01:59 summer time and walks over the repeated
+    // hour.
     const candidate = new Date(to);
-    candidate.setSeconds(0, 0);
+    candidate.setUTCSeconds(0, 0);
 
     for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES && candidate.getTime() >= from.getTime(); i++) {
         if (matchesCronFields(candidate, fields, timezone)) {
             return candidate;
         }
-        candidate.setMinutes(candidate.getMinutes() - 1);
+        candidate.setTime(candidate.getTime() - MINUTE_MS);
     }
 
     return undefined;
