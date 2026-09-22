@@ -5,7 +5,8 @@ import { drainBackgroundWork } from "../functions/wait-until";
 
 interface ShutdownConfig {
     server: Server;
-    cronScheduler?: { stop(): void };
+    /** Structural, for the same no-circular-imports reason as the backend below. */
+    cronScheduler?: { stop(timeoutMs?: number): Promise<void> | void };
     /** Structural, for the same no-circular-imports reason as the backend below. */
     jobQueue?: { stop(timeoutMs?: number): Promise<void> };
     /** Structural, same reason. */
@@ -125,10 +126,10 @@ export function installShutdownHandlers(
 }
 
 /**
- * The share of the shutdown budget spent waiting for work in flight — jobs
- * and `waitUntil()` tasks. The rest is kept for the teardown after it, so a
- * handler that never settles costs the work it was doing, not the realtime
- * teardown and the HTTP server's close.
+ * The share of the shutdown budget spent waiting for work in flight — cron
+ * runs, jobs and `waitUntil()` tasks. The rest is kept for the teardown after
+ * it, so a handler that never settles costs the work it was doing, not the
+ * realtime teardown and the HTTP server's close.
  */
 const WORK_DRAIN_SHARE = 2 / 3;
 
@@ -155,11 +156,17 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
             (async () => {
                 logger.info("Shutting down Rebase Backend...");
 
-                // 1. Stop cron scheduler
-                if (config.cronScheduler) {
-                    config.cronScheduler.stop();
-                    logger.info("Cron scheduler stopped");
-                }
+                // 1. Stop the cron scheduler, and wait for a run in flight —
+                // alongside the job drain below, within the same budget, since
+                // the pool closing under a handler is the same failure either
+                // way. A run still going when the budget runs out has its
+                // `ctx.signal` aborted and is recorded as stopped.
+                const cronStopped = config.cronScheduler
+                    ? Promise.resolve(config.cronScheduler.stop(workBudget())).then(
+                        () => logger.info("Cron scheduler stopped"),
+                        (err: unknown) => logger.warn("Error stopping the cron scheduler:", { error: err })
+                    )
+                    : undefined;
 
                 // 1a. Stop the audit timer. Nothing waits on it: a scan in
                 // flight is a read-only query that ends with the connection.
@@ -180,6 +187,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     await config.jobQueue.stop(workBudget());
                     logger.info("Job queue stopped");
                 }
+                await cronStopped;
 
                 // 1c. Wait for post-response work handed to `waitUntil()`.
                 //

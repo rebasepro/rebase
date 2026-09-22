@@ -338,6 +338,13 @@ export class CronScheduler {
     private started = false;
     private store?: CronStore;
     private client?: RebaseServerClient;
+    /**
+     * Work `stop()` has to wait for: every run executing right now, and every
+     * run's log write still on its way to the store.
+     */
+    private inFlight = new Set<Promise<unknown>>();
+    /** The controller that ends each executing run — what `stop()` aborts. */
+    private runControllers = new Set<AbortController>();
 
     /**
      * Set the server singleton to make it available to cron job handlers.
@@ -480,15 +487,45 @@ export class CronScheduler {
     }
 
     /**
-     * Stop the scheduler and clear all timers.
+     * Stop the scheduler: clear every timer, then wait for the runs executing
+     * right now — for at most `timeoutMs` when given.
      *
-     * Currently-executing handlers run to completion (they are async),
-     * but no further scheduling occurs after stop.
+     * A run still going when the budget runs out has its `ctx.signal` aborted
+     * and ends there, recorded as a failure that says why. Its slot stays
+     * claimed, so no other instance re-runs it; a handler that must not be cut
+     * short should watch its signal and leave its work resumable.
+     *
+     * Nothing is scheduled after `stop()`, whether or not the returned promise
+     * is awaited: the timers are cleared before it first yields.
      */
-    stop(): void {
+    async stop(timeoutMs?: number): Promise<void> {
         this.started = false;
         for (const [id] of this.jobs) {
             this.stopJob(id);
+        }
+        if (this.inFlight.size === 0) return;
+
+        const settled = Promise.allSettled([...this.inFlight]).then(() => true);
+        if (timeoutMs === undefined) {
+            await settled;
+            return;
+        }
+        let budget: ReturnType<typeof setTimeout> | undefined;
+        const finished = await Promise.race([
+            settled,
+            new Promise<false>((resolve) => {
+                budget = setTimeout(() => resolve(false), timeoutMs);
+                if (budget && typeof budget === "object" && "unref" in budget) {
+                    budget.unref();
+                }
+            })
+        ]);
+        clearTimeout(budget);
+        if (finished || this.runControllers.size === 0) return;
+
+        logger.warn(`[cron] ${this.runControllers.size} run(s) still executing after ${timeoutMs}ms — aborting them`);
+        for (const controller of this.runControllers) {
+            controller.abort(new Error("The server is shutting down; the run was stopped before it finished"));
         }
     }
 
@@ -853,9 +890,36 @@ export class CronScheduler {
      * - Persists to store (non-blocking) if available
      * - Always restores state even on catastrophic errors
      */
-    private async executeJob(
+    private executeJob(
         job: RegisteredJob,
         manual: boolean,
+        seedLog?: string
+    ): Promise<CronJobLogEntry> {
+        // Aborted when the run is over before its handler is: the timeout
+        // below, or `stop()` giving up on it. Without it the timeout only
+        // stopped the scheduler waiting: the handler's `fetch` kept its socket,
+        // so a job whose timeout matches its interval leaked one abandoned
+        // request per tick while every run was already marked failed.
+        const abort = new AbortController();
+        this.runControllers.add(abort);
+        const run = this.runJob(job, manual, abort, seedLog);
+        this.track(run);
+        return run.finally(() => {
+            this.runControllers.delete(abort);
+        });
+    }
+
+    /** Hold `stop()` until `work` settles. */
+    private track(work: Promise<unknown>): void {
+        this.inFlight.add(work);
+        const release = () => { this.inFlight.delete(work); };
+        work.then(release, release);
+    }
+
+    private async runJob(
+        job: RegisteredJob,
+        manual: boolean,
+        abort: AbortController,
         seedLog?: string
     ): Promise<CronJobLogEntry> {
         const startedAt = new Date();
@@ -867,12 +931,6 @@ export class CronScheduler {
 
         // Set executing flag — prevents concurrent runs
         job.executing = true;
-
-        // Aborted when the timeout below wins the race. Without it the timeout
-        // only stopped the scheduler waiting: the handler's `fetch` kept its
-        // socket, so a job whose timeout matches its interval leaked one
-        // abandoned request per tick while every run was already marked failed.
-        const abort = new AbortController();
 
         const ctx: CronJobContext = {
             jobId: job.id,
@@ -899,28 +957,31 @@ export class CronScheduler {
         let error: string | undefined;
         let result: unknown;
 
+        // The run ends when the handler settles or when `abort` fires,
+        // whichever is first — so an abort ends the run even for a handler
+        // that ignores its signal, and the run is recorded rather than left
+        // "running" forever.
+        const aborted = new Promise<never>((_, reject) => {
+            const end = () => reject(abort.signal.reason);
+            if (abort.signal.aborted) end();
+            else abort.signal.addEventListener("abort", end, { once: true });
+        });
+        // Handled here as well as by the race: a handler that throws before
+        // the race is entered leaves nothing else listening.
+        aborted.catch(() => undefined);
+
         try {
             // Race with timeout
             const timeout = (job.definition.timeoutSeconds ?? 300) * 1000;
-            const handlerPromise = Promise.resolve(job.definition.handler(ctx));
-            let timeoutHandle: ReturnType<typeof setTimeout>;
-            const timeoutPromise = new Promise<never>((_, reject) => {
-                timeoutHandle = setTimeout(
-                    () => {
-                        // Abort first, so the handler's in-flight work is
-                        // cancelled rather than left running past the run it
-                        // belongs to.
-                        abort.abort(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`));
-                        reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`));
-                    },
-                    timeout
-                );
-            });
+            const timeoutHandle = setTimeout(
+                () => abort.abort(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)),
+                timeout
+            );
 
             try {
-                result = await Promise.race([handlerPromise, timeoutPromise]);
+                result = await Promise.race([Promise.resolve(job.definition.handler(ctx)), aborted]);
             } finally {
-                clearTimeout(timeoutHandle!);
+                clearTimeout(timeoutHandle);
             }
         } catch (err: unknown) {
             success = false;
@@ -961,11 +1022,12 @@ export class CronScheduler {
             job.logs.shift();
         }
 
-        // Persist to database (non-blocking)
+        // Persist to database (non-blocking for the run, but tracked, so a
+        // shutdown does not close the pool under the write)
         if (this.store) {
-            this.store.insertLog(logEntry).catch((persistErr) => {
+            this.track(this.store.insertLog(logEntry).catch((persistErr) => {
                 logger.error(`[cron] Failed to persist log for "${job.id}"`, { error: persistErr });
-            });
+            }));
         }
 
         if (success) {

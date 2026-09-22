@@ -446,6 +446,79 @@ reason: "already_executing" });
         });
     });
 
+    // ── Stopping with a run in flight ───────────────────────────────
+
+    describe("stop with a run in flight", () => {
+        // A deploy's SIGTERM used to find `stop()` clearing timers and
+        // returning at once: the backend went on to close the pool under a
+        // running handler, whose signal was never aborted and whose run was
+        // never recorded.
+        beforeEach(() => { jest.useRealTimers(); });
+
+        function recordingStore() {
+            return {
+                ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+                insertLog: jest.fn<(entry: CronJobLogEntry) => Promise<void>>().mockResolvedValue(undefined),
+                fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>>().mockResolvedValue(new Map())
+            };
+        }
+
+        it("waits for a run that finishes inside the budget, and its log", async () => {
+            const store = recordingStore();
+            let finished = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("nightly", {
+                handler: async () => {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    finished = true;
+                }
+            })]);
+
+            const run = scheduler.triggerJob("nightly");
+            await scheduler.stop(2_000);
+
+            expect(finished).toBe(true);
+            expect(store.insertLog).toHaveBeenCalledTimes(1);
+            expect(store.insertLog.mock.calls[0]![0].success).toBe(true);
+            await run;
+        });
+
+        it("aborts a run that outlasts the budget, and records why it ended", async () => {
+            const store = recordingStore();
+            let signal: AbortSignal | undefined;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("stuck", {
+                timeoutSeconds: 300,
+                // Ignores its signal, as plenty of handlers will.
+                handler: (ctx) => { signal = ctx.signal; return new Promise(() => { /* never settles */ }); }
+            })]);
+
+            const run = scheduler.triggerJob("stuck");
+            const started = Date.now();
+            await scheduler.stop(50);
+
+            expect(Date.now() - started).toBeLessThan(1_000);
+            expect(signal?.aborted).toBe(true);
+            // The run ends with the abort even though the handler never
+            // settles, so it is recorded rather than left "running".
+            const log = await run;
+            expect(log!.success).toBe(false);
+            expect(log!.error).toMatch(/shutting down/i);
+            expect(scheduler.getJob("stuck")?.state).toBe("error");
+            expect(store.insertLog).toHaveBeenCalledTimes(1);
+        });
+
+        it("returns at once with nothing running", async () => {
+            scheduler.registerJobs([makeJob("idle")]);
+            scheduler.start();
+            const started = Date.now();
+            await scheduler.stop(5_000);
+            expect(Date.now() - started).toBeLessThan(100);
+            expect(scheduler.getJob("idle")?.nextRunAt).toBeUndefined();
+        });
+    });
+
     // ── Logs ring buffer ────────────────────────────────────────────
 
     describe("getJobLogs", () => {

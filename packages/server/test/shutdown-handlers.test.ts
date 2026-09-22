@@ -2,6 +2,7 @@ import { createServer } from "http";
 import type { RealtimeProvider } from "@rebasepro/types";
 import { createShutdown, installShutdownHandlers } from "../src/init/shutdown";
 import { createJobQueue } from "../src/jobs";
+import { CronScheduler } from "../src/cron/cron-scheduler";
 import type { JobRecord, JobStore } from "../src/jobs";
 
 // Use SIGUSR2 in tests so we never trigger listeners that other tooling
@@ -186,6 +187,45 @@ describe("createShutdown", () => {
         expect(Date.now() - started).toBeLessThan(1_000);
         // The job drain gave up inside the budget, leaving time for the rest.
         expect(closedByShutdown).toBe(true);
+    });
+
+    it("waits for a cron run in flight before tearing down under it", async () => {
+        const cronScheduler = new CronScheduler();
+        let finished = false;
+        cronScheduler.registerJobs([{
+            id: "nightly",
+            definition: {
+                schedule: "0 3 * * *",
+                handler: async () => {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    finished = true;
+                }
+            }
+        }]);
+        const run = cronScheduler.triggerJob("nightly");
+
+        await createShutdown({ server: createServer(), cronScheduler, realtimeServices: {} })(3_000);
+
+        expect(finished).toBe(true);
+        expect((await run)?.success).toBe(true);
+    });
+
+    it("aborts a cron run that outlasts the budget, rather than leaving it running", async () => {
+        const cronScheduler = new CronScheduler();
+        let signal: AbortSignal | undefined;
+        cronScheduler.registerJobs([{
+            id: "stuck",
+            definition: {
+                schedule: "0 3 * * *",
+                handler: (ctx) => { signal = ctx.signal; return new Promise<void>(() => { /* never settles */ }); }
+            }
+        }]);
+        const run = cronScheduler.triggerJob("stuck");
+
+        await createShutdown({ server: createServer(), cronScheduler, realtimeServices: {} })(300);
+
+        expect(signal?.aborted).toBe(true);
+        expect((await run)?.success).toBe(false);
     });
 
     it("resolves at its timeout even when a teardown step hangs", async () => {
