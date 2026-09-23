@@ -111,6 +111,7 @@ export const copyEntityAction: EntityAction = {
         sidePanelController,
         highlightEntity,
         unhighlightEntity,
+        onCollectionChange,
         openEntityMode
     }): Promise<void> {
         if (!entity) {
@@ -137,6 +138,9 @@ export const copyEntityAction: EntityAction = {
             copy: true,
             sidePanelController,
             onClose: () => unhighlightEntity?.(entity),
+            // The copy is a new row: saved from a side panel, it changes what
+            // the collection counts, the way a delete does.
+            onUpdate: onCollectionChange,
             navigation: context.urlController
         });
 

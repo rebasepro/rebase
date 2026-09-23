@@ -1,5 +1,5 @@
 
-import type { UrlController, SidePanelController, NavigateOptions, AdminCollection } from "@rebasepro/cms-types";
+import type { UrlController, SidePanelBindingProps, SidePanelController, NavigateOptions, AdminCollection } from "@rebasepro/cms-types";
 import { withListState } from "./view_mode";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
@@ -19,6 +19,7 @@ export function navigateToEntity({
     defaultValues,
     sidePanelController,
     onClose,
+    onUpdate,
     navigation,
     replace
 }:
@@ -41,6 +42,12 @@ export function navigateToEntity({
         path: string;
         sidePanelController: SidePanelController;
         onClose?: () => void;
+        /**
+         * Called when the side panel or dialog saves the record. A full-screen
+         * record replaces the view that opened it, and that view reads
+         * everything again when it comes back, so nothing is called there.
+         */
+        onUpdate?: SidePanelBindingProps["onUpdate"];
         navigation: UrlController;
         replace?: boolean;
     }) {
@@ -55,6 +62,7 @@ export function navigateToEntity({
             collection,
             updateUrl: openEntityMode !== "dialog",
             onClose,
+            onUpdate,
             defaultValues
         });
 

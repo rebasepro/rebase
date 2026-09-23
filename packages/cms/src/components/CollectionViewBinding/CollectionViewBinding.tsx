@@ -450,21 +450,12 @@ const CollectionViewBindingInner = React.memo(
 
         }, [sidePanelController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController]);
 
-        const onNewClick = useCallback(() => {
-            const collection = collectionRef.current;
-            analyticsController.onAnalyticsEvent?.("new_entity_click", {
-                path: path
-            });
-            navigateToEntity({
-                openEntityMode,
-                collection,
-                entityId: undefined,
-                path: path,
-                sidePanelController,
-                navigation: urlController,
-                onClose: unselectNavigatedEntity
-            })
-        }, [path, sidePanelController, openEntityMode, urlController, unselectNavigatedEntity, analyticsController]);
+        // A record created in the side panel or a dialog leaves this view
+        // mounted, so it says so the way a delete does: the toolbar counts
+        // again, and a table without realtime reads its rows again.
+        const onCreatedInPanel = useCallback(() => {
+            setLastDeleteTimestamp(Date.now());
+        }, []);
 
         /**
          * Attach rows that already exist to this parent.
@@ -523,9 +514,14 @@ const CollectionViewBindingInner = React.memo(
                 path: path,
                 sidePanelController,
                 navigation: urlController,
-                onClose: unselectNavigatedEntity
+                onClose: unselectNavigatedEntity,
+                onUpdate: onCreatedInPanel
             });
-        }, [path, sidePanelController, openEntityMode, urlController, unselectNavigatedEntity]);
+        }, [path, sidePanelController, openEntityMode, urlController, unselectNavigatedEntity, onCreatedInPanel]);
+
+        // The toolbar's "new" and a board column's "add" open the same form,
+        // one of them with values filled in.
+        const onNewClick = useCallback(() => openNewDocument(), [openNewDocument]);
 
         const onMultipleDeleteClick = () => {
             analyticsController.onAnalyticsEvent?.("multiple_delete_dialog_open", {
