@@ -96,3 +96,19 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
 
     return argv;
 }
+
+/**
+ * `atlas migrate apply`'s own arguments for `rebase db migrate`.
+ *
+ * `positionals` are what is left of the user's line once every flag the
+ * driver knows has been consumed — at most the optional amount Atlas takes. A
+ * flag reaching here is a flag Atlas rejects before doing any work.
+ */
+export function migrateApplyArgs(positionals: string[], baseline: string | undefined): string[] {
+    return [
+        "apply",
+        "--dir", "file://drizzle/migrations",
+        ...(baseline ? ["--baseline", baseline] : []),
+        ...positionals.filter(positional => positional !== "migrate")
+    ];
+}

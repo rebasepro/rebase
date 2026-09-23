@@ -33,13 +33,31 @@ import arg from "arg";
  * the thing to re-run with. Rejecting any of the three would make the driver
  * refuse commands the CLI documents.
  */
-const RELAYED_FLAGS: arg.Spec = {
+export const RELAYED_FLAGS = {
     "--database-url": String,
     "--docker": Boolean,
     "--debug": Boolean,
     "--help": Boolean,
     "-h": "--help"
-};
+} satisfies arg.Spec;
+
+/**
+ * Parse a driver command's line — `["db", "<subcommand>", …]` — with the
+ * relayed flags declared alongside the command's own.
+ *
+ * Every driver parser is permissive, and an undeclared flag in a permissive
+ * parse is a positional. The positionals are what `db migrate` hands
+ * `atlas migrate apply`, what `db generate` names its migration after and
+ * which backup `db restore` restores, so a relayed flag left undeclared was
+ * read as one of those: `rebase db migrate --docker` died on Atlas's
+ * `unknown flag: --docker` after it had already written the auth schema.
+ */
+export function parseDriverLine<S extends arg.Spec>(
+    spec: S,
+    args: string[]
+): arg.Result<typeof RELAYED_FLAGS & S> {
+    return arg({ ...RELAYED_FLAGS, ...spec }, { argv: args.slice(2), permissive: true });
+}
 
 /** Keyed by `"<domain> <subcommand>"`, the way the user types it. */
 export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {

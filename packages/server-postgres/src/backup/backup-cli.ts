@@ -12,6 +12,7 @@ import chalk from "chalk";
 // Aliased: `out` is already a local in two of the commands below (the `--out`
 // backup destination).
 import { out as print, outWarn, outError } from "../cli-output";
+import { parseDriverLine } from "../cli-flags";
 import type { StorageController } from "@rebasepro/server";
 import { parseEnvBoolean } from "@rebasepro/types";
 import {
@@ -219,19 +220,23 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────
 // rebase db restore <backup>
 // ─────────────────────────────────────────────────────────────────────────
+const RESTORE_FLAGS = {
+    "--target-db": String,
+    "--create-db": Boolean,
+    "--clean": Boolean,
+    "--no-owner": Boolean,
+    "--continue-on-error": Boolean,
+    "--yes": Boolean,
+    "-y": "--yes"
+} satisfies arg.Spec;
+
+/** Parse a `rebase db restore …` line; the first positional is the backup. */
+export function parseRestoreLine(rawArgs: string[]) {
+    return parseDriverLine(RESTORE_FLAGS, rawArgs);
+}
+
 export async function restoreCommand(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--target-db": String,
-            "--create-db": Boolean,
-            "--clean": Boolean,
-            "--no-owner": Boolean,
-            "--continue-on-error": Boolean,
-            "--yes": Boolean,
-            "-y": "--yes"
-        },
-        { argv: rawArgs.slice(2), permissive: true }
-    );
+    const args = parseRestoreLine(rawArgs);
 
     const backupArg = args._[0];
     if (!backupArg || rawArgs.includes("--help")) {

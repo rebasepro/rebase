@@ -55,9 +55,9 @@ import {
     describeConflict
 } from "./schema/generated-column-conflicts";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
-import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
+import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
-import { assertKnownFlags, collectionsPathIn } from "./cli-flags";
+import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
 import { backupActionOf } from "./backup-argv";
 
@@ -286,6 +286,21 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
     return !result.empty;
 }
 
+/**
+ * The flags `rebase db` reads for the subcommands it parses itself. Hoisted
+ * and named `…FLAGS` so the documentation verifier, which reads specs out of
+ * this source, sees them.
+ */
+const DB_FLAGS = {
+    "--collections": String,
+    "--allow-destructive": Boolean,
+    "--dry-run": Boolean,
+    "--yes": Boolean,
+    "--baseline": String,
+    "-c": "--collections",
+    "-y": "--yes"
+} satisfies arg.Spec;
+
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const VALID_ACTIONS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
@@ -325,21 +340,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         return;
     }
 
-    const argsList = arg(
-        {
-            "--collections": String,
-            "--allow-destructive": Boolean,
-            "--dry-run": Boolean,
-            "--yes": Boolean,
-            "--baseline": String,
-            "-c": "--collections",
-            "-y": "--yes"
-        },
-        {
-            argv: rawArgs.slice(2),
-            permissive: true
-        }
-    );
+    const argsList = parseDriverLine(DB_FLAGS, rawArgs);
     const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
 
     if (subcommand === "generate") {
@@ -698,7 +699,6 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (databaseUrl) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
-            const extraArgs = argsList._.filter(arg => arg !== "migrate");
             // `--baseline <version>` is relayed to Atlas as its own: it records
             // the version as already applied and starts from the next one. The
             // database a Rebase boot has provisioned is exactly the case it is
@@ -709,16 +709,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 out(chalk.gray(`  Recording ${baseline} as already applied, then migrating from the next one.`));
                 out("");
             }
-            await runAtlas(
-                "migrate",
-                [
-                    "apply",
-                    "--dir", "file://drizzle/migrations",
-                    ...(baseline ? ["--baseline", baseline] : []),
-                    ...extraArgs
-                ],
-                collectionsPath
-            );
+            await runAtlas("migrate", migrateApplyArgs(argsList._, baseline), collectionsPath);
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
