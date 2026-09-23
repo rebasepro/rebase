@@ -94,4 +94,24 @@ describe("importing a live policy from the RLS tab", () => {
         expect(rule.pgRoles).toEqual(["rebase_user"]);
         expect(rule.roles).toBeUndefined();
     });
+
+    it("keeps the WITH CHECK of an INSERT policy, which has no USING", async () => {
+        const rule = await importOnly({
+            policyname: "authors_insert",
+            permissive: "PERMISSIVE",
+            roles: "{public}",
+            cmd: "INSERT",
+            qual: null,
+            with_check: "(author_id = rebase.uid())"
+        });
+
+        // Dropped, the rule is roles-only with no roles, which compiles to
+        // `WITH CHECK (false)` — the imported policy would stop every insert.
+        expect(rule).toEqual({
+            name: "authors_insert",
+            operation: "insert",
+            mode: "permissive",
+            withCheck: "(author_id = rebase.uid())"
+        });
+    });
 });

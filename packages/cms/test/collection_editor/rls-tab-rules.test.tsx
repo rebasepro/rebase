@@ -1,10 +1,12 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 /**
- * Which live table the collection editor's RLS tab reads policies from.
+ * What the collection editor's RLS tab writes into `securityRules`, and which
+ * live table it reads policies from.
  *
- * Importing a live policy is covered in `rls-tab-import.test.tsx`.
+ * Importing a live policy is covered in `rls-tab-import.test.tsx`; this file
+ * covers the tab's own editor and the table it looks at.
  */
 
 const setFieldValue = jest.fn();
@@ -55,6 +57,105 @@ beforeEach(() => {
     livePolicies = [];
     policyQueries.length = 0;
     values = { slug: "posts", name: "Posts", table: "posts", properties: {}, securityRules: [] };
+});
+
+/** The rules the tab last wrote. */
+async function savedRules(): Promise<Record<string, unknown>[]> {
+    await waitFor(() => expect(setFieldValue).toHaveBeenCalledTimes(1));
+    const [field, rules] = setFieldValue.mock.calls[0] as [string, Record<string, unknown>[]];
+    expect(field).toBe("securityRules");
+    return rules;
+}
+
+describe("creating a policy in the RLS tab", () => {
+    it("keeps the WITH CHECK of an INSERT policy, which has no USING", async () => {
+        render(<CollectionRLSTab/>);
+
+        fireEvent.click(screen.getByRole("button", { name: "CREATE POLICY" }));
+        fireEvent.change(await screen.findByLabelText("studio_policy_name"), { target: { value: "authors_insert" } });
+        fireEvent.click(screen.getByRole("button", { name: "INSERT" }));
+        // INSERT has no USING clause, so the editor does not offer one.
+        expect(screen.queryByLabelText("studio_policy_using_expr")).toBeNull();
+        fireEvent.change(screen.getByLabelText("studio_policy_check_expr"), { target: { value: "author_id = rebase.uid()" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        const rules = await savedRules();
+        // Without `withCheck` this is a roles-only rule with no roles, which
+        // the generator compiles to `WITH CHECK (false)`: nobody can insert.
+        expect(rules).toEqual([
+            {
+                name: "authors_insert",
+                operation: "insert",
+                mode: "permissive",
+                roles: [],
+                withCheck: "author_id = rebase.uid()"
+            }
+        ]);
+    });
+});
+
+describe("editing a rule in the RLS tab", () => {
+    /** Open the editor on the rule at `index`. */
+    async function edit(index: number) {
+        render(<CollectionRLSTab/>);
+        fireEvent.click(screen.getAllByRole("button", { name: "EDIT" })[index]);
+        return await screen.findByLabelText("studio_policy_name");
+    }
+
+    it("keeps what the editor does not show", async () => {
+        values.securityRules = [
+            { name: "own_rows", operations: ["select", "update"], ownerField: "user_id", pgRoles: ["app_user"] }
+        ];
+        fireEvent.change(await edit(0), { target: { value: "own_rows_v2" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        // The editor has no field for `ownerField`, `operations` or `pgRoles`.
+        // Rebuilt from the form, the rule came back roles-only with no roles —
+        // `USING (false)` on every operation — from a rename.
+        expect(await savedRules()).toEqual([
+            { name: "own_rows_v2", operations: ["select", "update"], ownerField: "user_id", pgRoles: ["app_user"] }
+        ]);
+    });
+
+    it("replaces the operations when the command is changed", async () => {
+        values.securityRules = [{ name: "own_rows", operations: ["select", "update"], ownerField: "user_id" }];
+        await edit(0);
+        fireEvent.click(screen.getByRole("button", { name: "DELETE" }));
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        // `operations` wins over `operation`: left in place, the edit is a no-op.
+        expect(await savedRules()).toEqual([{ name: "own_rows", operation: "delete", ownerField: "user_id" }]);
+    });
+
+    it("edits the unnamed rule it was opened on", async () => {
+        values.securityRules = [
+            { operation: "select", access: "public" },
+            { operation: "delete", roles: ["admin"] }
+        ];
+        fireEvent.change(await edit(0), { target: { value: "public_read" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        // Found by `name`, an unnamed rule matched nothing, and the save wrote
+        // the rules back unchanged.
+        expect(await savedRules()).toEqual([
+            { name: "public_read", operation: "select", access: "public" },
+            { operation: "delete", roles: ["admin"] }
+        ]);
+    });
+
+    it("deletes only the unnamed rule it was asked to", async () => {
+        values.securityRules = [
+            { operation: "select", access: "public" },
+            { operation: "delete", roles: ["admin"] }
+        ];
+        render(<CollectionRLSTab/>);
+        const row = screen.getAllByRole("button", { name: "EDIT" })[0].parentElement!;
+        const [, remove] = within(row).getAllByRole("button");
+        fireEvent.click(remove);
+
+        // Filtered by `name`, every unnamed rule went with it.
+        expect(await savedRules()).toEqual([{ operation: "delete", roles: ["admin"] }]);
+    });
 });
 
 describe("the live table the RLS tab reads", () => {

@@ -42,12 +42,40 @@ import { useFormex } from "@rebasepro/forms";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { useRebaseContext, useTranslation } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { isPostgresCollectionConfig, RLS_ROLES_SQL, RLS_UID_SQL, type PostgresPolicy, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
+import {
+    isPostgresCollectionConfig,
+    RLS_ROLES_SQL,
+    RLS_UID_SQL,
+    type PolicyExpression,
+    type PostgresPolicy,
+    type SecurityOperation,
+    type SecurityRule,
+    type SecurityRuleBase
+} from "@rebasepro/types";
 
 export type { PostgresPolicy } from "@rebasepro/types";
 
 type CollectionWithSecurity = AdminCollection & {
     securityRules?: SecurityRule[];
+};
+
+/**
+ * The security-rule fields a {@link PostgresPolicy} describes, and the ones an
+ * edit carries over from the rule it changes.
+ *
+ * Wider than any one `SecurityRule` variant on purpose — the same shape as
+ * Studio's `PolicyRule`: a policy with only a `WITH CHECK` clause, which is
+ * every INSERT-only policy, carries `withCheck` and no `using`. The raw-SQL
+ * variant requires `using` and the roles-only one forbids `withCheck`, but the
+ * generator compiles the pair exactly as written.
+ */
+type PolicyRule = SecurityRuleBase & {
+    using?: string;
+    withCheck?: string;
+    ownerField?: string;
+    access?: "public";
+    condition?: PolicyExpression;
+    check?: PolicyExpression;
 };
 
 /**
@@ -82,30 +110,23 @@ function toSecurityMode(permissive: PostgresPolicy["permissive"] | undefined): S
 }
 
 /**
- * Build a {@link SecurityRule} from a `pg_policies` row.
+ * Build a rule from a `pg_policies` row, or from what the inline editor saved.
  *
- * `SecurityRule` is a discriminated union and this is the part the local shadow
- * type flattened away: a raw-SQL rule *requires* `using`, so a policy with only
- * a `WITH CHECK` clause — every INSERT-only policy — is not one. It is a
- * roles-only rule carrying the check. Assembling the object field-by-field
- * against `operation?: string` accepted all of these and told the compiler
- * nothing.
+ * The WITH CHECK is kept whether or not there is a USING. It used to be kept
+ * only beside one, because the raw-SQL `SecurityRule` requires `using` — so
+ * every INSERT-only policy, which has only a check, came out as a roles-only
+ * rule, and a roles-only rule with no roles compiles to `WITH CHECK (false)`:
+ * saved or imported here, the policy stopped every insert.
  */
-function toSecurityRule(policy: Partial<PostgresPolicy>): SecurityRule {
-    const base = {
+function toSecurityRule(policy: Partial<PostgresPolicy>): PolicyRule {
+    return {
         name: policy.policyname ?? "",
         operation: toSecurityOperation(policy.cmd),
         mode: toSecurityMode(policy.permissive),
-        roles: policy.roles ? [...policy.roles] : undefined
+        roles: policy.roles ? [...policy.roles] : undefined,
+        ...(policy.qual ? { using: policy.qual } : {}),
+        ...(policy.with_check ? { withCheck: policy.with_check } : {})
     };
-    if (policy.qual) {
-        return {
-            ...base,
-            using: policy.qual,
-            withCheck: policy.with_check || undefined
-        };
-    }
-    return base;
 }
 
 /**
@@ -122,16 +143,74 @@ function toSecurityRule(policy: Partial<PostgresPolicy>): SecurityRule {
  * `pgRoles` is omitted at the `public` default, so a rule that targets every
  * connection — nearly all of them — carries no advanced field it does not need.
  */
-function livePolicyToSecurityRule(policy: PostgresPolicy): SecurityRule {
+function livePolicyToSecurityRule(policy: PostgresPolicy): PolicyRule {
     const { roles, ...rest } = policy;
     const rule = toSecurityRule(rest);
     const targetsEveryone = roles.length === 0 || (roles.length === 1 && roles[0] === "public");
     return targetsEveryone ? rule : { ...rule, pgRoles: [...roles] };
 }
 
+/**
+ * The rule with what the editor changed, and nothing else.
+ *
+ * The editor shows a rule as a policy — name, command, mode, application roles
+ * and raw USING / WITH CHECK — and has no field for `ownerField`, `access`, a
+ * structured `condition`, `operations` (it shows them as ALL) or `pgRoles`.
+ * The rule used to be rebuilt from the form, which dropped all of them:
+ * renaming an owner rule saved a roles-only rule with no roles, which compiles
+ * to `USING (false)`. So a field is only written when it differs from what the
+ * editor was opened with. A condition typed in replaces the rule's condition
+ * whole — the forms are exclusive.
+ *
+ * Studio's RLS editor does the same in `policyRules.ts`; there the editor's
+ * roles are the policy's `TO` list, `pgRoles`, and here they are `roles`.
+ */
+function editedRule(rule: SecurityRule, original: PostgresPolicy, edited: Partial<PostgresPolicy>): PolicyRule {
+    const next = toSecurityRule(edited);
+    const result: PolicyRule = { ...rule };
+
+    if ((edited.policyname ?? "") !== original.policyname) {
+        if (next.name) result.name = next.name;
+        else delete result.name;
+    }
+    if (edited.cmd !== original.cmd) {
+        // `operations` wins over `operation`, so it has to go for the new
+        // command to mean anything.
+        delete result.operations;
+        result.operation = next.operation;
+    }
+    if (edited.permissive !== original.permissive) {
+        result.mode = next.mode;
+    }
+    if (!sameRoles(edited.roles, original.roles)) {
+        if (next.roles && next.roles.length > 0) result.roles = next.roles;
+        else delete result.roles;
+    }
+    if ((edited.qual || null) !== (original.qual || null) || (edited.with_check || null) !== (original.with_check || null)) {
+        delete result.ownerField;
+        delete result.access;
+        delete result.condition;
+        delete result.check;
+        delete result.using;
+        delete result.withCheck;
+        if (next.using) result.using = next.using;
+        if (next.withCheck) result.withCheck = next.withCheck;
+    }
+    return result;
+}
+
+function sameRoles(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
+    const left = [...(a ?? [])].sort();
+    const right = [...(b ?? [])].sort();
+    return left.length === right.length && left.every((role, i) => role === right[i]);
+}
+
 export function CollectionRLSTab() {
     const { values, setFieldValue } = useFormex<CollectionWithSecurity>();
-    const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
+    // The rule being edited is held by its position: an unnamed rule has no
+    // name to find it by, and matching `rule.name` against the editor's empty
+    // name found nothing, so the save wrote the rules back unchanged.
+    const [editing, setEditing] = useState<{ index: number; policy: PostgresPolicy } | "new" | null>(null);
 
     // Every other tab in this dialog disables its inputs when the backend will
     // not accept an edit — the general and display forms behind a `fieldset
@@ -254,17 +333,13 @@ export function CollectionRLSTab() {
 
     const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));
 
-    const handleSave = async (newPolicy: Partial<PostgresPolicy>) => {
-        const rule: SecurityRule = toSecurityRule(newPolicy);
-
-        let newRules;
-        if (editingPolicy === "new") {
-            newRules = [...rules, rule];
-        } else {
-            newRules = rules.map((r: SecurityRule) => r.name === (editingPolicy as PostgresPolicy).policyname ? rule : r);
-        }
+    const handleSave = (newPolicy: Partial<PostgresPolicy>) => {
+        if (!editing) return;
+        const newRules: PolicyRule[] = editing === "new"
+            ? [...rules, toSecurityRule(newPolicy)]
+            : rules.map((r, i) => (i === editing.index ? editedRule(r, editing.policy, newPolicy) : r));
         setFieldValue("securityRules", newRules);
-        setEditingPolicy(null);
+        setEditing(null);
     };
 
     return (
@@ -275,7 +350,7 @@ export function CollectionRLSTab() {
                     <Typography variant="h5">Row Level Security</Typography>
                     <Tooltip title={readOnly ? readOnlyTitle : undefined}>
                         <div>
-                            <Button variant="filled" color="neutral" disabled={readOnly} onClick={() => setEditingPolicy("new")}>
+                            <Button variant="filled" color="neutral" disabled={readOnly} onClick={() => setEditing("new")}>
                                 CREATE POLICY
                             </Button>
                         </div>
@@ -288,8 +363,8 @@ export function CollectionRLSTab() {
                     </div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {rules.map((rule: SecurityRule) => (
-                            <Paper key={rule.name}
+                        {rules.map((rule: SecurityRule, index: number) => (
+                            <Paper key={`${index}:${rule.name ?? ""}`}
                                 className={"p-4 border border-transparent hover:border-surface-200 dark:hover:border-surface-700 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors bg-surface-card shadow-sm"}>
                                 <div className="flex flex-col gap-1.5 min-w-0">
                                     <div className="flex items-center gap-2">
@@ -308,19 +383,24 @@ export function CollectionRLSTab() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                    <Button size="small" variant="text" disabled={readOnly} onClick={() => setEditingPolicy({
-                                        policyname: rule.name ?? "",
-                                        tablename: tableName || "your_table",
-                                        permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
-                                        cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                                        roles: [...(rule.roles ?? [])],
-                                        qual: rule.using || null,
-                                        with_check: rule.withCheck || null
+                                    <Button size="small" variant="text" disabled={readOnly} onClick={() => setEditing({
+                                        index,
+                                        policy: {
+                                            policyname: rule.name ?? "",
+                                            tablename: tableName || "your_table",
+                                            permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
+                                            cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
+                                            roles: [...(rule.roles ?? [])],
+                                            qual: rule.using || null,
+                                            with_check: rule.withCheck || null
+                                        }
                                     })}>
                                         EDIT
                                     </Button>
                                     <IconButton size="small" disabled={readOnly} onClick={() => {
-                                        setFieldValue("securityRules", rules.filter((r: SecurityRule) => r.name !== rule.name));
+                                        // By position, for the reason editing is: filtered
+                                        // by `name`, every unnamed rule went with this one.
+                                        setFieldValue("securityRules", rules.filter((_r: SecurityRule, i: number) => i !== index));
                                     }}>
                                         <Trash2Icon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark hover:text-red-500 dark:hover:text-red-500 transition-colors"/>
                                     </IconButton>
@@ -368,7 +448,7 @@ export function CollectionRLSTab() {
                                         <Tooltip title={readOnly ? readOnlyTitle : undefined}>
                                             <div>
                                                 <Button size="small" variant="outlined" color="primary" disabled={readOnly} onClick={() => {
-                                                    const rule: SecurityRule = livePolicyToSecurityRule(dp);
+                                                    const rule: PolicyRule = livePolicyToSecurityRule(dp);
                                                     setFieldValue("securityRules", [...rules, rule]);
                                                 }}>
                                                     Import to codebase
@@ -382,16 +462,16 @@ export function CollectionRLSTab() {
                     </div>
                 )}
                 </div>
-                <Dialog open={!!editingPolicy} onOpenChange={(open) => !open && setEditingPolicy(null)} maxWidth="4xl">
-                    {editingPolicy && (
+                <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)} maxWidth="4xl">
+                    {editing && (
                         <InlinePolicyEditor
-                            policy={editingPolicy === "new" ? undefined : editingPolicy}
+                            policy={editing === "new" ? undefined : editing.policy}
                             table={tableName || "your_table"}
                             schema={schemaName}
                             availableRoles={availableRoles}
                             rolesUnavailable={rolesUnavailable}
                             onSave={handleSave}
-                            onCancel={() => setEditingPolicy(null)}
+                            onCancel={() => setEditing(null)}
                         />
                     )}
                 </Dialog>
