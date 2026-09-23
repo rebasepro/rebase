@@ -20,7 +20,7 @@ import { isScaffoldedLocalDatabase } from "../src/PostgresBootstrapper";
  * right, so it must not be swept up by "it's only development".
  */
 describe("isScaffoldedLocalDatabase", () => {
-    const SCAFFOLD = "postgresql://rebase_app:changeme@127.0.0.1:5435/rebase?options=-c%20search_path=public";
+    const SCAFFOLD = "postgresql://rebase_app:changeme@127.0.0.1:5435/rebase?options=-c%20search_path%3Dpublic";
     const REMOTE = "postgresql://postgres:pw@db.prod.example.com:5432/app";
 
     const nodeEnv = process.env.NODE_ENV;

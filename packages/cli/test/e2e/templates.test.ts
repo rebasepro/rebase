@@ -125,7 +125,7 @@ let adminClient: pg.Client;
 /** A connection string for a dedicated database on the shared container. */
 function urlFor(database: string): string {
     return `postgresql://rebase:rebase@localhost:${pgContainer.port}/${database}` +
-        "?options=-c%20search_path=public&sslmode=disable";
+        "?options=-c%20search_path%3Dpublic&sslmode=disable";
 }
 
 async function createDatabase(name: string): Promise<string> {

@@ -92,7 +92,7 @@ export async function startPgContainer(): Promise<PgContainer> {
     const port = parseInt(portMatch[1], 10);
     // sslmode=disable: the container has no TLS and atlas (rebase db push)
     // defaults to requiring SSL when the URL doesn't say otherwise.
-    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public&sslmode=disable`;
+    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`;
 
     console.log(`Container started on port ${port}. Waiting for database readiness...`);
 

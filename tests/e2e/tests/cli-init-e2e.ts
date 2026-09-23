@@ -708,7 +708,7 @@ export async function startPgContainer(): Promise<PgContainer> {
         throw new Error(`Failed to parse host port from docker port output: ${portOutput}`);
     }
     const port = parseInt(portMatch[1], 10);
-    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public&sslmode=disable`;
+    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`;
 
     console.log(`Container started on port ${port}. Waiting for database readiness...`);
 
@@ -1320,7 +1320,7 @@ timeout: 10000 });
             stdio: "inherit",
             env: {
                 ...cleanEnv,
-                DATABASE_URL: `postgresql://${composeDbUser}:${composeDbPassword}@localhost:${DOCKER_DB_PORT}/rebase?options=-c%20search_path=public&sslmode=disable`
+                DATABASE_URL: `postgresql://${composeDbUser}:${composeDbPassword}@localhost:${DOCKER_DB_PORT}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`
             }
         });
         console.log("Migrations applied inside Docker.");
