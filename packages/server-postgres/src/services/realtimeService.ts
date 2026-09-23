@@ -6,7 +6,7 @@ import { DataService } from "./dataService";
 
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { sql as drizzleSql } from "drizzle-orm";
+import { getTableColumns, sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection } from "@rebasepro/common";
@@ -23,7 +23,7 @@ import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
 import type { ChannelHistoryEntry, ChannelRetentionRule, User } from "@rebasepro/types";
-import { unref } from "@rebasepro/utils";
+import { toSnakeCase, unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -2782,7 +2782,30 @@ lastSeen: Date.now() });
     private extractIdFromCdcRow(collection: CollectionConfig, row: Record<string, unknown>): string {
         // Unaddressable falls back to a collection-level invalidation: single-row
         // subs won't match, but collection subs still refetch.
-        return deriveRowAddress(row, collection, this.registry) || "*";
+        return deriveRowAddress(this.cdcRowByKeyFields(collection, row), collection, this.registry) || "*";
+    }
+
+    /**
+     * A captured row with its key under the key's *field* names.
+     *
+     * The trigger captures the tuple by column — `user_id` — and an address is
+     * built from the key's property names — `userId`. Read by property name
+     * alone, a key declared apart from its column was never on the captured
+     * row, the address fell back to `*`, and no single-row subscriber heard
+     * about any write made outside this server.
+     */
+    private cdcRowByKeyFields(collection: CollectionConfig, row: Record<string, unknown>): Record<string, unknown> {
+        const table = this.registry.getTable(getTableName(collection));
+        const columns = table ? getTableColumns(table) : undefined;
+        const keyed: Record<string, unknown> = { ...row };
+        for (const pk of getPrimaryKeys(collection, this.registry)) {
+            if (pk.fieldName in row) continue;
+            const property = collection.properties?.[pk.fieldName];
+            const declared = property && "columnName" in property ? property.columnName : undefined;
+            const columnName = columns?.[pk.fieldName]?.name ?? declared ?? toSnakeCase(pk.fieldName);
+            if (columnName in row) keyed[pk.fieldName] = row[columnName];
+        }
+        return keyed;
     }
 
     // ── App/CDC de-duplication ──

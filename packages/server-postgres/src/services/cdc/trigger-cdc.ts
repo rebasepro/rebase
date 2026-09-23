@@ -36,6 +36,11 @@ export const CDC_TRIGGER_NAME = "rebase_cdc_trigger";
  * statement* if the limit is exceeded. We stay comfortably under it and, for
  * wide rows, fall back to an identity-only payload so CDC can never break a
  * write. 7900 leaves headroom for the JSON envelope keys.
+ *
+ * The identity is every primary-key column, read from the catalogue for the
+ * table that fired — `id` only where the table declares no primary key. It
+ * used to be `id` alone, so a wide row of a table keyed on anything else
+ * arrived with no key at all and reached no single-row subscriber.
  */
 const MAX_NOTIFY_BYTES = 7900;
 
@@ -61,6 +66,7 @@ LANGUAGE plpgsql AS $rebase_cdc$
 DECLARE
     rec     jsonb;
     payload text;
+    ident   jsonb;
 BEGIN
     IF (TG_OP = 'DELETE') THEN
         rec := to_jsonb(OLD);
@@ -79,11 +85,18 @@ BEGIN
     -- 8000-byte cap, emit an identity-only payload the consumer can still route
     -- (and refetch the authoritative row from).
     IF (octet_length(payload) > ${MAX_NOTIFY_BYTES}) THEN
+        SELECT jsonb_object_agg(a.attname, rec->a.attname) INTO ident
+        FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+        WHERE i.indrelid = TG_RELID AND i.indisprimary;
+        IF ident IS NULL THEN
+            ident := CASE WHEN rec ? 'id' THEN jsonb_build_object('id', rec->'id') ELSE '{}'::jsonb END;
+        END IF;
         payload := json_build_object(
             'schema',    TG_TABLE_SCHEMA,
             'table',     TG_TABLE_NAME,
             'op',        TG_OP,
-            'row',       CASE WHEN rec ? 'id' THEN jsonb_build_object('id', rec->'id') ELSE '{}'::jsonb END,
+            'row',       ident,
             'truncated', true
         )::text;
     END IF;
