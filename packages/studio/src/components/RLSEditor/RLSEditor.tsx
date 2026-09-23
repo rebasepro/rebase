@@ -28,7 +28,7 @@ import {
 } from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, ConfirmationDialog } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
-import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
+import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, getTableName } from "@rebasepro/common";
 import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
@@ -36,6 +36,24 @@ import { saveRules, isCancellation } from "./saveRules";
 import { applyPolicyEdit, policyToRule, type PolicyEditRefusal } from "./policyRules";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
+
+/**
+ * Whether `collection` is the one `db push` writes `table` for: the table
+ * `getTableName` derives, in the schema the collection declares or `public` —
+ * the planner's own resolution.
+ *
+ * This matched a table to any collection whose `id`, `path`, `table`, `slug`
+ * or `collectionId` equalled its name, in any schema. So an unmapped table
+ * named like another collection's slug, or a same-named table in another
+ * schema, was taken for that collection: it listed the collection's policies
+ * as missing from the table, and offered to import the table's own policies
+ * into the collection. And a collection that leaves `table` to a slug that is
+ * not already snake case mapped nothing.
+ */
+function mapsTable(collection: CollectionConfig, table: { schemaName: string; tableName: string }): boolean {
+    if (!isPostgresCollectionConfig(collection)) return false;
+    return getTableName(collection) === table.tableName && (collection.schema || "public") === table.schemaName;
+}
 
 /** What the editor says when an edit has no declared rule to go back to. */
 const POLICY_EDIT_REFUSALS: Record<PolicyEditRefusal, string> = {
@@ -460,14 +478,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         };
 
         tables.forEach(table => {
-            const isMapped = !!collectionRegistry.collections?.find(
-                (c: { id?: string, path?: string, table?: string, slug?: string, collectionId?: string }) =>
-                    c.id === table.tableName ||
-                    c.path === table.tableName ||
-                    c.table === table.tableName ||
-                    c.slug === table.tableName ||
-                    c.collectionId === table.tableName
-            );
+            const isMapped = !!collectionRegistry.collections?.some(c => mapsTable(c, table));
             const cat = classifyTableClient(table.tableName, table.schemaName, junctionTableNames, isMapped);
             groups[cat].push(table);
         });
@@ -477,13 +488,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
 
     const activeCollection = useMemo(() => {
         if (!activeTableData) return null;
-        return collectionRegistry.collections?.find((c: { id?: string, path?: string, table?: string, slug?: string, collectionId?: string }) =>
-            c.id === activeTableData.tableName ||
-            c.path === activeTableData.tableName ||
-            c.table === activeTableData.tableName ||
-            c.slug === activeTableData.tableName ||
-            c.collectionId === activeTableData.tableName
-        ) || null;
+        return collectionRegistry.collections?.find(c => mapsTable(c, activeTableData)) || null;
     }, [activeTableData, collectionRegistry.collections]);
 
     /** The category of the currently selected table. */

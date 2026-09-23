@@ -1,6 +1,6 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getGeneratedPolicyNames } from "@rebasepro/common";
+import { getGeneratedPolicyNames, getTableName } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**
@@ -42,15 +42,12 @@ import { useFormex } from "@rebasepro/forms";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { useRebaseContext, useTranslation } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { RLS_ROLES_SQL, RLS_UID_SQL, type PostgresPolicy, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
+import { isPostgresCollectionConfig, RLS_ROLES_SQL, RLS_UID_SQL, type PostgresPolicy, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 
 export type { PostgresPolicy } from "@rebasepro/types";
 
 type CollectionWithSecurity = AdminCollection & {
     securityRules?: SecurityRule[];
-    id?: string;
-    table?: string;
-    alias?: string;
 };
 
 /**
@@ -150,20 +147,29 @@ export function CollectionRLSTab() {
     const [dbPolicies, setDbPolicies] = useState<PostgresPolicy[]>([]);
     const [isLoadingDb, setIsLoadingDb] = useState(false);
 
+    // The table `db push` writes this collection's policies on, resolved the
+    // way the planner resolves it: `getTableName`, in the collection's schema
+    // or `public`. This read `id || table || alias` — none of which a
+    // collection that leaves `table` to its slug has, so it loaded no live
+    // policies at all — and matched the name in every schema, offering another
+    // schema's same-named table's policies for import into this collection.
+    const tableName = getTableName(values);
+    const schemaName = isPostgresCollectionConfig(values) && values.schema ? values.schema : "public";
+
     useEffect(() => {
         const fetchLivePolicies = async () => {
-            const tableName = values.id || values.table || values.alias;
             if (!tableName || !databaseAdmin?.executeSql) return;
 
             setIsLoadingDb(true);
             try {
-                const safeTableName = sanitizeSqlIdentifier(tableName);
-                // safeTableName is validated to be [a-zA-Z_][a-zA-Z0-9_]* — safe for string literal
-                const quotedName = safeTableName.slice(1, -1); // strip double quotes to get raw name
+                // Both validated to be [a-zA-Z_][a-zA-Z0-9_]* — safe inside a
+                // string literal once the double quotes are stripped.
+                const rawTableName = sanitizeSqlIdentifier(tableName).slice(1, -1);
+                const rawSchemaName = sanitizeSqlIdentifier(schemaName).slice(1, -1);
                 const sql = `
                     SELECT policyname, permissive, roles, cmd, qual, with_check
                     FROM pg_policies
-                    WHERE tablename = '${quotedName}' AND schemaname NOT IN ('information_schema', 'pg_catalog');
+                    WHERE schemaname = '${rawSchemaName}' AND tablename = '${rawTableName}';
                 `;
                 const result = await databaseAdmin.executeSql(sql);
                 const extractRows = (res: unknown): Record<string, unknown>[] => {
@@ -200,7 +206,7 @@ export function CollectionRLSTab() {
             }
         };
         fetchLivePolicies();
-    }, [databaseAdmin, values.id, values.table, values.alias]);
+    }, [databaseAdmin, tableName, schemaName]);
 
     /**
      * Application roles available to `SecurityRule.roles`.
@@ -236,8 +242,6 @@ export function CollectionRLSTab() {
             mounted = false;
         };
     }, [databaseAdmin]);
-
-    const tableName = values.id || values.table || values.alias;
 
     // Every policy name `rebase db push` would write for this collection — see
     // `getGeneratedPolicyNames`. This used to be derived here by hand, and the
@@ -306,7 +310,7 @@ export function CollectionRLSTab() {
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                                     <Button size="small" variant="text" disabled={readOnly} onClick={() => setEditingPolicy({
                                         policyname: rule.name ?? "",
-                                        tablename: values.id || values.table || values.alias || "your_table",
+                                        tablename: tableName || "your_table",
                                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
                                         cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
                                         roles: [...(rule.roles ?? [])],
@@ -382,7 +386,8 @@ export function CollectionRLSTab() {
                     {editingPolicy && (
                         <InlinePolicyEditor
                             policy={editingPolicy === "new" ? undefined : editingPolicy}
-                            table={values.id || values.table || values.alias || "your_table"}
+                            table={tableName || "your_table"}
+                            schema={schemaName}
                             availableRoles={availableRoles}
                             rolesUnavailable={rolesUnavailable}
                             onSave={handleSave}
@@ -403,6 +408,7 @@ const COMMAND_OPTIONS: PolicyCommand[] = ["ALL", "SELECT", "INSERT", "UPDATE", "
 function InlinePolicyEditor({
     policy,
     table,
+    schema,
     availableRoles,
     rolesUnavailable,
     onSave,
@@ -410,6 +416,7 @@ function InlinePolicyEditor({
 }: {
     policy?: PostgresPolicy;
     table: string;
+    schema: string;
     availableRoles: string[];
     rolesUnavailable: boolean;
     onSave: (policyData: Partial<PostgresPolicy>) => void;
@@ -456,7 +463,7 @@ function InlinePolicyEditor({
             <DialogTitle variant="h6">
                 {policy ? "Edit Policy" : "Create Policy"}
                 <div className="text-sm font-normal text-text-secondary dark:text-text-secondary-dark tracking-wide mt-1">
-                    Define RLS rules for <span className="font-mono text-primary bg-primary-bg px-1 py-0.5 rounded">public.{table}</span>
+                    Define RLS rules for <span className="font-mono text-primary bg-primary-bg px-1 py-0.5 rounded">{schema}.{table}</span>
                 </div>
             </DialogTitle>
             <DialogContent className="p-4 md:p-6 border-t dark:border-surface-700 bg-surface-sheet" includeMargin={false}>
