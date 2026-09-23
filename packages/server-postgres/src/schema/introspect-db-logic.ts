@@ -1274,6 +1274,14 @@ export function generateCollectionFile(
         ? `\n    description: ${quote(tableComment)},`
         : "";
 
+    // The schema the table was read from. `public` is what an absent `schema`
+    // means, so it is left out; any other is load-bearing — without it the
+    // runtime serves, and boot creates, a table of the same name in `public`.
+    const pgSchema = context.metadata?.schema;
+    const schemaBlock = pgSchema && pgSchema !== "public"
+        ? `\n    schema: ${quote(pgSchema)},`
+        : "";
+
     // The classification is stated in the file because it is a *decision*, and a
     // decision the reader may disagree with. Naming the evidence tells them
     // which line to delete when they do.
@@ -1304,7 +1312,7 @@ ${open}
     name: ${quote(collectionName)},
     singularName: ${quote(singular)},
     slug: ${quote(tableName)},
-    table: ${quote(tableName)},${descriptionBlock}
+    table: ${quote(tableName)},${schemaBlock}${descriptionBlock}
     properties: {${propsOutput}
     },${relationsBlock}${adminBlock}
 ${close}

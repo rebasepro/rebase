@@ -37,9 +37,17 @@ interface GeneratedSchema {
     context: GenerationContext;
 }
 
-/** Runs the whole pipeline over a captured schema, as the CLI does. */
-function generateAll(name: RealSchemaName, builder: CollectionBuilder = "admin-types"): GeneratedSchema {
-    const { metadata, tables } = loadRealSchema(name);
+/**
+ * Runs the whole pipeline over a captured schema, as the CLI does. `pgSchema`
+ * stands in for `--schema`: the same tables, read out of another schema.
+ */
+function generateAll(
+    name: RealSchemaName,
+    builder: CollectionBuilder = "admin-types",
+    pgSchema?: string
+): GeneratedSchema {
+    const { metadata: captured, tables } = loadRealSchema(name);
+    const metadata = pgSchema ? { ...captured, schema: pgSchema } : captured;
     const enumMap = buildEnumMap(metadata.enumValues);
     const classifications = classifyTables(metadata, tables);
     const checkFacts = parseCheckConstraints(metadata.checks);
@@ -111,6 +119,40 @@ describe("collections generated from a real schema", () => {
         expect(navigable).toHaveLength(13);
         const grouped = [...pagila.files.values()].filter((f) => f.includes('group: "Reference"'));
         expect(grouped).toHaveLength(2);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// A schema other than public
+// ═══════════════════════════════════════════════════════════════════════
+describe("collections introspected from a schema other than public", () => {
+    // pagila, as if restored into `crm` and read with `--schema crm`.
+    const crm = generateAll("pagila", "admin-types", "crm");
+
+    it("says which schema each collection's table is in", () => {
+        // Without it the runtime serves `public.film`, boot creates an empty
+        // one, and the introspected rows are never read.
+        expect(crm.files.get("film")).toContain('\n    table: "film",\n    schema: "crm",\n');
+        for (const [table, source] of crm.files) {
+            expect({ table, schema: /^ {4}schema: "crm",$/m.test(source) }).toEqual({ table, schema: true });
+        }
+    });
+
+    it("keeps a junction table as a table, since Rebase reads junctions only from public", () => {
+        // A `manyToMany` through `film_actor` would read and write
+        // `public.film_actor`, which boot creates empty beside the real one.
+        expect(crm.junctions.size).toBe(0);
+        expect(crm.files.get("film_actor")).toContain('schema: "crm"');
+        for (const source of crm.files.values()) {
+            expect(source).not.toContain('kind: "manyToMany"');
+        }
+    });
+
+    it("writes no schema line, and still folds junctions, for public", () => {
+        for (const source of pagila.files.values()) {
+            expect(source).not.toMatch(/^ {4}schema: /m);
+        }
+        expect(pagila.junctions.has("film_actor")).toBe(true);
     });
 });
 

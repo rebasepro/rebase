@@ -275,6 +275,8 @@ function sameColumnSet(a: string[], b: string[]): boolean {
 
 /** Everything classification needs, assembled once per run. */
 interface AnalysisContext {
+    /** The schema the tables were read from. */
+    schema: string;
     tables: Map<string, TableMeta>;
     constraintsByTable: Map<string, ForeignKeyConstraint[]>;
     inboundByTable: Map<string, ForeignKeyConstraint[]>;
@@ -298,6 +300,7 @@ function buildContext(metadata: SchemaMetadata, tables: Map<string, TableMeta>):
     }
 
     return {
+        schema: metadata.schema,
         tables,
         constraintsByTable,
         inboundByTable,
@@ -318,9 +321,14 @@ function buildContext(metadata: SchemaMetadata, tables: Map<string, TableMeta>):
  *   with attributes, and collapsing it into a many-to-many silently drops those
  *   attributes from the UI entirely;
  * - nothing references it. A junction with its own dependents is something rows
- *   point *at*, so it needs an identity of its own.
+ *   point *at*, so it needs an identity of its own;
+ * - it is in `public`. That is the only schema Rebase reads and creates
+ *   junction tables in (`resolveJunctionSpecs`), so a `manyToMany` folded from
+ *   `crm.contacts_tags` would read and write an empty `public.contacts_tags`
+ *   instead. Kept as a table, its rows stay where they are and are served.
  */
 function classifyJunction(table: string, context: AnalysisContext): TableClassification | null {
+    if (context.schema !== "public") return null;
     const meta = context.tables.get(table);
     if (!meta) return null;
 
