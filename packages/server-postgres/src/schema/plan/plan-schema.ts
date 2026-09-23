@@ -1411,23 +1411,28 @@ function planRelations(
             const { relation, source } = entry.junction;
             if (!isManyToMany(relation)) continue;
             const target = relation.target();
-            // The owning relation's name, shared with the source table's
-            // `many(junction, { relationName })`.
-            const owningRelationName = relation.relationName ?? toSnakeCase(getTableName(target));
-            let inverseRelationName: string | undefined;
+            // Each `one()` here pairs with a `many(junction, { relationName })`
+            // on its endpoint, so each takes the name that endpoint's own
+            // relation derives — the rule `addJunctionSides` in
+            // `config-relations.ts` builds the runtime's relations by.
+            //
+            // The far side is looked up as the target's many-to-many through
+            // this same junction. It used to be matched on the *owning* side's
+            // name, which `tags.posts` never carries, so the synthesized name
+            // won and `tags`' `many(…, { relationName: "posts" })` had nothing
+            // to pair with: `with: { posts: true }` threw. Only a junction
+            // nothing points back through needs the synthesized name.
+            const owningRelationName = sharedRelationName(relation, source);
+            let inverse: ResolvedRelation | undefined;
             try {
-                for (const targetRel of Object.values(resolveCollectionRelations(target))) {
-                    if (targetRel.kind !== "belongsTo"
-                        && targetRel.cardinality === "many"
-                        && targetRel.relationName === owningRelationName) {
-                        inverseRelationName = targetRel.relationName;
-                        break;
-                    }
-                }
+                inverse = Object.values(resolveCollectionRelations(target)).find(r =>
+                    r.kind === "manyToMany" && bareTableName(r.through.table) === bareTableName(tableName));
             } catch {
-                // The inverse side may not exist; the synthesized name below is
-                // then what keeps the two `one()`s from colliding.
+                // A target whose relations cannot be resolved declares no inverse.
             }
+            const inverseRelationName = inverse
+                ? sharedRelationName(inverse, target)
+                : `${tableName}_${relation.through.targetColumn}`;
             plans.push({
                 tableVar,
                 key: relation.through.sourceColumn,
@@ -1437,12 +1442,15 @@ function planRelations(
                 fields: [relation.through.sourceColumn],
                 references: [getPrimaryKeyName(source)]
             });
+            // A self-referencing link is its own inverse: one name, one
+            // endpoint table, and drizzle refuses two relations named alike.
+            if (inverseRelationName === owningRelationName) continue;
             plans.push({
                 tableVar,
                 key: relation.through.targetColumn,
                 kind: "one",
                 targetVar: getTableVarName(getTableName(target)),
-                relationName: inverseRelationName ?? `${tableName}_${relation.through.targetColumn}`,
+                relationName: inverseRelationName,
                 fields: [relation.through.targetColumn],
                 references: [getPrimaryKeyName(target)]
             });
