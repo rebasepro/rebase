@@ -655,6 +655,16 @@ export const en: RebaseTranslations = {
     auth_email_verified_body: "Your email address is confirmed. You can sign in now.",
     auth_email_verification_failed_title: "Email not confirmed",
     auth_email_verification_unavailable: "Email verification is not available on this backend.",
+    auth_mfa_title: "Two-step verification",
+    auth_mfa_subtitle: "Enter the code from your authenticator app, or one of your recovery codes.",
+    auth_mfa_factor_label: "Verify with",
+    auth_mfa_factor_totp: "Authenticator app",
+    auth_mfa_code_label: "Verification code",
+    auth_mfa_verify: "Verify",
+    auth_mfa_code_invalid: "That code is not right. Try the current code from your authenticator app, or a recovery code.",
+    auth_mfa_challenge_exhausted: "Too many wrong codes. Enter a new code from your authenticator app to try again.",
+    auth_mfa_expired: "This sign-in has expired. Sign in again to continue.",
+    auth_mfa_sign_in_again: "Sign in again",
 
 
     auto_setup_collections_button: "Automatically set up collections",

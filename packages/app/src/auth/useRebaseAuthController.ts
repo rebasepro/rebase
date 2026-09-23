@@ -240,6 +240,42 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
+    /**
+     * Open the challenge that finishes a sign-in refused with `MFA_REQUIRED`.
+     *
+     * `mfaToken` is that refusal's `details.mfaToken`, sent on this request
+     * only. Every sign-in method above lands such a refusal in
+     * `authProviderError`, which is where the login view reads it from.
+     */
+    const startMfaChallenge = useCallback(async (mfaToken: string, factorId: string) => {
+        if (!auth?.mfa) throw new Error("Rebase client with MFA is required");
+        const { challengeId } = await auth.mfa.challenge(factorId, { mfaToken });
+        return challengeId;
+    }, [auth]);
+
+    /**
+     * Answer that challenge. On success the SDK adopts the session and emits
+     * SIGNED_IN, which sets the user like any other sign-in.
+     *
+     * A refused code is rethrown and NOT recorded in `authProviderError`: the
+     * code step reports it itself, and the refusal it would replace is the
+     * `MFA_REQUIRED` that says a sign-in is still waiting for its second
+     * factor.
+     */
+    const verifyMfaChallenge = useCallback(async (mfaToken: string, challengeId: string, code: string) => {
+        if (!auth?.mfa) throw new Error("Rebase client with MFA is required");
+        setAuthLoading(true);
+        try {
+            await auth.mfa.verifyChallenge(challengeId, code, { mfaToken });
+            // Answered. Left in place, the refusal would reopen the code step
+            // — for a token long expired — the next time the login screen is
+            // shown, after a sign-out.
+            setAuthProviderError(null);
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
     const skipLogin = useCallback(() => {
         setLoginSkipped(true);
         setUser(null);
@@ -355,6 +391,10 @@ export function useRebaseAuthController(
         revokeAllSessions,
         clearError,
         setAuthProviderError,
+        // Offered only when the client can answer a challenge, so a login
+        // view can tell a second step it can take from one it cannot.
+        startMfaChallenge: auth?.mfa ? startMfaChallenge : undefined,
+        verifyMfaChallenge: auth?.mfa ? verifyMfaChallenge : undefined,
         extra,
         setExtra,
         // `authConfig` is null until `GET /auth/config` lands, so each fallback

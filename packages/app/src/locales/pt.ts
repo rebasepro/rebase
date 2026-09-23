@@ -652,6 +652,16 @@ export const pt: RebaseTranslations = {
     auth_email_verified_body: "O seu endereço de email está confirmado. Já pode iniciar sessão.",
     auth_email_verification_failed_title: "Email não confirmado",
     auth_email_verification_unavailable: "A verificação de email não está disponível neste backend.",
+    auth_mfa_title: "Verificação em dois passos",
+    auth_mfa_subtitle: "Introduza o código da sua aplicação de autenticação ou um dos seus códigos de recuperação.",
+    auth_mfa_factor_label: "Verificar com",
+    auth_mfa_factor_totp: "Aplicação de autenticação",
+    auth_mfa_code_label: "Código de verificação",
+    auth_mfa_verify: "Verificar",
+    auth_mfa_code_invalid: "Esse código não está correto. Experimente o código atual da sua aplicação de autenticação ou um código de recuperação.",
+    auth_mfa_challenge_exhausted: "Demasiados códigos errados. Introduza um novo código da sua aplicação de autenticação para tentar novamente.",
+    auth_mfa_expired: "Este início de sessão expirou. Inicie sessão novamente para continuar.",
+    auth_mfa_sign_in_again: "Iniciar sessão novamente",
 
 
     auto_setup_collections_button: "Configurar coleções automaticamente",

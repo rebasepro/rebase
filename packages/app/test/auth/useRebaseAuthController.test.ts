@@ -531,6 +531,91 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         });
     });
 
+    // ─── MFA second step ─────────────────────────────────────────────
+
+    /**
+     * A sign-in by an account with a second factor is refused with
+     * `MFA_REQUIRED`, carrying a pending token; the session comes from a
+     * challenge opened and answered with that token. The admin had no way to
+     * do either, so every account that enrolled TOTP was locked out of it.
+     */
+    describe("MFA second step", () => {
+        const mfaRequired = Object.assign(new Error("Multi-factor authentication is required to complete sign-in."), {
+            code: "MFA_REQUIRED",
+            details: { mfaToken: "pending-1", factors: [{ id: "f1", factorType: "totp" }] }
+        });
+
+        function withMfa() {
+            const mfa = {
+                challenge: jest.fn().mockResolvedValue({ challengeId: "ch1", factorId: "f1", expiresAt: "later" }),
+                verifyChallenge: jest.fn().mockResolvedValue(undefined)
+            };
+            mockAuth.mfa = mfa;
+            return mfa;
+        }
+
+        it("opens the challenge with the sign-in's pending token and hands back its id", async () => {
+            const mfa = withMfa();
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            let challengeId: string | undefined;
+            await act(async () => {
+                challengeId = await result.current.startMfaChallenge!("pending-1", "f1");
+            });
+
+            expect(mfa.challenge).toHaveBeenCalledWith("f1", { mfaToken: "pending-1" });
+            expect(challengeId).toBe("ch1");
+        });
+
+        it("answers it with the same token, and drops the MFA_REQUIRED refusal once it is answered", async () => {
+            const mfa = withMfa();
+            mockAuth.signInWithEmail.mockRejectedValue(mfaRequired);
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                try { await result.current.emailPasswordLogin("mfa@rebase.pro", "pw"); } catch { /* expected */ }
+            });
+            expect(result.current.authProviderError).toBe(mfaRequired);
+
+            await act(async () => {
+                await result.current.verifyMfaChallenge!("pending-1", "ch1", "418293");
+            });
+
+            expect(mfa.verifyChallenge).toHaveBeenCalledWith("ch1", "418293", { mfaToken: "pending-1" });
+            // Left in place, a later sign-out would open the login screen on
+            // a code step for a token that has long expired.
+            expect(result.current.authProviderError).toBeNull();
+            expect(result.current.authLoading).toBe(false);
+        });
+
+        it("leaves the MFA_REQUIRED refusal in place when a code is refused, and rethrows", async () => {
+            const mfa = withMfa();
+            const refused = Object.assign(new Error("Invalid verification code"), { code: "INVALID_CODE" });
+            mfa.verifyChallenge.mockRejectedValue(refused);
+            mockAuth.signInWithEmail.mockRejectedValue(mfaRequired);
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                try { await result.current.emailPasswordLogin("mfa@rebase.pro", "pw"); } catch { /* expected */ }
+            });
+            await act(async () => {
+                await expect(result.current.verifyMfaChallenge!("pending-1", "ch1", "000000")).rejects.toBe(refused);
+            });
+
+            // The code step reports its own refusals; the sign-in is still
+            // the one waiting for a second factor.
+            expect(result.current.authProviderError).toBe(mfaRequired);
+            expect(result.current.authLoading).toBe(false);
+        });
+
+        it("offers neither method when the client cannot answer a challenge", () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            expect(result.current.startMfaChallenge).toBeUndefined();
+            expect(result.current.verifyMfaChallenge).toBeUndefined();
+        });
+    });
+
     // ─── getAuthToken ────────────────────────────────────────────────
 
     describe("getAuthToken", () => {

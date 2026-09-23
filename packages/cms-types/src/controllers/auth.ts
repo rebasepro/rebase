@@ -95,6 +95,19 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
 };
 
 /**
+ * A second factor an account can finish signing in with, as a sign-in refused
+ * with `MFA_REQUIRED` lists it in `details.factors`.
+ * @group Hooks and utilities
+ */
+export interface MfaFactorSummary {
+    id: string;
+    /** `"totp"` for an authenticator app. */
+    factorType: string;
+    /** The name the user gave the factor when enrolling it, if any. */
+    friendlyName?: string;
+}
+
+/**
  * Extended auth controller with common optional auth methods.
  * Backend implementations (Rebase backend, Firebase, etc.)
  * extend this with their own backend-specific extras.
@@ -121,4 +134,15 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     changePassword?(oldPassword: string, newPassword: string): Promise<void>;
     /** Update user profile */
     updateProfile?(displayName?: string, photoURL?: string): Promise<USER>;
+    /**
+     * Open a challenge against one of the factors a sign-in refused with
+     * `MFA_REQUIRED` listed, using that refusal's `details.mfaToken`. Resolves
+     * to the challenge id `verifyMfaChallenge` answers.
+     */
+    startMfaChallenge?(mfaToken: string, factorId: string): Promise<string>;
+    /**
+     * Answer a challenge with a code from the authenticator app or a recovery
+     * code. On success the user is signed in, as by any other sign-in.
+     */
+    verifyMfaChallenge?(mfaToken: string, challengeId: string, code: string): Promise<void>;
 }

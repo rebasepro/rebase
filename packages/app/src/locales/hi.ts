@@ -647,6 +647,16 @@ export const hi: RebaseTranslations = {
     auth_email_verified_body: "आपके ईमेल पते की पुष्टि हो गई है। अब आप साइन इन कर सकते हैं।",
     auth_email_verification_failed_title: "ईमेल की पुष्टि नहीं हुई",
     auth_email_verification_unavailable: "इस बैकएंड पर ईमेल सत्यापन उपलब्ध नहीं है।",
+    auth_mfa_title: "दो-चरणीय सत्यापन",
+    auth_mfa_subtitle: "अपने ऑथेंटिकेटर ऐप का कोड या अपना कोई रिकवरी कोड दर्ज करें।",
+    auth_mfa_factor_label: "इससे सत्यापित करें",
+    auth_mfa_factor_totp: "ऑथेंटिकेटर ऐप",
+    auth_mfa_code_label: "सत्यापन कोड",
+    auth_mfa_verify: "सत्यापित करें",
+    auth_mfa_code_invalid: "यह कोड सही नहीं है। अपने ऑथेंटिकेटर ऐप का मौजूदा कोड या कोई रिकवरी कोड आज़माएँ।",
+    auth_mfa_challenge_exhausted: "बहुत अधिक गलत कोड। फिर से प्रयास करने के लिए अपने ऑथेंटिकेटर ऐप से नया कोड दर्ज करें।",
+    auth_mfa_expired: "यह साइन-इन समाप्त हो गया है। जारी रखने के लिए फिर से साइन इन करें।",
+    auth_mfa_sign_in_again: "फिर से साइन इन करें",
 
 
     auto_setup_collections_button: "संग्रहों को स्वचालित रूप से सेट करें",

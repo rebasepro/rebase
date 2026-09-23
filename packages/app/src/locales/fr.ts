@@ -647,6 +647,16 @@ export const fr: RebaseTranslations = {
     auth_email_verified_body: "Votre adresse e-mail est confirmée. Vous pouvez maintenant vous connecter.",
     auth_email_verification_failed_title: "E-mail non confirmé",
     auth_email_verification_unavailable: "La vérification de l'e-mail n'est pas disponible sur ce backend.",
+    auth_mfa_title: "Validation en deux étapes",
+    auth_mfa_subtitle: "Saisissez le code de votre application d'authentification, ou l'un de vos codes de récupération.",
+    auth_mfa_factor_label: "Valider avec",
+    auth_mfa_factor_totp: "Application d'authentification",
+    auth_mfa_code_label: "Code de vérification",
+    auth_mfa_verify: "Valider",
+    auth_mfa_code_invalid: "Ce code n'est pas le bon. Essayez le code actuel de votre application d'authentification, ou un code de récupération.",
+    auth_mfa_challenge_exhausted: "Trop de codes erronés. Saisissez un nouveau code de votre application d'authentification pour réessayer.",
+    auth_mfa_expired: "Cette connexion a expiré. Reconnectez-vous pour continuer.",
+    auth_mfa_sign_in_again: "Se reconnecter",
 
 
     auto_setup_collections_button: "Configurer les collections automatiquement",

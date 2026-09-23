@@ -568,4 +568,202 @@ enabledProviders: ["github"] }
             expect(window.history.state).toEqual(routerState);
         });
     });
+
+    /**
+     * An account with TOTP enrolled is refused a session by its password with
+     * `401 MFA_REQUIRED { mfaToken, factors }`. The login view had no second
+     * step, so it showed that refusal as an error and the account could never
+     * sign in to the admin.
+     */
+    describe("second factor", () => {
+        function mfaRequired(factors: Array<{ id: string; factorType: string; friendlyName?: string }> = [{ id: "f1", factorType: "totp" }]) {
+            return Object.assign(new Error("Multi-factor authentication is required to complete sign-in."), {
+                code: "MFA_REQUIRED",
+                status: 401,
+                details: { mfaToken: "pending-1", factors }
+            });
+        }
+
+        function refusal(code: string, status = 401) {
+            return Object.assign(new Error(code), { code, status });
+        }
+
+        /**
+         * A controller that behaves like the real one where it matters here:
+         * a refused sign-in lands in `authProviderError`, and a verified
+         * challenge signs the user in.
+         */
+        function Harness({ controller, refusalOnSignIn, verify }: {
+            controller: any,
+            refusalOnSignIn: Error,
+            verify: jest.Mock
+        }) {
+            const [authProviderError, setAuthProviderError] = React.useState<Error | null>(null);
+            const [user, setUser] = React.useState<{ uid: string } | null>(null);
+            if (user) return <div>signed in as {user.uid}</div>;
+            return <LoginView authController={{
+                ...controller,
+                authProviderError,
+                user,
+                emailPasswordLogin: async () => {
+                    setAuthProviderError(refusalOnSignIn);
+                    throw refusalOnSignIn;
+                },
+                verifyMfaChallenge: async (mfaToken: string, challengeId: string, code: string) => {
+                    await verify(mfaToken, challengeId, code);
+                    setAuthProviderError(null);
+                    setUser({ uid: "u1" });
+                }
+            }}/>;
+        }
+
+        async function signInWithPassword() {
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+            fireEvent.change(await screen.findByPlaceholderText("you@example.com"), { target: { value: "mfa@rebase.pro" } });
+            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            await act(async () => {
+                fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
+            });
+        }
+
+        async function enterCode(code: string) {
+            fireEvent.change(await screen.findByLabelText("auth_mfa_code_label"), { target: { value: code } });
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: "auth_mfa_verify" }));
+            });
+        }
+
+        let verify: jest.Mock;
+
+        beforeEach(() => {
+            verify = jest.fn().mockResolvedValue(undefined);
+            mockAuthController.startMfaChallenge = jest.fn().mockResolvedValue("ch1");
+        });
+
+        it("asks for a code after the password, and a correct code signs in", async () => {
+            render(<Harness controller={mockAuthController} refusalOnSignIn={mfaRequired()} verify={verify}/>);
+
+            await signInWithPassword();
+
+            const codeField = await screen.findByLabelText("auth_mfa_code_label");
+            expect(codeField).toHaveAttribute("autocomplete", "one-time-code");
+            // The refusal is the step's cue, not an error to show.
+            expect(screen.queryByText(/Multi-factor authentication is required/)).not.toBeInTheDocument();
+
+            await enterCode("418293");
+
+            expect(mockAuthController.startMfaChallenge).toHaveBeenCalledWith("pending-1", "f1");
+            expect(verify).toHaveBeenCalledWith("pending-1", "ch1", "418293");
+            expect(await screen.findByText("signed in as u1")).toBeInTheDocument();
+        });
+
+        it("takes a recovery code in the same field", async () => {
+            render(<Harness controller={mockAuthController} refusalOnSignIn={mfaRequired()} verify={verify}/>);
+            await signInWithPassword();
+
+            await enterCode("  ABCD-EFGH  ");
+
+            expect(verify).toHaveBeenCalledWith("pending-1", "ch1", "ABCD-EFGH");
+        });
+
+        it("opens the step for a refusal from a provider button too", () => {
+            mockAuthController.verifyMfaChallenge = jest.fn();
+            mockAuthController.authProviderError = mfaRequired();
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(screen.getByLabelText("auth_mfa_code_label")).toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: /Sign in with email/i })).not.toBeInTheDocument();
+        });
+
+        it("says a wrong code is wrong, and answers the same challenge with the next one", async () => {
+            verify.mockRejectedValueOnce(refusal("INVALID_CODE")).mockResolvedValueOnce(undefined);
+            render(<Harness controller={mockAuthController} refusalOnSignIn={mfaRequired()} verify={verify}/>);
+            await signInWithPassword();
+
+            await enterCode("000000");
+
+            expect(screen.getByText("auth_mfa_code_invalid")).toBeInTheDocument();
+            expect(screen.getByLabelText("auth_mfa_code_label")).toHaveValue("");
+
+            await enterCode("418293");
+
+            expect(mockAuthController.startMfaChallenge).toHaveBeenCalledTimes(1);
+            expect(verify).toHaveBeenLastCalledWith("pending-1", "ch1", "418293");
+            expect(await screen.findByText("signed in as u1")).toBeInTheDocument();
+        });
+
+        it("opens a new challenge for the code after one that is spent", async () => {
+            mockAuthController.startMfaChallenge = jest.fn()
+                .mockResolvedValueOnce("ch1")
+                .mockResolvedValueOnce("ch2");
+            verify.mockRejectedValueOnce(refusal("CHALLENGE_EXHAUSTED")).mockResolvedValueOnce(undefined);
+            render(<Harness controller={mockAuthController} refusalOnSignIn={mfaRequired()} verify={verify}/>);
+            await signInWithPassword();
+
+            await enterCode("000000");
+
+            expect(screen.getByText("auth_mfa_challenge_exhausted")).toBeInTheDocument();
+
+            await enterCode("418293");
+
+            expect(mockAuthController.startMfaChallenge).toHaveBeenCalledTimes(2);
+            expect(verify).toHaveBeenLastCalledWith("pending-1", "ch2", "418293");
+        });
+
+        it("says the sign-in has expired, and sends the visitor back to sign in again", async () => {
+            mockAuthController.startMfaChallenge = jest.fn().mockRejectedValue(refusal("UNAUTHORIZED"));
+            render(<Harness controller={mockAuthController} refusalOnSignIn={mfaRequired()} verify={verify}/>);
+            await signInWithPassword();
+
+            await enterCode("418293");
+
+            expect(screen.getByText("auth_mfa_expired")).toBeInTheDocument();
+            expect(verify).not.toHaveBeenCalled();
+
+            fireEvent.click(screen.getByRole("button", { name: "auth_mfa_sign_in_again" }));
+
+            expect(await screen.findByPlaceholderText("••••••••")).toBeInTheDocument();
+            expect(screen.queryByLabelText("auth_mfa_code_label")).not.toBeInTheDocument();
+        });
+
+        it("goes back to the sign-in it came from, without the refusal as an error", async () => {
+            render(<Harness controller={mockAuthController} refusalOnSignIn={mfaRequired()} verify={verify}/>);
+            await signInWithPassword();
+            await screen.findByLabelText("auth_mfa_code_label");
+
+            fireEvent.click(screen.getByRole("button", { name: "back" }));
+
+            expect(await screen.findByPlaceholderText("you@example.com")).toBeInTheDocument();
+            expect(screen.queryByLabelText("auth_mfa_code_label")).not.toBeInTheDocument();
+            expect(screen.queryByText(/Multi-factor authentication is required/)).not.toBeInTheDocument();
+        });
+
+        it("offers a choice of factor only when there is more than one", async () => {
+            mockAuthController.verifyMfaChallenge = jest.fn();
+            mockAuthController.authProviderError = mfaRequired([
+                { id: "f1", factorType: "totp", friendlyName: "Phone" },
+                { id: "f2", factorType: "totp", friendlyName: "Tablet" }
+            ]);
+            const { unmount } = render(<LoginView authController={mockAuthController}/>);
+
+            expect(screen.getByRole("combobox", { name: "auth_mfa_factor_label" })).toHaveTextContent("Phone");
+            unmount();
+
+            mockAuthController.authProviderError = mfaRequired();
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(screen.queryByRole("combobox", { name: "auth_mfa_factor_label" })).not.toBeInTheDocument();
+        });
+
+        it("shows the refusal as before when the controller cannot take a second step", () => {
+            delete mockAuthController.startMfaChallenge;
+            mockAuthController.authProviderError = mfaRequired();
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(screen.queryByLabelText("auth_mfa_code_label")).not.toBeInTheDocument();
+            expect(screen.getByText(/Multi-factor authentication is required/)).toBeInTheDocument();
+        });
+    });
 });

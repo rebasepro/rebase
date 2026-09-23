@@ -647,6 +647,16 @@ export const de: RebaseTranslations = {
     auth_email_verified_body: "Deine E-Mail-Adresse ist bestätigt. Du kannst dich jetzt anmelden.",
     auth_email_verification_failed_title: "E-Mail nicht bestätigt",
     auth_email_verification_unavailable: "Die E-Mail-Bestätigung ist in diesem Backend nicht verfügbar.",
+    auth_mfa_title: "Bestätigung in zwei Schritten",
+    auth_mfa_subtitle: "Gib den Code aus deiner Authenticator-App oder einen deiner Wiederherstellungscodes ein.",
+    auth_mfa_factor_label: "Bestätigen mit",
+    auth_mfa_factor_totp: "Authenticator-App",
+    auth_mfa_code_label: "Bestätigungscode",
+    auth_mfa_verify: "Bestätigen",
+    auth_mfa_code_invalid: "Dieser Code stimmt nicht. Versuche den aktuellen Code aus deiner Authenticator-App oder einen Wiederherstellungscode.",
+    auth_mfa_challenge_exhausted: "Zu viele falsche Codes. Gib einen neuen Code aus deiner Authenticator-App ein, um es erneut zu versuchen.",
+    auth_mfa_expired: "Diese Anmeldung ist abgelaufen. Melde dich erneut an, um fortzufahren.",
+    auth_mfa_sign_in_again: "Erneut anmelden",
 
 
     auto_setup_collections_button: "Sammlungen automatisch einrichten",

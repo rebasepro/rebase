@@ -53,6 +53,16 @@ export type RebaseAuthController = AuthController & {
     clearError: () => void;
     /** Set or clear the auth provider error */
     setAuthProviderError: (error: Error | null) => void;
+    /**
+     * Open a challenge to finish a sign-in refused with `MFA_REQUIRED`. See
+     * `AuthControllerExtended`. Absent when the client has no MFA support.
+     */
+    startMfaChallenge?: (mfaToken: string, factorId: string) => Promise<string>;
+    /**
+     * Answer that challenge; the user is signed in on success. Absent when
+     * the client has no MFA support.
+     */
+    verifyMfaChallenge?: (mfaToken: string, challengeId: string, code: string) => Promise<void>;
 }
 
 /**
@@ -80,6 +90,16 @@ export interface ClientAuth {
     getSessions(): Promise<DeviceSession[]>;
     revokeSession(sessionId: string): Promise<unknown>;
     revokeAllSessions(): Promise<unknown>;
+    /**
+     * The challenge that finishes a sign-in refused with `MFA_REQUIRED`: both
+     * requests carry that refusal's `mfaToken`, and a verified one signs the
+     * user in. Optional so a hand-built auth client need not implement it;
+     * without it an account with a second factor cannot sign in here.
+     */
+    mfa?: {
+        challenge(factorId: string, options: { mfaToken: string }): Promise<{ challengeId: string }>;
+        verifyChallenge(challengeId: string, code: string, options: { mfaToken: string }): Promise<unknown>;
+    };
 }
 
 /**

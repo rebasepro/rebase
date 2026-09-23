@@ -32,13 +32,15 @@ import {
     Menu,
     MenuItem,
     MoonIcon,
+    Select,
+    SelectItem,
     SunIcon,
     SunMoonIcon,
     TextField,
     Typography
 } from "@rebasepro/ui";
 import { User } from "@rebasepro/types";
-import { AuthControllerExtended } from "@rebasepro/cms-types";
+import { AuthControllerExtended, MfaFactorSummary } from "@rebasepro/cms-types";
 import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";
 import { LanguageToggle } from "../LanguageToggle";
@@ -46,6 +48,7 @@ import { useModeController, useTranslation } from "../../hooks";
 import { consumeOAuthCallback, startOAuthRedirect } from "./oauth-redirect-flow";
 import { authErrorMessage } from "./auth-error-message";
 import { appAddressOfEmailLink, readEmailLinkAction } from "./email-link";
+import { canAnswerMfa, classifyMfaRefusal, PendingMfaSignIn, readMfaRequired } from "./mfa-required";
 
 /**
  * Props for the generic LoginView.
@@ -220,6 +223,19 @@ function isUserCancellation(code: string | undefined): boolean {
 }
 
 /**
+ * The controller's last refused sign-in, as a sign-in screen should show it:
+ * not at all once a user is present — a stale failure must not sit over a
+ * screen that has since succeeded — and not at all for an `MFA_REQUIRED` this
+ * view can take to its code step, where it is a cue rather than a failure.
+ */
+function signInRefusal(authController: AuthControllerExtended): unknown {
+    const error = authController.authProviderError;
+    if (!error || authController.user) return null;
+    if (canAnswerMfa(authController) && readMfaRequired(error)) return null;
+    return error;
+}
+
+/**
  * Generic login view component that works with any AuthControllerExtended.
  * Feature-detects capabilities to show/hide login methods.
  * @group Core
@@ -266,6 +282,20 @@ export function LoginView({
     // and read after a sign-in that happens one or two screens later, so it has
     // to outlive both. The form also unmounts on every login↔register switch.
     const [newsletterOptIn, setNewsletterOptIn] = useState(false);
+    // A sign-in waiting for its second factor. Every sign-in method — the
+    // email form, Google, an OAuth redirect — reports an `MFA_REQUIRED`
+    // refusal through the controller, so this is taken from there rather
+    // than from any one of them, and shown in place of whichever screen
+    // started it. Back clears it and that screen is still there.
+    const [pendingMfa, setPendingMfa] = useState<PendingMfaSignIn | null>(null);
+    const mfaAnswerable = canAnswerMfa(authController);
+    useEffect(() => {
+        if (!mfaAnswerable || authController.user) return;
+        const pending = readMfaRequired(authController.authProviderError);
+        if (!pending) return;
+        setProviderError(null);
+        setPendingMfa(pending);
+    }, [authController.authProviderError, authController.user, mfaAnswerable]);
 
     // The controller as of the latest render. A provider callback resolves long
     // after the click that started it, and the `authController` captured in that
@@ -397,12 +427,10 @@ export function LoginView({
         logoComponent = <RebaseLogo/>;
     }
 
-    // The controller's own record of the last rejected sign-in, ignored once a
-    // user is present — a stale failure must not sit over a screen that has
-    // since succeeded. `LoginForm` renders the same value for the email path.
-    const controllerError = authController.authProviderError && !authController.user
-        ? authErrorMessage(authController.authProviderError, t)
-        : null;
+    // The controller's own record of the last rejected sign-in — see
+    // `signInRefusal`. `LoginForm` renders the same value for the email path.
+    const refusal = signInRefusal(authController);
+    const controllerError = refusal ? authErrorMessage(refusal, t) : null;
     const buttonsErrorMessage = providerError ?? controllerError;
 
     let notAllowedMessage: string | undefined;
@@ -475,8 +503,19 @@ export function LoginView({
                         />
                     )}
 
+                    {/* The second step of a sign-in, whichever screen began it */}
+                    {!isBootstrapMode && pendingMfa && (
+                        <MfaChallengeForm
+                            key={pendingMfa.mfaToken}
+                            pending={pendingMfa}
+                            authController={authController}
+                            onBack={() => setPendingMfa(null)}
+                            onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
+                        />
+                    )}
+
                     {/* Normal mode */}
-                    {!isBootstrapMode && (
+                    {!isBootstrapMode && !pendingMfa && (
                         <>
                             {/* Provider buttons screen */}
                             {mode === "buttons" && (
@@ -650,7 +689,7 @@ export function LoginView({
                     )}
                 </div>
 
-                {additionalComponent && !isBootstrapMode && mode === "buttons" && (
+                {additionalComponent && !isBootstrapMode && mode === "buttons" && !pendingMfa && (
                     <div className="w-full">
                         {additionalComponent}
                     </div>
@@ -993,8 +1032,8 @@ function LoginForm({
             )}
 
             {(() => {
-                const err = authController.authProviderError;
-                if (!err || authController.user) return null;
+                const err = signInRefusal(authController);
+                if (!err) return null;
                 const msg = authErrorMessage(err, t);
                 return (
                     <div className="w-full mb-2">
@@ -1138,6 +1177,177 @@ function LoginForm({
                     </Typography>
                 </div>
             )}
+        </form>
+    );
+}
+
+/** How a factor is named in the picker: the name its owner gave it, if any. */
+function factorName(factor: MfaFactorSummary, index: number, t: (key: string) => string): string {
+    if (factor.friendlyName) return factor.friendlyName;
+    const kind = factor.factorType === "totp" ? t("auth_mfa_factor_totp") : factor.factorType;
+    return `${kind} ${index + 1}`;
+}
+
+/**
+ * The second step of a sign-in refused with `MFA_REQUIRED`: a code from the
+ * authenticator app, or one of the recovery codes, in the same field — the
+ * server tries the one and then the other.
+ *
+ * The challenge is opened on the first submit and answered by every code
+ * after it until it is spent, which is after five wrong ones: the next code
+ * then opens a new one. The pending token behind both lasts five minutes from
+ * the password; once it has lapsed nothing here can help, so the step says so
+ * and sends the visitor back to sign in again.
+ */
+function MfaChallengeForm({
+    pending,
+    authController,
+    onBack,
+    onSignedIn
+}: {
+    pending: PendingMfaSignIn,
+    authController: AuthControllerExtended,
+    /** Back to the sign-in screen the refusal came from. */
+    onBack: () => void,
+    /** Called once the controller has accepted a code. */
+    onSignedIn?: () => void
+}) {
+    const { t } = useTranslation();
+    const factorFieldId = useId();
+    const codeId = useId();
+    const [factorId, setFactorId] = useState(pending.factors[0].id);
+    const [code, setCode] = useState("");
+    const [challengeId, setChallengeId] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [expired, setExpired] = useState(false);
+
+    // A challenge belongs to one factor: another factor needs its own.
+    const chooseFactor = (id: string) => {
+        setFactorId(id);
+        setChallengeId(null);
+        setError(null);
+    };
+
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const answer = code.trim();
+        const { startMfaChallenge, verifyMfaChallenge } = authController;
+        if (!answer || submitting || expired || !startMfaChallenge || !verifyMfaChallenge) return;
+
+        setError(null);
+        setSubmitting(true);
+        try {
+            const id = challengeId ?? await startMfaChallenge(pending.mfaToken, factorId);
+            setChallengeId(id);
+            await verifyMfaChallenge(pending.mfaToken, id, answer);
+            onSignedIn?.();
+        } catch (err: unknown) {
+            switch (classifyMfaRefusal(err)) {
+                case "invalid-code":
+                    setCode("");
+                    setError(t("auth_mfa_code_invalid"));
+                    break;
+                case "exhausted":
+                    setCode("");
+                    setChallengeId(null);
+                    setError(t("auth_mfa_challenge_exhausted"));
+                    break;
+                case "expired":
+                    setExpired(true);
+                    setError(t("auth_mfa_expired"));
+                    break;
+                default:
+                    setError(authErrorMessage(err, t));
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
+            <div className="w-full mb-2 -ml-2.5">
+                <IconButton onClick={onBack} aria-label={t("back")}>
+                    <ArrowLeftIcon/>
+                </IconButton>
+            </div>
+
+            <Typography variant="h6" className="mb-0.5">
+                {t("auth_mfa_title")}
+            </Typography>
+            <Typography variant="body2" color="secondary" className="mb-5">
+                {t("auth_mfa_subtitle")}
+            </Typography>
+
+            {error && (
+                <div className="w-full mb-3">
+                    <ErrorView error={error}/>
+                </div>
+            )}
+
+            {pending.factors.length > 1 && (
+                <div className="w-full mb-3">
+                    <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={factorFieldId}>
+                        {t("auth_mfa_factor_label")}
+                    </Typography>
+                    <Select
+                        id={factorFieldId}
+                        aria-label={t("auth_mfa_factor_label")}
+                        value={factorId}
+                        onValueChange={chooseFactor}
+                        disabled={submitting || expired}
+                        size="medium"
+                        fullWidth
+                    >
+                        {pending.factors.map((factor, index) => (
+                            <SelectItem key={factor.id} value={factor.id}>
+                                {factorName(factor, index, t)}
+                            </SelectItem>
+                        ))}
+                    </Select>
+                </div>
+            )}
+
+            <div className="w-full mb-3">
+                <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={codeId}>
+                    {t("auth_mfa_code_label")}
+                </Typography>
+                {/* Text, not numeric: a recovery code has letters in it. */}
+                <TextField
+                    id={codeId}
+                    className={loginFieldClasses}
+                    autoFocus
+                    autoComplete="one-time-code"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={code}
+                    disabled={expired}
+                    type="text"
+                    size="medium"
+                    onChange={(event) => setCode(event.target.value)}
+                />
+            </div>
+
+            {expired
+                ? (
+                    <Button onClick={onBack} variant="filled" color="primary" size="large" className="w-full mt-1">
+                        {t("auth_mfa_sign_in_again")}
+                    </Button>
+                )
+                : (
+                    <LoadingButton
+                        type="submit"
+                        variant="filled"
+                        color="primary"
+                        className="w-full mt-1"
+                        size="large"
+                        loading={submitting}
+                        disabled={submitting || !code.trim()}
+                    >
+                        {t("auth_mfa_verify")}
+                    </LoadingButton>
+                )}
         </form>
     );
 }
