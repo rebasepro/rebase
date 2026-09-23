@@ -26,6 +26,8 @@ import {
     type LiveSchemaRoutesConfig
 } from "../src/api/live-schema-routes";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
+import { findCollectionConfigProblems } from "../src/collections/validate-config";
+import { resolveCollectionRelations } from "@rebasepro/common";
 
 const collection = (slug: string, properties: Record<string, unknown> = {}): CollectionConfig =>
     ({ slug, name: slug, properties }) as unknown as CollectionConfig;
@@ -687,5 +689,227 @@ describe("a project that keeps versioned migrations", () => {
         } as never);
         const body = await (await post("/plan", change)).json() as { followUp: string[] };
         expect(body.followUp).toEqual([]);
+    });
+});
+
+/**
+ * A collection with a relation, the way the panel sends it.
+ *
+ * A relation's `target` is a thunk, and the panel posts the whole collection as
+ * JSON — so every relation it did not touch arrives with no target at all, and
+ * one picked in the property form names its target by slug. The planner calls
+ * `target()` on every relation in the set, so handed the JSON as it arrived it
+ * threw on the first one: no change of any kind could be planned for a
+ * collection that had a relation, not a new column and not a policy.
+ *
+ * The planner here does what the real one does first — resolves every relation
+ * with the real `resolveCollectionRelations` — and the proposed set is run
+ * through the boot validator, because a plan for a set that cannot boot is no
+ * plan at all.
+ */
+describe("a collection with relations", () => {
+    const authors = collection("authors", { id: { type: "string", isId: true }, name: { type: "string" } });
+    const tags = collection("tags", { id: { type: "string", isId: true }, label: { type: "string" } });
+    const posts = {
+        ...collection("posts", {
+            id: { type: "string", isId: true },
+            title: { type: "string" },
+            author: {
+                name: "Author",
+                type: "relation",
+                relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
+            }
+        }),
+        relations: [{ kind: "manyToMany", target: () => tags, relationName: "tags" }]
+    } as CollectionConfig;
+
+    function resolvingHarness() {
+        const planned: CollectionConfig[][] = [];
+        const admin = {
+            planSchemaChange: async (_before: CollectionConfig[], after: CollectionConfig[]) => {
+                planned.push(after);
+                for (const each of after) resolveCollectionRelations(each);
+                return okPlan();
+            },
+            executeSql: async () => ({ rows: [] })
+        } as unknown as DatabaseAdmin;
+        const { post } = harness({
+            getCollections: () => [authors, tags, posts],
+            getAdmin: () => admin
+        });
+        const proposedPosts = () => planned[planned.length - 1].find(c => c.slug === "posts")!;
+        return { post, planned, proposedPosts };
+    }
+
+    const targetsOf = (collection: CollectionConfig) => Object.fromEntries(
+        Object.entries(resolveCollectionRelations(collection)).map(([name, relation]) => [name, relation.target().slug])
+    );
+
+    it("plans a new column on a collection whose relation targets were dropped on the wire", async () => {
+        const { post, planned, proposedPosts } = resolvingHarness();
+        const res = await post("/plan", {
+            collectionId: "posts",
+            collection: { ...posts, properties: { ...posts.properties, subtitle: { type: "string", name: "Subtitle" } } }
+        });
+
+        expect(res.status).toBe(200);
+        expect(targetsOf(proposedPosts())).toEqual({ author: "authors", tags: "tags" });
+        expect(findCollectionConfigProblems(planned[0]).filter(p => p.severity === "error")).toEqual([]);
+    });
+
+    it("applies it too — /apply plans the same proposed set", async () => {
+        const { post, proposedPosts } = resolvingHarness();
+        const res = await post("/apply", { collectionId: "posts", collection: posts });
+
+        expect(res.status).toBe(200);
+        expect(targetsOf(proposedPosts())).toEqual({ author: "authors", tags: "tags" });
+    });
+
+    it("links a relation picked by slug to the collection it names", async () => {
+        const { post, planned, proposedPosts } = resolvingHarness();
+        const res = await post("/plan", {
+            collectionId: "posts",
+            collection: {
+                ...posts,
+                properties: {
+                    ...posts.properties,
+                    editor: { name: "Editor", type: "relation", relation: { kind: "belongsTo", target: "authors" } }
+                },
+                relations: [
+                    { kind: "manyToMany", relationName: "tags" },
+                    { kind: "hasMany", relationName: "replies", target: "posts", foreignKeyOnTarget: "parent_id" }
+                ]
+            }
+        });
+
+        expect(res.status).toBe(200);
+        expect(targetsOf(proposedPosts())).toEqual({
+            author: "authors",
+            editor: "authors",
+            tags: "tags",
+            // A relation to the collection being edited reaches the proposed
+            // version of it, not the one it is replacing.
+            replies: "posts"
+        });
+        expect(resolveCollectionRelations(proposedPosts()).replies.target()).toBe(proposedPosts());
+        expect(findCollectionConfigProblems(planned[0]).filter(p => p.severity === "error")).toEqual([]);
+    });
+
+    it("refuses a relation to a collection that does not exist, rather than a 500 from the planner", async () => {
+        const { post, planned } = resolvingHarness();
+        const res = await post("/plan", {
+            collectionId: "posts",
+            collection: {
+                ...posts,
+                properties: { ...posts.properties, editor: { type: "relation", relation: { kind: "belongsTo", target: "ghosts" } } }
+            }
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("INVALID_CHANGE");
+        expect(body.error.message).toContain("ghosts");
+        expect(planned).toEqual([]);
+    });
+
+    it("refuses a new relation with no target at all", async () => {
+        const { post, planned } = resolvingHarness();
+        const res = await post("/plan", {
+            collectionId: "posts",
+            collection: {
+                ...posts,
+                properties: { ...posts.properties, editor: { type: "relation", relation: { kind: "belongsTo" } } }
+            }
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("INVALID_CHANGE");
+        expect(body.error.message).toContain("editor");
+        expect(planned).toEqual([]);
+    });
+});
+
+/**
+ * A planner that refuses, the way the contract says it does.
+ *
+ * `SchemaEditingAdmin.planSchemaChange` *rejects* an unapplicable change,
+ * carrying the classification — and the Postgres planner does exactly that,
+ * with a `SchemaCommitError`. These routes read `plan.classified.applicable`
+ * instead, so every blocked change — a removed property, a table moved from
+ * under its rows — reached the error handler unclassified and came back as a
+ * 500, and the panel could offer only a retry, never the source-only save a
+ * blocked change is meant to lead to.
+ */
+describe("a planner that rejects a blocked change", () => {
+    class RefusedPlan extends Error {
+        constructor(readonly classified: SchemaChangePlan["classified"]) {
+            super("This change cannot be applied to a running database.");
+        }
+    }
+    const refusing = {
+        planSchemaChange: async () => { throw new RefusedPlan(blockedPlan().classified); },
+        executeSql: async () => ({ rows: [] })
+    } as unknown as DatabaseAdmin;
+
+    it("is planned as blocked, not answered with a 500", async () => {
+        const { post } = harness({ getAdmin: () => refusing });
+        const res = await post("/plan", change);
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({
+            applicable: false,
+            verdict: "needs-migration",
+            changes: [{ kind: "remove-property", property: "subtitle" }],
+            statements: []
+        });
+    });
+
+    it("is refused on /apply as unapplicable, before anything is written", async () => {
+        const { post, events } = harness({ getAdmin: () => refusing });
+        const res = await post("/apply", change);
+
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("SCHEMA_CHANGE_UNAPPLICABLE");
+        expect(body.error.message).toContain("migration you have read");
+        expect(events).toEqual([]);
+    });
+
+    it("still fails loudly on anything else the planner throws", async () => {
+        const broken = {
+            planSchemaChange: async () => { throw new Error("catalogue read failed"); },
+            executeSql: async () => ({ rows: [] })
+        } as unknown as DatabaseAdmin;
+        const { post } = harness({ getAdmin: () => broken });
+        expect((await post("/plan", change)).status).toBe(500);
+    });
+});
+
+/**
+ * A body that is not JSON is the caller's mistake, and `c.req.json()` throws a
+ * `SyntaxError` on it — which reached the error handler as an unclassified
+ * error and went back as a 500.
+ */
+describe("a body that is not JSON", () => {
+    it.each(["/plan", "/apply"])("is a 400 on %s, not a 500", async (path) => {
+        const { events } = harness();
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [],
+            getAdmin: () => ({ planSchemaChange: async () => { events.push("plan"); return okPlan(); } }) as unknown as DatabaseAdmin,
+            getRepository: () => undefined
+        }));
+        const res = await app.fetch(new Request(`http://localhost/api/schema${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{ \"collectionId\": \"posts\", "
+        }));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
+        expect(events).toEqual([]);
     });
 });

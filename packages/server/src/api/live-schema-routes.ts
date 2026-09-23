@@ -28,13 +28,16 @@
  * no primary keys. The planner refuses them and this refuses to route around it
  * — `applySchemaChange` re-checks rather than trusting the plan it is handed.
  */
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import {
     isSchemaEditingAdmin,
     isSQLAdmin,
+    type ClassifiedSchemaChanges,
     type CollectionConfig,
     type DatabaseAdmin,
-    type SchemaCommitPaths
+    type SchemaChangePlan,
+    type SchemaCommitPaths,
+    type SchemaEditingAdmin
 } from "@rebasepro/types";
 import { HonoEnv } from "./types";
 import { ApiError, errorHandler } from "./errors";
@@ -233,20 +236,227 @@ const parseProposed = (body: unknown): ProposedChange => {
 };
 
 /**
+ * The request body, or a 400 that says it is not JSON.
+ *
+ * `c.req.json()` throws a `SyntaxError` on a malformed body, and the error
+ * handler cannot tell that from a fault of the server's, so the caller's typo
+ * went back as a 500.
+ */
+async function readBody(c: Context<HonoEnv>): Promise<unknown> {
+    try {
+        return await c.req.json();
+    } catch {
+        throw ApiError.badRequest("The request body is not valid JSON.", "INVALID_CHANGE");
+    }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A relation as it arrived, given back with a callable `target`.
+ *
+ * `relation` is the posted one; `current` is the same relation in the
+ * collection as it is now, when there is one.
+ */
+type RelationRepair = (
+    relation: Record<string, unknown>,
+    current: Record<string, unknown> | undefined,
+    path: string
+) => Record<string, unknown>;
+
+/**
+ * {@link RelationRepair} applied to every relation in a property tree, paired
+ * by key with the same property in the collection as it is now.
+ *
+ * Nested, because the registry resolves a relation inside a `map`, an array's
+ * `of` or a block's `oneOf` as well as a top-level one, and throws on the same
+ * missing target there.
+ */
+function repairPropertyRelations(
+    properties: unknown,
+    current: unknown,
+    path: string,
+    repair: RelationRepair
+): unknown {
+    if (!isRecord(properties)) return properties;
+    const was = isRecord(current) ? current : {};
+    return Object.fromEntries(Object.entries(properties).map(([key, property]) =>
+        [key, repairPropertyRelation(property, was[key], `${path}.${key}`, repair)]
+    ));
+}
+
+function repairPropertyRelation(
+    property: unknown,
+    current: unknown,
+    path: string,
+    repair: RelationRepair
+): unknown {
+    if (!isRecord(property)) return property;
+    const was = isRecord(current) ? current : {};
+    const next: Record<string, unknown> = { ...property };
+
+    if (property.type === "relation" && isRecord(property.relation)) {
+        next.relation = repair(property.relation, isRecord(was.relation) ? was.relation : undefined, path);
+    }
+    if (isRecord(property.properties)) {
+        next.properties = repairPropertyRelations(property.properties, was.properties, path, repair);
+    }
+    if (Array.isArray(property.of)) {
+        const wasOf = Array.isArray(was.of) ? was.of : [];
+        next.of = property.of.map((item, index) =>
+            repairPropertyRelation(item, wasOf[index], `${path}.of[${index}]`, repair));
+    } else if (isRecord(property.of)) {
+        next.of = repairPropertyRelation(property.of, was.of, `${path}.of`, repair);
+    }
+    if (isRecord(property.oneOf) && isRecord(property.oneOf.properties)) {
+        const wasOneOf = isRecord(was.oneOf) ? was.oneOf : {};
+        next.oneOf = {
+            ...property.oneOf,
+            properties: repairPropertyRelations(property.oneOf.properties, wasOneOf.properties, `${path}.oneOf`, repair)
+        };
+    }
+    return next;
+}
+
+/**
+ * {@link RelationRepair} applied to the collection's own `relations` array.
+ *
+ * Paired with the current entries the way the AST editor pairs them when it
+ * writes the file (`writeRelations`): by `relationName`, and positionally for
+ * an unnamed entry only while the array's length is unchanged — after that a
+ * position no longer means the same relation. The plan and the file have to
+ * agree about which relation is which, or the plan describes a change the
+ * write does not make.
+ */
+function repairCollectionRelations(relations: unknown, current: unknown, repair: RelationRepair): unknown {
+    if (!Array.isArray(relations)) return relations;
+    const was = Array.isArray(current) ? current : [];
+    const byName = new Map<string, Record<string, unknown>>();
+    const anonymousByIndex: (Record<string, unknown> | undefined)[] = [];
+    was.forEach((relation, index) => {
+        if (!isRecord(relation)) return;
+        if (typeof relation.relationName === "string") byName.set(relation.relationName, relation);
+        else anonymousByIndex[index] = relation;
+    });
+
+    return relations.map((relation, index) => {
+        if (!isRecord(relation)) return relation;
+        const name = typeof relation.relationName === "string" ? relation.relationName : undefined;
+        const counterpart = (name !== undefined ? byName.get(name) : undefined)
+            ?? (relations.length === was.length ? anonymousByIndex[index] : undefined);
+        return repair(relation, counterpart, `relations.${name ?? index}`);
+    });
+}
+
+/**
  * The proposed collection set: everything as it is, with one collection
  * replaced or added.
+ *
+ * The replacement arrives as JSON, and a relation's `target` is a thunk —
+ * `JSON.stringify` drops it, so every relation the panel did not touch comes
+ * back with no target, and one picked in the property form names its target by
+ * slug. The planner calls `target()` on every relation in the set, so as it
+ * arrived it threw on the first one, and no change of any kind could be planned
+ * for a collection that had a relation.
+ *
+ * So each target is made callable again, the way the AST editor makes it
+ * source again when it writes the file: a slug becomes a lookup in the
+ * proposed set — so a link to the collection being edited reaches its new
+ * version — and a missing target is the one the same relation has now. A
+ * target that is neither is refused here, as the caller's mistake, rather than
+ * thrown from inside the planner as a 500.
  */
 export function proposedCollections(
     current: CollectionConfig[],
     change: ProposedChange
 ): CollectionConfig[] {
-    const next = { ...change.collection, slug: change.collectionId } as CollectionConfig;
-    const replaced = current.map(collection =>
-        collection.slug === change.collectionId ? next : collection
+    let proposed: CollectionConfig[] = [];
+    const slugs = new Set([...current.map(collection => collection.slug), change.collectionId]);
+    const lookup = (slug: string) => (): CollectionConfig => {
+        const found = proposed.find(collection => collection.slug === slug);
+        if (!found) throw new Error(`No collection "${slug}" in the proposed set.`);
+        return found;
+    };
+
+    const repair: RelationRepair = (relation, was, path) => {
+        const target = relation.target;
+        if (typeof target === "function") return relation;
+
+        const named = typeof target === "string" ? target.trim() : "";
+        if (named && slugs.has(named)) return { ...relation, target: lookup(named) };
+        // `() => authorsCollection` is the thunk's own source, which the AST
+        // editor accepts and writes back as it is. An identifier is not
+        // something this can look up, so only the relation's current target
+        // can stand in for it.
+        if (named && !/^\(\s*\)\s*=>/.test(named)) {
+            throw ApiError.badRequest(
+                `The relation at \`${path}\` on "${change.collectionId}" targets "${named}", which is not a ` +
+                "collection. Pick an existing collection as its target.",
+                "INVALID_CHANGE"
+            );
+        }
+        if (typeof was?.target === "function") return { ...relation, target: was.target };
+        throw ApiError.badRequest(
+            `The relation at \`${path}\` on "${change.collectionId}" has no target collection. ` +
+            "Pick one before saving.",
+            "INVALID_CHANGE"
+        );
+    };
+
+    const existing = current.find(collection => collection.slug === change.collectionId);
+    const repaired: Record<string, unknown> = { ...change.collection };
+    if ("properties" in repaired) {
+        repaired.properties = repairPropertyRelations(repaired.properties, existing?.properties, "properties", repair);
+    }
+    if ("relations" in repaired) {
+        repaired.relations = repairCollectionRelations(
+            repaired.relations,
+            existing && "relations" in existing ? existing.relations : undefined,
+            repair
+        );
+    }
+
+    const next = { ...repaired, slug: change.collectionId } as CollectionConfig;
+    const replaced = current.map(each =>
+        each.slug === change.collectionId ? next : each
     );
-    return replaced.some(collection => collection.slug === change.collectionId)
+    proposed = replaced.some(each => each.slug === change.collectionId)
         ? replaced
         : [...replaced, next];
+    return proposed;
+}
+
+const isClassification = (value: unknown): value is ClassifiedSchemaChanges =>
+    isRecord(value) &&
+    Array.isArray(value.changes) &&
+    typeof value.verdict === "string" &&
+    typeof value.applicable === "boolean";
+
+/**
+ * The plan — or, when the planner refuses the change, the refusal as a plan.
+ *
+ * `SchemaEditingAdmin.planSchemaChange` *rejects* an unapplicable change,
+ * carrying its classification, and the Postgres planner does exactly that.
+ * Both routes read `plan.classified.applicable` instead, so every blocked
+ * change — a removed property, a table moved from under its rows — reached the
+ * error handler unclassified and went back as a 500: the panel could offer a
+ * retry, and never the source-only save a blocked change is meant to lead to.
+ * Anything thrown without a classification is still a fault, and still a 500.
+ */
+async function planOrRefusal(
+    admin: SchemaEditingAdmin,
+    before: CollectionConfig[],
+    after: CollectionConfig[],
+    paths: Partial<SchemaCommitPaths> | undefined
+): Promise<SchemaChangePlan> {
+    try {
+        return await admin.planSchemaChange(before, after, { paths });
+    } catch (err) {
+        const classified = isRecord(err) ? err.classified : undefined;
+        if (!isClassification(classified)) throw err;
+        return { files: [], statements: [], classified, message: "" };
+    }
 }
 
 /**
@@ -394,7 +604,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
      * knowing where it would be committed.
      */
     router.post("/plan", async (c) => {
-        const change = parseProposed(await c.req.json());
+        const change = parseProposed(await readBody(c));
         const admin = requirePlanner();
 
         // Checked even though planning has no side effects, and even though the
@@ -415,7 +625,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         const before = config.getCollections();
         const after = proposedCollections(before, change);
 
-        const plan = await admin.planSchemaChange(before, after, { paths: config.commitPaths });
+        const plan = await planOrRefusal(admin, before, after, config.commitPaths);
         return c.json({
             applicable: plan.classified.applicable,
             verdict: plan.classified.verdict,
@@ -433,7 +643,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     });
 
     router.post("/apply", async (c) => {
-        const change = parseProposed(await c.req.json());
+        const change = parseProposed(await readBody(c));
         const admin = requirePlanner();
 
         // Applying is the second privilege, and the admin gate in front of this
@@ -466,7 +676,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         // a change that turns out to be unapplicable must be refused *first* —
         // otherwise a rejected edit still leaves a rewritten collection file
         // behind, and the refusal reads as "nothing happened" when something did.
-        const plan = await admin.planSchemaChange(before, after, { paths: config.commitPaths });
+        const plan = await planOrRefusal(admin, before, after, config.commitPaths);
         if (!plan.classified.applicable) {
             const blocking = plan.classified.changes.filter(c => c.verdict !== "safe");
             throw ApiError.badRequest(
