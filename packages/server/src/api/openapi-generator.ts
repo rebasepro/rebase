@@ -588,7 +588,23 @@ description: "Whether more records exist beyond this page" },
                         schema: { type: "string" },
                         example: "status"
                     },
-                    ...listQueryParameters().filter(p => p.name === "searchString" || p.name === "limit"),
+                    // `limit`, `offset` and `page` bound and page the groups,
+                    // exactly as they do a listing's rows.
+                    ...listQueryParameters().filter(p =>
+                        p.name === "searchString" || p.name === "limit" || p.name === "offset" || p.name === "page"),
+                    {
+                        name: "orderBy",
+                        in: "query",
+                        required: false,
+                        description:
+                            "Sort for the groups, by a `groupBy` field or an aggregate's result key (`count`, " +
+                            "`sum_total`): `key:asc`, `key:desc` or `key:desc:last`. Groups it leaves tied are " +
+                            "ordered by the `groupBy` fields, so every page boundary falls in the same place. " +
+                            "`offset`, `page` and `orderBy` need `groupBy` — without it the result is one row — " +
+                            "and are otherwise a 400 INVALID_AGGREGATE_WINDOW.",
+                        schema: { type: "string" },
+                        example: "count:desc"
+                    },
                     ...buildFilterParameters(collection, reservedParameterNames)
                 ],
                 responses: {
@@ -603,6 +619,15 @@ description: "Whether more records exist beyond this page" },
                                         data: {
                                             type: "array",
                                             items: { type: "object", additionalProperties: true }
+                                        },
+                                        meta: {
+                                            type: "object",
+                                            description: "The page of groups. Present when `groupBy` is.",
+                                            properties: {
+                                                limit: { type: "integer" },
+                                                offset: { type: "integer" },
+                                                hasMore: { type: "boolean", description: "Whether a group follows this page." }
+                                            }
                                         }
                                     }
                                 }

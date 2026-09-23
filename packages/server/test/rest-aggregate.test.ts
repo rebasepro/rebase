@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { parseAggregateSelect, parseGroupBy } from "../src/api/rest/query-parser";
+import { encodeCursor } from "@rebasepro/common";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 
 /**
@@ -129,6 +130,81 @@ describe("the aggregate route", () => {
         const res = await app.request("/orders/aggregate?select=count()");
 
         expect(res.status).toBe(501);
+    });
+});
+
+describe("paging through groups", () => {
+    /**
+     * A grouped aggregate is bounded by `limit`, so a collection with more
+     * groups than one page holds has to be paged. `offset`, `page` and
+     * `orderBy` were parsed and then dropped: every "next page" was the first
+     * one again, in whatever order Postgres happened to return, so a pager
+     * looped forever over fifty arbitrary customers of three hundred.
+     */
+    it("carries offset and orderBy to the grouped aggregate", async () => {
+        const { app, aggregate } = createApp();
+
+        await app.request("/orders/aggregate?select=count()&groupBy=status&limit=10&offset=20&orderBy=count:desc");
+
+        expect(aggregate).toHaveBeenCalledWith("orders", expect.objectContaining({
+            groupBy: ["status"],
+            offset: 20,
+            orderBy: [["count", "desc"]]
+        }));
+    });
+
+    it("reads `page` as the offset of that page", async () => {
+        const { app, aggregate } = createApp();
+
+        await app.request("/orders/aggregate?select=count()&groupBy=status&limit=10&page=3");
+
+        expect(aggregate).toHaveBeenCalledWith("orders", expect.objectContaining({ offset: 20 }));
+    });
+
+    it("says whether another page of groups follows", async () => {
+        const { app, aggregate } = createApp();
+        const group = (status: string) => ({ status, count: 1 });
+
+        aggregate.mockResolvedValueOnce([group("a"), group("b"), group("c")]);
+        const more = await app.request("/orders/aggregate?select=count()&groupBy=status&limit=2");
+        // One group past the page is asked for, and never served.
+        expect((aggregate.mock.calls[0][1] as { limit?: number }).limit).toBe(3);
+        expect(await more.json()).toEqual({
+            data: [group("a"), group("b")],
+            meta: { limit: 2, offset: 0, hasMore: true }
+        });
+
+        aggregate.mockResolvedValueOnce([group("c")]);
+        const last = await app.request("/orders/aggregate?select=count()&groupBy=status&limit=2&offset=2");
+        expect(await last.json()).toEqual({
+            data: [group("c")],
+            meta: { limit: 2, offset: 2, hasMore: false }
+        });
+    });
+
+    it.each([
+        ["an offset", "&offset=5"],
+        ["a page", "&page=2"],
+        ["an orderBy", "&orderBy=count:desc"]
+    ])("refuses %s on an aggregate with no groupBy, which is one row", async (_what, window) => {
+        const { app, aggregate } = createApp();
+
+        const res = await app.request(`/orders/aggregate?select=count()${window}`);
+
+        expect(res.status).toBe(400);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("INVALID_AGGREGATE_WINDOW");
+        expect(aggregate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a cursor, which addresses a row rather than a group", async () => {
+        const { app, aggregate } = createApp();
+        const cursor = encodeCursor([["total", "asc"]], { total: 5 }, "o1")!;
+
+        const res = await app.request(`/orders/aggregate?select=count()&groupBy=status&after=${cursor}`);
+
+        expect(res.status).toBe(400);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("INVALID_AGGREGATE_WINDOW");
+        expect(aggregate).not.toHaveBeenCalled();
     });
 });
 

@@ -1191,19 +1191,47 @@ values: entity as Record<string, unknown> },
             assertReadableFields(aggregates.map(a => a.field), resolvedCollection, viewer, "select");
             assertReadableFields(groupBy ?? [], resolvedCollection, viewer, "groupBy");
 
-            const data = await fetchService.aggregate(collection.slug, {
+            // The groups are paged like a listing's rows: `limit` bounds them,
+            // `offset` (or `page`) moves past them, `orderBy` sorts them by a
+            // group key or an aggregate. Without `groupBy` there is one row,
+            // and nothing to sort or skip — so a window there is refused rather
+            // than read as nothing, which is also what a cursor is: it names a
+            // row to continue after, and a group is not a row.
+            const grouped = groupBy !== undefined && groupBy.length > 0;
+            const orderBy = orderByEntriesToTuples(queryOptions.orderBy);
+            if (queryOptions.cursor || (!grouped && (queryOptions.offset || orderBy))) {
+                throw ApiError.badRequest(
+                    queryOptions.cursor
+                        ? "An aggregate is not paged by cursor: `after` continues after a row, and a group is not one. " +
+                          "Page the groups with `offset` or `page`."
+                        : "`offset`, `page` and `orderBy` page through the groups of an aggregate, and without " +
+                          "`groupBy` it has one row. Add `groupBy`, or drop them.",
+                    "INVALID_AGGREGATE_WINDOW"
+                );
+            }
+
+            // One group past the page, so `hasMore` is known rather than
+            // guessed from a page that happened to come back full.
+            const limit = queryOptions.limit;
+            const rows = await fetchService.aggregate(collection.slug, {
                 aggregates,
                 groupBy,
                 filter: queryOptions.where,
                 logical: queryOptions.logical,
                 searchString,
-                limit: queryOptions.limit,
+                limit: grouped && limit !== undefined ? limit + 1 : limit,
+                offset: queryOptions.offset,
+                orderBy,
                 // Same reasoning as the listing and its count: an aggregate
                 // that counts stamped rows disagrees with the page beside it.
                 withDeleted: queryOptions.withDeleted
             });
 
-            return c.json({ data });
+            if (!grouped || limit === undefined) return c.json({ data: rows });
+            return c.json({
+                data: rows.slice(0, limit),
+                meta: { limit, offset: queryOptions.offset ?? 0, hasMore: rows.length > limit }
+            });
         });
 
         // GET /collection - List entities

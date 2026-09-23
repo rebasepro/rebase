@@ -771,7 +771,17 @@ export interface RestFetchService {
             filter?: FilterValues<string>;
             logical?: LogicalCondition;
             searchString?: string;
+            /** Groups to return. Applies to a grouped aggregate; one without `groupBy` is one row. */
             limit?: number;
+            /** Groups to skip, for paging past `limit`. Grouped aggregates only. */
+            offset?: number;
+            /**
+             * Sort for the groups, by a `groupBy` field or an aggregate's alias
+             * (`count`, `sum_total`). Whatever it leaves tied is ordered by the
+             * group keys, so the order is total and a page boundary falls in
+             * the same place every time. Grouped aggregates only.
+             */
+            orderBy?: OrderByTuple[];
             /** See {@link FetchCollectionProps.withDeleted}. */
             withDeleted?: boolean | "only";
         }

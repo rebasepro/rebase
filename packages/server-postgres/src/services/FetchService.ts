@@ -1643,6 +1643,13 @@ idColumn };
             logical?: LogicalCondition;
             searchString?: string;
             limit?: number;
+            /** Groups to skip. Applied only to a grouped aggregate, like `limit`. */
+            offset?: number;
+            /**
+             * Sort for the groups: by a `groupBy` field or an aggregate's alias.
+             * Applied only to a grouped aggregate; see {@link aggregateOrdering}.
+             */
+            orderBy?: OrderByTuple[];
             /** See `FetchCollectionProps.withDeleted`. */
             withDeleted?: WithDeleted;
         }
@@ -1728,10 +1735,12 @@ idColumn };
 
         if (groupColumns.length > 0) {
             query = query.groupBy(...groupColumns.map(g => g.column));
+            query = query.orderBy(...this.aggregateOrdering(options.orderBy, groupColumns, options.aggregates, selection));
             // Bounded for the same reason a listing is: grouping by a
             // high-cardinality column is a whole table's worth of rows in one
             // response.
             if (options.limit) query = query.limit(options.limit);
+            if (options.offset) query = query.offset(options.offset);
         }
 
         const rows = await query as Record<string, unknown>[];
@@ -1766,6 +1775,53 @@ idColumn };
             }
             return out;
         });
+    }
+
+    /**
+     * The `ORDER BY` of a grouped aggregate: the caller's keys, then every
+     * group key they did not name.
+     *
+     * A grouped aggregate is paged like a listing — `limit` bounds it, so more
+     * groups than one page holds are reached with `offset` — and a page is only
+     * a page over a total order. With no `ORDER BY` at all, Postgres returns the
+     * groups in whatever order its plan produces them, so "the next fifty" was
+     * not a thing that existed. The group keys identify a group, so ending on
+     * them makes the order total and puts every page boundary in the same place
+     * on every request.
+     *
+     * A key may name a `groupBy` field or an aggregate by its alias
+     * (`count`, `sum_total`), sorted on the aggregate's own expression — a
+     * drizzle selection is not aliased in the SQL, so there is no output name
+     * to refer to. Anything else is a 400: Postgres would refuse it too, but as
+     * a `GROUP BY` error from inside the statement.
+     */
+    private aggregateOrdering(
+        orderBy: OrderByTuple[] | undefined,
+        groupColumns: { field: string; column: AnyPgColumn }[],
+        aggregates: { alias: string }[],
+        selection: Record<string, SQL>
+    ): SQL[] {
+        const keys: ResolvedOrderKey[] = [];
+        const named = new Set<string>();
+        for (const [field, direction, nulls] of orderBy ?? []) {
+            const group = groupColumns.find(g => g.field === field);
+            const aggregate = aggregates.find(a => a.alias === field);
+            const target = group?.column ?? (aggregate ? selection[aggregate.alias] : undefined);
+            if (!target) {
+                const sortable = [...groupColumns.map(g => g.field), ...aggregates.map(a => a.alias)];
+                throw ApiError.badRequest(
+                    `An aggregate cannot be sorted by '${field}'. It sorts by what it returns: ` +
+                    `${sortable.map(name => `'${name}'`).join(", ")}.`,
+                    "INVALID_ORDER_BY"
+                );
+            }
+            keys.push({ field, direction, nulls, target });
+            named.add(field);
+        }
+        for (const group of groupColumns) {
+            if (!named.has(group.field)) keys.push({ field: group.field, direction: "asc", target: group.column });
+        }
+        return this.buildOrderExpressions(keys, groupColumns[0].column, false);
     }
 
     /**
