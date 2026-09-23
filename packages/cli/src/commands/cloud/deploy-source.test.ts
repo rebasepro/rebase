@@ -42,6 +42,7 @@ let said: string[];
 let invoke: ReturnType<typeof vi.fn>;
 let requests: string[];
 let contextArchive: Buffer | undefined;
+let bundleArchive: Buffer | undefined;
 
 function write(root: string, relative: string, content: string): void {
     const file = path.join(root, relative);
@@ -49,7 +50,7 @@ function write(root: string, relative: string, content: string): void {
     fs.writeFileSync(file, content);
 }
 
-function bundle(kind: "backend" | "static"): void {
+function bundle(kind: "backend" | "static", deps: Record<string, unknown> = { declared: {} }): void {
     write(bundleDir, "manifest.json", JSON.stringify({
         bundleFormat: 2,
         runtime: { range: "^1", builtAgainst: "0.21.0", contract: 1 },
@@ -57,7 +58,7 @@ function bundle(kind: "backend" | "static"): void {
         app: kind === "backend" ? "backend" : "web",
         kind,
         hooks: { native: false },
-        deps: { declared: {} },
+        deps,
         build: { cli: "0.21.0", node: "22", createdAt: "2026-09-15T00:00:00Z" }
     }));
     write(bundleDir, "config/index.js", "export default {};\n");
@@ -67,7 +68,10 @@ function bundle(kind: "backend" | "static"): void {
 function controlPlane(sourceStatus = 200): void {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
         requests.push(url);
-        if (url.includes("/deploy/bundle/upload")) return new Response(JSON.stringify({ bundleId: "b1" }));
+        if (url.includes("/deploy/bundle/upload")) {
+            bundleArchive = Buffer.from(init?.body as Uint8Array);
+            return new Response(JSON.stringify({ bundleId: "b1" }));
+        }
         if (url.includes("/deploy/upload")) {
             // `--source`: the build context. Kept, so a test can read what left.
             contextArchive = Buffer.from(init?.body as Uint8Array);
@@ -102,6 +106,7 @@ beforeEach(() => {
     said = [];
     requests = [];
     contextArchive = undefined;
+    bundleArchive = undefined;
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
@@ -257,6 +262,56 @@ describe("a bundle refused as a downgrade", () => {
     });
 });
 
+/** The entries of an uploaded archive, without directories or the `./` prefix. */
+function archiveEntries(archive: Buffer | undefined): string[] {
+    expect(archive).toBeDefined();
+    const tar = path.join(bundleDir, "..", `${path.basename(bundleDir)}-read.tar.gz`);
+    fs.writeFileSync(tar, archive!);
+    try {
+        return execFileSync("tar", ["-tzf", tar], { encoding: "utf8" })
+            .split("\n")
+            .filter(entry => entry !== "" && !entry.endsWith("/"))
+            .map(entry => entry.replace(/^\.\//, ""))
+            .sort();
+    } finally {
+        fs.rmSync(tar, { force: true });
+    }
+}
+
+/**
+ * `rebase build` vendors the bundle's dependencies so a pod untars and boots,
+ * rather than spending 35-55s of every start in `npm install`. The upload left
+ * `node_modules` out, so the install was paid at every deploy and still at
+ * every pod start.
+ */
+describe("a vendored bundle", () => {
+    it("uploads the dependency tree the build installed", async () => {
+        bundle("backend", { declared: { pg: "^8.22.0" }, vendored: true, vendorTarget: { os: "linux", cpu: "x64", node: "22" } });
+        write(bundleDir, "node_modules/pg/package.json", "{\"name\":\"pg\"}");
+        write(bundleDir, "node_modules/pg/node_modules/pg-types/index.js", "module.exports = {};");
+        controlPlane();
+
+        await deploy("--no-source");
+
+        expect(archiveEntries(bundleArchive)).toEqual([
+            "config/index.js",
+            "manifest.json",
+            "node_modules/pg/node_modules/pg-types/index.js",
+            "node_modules/pg/package.json"
+        ]);
+    });
+
+    it("uploads no node_modules the build did not vendor", async () => {
+        bundle("backend", { declared: { pg: "^8.22.0" } });
+        write(bundleDir, "node_modules/pg/package.json", "{\"name\":\"pg\"}");
+        controlPlane();
+
+        await deploy("--no-source");
+
+        expect(archiveEntries(bundleArchive)).toEqual(["config/index.js", "manifest.json"]);
+    });
+});
+
 /**
  * `--source <dir>` uploads a build context, and the control plane keeps it as
  * the project's source archive. It used to be `tar .` with the root
@@ -266,16 +321,7 @@ describe("a bundle refused as a downgrade", () => {
  */
 describe("a --source deploy", () => {
     /** The entries of the build context the control plane was sent. */
-    function uploadedContext(): string[] {
-        expect(contextArchive).toBeDefined();
-        const tar = path.join(bundleDir, "context.tar.gz");
-        fs.writeFileSync(tar, contextArchive!);
-        return execFileSync("tar", ["-tzf", tar], { encoding: "utf8" })
-            .split("\n")
-            .filter(entry => entry !== "" && !entry.endsWith("/"))
-            .map(entry => entry.replace(/^\.\//, ""))
-            .sort();
-    }
+    const uploadedContext = (): string[] => archiveEntries(contextArchive);
 
     function sourceDeploy(dir: string): Promise<void> {
         return deployCommand(["node", "rebase", "cloud", "deploy", "--source", dir, "--no-follow"], "shop");

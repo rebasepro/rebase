@@ -35,7 +35,15 @@ import {
     billingAccountIdOf
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
-import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, bundleCommit, declaredAppsFrom } from "./bundle-deploy";
+import {
+    readBundleManifest,
+    packBundleForUpload,
+    uploadBundle,
+    bundleDeployBody,
+    bundleCommit,
+    declaredAppsFrom,
+    MAX_BUNDLE_UPLOAD_BYTES
+} from "./bundle-deploy";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
@@ -172,8 +180,9 @@ async function uploadSource(url: string, token: string, projectId: string, tarPa
  * Build, upload and deploy a project as a managed bundle.
  *
  * Builds the backend app into `dist-bundle` (unless one is pointed at with
- * `--bundle-dir`), packs it without `node_modules`, uploads it, and triggers a
- * deploy carrying the manifest so the control plane can validate intake fast.
+ * `--bundle-dir`), packs it with the dependency tree the build vendored into it,
+ * uploads it, and triggers a deploy carrying the manifest so the control plane
+ * can validate intake fast.
  */
 async function deployBundle(opts: {
     client: CloudClient;
@@ -368,8 +377,15 @@ async function uploadAndTrigger(opts: {
 
     let bundleId: string;
     try {
-        await packBundle(bundleDir, tarPath);
-        const sizeMb = (fs.statSync(tarPath).size / 1024 / 1024).toFixed(1);
+        const packed = await packBundleForUpload(bundleDir, tarPath, manifest);
+        if (packed.modulesLeftOut) {
+            warn(
+                `The dependencies installed into this bundle take it over the ${MAX_BUNDLE_UPLOAD_BYTES / 1024 / 1024} MB ` +
+                    "upload limit, so they were left out and every pod start installs them instead (~40-60s).",
+                "Shrink the declared dependencies, or build with `rebase build --no-vendor` to skip installing them."
+            );
+        }
+        const sizeMb = (packed.bytes / 1024 / 1024).toFixed(1);
         progress(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
         bundleId = await uploadBundle(url, token!, projectId, tarPath);
     } catch (e) {

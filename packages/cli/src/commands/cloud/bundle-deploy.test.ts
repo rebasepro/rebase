@@ -1,8 +1,10 @@
+import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { execFileSync } from "child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readBundleManifest, bundleDeployBody, bundleCommit, packBundle, declaredAppsFrom } from "./bundle-deploy";
+import { readBundleManifest, bundleDeployBody, bundleCommit, packBundleForUpload, declaredAppsFrom } from "./bundle-deploy";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 
 let scratch: string;
@@ -87,26 +89,62 @@ message: "ship it" });
     });
 });
 
-describe("packBundle", () => {
-    it("packs the bundle and excludes node_modules", async () => {
-        // A bundle ships a package.json; node_modules is installed at boot, and a
-        // platform-specific install must not travel in the archive.
+/**
+ * `rebase build` installs the bundle's dependencies into it, so a pod untars
+ * and boots instead of spending 35-55s of every start in `npm install`. The
+ * archive then left `node_modules` out, so every deploy paid for the install
+ * and no pod ever got it.
+ */
+describe("packing a bundle for upload", () => {
+    function bundleWithModules(): void {
         fs.writeFileSync(path.join(scratch, "manifest.json"), "{}");
         fs.mkdirSync(path.join(scratch, "config"), { recursive: true });
         fs.writeFileSync(path.join(scratch, "config", "index.js"), "export const x = 1;");
-        fs.mkdirSync(path.join(scratch, "node_modules", "junk"), { recursive: true });
-        fs.writeFileSync(path.join(scratch, "node_modules", "junk", "big.js"), "x".repeat(1000));
+        fs.mkdirSync(path.join(scratch, "node_modules", "pg", "node_modules", "pg-types"), { recursive: true });
+        fs.writeFileSync(path.join(scratch, "node_modules", "pg", "index.js"), "module.exports = {};");
+        fs.writeFileSync(path.join(scratch, "node_modules", "pg", "node_modules", "pg-types", "index.js"), "x");
+    }
 
-        const out = path.join(scratch, "..", "out.tar.gz");
-        await packBundle(scratch, out);
-        expect(fs.existsSync(out)).toBe(true);
+    function entries(archive: string): string[] {
+        return execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).split("\n").filter(Boolean);
+    }
 
-        // The archive should not contain node_modules.
-        const { execSync } = await import("child_process");
-        const listing = execSync(`tar -tzf ${out}`).toString();
-        expect(listing).toContain("config/index.js");
-        expect(listing).not.toContain("node_modules");
-        fs.rmSync(out, { force: true });
+    const out = (): string => path.join(scratch, "..", `out-${path.basename(scratch)}.tar.gz`);
+    afterEach(() => fs.rmSync(out(), { force: true }));
+
+    it("carries the dependency tree the build vendored, nested installs included", async () => {
+        bundleWithModules();
+
+        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }));
+
+        expect(packed.modulesLeftOut).toBe(false);
+        const listing = entries(out());
+        expect(listing).toContain("./config/index.js");
+        expect(listing).toContain("./node_modules/pg/index.js");
+        expect(listing).toContain("./node_modules/pg/node_modules/pg-types/index.js");
+    });
+
+    it("leaves out a node_modules the build did not vendor", async () => {
+        // Installed by hand into a prebuilt bundle, for whatever machine it ran on.
+        bundleWithModules();
+
+        await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" } } }));
+
+        const listing = entries(out());
+        expect(listing).toContain("./config/index.js");
+        expect(listing.some(entry => entry.includes("node_modules"))).toBe(false);
+    });
+
+    it("leaves the vendored tree out when it takes the archive over the upload cap", async () => {
+        // A bundle refused at the door is worse than one that installs at boot.
+        bundleWithModules();
+        fs.writeFileSync(path.join(scratch, "node_modules", "pg", "blob.bin"), crypto.randomBytes(64 * 1024));
+
+        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }), 32 * 1024);
+
+        expect(packed.modulesLeftOut).toBe(true);
+        expect(packed.bytes).toBe(fs.statSync(out()).size);
+        expect(entries(out()).some(entry => entry.includes("node_modules"))).toBe(false);
     });
 });
 

@@ -40,14 +40,19 @@ export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
 }
 
 /**
+ * The control plane's cap on an uploaded bundle: its `MAX_BUNDLE_BYTES`, which
+ * it checks before reading the body.
+ */
+export const MAX_BUNDLE_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+/**
  * Tar a built bundle into a gzipped archive.
  *
- * `node_modules` is excluded on purpose: the bundle ships a `package.json`, and
- * the managed runtime installs the declared dependencies at boot. Uploading an
- * installed `node_modules` would bloat the archive and could carry a
- * platform-specific build that will not run on the runtime image.
+ * `node_modules` goes in only with `withModules`: a tree the build vendored for
+ * the runtime's platform is the point of vendoring, while one installed into a
+ * prebuilt bundle by hand was installed for whatever machine ran it.
  */
-export function packBundle(bundleDir: string, outPath: string): Promise<void> {
+export function packBundle(bundleDir: string, outPath: string, options: { withModules?: boolean } = {}): Promise<void> {
     return new Promise((resolve, reject) => {
         const child = spawn(
             "tar",
@@ -55,7 +60,7 @@ export function packBundle(bundleDir: string, outPath: string): Promise<void> {
             // `LIBARCHIVE.xattr.com.apple.provenance` headers into the archive,
             // which GNU tar on the runtime image then warns about once per file.
             // Harmless, but it buries real extraction errors in noise.
-            ["-czf", outPath, "--no-xattrs", "--exclude", "node_modules", "-C", bundleDir, "."],
+            ["-czf", outPath, "--no-xattrs", ...(options.withModules ? [] : ["--exclude", "node_modules"]), "-C", bundleDir, "."],
             // Only a deploy packs a bundle, and a deploy's stdout may be its JSON result.
             { stdio: toolStdio(true),
 env: { ...process.env,
@@ -64,6 +69,35 @@ COPYFILE_DISABLE: "1" } }
         child.on("error", reject);
         child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`tar exited ${code}`))));
     });
+}
+
+/**
+ * Pack a bundle for upload, carrying the dependency tree `rebase build`
+ * vendored into it.
+ *
+ * Vendoring exists so a pod untars and boots: the runtime skips its own
+ * `npm install` when the bundle already holds `node_modules`, and that install
+ * is 35-55 seconds of every pod start. Only a bundle whose manifest says it was
+ * vendored carries its tree — the build installed it for the runtime's platform.
+ *
+ * The build already declines to vendor a tree too large to upload, but it
+ * measures the tree on disk and guesses at compression. When the archive still
+ * comes out over the cap, it is packed again without the tree: a bundle that
+ * installs at boot is better than one refused at the door.
+ */
+export async function packBundleForUpload(
+    bundleDir: string,
+    outPath: string,
+    manifest: RebaseBundleManifest,
+    maxBytes: number = MAX_BUNDLE_UPLOAD_BYTES
+): Promise<{ bytes: number; modulesLeftOut: boolean }> {
+    const vendored = manifest.deps?.vendored === true;
+    await packBundle(bundleDir, outPath, { withModules: vendored });
+    const bytes = fs.statSync(outPath).size;
+    if (!vendored || bytes <= maxBytes) return { bytes, modulesLeftOut: false };
+
+    await packBundle(bundleDir, outPath, { withModules: false });
+    return { bytes: fs.statSync(outPath).size, modulesLeftOut: true };
 }
 
 /**
