@@ -531,7 +531,7 @@ following: false }
         console.log("");
     }
 
-    const status = await streamBuildLogs(client, deploymentId, {
+    const { status } = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
         timeoutMs: opts.timeoutMs,
         projectId,
@@ -1271,7 +1271,7 @@ following: false,
     // result object would make neither parseable. The deploy is still followed
     // to completion — a caller waiting on the exit code still waits — and the
     // one object printed at the end carries the outcome.
-    const status = await streamBuildLogs(client, deploymentId, {
+    const { status } = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
@@ -1492,7 +1492,7 @@ async function streamBuildLogs(
     client: CloudClient,
     deploymentId: string,
     opts: { quiet?: boolean; timeoutMs?: number; projectId?: string; url?: string } = {}
-): Promise<string> {
+): Promise<{ status: string; logs: string }> {
     const quiet = opts.quiet === true;
     const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
     let printed = "";
@@ -1547,7 +1547,7 @@ async function streamBuildLogs(
                 if (url) console.log(`  ${chalk.cyan(`https://${url}`)}`);
                 console.log("");
             }
-            return dep.status;
+            return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };
         }
 
         if (Date.now() - started > timeoutMs) {
@@ -1591,11 +1591,17 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
                 { method: "GET",
 path: projectId }
             );
-            console.log("");
-            console.log(chalk.bold(`  📄 Runtime logs — project ${projectRef}`));
-            console.log("");
-            console.log(res.logs ?? chalk.gray("  (no logs)"));
-            console.log("");
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.bold(`  📄 Runtime logs — project ${projectRef}`));
+                    console.log("");
+                    console.log(res.logs ?? chalk.gray("  (no logs)"));
+                    console.log("");
+                },
+                { runtime: true,
+logs: res.logs ?? null }
+            );
         } catch (e) {
             reportError(e, "Failed to fetch runtime logs");
         }
@@ -1603,27 +1609,57 @@ path: projectId }
     }
 
     // Build logs: latest deployment, optionally follow if still running.
+    //
+    // In JSON mode the page is one object, `{ deploymentId, status, logs }`: it
+    // used to be the human page whatever the mode, so `cloud logs --json | jq`
+    // failed on every run. The log is the build's, without the heartbeat line a
+    // running build keeps rewriting at its end.
     try {
         const dep = (await latestDeployment(client, projectId)) as Deployment | undefined;
         if (!dep) {
-            console.log("");
-            console.log(chalk.gray("  No deployments yet for this project."));
-            console.log("");
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.gray("  No deployments yet for this project."));
+                    console.log("");
+                },
+                { deploymentId: null,
+status: null,
+logs: null }
+            );
             return;
         }
 
-        console.log("");
-        console.log(chalk.bold(`  📄 Build logs — deployment ${dep.id}`) + `  ${colorStatus(dep.status)}`);
-        console.log("");
-
+        const deploymentId = String(dep.id);
         if (args["--follow"] && dep.status === "deploying") {
+            if (!isJsonMode()) {
+                console.log("");
+                console.log(chalk.bold(`  📄 Build logs — deployment ${dep.id}`) + `  ${colorStatus(dep.status)}`);
+                console.log("");
+            }
             // Hand off to the streamer, which prints from the top and tails live.
-            await streamBuildLogs(client, String(dep.id), { projectId,
+            const { status, logs } = await streamBuildLogs(client, deploymentId, { quiet: isJsonMode(),
+projectId,
 url });
-        } else {
-            console.log(dep.logs ?? chalk.gray("  (no logs)"));
-            console.log("");
+            emit(() => {}, { deploymentId,
+status,
+logs });
+            return;
         }
+
+        const logs = dep.logs == null ? null : withoutHeartbeat(dep.logs);
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  📄 Build logs — deployment ${dep.id}`) + `  ${colorStatus(dep.status)}`);
+                console.log("");
+                console.log(logs ?? chalk.gray("  (no logs)"));
+                console.log("");
+            },
+            { deploymentId,
+status: dep.status ?? null,
+logs }
+        );
     } catch (e) {
         reportError(e, "Failed to fetch build logs");
     }

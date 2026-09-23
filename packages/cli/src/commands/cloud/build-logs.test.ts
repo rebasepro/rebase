@@ -154,3 +154,103 @@ describe("rebase cloud logs --follow", () => {
         expect(written.join("")).toBe(L1 + L2 + FAILED);
     });
 });
+
+/**
+ * `rebase cloud logs --json` printed the human page (emoji header, raw log),
+ * so `rebase cloud logs --json | jq` failed on every run, and piping the
+ * command at all turns JSON mode on.
+ */
+describe("rebase cloud logs in JSON mode", () => {
+    let stdout: string[];
+
+    function client(rows: Array<Record<string, unknown>>, runtime?: { logs?: string }): void {
+        let read = 0;
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                data: {
+                    collection: () => ({
+                        find: async () => ({ data: rows.slice(0, 1) }),
+                        findById: async () => rows[Math.min(read++, rows.length - 1)]
+                    })
+                },
+                functions: { invoke: vi.fn(async () => runtime ?? {}) }
+            },
+            url: "https://cp.example"
+        });
+    }
+
+    /** Everything written to stdout, as the one JSON value it has to be. */
+    const result = (): unknown => JSON.parse(stdout.join(""));
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        stdout = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+        vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+            stdout.push(`${args.map(String).join(" ")}\n`);
+        });
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Exited(code ?? 0);
+        }) as never);
+        context.setJsonModeForTest(true);
+    });
+
+    afterEach(() => {
+        context.setJsonModeForTest(false);
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it("prints the latest deployment's log as one object", async () => {
+        client([{ id: "d1", status: "failed", logs: L1 + L2 + FAILED }]);
+
+        await logsCommand(["node", "rebase", "cloud", "logs", "--json"], "shop");
+
+        expect(result()).toEqual({ deploymentId: "d1", status: "failed", logs: L1 + L2 + FAILED });
+    });
+
+    it("leaves the heartbeat out of a build still running", async () => {
+        client([{ id: "d1", status: "deploying", logs: L1 + beat("2026-09-23T10:00:00.000Z") }]);
+
+        await logsCommand(["node", "rebase", "cloud", "logs", "--json"], "shop");
+
+        expect(result()).toEqual({ deploymentId: "d1", status: "deploying", logs: L1 });
+    });
+
+    it("follows a running build and prints the finished one", async () => {
+        client([
+            { id: "d1", status: "deploying", logs: L1 + beat("2026-09-23T10:00:00.000Z") },
+            { id: "d1", status: "success", logs: `${L1 + L2}\n🎉 Managed deploy complete.\n` }
+        ]);
+
+        const done = logsCommand(["node", "rebase", "cloud", "logs", "--json", "--follow"], "shop");
+        await vi.advanceTimersByTimeAsync(5_000);
+        await done;
+
+        expect(result()).toEqual({
+            deploymentId: "d1",
+            status: "success",
+            logs: `${L1 + L2}\n🎉 Managed deploy complete.\n`
+        });
+    });
+
+    it("says there is no deployment yet", async () => {
+        client([]);
+
+        await logsCommand(["node", "rebase", "cloud", "logs", "--json"], "shop");
+
+        expect(result()).toEqual({ deploymentId: null, status: null, logs: null });
+    });
+
+    it("prints the runtime log as one object", async () => {
+        client([], { logs: "GET /api/health 200\n" });
+
+        await logsCommand(["node", "rebase", "cloud", "logs", "--json", "--runtime"], "shop");
+
+        expect(result()).toEqual({ runtime: true, logs: "GET /api/health 200\n" });
+    });
+});
