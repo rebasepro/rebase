@@ -27,6 +27,12 @@ import type { BackendCollectionRegistry } from "../src/collections/BackendCollec
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 
+const customers = {
+    name: "customers",
+    slug: "customers",
+    properties: { id: { name: "ID", type: "string", isId: "uuid" } }
+} as unknown as CollectionConfig;
+
 const orders = {
     name: "orders",
     slug: "orders",
@@ -38,7 +44,13 @@ const orders = {
         terms: { name: "Terms", type: "map", access: { write: ["admin"] } },
         approvedAt: { name: "Approved", type: "date", access: { write: ["admin"] } },
         internalNote: { name: "Note", type: "string", access: { read: ["admin"], write: ["admin"] } },
-        stripeIntent: { name: "Intent", type: "string", columnName: "stripe_intent", excludeFromApi: true }
+        stripeIntent: { name: "Intent", type: "string", columnName: "stripe_intent", excludeFromApi: true },
+        customer: {
+            name: "Customer",
+            type: "relation",
+            access: { write: ["admin"] },
+            relation: { kind: "belongsTo", target: () => customers, localKey: "customer_id" }
+        }
     }
 } as unknown as CollectionConfig;
 
@@ -53,7 +65,8 @@ const CURRENT = {
     terms: { net: 30, currency: "EUR" },
     approvedAt: APPROVED,
     internalNote: "current note",
-    stripe_intent: "pi_current"
+    stripe_intent: "pi_current",
+    customerId: "c1"
 };
 
 /** A stored version, as it came back out of `jsonb`. */
@@ -70,6 +83,7 @@ function snapshot(overrides: Record<string, unknown> = {}) {
             approvedAt: APPROVED.toISOString(),
             internalNote: "old note",
             stripe_intent: "pi_old",
+            customerId: "c1",
             ...overrides
         }
     };
@@ -128,6 +142,18 @@ describe("POST /:slug/:id/history/:historyId/revert — field write rules", () =
         expect(save).not.toHaveBeenCalled();
     });
 
+    it("refuses a revert that would move a relation the caller cannot write, by its foreign key", async () => {
+        // `customerId` sets the column `customer` sets. It was already left out
+        // of the write, so without the refusal the revert answered 200 having
+        // restored everything but the one change the caller may not make.
+        const { status, body, save } = await revert(["user"], snapshot({ customerId: "c2" }));
+
+        expect(status).toBe(400);
+        expect(body.error?.code).toBe("FIELD_NOT_WRITABLE");
+        expect(body.error?.details?.fields).toEqual(["customerId"]);
+        expect(save).not.toHaveBeenCalled();
+    });
+
     it("treats a request with no user as anonymous, not as the trusted plane", async () => {
         const { status, save } = await revert(undefined, snapshot({ discountPercent: 50 }));
 
@@ -146,10 +172,10 @@ describe("POST /:slug/:id/history/:historyId/revert — field write rules", () =
     });
 
     it("lets a caller holding the role restore the field", async () => {
-        const { status, written } = await revert(["admin"], snapshot({ discountPercent: 50 }));
+        const { status, written } = await revert(["admin"], snapshot({ discountPercent: 50, customerId: "c2" }));
 
         expect(status).toBe(200);
-        expect(written).toMatchObject({ title: "old title", discountPercent: 50, internalNote: "old note" });
+        expect(written).toMatchObject({ title: "old title", discountPercent: 50, internalNote: "old note", customerId: "c2" });
     });
 
     it("never writes an `excludeFromApi` column back, for any caller", async () => {

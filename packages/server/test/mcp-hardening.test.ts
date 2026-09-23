@@ -584,15 +584,22 @@ describe("the mutating tools apply the field write rules", () => {
     // REST routes and the socket's SAVE check them; these two tools took `values`
     // straight to `driver.save`, so a recruiter refused `PATCH { rating: 5 }`
     // could set it by asking the model to.
+    const teams = { slug: "teams", name: "Teams", properties: { name: { type: "string", name: "Name" } } };
     const guarded = [{
         slug: "candidates",
         name: "Candidates",
         properties: {
             name: { type: "string", name: "Name" },
             rating: { type: "number", name: "Rating", access: { write: ["hiring_manager"] } },
-            inviteToken: { type: "string", name: "Invite", columnName: "invite_token", excludeFromApi: true }
+            inviteToken: { type: "string", name: "Invite", columnName: "invite_token", excludeFromApi: true },
+            team: {
+                type: "relation",
+                name: "Team",
+                access: { write: ["hiring_manager"] },
+                relation: { kind: "belongsTo", target: () => teams, localKey: "team_id" }
+            }
         }
-    }] as unknown as CollectionConfig[];
+    }, teams] as unknown as CollectionConfig[];
 
     async function call(name: string, args: Record<string, unknown>, roles = ["recruiter"]) {
         const { driver, calls } = stubDriver();
@@ -613,6 +620,26 @@ describe("the mutating tools apply the field write rules", () => {
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toContain("'rating' on 'candidates' is not writable with your roles");
         expect(saves).toHaveLength(0);
+    });
+
+    it.each([
+        ["update_document", "teamId", { collection: "candidates", id: "c1", values: { teamId: "t2" } }],
+        ["update_document", "team_id", { collection: "candidates", id: "c1", values: { team_id: "t2" } }],
+        ["create_document", "teamId", { collection: "candidates", values: { name: "X", teamId: "t2" } }]
+    ])("%s refuses `%s`, the foreign key of a relation the caller's roles cannot write", async (tool, key, args) => {
+        // `teamId` sets the column `team` sets, so the relation's rule is its rule.
+        const { body, saves } = await call(tool, args);
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain(`'${key}' on 'candidates' is not writable with your roles`);
+        expect(saves).toHaveLength(0);
+    });
+
+    it("writes the foreign key for a caller who may write the relation", async () => {
+        const { body, saves } = await call(
+            "update_document", { collection: "candidates", id: "c1", values: { teamId: "t2" } }, ["hiring_manager"]
+        );
+        expect(body.result?.isError).toBeUndefined();
+        expect(saves).toHaveLength(1);
     });
 
     it("refuses an `excludeFromApi` column under either spelling, for any role", async () => {

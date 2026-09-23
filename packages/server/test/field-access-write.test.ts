@@ -1,6 +1,8 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import { Hono } from "hono";
+import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest/write-validation";
-import { ApiError } from "../src/api/errors";
+import { RestApiGenerator } from "../src/api/rest/api-generator";
+import { ApiError, errorHandler } from "../src/api/errors";
 
 /**
  * Per-field `access.write`, at the write boundary.
@@ -180,5 +182,122 @@ describe("strictWrites: false", () => {
 
     it("still lets an undeclared key through, which is what the flag is for", () => {
         expect(() => assertKnownWriteFields({ whatever: 1 }, loose, { viewer: clerk })).not.toThrow();
+    });
+});
+
+describe("the foreign key of a to-one relation", () => {
+    /**
+     * `bandId: 7` sets the column `band: { id: 7 }` sets. A write rule on the
+     * relation that left its key open was one a caller stepped around by
+     * spelling the write the way the row is served — and the read side already
+     * treats the two as one field.
+     */
+    const bands = {
+        slug: "bands",
+        table: "bands",
+        properties: { id: { type: "number", isId: "increment" } }
+    } as unknown as CollectionConfig;
+    const offices = {
+        slug: "offices",
+        table: "offices",
+        properties: { id: { type: "number", isId: "increment" } }
+    } as unknown as CollectionConfig;
+    const banded = {
+        ...staff,
+        properties: {
+            ...staff.properties,
+            band: {
+                type: "relation",
+                access: { write: ["hr"] },
+                relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
+            },
+            office: {
+                type: "relation",
+                excludeFromApi: true,
+                relation: { kind: "belongsTo", target: () => offices, localKey: "office_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+    const loose = { ...banded, strictWrites: false } as unknown as CollectionConfig;
+
+    it.each(["bandId", "band_id"])("refuses `%s` from a caller who may not write the relation", (key) => {
+        for (const collection of [banded, loose]) {
+            const error = thrown(() => assertKnownWriteFields({ [key]: 7 }, collection, { viewer: clerk }));
+            expect(error.code).toBe("FIELD_NOT_WRITABLE");
+            expect((error.details as { fields: string[] }).fields).toEqual([key]);
+        }
+    });
+
+    it("accepts it from a caller who may", () => {
+        expect(() => assertKnownWriteFields({ bandId: 7 }, banded, { viewer: hr })).not.toThrow();
+        expect(() => assertKnownWriteFields({ band_id: 7 }, loose, { viewer: hr })).not.toThrow();
+    });
+
+    it.each(["officeId", "office_id"])("refuses `%s` to everyone when the relation is `excludeFromApi`", (key) => {
+        for (const viewer of [admin, hr, undefined]) {
+            const error = thrown(() => assertKnownWriteFields({ [key]: 3 }, loose, { viewer }));
+            expect(error.code).toBe("VALIDATION_EXCLUDED_FIELDS");
+            expect((error.details as { fields: string[] }).fields).toEqual([key]);
+        }
+    });
+
+    it("refuses it through `assertWriteRequestValid`, which is the socket's and MCP's door", () => {
+        expect(thrown(() => assertWriteRequestValid({ bandId: 7 }, banded, { viewer: clerk })).code)
+            .toBe("FIELD_NOT_WRITABLE");
+    });
+
+    it("is not offered in the known-fields list to a caller who may not write it", () => {
+        expect(thrown(() => assertKnownWriteFields({ titel: "x" }, banded, { viewer: clerk })).message)
+            .not.toContain("'bandId'");
+        expect(thrown(() => assertKnownWriteFields({ titel: "x" }, banded, { viewer: hr })).message)
+            .toContain("'bandId'");
+    });
+
+    describe("through the REST routes", () => {
+        function mount(roles: string[]) {
+            const save = jest.fn(async ({ values }: { values: Record<string, unknown> }) => ({ id: 1, ...values }));
+            const driver = {
+                key: "postgres",
+                initialised: true,
+                fetchOne: jest.fn(async () => ({ id: 1, name: "ada", bandId: 1 })),
+                save,
+                saveMany: jest.fn(async () => [])
+            } as unknown as DataDriver;
+            const app = new Hono();
+            app.onError(errorHandler);
+            app.use("/*", async (c, next) => {
+                c.set("driver" as never, driver as never);
+                c.set("user" as never, { uid: "u1", roles } as never);
+                await next();
+            });
+            app.route("/", new RestApiGenerator([banded, bands, offices], driver).generateRoutes());
+            const send = (method: string, path: string, body: unknown) => app.request(path, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            const writes = () => save.mock.calls.length + (driver.saveMany as jest.Mock).mock.calls.length;
+            return { send, writes };
+        }
+
+        it.each([
+            ["POST", "/staff", { name: "ada", bandId: 7 }],
+            ["PATCH", "/staff/1", { bandId: 7 }],
+            ["PATCH", "/staff/1", { band_id: 7 }],
+            ["POST", "/staff/bulk", { rows: [{ name: "ada", bandId: 7 }] }]
+        ])("%s %s refuses the key, and writes nothing", async (method, path, body) => {
+            const { send, writes } = mount(["staff"]);
+            const res = await send(method, path, body);
+            expect(res.status).toBe(400);
+            expect((await res.json() as { error: { code: string } }).error.code).toBe("FIELD_NOT_WRITABLE");
+            expect(writes()).toBe(0);
+        });
+
+        it("writes it for a caller who may write the relation", async () => {
+            const { send, writes } = mount(["hr"]);
+            const res = await send("PATCH", "/staff/1", { bandId: 7 });
+            expect(res.status).toBe(200);
+            expect(writes()).toBe(1);
+        });
     });
 });

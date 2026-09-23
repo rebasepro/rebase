@@ -1,8 +1,6 @@
 import { CollectionConfig, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
 import {
     type FieldViewer,
-    canWriteField,
-    effectiveAccess,
     enumToObjectEntries,
     fieldKeyForColumn,
     getJunctionConfigForRelation,
@@ -64,30 +62,24 @@ function pivotsIn(value: unknown): Array<{ index: number; pivot: Record<string, 
  * same for everybody, the second is a property of the *caller* and would be a
  * 200 for their colleague. A client that retries after acquiring a role should
  * be able to tell which it hit without parsing English.
+ *
+ * Both are `restrictedFieldNames`, which is the one list of the names a closed
+ * field can be written under: its key, its column, and — for a to-one relation —
+ * the foreign key that sets the same column (`bandId: 7` is `band: { id: 7 }`).
+ * Asked for the trusted plane, which satisfies every role list but the empty
+ * one, it answers exactly the `[]` half.
  */
 function closedWriteNames(
     collection: CollectionConfig,
     viewer: FieldViewer | undefined
-): { excluded: Set<string>; unwritable: Map<string, string>; declared: string[] } {
-    const excluded = new Set<string>();
-    const unwritable = new Map<string, string>();
-    const declared: string[] = [];
-
-    for (const [name, property] of Object.entries(collection.properties ?? {})) {
-        const access = effectiveAccess(property as Property);
-        if (!access || access.write === undefined) continue;
-        if (canWriteField(property as Property, viewer)) continue;
-
-        declared.push(name);
-        const columnName = (property as Property).columnName;
-        const spellings = columnName ? [name, columnName] : [name];
-        if (access.write.length === 0) {
-            for (const spelling of spellings) excluded.add(spelling);
-        } else {
-            for (const spelling of spellings) unwritable.set(spelling, name);
-        }
+): { excluded: Set<string>; unwritable: Set<string> } {
+    const excluded = restrictedFieldNames(collection, undefined, "write").refused;
+    const unwritable = new Set<string>();
+    if (!viewer) return { excluded, unwritable };
+    for (const name of restrictedFieldNames(collection, viewer, "write").refused) {
+        if (!excluded.has(name)) unwritable.add(name);
     }
-    return { excluded, unwritable, declared };
+    return { excluded, unwritable };
 }
 
 /**
@@ -229,17 +221,18 @@ export function assertKnownWriteFields(
     // so it is absent from the "Known fields:" list the error prints. That list
     // is an offer, and offering a field the next request would refuse is worse
     // than saying nothing.
-    for (const name of restrictedFieldNames(collection, options?.viewer, "write").declared) {
-        known.delete(name);
-    }
+    const restricted = restrictedFieldNames(collection, options?.viewer, "write");
+    for (const name of restricted.declared) known.delete(name);
 
     // An owning relation stores its target in a local FK column that usually
     // has no property of its own; writing it directly is legitimate. Under its
     // *wire* name — `authorId` — which is the key the row is served under and
-    // therefore the only one a caller can be expected to send back.
+    // therefore the only one a caller can be expected to send back. Not offered
+    // to a caller who may not write the relation: the key is the relation.
     for (const relation of Object.values(resolveCollectionRelations(collection))) {
         if (relation.kind === "belongsTo") {
-            known.add(fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
+            const key = fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey);
+            if (!restricted.refused.has(key)) known.add(key);
         }
     }
 

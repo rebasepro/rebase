@@ -168,6 +168,28 @@ describe("restrictedFieldNames over a withheld to-one relation", () => {
         const { declared } = restrictedFieldNames(declaredKey, { roles: ["staff"] }, "read");
         expect(declared.sort()).toEqual(["band", "bandId"]);
     });
+
+    it("closes the foreign key to a write the relation refuses — and, for the trusted plane, only to `[]`", () => {
+        // The write refusal reads its `excluded` half off the trusted plane's
+        // answer, which satisfies every role list but the empty one.
+        const offices = { slug: "offices", table: "offices", properties: {} } as unknown as CollectionConfig;
+        const guarded = {
+            ...collection,
+            properties: {
+                ...collection.properties,
+                band: { ...collection.properties.band, access: { write: ["hr"] } },
+                office: {
+                    type: "relation",
+                    excludeFromApi: true,
+                    relation: { kind: "belongsTo", target: () => offices, localKey: "office_id" }
+                }
+            }
+        } as unknown as CollectionConfig;
+        expect([...restrictedFieldNames(guarded, { roles: ["staff"] }, "write").refused].sort())
+            .toEqual(["band", "bandId", "band_id", "office", "officeId", "office_id"]);
+        expect([...restrictedFieldNames(guarded, undefined, "write").refused].sort())
+            .toEqual(["office", "officeId", "office_id"]);
+    });
 });
 
 describe("hasFieldAccessRules", () => {
