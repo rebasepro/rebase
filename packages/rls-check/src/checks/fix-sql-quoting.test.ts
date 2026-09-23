@@ -111,8 +111,9 @@ function hostileSnapshot(evil: string): DbSnapshot {
             role(n("api"), { canLogin: true })
         ],
         relations: [
-            // rls-disabled, grant-to-public
+            // rls-disabled, grant-to-public (a table, and a foreign table)
             table(schema, n("open"), { owner }),
+            table(schema, n("remote"), { owner, kind: "foreign_table" }),
             // rls-enabled-no-policies, rls-enabled-not-forced (both wordings)
             table(schema, n("empty"), { owner, rlsEnabled: true }),
             table(schema, n("admin_only"), { owner: n("admin"), rlsEnabled: true }),
@@ -149,6 +150,7 @@ function hostileSnapshot(evil: string): DbSnapshot {
         grants: [
             grant(schema, n("open"), "public", ["SELECT", "INSERT"]),
             grant(schema, n("open"), n("api"), ["SELECT"]),
+            grant(schema, n("remote"), n("api"), ["SELECT"]),
             grant(schema, n("org_people"), "anon", ["SELECT"]),
             grant(schema, n("posts"), "anon", ["SELECT", "INSERT", "UPDATE", "DELETE"]),
             grant(schema, n("posts"), n("api"), ["SELECT", "INSERT"]),

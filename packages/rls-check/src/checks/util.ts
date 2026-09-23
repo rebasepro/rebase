@@ -113,6 +113,14 @@ export function scannedTables(snapshot: DbSnapshot): DbRelation[] {
     return snapshot.relations.filter((r) => isTable(r) && snapshot.schemas.includes(r.schema));
 }
 
+/**
+ * Foreign tables in the scanned schemas. Postgres cannot put row-level
+ * security on one, so a grant is all that stands between it and a caller.
+ */
+export function scannedForeignTables(snapshot: DbSnapshot): DbRelation[] {
+    return snapshot.relations.filter((r) => r.kind === "foreign_table" && snapshot.schemas.includes(r.schema));
+}
+
 export function relationAt(snapshot: DbSnapshot, schema: string, name: string): DbRelation | undefined {
     return snapshot.relations.find((r) => r.schema === schema && r.name === name);
 }
@@ -143,7 +151,7 @@ export function rowsPhrase(rel: DbRelation | undefined): string {
  * off for this line.
  */
 // eslint-disable-next-line no-control-regex
-const UNPRINTABLE =/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+const UNPRINTABLE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 const UNPRINTABLE_ALL = new RegExp(UNPRINTABLE.source, "g");
 
 /**

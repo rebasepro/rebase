@@ -27,7 +27,9 @@ export const grantToPublic: Check = {
             if (!snapshot.schemas.includes(grant.schema)) continue;
 
             const rel = relationAt(snapshot, grant.schema, grant.table);
-            if (!rel || (rel.kind !== "table" && rel.kind !== "partitioned_table")) continue;
+            // Foreign tables too: they cannot have row-level security at all, so
+            // this grant is the whole of their access control.
+            if (!rel || !["table", "partitioned_table", "foreign_table"].includes(rel.kind)) continue;
 
             const privileges = DML.filter((p) => grant.privileges.includes(p));
             if (privileges.length === 0) continue;
@@ -47,8 +49,11 @@ export const grantToPublic: Check = {
                               `policy — but this grant decides *whose* policies get evaluated, and it ` +
                               `answers "everyone's". A permissive policy added later for any role applies ` +
                               `immediately, with no separate grant needed.`
-                            : `Row-level security is not enabled on this table, so nothing filters the rows ` +
-                              `this grant exposes.`),
+                            : rel.kind === "foreign_table"
+                                ? `This is a foreign table, which cannot have row-level security, so nothing ` +
+                                  `filters the rows this grant exposes.`
+                                : `Row-level security is not enabled on this table, so nothing filters the rows ` +
+                                  `this grant exposes.`),
                     impact: rel.rlsEnabled
                         ? `Every role in the database can attempt ${listAnd(privileges)} on this table` +
                           `${rowsPhrase(rel)}; what they get back depends entirely on the policies, ` +

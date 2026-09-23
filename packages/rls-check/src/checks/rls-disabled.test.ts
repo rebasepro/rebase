@@ -104,4 +104,22 @@ describe("rls-disabled", () => {
 
         expect(findings).toEqual([]);
     });
+
+    // A foreign table cannot have row-level security at all — Postgres
+    // refuses ENABLE ROW LEVEL SECURITY on one — so a grant to an exposed role
+    // hands over whatever the remote side returns. It was read in and then
+    // left out of every exposure check (Supabase's lint 0017 is this case).
+    it("flags a foreign table granted to anon, with a fix that does not try to enable RLS on it", () => {
+        const [f] = rlsDisabled.run(
+            snapshot({
+                relations: [table("public", "stripe_customers", { kind: "foreign_table" })],
+                grants: [grant("public", "stripe_customers", "anon", ["SELECT"])]
+            })
+        );
+
+        expect(f?.severity).toBe("critical");
+        expect(f?.title).toContain("foreign table");
+        expect(f?.fix).not.toContain("ENABLE ROW LEVEL SECURITY");
+        expect(f?.fix).toContain('REVOKE SELECT ON "public"."stripe_customers" FROM "anon";');
+    });
 });

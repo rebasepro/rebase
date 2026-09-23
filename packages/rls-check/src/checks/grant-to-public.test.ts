@@ -62,4 +62,16 @@ describe("grant-to-public", () => {
 
         expect(findings).toEqual([]);
     });
+
+    it("flags a foreign table granted to PUBLIC, which no policy can ever filter", () => {
+        const [f] = grantToPublic.run(
+            snapshot({
+                relations: [table("public", "stripe_customers", { kind: "foreign_table" })],
+                grants: [grant("public", "stripe_customers", "public", ["SELECT"])]
+            })
+        );
+
+        expect(f?.id).toBe("grant-to-public");
+        expect(f?.detail).toContain("foreign table");
+    });
 });
