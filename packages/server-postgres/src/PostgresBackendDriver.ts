@@ -45,7 +45,6 @@ import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
 import { runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
-import { mergeDeep } from "@rebasepro/utils";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
@@ -111,6 +110,23 @@ export class RoleSwitchUnavailableError extends Error {
         this.role = role;
         this.pgError = pgError;
     }
+}
+
+/**
+ * Fold what a `beforeSave` returned into the values being saved.
+ *
+ * The hook returns the values that will be saved, so a key it returns replaces
+ * the value outright: an array it filtered stays filtered, a map it narrowed
+ * stays narrow. A key it leaves out keeps the value it was given, so a hook
+ * that returns only the field it computed still saves the rest.
+ *
+ * Not a deep merge. `mergeDeep` merges arrays of objects element by element and
+ * keeps every element past the end of the shorter one, so a hook that dropped
+ * one line item of three had the last one merged back in and the order was
+ * stored with a line duplicated.
+ */
+function applyBeforeSaveResult<T extends object, R extends object>(values: T, result: R): T & R {
+    return { ...values, ...result };
 }
 
 /**
@@ -977,7 +993,7 @@ export class PostgresBackendDriver implements DataDriver {
                         status,
                         context: contextForCallback
                     });
-                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                    if (result) updatedValues = applyBeforeSaveResult(updatedValues, result);
                 }
 
                 // 2. Collection callbacks second
@@ -991,7 +1007,7 @@ export class PostgresBackendDriver implements DataDriver {
                         status,
                         context: contextForCallback
                     });
-                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                    if (result) updatedValues = applyBeforeSaveResult(updatedValues, result);
                 }
 
                 // 3. Property callbacks third
@@ -1005,7 +1021,7 @@ export class PostgresBackendDriver implements DataDriver {
                         status,
                         context: contextForCallback
                     });
-                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                    if (result) updatedValues = applyBeforeSaveResult(updatedValues, result);
                 }
 
             }
