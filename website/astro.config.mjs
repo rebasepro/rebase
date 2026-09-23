@@ -133,7 +133,7 @@ export default defineConfig({
                         { label: "Headless setup", slug: "docs/getting-started/headless" },
                         { label: "REST API", slug: "docs/backend/api" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
-                        { label: "Client SDK", slug: "docs/sdk" },
+                        { label: "Typed SDK", slug: "docs/sdk" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
                         { label: "Field access", slug: "docs/collections/field-access" }
                     ]
@@ -233,7 +233,7 @@ export default defineConfig({
                     items: [{ autogenerate: { directory: "docs/ui" } }]
                 },
                 {
-                    label: "Client SDK",
+                    label: "Typed SDK",
                     collapsed: false,
                     items: [
                         { label: "Getting Started", slug: "docs/sdk" },

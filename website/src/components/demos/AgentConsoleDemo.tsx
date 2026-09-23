@@ -103,7 +103,7 @@ const CAPABILITIES: Capability[] = [
         label: "Agent skills",
         Icon: BookOpen,
         title: "Official agent skills",
-        desc: "Twenty maintained skills — collections, security rules, auth, realtime, storage, the SDK — written into your agent's own rules directory. It reads how Rebase works instead of guessing.",
+        desc: "Twenty maintained skills — collections, access rules, auth, realtime, storage, the SDK — written into your agent's own rules directory. It reads how Rebase works instead of guessing.",
         pills: ["Claude Code", "Cursor", "Windsurf", "Gemini CLI"],
         screen: "~/my-app",
         body: (

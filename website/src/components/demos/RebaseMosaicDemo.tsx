@@ -444,7 +444,7 @@ export default function RebaseMosaicDemo() {
                                     </div>
                                     <p className="text-neutral-400">
                                         Rebase connects directly to Postgres, autogenerating a Notion-style block editor
-                                        and type-safe Client SDK methods.
+                                        and typed SDK methods.
                                     </p>
                                 </div>
 

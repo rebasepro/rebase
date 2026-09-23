@@ -1,5 +1,5 @@
 ---
-title: Client SDK — Getting Started
+title: Typed SDK — Getting Started
 sidebar_label: Getting Started
 description: Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 ---

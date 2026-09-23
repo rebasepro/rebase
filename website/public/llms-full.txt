@@ -13,9 +13,9 @@
 
 ### What is Rebase?
 
-Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** built with React and TypeScript. It gives you everything you need to build production-ready back-office applications on top of **PostgreSQL**:
+Rebase is the **open-source backend for PostgreSQL**, with an **admin panel** for your team, built with React and TypeScript. It gives you everything you need to build a production-ready application on **PostgreSQL**:
 
-- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
+- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and a typed SDK from a single source of truth.
 - **Instant Admin Panel** — A beautiful, fast React-based panel with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
 - **Integrated Backend** — Authentication (passwords, magic links, one-time codes, MFA, API keys and twelve OAuth/OIDC providers), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
@@ -26,7 +26,7 @@ Rebase runs either way, and your code does not change between them. **Self-host 
 
 ### Choose your path
 
-Rebase is two products that happen to share a server. Start from the one you
+Rebase is a backend and an admin panel that share a server. Start from the one you
 came for:
 
 | I want… | Start here | What you get |
@@ -11764,7 +11764,7 @@ An `update` or `delete` naming a row that does not exist fails the whole batch
 with a `404`, for the same reason a partial write is refused everywhere else:
 half-applied is the state with no good recovery.
 
-## Client SDK — Getting Started
+## Typed SDK — Getting Started
 
 ### Overview
 
@@ -32327,7 +32327,7 @@ export function Sizes() {
 }
 ```
 
-## Client SDK — Getting Started
+## Typed SDK — Getting Started
 
 ### Overview
 

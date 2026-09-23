@@ -154,19 +154,31 @@ asserting it: the panel is obviously a layer over the backend because the reader
 came before it. It also stops the product reading as "a way to generate REST
 routes", which is what happens when only the middle product is described.
 
-**The naming sheet.** Three product names, one descriptive phrase, nothing else.
+**The naming sheet.** Three product names, one descriptive phrase, one category noun, nothing else.
 
 - **Rebase Backend**, **Rebase CMS**, **Rebase Studio** — with the prefix, in
   every heading, nav item and meta title. Never "Studio" alone beside "Rebase
   CMS" in the same menu.
-- **the panel** — lowercase, the only phrase for CMS and Studio rendered
-  together. The nav column is "The panel".
+- **admin panel** — lowercase, the only phrase for CMS and Studio together;
+  "the panel" once it has been named. The nav column is "The admin panel".
+  The story is TWO layers — the backend, and the admin panel on top — and CMS
+  and Studio are the panel's two sides (the team's, the developers'), not a
+  third layer. (Revised 2026-09-23: the site said "panel", "admin panel",
+  "back office", "surface" and "three layers" for the same thing.)
+- **backend** is the category noun: "the open-source backend for Postgres".
+  Not "framework", "platform", "BaaS" or "backend-as-a-service" — those name a
+  competitor's category on /compare, never Rebase.
+- **back office** names only the thing a customer would otherwise build ("the
+  back office stops being a project"), never what Rebase generates.
+- **access rules** in prose, for what a collection declares; `securityRules`
+  is the key. **typed SDK**, in the nav and page titles too — not "Client SDK".
 - Studio's place is one sentence, used verbatim wherever it is described:
   *Studio is the developer workspace. It registers inside the same panel as
   CMS.* Before 2026-09-02 four pages described it four ways — a child of CMS,
   "the database half of the panel", "layer 03", and inside "the admin panel".
 - Banned in copy: "Rebase Admin", "Admin UI", "admin console", "admin tool",
-  "admin scaffolding", "the Rebase Studio". The one legitimate "admin UI" in
+  "admin scaffolding", "the Rebase Studio", and for the panel "surface" and
+  "back office". `check_site.mjs` holds the machine-checkable half of this list. The one legitimate "admin UI" in
   the tree is `src/data/alternatives.ts` describing PocketBase's and Directus's
   own products; a competitor's product keeps its own name.
 - The `admin:` collection key, `roles: ["admin"]` and `/api/admin/*` are code,

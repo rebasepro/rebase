@@ -33,7 +33,7 @@
 
 ## Documentation
 
-- [Introduction](https://rebase.pro/docs): Rebase is an open-source Backend-as-a-Service and admin panel built with React and TypeScript. Define your schema in TypeScript, and Rebase generates a full CRUD UI, REST API, authentication, storage, and real-time sync — powered by PostgreSQL.
+- [Introduction](https://rebase.pro/docs): Rebase is the open-source backend for Postgres, with an admin panel for your team, built with React and TypeScript. Define your schema in TypeScript, and Rebase generates a full CRUD UI, REST API, authentication, storage, and real-time sync — powered by PostgreSQL.
 - [Quickstart](https://rebase.pro/docs/getting-started/quickstart): Create a new Rebase project and get it running locally in under 2 minutes.
 - [Project Structure](https://rebase.pro/docs/getting-started/project-structure): Understand the structure of a Rebase project — frontend, backend, and collections configuration.
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
@@ -50,7 +50,7 @@
 - [Backend only (headless)](https://rebase.pro/docs/getting-started/headless): Run Rebase as a headless Backend-as-a-Service over your own PostgreSQL — a REST API, auth, storage and realtime, with no admin panel and no collection files.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
 - [Writing over REST](https://rebase.pro/docs/backend/writes): Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-collection batches.
-- [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
+- [Typed SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Field access](https://rebase.pro/docs/collections/field-access): Per-property read and write permissions by role. A caller the row's security rules let through still does not receive a field their roles cannot read.
 - [Collections](https://rebase.pro/docs/collections): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
@@ -207,7 +207,7 @@
 - [Icons](https://rebase.pro/docs/ui/icons): Icons in @rebasepro/ui — the component library Rebase CMS and Rebase Studio are built from.
 - [GitHubIcon](https://rebase.pro/docs/ui/icons/githubicon): GitHubIcon — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [HandleIcon](https://rebase.pro/docs/ui/icons/handleicon): HandleIcon — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
-- [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
+- [Typed SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, sorting, column selection and aggregates with the Rebase Client SDK.
 - [Pagination](https://rebase.pro/docs/sdk/pagination): Page a collection with limit/offset, page numbers, or a keyset cursor — and when each one stops being correct.
 - [Writing data](https://rebase.pro/docs/sdk/writing): create, upsert, update and delete with the SDK — field operations, conditional writes, idempotency keys, batch writes, and writing across collections in one transaction.

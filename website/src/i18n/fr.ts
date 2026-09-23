@@ -538,7 +538,7 @@ export const fr = {
   "manifesto.problem.p2": "Les plateformes cloud ont simplifié le démarrage. Firebase, Supabase, les CMS managés — ils permettent de sauter la tuyauterie et de passer directement au produit. Payer quelqu'un pour exploiter son infrastructure n'a jamais été le problème ; peu d'équipes ont envie de veiller sur un cluster Postgres. Le problème, c'est ce qui vient avec : un schéma lisible uniquement depuis leur console, une tarification imprévisible, et une sortie qui équivaut à une réécriture. La commodité devrait être une facture qu'on peut arrêter de payer, pas une décision irréversible.",
   "manifesto.problem.p3": "En face, les solutions auto-hébergées existent, mais elles semblent souvent d'une autre époque. Complexes à installer, pénibles à personnaliser, pensées pour un monde d'avant l'IA, d'avant le TypeScript partout, d'avant que les développeurs exigent des outils qui marchent tout simplement.",
   "manifesto.origin.title": "D'où nous venons",
-  "manifesto.origin.p1": "On n'en est pas à notre coup d'essai. Avant Rebase, nous avons créé <a href=\"https://firecms.co\" target=\"_blank\" rel=\"noopener\" class=\"text-primary hover:underline font-medium\">FireCMS</a> — un CMS open-source pour Firebase déployé sur plus de 10 000 projets dans le monde, adopté par des équipes chez Microsoft et IKEA. Pendant des années, nous avons appris ce que les développeurs attendent vraiment d'un panneau d'administration, ce qui bloque les éditeurs de contenu, et où chaque CMS finit par montrer ses limites.",
+  "manifesto.origin.p1": "On n'en est pas à notre coup d'essai. Avant Rebase, nous avons créé <a href=\"https://firecms.co\" target=\"_blank\" rel=\"noopener\" class=\"text-primary-light hover:underline font-medium\">FireCMS</a> — un CMS open-source pour Firebase déployé sur plus de 10 000 projets dans le monde, adopté par des équipes chez Microsoft et IKEA. Pendant des années, nous avons appris ce que les développeurs attendent vraiment d'un panneau d'administration, ce qui bloque les éditeurs de contenu, et où chaque CMS finit par montrer ses limites.",
   "manifesto.origin.p2": "FireCMS nous a énormément appris. Que les développeurs veulent de la flexibilité, pas du lock-in. Que les utilisateurs finaux veulent du beau et du simple, pas un mur de formulaires. Que les meilleurs outils se font oublier et laissent les gens se concentrer sur ce qui compte vraiment.",
   "manifesto.origin.p3": "Mais FireCMS était indissociable de Firebase. Et en voyant l'industrie migrer vers Postgres, vers les standards ouverts, vers la souveraineté des données — nous avons compris qu'il était temps de voir plus grand. De bâtir un socle capable de porter n'importe quel projet numérique, pas seulement ceux liés à un seul fournisseur cloud.",
   "manifesto.beliefs.title": "Nos convictions",
@@ -619,7 +619,7 @@ export const fr = {
   "europe.31": "<b class=\"text-white\">C'est à vous de prouver vos sauvegardes.</b> <code class=\"font-mono text-surface-300\">rebase db backup</code> produit des dumps complets avec les rôles et les restaure, mais une sauvegarde que personne n'a restaurée est une hypothèse.",
   "europe.32": "<b class=\"text-white\">Les clés sont à vous, y compris à perdre.</b> Aucun ticket de support ne récupère un <code class=\"font-mono text-surface-300\">JWT_SECRET</code> que vous avez supprimé.",
   "europe.33": "<b class=\"text-white\">La disponibilité vous appartient.</b> Un VPS, c'est une machine. Si l'activité en demande deux, l'architecture le permet et votre facture s'en aperçoit.",
-  "europe.34": "Si personne dans l'équipe ne veut ce travail, c'est une vraie réponse, et une plateforme managée vous achète quelque chose de réel. La nôtre s'appelle <a href=\"/pricing\" class=\"text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary\">Rebase Cloud</a>, exploitée par FireCMS S.L. en Espagne — ce qui fait de nous votre sous-traitant, avec tout ce que cela implique, plutôt que personne du tout. Nous préférons que vous le décidiez à l'entrée plutôt que de le découvrir plus tard.",
+  "europe.34": "Si personne dans l'équipe ne veut ce travail, c'est une vraie réponse, et une plateforme managée vous achète quelque chose de réel. La nôtre s'appelle <a href=\"/pricing\" class=\"text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary-light\">Rebase Cloud</a>, exploitée par FireCMS S.L. en Espagne — ce qui fait de nous votre sous-traitant, avec tout ce que cela implique, plutôt que personne du tout. Nous préférons que vous le décidiez à l'entrée plutôt que de le découvrir plus tard.",
   "europe.link.selfhost": "Le guide d'auto-hébergement",
   "europe.panelNote": "Le panneau d'administration est une application React distincte qui parle à la même API publique sous les mêmes politiques. Ajoutez-le, ignorez-le ou supprimez-le — la réponse de l'API ne bouge pas.",
   "europe.link.panel": "Voir le panneau",
@@ -630,17 +630,17 @@ export const fr = {
   "europe.meta.description": "Tout le monde peut héberger en Europe. La question est de savoir qui est la seconde partie : exploitez Rebase vous-même et il n'y en a aucune, ou laissez une société espagnole l'exploiter, avec le sous-traitant divulgué.",
 
   // ── ui ──────────────────────────────────────────────────────────
-  "ui.00": "<a href=\"/cms\" class=\"hover:text-primary transition-colors\">Rebase CMS</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Bibliothèque de composants</span>",
+  "ui.00": "<a href=\"/cms\" class=\"hover:text-primary-light transition-colors\">Rebase CMS</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Bibliothèque de composants</span>",
   "ui.01": "Les composants<br/>dont le panneau est fait.",
   "ui.02": "<code class=\"font-mono text-surface-200\">@rebasepro/ui</code> est la bibliothèque React avec laquelle le panneau se rend lui-même — et celle que vos champs, aperçus et vues d'entité personnalisés devraient utiliser, pour qu'une extension ait l'air d'appartenir au produit plutôt que d'y être greffée.",
   "ui.03": "Déjà une dépendance de chaque panneau Rebase. Ajoutez-la directement lorsque vous construisez des extensions dans un paquet séparé.",
   "ui.04": "Chaque composant, avec ses vrais types de props et un exemple qui marche — consultable, et généré depuis la bibliothèque elle-même.",
   "ui.05": "Comment le panneau est composé",
-  "ui.06": "Les mêmes composants assemblés dans les écrans que le panneau livre réellement — tiroir, barre d'application, onglets, vues de gestion. Les props et exemples de chaque composant sont dans la <a href=\"/docs/ui/components/\" class=\"text-primary hover:underline\">référence de la documentation</a>.",
+  "ui.06": "Les mêmes composants assemblés dans les écrans que le panneau livre réellement — tiroir, barre d'application, onglets, vues de gestion. Les props et exemples de chaque composant sont dans la <a href=\"/docs/ui/components/\" class=\"text-primary-light hover:underline\">référence de la documentation</a>.",
   "ui.07": "Référence des composants",
 
   // ── cli ─────────────────────────────────────────────────────────
-  "cli.00": "<a href=\"/developers\" class=\"hover:text-primary transition-colors\">Pour les développeurs</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">CLI et outillage</span>",
+  "cli.00": "<a href=\"/developers\" class=\"hover:text-primary-light transition-colors\">Pour les développeurs</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">CLI et outillage</span>",
   "cli.01": "Une CLI pour<br/>tout le cycle de vie.",
   "cli.02": "Échafaudez un projet, introspectez une base de données que vous avez déjà, déplacez le schéma, régénérez les types, lancez les deux moitiés en dev, et installez les skills dont votre agent de code a besoin.",
   "cli.03": "Les cinq premières minutes",
@@ -677,7 +677,7 @@ export const fr = {
   "contact.06": "Voir sur GitHub →",
   "contact.07": "Des questions sur Rebase, des intégrations sur mesure, ou le support entreprise ? Nous sommes là.",
   "contact.08": "Vous signalez un problème de sécurité ?",
-  "contact.09": "Merci de signaler les vulnérabilités en privé à <a href=\"mailto:security@rebase.pro\" class=\"text-primary font-semibold hover:underline\">security@rebase.pro</a> plutôt que d'ouvrir un ticket public. Voir notre <a href=\"https://github.com/rebasepro/rebase/blob/main/SECURITY.md\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-primary hover:underline\">politique de sécurité</a> et la <a href=\"/security\" class=\"text-primary hover:underline\">page sécurité</a> pour les détails.",
+  "contact.09": "Merci de signaler les vulnérabilités en privé à <a href=\"mailto:security@rebase.pro\" class=\"text-primary-light font-semibold hover:underline\">security@rebase.pro</a> plutôt que d'ouvrir un ticket public. Voir notre <a href=\"https://github.com/rebasepro/rebase/blob/main/SECURITY.md\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-primary-light hover:underline\">politique de sécurité</a> et la <a href=\"/security\" class=\"text-primary-light hover:underline\">page sécurité</a> pour les détails.",
   "contact.10": "Suivez-nous sur les réseaux",
   "contact.11": "Communauté Discord",
   "contact.12": "Dépôt GitHub",
@@ -716,7 +716,7 @@ export const fr = {
   "cmspage.23": "Rebase Studio",
 
   // ── sdkpage ─────────────────────────────────────────────────────
-  "sdkpage.00": "<a href=\"/backend\" class=\"hover:text-primary transition-colors\">Le backend</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">SDK client</span>",
+  "sdkpage.00": "<a href=\"/backend\" class=\"hover:text-primary-light transition-colors\">Le backend</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">SDK client</span>",
   "sdkpage.01": "Un client.<br/>Typé depuis votre schéma.",
   "sdkpage.02": "Données, auth, stockage, temps réel et vos propres fonctions — depuis n'importe quel environnement JavaScript ou TypeScript, avec les noms de collection et les types de champ vérifiés à la compilation.",
   "sdkpage.03": "Un client, cinq surfaces, une chaîne de connexion",
@@ -770,13 +770,13 @@ export const fr = {
 
   // ── studiopage ──────────────────────────────────────────────────
   "studiopage.00": "SQL · Schema · RLS · Logs",
-  "studiopage.01": "<a href=\"/product\" class=\"hover:text-primary transition-colors\">Le panneau</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Rebase Studio</span>",
+  "studiopage.01": "<a href=\"/product\" class=\"hover:text-primary-light transition-colors\">Le panneau</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Rebase Studio</span>",
   "studiopage.02": "Pilotez votre base de données<br/>depuis le même panneau.",
   "studiopage.03": "Une console SQL, un constructeur de schéma visuel, l'éditeur de politiques de sécurité au niveau des lignes, des branches de base de données, du cron et des logs. Studio est l'espace de travail du développeur. Il s'enregistre dans le même panneau que CMS — et tout ce qu'il fait visuellement, il le réécrit en TypeScript que vous committez.",
   "studiopage.04": "Chaque changement visuel génère du TypeScript propre et versionné par transformation d'AST. Ce que vous voyez dans l'interface est ce qui est committé dans votre dépôt.",
   "studiopage.05": "Chaque changement visuel est réécrit dans ce fichier par transformation d'AST.",
   "studiopage.06": "Quand l'interface s'arrête, vous êtes déjà dans le SQL.",
-  "studiopage.07": "Plusieurs onglets, de l'autocomplétion sur votre vrai schéma, <code class=\"text-primary\">EXPLAIN</code>, et des résultats éditables sur place — le tout sur votre propre Postgres, sous la même sécurité au niveau des lignes que tout le reste.",
+  "studiopage.07": "Plusieurs onglets, de l'autocomplétion sur votre vrai schéma, <code class=\"text-primary-light\">EXPLAIN</code>, et des résultats éditables sur place — le tout sur votre propre Postgres, sous la même sécurité au niveau des lignes que tout le reste.",
   "studiopage.08": "Le reste de la boîte à outils",
   "studiopage.09": "Chaque outil de Studio est livré avec un projet échafaudé et tourne sur votre propre base de données. Rien ici n'est un service hébergé.",
   "studiopage.10": "Constructeur de schéma visuel",
@@ -969,7 +969,7 @@ export const fr = {
   "devpage.31": "Votre code",
 
   // ── securitypage ────────────────────────────────────────────────
-  "securitypage.00": "<a href=\"/backend\" class=\"hover:text-primary transition-colors\">Le backend</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Sécurité et RLS</span>",
+  "securitypage.00": "<a href=\"/backend\" class=\"hover:text-primary-light transition-colors\">Le backend</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Sécurité et RLS</span>",
   "securitypage.01": "Open source · auto-hébergé · Rebase Cloud (bêta privée)",
   "securitypage.02": "Sécurisé par la base de données.<br/>Pas par le middleware.",
   "securitypage.03": "L'autorisation dans Rebase, c'est la sécurité au niveau des lignes de Postgres, appliquée par la base elle-même — et elle échoue en position fermée : une table sans RLS est <b>refusée</b>, jamais divulguée. C'est vrai aujourd'hui en auto-hébergeant la pile open source, et c'est vrai sur Rebase Cloud, qui fait tourner le même serveur.",
@@ -1024,7 +1024,7 @@ export const fr = {
   "securitypage.52": "Rebase Cloud est notre hébergement managé. Nous hébergeons votre base et votre application sur notre infrastructure, ce qui signifie que <b class=\"text-white\">Rebase agit comme sous-traitant</b> pour votre compte, avec Google Cloud comme sous-traitant ultérieur. Rien sur cette page ne prétend le contraire.",
   "securitypage.53": "La section Rebase\u00a0Cloud ci-dessous décrit exactement où ces données vivent et comment elles sont isolées.",
   "securitypage.54": "Quand nous l'hébergeons, voici ce que cela signifie",
-  "securitypage.55": "Voici l'architecture qui tourne aujourd'hui : votre base et votre application sur une infrastructure que nous exploitons, avec Rebase comme sous-traitant des données que vous y mettez et vous comme responsable de traitement. Rebase Cloud est en bêta privée — il fait tourner de vrais clients aujourd'hui et s'ouvre par vagues. <a href=\"/pricing\" class=\"text-primary hover:underline\">Demandez un accès</a>.",
+  "securitypage.55": "Voici l'architecture qui tourne aujourd'hui : votre base et votre application sur une infrastructure que nous exploitons, avec Rebase comme sous-traitant des données que vous y mettez et vous comme responsable de traitement. Rebase Cloud est en bêta privée — il fait tourner de vrais clients aujourd'hui et s'ouvre par vagues. <a href=\"/pricing\" class=\"text-primary-light hover:underline\">Demandez un accès</a>.",
   "securitypage.56": "Hébergé dans l'UE",
   "securitypage.57": "Rebase Cloud tourne sur un cluster Google Kubernetes Engine Autopilot dans <b class=\"text-white\">Google&nbsp;Cloud europe-west1 (Belgique)</b>. Votre base et les conteneurs de votre application y tournent. Rebase Cloud ne propose pas encore de choix de région.",
   "securitypage.58": "Sous-traitant et sous-traitant ultérieur",
@@ -1048,8 +1048,8 @@ export const fr = {
   "securitypage.76": "<b class=\"text-white\">Rebase traite selon vos instructions.</b> Vous restez responsable de traitement pour les données de vos utilisateurs finaux.",
   "securitypage.77": "<b class=\"text-white\">Google Cloud est sous-traitant ultérieur</b>, fournissant le calcul, le stockage et le réseau dans europe-west1 (Belgique).",
   "securitypage.78": "<b class=\"text-white\">Les données restent dans l'UE par défaut</b>, car c'est la seule région dans laquelle Rebase Cloud provisionne.",
-  "securitypage.79": "Besoin d'un contrat de sous-traitance signé ou d'une liste formelle de sous-traitants avant d'acheter ? Écrivez à <a href=\"mailto:sales@rebase.pro\" class=\"text-primary hover:underline\">sales@rebase.pro</a> et nous vous dirons honnêtement où en est cette paperasse.",
-  "securitypage.80": "Signalez-le en privé à <a href=\"mailto:security@rebase.pro\" class=\"text-primary font-semibold hover:underline\">security@rebase.pro</a>. Merci de ne pas ouvrir de ticket GitHub public pour un problème de sécurité, et de nous laisser une chance de livrer un correctif avant toute divulgation. Nous visons un accusé de réception sous quelques jours ouvrés.",
+  "securitypage.79": "Besoin d'un contrat de sous-traitance signé ou d'une liste formelle de sous-traitants avant d'acheter ? Écrivez à <a href=\"mailto:sales@rebase.pro\" class=\"text-primary-light hover:underline\">sales@rebase.pro</a> et nous vous dirons honnêtement où en est cette paperasse.",
+  "securitypage.80": "Signalez-le en privé à <a href=\"mailto:security@rebase.pro\" class=\"text-primary-light font-semibold hover:underline\">security@rebase.pro</a>. Merci de ne pas ouvrir de ticket GitHub public pour un problème de sécurité, et de nous laisser une chance de livrer un correctif avant toute divulgation. Nous visons un accusé de réception sous quelques jours ouvrés.",
   "securitypage.81": "Tester la démo",
   "securitypage.82": "Le comportement par défaut",
   "securitypage.83": "Votre base de données",
@@ -1747,7 +1747,7 @@ export const fr = {
   "ehc.bar.managed": "Managé",
   "ehc.bar.box": "Votre machine",
   "ehc.ceiling": "<b class=\"text-surface-200\">Les curseurs s'arrêtent ici exprès.</b> Au-delà de cette taille, vous ne choisissez plus entre une machine et un forfait — il vous faut du stockage objet pour les fichiers, un réplica pour qu'une seule machine ne soit pas toute l'entreprise, et quelqu'un dont c'est le métier. C'est une vraie architecture et Rebase tourne dessus, mais une figure à deux colonnes ne pourrait la comparer honnêtement à quoi que ce soit, alors elle ne fait pas semblant.",
-  "ehc.footnote": "La colonne de droite est dimensionnée par les curseurs — le disque de la base plus 30 % de marge et 20 Go pour le système, de la RAM pour mettre en cache un quart de la base, un vCPU par 50k actifs mensuels — et la <b class=\"text-surface-400\">même règle dimensionne l'option de calcul à gauche</b>, de sorte qu'aucune colonne ne fait tourner cette charge sur du matériel incapable de la tenir. Les fichiers sont dans un bucket compatible S3 plutôt que sur ce disque, ce qui est la façon dont la couche de stockage de Rebase est déployée en pratique. Ces gabarits et ces tarifs sont indicatifs, pas un devis. Les dollars et les euros sont affichés tels qu'ils sont facturés, sans conversion — nous n'allons pas suivre le change sur une page marketing, et aux taux actuels cela ne change pas la forme. <a href=\"%1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary\">Les prix publiés par Supabase</a> sont la source de la colonne de gauche ; vérifiez votre propre fournisseur pour celle de droite. <b class=\"text-surface-400\">Firebase n'est volontairement pas modélisé ici :</b> Firestore facture à la lecture de document, et personne ne peut vous dire combien de lectures fera une app que vous n'avez pas encore écrite. Cette imprévisibilité est un coût aussi, elle ne tient simplement pas dans un curseur.",
+  "ehc.footnote": "La colonne de droite est dimensionnée par les curseurs — le disque de la base plus 30 % de marge et 20 Go pour le système, de la RAM pour mettre en cache un quart de la base, un vCPU par 50k actifs mensuels — et la <b class=\"text-surface-400\">même règle dimensionne l'option de calcul à gauche</b>, de sorte qu'aucune colonne ne fait tourner cette charge sur du matériel incapable de la tenir. Les fichiers sont dans un bucket compatible S3 plutôt que sur ce disque, ce qui est la façon dont la couche de stockage de Rebase est déployée en pratique. Ces gabarits et ces tarifs sont indicatifs, pas un devis. Les dollars et les euros sont affichés tels qu'ils sont facturés, sans conversion — nous n'allons pas suivre le change sur une page marketing, et aux taux actuels cela ne change pas la forme. <a href=\"%1\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary-light\">Les prix publiés par Supabase</a> sont la source de la colonne de gauche ; vérifiez votre propre fournisseur pour celle de droite. <b class=\"text-surface-400\">Firebase n'est volontairement pas modélisé ici :</b> Firestore facture à la lecture de document, et personne ne peut vous dire combien de lectures fera une app que vous n'avez pas encore écrite. Cette imprévisibilité est un coût aussi, elle ne tient simplement pas dans un curseur.",
 
   // ── em ──────────────────────────────────────────────────────────
   "em.country.germany": "Allemagne",

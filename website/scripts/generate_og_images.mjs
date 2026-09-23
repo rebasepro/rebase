@@ -66,7 +66,7 @@ const CARDS = [
         // headline for eleven days after the hero changed, so every shared link
         // to the home page promised something the page no longer said.
         title: "A backend for your Postgres. And the panel you never write.",
-        sub: "REST, a typed SDK, realtime, auth and storage for your app — and the panel your team works in."
+        sub: "REST, a typed SDK, realtime, auth and storage for your app — and the admin panel your team works in."
     },
     {
         slug: "docs",
@@ -77,7 +77,7 @@ const CARDS = [
     {
         slug: "pricing",
         eyebrow: "Pricing",
-        title: "The framework is free. Always.",
+        title: "Free and open source. Always.",
         sub: "MIT-licensed and self-hostable. Rebase Cloud runs it for you."
     },
     {

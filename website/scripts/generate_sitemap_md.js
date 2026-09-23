@@ -54,7 +54,7 @@ import { extractSidebarSlugs } from "./sidebar-slugs.js";
         compare: "Compare Rebase",
         cms: "Rebase CMS",
         studio: "Rebase Studio",
-        sdk: "Client SDK",
+        sdk: "Typed SDK",
         cli: "CLI Tooling",
         backend: "Backend & APIs",
         ai: "AI & Agents",

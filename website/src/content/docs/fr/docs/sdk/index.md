@@ -1,6 +1,6 @@
 ---
 sourceHash: 35d04e650c33c5cb
-title: SDK Client — Prise en main
+title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK Client Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
 ---

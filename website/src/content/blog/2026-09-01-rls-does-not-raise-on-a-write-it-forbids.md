@@ -82,4 +82,4 @@ You would rather know today.
 
 ---
 
-Rebase generates Postgres row-level security from the same definition that generates your API, so the policies and the routes cannot drift apart. It is an open-source backend-as-a-service for Postgres — REST, a typed SDK, auth, storage, realtime and RLS over a database you own — [MIT-licensed on GitHub](https://github.com/rebasepro/rebase), and in public beta. If you want to know whether your own database leaks today, `npx @rebasepro/rls-check "<connection string>"` is free, read-only and knows nothing about Rebase.
+Rebase generates Postgres row-level security from the same definition that generates your API, so the policies and the routes cannot drift apart. It is the open-source backend for Postgres — REST, a typed SDK, auth, storage, realtime and RLS over a database you own — [MIT-licensed on GitHub](https://github.com/rebasepro/rebase), and in public beta. If you want to know whether your own database leaks today, `npx @rebasepro/rls-check "<connection string>"` is free, read-only and knows nothing about Rebase.

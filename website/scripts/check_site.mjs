@@ -104,6 +104,21 @@ const BANNED = [
     /\bthe Rebase Studio\b/, /\badmin console\b/i, /\badmin scaffolding\b/i,
 ];
 
+/* The rest of the §2 sheet (2026-09-23): Rebase is a BACKEND with an ADMIN
+   PANEL on top. English only — "Framework" is a German noun, and a translator
+   picks the locale's own word — and only phrasings that can only mean Rebase:
+   "framework" also names Django, and Firebase's own product is "Security
+   Rules". Also read in the `.md` mirrors, which are what an LLM is handed. */
+const BANNED_EN = [
+    /\b(?:Rebase|our|open-source|the entire) framework\b/i, /\bthe framework (?:is|you run)\b/i,
+    /\bRebase (?:is|—) an? [^.]{0,30}\b(?:BaaS|backend-as-a-service)\b/i, /\bBaaS Core\b/,
+    /\b(?:generated|React) back office\b/i, /\bRebase generates (?:the|a) back office\b/i,
+    /\bsurface (?:your team|you can hand)\b/i, /\bthree layers\b/i,
+    /\bPlatform overview\b/, /\bClient SDK\b/,
+    /\bcollection(?:'s)? security rules\b/i, /\bcompiles (?:its )?security rules\b/i,
+];
+const isEnglishRoute = (route) => !/^\/(?:es|de|fr)(?:\/|$)/.test(route);
+
 // 1. Internal links resolve, on every page in `dist`. The cookie banner
 //    shipped 114 404s this way: a localised prefix on a route that exists only
 //    at the root. The docs logo shipped 378 more, pointing at `/it` and `/pt`.
@@ -138,9 +153,19 @@ for (const [route, file] of [...pages].sort()) {
     else if (!title.includes("—")) fail(route, "meta-title", title);
 
     // 5. §2 naming sheet.
-    for (const re of BANNED) {
+    for (const re of isEnglishRoute(route) ? [...BANNED, ...BANNED_EN] : BANNED) {
         const hit = body.match(re);
         if (hit) fail(route, "banned-term", hit[0]);
+    }
+}
+
+// 5b. The same sheet over the English `.md` mirrors (`/product.md`, …).
+for (const f of files) {
+    if (!/^[a-z0-9-]+\.md$/.test(f)) continue;
+    const md = readFileSync(join(DIST, f), "utf8");
+    for (const re of [...BANNED, ...BANNED_EN]) {
+        const hit = md.match(re);
+        if (hit) fail(`/${f}`, "banned-term", hit[0]);
     }
 }
 

@@ -74,11 +74,11 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 ## Three adoption modes
 
-Rebase is adopted in layers, and each one is additive:
+Rebase is a backend, with an admin panel on top of it:
 
-- **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres, with or without the panel.
-- **Rebase CMS** — the above, plus a schema-driven back office generated from the same collection definitions.
-- **Rebase Studio** — the above, plus the developer workspace: SQL editor, schema visualizer, RLS editor, logs and an API explorer, registered inside the same panel as CMS.
+- **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres, with or without the admin panel.
+- **Rebase CMS** — the team's side of the admin panel: tables, forms, media and roles, generated from the same collection definitions.
+- **Rebase Studio** — the developers' side of the admin panel: SQL editor, schema visualizer, RLS editor, logs and an API explorer. Studio is the developer workspace. It registers inside the same panel as CMS.
 
 Authorization is Postgres row-level security in every mode, and no panel changes the API.
 
@@ -184,7 +184,7 @@ Define your collections in TypeScript and get a complete API server.
   if (page === "admin") {
     return `# Rebase CMS
 
-A generated back office that sits on top of a Rebase backend — optional, and a client of the same API.
+The admin panel that sits on top of a Rebase backend — optional, and a client of the same API.
 
 ## How it relates to the backend
 - **Opt-in**: the \`admin\` block on a collection only type-checks once \`@rebasepro/cms-types\` is added to the project.
@@ -227,9 +227,9 @@ A visual developer workspace to manage database content, edit schemas, and inspe
   }
 
   if (page === "sdk") {
-    return `# Rebase Client SDK
+    return `# Rebase typed SDK
 
-A type-safe client library to interact with your Rebase backend from client-side or server-side TypeScript.
+A typed client library to interact with your Rebase backend from client-side or server-side TypeScript.
 
 ## Features
 - **Type Safety**: Automatic TypeScript types generated directly from your collection schemas.
@@ -293,26 +293,27 @@ Ship your product faster with schema-driven development. Eliminate backend boile
   if (page === "developers") {
     return `# Rebase — Developers Overview
 
-A developer-first BaaS and admin dashboard framework built on TypeScript and React.
+Rebase is the open-source backend for Postgres, with an admin panel for your team. You write TypeScript collections; the schema, REST API, typed SDK and admin panel come out of them.
 
 ## Key Principles
 - **Schema-as-Code**: Your TypeScript definitions are the single source of truth.
-- **AST Generation**: Code changes flow bi-directionally between visual studio and Git.
+- **AST Generation**: Edits made in Rebase Studio are written back to your TypeScript files, and your files drive Studio.
 - **Extensible**: Override form fields and add custom dashboard views using standard React components.
 - **Lightweight**: Zero SSR, zero bloated monoliths — runs as a fast React SPA.
 `;
   }
 
   if (page === "product") {
-    return `# Rebase Product Ecosystem
+    return `# Rebase — Product overview
 
-Rebase combines an auto-generated admin panel, lightweight backend APIs, and a client SDK into a unified developer platform.
+Rebase is the open-source backend for Postgres — REST, a typed SDK, realtime, auth, storage, functions and cron — with an admin panel for your team on top. Access rules compile to Postgres row-level security, so every client obeys them.
 
 ## Key Components
-- **Lightweight API Engine**: Hono-based REST and WebSocket server.
-- **Visual Studio**: Spreadsheet editor and visual schema manager syncing back to code.
-- **TypeScript Client SDK**: Isomorphic library for type-safe queries, auth, and storage.
-- **React UI Kit**: Reusable widgets and layout components to build custom admin dashboards.
+- **Rebase Backend**: a Hono server for REST, realtime over WebSocket, auth, storage, functions and cron.
+- **Rebase CMS**: the team's side of the admin panel — spreadsheet editing, forms, media and roles.
+- **Rebase Studio**: the developers' side — SQL editor, a visual schema editor that writes back to your TypeScript, RLS policies and logs.
+- **Typed SDK**: an isomorphic client for typed queries, auth, storage and realtime.
+- **Component library**: the React components the admin panel is built from.
 `;
   }
 
