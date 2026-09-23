@@ -364,7 +364,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
-While the job is running — here or on any other process — the answer is `409`
+<span class="since-badge" data-since="0.23">Since 0.23</span> While the job is running — here or on any other process — the answer is `409`
 with the code `CRON_JOB_ALREADY_EXECUTING`; see [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
 
 ### Pausing a job

@@ -1,5 +1,5 @@
 ---
-sourceHash: bd5ebbaf6bff7eb9
+sourceHash: 7f143b9dd11e44cb
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -361,7 +361,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
-Tant que la tâche s'exécute — ici ou dans n'importe quel autre processus —, la
+<span class="since-badge" data-since="0.23">Depuis la version 0.23</span> Tant que la tâche s'exécute — ici ou dans n'importe quel autre processus —, la
 réponse est `409` avec le code `CRON_JOB_ALREADY_EXECUTING` ; voir
 [Gestion de la concurrence](/docs/backend/cron-across-instances/#concurrency-guarding).
 
