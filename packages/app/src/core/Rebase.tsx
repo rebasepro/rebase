@@ -384,9 +384,11 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         components: componentsProp
     }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, collectionViews, entityActions, propertyConfigs, componentsProp]);
 
+    // Keyed on the handler: an inline one — gated on consent, say — closes over
+    // that render's state, and the first one frozen kept its consent forever.
     const analyticsController = useMemo(() => ({
         onAnalyticsEvent
-    }), []);
+    }), [onAnalyticsEvent]);
 
     const fallbackEffectiveRoleController = useBuildEffectiveRoleController();
     const activeEffectiveRoleController = effectiveRoleController ?? fallbackEffectiveRoleController;
