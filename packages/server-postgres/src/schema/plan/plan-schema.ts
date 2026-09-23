@@ -387,6 +387,37 @@ const linkTarget = (
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
+/** A value already written as a day, or as a time of day. */
+const BARE_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const BARE_TIME = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+/**
+ * A date default in the shape its column's type accepts: a day for `date`, a
+ * time of day for `time`, an instant for a timestamp.
+ *
+ * Rendered as a full ISO timestamp whatever the column, a `time` column's
+ * DEFAULT was `'2024-03-01T15:30:00.000Z'`, which Postgres refuses — "invalid
+ * input syntax for type time" — so the schema would not apply. A value already
+ * written in the column's shape (`"2024-12-25"`, `"09:00"`) is kept as written;
+ * anything else is read as an instant and its UTC day or time of day taken, the
+ * same zone the timestamp rendering has always used. A string that is no date
+ * at all is no DEFAULT, rather than a schema that cannot be applied.
+ */
+const dateDefaultLiteral = (value: unknown, type: PgType): string | undefined => {
+    if (typeof value === "string") {
+        if (type.kind === "date" && BARE_DATE.test(value)) return value;
+        if (type.kind === "time" && BARE_TIME.test(value)) return value;
+    }
+    const instant = value instanceof Date ? value : typeof value === "string" ? new Date(value) : undefined;
+    if (!instant || Number.isNaN(instant.getTime())) return undefined;
+    const iso = instant.toISOString();
+    if (type.kind === "date") return iso.slice(0, 10);
+    if (type.kind === "time") return iso.slice(11, 23);
+    // A timestamp keeps a string default as it was written — its own offset
+    // included — and a Date as the instant it is.
+    return typeof value === "string" ? value : iso;
+};
+
 /**
  * A `defaultValue` as a database DEFAULT.
  *
@@ -419,10 +450,8 @@ const literalDefault = (prop: Property, type: PgType): ColumnDefault | undefined
                 ? { kind: "literal", value, sql: value ? "TRUE" : "FALSE" }
                 : undefined;
         case "date": {
-            const iso = value instanceof Date
-                ? (Number.isNaN(value.getTime()) ? undefined : value.toISOString())
-                : typeof value === "string" ? value : undefined;
-            return iso === undefined ? undefined : { kind: "literal", value: iso, sql: quoteSqlLiteral(iso) };
+            const literal = dateDefaultLiteral(value, type);
+            return literal === undefined ? undefined : { kind: "literal", value: literal, sql: quoteSqlLiteral(literal) };
         }
         case "map":
         case "array":
