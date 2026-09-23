@@ -156,15 +156,23 @@ describe("a production deployment whose local default was dropped", () => {
         }
     });
 
+    // With no local default, TUS spools to `STORAGE_PATH || "./uploads"` —
+    // relative to the cwd, which under jest is this package. Point it at the
+    // scratch root, or every run leaves a `.tus-uploads` in the repository.
+    const originalStoragePath = process.env.STORAGE_PATH;
+
     beforeEach(async () => {
         process.env.NODE_ENV = "production";
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         authorization = `Bearer ${await generateAccessToken("u1", [])}`;
         root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-dropped-default-"));
         mediaDir = path.join(root, "media");
+        process.env.STORAGE_PATH = path.join(root, "spool");
     });
 
     afterEach(async () => {
+        if (originalStoragePath === undefined) delete process.env.STORAGE_PATH;
+        else process.env.STORAGE_PATH = originalStoragePath;
         await fs.promises.rm(root, { recursive: true, force: true });
     });
 
