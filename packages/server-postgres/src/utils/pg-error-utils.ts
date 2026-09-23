@@ -401,6 +401,17 @@ export function pgErrorToFriendlyMessage(
                 code,
                 violations
             };
+        case "23001": // restrict_violation
+            // A row other rows still point at, under `ON DELETE RESTRICT` — the
+            // default for a required link. `table` is the *referencing* table,
+            // which is the one the caller has to clear or reassign first.
+            return {
+                message: `Cannot complete operation: rows in "${table ?? "another table"}" still reference this row in ` +
+                    `"${context}", and their foreign key${constraint ? ` (${constraint})` : ""} does not allow it to be ` +
+                    `deleted or its key changed. Delete or reassign those rows first.${detail ? ` ${detail}` : ""}${suffix}`,
+                code,
+                violations
+            };
         case "23505": // unique_violation
             return {
                 message: detail

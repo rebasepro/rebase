@@ -162,6 +162,22 @@ describe("pg-error-utils", () => {
             expect(result.message).toContain("already exists");
         });
 
+        it("maps 23001 (restrict_violation) to the table still referencing the row, without its values", () => {
+            const result = pgErrorToFriendlyMessage({
+                code: "23001",
+                message: "update or delete on table \"orgs\" violates RESTRICT setting of foreign key constraint \"projects_org_id_fkey\" on table \"projects\"",
+                detail: "Key (id)=(1) is referenced from table \"projects\".",
+                table: "projects",
+                constraint: "projects_org_id_fkey"
+            }, "orgs", { verbose: false });
+            expect(result.code).toBe("23001");
+            expect(result.message).toContain('"projects"');
+            expect(result.message).toContain("projects_org_id_fkey");
+            // The key value is the detail's, and a production answer carries none.
+            expect(result.message).not.toContain("(1)");
+            expect(result.violations).toEqual([]);
+        });
+
         it("maps 42501 (insufficient_privilege) to permission denied", () => {
             const pgError = Object.assign(new Error("permission denied for table clients"), {
                 code: "42501",

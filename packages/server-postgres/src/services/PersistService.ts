@@ -163,9 +163,14 @@ export class PersistService {
             conditions.push(eq(field, parsedIdObj[info.fieldName]));
         }
 
-        const result = await this.db
-            .delete(table)
-            .where(and(...conditions));
+        let result;
+        try {
+            result = await this.db
+                .delete(table)
+                .where(and(...conditions));
+        } catch (error: unknown) {
+            throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
+        }
 
         if ((result.rowCount ?? 0) === 0) {
             throw await this.explainZeroRowWrite(this.db, table, conditions, collectionPath, id, "delete");
@@ -639,7 +644,12 @@ export class PersistService {
      * so `author_id` had to be translated to `authorId` by whoever read the
      * message — which nothing does. See `pgFieldViolations`.
      */
-    private toUserFriendlyError(error: unknown, collectionSlug: string, collection?: CollectionConfig): Error {
+    private toUserFriendlyError(
+        error: unknown,
+        collectionSlug: string,
+        collection?: CollectionConfig,
+        operation: "save" | "delete" = "save"
+    ): Error {
         // Deliberate API errors already carry their own status, code and wording.
         // Re-wrapping one flattens it into a generic Error, and the status is lost
         // on the way out — a policy rejection would surface as a 500. Matched by
@@ -664,8 +674,17 @@ export class PersistService {
             // and 23 (integrity constraint violation) are the caller's data;
             // everything else — a dropped connection, a missing column, a
             // *privilege* problem — is ours, and stays a 500.
+            //
+            // Within class 23, a conflict with rows already there is a 409
+            // rather than a 400: a duplicate key, and a row other rows still
+            // reference. A delete refused by a foreign key is the second
+            // whichever way the key is declared — `RESTRICT` raises 23001,
+            // `NO ACTION` raises 23503 — while a *save* raising 23503 named a
+            // target that does not exist, which is the caller's data.
             if (/^2[23]/.test(code)) {
-                return code === "23505"
+                const conflict = code === "23505" || code === "23001"
+                    || (code === "23503" && operation === "delete");
+                return conflict
                     ? ApiError.conflict(message, `PG_${code}`, details)
                     : ApiError.badRequest(message, `PG_${code}`, details);
             }
