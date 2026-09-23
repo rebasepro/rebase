@@ -11,18 +11,31 @@
     "showcase.title.part1": "a454f4cd0590"
   },
   "es": {
+    "aipage.00": "eaa72d89e321",
     "modes.badge": "61e5aff9c6fb",
+    "personas.agent.link": "eaa72d89e321",
     "showcase.title.part1": "a454f4cd0590"
   },
   "fr": {
     "agencies.features.f1.title": "cd5579e438b8",
     "agencies.features.f3.title": "02fd15a66576",
     "agencies.features.f5.title": "731385352686",
+    "alt.page.supabase.r0.why": "1ddd76feb38f",
+    "alt.rebase.retool.bestFor": "00b8dbba118e",
+    "close.admin.blurb": "5c5ce13320d5",
+    "cmspage.12": "35b14a2386f6",
     "cta.button.demo": "38cfaf72c1d2",
     "cta.button.docs": "d4a74b503a15",
     "modes.badge": "61e5aff9c6fb",
+    "nav.col.admin": "88e40fcc8bd1",
     "nav.tryDemo": "38cfaf72c1d2",
+    "personas.agent.link": "eaa72d89e321",
     "showcase.badge": "937a522b5b04",
-    "showcase.title.part1": "a454f4cd0590"
+    "showcase.sync.badge": "88e40fcc8bd1",
+    "showcase.title.part1": "a454f4cd0590",
+    "vsfirebase.10": "f37f5a0e6375",
+    "vsfirebase.14": "c717b4fcb3a8",
+    "vshasura.01": "06485316fb89",
+    "vshasura.08": "c949d677019a"
   }
 }

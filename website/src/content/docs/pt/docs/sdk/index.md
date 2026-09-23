@@ -1,5 +1,5 @@
 ---
-sourceHash: 35d04e650c33c5cb
+sourceHash: d84680ca60bab8a4
 title: SDK tipado — Primeiros passos
 sidebar_label: Primeiros Passos
 description: Instale e configure o Rebase Client SDK para interagir com seu backend a partir de qualquer aplicação JavaScript ou TypeScript.
