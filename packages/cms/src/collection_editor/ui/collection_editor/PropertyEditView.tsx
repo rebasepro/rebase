@@ -145,6 +145,15 @@ export const PropertyForm = React.memo(
             id,
             property
         }: OnPropertyChangedParams) => {
+            // A change of ID is a rename wherever this is applied as it is
+            // typed: the property is written under the new key and the old one
+            // is deleted. So an ID that is another property's, or not a valid
+            // ID at all, is held back until it is one — applied, it would write
+            // this property over the other, and the rename that followed would
+            // start from a key this property never really had.
+            if (includeIdAndName && id !== lastSubmittedProperty.current?.id && validateId(id, existingPropertyKeys)) {
+                return;
+            }
             const params = {
                 id,
                 previousId: lastSubmittedProperty.current?.id,

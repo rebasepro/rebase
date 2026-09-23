@@ -38,7 +38,10 @@ export const CommonPropertyFields = React.forwardRef<HTMLDivElement, CommonPrope
         const nameError = showErrors && (getIn(errors, name) as string | undefined);
 
         const id = "id";
-        const idError = showErrors && (getIn(errors, id) as string | undefined);
+        // Shown as soon as the ID has been edited, not only after a save: an
+        // ID that is invalid or taken holds the property's edits back until it
+        // is fixed, and a refusal nobody can see reads as edits not saving.
+        const idError = (showErrors || Boolean(getIn(touched, id))) && (getIn(errors, id) as string | undefined);
 
         const description = "description";
         const descriptionError = showErrors && (getIn(errors, description) as string | undefined);

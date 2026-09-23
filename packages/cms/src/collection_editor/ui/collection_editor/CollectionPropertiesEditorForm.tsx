@@ -404,6 +404,15 @@ export function CollectionPropertiesEditorForm({
         ? values.propertiesOrder
         : Object.keys(values.properties)) as string[];
 
+    // The keys the selected property may not be renamed to. The side panel
+    // applies every edit as it is typed, and a rename onto one of these would
+    // write the selected property over it.
+    const selectedNamespaceOrder = getCurrentPropertiesOrder(selectedPropertyNamespace) as string[] | undefined;
+    const otherPropertyKeys = useMemo(
+        () => (selectedNamespaceOrder ?? []).filter(key => key !== selectedPropertyKey),
+        [selectedNamespaceOrder, selectedPropertyKey]
+    );
+
     const owner = useMemo(() => values.ownerId && getUser ? getUser(values.ownerId) : null, [getUser, values.ownerId]);
 
     // Get AI generation counter for key to force remount on AI changes
@@ -518,6 +527,7 @@ export function CollectionPropertiesEditorForm({
                                 propertyKey={selectedPropertyKey}
                                 propertyNamespace={selectedPropertyNamespace}
                                 property={selectedProperty as Property}
+                                existingPropertyKeys={otherPropertyKeys}
                                 onPropertyChanged={onPropertyChanged}
                                 onDelete={deleteProperty}
                                 onError={onPropertyErrorInternal}
