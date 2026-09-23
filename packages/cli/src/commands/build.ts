@@ -18,7 +18,7 @@ import chalk from "chalk";
 import { execa } from "execa";
 import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
-import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
 import { toolStdio } from "../utils/tool-stdio";
@@ -198,6 +198,22 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
         return;
     }
 
+    // `--output` names one bundle directory, resolved from where it was typed.
+    // It is refused for a build that produces several bundles rather than
+    // handed to each: every bundle build empties its directory first, so the
+    // last app built deleted the others' and the build still reported success.
+    const output = args["--output"] ? path.resolve(process.cwd(), args["--output"]) : undefined;
+    const bundled = targets.filter(({ app }) =>
+        (app.type === "backend" && app.runtime !== "custom") ||
+        (app.type === "static" && Boolean(app.build) && Boolean(app.output)));
+    if (output && bundled.length > 1) {
+        throw new UsageError(
+            `--output names one bundle directory, and this build produces ${bundled.length}: ` +
+            `${bundled.map(t => t.name).join(", ")}. Build one app into it: ` +
+            `rebase build ${bundled[0].name} --output ${args["--output"]}`
+        );
+    }
+
     console.log(`${chalk.bold("Rebase")} — building ${targets.length} app(s)\n`);
 
     for (const { name, app } of targets) {
@@ -243,7 +259,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 projectRoot,
                 appName: name,
                 app,
-                outDir: args["--output"],
+                outDir: output,
                 runtimeRange: manifest.rebase,
                 resources: resourceGraph,
                 skipTypeCheck: args["--skip-type-check"],
@@ -359,7 +375,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 }
             }
         } else if (app.type === "static") {
-            await buildAssetApp(projectRoot, name, app, manifest.rebase, args["--output"]).catch((err: unknown) => {
+            await buildAssetApp(projectRoot, name, app, manifest.rebase, output).catch((err: unknown) => {
                 console.error(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
                 process.exit(1);
             });

@@ -127,6 +127,49 @@ describe("what `rebase build` does with each runtime", () => {
     });
 });
 
+/**
+ * `--output` names one bundle directory.
+ *
+ * It was handed to every app the build produced a bundle for, and each bundle
+ * build empties its directory first — so `rebase build --output out` on a stock
+ * scaffold built the backend into `out/`, then the admin's static bundle
+ * deleted it and took its place, and the command said "✓ Build complete." over
+ * a directory holding the wrong artifact. The two apps also resolved the path
+ * against different directories: the backend against the project root, the
+ * static app against the cwd.
+ */
+describe("`rebase build --output`", () => {
+    function twoApps(): void {
+        fs.writeFileSync(path.join(projectRoot, "rebase.json"), JSON.stringify({
+            rebase: "^1",
+            apps: {
+                backend: { type: "backend", runtime: "managed" },
+                admin: { type: "static", root: "admin", path: "/admin", build: "true", output: "admin-dist" }
+            }
+        }));
+        process.chdir(projectRoot);
+    }
+
+    it("refuses to send several apps' bundles into one directory", async () => {
+        twoApps();
+
+        await expect(buildCommand(["node", "rebase", "build", "--output", "out"]))
+            .rejects.toThrow(/--output names one bundle directory.*backend, admin/);
+        expect(buildBundle).not.toHaveBeenCalled();
+    });
+
+    it("builds the one app it is given, into the directory named from where it was typed", async () => {
+        twoApps();
+        const sub = path.join(projectRoot, "backend");
+        fs.mkdirSync(sub);
+        process.chdir(sub);
+
+        await buildCommand(["node", "rebase", "build", "backend", "--output", "out"]);
+
+        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ outDir: path.join(sub, "out") });
+    });
+});
+
 describe("the build summary line", () => {
     /** Every `console.log` argument of one build, joined. */
     async function summary(schemaVersion: string): Promise<string> {
