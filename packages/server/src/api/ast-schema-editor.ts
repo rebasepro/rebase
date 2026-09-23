@@ -382,7 +382,35 @@ export class AstSchemaEditor {
         }
     }
 
+    /**
+     * Drop whatever a refused edit left in memory.
+     *
+     * One editor serves every request, and `project.save()` writes every file
+     * with unsaved changes. So an edit refused halfway through — a relation with
+     * no target, found after the name was already rewritten and an import
+     * added — reached the disk with the next save of some other collection, and
+     * a file refused as it was being created appeared anyway.
+     */
+    private forgetUnsaved(collectionId: string): void {
+        const file = this.project.getSourceFile(path.resolve(this.collectionsDir, `${collectionId}.ts`));
+        if (!file || file.isSaved()) return;
+        if (fs.existsSync(file.getFilePath())) {
+            file.refreshFromFileSystemSync();
+        } else {
+            this.project.removeSourceFile(file);
+        }
+    }
+
     public async saveProperty(collectionId: string, propertyKey: string, propertyConfig: Record<string, unknown>) {
+        try {
+            await this.writeProperty(collectionId, propertyKey, propertyConfig);
+        } catch (err) {
+            this.forgetUnsaved(collectionId);
+            throw err;
+        }
+    }
+
+    private async writeProperty(collectionId: string, propertyKey: string, propertyConfig: Record<string, unknown>) {
         const collectionObj = this.requireCollectionObject(collectionId);
 
         // The panel's property forms bind to the flat names — `readOnly`,
@@ -408,7 +436,13 @@ export class AstSchemaEditor {
                 oldPropAstNode = existingProp.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
             }
 
-            const newInitializer = this.convertJsonToAstString(nestedConfig, 2, oldPropAstNode);
+            const withTargets = this.relationTargetsAsSource(
+                collectionId,
+                this.getCollectionFile(collectionId)!,
+                { [propertyKey]: nestedConfig },
+                propsObj
+            )[propertyKey];
+            const newInitializer = this.convertJsonToAstString(withTargets, 2, oldPropAstNode);
 
             if (existingProp) {
                 if (existingProp.isKind(SyntaxKind.PropertyAssignment)) {
@@ -461,6 +495,15 @@ export class AstSchemaEditor {
      * default, which in the scaffold is `access: "public"`.
      */
     public async saveCollection(collectionId: string, collectionData: Record<string, unknown>, options: { partial?: boolean } = {}) {
+        try {
+            await this.writeCollection(collectionId, collectionData, options);
+        } catch (err) {
+            this.forgetUnsaved(collectionId);
+            throw err;
+        }
+    }
+
+    private async writeCollection(collectionId: string, collectionData: Record<string, unknown>, options: { partial?: boolean }) {
         const partial = options.partial === true;
         let file = this.getCollectionFile(collectionId);
         const collectionObj = file ? this.getCollectionObject(collectionId) : null;
@@ -483,7 +526,17 @@ export class AstSchemaEditor {
                 throw new Error(`Refusing to overwrite ${newFilePath}: a file for "${collectionId}" already exists but could not be parsed.`);
             }
             const varName = `${AstSchemaEditor.collectionVarName(safeId)}Collection`;
-            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${varName}: CollectionConfig = ${this.convertJsonToAstString(nestAdminKeysDeep(collectionData))};\n\nexport default ${varName};\n`);
+            // Created empty and filled in after: a relation's target becomes an
+            // import, and an import needs a file to be added to.
+            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${varName}: CollectionConfig = {};\n\nexport default ${varName};\n`);
+            const { relations, ...rest } = nestAdminKeysDeep(collectionData);
+            const data = "properties" in rest
+                ? { ...rest, properties: this.relationTargetsAsSource(collectionId, file, rest.properties, undefined) }
+                : rest;
+            file.getVariableDeclarationOrThrow(varName).setInitializer(this.convertJsonToAstString(data));
+            if (relations !== undefined) {
+                this.writeRelations(collectionId, file, this.requireCollectionObject(collectionId), relations);
+            }
         } else {
             // Update root level properties gracefully
 
@@ -524,6 +577,10 @@ export class AstSchemaEditor {
                     oldAstNode = prop.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
                 }
 
+                if (key === "properties") {
+                    collectionData[key] = this.relationTargetsAsSource(collectionId, file, collectionData[key], oldAstNode);
+                }
+
                 if (partial && oldAstNode && AstSchemaEditor.isPlainObject(collectionData[key])) {
                     this.mergeIntoObjectLiteral(oldAstNode, collectionData[key] as Record<string, unknown>, 2);
                     continue;
@@ -551,6 +608,111 @@ export class AstSchemaEditor {
             file.formatText();
         }
         await this.project.save();
+    }
+
+    /**
+     * Every property relation's `target`, as source.
+     *
+     * The collection-level `relations` array has {@link writeRelations}. A
+     * relation declared on a property went through `convertJsonToAstString`
+     * like any other value, so a target the property form had picked — a slug,
+     * which is all JSON can carry — was written as the string literal
+     * `target: "authors"`, and the next boot threw in `resolveRelation` for every
+     * collection in the directory. The same rule applies here as there: a slug
+     * becomes `() => xCollection` plus its import, an arrow returning one
+     * identifier is written through, and a relation sent without a target keeps
+     * the one already in the file — or is refused, when there is none.
+     *
+     * Walks into `map` properties, an array's `of` and a block's `oneOf`, which
+     * the registry resolves relations in too. `oldProperties` is the same
+     * properties object in the file, when there is one.
+     */
+    private relationTargetsAsSource(
+        collectionId: string,
+        file: SourceFile,
+        properties: unknown,
+        oldProperties: ObjectLiteralExpression | undefined,
+        path = "properties"
+    ): Record<string, unknown> {
+        if (!AstSchemaEditor.isPlainObject(properties)) return {};
+        return Object.fromEntries(Object.entries(properties).map(([key, property]) => [
+            key,
+            this.propertyRelationTargetsAsSource(
+                collectionId,
+                file,
+                property,
+                oldProperties ? this.objectAt(oldProperties, key) : undefined,
+                `${path}.${key}`
+            )
+        ]));
+    }
+
+    private propertyRelationTargetsAsSource(
+        collectionId: string,
+        file: SourceFile,
+        property: unknown,
+        oldProperty: ObjectLiteralExpression | undefined,
+        path: string
+    ): unknown {
+        if (!AstSchemaEditor.isPlainObject(property)) return property;
+        const next: Record<string, unknown> = { ...property };
+
+        if (property.type === "relation" && AstSchemaEditor.isPlainObject(property.relation)) {
+            const relation: Record<string, unknown> = { ...property.relation };
+            const rawTarget = relation.target;
+            if (typeof rawTarget === "string" && rawTarget.trim().length > 0) {
+                const trimmed = rawTarget.trim();
+                // See `writeRelations` for why the arrow is matched this narrowly.
+                relation.target = new RawExpression(ARROW_TO_IDENTIFIER.test(trimmed)
+                    ? trimmed
+                    : this.targetThunk(file, trimmed));
+            } else {
+                const oldRelation = oldProperty ? this.objectAt(oldProperty, "relation") : undefined;
+                if (!oldRelation || !this.findProperty(oldRelation, "target")) {
+                    throw new Error(`Relation property "${path}" on collection "${collectionId}" has no target collection. Pick one before saving.`);
+                }
+                // Absent, so `convertJsonToAstString` keeps the thunk in the file.
+                delete relation.target;
+            }
+            next.relation = relation;
+        }
+
+        if (AstSchemaEditor.isPlainObject(property.properties)) {
+            next.properties = this.relationTargetsAsSource(
+                collectionId, file, property.properties,
+                oldProperty ? this.objectAt(oldProperty, "properties") : undefined, path);
+        }
+        if (Array.isArray(property.of)) {
+            const oldOf = oldProperty ? this.initializerOf(oldProperty, "of")?.asKind(SyntaxKind.ArrayLiteralExpression) : undefined;
+            next.of = property.of.map((item, index) => this.propertyRelationTargetsAsSource(
+                collectionId, file, item,
+                oldOf?.getElements()[index]?.asKind(SyntaxKind.ObjectLiteralExpression), `${path}.of[${index}]`));
+        } else if (AstSchemaEditor.isPlainObject(property.of)) {
+            next.of = this.propertyRelationTargetsAsSource(
+                collectionId, file, property.of,
+                oldProperty ? this.objectAt(oldProperty, "of") : undefined, `${path}.of`);
+        }
+        if (AstSchemaEditor.isPlainObject(property.oneOf) && AstSchemaEditor.isPlainObject(property.oneOf.properties)) {
+            const oldOneOf = oldProperty ? this.objectAt(oldProperty, "oneOf") : undefined;
+            next.oneOf = {
+                ...property.oneOf,
+                properties: this.relationTargetsAsSource(
+                    collectionId, file, property.oneOf.properties,
+                    oldOneOf ? this.objectAt(oldOneOf, "properties") : undefined, `${path}.oneOf`)
+            };
+        }
+        return next;
+    }
+
+    /** The initializer of `obj[key]` in the file, when it is written as a property assignment. */
+    private initializerOf(obj: ObjectLiteralExpression, key: string): Node | undefined {
+        const prop = this.findProperty(obj, key);
+        return prop && prop.isKind(SyntaxKind.PropertyAssignment) ? prop.getInitializer() : undefined;
+    }
+
+    /** `obj[key]` in the file, when it is an object literal. */
+    private objectAt(obj: ObjectLiteralExpression, key: string): ObjectLiteralExpression | undefined {
+        return this.initializerOf(obj, key)?.asKind(SyntaxKind.ObjectLiteralExpression);
     }
 
     /**

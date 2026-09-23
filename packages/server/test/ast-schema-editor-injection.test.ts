@@ -129,6 +129,25 @@ export default ${varName};
         } as never)).rejects.toThrow(/Invalid collection ID|Cannot link to collection/);
     });
 
+    it("refuses the same target on a property's relation, which is written as code too", async () => {
+        seed("posts", "postsCollection", `{
+    name: "Posts",
+    slug: "posts",
+    properties: { id: { type: "string" } }
+}`);
+        const posts = read("posts");
+        await expect(editor.saveProperty("posts", "author", {
+            name: "Author",
+            type: "relation",
+            relation: {
+                kind: "belongsTo",
+                target: "() => { require('child_process').execSync('id'); return x; }"
+            }
+        })).rejects.toThrow(/Invalid collection ID|Cannot link to collection/);
+
+        expect(read("posts")).toBe(posts);
+    });
+
     it("still accepts a target named by its slug, and the thunk it already wrote", async () => {
         seed("authors", "authorsCollection", `{
     name: "Authors",

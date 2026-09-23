@@ -6,6 +6,9 @@ import { nestAdminPropertyKeys } from "@rebasepro/types";
 
 import { AstSchemaEditor, nestAdminKeysDeep } from "../src/api/ast-schema-editor";
 import { findCollectionConfigProblems } from "../src/collections/validate-config";
+import { loadCollectionsFromDirectory } from "../src/collections/loader";
+import { CollectionRegistry, resolveCollectionRelations } from "@rebasepro/common";
+import type { RelationProperty } from "@rebasepro/types";
 
 /**
  * The schema editor against the files `rebase init` actually writes.
@@ -414,6 +417,8 @@ export default postsCollection;
         fs.rmSync(dir, { recursive: true, force: true });
     });
 
+    const read = (slug: string) => fs.readFileSync(path.join(dir, `${slug}.ts`), "utf8");
+
     it("writes a relation added in the panel, thunk and import included", async () => {
         // The Relations tab stores the target as a slug; the file wants a thunk.
         // An untouched relation arrives with no target at all — `JSON.stringify`
@@ -443,5 +448,132 @@ export default postsCollection;
             slug: "posts",
             relations: [{ relationName: "unnamed", kind: "hasMany" }]
         })).rejects.toThrow(/has no target collection/);
+    });
+
+    /**
+     * A relation declared on a property, the way the property form sends it.
+     *
+     * Only the collection-level `relations` array went through `writeRelations`.
+     * A property's `relation` was written like any other value, so the target the
+     * form had picked — a slug, which is all JSON can carry — landed in the file
+     * as the string literal `target: "authors"`. The panel reported success and
+     * the next boot threw in `resolveRelation`, for every collection in the
+     * directory, because the loader imports all of them.
+     *
+     * So these read the file back the way boot does: the real loader, which runs
+     * the boot validator, then the real registry, which resolves every relation.
+     */
+    const boot = async () => new CollectionRegistry(await loadCollectionsFromDirectory(dir));
+    const targetOf = (registry: CollectionRegistry, slug: string, property: string) =>
+        (registry.get(slug)?.properties[property] as RelationProperty | undefined)?.resolvedRelation?.targetSlug;
+
+    const authorProperty = {
+        name: "Author",
+        type: "relation",
+        relation: { kind: "belongsTo", target: "authors", relationName: "author" }
+    };
+
+    it("writes a property's relation target as a thunk, with its import", async () => {
+        await new AstSchemaEditor(dir).saveCollection("posts", {
+            name: "Posts",
+            slug: "posts",
+            table: "posts",
+            properties: { title: { name: "Title", type: "string" }, author: authorProperty },
+            relations: [{ relationName: "comments", kind: "hasMany", foreignKeyOnTarget: "post_id" }]
+        });
+
+        const written = read("posts");
+        expect(written).toContain("target: () => authorsCollection");
+        expect(written).not.toContain('target: "authors"');
+        expect(written).toContain('import authorsCollection from "./authors.js"');
+        expect(targetOf(await boot(), "posts", "author")).toBe("authors");
+    });
+
+    it("writes it the same way through saveProperty", async () => {
+        await new AstSchemaEditor(dir).saveProperty("posts", "author", authorProperty);
+
+        expect(read("posts")).toContain("target: () => authorsCollection");
+        expect(targetOf(await boot(), "posts", "author")).toBe("authors");
+    });
+
+    it("keeps the thunk on the next save, which sends the relation without it", async () => {
+        const editor = new AstSchemaEditor(dir);
+        await editor.saveProperty("posts", "author", authorProperty);
+        await new AstSchemaEditor(dir).saveProperty("posts", "author", {
+            ...authorProperty,
+            name: "Written by",
+            relation: { kind: "belongsTo", relationName: "author" }
+        });
+
+        expect(read("posts")).toContain("target: () => authorsCollection");
+        expect(targetOf(await boot(), "posts", "author")).toBe("authors");
+    });
+
+    it("writes a relation nested in a map property as a thunk too", async () => {
+        await new AstSchemaEditor(dir).saveProperty("posts", "meta", {
+            name: "Meta",
+            type: "map",
+            properties: { reviewer: authorProperty }
+        });
+
+        expect(read("posts")).toContain("target: () => authorsCollection");
+        expect(read("posts")).not.toContain('target: "authors"');
+    });
+
+    it("writes the thunks into a collection it creates", async () => {
+        await new AstSchemaEditor(dir).saveCollection("reviews", {
+            name: "Reviews",
+            slug: "reviews",
+            table: "reviews",
+            properties: {
+                body: { name: "Body", type: "string" },
+                post: { name: "Post", type: "relation", relation: { kind: "belongsTo", target: "posts" } }
+            },
+            relations: [{ relationName: "reviewer", kind: "belongsTo", target: "authors" }]
+        });
+
+        const written = read("reviews");
+        expect(written).toContain("target: () => postsCollection");
+        expect(written).toContain("target: () => authorsCollection");
+        const registry = await boot();
+        expect(targetOf(registry, "reviews", "post")).toBe("posts");
+        expect(resolveCollectionRelations(registry.get("reviews")!).reviewer.targetSlug).toBe("authors");
+    });
+
+    it("refuses a relation property with no target instead of writing a file that cannot boot", async () => {
+        await expect(new AstSchemaEditor(dir).saveProperty("posts", "author", {
+            name: "Author",
+            type: "relation",
+            relation: { kind: "belongsTo" }
+        })).rejects.toThrow(/has no target collection/);
+        expect(read("posts")).not.toContain("author:");
+    });
+
+    it("leaves nothing of a refused save in memory for the next save to write", async () => {
+        // One editor serves every request, and `project.save()` writes every
+        // file with unsaved changes — so an edit refused halfway through, after
+        // the name was already rewritten, reached the disk with the next save of
+        // an unrelated collection. So did a collection file refused as it was
+        // being created.
+        const editor = new AstSchemaEditor(dir);
+        const posts = read("posts");
+        await expect(editor.saveCollection("posts", {
+            name: "Renamed",
+            slug: "posts",
+            properties: {
+                author: authorProperty,
+                editor: { name: "Editor", type: "relation", relation: { kind: "belongsTo" } }
+            }
+        })).rejects.toThrow(/has no target collection/);
+        await expect(editor.saveCollection("reviews", {
+            name: "Reviews",
+            slug: "reviews",
+            relations: [{ relationName: "reviewer", kind: "belongsTo" }]
+        })).rejects.toThrow(/has no target collection/);
+
+        await editor.saveProperty("authors", "bio", { name: "Bio", type: "string" });
+
+        expect(read("posts")).toBe(posts);
+        expect(fs.existsSync(path.join(dir, "reviews.ts"))).toBe(false);
     });
 });
