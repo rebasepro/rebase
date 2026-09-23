@@ -103,3 +103,15 @@ export function getDatePropertyTimezone(property: DateProperty): string | undefi
 export function getDatePropertyMode(property: DateProperty): "date" | "date_time" | undefined {
     return property.columnType === "date" ? "date" : property.mode;
 }
+
+/**
+ * Whether a value has nothing to show: absent, a blank string, an empty list.
+ * A preview of one draws the empty marker, which is the right thing for a
+ * column of values and the wrong thing for the one line under a record's name.
+ */
+export function isEmptyPreviewValue(value: unknown): boolean {
+    if (value === undefined || value === null) return true;
+    if (typeof value === "string") return value.trim() === "";
+    if (Array.isArray(value)) return value.length === 0;
+    return false;
+}

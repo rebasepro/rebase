@@ -5,13 +5,13 @@ import { Entity, EntityRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
-import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
+import { EntityPreviewBinding, EntityPreviewBindingData, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import {
     InlineEntityPreview,
     InlineEntityPreviewMissing,
     InlineEntityPreviewSkeleton
 } from "../../components/InlineEntityPreview";
-import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
+import { useEntityPreviewLayout, useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -173,6 +173,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     const ResolvedEntityPreview = useComponentOverride("EntityPreview", EntityPreviewBinding);
     const customizationController = useCustomizationController();
     const nested = useIsNestedEntityPreview();
+    const layout = useEntityPreviewLayout();
 
     // Nested inside another preview, filling a title slot, or rendered small
     // (a table cell, a list row): one line of text, not a second card. The
@@ -257,6 +258,18 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
             // In a title slot the row itself is the click target; only a
             // preview nested inside a card opens its own side panel.
             includeEntityLink={!textOnly && includeEntityLink !== false}/>;
+    }
+
+    // A table cell tall enough for more than a line: the record as a row of
+    // it, not a card taller than the row. An overridden preview is the
+    // developer's own and is drawn as given.
+    if (layout === "row" && ResolvedEntityPreview === EntityPreviewBinding) {
+        return <EntityPreviewBindingData layout={"row"}
+            size={size}
+            entity={usedEntity}
+            collection={collection}
+            previewKeys={previewProperties}
+            includeEntityLink={!disabled && includeEntityLink !== false}/>;
     }
 
     return <ResolvedEntityPreview size={size}

@@ -250,7 +250,6 @@ export function getTableBindingForProperty(
                         previewProperties={(property as ReferenceProperty).admin?.previewProperties}
                         includeId={(property as ReferenceProperty).admin?.includeId}
                         includeEntityLink={(property as ReferenceProperty).admin?.includeEntityLink}
-                        title={property.name ?? propertyKey}
                         fixedFilter={(property as ReferenceProperty).admin?.fixedFilter}
                     />
                     );
@@ -329,7 +328,6 @@ export function getTableBindingForProperty(
                                 multiselect={true}
                                 path={refOfProp.path!}
                                 previewProperties={refOfProp.admin?.previewProperties}
-                                title={arrayProperty.name}
                                 fixedFilter={refOfProp.admin?.fixedFilter}
                                 includeId={refOfProp.admin?.includeId}
                                 includeEntityLink={refOfProp.admin?.includeEntityLink}
@@ -406,7 +404,6 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
             previewProperties={relProp.admin?.previewProperties}
             includeId={relProp.admin?.includeId}
             includeEntityLink={relProp.admin?.includeEntityLink}
-            title={relProp.name ?? propertyKey}
             fixedFilter={relProp.admin?.fixedFilter}
         />
     );

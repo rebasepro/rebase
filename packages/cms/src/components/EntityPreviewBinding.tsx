@@ -30,7 +30,8 @@ import { useEntityTitle } from "../hooks/useEntityDisplay";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
-import { NestedEntityPreviewBoundary } from "./EntityPreviewNesting";
+import { EntityPreviewLayout, NestedEntityPreviewBoundary } from "./EntityPreviewNesting";
+import { isEmptyPreviewValue } from "../preview/util";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 export type EntityPreviewBindingProps = {
@@ -60,6 +61,12 @@ export type EntityPreviewBindingDataProps = {
     includeTitle?: boolean,
     includeEntityLink?: boolean,
     includeImage?: boolean,
+    /**
+     * `row` draws the record as a line of a table row instead of a card: see
+     * {@link EntityPreviewLayout}. No id, no open button — the title opens the
+     * record — and only as many supporting lines as the row has room for.
+     */
+    layout?: EntityPreviewLayout,
 };
 
 /**
@@ -76,6 +83,7 @@ export function EntityPreviewBindingData({
     includeTitle = true,
     includeEntityLink = true,
     includeImage = true,
+    layout = "card",
     entity
 }: EntityPreviewBindingDataProps) {
 
@@ -131,12 +139,37 @@ export function EntityPreviewBindingData({
     const usedImageProperty = ofProp ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) : imageProperty;
     const restProperties = listProperties.filter(p => p !== titleProperty && p !== imagePropertyKey);
 
+    const openInSidePanel = () => {
+        onSidePanelClick?.(entity);
+        analyticsController.onAnalyticsEvent?.("entity_click_from_reference", {
+            path: entity.path,
+            entityId: entity.id
+        });
+        sidePanelController.open({
+            entityId: entity.id,
+            path: entity.path,
+            collection,
+            updateUrl: true
+        });
+    };
+
     const imageValue = imagePropertyKey ? getValueInPath(entity.values, imagePropertyKey) : undefined;
     const usedImageValue = imageProperty !== undefined ? ("of" in imageProperty
         ? (((imageValue as unknown[]) ?? []).length > 0
             ? (imageValue as unknown[])[0] : undefined)
         : imageValue)
         : undefined;
+
+    if (layout === "row")
+        return <EntityRowPreviewContent size={size}
+            entity={entity}
+            collection={collection}
+            title={title.value ?? String(entity.id)}
+            imageProperty={usedImageProperty}
+            imagePropertyKey={imagePropertyKey}
+            imageValue={usedImageValue}
+            supportingKeys={restProperties}
+            onOpen={includeEntityLink ? openInSidePanel : undefined}/>;
 
     return (
         // Everything below renders *inside* this preview: a reference or
@@ -237,17 +270,7 @@ export function EntityPreviewBindingData({
                             onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                onSidePanelClick?.(entity);
-                                analyticsController.onAnalyticsEvent?.("entity_click_from_reference", {
-                                    path: entity.path,
-                                    entityId: entity.id
-                                });
-                                sidePanelController.open({
-                                    entityId: entity.id,
-                                    path: entity.path,
-                                    collection,
-                                    updateUrl: true
-                                });
+                                openInSidePanel();
                             }}>
                             <ArrowRightToLineIcon/>
                         </IconButton>
@@ -255,6 +278,101 @@ export function EntityPreviewBindingData({
                 </div>}
 
             {actions && <div className="flex-shrink-0">{actions}</div>}
+        </NestedEntityPreviewBoundary>
+    );
+}
+
+/**
+ * A record as a line of a table row: its image, a title that opens it, and the
+ * supporting lines that fit — one at `medium`, two at `large`. Supporting
+ * values that are empty are skipped rather than drawn as an empty bar, so the
+ * line under a name is the first thing the record actually has to say.
+ */
+function EntityRowPreviewContent({
+    size,
+    entity,
+    collection,
+    title,
+    imageProperty,
+    imagePropertyKey,
+    imageValue,
+    supportingKeys,
+    onOpen
+}: {
+    size: "smallest" | "small" | "medium" | "large";
+    entity: Entity<Record<string, unknown>>;
+    collection: AdminCollection;
+    title: string;
+    imageProperty?: Property;
+    imagePropertyKey?: string;
+    imageValue: unknown;
+    supportingKeys: string[];
+    onOpen?: () => void;
+}) {
+    const maxLines = size === "large" ? 2 : 1;
+    const lines = supportingKeys
+        .map(key => ({
+            key,
+            property: getPropertyInPath(collection.properties, key),
+            value: getValueInPath(entity.values, key)
+        }))
+        .filter((line): line is { key: string, property: Property, value: unknown } =>
+            Boolean(line.property) && !isEmptyPreviewValue(line.value))
+        .slice(0, maxLines);
+
+    const titleNode = <span className={"truncate"}>{title}</span>;
+
+    return (
+        <NestedEntityPreviewBoundary>
+            <div className={"flex items-center gap-2.5 min-w-0 w-full text-left"}>
+                {imagePropertyKey && <div className={cls("flex shrink-0 items-center justify-center overflow-hidden rounded-md",
+                    size === "large" ? "w-10 h-10" : "w-8 h-8")}>
+                    {imageProperty && imageValue
+                        ? <PropertyPreview property={imageProperty}
+                            propertyKey={imagePropertyKey}
+                            size={"small"}
+                            value={imageValue as never}/>
+                        : <IconForView collectionOrView={collection}
+                            color={"primary"}
+                            size={"small"}/>}
+                </div>}
+                <div className={"flex flex-col min-w-0 flex-1"}>
+                    <div className={"flex min-w-0 text-sm font-medium text-text-primary dark:text-text-primary-dark"}>
+                        {onOpen
+                            ? <Tooltip title={`See details for ${title}`} asChild={true}>
+                                <span role={"button"}
+                                    tabIndex={0}
+                                    className={"inline-flex min-w-0 max-w-full cursor-pointer hover:underline underline-offset-2"}
+                                    // See InlineEntityPreview: a press does not
+                                    // move the focus, or a table cell would
+                                    // select itself mid-click.
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        onOpen();
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key !== "Enter" && event.key !== " ") return;
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        onOpen();
+                                    }}>
+                                    {titleNode}
+                                </span>
+                            </Tooltip>
+                            : titleNode}
+                    </div>
+                    {lines.map(({ key, property, value }) =>
+                        <div key={key}
+                            className={"truncate min-w-0 max-h-5 overflow-hidden text-xs text-text-secondary dark:text-text-secondary-dark"}>
+                            <PropertyPreview propertyKey={key}
+                                value={value as never}
+                                property={property}
+                                size={"small"}/>
+                        </div>)}
+                </div>
+            </div>
         </NestedEntityPreviewBoundary>
     );
 }

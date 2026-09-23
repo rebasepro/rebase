@@ -51,7 +51,9 @@ jest.mock("../../src/components/InlineEntityPreview", () => ({
 }));
 
 jest.mock("../../src/components/EntityPreviewNesting", () => ({
-    useIsNestedEntityPreview: () => false
+    useIsNestedEntityPreview: () => false,
+    // A form's card, not a table row: the card is what these assertions read.
+    useEntityPreviewLayout: () => "card"
 }));
 
 jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => ({

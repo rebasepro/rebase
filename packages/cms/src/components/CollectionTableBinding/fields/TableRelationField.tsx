@@ -11,8 +11,6 @@ import { CollectionSize, AdminCollection } from "@rebasepro/cms-types";
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
-import { cls, PencilIcon } from "@rebasepro/ui";
-import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";
 import { CompactEntityCellField } from "./CompactEntityCellField";
@@ -35,7 +33,6 @@ type TableRelationFieldProps = {
     size: CollectionSize;
     multiselect: boolean;
     previewProperties?: string[];
-    title?: string;
     relation: Relation;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
@@ -62,9 +59,7 @@ export function TableRelationField(props: TableRelationFieldProps) {
             disabled={props.disabled}
             internalValue={Array.isArray(props.internalValue) ? props.internalValue : []}
             updateValue={(newValue) => props.updateValue(newValue)}
-            size={props.size}
             previewProperties={props.previewProperties}
-            title={props.title}
             relation={props.relation}
             fixedFilter={props.fixedFilter}
             includeId={props.includeId}
@@ -90,7 +85,6 @@ export const TableRelationFieldInternal = React.memo(
             relation,
             size,
             previewProperties,
-            title,
             disabled,
             fixedFilter,
             collection,
@@ -143,95 +137,27 @@ export const TableRelationFieldInternal = React.memo(
 
         const valueNotSet = !internalValue || (Array.isArray(internalValue) && internalValue.length === 0);
 
-        const buildSingleRelationField = () => {
-            const normalizedRelation = normalizeToEntityRelation(internalValue);
-
-            if (normalizedRelation)
-                return <RelationPreview
-                    onClick={disabled ? undefined : handleOpen}
-                    size={getPreviewSizeFrom(size)}
-                    relation={normalizedRelation}
-                    hover={!disabled}
-                    previewProperties={previewProperties}
-                    includeId={includeId}
-                    includeEntityLink={includeEntityLink}
-                />;
-            else
-                return <EntityPreviewContainer
-                    onClick={disabled ? undefined : handleOpen}
-                    size={getPreviewSizeFrom(size)}>
-                    <ErrorView title="Value is not a relation." error={"Click to edit"}/>
-                </EntityPreviewContainer>;
-        };
-
-        const buildMultipleRelationField = () => {
-            if (Array.isArray(internalValue))
-                return <>
-                    {internalValue.map((relationItem, index) =>
-                        <div className="w-full my-0.5"
-                            key={`preview_array_ref_${name}_${index}`}>
-                            <RelationPreview
-                                onClick={disabled ? undefined : handleOpen}
-                                size={"small"}
-                                relation={relationItem}
-                                hover={!disabled}
-                                previewProperties={previewProperties}
-                                includeId={includeId}
-                                includeEntityLink={includeEntityLink}
-                            />
-                        </div>
-                    )
-                    }
-                </>;
-            else
-                return <ErrorView error={"Data is not an array of relations"}/>;
-        };
-
         if (!collection)
             return <ErrorView error={"The specified collection does not exist"}/>;
 
-        // Text rows: see CompactEntityCellField.
-        if (getPreviewSizeFrom(size) === "small") {
-            const items = !internalValue ? [] : (Array.isArray(internalValue) ? internalValue : [internalValue]);
-            return <CompactEntityCellField empty={valueNotSet}
-                disabled={disabled}
-                selected={selected}
-                onClear={() => updateValue(multiselect ? [] : null)}>
-                {items.map((item, index) => {
-                    const relationItem = normalizeToEntityRelation(item);
-                    if (!relationItem) return null;
-                    return <RelationPreview key={`compact_rel__`}
-                        size={"small"}
-                        relation={relationItem}
-                        hover={false}
-                        previewProperties={previewProperties}
-                        includeId={includeId}
-                        includeEntityLink={includeEntityLink}/>;
-                })}
-            </CompactEntityCellField>;
-        }
-
-        return (
-            <div className="w-full group">
-
-                {internalValue && !multiselect && buildSingleRelationField()}
-
-                {internalValue && multiselect && buildMultipleRelationField()}
-
-                {valueNotSet &&
-                    <EntityPreviewContainer
-                        className={cls("px-3 py-2 text-sm font-medium flex items-center",
-                            multiselect ? "gap-4" : "gap-6",
-                            disabled
-                                ? "text-surface-accent-500"
-                                : "cursor-pointer text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover group-hover:bg-surface-hover")}
-                        onClick={handleOpen}
-                        size={"medium"}>
-                        <PencilIcon
-                            className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
-                        {title}
-                    </EntityPreviewContainer>}
-
-            </div>
-        );
+        // One line at every row size: see CompactEntityCellField. A single
+        // record takes the row's preview size — a line of text in a text row,
+        // a row with its image in a taller one — and a list stays lines.
+        const items = !internalValue ? [] : (Array.isArray(internalValue) ? internalValue : [internalValue]);
+        return <CompactEntityCellField empty={valueNotSet}
+            disabled={disabled}
+            selected={selected}
+            onClear={() => updateValue(multiselect ? [] : null)}>
+            {items.map((item, index) => {
+                const relationItem = normalizeToEntityRelation(item);
+                if (!relationItem) return null;
+                return <RelationPreview key={`compact_rel_${name}_${index}`}
+                    size={multiselect ? "small" : getPreviewSizeFrom(size)}
+                    relation={relationItem}
+                    hover={false}
+                    previewProperties={previewProperties}
+                    includeId={includeId}
+                    includeEntityLink={includeEntityLink}/>;
+            })}
+        </CompactEntityCellField>;
     }, equal);

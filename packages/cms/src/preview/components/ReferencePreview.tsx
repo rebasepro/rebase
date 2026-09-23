@@ -7,13 +7,13 @@ import { useCustomizationController, useFetch, useComponentOverride, CollectionS
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/app";
-import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
+import { EntityPreviewBinding, EntityPreviewBindingData, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import {
     InlineEntityPreview,
     InlineEntityPreviewMissing,
     InlineEntityPreviewSkeleton
 } from "../../components/InlineEntityPreview";
-import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
+import { useEntityPreviewLayout, useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -141,6 +141,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     const ResolvedEntityPreview = useComponentOverride("EntityPreview", EntityPreviewBinding);
     const customizationController = useCustomizationController();
     const nested = useIsNestedEntityPreview();
+    const layout = useEntityPreviewLayout();
 
     // Nested inside another preview, filling a title slot, or rendered small
     // (a table cell, a list row): one line of text, not a second card. The
@@ -221,6 +222,16 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
             // In a title slot the row itself is the click target; only a
             // preview nested inside a card opens its own side panel.
             includeEntityLink={!textOnly && includeEntityLink !== false}/>;
+    }
+
+    // See RelationPreview: a row of a table cell, not a card taller than it.
+    if (layout === "row" && ResolvedEntityPreview === EntityPreviewBinding) {
+        return <EntityPreviewBindingData layout={"row"}
+            size={size}
+            entity={usedEntity}
+            collection={collection}
+            previewKeys={previewProperties}
+            includeEntityLink={!disabled && includeEntityLink !== false}/>;
     }
 
     return <ResolvedEntityPreview size={size}

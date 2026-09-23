@@ -141,7 +141,10 @@ description: Every released change to Rebase — new features, fixes, and the br
   of the value the cell clips. A relation's title opens the record in the side
   panel on the first click. Empty date cells no longer show the `dd/mm/yyyy`
   mask, and a to-many relation in a text row lists on one line with a `+N`.
-  The UI kit's `Select` and `MultiSelect` gain `chevron`, `MultiSelect` gains
+  In the taller rows (`l`, `xl`) a reference or relation is a line of the row
+  — its image, a title that opens it, one or two supporting lines — instead of
+  the form's card, which was taller than the row and was cut off by it. The UI
+  kit's `Select` and `MultiSelect` gain `chevron`, `MultiSelect` gains
   `anchorRef`, and `DateTimeField` and `VirtualTableDateField` gain
   `pickerButton` and `inputRef`.
 

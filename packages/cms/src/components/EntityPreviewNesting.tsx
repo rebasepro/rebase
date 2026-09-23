@@ -48,3 +48,27 @@ export function RootEntityPreviewBoundary({ children }: { children: React.ReactN
         {children}
     </EntityPreviewDepthContext.Provider>;
 }
+
+/**
+ * How a top-level reference or relation preview is laid out.
+ *
+ * `card` is the form's: a bordered box with the record's id, title, preview
+ * properties and a button to open it. `row` is a table cell's: the same
+ * record as a line of the row it sits in — image, a title that opens it, one
+ * supporting line — with no box of its own, because the cell is the box and
+ * a card is taller than a row.
+ */
+export type EntityPreviewLayout = "card" | "row";
+
+const EntityPreviewLayoutContext = React.createContext<EntityPreviewLayout>("card");
+
+export function useEntityPreviewLayout(): EntityPreviewLayout {
+    return React.useContext(EntityPreviewLayoutContext);
+}
+
+/** Lays out the previews below it as rows. See {@link EntityPreviewLayout}. */
+export function RowEntityPreviewLayout({ children }: { children: React.ReactNode }) {
+    return <EntityPreviewLayoutContext.Provider value={"row"}>
+        {children}
+    </EntityPreviewLayoutContext.Provider>;
+}

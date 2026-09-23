@@ -7,6 +7,7 @@ import { ErrorBoundary, MinusCircleIcon } from "@rebasepro/ui";
 import { getRowHeight, TableSize } from "@rebasepro/app";
 import { ErrorTooltip } from "@rebasepro/app";
 import { TableCellOpener, TableCellOpenerKind } from "./TableCellOpener";
+import { RowEntityPreviewLayout } from "../../EntityPreviewNesting";
 
 export interface EntityTableCellOpener {
     kind: TableCellOpenerKind;
@@ -228,7 +229,9 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 ? "border-primary"
                 : "border-transparent";
 
-        const content = <ErrorBoundary>
+        // A reference or relation inside a cell is drawn as a line of its row,
+        // never as the form's card, which is taller than any row.
+        const content = <RowEntityPreviewLayout><ErrorBoundary>
 
             {fullHeight && !faded && children}
 
@@ -249,7 +252,7 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 </div>}
 
             </TableCellInner>}
-        </ErrorBoundary>;
+        </ErrorBoundary></RowEntityPreviewLayout>;
 
         const result = <>
             <div
