@@ -27,7 +27,7 @@ import {
     type NestedPathHop
 } from "./nested-path";
 import { ApiError, logger, splitFieldOps } from "@rebasepro/server";
-import { compileFieldOps } from "./field-op-sql";
+import { brokenFieldOpBounds, compileFieldOpBounds, compileFieldOps, fieldOpBoundsError } from "./field-op-sql";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
 
@@ -437,6 +437,12 @@ export class PersistService {
                     const compiledOps = fieldOpKeys.length > 0
                         ? compileFieldOps(table, fieldOps, { collectionPath: effectiveCollectionPath })
                         : undefined;
+                    // What each operation produces, held to the property's
+                    // declared bounds by the same statement — see
+                    // `compileFieldOpBounds` for why it cannot be a read first.
+                    const bounds = fieldOpKeys.length > 0
+                        ? compileFieldOpBounds(table, fieldOps, collection.properties ?? {}, { collectionPath: effectiveCollectionPath })
+                        : [];
                     if (scalarKeys.length > 0 || compiledOps) {
                         const updateQuery = tx.update(table).set({
                             ...(entityData as Record<string, unknown>),
@@ -448,11 +454,13 @@ export class PersistService {
                             conditions.push(eq(field, idValues[info.fieldName]));
                         }
 
-                        const updateResult = await updateQuery.where(and(...conditions));
+                        const updateResult = await updateQuery.where(and(...conditions, ...bounds.map(bound => bound.holds)));
 
                         // Throwing rolls the transaction back, so relation writes
                         // already applied above do not survive a rejected update.
                         if ((updateResult.rowCount ?? 0) === 0) {
+                            const broken = await brokenFieldOpBounds(tx, table, conditions, bounds);
+                            if (broken.length > 0) throw fieldOpBoundsError(collection.slug, broken);
                             throw await this.explainZeroRowWrite(
                                 tx, table, conditions, effectiveCollectionPath, currentId, "update"
                             );

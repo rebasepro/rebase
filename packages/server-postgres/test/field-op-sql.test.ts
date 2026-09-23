@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { pgTable, text, integer, jsonb, json, boolean } from "drizzle-orm/pg-core";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { compileFieldOp, compileFieldOps } from "../src/services/field-op-sql";
+import type { Properties } from "@rebasepro/types";
+import { compileFieldOp, compileFieldOpBounds, compileFieldOps } from "../src/services/field-op-sql";
 
 /**
  * What a field operation becomes, in SQL.
@@ -123,6 +124,57 @@ describe("$merge", () => {
 
     it("refuses a column that is not json", () => {
         expect(() => render("views", "$merge", { a: 1 })).toThrow(/\$merge/);
+    });
+});
+
+describe("compileFieldOpBounds", () => {
+    /**
+     * The bound a result must keep, as a condition for the UPDATE's WHERE. The
+     * behaviour over a real row is pinned in `field-op-bounds.test.ts`; this is
+     * the mapping from each declared rule to its comparison.
+     */
+    const properties = {
+        views: { name: "Views", type: "number", validation: { min: 0, max: 10, moreThan: -1, lessThan: 11, positive: true, negative: true } },
+        tags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" }, validation: { min: 1, max: 3 } },
+        jsonTags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" }, validation: { min: 1, max: 3 } },
+        legacyTags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" }, validation: { max: 3 } },
+        meta: { name: "Meta", type: "map", properties: {} }
+    } as Properties;
+
+    const boundsFor = (field: string, operator: string, operand: unknown) =>
+        compileFieldOpBounds(table, { [field]: { operator: operator as never, operand } }, properties, context)
+            .map(bound => ({ code: bound.code, sql: dialect.sqlToQuery(bound.holds).sql }));
+
+    it("compares an increment's result with each of a number's rules", () => {
+        const result = String.raw`\(COALESCE\("posts"\."views", 0\) \+ \$1\)`;
+        expect(boundsFor("views", "$inc", -1)).toEqual([
+            { code: "min", sql: expect.stringMatching(new RegExp(`^${result} >= \\$2::numeric$`)) },
+            { code: "max", sql: expect.stringMatching(new RegExp(`^${result} <= \\$2::numeric$`)) },
+            { code: "more_than", sql: expect.stringMatching(new RegExp(`^${result} > \\$2::numeric$`)) },
+            { code: "less_than", sql: expect.stringMatching(new RegExp(`^${result} < \\$2::numeric$`)) },
+            { code: "positive", sql: expect.stringMatching(new RegExp(`^${result} > 0$`)) },
+            { code: "negative", sql: expect.stringMatching(new RegExp(`^${result} < 0$`)) }
+        ]);
+    });
+
+    it("counts a native array with cardinality, and a json one through jsonb", () => {
+        expect(boundsFor("tags", "$push", "a")).toEqual([
+            { code: "min_items", sql: expect.stringMatching(/^COALESCE\(cardinality\(array_append\("posts"\."tags", \$1\)\) >= \$2::numeric, TRUE\)$/) },
+            { code: "max_items", sql: expect.stringMatching(/^COALESCE\(cardinality\(array_append\("posts"\."tags", \$1\)\) <= \$2::numeric, TRUE\)$/) }
+        ]);
+        expect(boundsFor("jsonTags", "$pull", "a").map(bound => bound.sql))
+            .toEqual([expect.stringMatching(/^COALESCE\(jsonb_array_length\(\(.*jsonb_agg.*\)::jsonb\) >= \$\d+::numeric, TRUE\)$/s), expect.anything()]);
+        expect(boundsFor("legacyTags", "$push", "a")).toEqual([
+            { code: "max_items", sql: expect.stringMatching(/^COALESCE\(jsonb_array_length\(\(\(.*\)::json\)::jsonb\) <= \$\d+::numeric, TRUE\)$/s) }
+        ]);
+    });
+
+    it("has nothing to hold for a property without bounds, or for $merge", () => {
+        expect(compileFieldOpBounds(table, {
+            views: { operator: "$inc", operand: 1 },
+            meta: { operator: "$merge", operand: { a: 1 } }
+        }, { views: { name: "Views", type: "number" }, meta: properties.meta } as Properties, context)).toEqual([]);
+        expect(boundsFor("meta", "$merge", { a: 1 })).toEqual([]);
     });
 });
 
