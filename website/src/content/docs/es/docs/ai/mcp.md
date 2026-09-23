@@ -1,5 +1,5 @@
 ---
-sourceHash: 50026032d03a87e2
+sourceHash: 5a197121af0d5219
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la compuerta de loopback que se interpone entre un agente y producción."
@@ -524,12 +524,13 @@ a un solo usuario, el endpoint se negará a montarse e indicará el motivo en el
   `/api/data`, `/api/admin` y el WebSocket, por lo que conectar un asistente no
   le otorga una sesión.
 
-Dos limitaciones. Desconectar un cliente (`DELETE /api/oauth/grants/:clientId`, con la
-propia sesión de la persona) revoca sus refresh tokens de inmediato, pero un token de acceso
-ya emitido sigue funcionando hasta que expire, dentro del plazo de una hora. Y los roles que conlleva
-una concesión son los que la persona tenía al momento de dar su consentimiento. Un cambio de roles no
-le afecta: un cliente que continúa refrescándose conserva esos roles hasta que la persona
-lo desconecte.
+Una limitación. Desconectar un cliente (`DELETE /api/oauth/grants/:clientId`, con la propia
+sesión de la persona) revoca sus refresh tokens de inmediato, pero un token de acceso ya emitido
+sigue funcionando hasta que expire, dentro del plazo de una hora. Esa misma hora acota todo lo
+demás: cada refresco vuelve a leer los roles de la persona y rechaza una cuenta que se eliminó o
+una concesión anterior a su último "cerrar sesión en todas partes" o cambio de contraseña. Así,
+una degradación o un cierre de sesión llega a un cliente conectado en el plazo de vida de un
+token de acceso. Una sesión de invitado no puede dar su consentimiento.
 
 Las rutas se encuentran en [Endpoints](/docs/backend/endpoints/#mcp-surface) y las
 variables en [Configuración](/docs/getting-started/configuration/#mcp-surface).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 50026032d03a87e2
+sourceHash: 5a197121af0d5219
 title: MCP-Server
 sidebar_label: MCP-Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder beliebige MCP-Clients mit einem Rebase-Projekt – die 42 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate zwischen Agent und Produktion.
@@ -532,12 +532,14 @@ Grund im Boot-Log an. Es gibt keine `REBASE_ROLE`, die ihn aktiviert.
   `/api/admin` und dem WebSocket abgelehnt; das Verbinden eines Assistenten übergibt diesem
   also keine vollständige Session.
 
-Zwei Einschränkungen: Das Trennen eines Clients (`DELETE /api/oauth/grants/:clientId` mit
-der eigenen Session der Person) widerruft dessen Refresh-Tokens sofort, doch ein bereits
-ausgestelltes Access-Token bleibt bis zu seinem Ablauf innerhalb einer Stunde gültig. Zudem
-sind die Rollen, die eine Autorisierung beinhaltet, diejenigen, die die Person zum Zeitpunkt
-der Zustimmung innehatte. Eine Rollenänderung wird nicht übertragen: Ein Client, der Tokens
-kontinuierlich erneuert, behält diese Rollen, bis die Person die Verbindung trennt.
+Eine Einschränkung: Das Trennen eines Clients (`DELETE /api/oauth/grants/:clientId` mit der
+eigenen Session der Person) widerruft dessen Refresh-Tokens sofort, doch ein bereits
+ausgestelltes Access-Token bleibt bis zu seinem Ablauf innerhalb einer Stunde gültig.
+Dieselbe Stunde begrenzt alles andere: Jede Erneuerung liest die Rollen der Person neu und
+lehnt ein gelöschtes Konto ab oder eine Autorisierung, die älter ist als das letzte „Überall
+abmelden“ oder die letzte Passwortänderung. Eine Herabstufung oder Abmeldung erreicht einen
+verbundenen Client also innerhalb der Lebensdauer eines Access-Tokens. Eine Gast-Session
+kann gar nicht zustimmen.
 
 Die Routen finden Sie unter [Endpoints](/docs/backend/endpoints/#mcp-surface) und die
 Variablen unter [Configuration](/docs/getting-started/configuration/#mcp-surface).

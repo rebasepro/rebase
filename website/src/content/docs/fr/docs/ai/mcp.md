@@ -1,5 +1,5 @@
 ---
-sourceHash: 50026032d03a87e2
+sourceHash: 5a197121af0d5219
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou tout client MCP à un projet Rebase — les 42 outils qu'il expose, l'identifiant avec lequel il s'authentifie, et la barrière de bouclage qui sépare un agent de la production.
@@ -522,12 +522,13 @@ Sans `REBASE_PUBLIC_URL`, un secret JWT ou un pilote de données capable de rest
   `/api/data`, `/api/admin` et le WebSocket, de sorte que connecter un assistant ne
   lui transmet pas de session.
 
-Deux limites. La déconnexion d'un client (`DELETE /api/oauth/grants/:clientId`, avec la
-propre session de l'utilisateur) révoque immédiatement ses jetons de rafraîchissement, mais un jeton d'accès
-déjà émis continue de fonctionner jusqu'à son expiration, dans l'heure qui suit. De plus, les rôles
-associés à une autorisation sont ceux que l'utilisateur possédait au moment du consentement. Une modification de rôle ne
-lui est pas répercutée : un client qui continue de se rafraîchir conserve ces rôles jusqu'à ce que l'utilisateur
-le déconnecte.
+Une limite. La déconnexion d'un client (`DELETE /api/oauth/grants/:clientId`, avec la propre session de
+l'utilisateur) révoque immédiatement ses jetons de rafraîchissement, mais un jeton d'accès déjà émis continue
+de fonctionner jusqu'à son expiration, dans l'heure qui suit. Cette même heure borne tout le reste : chaque
+rafraîchissement relit les rôles de l'utilisateur, et refuse un compte supprimé ou une autorisation antérieure
+à son dernier « se déconnecter partout » ou changement de mot de passe. Une rétrogradation ou une déconnexion
+atteint donc un client connecté dans la durée de vie d'un jeton d'accès. Une session invité ne peut pas donner
+son consentement.
 
 Les routes sont détaillées dans [Endpoints](/docs/backend/endpoints/#mcp-surface) et les
 variables dans [Configuration](/docs/getting-started/configuration/#mcp-surface).

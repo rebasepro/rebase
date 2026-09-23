@@ -1,5 +1,5 @@
 ---
-sourceHash: 50026032d03a87e2
+sourceHash: 5a197121af0d5219
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 42 ferramentas expostas, a credencial com a qual ele se autentica e o gate de loopback que fica entre um agente e a produção.
@@ -530,12 +530,14 @@ de inicialização. Nenhuma `REBASE_ROLE` o ativa.
   `/api/data`, `/api/admin` e pelo WebSocket, portanto, conectar um assistente não
   concede a ele uma sessão geral.
 
-Duas limitações. Desconectar um cliente (`DELETE /api/oauth/grants/:clientId`, com a
+Uma limitação. Desconectar um cliente (`DELETE /api/oauth/grants/:clientId`, com a
 própria sessão da pessoa) revoga seus tokens de atualização (refresh tokens)
 imediatamente, mas um token de acesso já emitido continua funcionando até expirar,
-dentro de uma hora. E as roles que uma concessão carrega são aquelas que a pessoa
-possuía no momento do consentimento. Uma alteração de role não tem efeito retroativo:
-um cliente que continuar atualizando manterá essas roles até que a pessoa o desconecte.
+dentro de uma hora. Essa mesma hora limita todo o resto: cada atualização relê as
+roles da pessoa e recusa uma conta que foi excluída ou uma concessão anterior ao seu
+último "sair de todos os lugares" ou troca de senha. Assim, um rebaixamento ou uma
+saída chega a um cliente conectado dentro da vida útil de um token de acesso. Uma
+sessão de convidado não pode dar consentimento.
 
 As rotas estão em [Endpoints](/docs/backend/endpoints/#mcp-surface) e as variáveis
 em [Configuração](/docs/getting-started/configuration/#mcp-surface).

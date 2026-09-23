@@ -1,5 +1,5 @@
 ---
-sourceHash: 50026032d03a87e2
+sourceHash: 5a197121af0d5219
 title: Server MCP
 sidebar_label: Server MCP
 description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 42 strumenti che espone, le credenziali con cui si autentica e il gate di loopback interposto tra un agent e la produzione.
@@ -523,12 +523,12 @@ a un singolo utente, l'endpoint rifiuterà di montarsi segnalandone il motivo ne
   `/api/data`, `/api/admin` e dal WebSocket; connettere un assistente non equivale quindi
   a fornirgli una sessione utente completa.
 
-Due limitazioni da tenere presenti. La disconnessione di un client (`DELETE /api/oauth/grants/:clientId`, con la
-sessione dell'utente) revoca immediatamente i suoi refresh token, ma un access token
-già emesso continuerà a funzionare fino alla sua scadenza, entro un'ora. Inoltre, i ruoli assegnati a
-una concessione sono quelli posseduti dall'utente al momento del consenso. Una successiva modifica dei ruoli non
-si riflette su di essa: un client che continua a rinnovare il token conserverà tali ruoli finché l'utente
-non procederà alla disconnessione.
+Una limitazione da tenere presente. La disconnessione di un client (`DELETE /api/oauth/grants/:clientId`, con
+la sessione dell'utente) revoca immediatamente i suoi refresh token, ma un access token già emesso continuerà
+a funzionare fino alla sua scadenza, entro un'ora. La stessa ora limita tutto il resto: ogni rinnovo rilegge i
+ruoli dell'utente, e rifiuta un account eliminato o una concessione precedente al suo ultimo "esci ovunque" o
+cambio di password. Quindi un declassamento o una disconnessione raggiunge un client collegato entro la durata
+di un access token. Una sessione ospite non può dare il consenso.
 
 I percorsi sono descritti in [Endpoint](/docs/backend/endpoints/#mcp-surface) e le
 variabili in [Configurazione](/docs/getting-started/configuration/#mcp-surface).
