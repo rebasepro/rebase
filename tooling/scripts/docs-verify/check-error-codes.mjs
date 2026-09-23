@@ -319,7 +319,14 @@ export function collectFromSource(source, rel, record) {
 
 /** Every code the source can put in a response, with where it was found. */
 export function collectErrorCodes(root) {
-    /** @type {Map<string, { status?: number, locations: string[] }>} */
+    /**
+     * Every status a code is raised with, and where. A set, not the first one
+     * seen: a code raised as 400 by one route and 401 by another has two
+     * statuses a caller can meet, and keeping only whichever call site the walk
+     * reached first let a row naming that one pass while the other was wrong.
+     *
+     * @type {Map<string, { statuses: Map<number, string[]>, locations: string[] }>}
+     */
     const codes = new Map();
     /** @type {Map<string, string[]>} template-literal prefixes, e.g. `PG_`. */
     const families = new Map();
@@ -329,8 +336,8 @@ export function collectErrorCodes(root) {
             families.set(found.family, [...(families.get(found.family) ?? []), location]);
             return;
         }
-        const existing = codes.get(found.code) ?? { status: undefined, locations: [] };
-        if (existing.status === undefined && status !== undefined) existing.status = status;
+        const existing = codes.get(found.code) ?? { statuses: new Map(), locations: [] };
+        if (status !== undefined) existing.statuses.set(status, [...(existing.statuses.get(status) ?? []), location]);
         existing.locations.push(location);
         codes.set(found.code, existing);
     };
@@ -360,15 +367,20 @@ export function collectErrorCodes(root) {
     return { codes, families, scanned };
 }
 
-/** The codes the reference page lists, from the first column of its tables. */
+/**
+ * The codes the reference page lists, from the first column of its tables,
+ * with every status the second column names (`400`, or `400 / 401`).
+ */
 export function documentedErrorCodes(root) {
     const file = path.join(root, REFERENCE);
     if (!fs.existsSync(file)) return null;
     const documented = new Map();
     const lines = fs.readFileSync(file, "utf8").split("\n");
     lines.forEach((line, index) => {
-        const row = line.match(new RegExp(`^\\|\\s*\`(${CODE})\`\\s*\\|\\s*(\\d{3})?`));
-        if (row) documented.set(row[1], { status: row[2] ? Number(row[2]) : undefined, line: index + 1 });
+        const row = line.match(new RegExp(`^\\|\\s*\`(${CODE})\`\\s*\\|([^|]*)`));
+        if (!row) return;
+        const statuses = (row[2].match(/\b\d{3}\b/g) ?? []).map(Number);
+        documented.set(row[1], { statuses, line: index + 1 });
     });
     return documented;
 }
@@ -484,13 +496,22 @@ export function checkErrorCodes(root) {
     }
     for (const [code, info] of codes) {
         const row = documented.get(code);
-        if (!row || row.status === undefined || info.status === undefined) continue;
-        if (row.status !== info.status) {
-            findings.push({
-                code,
-                message: `${REFERENCE} says ${row.status}, the source raises ${info.status}`
-            });
+        if (!row || row.statuses.length === 0 || info.statuses.size === 0) continue;
+        const missing = [...info.statuses.keys()].filter(status => !row.statuses.includes(status)).sort();
+        const extra = row.statuses.filter(status => !info.statuses.has(status));
+        if (missing.length === 0 && extra.length === 0) continue;
+        const parts = [];
+        if (missing.length) {
+            parts.push(
+                "the source also raises " +
+                missing.map(status => `${status} (${[...new Set(info.statuses.get(status))].slice(0, 2).join(", ")})`).join(", ")
+            );
         }
+        if (extra.length) parts.push(`the source never raises ${extra.join(", ")}`);
+        findings.push({
+            code,
+            message: `${REFERENCE}:${row.line} says ${row.statuses.join(" / ")}, ${parts.join(", and ")}`
+        });
     }
 
     return { findings, scanned, total: codes.size, families: families.size };
