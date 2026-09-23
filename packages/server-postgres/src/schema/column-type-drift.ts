@@ -157,16 +157,31 @@ export function typesAgree(declared: string, actual: string): boolean {
     // them silently does not — so the two disagree, and the drift report says
     // so. A declaration with no modifier accepts whatever is there, which is
     // what it always did.
-    if (a !== "numeric") return true;
+    //
+    // Tested on the spelling, not the family: the family is `number` for every
+    // numeric type, and an `int4` under a `NUMERIC(10, 2)` stays the adopted
+    // schema it was.
+    if (!isNumeric(declared) || !isNumeric(actual)) return true;
     const declaredModifier = numericModifier(declared);
     if (declaredModifier === null) return true;
     return declaredModifier === numericModifier(actual);
 }
 
-/** `numeric(10,2)` / `NUMERIC(10, 2)` → `10,2`; a bare `numeric` → `null`. */
+/** `NUMERIC`, `numeric(10,2)`, `DECIMAL(10, 2)` — the arbitrary-precision type itself. */
+function isNumeric(raw: string): boolean {
+    return /^\s*(?:numeric|decimal)\s*(?:\(|$)/i.test(raw);
+}
+
+/**
+ * `numeric(10,2)` / `NUMERIC(10, 2)` → `10,2`; a bare `numeric` → `null`. A
+ * precision alone means a scale of 0, which is how the catalogue reports it:
+ * `NUMERIC(10)` → `10,0`.
+ */
 function numericModifier(raw: string): string | null {
     const match = raw.match(/\(([^)]*)\)/);
-    return match ? match[1].replace(/\s+/g, "") : null;
+    if (!match) return null;
+    const [precision, scale = "0"] = match[1].split(",").map(part => part.trim());
+    return `${precision},${scale}`;
 }
 
 /**

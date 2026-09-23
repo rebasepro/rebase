@@ -84,6 +84,57 @@ describe("deciding whether two types agree", () => {
     });
 });
 
+describe("a numeric that declares its precision", () => {
+    // `readExistingSchema` spells a live `numeric` column with its modifier
+    // (`numeric(10,2)`) or without (`numeric`), because the property that asks
+    // for `precision`/`scale` is asking the database to round, and an
+    // unbounded column silently does not.
+    it.each([
+        ["NUMERIC(10, 2)", "numeric"],
+        ["NUMERIC(10, 2)", "numeric(12,2)"],
+        ["NUMERIC(10, 2)", "numeric(10,4)"],
+        ["NUMERIC(10)", "numeric(10,2)"]
+    ])("%s over a %s column is drift", (declared, actual) => {
+        expect(typesAgree(declared, actual)).toBe(false);
+    });
+
+    it.each([
+        ["NUMERIC(10, 2)", "numeric(10,2)"],
+        ["NUMERIC(10)", "numeric(10,0)"],
+        ["DECIMAL(10, 2)", "numeric(10,2)"],
+        // A declaration with no modifier accepts whatever is there.
+        ["NUMERIC", "numeric(10,2)"],
+        // Other numbers stay one family: an adopted `int4` is not news.
+        ["NUMERIC(10, 2)", "int4"],
+        ["NUMERIC(10, 2)", "float8"]
+    ])("%s over a %s column agrees", (declared, actual) => {
+        expect(typesAgree(declared, actual)).toBe(true);
+    });
+
+    it("is reported by the plan against an unbounded column", () => {
+        const products = {
+            name: "Products",
+            slug: "products",
+            properties: {
+                id: { name: "ID", type: "string", isId: "uuid" },
+                price: { name: "Price", type: "number", precision: 10, scale: 2 }
+            }
+        } as unknown as CollectionConfig;
+        const plan = planCollectionSchemaEnsure([products], {
+            tables: new Map([["public.products", new Set(["id", "price"])]]),
+            enums: new Set(),
+            columnTypes: new Map([
+                ["public.products.id", "uuid"],
+                ["public.products.price", "numeric"]
+            ])
+        });
+
+        expect(plan.columnTypeDrift).toEqual([
+            expect.objectContaining({ table: "public.products", column: "price", actual: "numeric" })
+        ]);
+    });
+});
+
 describe("the plan reporting a drifted column", () => {
     const observations = {
         name: "Listing observations",
