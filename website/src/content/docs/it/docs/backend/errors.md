@@ -1,5 +1,5 @@
 ---
-sourceHash: 149704990d5e02cb
+sourceHash: 99eda64e07fc731d
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -119,7 +119,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `ROLE_LOOKUP_FAILED` | 503 | Impossibile leggere i ruoli del chiamante — su una route di amministrazione, o su una richiesta di dati in un backend con `config.auth`. Si blocca per sicurezza invece di fidarsi dei ruoli nel token. | Riprova; controlla il database. |
 | `SELF_DELETE` | 400 | Un amministratore ha tentato di eliminare il proprio account. | Fai eseguire l'operazione a un altro amministratore. |
 | `SESSION_REVOKED` | 401 | È stato eseguito il logout dalla sessione altrove, oppure tutte le sessioni sono state revocate. | Accedi nuovamente. |
-| `UNVERIFIED_IDENTITIES` | 409 | Un magic link, un codice via email o un ripristino della password ha dimostrato l'indirizzo di un account non verificato, e l'account ha un'identità di accesso il cui provider non ha mai verificato quell'indirizzo. Il repository di autenticazione non può rimuoverla (non ha `unlinkUserIdentity`), quindi la prova viene rifiutata invece di lasciare quella via d'accesso su un account verificato. | Implementa `unlinkUserIdentity` nel repository di autenticazione personalizzato, o fai verificare l'account da un amministratore. |
+| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Dalla 0.23</span> Un magic link, un codice via email o un ripristino della password ha dimostrato l'indirizzo di un account non verificato, e l'account ha un'identità di accesso il cui provider non ha mai verificato quell'indirizzo. Il repository di autenticazione non può rimuoverla (non ha `unlinkUserIdentity`), quindi la prova viene rifiutata invece di lasciare quella via d'accesso su un account verificato. | Implementa `unlinkUserIdentity` nel repository di autenticazione personalizzato, o fai verificare l'account da un amministratore. |
 | `SETUP_REQUIRED` | 403 | Il progetto non ha ancora un amministratore, quindi questa route non è disponibile. | Completa la configurazione del primo amministratore. |
 | `TOKEN_ALREADY_USED` | 401 | È stato riutilizzato un token monouso. | Richiedine uno nuovo. |
 | `TOKEN_EXPIRED` | 401 | Il token ha superato la sua durata di validità. | Richiedine uno nuovo. |
@@ -236,7 +236,7 @@ codice SQLSTATE per tutti, e il messaggio indica il vincolo violato.
 
 | Codice | Stato | Significato | Cosa fare |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | Il `maxResults` di un elenco dello storage non è un numero intero di almeno 1, o il suo `pageToken` non è stato emesso dalla sorgente. Una dimensione di pagina inferiore a uno restituiva una pagina vuota con lo stesso token, così un ciclo `while (pageToken)` non finiva mai. | Invia un `maxResults` positivo e restituisci `nextPageToken` invariato. |
+| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Dalla 0.23</span> Il `maxResults` di un elenco dello storage non è un numero intero di almeno 1, o il suo `pageToken` non è stato emesso dalla sorgente. Una dimensione di pagina inferiore a uno restituiva una pagina vuota con lo stesso token, così un ciclo `while (pageToken)` non finiva mai. | Invia un `maxResults` positivo e restituisci `nextPageToken` invariato. |
 | `INVALID_STORAGE_BUCKET` | 400 | Il nome del bucket è malformato. | Controlla il nome. |
 | `INVALID_STORAGE_KEY` | 400 | La chiave dell'oggetto è malformata o esce dal prefisso consentito. | Controlla la chiave. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | I parametri di trasformazione dell'immagine sono fuori scala o contraddittori. | Consulta [Storage](/docs/backend/storage/). |

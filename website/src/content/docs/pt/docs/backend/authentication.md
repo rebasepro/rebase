@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ac172042bd08b13
+sourceHash: 3c10e2e8a92e2f64
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -467,7 +467,7 @@ provas remove a senha (uma redefinição define a nova) e cada identidade vincul
 cujo provedor não verificou esse endereço, e encerra todas as sessões, antes de
 marcar a conta como verificada. A partir daí vale o passo 2. Contas criadas por um
 administrador com `POST /api/admin/users` são salvas como verificadas, então um
-convidado pode usar "Entrar com o Google" imediatamente. Um repositório de
+convidado pode usar "Entrar com o Google" imediatamente. <span class="since-badge" data-since="0.23">Desde 0.23</span> Um repositório de
 autenticação próprio sem `unlinkUserIdentity` recusa essa prova com
 `409 UNVERIFIED_IDENTITIES` quando há uma identidade a remover.
 

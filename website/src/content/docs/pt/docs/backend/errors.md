@@ -1,5 +1,5 @@
 ---
-sourceHash: 149704990d5e02cb
+sourceHash: 99eda64e07fc731d
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -121,7 +121,7 @@ ID recebido. Leia o cabeçalho de resposta.
 | `ROLE_LOOKUP_FAILED` | 503 | Não foi possível ler as roles do chamador — em uma rota de administração, ou em uma requisição de dados em um backend com `config.auth`. Falha de forma segura em vez de confiar nas roles do token. | Tente novamente; verifique o banco de dados. |
 | `SELF_DELETE` | 400 | Um administrador tentou excluir a própria conta. | Peça a outro administrador para fazê-lo. |
 | `SESSION_REVOKED` | 401 | A sessão foi encerrada em outro lugar ou todas as sessões foram revogadas. | Faça login novamente. |
-| `UNVERIFIED_IDENTITIES` | 409 | Um magic link, código por e-mail ou redefinição de senha comprovou o endereço de uma conta não verificada, e a conta tem uma identidade de login cujo provedor nunca verificou esse endereço. O repositório de autenticação não consegue removê-la (não tem `unlinkUserIdentity`), então a prova é recusada em vez de deixar essa forma de acesso em uma conta verificada. | Implemente `unlinkUserIdentity` no repositório de autenticação próprio, ou peça a um administrador que revise a conta. |
+| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Desde 0.23</span> Um magic link, código por e-mail ou redefinição de senha comprovou o endereço de uma conta não verificada, e a conta tem uma identidade de login cujo provedor nunca verificou esse endereço. O repositório de autenticação não consegue removê-la (não tem `unlinkUserIdentity`), então a prova é recusada em vez de deixar essa forma de acesso em uma conta verificada. | Implemente `unlinkUserIdentity` no repositório de autenticação próprio, ou peça a um administrador que revise a conta. |
 | `SETUP_REQUIRED` | 403 | O projeto ainda não possui nenhum administrador, portanto esta rota não está disponível. | Conclua a configuração do primeiro administrador. |
 | `TOKEN_ALREADY_USED` | 401 | Um token de uso único foi reutilizado. | Solicite um novo. |
 | `TOKEN_EXPIRED` | 401 | O token ultrapassou seu tempo de vida. | Solicite um novo. |
@@ -239,7 +239,7 @@ traz o mesmo SQLSTATE para todos eles, e a mensagem informa a restrição violad
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | O `maxResults` de uma listagem de armazenamento não é um número inteiro de pelo menos 1, ou o seu `pageToken` não foi emitido pela fonte. Um tamanho de página menor que um retornava uma página vazia com o mesmo token, então um laço `while (pageToken)` nunca terminava. | Envie um `maxResults` positivo e devolva `nextPageToken` sem alterações. |
+| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Desde 0.23</span> O `maxResults` de uma listagem de armazenamento não é um número inteiro de pelo menos 1, ou o seu `pageToken` não foi emitido pela fonte. Um tamanho de página menor que um retornava uma página vazia com o mesmo token, então um laço `while (pageToken)` nunca terminava. | Envie um `maxResults` positivo e devolva `nextPageToken` sem alterações. |
 | `INVALID_STORAGE_BUCKET` | 400 | O nome do bucket está malformado. | Verifique o nome. |
 | `INVALID_STORAGE_KEY` | 400 | A chave do objeto está malformada ou escapa do seu prefixo. | Verifique a chave. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | Os parâmetros de transformação de imagem estão fora do intervalo ou são contraditórios. | Consulte [Storage](/docs/backend/storage/). |

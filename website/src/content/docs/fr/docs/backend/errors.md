@@ -1,5 +1,5 @@
 ---
-sourceHash: 149704990d5e02cb
+sourceHash: 99eda64e07fc731d
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -94,7 +94,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `ROLE_LOOKUP_FAILED` | 503 | Impossible de lire les rôles de l'appelant — sur une route d'administration, ou sur une requête de données d'un backend avec `config.auth`. Échoue par sécurité plutôt que de faire confiance aux rôles du jeton. | Réessayez ; vérifiez la base de données. |
 | `SELF_DELETE` | 400 | Un administrateur a tenté de supprimer son propre compte. | Demandez à un autre administrateur de le faire. |
 | `SESSION_REVOKED` | 401 | La session a été déconnectée ailleurs, ou toutes les sessions ont été révoquées. | Reconnectez-vous. |
-| `UNVERIFIED_IDENTITIES` | 409 | Un lien magique, un code par e-mail ou une réinitialisation du mot de passe a prouvé l'adresse d'un compte non vérifié, et ce compte porte une identité de connexion dont le fournisseur n'a jamais vérifié cette adresse. Le dépôt d'authentification ne peut pas la supprimer (il n'a pas `unlinkUserIdentity`), donc la preuve est refusée plutôt que de laisser ce moyen d'accès sur un compte vérifié. | Implémentez `unlinkUserIdentity` dans le dépôt d'authentification personnalisé, ou faites examiner le compte par un administrateur. |
+| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Depuis la version 0.23</span> Un lien magique, un code par e-mail ou une réinitialisation du mot de passe a prouvé l'adresse d'un compte non vérifié, et ce compte porte une identité de connexion dont le fournisseur n'a jamais vérifié cette adresse. Le dépôt d'authentification ne peut pas la supprimer (il n'a pas `unlinkUserIdentity`), donc la preuve est refusée plutôt que de laisser ce moyen d'accès sur un compte vérifié. | Implémentez `unlinkUserIdentity` dans le dépôt d'authentification personnalisé, ou faites examiner le compte par un administrateur. |
 | `SETUP_REQUIRED` | 403 | Le projet n'a pas encore d'administrateur ; cette route n'est donc pas disponible. | Terminez la configuration du premier administrateur. |
 | `TOKEN_ALREADY_USED` | 401 | Un jeton à usage unique a été rejoué. | Demandez-en un nouveau. |
 | `TOKEN_EXPIRED` | 401 | Le jeton a dépassé sa durée de validité. | Demandez-en un nouveau. |
@@ -203,7 +203,7 @@ Tout le reste — coupure de connexion, colonne manquante, problème de droits �
 
 | Code | Statut | Signification | Action |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | Le `maxResults` d'un listage de stockage n'est pas un entier d'au moins 1, ou son `pageToken` n'a pas été émis par la source. Une taille de page inférieure à un renvoyait autrefois une page vide portant le même jeton, si bien qu'une boucle `while (pageToken)` ne se terminait jamais. | Envoyez un `maxResults` positif, et renvoyez `nextPageToken` tel quel. |
+| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Depuis la version 0.23</span> Le `maxResults` d'un listage de stockage n'est pas un entier d'au moins 1, ou son `pageToken` n'a pas été émis par la source. Une taille de page inférieure à un renvoyait autrefois une page vide portant le même jeton, si bien qu'une boucle `while (pageToken)` ne se terminait jamais. | Envoyez un `maxResults` positif, et renvoyez `nextPageToken` tel quel. |
 | `INVALID_STORAGE_BUCKET` | 400 | Le nom du bucket est malformé. | Vérifiez le nom. |
 | `INVALID_STORAGE_KEY` | 400 | La clé de l'objet est malformée ou sort de son préfixe. | Vérifiez la clé. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | Les paramètres de transformation d'image sont hors limites ou contradictoires. | Voir [Stockage](/docs/backend/storage/). |

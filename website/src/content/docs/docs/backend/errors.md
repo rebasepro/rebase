@@ -117,7 +117,7 @@ the ID you got. Read the response header.
 | `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. | Retry; check the database. |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
 | `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked. | Sign in again. |
-| `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
+| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed. | Request a fresh one. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
@@ -234,7 +234,7 @@ the message names the constraint.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | A storage listing's `maxResults` is not a whole number of at least 1, or its `pageToken` is not one the source issued. A page size below one used to answer an empty page carrying the same token, so a `while (pageToken)` loop never ended. | Send a positive `maxResults`, and pass back `nextPageToken` unchanged. |
+| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Since 0.23</span> A storage listing's `maxResults` is not a whole number of at least 1, or its `pageToken` is not one the source issued. A page size below one used to answer an empty page carrying the same token, so a `while (pageToken)` loop never ended. | Send a positive `maxResults`, and pass back `nextPageToken` unchanged. |
 | `INVALID_STORAGE_BUCKET` | 400 | The bucket name is malformed. | Check the name. |
 | `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ac172042bd08b13
+sourceHash: 3c10e2e8a92e2f64
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -321,7 +321,7 @@ El paso 3 es el caso crítico a nivel de seguridad. Si un correo electrónico de
 
 El lado de la cuenta importa por la misma razón. Nada verifica la dirección que recibe `POST /auth/register`, así que cualquiera puede registrar la dirección de otra persona con una contraseña, o iniciar sesión con ella a través de un proveedor que no la avala, y esperar. Vincular el inicio de sesión con Google del titular a esa cuenta dejaría en ella la vía de acceso de la otra persona.
 
-Un enlace mágico, un código por correo o un restablecimiento de contraseña demuestran la dirección y verifican la cuenta. En una cuenta que aún no estaba verificada, la primera de esas pruebas elimina la contraseña (un restablecimiento establece la nueva) y cada identidad vinculada cuyo proveedor no verificó esa dirección, y cierra todas las sesiones, antes de marcar la cuenta como verificada. A partir de ahí se aplica el paso 2. Las cuentas que crea un administrador con `POST /api/admin/users` se guardan verificadas, por lo que un invitado puede usar "Iniciar sesión con Google" de inmediato. Un repositorio de autenticación propio sin `unlinkUserIdentity` rechaza esa prueba con `409 UNVERIFIED_IDENTITIES` cuando hay una identidad que eliminar.
+Un enlace mágico, un código por correo o un restablecimiento de contraseña demuestran la dirección y verifican la cuenta. En una cuenta que aún no estaba verificada, la primera de esas pruebas elimina la contraseña (un restablecimiento establece la nueva) y cada identidad vinculada cuyo proveedor no verificó esa dirección, y cierra todas las sesiones, antes de marcar la cuenta como verificada. A partir de ahí se aplica el paso 2. Las cuentas que crea un administrador con `POST /api/admin/users` se guardan verificadas, por lo que un invitado puede usar "Iniciar sesión con Google" de inmediato. <span class="since-badge" data-since="0.23">Desde 0.23</span> Un repositorio de autenticación propio sin `unlinkUserIdentity` rechaza esa prueba con `409 UNVERIFIED_IDENTITIES` cuando hay una identidad que eliminar.
 
 Este comportamiento no es configurable — deliberadamente no existe ninguna opción para vincular cuentas mediante correos no verificados.
 

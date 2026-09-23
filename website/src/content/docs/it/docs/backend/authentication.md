@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ac172042bd08b13
+sourceHash: 3c10e2e8a92e2f64
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -321,7 +321,7 @@ Il punto 3 rappresenta il caso critico per la sicurezza. Se un'email del provide
 
 Il lato dell'account conta per lo stesso motivo. Nulla verifica l'indirizzo che riceve `POST /auth/register`, quindi chiunque può registrare l'indirizzo di un'altra persona con una password, o accedere con esso tramite un provider che non lo garantisce, e aspettare. Collegare l'accesso con Google del proprietario a quell'account vi lascerebbe la via d'accesso dell'altra persona.
 
-Un magic link, un codice via email o un ripristino della password dimostrano l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato. Da lì in poi vale il passaggio 2. Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come verificati, quindi un invitato può usare "Accedi con Google" subito. Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta questa prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.
+Un magic link, un codice via email o un ripristino della password dimostrano l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato. Da lì in poi vale il passaggio 2. Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come verificati, quindi un invitato può usare "Accedi con Google" subito. <span class="since-badge" data-since="0.23">Dalla 0.23</span> Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta questa prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.
 
 Questo comportamento non è configurabile — non esiste intenzionalmente alcuna opzione per collegare account sulla base di email non verificate.
 

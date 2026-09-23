@@ -1,5 +1,5 @@
 ---
-sourceHash: 149704990d5e02cb
+sourceHash: 99eda64e07fc731d
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -94,7 +94,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `ROLE_LOOKUP_FAILED` | 503 | Die Rollen des Aufrufers konnten nicht gelesen werden — auf einer Admin-Route oder bei einem Datenrequest auf einem Backend mit `config.auth`. Scheitert sicherheitshalber, statt den Rollen im Token zu vertrauen. | Erneut versuchen; die Datenbank prüfen. |
 | `SELF_DELETE` | 400 | Ein Administrator hat versucht, sein eigenes Konto zu löschen. | Lassen Sie dies einen anderen Administrator durchführen. |
 | `SESSION_REVOKED` | 401 | Die Session wurde an anderer Stelle abgemeldet oder alle Sessions wurden widerrufen. | Melden Sie sich erneut an. |
-| `UNVERIFIED_IDENTITIES` | 409 | Ein Magic Link, E-Mail-Code oder Passwort-Reset hat die Adresse eines unverifizierten Kontos nachgewiesen, und das Konto trägt eine Anmelde-Identität, deren Provider diese Adresse nie verifiziert hat. Das Auth-Repository kann sie nicht entfernen (es hat kein `unlinkUserIdentity`), daher wird der Nachweis abgelehnt, statt diesen Zugang auf einem verifizierten Konto zu belassen. | Implementieren Sie `unlinkUserIdentity` im eigenen Auth-Repository oder lassen Sie einen Admin das Konto prüfen. |
+| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Seit 0.23</span> Ein Magic Link, E-Mail-Code oder Passwort-Reset hat die Adresse eines unverifizierten Kontos nachgewiesen, und das Konto trägt eine Anmelde-Identität, deren Provider diese Adresse nie verifiziert hat. Das Auth-Repository kann sie nicht entfernen (es hat kein `unlinkUserIdentity`), daher wird der Nachweis abgelehnt, statt diesen Zugang auf einem verifizierten Konto zu belassen. | Implementieren Sie `unlinkUserIdentity` im eigenen Auth-Repository oder lassen Sie einen Admin das Konto prüfen. |
 | `SETUP_REQUIRED` | 403 | Das Projekt hat noch keinen Administrator, daher ist diese Route nicht verfügbar. | Schließen Sie das Setup des ersten Administrators ab. |
 | `TOKEN_ALREADY_USED` | 401 | Ein Einmal-Token wurde wiederholt verwendet. | Fordern Sie ein neues an. |
 | `TOKEN_EXPIRED` | 401 | Das Token hat seine Gültigkeitsdauer überschritten. | Fordern Sie ein neues an. |
@@ -203,7 +203,7 @@ Alles andere – eine abgebrochene Verbindung, eine fehlende Spalte, ein Berecht
 
 | Code | Status | Bedeutung | Maßnahme |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | Das `maxResults` einer Storage-Auflistung ist keine ganze Zahl von mindestens 1, oder ihr `pageToken` wurde nicht von der Quelle ausgegeben. Eine Seitengröße unter eins lieferte früher eine leere Seite mit demselben Token, sodass eine `while (pageToken)`-Schleife nie endete. | Senden Sie ein positives `maxResults` und geben Sie `nextPageToken` unverändert zurück. |
+| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Seit 0.23</span> Das `maxResults` einer Storage-Auflistung ist keine ganze Zahl von mindestens 1, oder ihr `pageToken` wurde nicht von der Quelle ausgegeben. Eine Seitengröße unter eins lieferte früher eine leere Seite mit demselben Token, sodass eine `while (pageToken)`-Schleife nie endete. | Senden Sie ein positives `maxResults` und geben Sie `nextPageToken` unverändert zurück. |
 | `INVALID_STORAGE_BUCKET` | 400 | Der Bucket-Name ist fehlerhaft. | Überprüfen Sie den Namen. |
 | `INVALID_STORAGE_KEY` | 400 | Der Objektschlüssel ist fehlerhaft oder verlässt sein Präfix. | Überprüfen Sie den Schlüssel. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | Die Parameter für die Bildtransformation liegen außerhalb des gültigen Bereichs oder widersprechen sich. | Siehe [Storage](/docs/backend/storage/). |

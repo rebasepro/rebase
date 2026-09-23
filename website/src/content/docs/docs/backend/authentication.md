@@ -445,7 +445,7 @@ proof removes the password (a reset sets the new one) and every linked identity
 whose provider did not verify that address, and ends every session, before it
 marks the account verified. After that, step 2 applies. Accounts created by an
 admin with `POST /api/admin/users` are stored verified, so an invitee can use
-"Sign in with Google" straight away. A custom auth repository without
+"Sign in with Google" straight away. <span class="since-badge" data-since="0.23">Since 0.23</span> A custom auth repository without
 `unlinkUserIdentity` refuses such a proof with `409 UNVERIFIED_IDENTITIES` when
 there is an identity to remove.
 
