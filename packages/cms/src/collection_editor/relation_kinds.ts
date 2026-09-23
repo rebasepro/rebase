@@ -42,3 +42,35 @@ export const kindUsesLocalKey = (kind: RelationKind) => kind === "belongsTo";
 export const kindUsesForeignKeyOnTarget = (kind: RelationKind) => kind === "hasOne" || kind === "hasMany";
 export const kindUsesThrough = (kind: RelationKind) => kind === "manyToMany";
 export const kindUsesJoinPath = (kind: RelationKind) => kind === "via";
+
+/**
+ * The link fields each kind owns — the only ones a relation of that kind may
+ * carry. The same table the boot validator checks a relation against.
+ */
+const LINK_FIELDS_BY_KIND: Record<RelationKind, readonly string[]> = {
+    belongsTo: ["localKey"],
+    hasOne: ["foreignKeyOnTarget", "sourceKey"],
+    hasMany: ["foreignKeyOnTarget", "sourceKey"],
+    manyToMany: ["through"],
+    via: ["joinPath", "cardinality"]
+};
+
+const LINK_FIELDS = new Set(Object.values(LINK_FIELDS_BY_KIND).flat());
+
+/**
+ * `relation` switched to `kind`, without the link fields its old kind owned.
+ *
+ * Switching kind in the property form used to set `kind` and nothing else, so
+ * a junction table filled in before switching to "Belongs to" stayed on the
+ * relation — `through` on a `belongsTo` — and a `localKey` rode along into a
+ * `hasMany`. The boot validator refuses both, and every collection in the
+ * directory stops loading. The name, the target and the referential actions
+ * belong to every kind and are kept.
+ */
+export function relationWithKind(relation: Record<string, unknown>, kind: RelationKind): Record<string, unknown> {
+    const owned = LINK_FIELDS_BY_KIND[kind];
+    return {
+        ...Object.fromEntries(Object.entries(relation).filter(([key]) => !LINK_FIELDS.has(key) || owned.includes(key))),
+        kind
+    };
+}

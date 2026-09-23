@@ -15,7 +15,8 @@ import {
     kindUsesForeignKeyOnTarget,
     kindUsesJoinPath,
     kindUsesLocalKey,
-    kindUsesThrough
+    kindUsesThrough,
+    relationWithKind
 } from "../../../relation_kinds";
 
 import { CollectionsSelect } from "./ReferencePropertyField";
@@ -80,16 +81,32 @@ export function RelationPropertyField({
     const showForeignKey = kindUsesForeignKeyOnTarget(kind);
     const showJoinPath = kindUsesJoinPath(kind);
 
+    // An empty field means "use the default", which is what an absent key
+    // says. An empty string is a column called "": `resolveRelation` defaults
+    // only a key that is missing, so a junction table typed in on its own used
+    // to carry `sourceColumn: ""` and `targetColumn: ""` beside it.
+    const setLinkField = useCallback(
+        (field: string, value: string) => setFieldValue(`relation.${field}`, value === "" ? undefined : value),
+        [setFieldValue]
+    );
+
     const updateThrough = useCallback(
-        (patch: Record<string, unknown>) => {
-            const currentThrough = link.through ?? { table: "",
-sourceColumn: "",
-targetColumn: "" };
-            setFieldValue("relation.through", { ...currentThrough,
-...patch });
+        (patch: Record<string, string>) => {
+            const next = Object.fromEntries(
+                Object.entries({ ...(link.through ?? {}), ...patch }).filter(([, value]) => value !== "" && value !== undefined)
+            );
+            setFieldValue("relation.through", Object.keys(next).length > 0 ? next : undefined);
         },
         [link.through, setFieldValue]
     );
+
+    // What the kind select shows is what gets saved. A relation with no kind
+    // used to display "Belongs to" and store nothing, which does not boot.
+    useEffect(() => {
+        if (!values.relation?.kind) {
+            setFieldValue("relation.kind", "belongsTo");
+        }
+    }, [values.relation?.kind, setFieldValue]);
 
     // Auto-generate relationName from target collection slug
     useEffect(() => {
@@ -146,7 +163,7 @@ targetColumn: "" };
             <div className={"col-span-12"}>
                 <Select
                     value={kind}
-                    onValueChange={(v) => setFieldValue("relation.kind", v as RelationKind)}
+                    onValueChange={(v) => setFieldValue("relation", relationWithKind(link, v as RelationKind))}
                     label={"Kind"}
                     disabled={disabled}
                     fullWidth
@@ -174,7 +191,7 @@ targetColumn: "" };
                     <TextField
                         value={localKey}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            setFieldValue("relation.localKey", e.target.value)
+                            setLinkField("localKey", e.target.value)
                         }
                         label={"Local key (foreign key column on this table)"}
                         disabled={disabled}
@@ -192,7 +209,7 @@ targetColumn: "" };
                     <TextField
                         value={foreignKeyOnTarget}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            setFieldValue("relation.foreignKeyOnTarget", e.target.value)
+                            setLinkField("foreignKeyOnTarget", e.target.value)
                         }
                         label={"Foreign key on target table"}
                         disabled={disabled}
@@ -205,7 +222,7 @@ targetColumn: "" };
                         className={"mt-4"}
                         value={sourceKey}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            setFieldValue("relation.sourceKey", e.target.value)
+                            setLinkField("sourceKey", e.target.value)
                         }
                         label={"Source key (optional)"}
                         disabled={disabled}

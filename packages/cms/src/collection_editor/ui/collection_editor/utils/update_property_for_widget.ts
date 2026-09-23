@@ -223,12 +223,17 @@ export function updatePropertyFromWidget(propertyData: any,
             } as DateProperty
         );
     } else if (selectedWidgetId === "relation") {
+        // `relationName` lives inside `relation`; at the top level, where this
+        // used to write it, the boot validator refuses it. The `kind` is seeded
+        // because the form's select *displays* "Belongs to" for a relation that
+        // has none, and a relation with no kind does not boot either.
+        const { relationName: _misplaced, ...rest } = propertyData ?? {};
         updatedProperty = mergeDeep(
-            propertyData,
+            rest,
             {
                 type: "relation",
                 propertyConfig: "relation",
-                relationName: propertyData.relationName ?? ""
+                relation: { kind: propertyData?.relation?.kind ?? "belongsTo" }
             } as Property
         );
     } else if (selectedWidgetId === "repeat") {
