@@ -1,5 +1,5 @@
 ---
-sourceHash: fe1edb8bd07dfdd0
+sourceHash: 5f87252e9cdbf780
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -89,6 +89,7 @@ rebase db push
 **Ce qu'elle fait :**
 - Lit le schéma Drizzle généré
 - Applique les changements directement à la base de données (CREATE, ALTER, DROP)
+- Exécute d'abord le plan à blanc (dry run) et s'arrête avant tout ce qui détruit des données : une table, une colonne, un schéma, une vue ou un type supprimés, un `TRUNCATE`, ou un changement de type de colonne qui peut perdre des valeurs (`timestamptz` → `date`, `numeric` → `integer`). Il demande confirmation dans un terminal et refuse sinon ; `--allow-destructive` (ou `--yes`) l'applique quand même
 - Ne crée **pas** de fichiers de migration
 
 :::caution

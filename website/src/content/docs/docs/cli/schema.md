@@ -100,6 +100,11 @@ rebase db push
 **What it does:**
 - Reads the generated Drizzle schema
 - Applies changes directly to the database (CREATE, ALTER, DROP)
+- Dry-runs the plan first and stops before anything that destroys data: a
+  dropped table, column, schema, view or type, a `TRUNCATE`, or a column type
+  change that can lose values (`timestamptz` → `date`, `numeric` → `integer`).
+  It asks on a terminal and refuses otherwise; `--allow-destructive` (or
+  `--yes`) applies it anyway
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: fe1edb8bd07dfdd0
+sourceHash: 5f87252e9cdbf780
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -89,6 +89,7 @@ rebase db push
 **O que ele faz:**
 - Lê o esquema Drizzle gerado
 - Aplica as mudanças diretamente ao banco de dados (CREATE, ALTER, DROP)
+- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, ou uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`). Pergunta em um terminal e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim
 - **Não** cria arquivos de migração
 
 :::caution

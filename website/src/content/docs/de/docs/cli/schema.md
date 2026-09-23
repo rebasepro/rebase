@@ -1,5 +1,5 @@
 ---
-sourceHash: fe1edb8bd07dfdd0
+sourceHash: 5f87252e9cdbf780
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -89,6 +89,7 @@ rebase db push
 **Was er tut:**
 - Liest das generierte Drizzle-Schema
 - Wendet Änderungen direkt auf die Datenbank an (CREATE, ALTER, DROP)
+- Führt den Plan zuerst als Dry-Run aus und hält vor jeder Änderung an, die Daten zerstört: eine gelöschte Tabelle, Spalte, View, ein gelöschtes Schema oder ein gelöschter Typ, ein `TRUNCATE` oder eine Änderung des Spaltentyps, bei der Werte verloren gehen können (`timestamptz` → `date`, `numeric` → `integer`). Im Terminal fragt er nach, sonst verweigert er; `--allow-destructive` (oder `--yes`) wendet die Änderung trotzdem an
 - Erstellt **keine** Migrationsdateien
 
 :::caution
