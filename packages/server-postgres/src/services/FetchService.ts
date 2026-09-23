@@ -1,5 +1,5 @@
-import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
-import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
+import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
+import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
@@ -1050,7 +1050,9 @@ target });
                 // falls through to no cursor condition, which is what a single
                 // missing sort value has always done here.
                 if (values.every((value, i) => resolved[i].cursorTarget || value !== undefined)) {
-                    return [this.buildKeysetComparison(resolved, values, idField, startAfterId)];
+                    const seekValues = values.map((value, i) =>
+                        this.preciseCursorValue(table, resolved[i].target, value, idField, startAfterId));
+                    return [this.buildKeysetComparison(resolved, seekValues, idField, startAfterId)];
                 }
             }
         } else {
@@ -1063,6 +1065,43 @@ target });
         }
 
         return [];
+    }
+
+    /**
+     * The cursor row's value for a timestamp key, to the microsecond.
+     *
+     * A cursor is built from the row as served, and a timestamp is served to
+     * the millisecond while Postgres stores it to the microsecond. Seeking past
+     * the served value compares the column against something up to 999µs short
+     * of the cursor row's own, so every row in that sliver lands on the wrong
+     * side of it: paging `createdAt desc` over rows written in one transaction
+     * stopped after the first page, and ascending repeated the cursor row
+     * forever.
+     *
+     * So the exact value is read back from the cursor row by its key — but only
+     * while that row still holds the millisecond the cursor carries. A row
+     * deleted or re-stamped since the page was served falls back to the stored
+     * value, which is where the listing was when the cursor was issued.
+     *
+     * Any other key, and a NULL, is returned as it came.
+     */
+    private preciseCursorValue(
+        table: PgTable<any>,
+        target: AnyPgColumn | SQL,
+        value: unknown,
+        idField: AnyPgColumn,
+        cursorId: unknown
+    ): unknown {
+        if (value === null || value === undefined) return value;
+        if (!is(target, PgTimestamp) && !is(target, PgTimestampString)) return value;
+        // A column that keeps no more than milliseconds is served whole.
+        if (target.precision !== undefined && target.precision <= 3) return value;
+
+        const stored = sql`CAST(${value instanceof Date ? value.toISOString() : String(value)} AS ${sql.raw(target.getSQLType())})`;
+        const alias = sql.identifier("__cursor_row");
+        const column = sql`${alias}.${sql.identifier(target.name)}`;
+        const key = sql`${alias}.${sql.identifier(idField.name)}`;
+        return sql`COALESCE((SELECT ${column} FROM ${table} AS ${alias} WHERE ${key} = ${sql.param(cursorId, idField)} AND ${column} >= ${stored} AND ${column} < ${stored} + INTERVAL '1 millisecond' LIMIT 1), ${stored})`;
     }
 
     /**
