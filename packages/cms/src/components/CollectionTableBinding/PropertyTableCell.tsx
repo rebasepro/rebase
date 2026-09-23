@@ -10,7 +10,7 @@ import { getTableBindingForProperty } from "./table_bindings";
 import { PropertyPreview } from "../../preview";
 import { getPreviewSizeFrom } from "../../preview/util";
 
-import { CustomFieldValidator, mapPropertyToZod } from "../../form/validation";
+import { applyValueTransforms, CustomFieldValidator, mapPropertyToZod } from "../../form/validation";
 
 import { EntityTableCell } from "./internal/EntityTableCell";
 import { EntityTableCellActions } from "./internal/EntityTableCellActions";
@@ -116,17 +116,37 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             [onValueUpdated, value]
         );
 
+        // What a save writes: the value with the string transforms the
+        // property declares (`trim`, `lowercase`, `uppercase`) applied, as the
+        // form writes it. Validation judges the same transformed value.
+        const toWrittenValue = useCallback((typed: unknown): unknown =>
+            applyValueTransforms({ value: typed }, { value: property }).value, [property]);
+
+        // The editor keeps what was typed while the cell is edited — trimming
+        // under the cursor would eat the space before the next word — and the
+        // cell shows what was written once it is left.
+        const [transformedWrite, setTransformedWrite] = useState<{ value: unknown }>();
+        useEffect(() => {
+            if (selected || !transformedWrite) return;
+            if (equal(toWrittenValue(internalValue), transformedWrite.value))
+                setInternalValue(transformedWrite.value);
+            setTransformedWrite(undefined);
+        }, [selected, transformedWrite, internalValue, toWrittenValue]);
+
         const saveValues = async (value: unknown) => {
-            if (equal(value, internalValueRef.current))
+            const writtenValue = toWrittenValue(value);
+            if (equal(writtenValue, internalValueRef.current))
                 return;
             const result = await validation.safeParseAsync(value);
             if (result.success) {
                     setValidationError(undefined);
-                    internalValueRef.current = value as T;
+                    internalValueRef.current = writtenValue as T;
+                    if (!equal(writtenValue, value))
+                        setTransformedWrite({ value: writtenValue });
                     if (onValueChange) {
                         try {
                             onValueChange({
-                                value,
+                                value: writtenValue,
                                 propertyKey,
                                 setError,
                                 onValueUpdated,

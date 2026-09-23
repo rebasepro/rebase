@@ -10,7 +10,7 @@ import { Entity, EntityValues } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/app";
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";
-import { CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
+import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
 import { useWindowSize } from "./useWindowSize";
 import { getPropertyInPath } from "../../../../util/property_utils";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
@@ -235,10 +235,13 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     const saveValue = async (values: M) => {
         setSavingError(null);
         if (collection && entity && onCellValueChange && propertyKey) {
+            // Written the way the form writes it: with the string transforms
+            // the properties declare (`trim`, `lowercase`, `uppercase`) applied.
+            const writtenValues = applyValueTransforms(values, collection.properties);
             return onCellValueChange({
                 // By path: a spread map's child is `address.street`, which is
                 // nested in the form values, not a key of them.
-                value: getIn(values, propertyKey as string),
+                value: getIn(writtenValues, propertyKey as string),
                 propertyKey: propertyKey as string,
                 data: entity,
                 setError: setSavingError,
