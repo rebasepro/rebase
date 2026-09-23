@@ -1,4 +1,16 @@
-import type { InsightDataResult } from "../types";
+import type { InsightContext, InsightDataResult } from "../types";
+
+/**
+ * The cache key for one insight, in one scope, for one user.
+ *
+ * The cache lives at the root of the app and outlives a sign-out, and a figure
+ * is computed under the permissions and row-level security of whoever asked
+ * for it. A key without the user served the previous account's numbers to the
+ * next one that signed in on the same tab, until the TTL ran out.
+ */
+export function insightCacheKey(definitionId: string, context: InsightContext, userId: string | null): string {
+    return JSON.stringify([userId, definitionId, context.path ?? context.collectionSlug ?? "global"]);
+}
 
 interface CacheEntry {
     data: InsightDataResult;

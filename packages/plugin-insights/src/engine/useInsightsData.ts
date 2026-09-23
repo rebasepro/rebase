@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { InsightDefinition, InsightDataResult, InsightContext } from "../types";
 import { useInsightsEngine } from "./InsightsProvider";
+import { insightCacheKey } from "./InsightsCache";
 import { useAuthController } from "@rebasepro/app";
 
 /**
@@ -12,7 +13,7 @@ import { useAuthController } from "@rebasepro/app";
  * - Loading and error state management
  *
  * @param definition - The insight to fetch data for
- * @param collectionSlug - Optional collection context for cache key scoping
+ * @param context - The collection scope; with the signed-in user, it scopes the cache key
  */
 export function useInsightsData(
     definition: InsightDefinition,
@@ -30,7 +31,7 @@ export function useInsightsData(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
-    const cacheKey = `${definition.id}:${context.path ?? context.collectionSlug ?? "global"}`;
+    const cacheKey = insightCacheKey(definition.id, context, user?.uid ?? null);
 
     useEffect(() => {
         // Keep showing skeleton until both auth and engine are ready

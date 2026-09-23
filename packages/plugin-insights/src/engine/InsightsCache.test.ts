@@ -1,4 +1,4 @@
-import { InsightsCache } from "./InsightsCache";
+import { InsightsCache, insightCacheKey } from "./InsightsCache";
 import type { InsightDataResult } from "../types";
 
 describe("InsightsCache", () => {
@@ -49,5 +49,31 @@ describe("InsightsCache", () => {
 
         cache.invalidate();
         expect(cache.get("key_2")).toBeNull();
+    });
+
+    // The cache is shared by the whole page and survives a sign-out. Alice's
+    // revenue, computed under her row-level security, must not be what Bob
+    // reads when he signs in on the same tab inside the TTL.
+    it("does not serve one user's figure to the next", () => {
+        const cache = new InsightsCache();
+        const context = { collectionSlug: "orders" };
+        const alices: InsightDataResult = { rows: [{ value: 1_000_000 }] };
+
+        cache.set(insightCacheKey("revenue", context, "alice"), alices);
+        cache.setInflight(insightCacheKey("revenue", context, "alice"), Promise.resolve(alices));
+
+        expect(cache.get(insightCacheKey("revenue", context, "bob"))).toBeNull();
+        expect(cache.getInflight(insightCacheKey("revenue", context, "bob"))).toBeNull();
+        expect(cache.get(insightCacheKey("revenue", context, null))).toBeNull();
+        // The same user, the same insight and the same scope still hit.
+        expect(cache.get(insightCacheKey("revenue", context, "alice"))).toEqual(alices);
+    });
+
+    it("keys each insight and scope apart", () => {
+        const global = insightCacheKey("revenue", {}, "alice");
+        expect(insightCacheKey("orders", {}, "alice")).not.toBe(global);
+        expect(insightCacheKey("revenue", { collectionSlug: "orders" }, "alice")).not.toBe(global);
+        expect(insightCacheKey("revenue", { path: "products/1/orders", collectionSlug: "orders" }, "alice"))
+            .not.toBe(insightCacheKey("revenue", { collectionSlug: "orders" }, "alice"));
     });
 });
