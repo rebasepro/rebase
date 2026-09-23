@@ -201,17 +201,32 @@ await client.auth.mfa.verify(factor.id, "418293");
 
 ### Mit MFA anmelden
 
-Eine Anmeldung an einem Konto mit eingerichteter MFA liefert eine Sitzung mit `aal1` zurück. Starten Sie eine Challenge und beantworten Sie diese, um die eigentliche Sitzung zu erhalten:
+Eine Anmeldung an einem Konto mit eingerichteter MFA liefert keine Sitzung. Sie wird mit `401 MFA_REQUIRED` abgelehnt, und die `details` des Fehlers enthalten ein `mfaToken` und die verifizierten `factors` des Kontos. Übergeben Sie dieses Token an `challenge` und `verifyChallenge`, um die Sitzung zu erhalten:
 
 ```typescript
-const factors = await client.auth.mfa.listFactors();
-const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+import { RebaseApiError } from "@rebasepro/client";
 
-// A TOTP code, or one of the recovery codes.
-const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+type MfaRequired = {
+    mfaToken: string;
+    factors: { id: string; factorType: string; friendlyName?: string }[];
+};
+
+try {
+    await client.auth.signInWithEmail(email, password);
+} catch (e) {
+    if (!(e instanceof RebaseApiError) || e.code !== "MFA_REQUIRED") throw e;
+    const { mfaToken, factors } = e.details as MfaRequired;
+
+    const { challengeId } = await client.auth.mfa.challenge(factors[0].id, { mfaToken });
+
+    // A TOTP code, or one of the recovery codes.
+    const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293", { mfaToken });
+}
 ```
 
-`verifyChallenge` erstellt die `aal2`-Sitzung, und dieser Client übernimmt sie, wodurch die Tokens aus der Anmeldung ersetzt werden. Eine Challenge läuft nach fünf Minuten ab, und eine Challenge, deren Rateversuche das Limit erreicht haben, bleibt für den Rest ihrer Lebensdauer ungültig — andernfalls würde eine offene Challenge unbegrenzte Versuche für sechs Ziffern ermöglichen.
+Das `mfaToken` wird nur bei diesen beiden Anfragen gesendet und nie im Client hinterlegt. `verifyChallenge` erstellt die `aal2`-Sitzung, dieser Client übernimmt sie und sendet `SIGNED_IN` wie bei jeder anderen Anmeldung. Das `mfaToken` läuft fünf Minuten nach der Anmeldung ab, die es geliefert hat, und eine Challenge fünf Minuten nachdem sie geöffnet wurde. Eine Challenge, deren Rateversuche das Limit erreicht haben, bleibt für den Rest ihrer Lebensdauer ungültig — andernfalls würde eine offene Challenge unbegrenzte Versuche für sechs Ziffern ermöglichen.
+
+Ohne `mfaToken` stufen die beiden Aufrufe die Sitzung, die dieser Client bereits hält, von `aal1` auf `aal2` hoch.
 
 ### Faktor entfernen
 

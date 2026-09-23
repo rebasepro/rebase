@@ -222,21 +222,41 @@ await client.auth.mfa.verify(factor.id, "418293");
 
 ### Signing in with MFA
 
-A sign-in against an MFA-enrolled account returns a session at `aal1`. Open a
-challenge and answer it to get the real one:
+A sign-in against an MFA-enrolled account returns no session. It is refused
+with `401 MFA_REQUIRED`, and the error's `details` carry an `mfaToken` and the
+account's verified `factors`. Pass that token to `challenge` and
+`verifyChallenge` to get the session:
 
 ```typescript
-const factors = await client.auth.mfa.listFactors();
-const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+import { RebaseApiError } from "@rebasepro/client";
 
-// A TOTP code, or one of the recovery codes.
-const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+type MfaRequired = {
+    mfaToken: string;
+    factors: { id: string; factorType: string; friendlyName?: string }[];
+};
+
+try {
+    await client.auth.signInWithEmail(email, password);
+} catch (e) {
+    if (!(e instanceof RebaseApiError) || e.code !== "MFA_REQUIRED") throw e;
+    const { mfaToken, factors } = e.details as MfaRequired;
+
+    const { challengeId } = await client.auth.mfa.challenge(factors[0].id, { mfaToken });
+
+    // A TOTP code, or one of the recovery codes.
+    const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293", { mfaToken });
+}
 ```
 
-`verifyChallenge` mints the `aal2` session and this client adopts it, replacing
-the tokens the sign-in handed back. A challenge expires after five minutes, and
-a challenge that has been guessed at its limit stays spent for the rest of its
-life — otherwise one open challenge is unlimited guesses at six digits.
+The `mfaToken` is sent on those two requests only, never installed on the
+client. `verifyChallenge` mints the `aal2` session, this client adopts it, and
+it emits `SIGNED_IN` like any other sign-in. The `mfaToken` expires five minutes
+after the sign-in that returned it, and a challenge five minutes after it was
+opened. A challenge that has been guessed at its limit stays spent for the rest
+of its life — otherwise one open challenge is unlimited guesses at six digits.
+
+Without `mfaToken`, the two calls step up the session this client already
+holds from `aal1` to `aal2`.
 
 ### Removing a factor
 

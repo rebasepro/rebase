@@ -201,17 +201,32 @@ await client.auth.mfa.verify(factor.id, "418293");
 
 ### Accesso con MFA
 
-L'accesso a un account con MFA registrata restituisce una sessione a livello `aal1`. Apri un challenge e rispondi per ottenere quella effettiva:
+L'accesso a un account con MFA registrata non restituisce alcuna sessione. Viene rifiutato con `401 MFA_REQUIRED`, e i `details` dell'errore contengono un `mfaToken` e i `factors` verificati dell'account. Passa quel token a `challenge` e `verifyChallenge` per ottenere la sessione:
 
 ```typescript
-const factors = await client.auth.mfa.listFactors();
-const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+import { RebaseApiError } from "@rebasepro/client";
 
-// A TOTP code, or one of the recovery codes.
-const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+type MfaRequired = {
+    mfaToken: string;
+    factors: { id: string; factorType: string; friendlyName?: string }[];
+};
+
+try {
+    await client.auth.signInWithEmail(email, password);
+} catch (e) {
+    if (!(e instanceof RebaseApiError) || e.code !== "MFA_REQUIRED") throw e;
+    const { mfaToken, factors } = e.details as MfaRequired;
+
+    const { challengeId } = await client.auth.mfa.challenge(factors[0].id, { mfaToken });
+
+    // A TOTP code, or one of the recovery codes.
+    const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293", { mfaToken });
+}
 ```
 
-`verifyChallenge` genera la sessione `aal2` e questo client la adotta, sostituendo i token restituiti all'accesso. Un challenge scade dopo cinque minuti e un challenge che ha raggiunto il limite massimo di tentativi rimane esaurito per il resto della sua validità — altrimenti un challenge aperto consentirebbe tentativi illimitati di indovinare le sei cifre.
+Il `mfaToken` viene inviato solo con queste due richieste e non viene mai installato sul client. `verifyChallenge` genera la sessione `aal2`, questo client la adotta ed emette `SIGNED_IN` come per qualsiasi altro accesso. Il `mfaToken` scade cinque minuti dopo l'accesso che lo ha restituito, e un challenge cinque minuti dopo la sua apertura. Un challenge che ha raggiunto il limite massimo di tentativi rimane esaurito per il resto della sua validità — altrimenti un challenge aperto consentirebbe tentativi illimitati di indovinare le sei cifre.
+
+Senza `mfaToken`, le due chiamate elevano la sessione che questo client possiede già da `aal1` ad `aal2`.
 
 ### Rimozione di un fattore
 

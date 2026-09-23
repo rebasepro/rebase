@@ -201,17 +201,32 @@ await client.auth.mfa.verify(factor.id, "418293");
 
 ### Iniciar sesión con MFA
 
-Un inicio de sesión contra una cuenta con MFA registrado devuelve una sesión en `aal1`. Abre un desafío y respóndelo para obtener la verdadera:
+Un inicio de sesión contra una cuenta con MFA registrado no devuelve ninguna sesión. Se rechaza con `401 MFA_REQUIRED`, y los `details` del error incluyen un `mfaToken` y los `factors` verificados de la cuenta. Pasa ese token a `challenge` y `verifyChallenge` para obtener la sesión:
 
 ```typescript
-const factors = await client.auth.mfa.listFactors();
-const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+import { RebaseApiError } from "@rebasepro/client";
 
-// A TOTP code, or one of the recovery codes.
-const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+type MfaRequired = {
+    mfaToken: string;
+    factors: { id: string; factorType: string; friendlyName?: string }[];
+};
+
+try {
+    await client.auth.signInWithEmail(email, password);
+} catch (e) {
+    if (!(e instanceof RebaseApiError) || e.code !== "MFA_REQUIRED") throw e;
+    const { mfaToken, factors } = e.details as MfaRequired;
+
+    const { challengeId } = await client.auth.mfa.challenge(factors[0].id, { mfaToken });
+
+    // A TOTP code, or one of the recovery codes.
+    const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293", { mfaToken });
+}
 ```
 
-`verifyChallenge` genera la sesión `aal2` y este cliente la adopta, reemplazando los tokens devueltos por el inicio de sesión. Un desafío expira después de cinco minutos, y un desafío que ha alcanzado su límite de intentos permanece inhabilitado durante el resto de su vida útil; de lo contrario, un desafío abierto permitiría intentos ilimitados para adivinar los seis dígitos.
+El `mfaToken` se envía solo en esas dos peticiones y nunca se instala en el cliente. `verifyChallenge` genera la sesión `aal2`, este cliente la adopta y emite `SIGNED_IN` como en cualquier otro inicio de sesión. El `mfaToken` expira cinco minutos después del inicio de sesión que lo devolvió, y un desafío cinco minutos después de abrirse. Un desafío que ha alcanzado su límite de intentos permanece inhabilitado durante el resto de su vida útil; de lo contrario, un desafío abierto permitiría intentos ilimitados para adivinar los seis dígitos.
+
+Sin `mfaToken`, las dos llamadas elevan la sesión que este cliente ya tiene de `aal1` a `aal2`.
 
 ### Eliminar un factor
 

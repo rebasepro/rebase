@@ -222,21 +222,32 @@ await client.auth.mfa.verify(factor.id, "418293");
 
 ### Fazendo login com MFA
 
-Um login em uma conta com MFA cadastrado retorna uma sessão em `aal1`. Abra um
-desafio e responda a ele para obter a sessão definitiva:
+Um login em uma conta com MFA cadastrado não retorna nenhuma sessão. Ele é recusado com `401 MFA_REQUIRED`, e os `details` do erro trazem um `mfaToken` e os `factors` verificados da conta. Passe esse token para `challenge` e `verifyChallenge` para obter a sessão:
 
 ```typescript
-const factors = await client.auth.mfa.listFactors();
-const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+import { RebaseApiError } from "@rebasepro/client";
 
-// A TOTP code, or one of the recovery codes.
-const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+type MfaRequired = {
+    mfaToken: string;
+    factors: { id: string; factorType: string; friendlyName?: string }[];
+};
+
+try {
+    await client.auth.signInWithEmail(email, password);
+} catch (e) {
+    if (!(e instanceof RebaseApiError) || e.code !== "MFA_REQUIRED") throw e;
+    const { mfaToken, factors } = e.details as MfaRequired;
+
+    const { challengeId } = await client.auth.mfa.challenge(factors[0].id, { mfaToken });
+
+    // A TOTP code, or one of the recovery codes.
+    const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293", { mfaToken });
+}
 ```
 
-`verifyChallenge` emite a sessão `aal2` e este cliente a adota, substituindo
-os tokens que o login retornou. Um desafio expira após cinco minutos, e
-um desafio cujas tentativas atingiram o limite é invalidado pelo resto de sua
-duração — caso contrário, um desafio aberto permitiria tentativas ilimitadas para adivinhar os seis dígitos.
+O `mfaToken` é enviado apenas nessas duas requisições e nunca é instalado no cliente. `verifyChallenge` emite a sessão `aal2`, este cliente a adota e emite `SIGNED_IN` como em qualquer outro login. O `mfaToken` expira cinco minutos após o login que o retornou, e um desafio cinco minutos após ser aberto. Um desafio cujas tentativas atingiram o limite é invalidado pelo resto de sua duração — caso contrário, um desafio aberto permitiria tentativas ilimitadas para adivinhar os seis dígitos.
+
+Sem `mfaToken`, as duas chamadas elevam a sessão que este cliente já mantém de `aal1` para `aal2`.
 
 ### Removendo um fator
 

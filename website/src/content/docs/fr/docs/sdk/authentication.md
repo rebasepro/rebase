@@ -206,17 +206,32 @@ await client.auth.mfa.verify(factor.id, "418293");
 
 ### Se connecter avec la MFA
 
-Une connexion sur un compte enrôlé en MFA renvoie une session au niveau `aal1`. Ouvrez un challenge et répondez-y pour obtenir la session définitive :
+Une connexion sur un compte enrôlé en MFA ne renvoie aucune session. Elle est refusée avec `401 MFA_REQUIRED`, et les `details` de l'erreur contiennent un `mfaToken` et les `factors` vérifiés du compte. Passez ce jeton à `challenge` et `verifyChallenge` pour obtenir la session :
 
 ```typescript
-const factors = await client.auth.mfa.listFactors();
-const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+import { RebaseApiError } from "@rebasepro/client";
 
-// A TOTP code, or one of the recovery codes.
-const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+type MfaRequired = {
+    mfaToken: string;
+    factors: { id: string; factorType: string; friendlyName?: string }[];
+};
+
+try {
+    await client.auth.signInWithEmail(email, password);
+} catch (e) {
+    if (!(e instanceof RebaseApiError) || e.code !== "MFA_REQUIRED") throw e;
+    const { mfaToken, factors } = e.details as MfaRequired;
+
+    const { challengeId } = await client.auth.mfa.challenge(factors[0].id, { mfaToken });
+
+    // A TOTP code, or one of the recovery codes.
+    const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293", { mfaToken });
+}
 ```
 
-`verifyChallenge` génère la session `aal2` et ce client l'adopte, remplaçant ainsi les jetons retournés lors de la connexion. Un challenge expire au bout de cinq minutes, et un challenge ayant atteint sa limite de tentatives reste consommé pour le reste de sa durée de vie — sans quoi un challenge ouvert permettrait des tentatives illimitées sur six chiffres.
+Le `mfaToken` n'est envoyé que sur ces deux requêtes et n'est jamais installé sur le client. `verifyChallenge` génère la session `aal2`, ce client l'adopte et émet `SIGNED_IN` comme pour toute autre connexion. Le `mfaToken` expire cinq minutes après la connexion qui l'a renvoyé, et un challenge cinq minutes après son ouverture. Un challenge ayant atteint sa limite de tentatives reste consommé pour le reste de sa durée de vie — sans quoi un challenge ouvert permettrait des tentatives illimitées sur six chiffres.
+
+Sans `mfaToken`, les deux appels élèvent la session que ce client détient déjà de `aal1` à `aal2`.
 
 ### Supprimer un facteur
 
