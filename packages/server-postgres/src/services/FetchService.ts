@@ -13,6 +13,7 @@ import {
     deriveRowAddress,
     parseIdValues,
     idCanAddressTable,
+    rowIdentityCondition,
     buildCompositeId,
     COMPOSITE_ID_SEPARATOR
 } from "./collection-helpers";
@@ -1234,20 +1235,13 @@ idColumn };
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
-
-        if (!idField) {
-            throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
-        }
 
         // An address the key columns cannot hold names no row — the same answer
         // as a well-formed id nobody has. Asking Postgres instead raises 22P02
         // and aborts the transaction around this read.
         if (!idCanAddressTable(id, table, idInfoArray)) return undefined;
 
-        const parsedIdObj = parseIdValues(id, idInfoArray);
-        const parsedId = parsedIdObj[idInfo.fieldName];
+        const addressed = rowIdentityCondition(table, idInfoArray, id, collectionPath);
 
         // Part of the identity, so a row the hook excludes is absent here
         // exactly as it is from the listing.
@@ -1255,8 +1249,8 @@ idColumn };
             collectionPath, collection, table, "get", {}
         );
         const identity = narrowing
-            ? and(eq(idField, parsedId), narrowing) as SQL
-            : eq(idField, parsedId);
+            ? and(addressed, narrowing) as SQL
+            : addressed;
 
         // Primary path: db.query.findFirst for the row, then its relations
         const tableName = getTableName(table);
@@ -1847,19 +1841,16 @@ idColumn };
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
         const field = table[fieldName as keyof typeof table] as AnyPgColumn;
 
         if (!field) return true;
 
-        const parsedExcludeId = excludeEntityId ? parseIdValues(excludeEntityId, idInfoArray)[idInfo.fieldName] : undefined;
-        const conditions = DrizzleConditionBuilder.buildUniqueFieldCondition(
-            field,
-            value,
-            idField,
-            parsedExcludeId
-        );
+        // An address the key columns cannot hold names no row, so there is
+        // nothing to exclude — a row being created, for instance.
+        const excludeRow = excludeEntityId && idCanAddressTable(excludeEntityId, table, idInfoArray)
+            ? rowIdentityCondition(table, idInfoArray, excludeEntityId, collectionPath)
+            : undefined;
+        const conditions = DrizzleConditionBuilder.buildUniqueFieldCondition(field, value, excludeRow);
 
         const result = await this.db
             .select({ count: count() })
@@ -1992,14 +1983,11 @@ relatedTo: hop }, include
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
         // See `fetchOne`: an unaddressable id is a 404, not a database error.
         if (!idCanAddressTable(id, table, idInfoArray)) return null;
 
-        const parsedIdObj = parseIdValues(id, idInfoArray);
-        const parsedId = parsedIdObj[idInfo.fieldName];
+        const addressed = rowIdentityCondition(table, idInfoArray, id, collectionPath);
 
         // Soft delete: a stamped row is a 404 through the REST read too, so
         // `GET /:id` and the listing agree about which rows exist.
@@ -2014,8 +2002,8 @@ relatedTo: hop }, include
             FetchService.describeRead({ fields: options?.fields })
         );
         const identity = narrowing
-            ? and(eq(idField, parsedId), narrowing) as SQL
-            : eq(idField, parsedId);
+            ? and(addressed, narrowing) as SQL
+            : addressed;
         const result = await this.db
             .select(projection as never)
             .from(table)

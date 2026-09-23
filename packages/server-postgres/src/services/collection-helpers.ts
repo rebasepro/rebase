@@ -1,5 +1,5 @@
 import { PgTable, AnyPgColumn, getTableConfig } from "drizzle-orm/pg-core";
-import { getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns, SQL } from "drizzle-orm";
 import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
@@ -10,7 +10,7 @@ import { ApiError, logger } from "@rebasepro/server";
 // so the implementation lives in `common` and both agree by construction.
 export { buildCompositeId, parseIdValues, isAddressableId, COMPOSITE_ID_SEPARATOR } from "@rebasepro/common";
 export type { PrimaryKeyInfo } from "@rebasepro/common";
-import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys, isAddressableId } from "@rebasepro/common";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys, isAddressableId, parseIdValues } from "@rebasepro/common";
 import type { PrimaryKeyInfo } from "@rebasepro/common";
 
 /**
@@ -69,6 +69,32 @@ export function idCanAddressTable(
             isUUID: meta.columnType === "PgUUID" };
     });
     return isAddressableId(id, columnBacked);
+}
+
+/**
+ * The condition that names one row: every key column equal to its part of the
+ * address.
+ *
+ * Every key column, not the first. A composite-key read that matched only the
+ * leading column answered `p1:::bob` with whichever `p1` row Postgres reached
+ * first, and a delete then judged that row's `beforeDelete` while deleting bob —
+ * the writes have always matched the whole key, so the reads must too.
+ */
+export function rowIdentityCondition(
+    table: PgTable,
+    idInfoArray: PrimaryKeyInfo[],
+    id: string | number,
+    collectionPath: string
+): SQL {
+    const parsed = parseIdValues(id, idInfoArray);
+    const conditions = idInfoArray.map(info => {
+        const column = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
+        if (!column) {
+            throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
+        }
+        return eq(column, parsed[info.fieldName]);
+    });
+    return conditions.length === 1 ? conditions[0] : and(...conditions) as SQL;
 }
 
 /**

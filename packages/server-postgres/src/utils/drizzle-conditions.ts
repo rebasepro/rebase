@@ -2608,18 +2608,22 @@ whereConditions };
     }
 
     /**
-     * Build a unique field check condition
+     * Build a unique field check condition: rows holding `value`, other than
+     * the one `excludeRow` names.
+     *
+     * `excludeRow` is the whole identity of the row being saved — every key
+     * column — so excluding one member of a composite-key table does not
+     * exclude every row sharing its first key part.
      */
     static buildUniqueFieldCondition(
         fieldColumn: AnyPgColumn,
         value: unknown,
-        idColumn?: AnyPgColumn,
-        excludeId?: string | number
+        excludeRow?: SQL
     ): SQL[] {
         const conditions: SQL[] = [eq(fieldColumn, value)];
 
-        if (excludeId && idColumn) {
-            conditions.push(sql`${idColumn} != ${excludeId}`);
+        if (excludeRow) {
+            conditions.push(not(excludeRow));
         }
 
         return conditions;
