@@ -87,3 +87,12 @@ export function navigateToEntity({
     }
 
 }
+
+/**
+ * Whether `pathname` is the record at `entityPath` or somewhere below it — one
+ * of its tabs, its `/edit`. A path segment, not a string prefix:
+ * `/c/products/12` is another record, not a place inside `/c/products/1`.
+ */
+export function isPathWithinRecord(pathname: string, entityPath: string): boolean {
+    return pathname === entityPath || pathname.startsWith(`${entityPath}/`);
+}

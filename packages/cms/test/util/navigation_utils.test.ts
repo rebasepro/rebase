@@ -10,6 +10,7 @@ import {
     resolveCollectionPathIds,
     getCollectionBySlugWithin,
     getCollectionPathsCombinations,
+    isPathWithinRecord,
     navigateToEntity
 } from "../../src/util/navigation_utils";
 
@@ -368,5 +369,30 @@ describe("navigateToEntity", () => {
         });
 
         expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc", { replace: true });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// isPathWithinRecord
+// ---------------------------------------------------------------------------
+/**
+ * The full-screen record's unsaved-changes guard lets through navigations that
+ * stay inside the record (its tabs, `/edit`). It tested that with a bare
+ * `startsWith`, so `/c/products/12` counted as inside `/c/products/1` — Back to
+ * another record whose id merely starts with this one's dropped the edits
+ * without asking.
+ */
+describe("isPathWithinRecord", () => {
+    it("accepts the record itself and anything below it", () => {
+        expect(isPathWithinRecord("/c/products/1", "/c/products/1")).toBe(true);
+        expect(isPathWithinRecord("/c/products/1/edit", "/c/products/1")).toBe(true);
+        expect(isPathWithinRecord("/c/products/1/orders/9", "/c/products/1")).toBe(true);
+    });
+    it("rejects another record whose id starts with this one's", () => {
+        expect(isPathWithinRecord("/c/products/12", "/c/products/1")).toBe(false);
+        expect(isPathWithinRecord("/c/products/1a/edit", "/c/products/1")).toBe(false);
+    });
+    it("rejects the collection", () => {
+        expect(isPathWithinRecord("/c/products", "/c/products/1")).toBe(false);
     });
 });

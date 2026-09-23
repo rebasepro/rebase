@@ -8,6 +8,7 @@ import { useNavigate } from "react-router";
 import { CollectionViewBinding } from "../components/CollectionViewBinding/CollectionViewBinding";
 import { ErrorView, NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
 import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";
+import { isPathWithinRecord } from "../util/navigation_utils";
 import { UnsavedChangesDialog } from "@rebasepro/app";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/app";
@@ -286,7 +287,10 @@ function EntityFullScreenRoute({
         currentLocation,
         nextLocation
     }) => {
-        if (nextLocation.pathname.startsWith(entityPath))
+        // Inside this record — a tab, `/edit`. By path segment: a bare
+        // prefix let Back to `/c/products/12` out of `/c/products/1` without
+        // asking.
+        if (isPathWithinRecord(nextLocation.pathname, entityPath))
             return false;
 
         // Side panel overlay navigations preserve the underlying form via
@@ -301,7 +305,7 @@ function EntityFullScreenRoute({
         const currentHash = currentLocation.hash;
         if ((currentHash === "#side" || currentHash === "#new_side") &&
             (nextLocation.pathname === basePath ||
-             nextLocation.pathname.startsWith(entityPath)))
+             isPathWithinRecord(nextLocation.pathname, entityPath)))
             return false;
 
         return blocked.current;
