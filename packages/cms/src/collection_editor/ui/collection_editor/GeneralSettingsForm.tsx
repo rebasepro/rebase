@@ -137,12 +137,16 @@ export function GeneralSettingsForm({
                             </FieldCaption>
                         </div>
 
-                        {/* Table name */}
+                        {/* Table name — fixed once the collection exists, like its ID. The
+                            schema is only ever changed additively, so a new name
+                            here would create a new, empty table and leave every
+                            row in the old one. Moving a table is a migration. */}
                         <div className={cls("col-span-12")}>
                             <Field name={"table"}
                                 as={DebouncedTextField}
                                 label={"Table name"}
                                 required
+                                disabled={!isNewCollection}
                                 error={showErrors && Boolean(errors.table)}/>
 
                             <FieldCaption error={touched.table && Boolean(errors.table)}>

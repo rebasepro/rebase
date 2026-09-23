@@ -275,6 +275,47 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
     });
 });
 
+/**
+ * A collection keeps its slug and moves to another table.
+ *
+ * The editor offered the table name as an ordinary field on an existing
+ * collection, and the classifier compared properties only — so a move read as
+ * "no change", `safe`. Applying it ran the one statement the ensure path had,
+ * `CREATE TABLE "articles"`, pointed the collection at the new empty table,
+ * and left every row behind in the old one.
+ */
+describe("moving a collection to another table", () => {
+    const at = (table: string, schema?: string) => ({
+        ...collection("posts", { title: str() }),
+        table,
+        ...(schema ? { schema } : {})
+    }) as CollectionConfig;
+
+    it("is a change the ensure path cannot make", () => {
+        const change = only([at("posts")], [at("articles")]);
+        expect(change).toMatchObject({ kind: "rename-table", verdict: "needs-migration", collection: "posts" });
+        expect(change.detail).toContain("public.posts");
+        expect(change.detail).toContain("public.articles");
+        expect(change.remedy).toContain("migration");
+    });
+
+    it("so the change is not applicable", () => {
+        expect(classifyCollectionChanges([at("posts")], [at("articles")], database({ rows: true })).applicable).toBe(false);
+    });
+
+    it("counts a move to another schema too", () => {
+        const change = only([at("posts")], [at("posts", "archive")]);
+        expect(change).toMatchObject({ kind: "rename-table", verdict: "needs-migration" });
+        expect(change.detail).toContain("archive.posts");
+    });
+
+    it("is not a move when the table is only spelled out", () => {
+        // `posts` with no `table` already lives in `public.posts`.
+        expect(classifyCollectionChanges([collection("posts", { title: str() })], [at("posts", "public")]).changes)
+            .toEqual([]);
+    });
+});
+
 describe("the overall verdict is the worst one present", () => {
     it("one blocked change condemns an otherwise safe batch", () => {
         const before = [collection("posts", { old: str() })];

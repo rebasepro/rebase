@@ -173,7 +173,25 @@ export function classifyCollectionChanges(
             });
             continue;
         }
-        classifyProperties(previous.get(slug)!, collection, changes, facts);
+        const was = previous.get(slug)!;
+        // The slug is the identity, so a collection that kept it and changed
+        // its table is the same collection *moved*. The ensure path would
+        // create the new table and never touch the old one: the collection
+        // would come back empty, with every row it had left behind.
+        if (qualifiedTable(was) !== qualifiedTable(collection)) {
+            changes.push({
+                kind: "rename-table",
+                verdict: "needs-migration",
+                collection: slug,
+                detail:
+                    `"${slug}" moves from table "${qualifiedTable(was)}" to "${qualifiedTable(collection)}", ` +
+                    "which would create the new table empty and leave every row in the old one.",
+                remedy:
+                    "The ensure path never renames or moves a table. Do it in a migration you have read " +
+                    "(ALTER TABLE … RENAME TO, or SET SCHEMA), then change the collection to match."
+            });
+        }
+        classifyProperties(was, collection, changes, facts);
     }
 
     for (const [slug, collection] of previous) {

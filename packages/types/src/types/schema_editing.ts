@@ -36,7 +36,8 @@ export type SchemaChangeKind =
     | "add-enum-value"
     | "remove-enum-value"
     | "change-required"
-    | "change-primary-key";
+    | "change-primary-key"
+    | "rename-table";
 
 export interface SchemaChange {
     kind: SchemaChangeKind;
