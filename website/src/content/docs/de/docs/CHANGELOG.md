@@ -11,7 +11,293 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Breaking
+
+#### Server & REST
+
+- **An API key on a nested path needs `read` on every parent collection in the
+  path.** A key scoped only to `posts` that calls `/authors/1/posts` now gets a
+  403 until it can also read `authors`. The route's operation is checked against
+  the relation's target collection, not the relation name in the URL. See the
+  API-key entry under Security.
+
+- **A numeric environment variable that is not a number fails the boot, naming
+  the variable.** This covers `PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` and
+  the `DB_POOL_*` variables. A blank value now means unset and takes the
+  default, and an explicit `0` still counts. See the entry under Fixed.
+
+#### Auth
+
+- **A session lifetime the token signer cannot read refuses to boot.**
+  `auth.accessExpiresIn` and `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+  `JWT_REFRESH_EXPIRES_IN`) take a positive number and a unit, such as `15m`,
+  `1h`, `30d` or `2 weeks`. A bare number, zero, a negative value or any other
+  value the signer cannot read now stops the boot and names the setting, where
+  it used to fall back silently. See the entry under Fixed.
+
+- **A custom auth repository needs the new optional `unlinkUserIdentity`, or
+  some sign-ins are refused.** When someone first proves an address by magic
+  link, email code or password reset, and the unverified account behind it has a
+  linked identity whose provider did not vouch for that address, the identity is
+  removed. A repository without `unlinkUserIdentity` answers that sign-in with
+  409 `UNVERIFIED_IDENTITIES` instead. `updatePassword` must also accept `null`,
+  which removes the password. The Postgres store implements both; the MongoDB
+  store has no `unlinkUserIdentity` yet. See the account-takeover entry under
+  Security.
+
+- **An unverified account loses its password, its unproven linked identities and
+  its other sessions the first time its address is proven.** That proof is a
+  magic link, an email code or a password reset, and anything put on the account
+  before it may be someone else's. Someone who registered with a password, never
+  verified, and then signs in by magic link or code has to set a password again,
+  and is signed out on their other devices. See the account-takeover entry under
+  Security.
+
+- **With captcha protecting `register`, `POST /auth/anonymous/link` needs a
+  solved challenge too.** `register` is one of the default captcha routes. An
+  app that turns guests into accounts must now send the token, in the
+  `captchaToken` body field or the `cf-turnstile-response` /
+  `h-captcha-response` header, as it does for `/auth/register`. See the
+  guest-upgrade entry under Security.
+
+#### Storage & email
+
+- **Email refuses to boot without an absolute password-reset base URL.**
+  Verification and magic links fall back to `auth.email.resetPasswordUrl`, and
+  nothing falls back to `verifyEmailUrl` or `magicLinkUrl`. A config that set
+  only those booted and sent dead relative links in its password-reset emails.
+  Set `FRONTEND_URL` or `auth.email.resetPasswordUrl` to an absolute URL. See
+  the entry under Fixed.
+
+### Added
+
+#### Server & REST
+
+- **A grouped aggregate can be paged, and its order is stable.** `/aggregate`
+  used to drop `offset`, `page` and `orderBy`, and its query had no ORDER BY, so
+  every page was the same arbitrary set of groups. It now accepts
+  `offset`/`page` and `orderBy` (a `groupBy` field or a result key such as
+  `count`), always ends its ordering on the group keys, and returns
+  `meta.hasMore`. Paging options on an aggregate without `groupBy`, or a cursor,
+  get a 400 `INVALID_AGGREGATE_WINDOW`.
+
+#### Postgres
+
+- **`SecurityRule` accepts a raw `withCheck` without a `using`.** The new
+  `RawSQLCheckOnlySecurityRule` variant is the shape of an INSERT policy, such
+  as `{ operation: "insert", withCheck: "{owner_id} = rebase.uid()" }`. The
+  policy generator already compiled this pair correctly; the type didn't allow
+  it.
+
+#### Client SDK
+
+- **`auth.mfa.challenge` and `auth.mfa.verifyChallenge` take `{ mfaToken }` to
+  finish a sign-in that answered `MFA_REQUIRED`.** Before, the only way to send
+  the pending token was `client.setToken(mfaToken)`, which put it on every
+  request the app made and left it there. The token is now sent on those two
+  requests only, and a verified challenge adopts the session and emits
+  `SIGNED_IN` like any other sign-in.
+
+- **`admin.listUsers()` takes `limit`, `offset` and `search`, and returns
+  `total`.** The route returns 25 users by default plus a total, but the method
+  took no options and was typed as `{ users }`. Callers, Studio's own snippet
+  included, got the first 25 with nothing saying there were more.
+
+#### Admin (CMS & app)
+
+- **An account with a second factor can sign in to the admin.** The server
+  answers such an account's password with `401 MFA_REQUIRED` and a pending
+  token, but the login view had no second step. It showed the refusal as an
+  error, so any account with TOTP enrolled was locked out, by email, Google or
+  OAuth alike. The login view now asks for a TOTP or a recovery code, with a
+  factor picker when there are several. It says when a code is wrong, when a
+  challenge is used up (the next code opens a new one), and when the five-minute
+  sign-in has expired. The auth controller gains optional `startMfaChallenge`
+  and `verifyMfaChallenge`.
+
+- **Password-reset, invitation and email-verification links open a step of their
+  own in the admin.** The links the server emails (`/reset-password?token=…`,
+  `/verify-email?token=…`) opened the ordinary sign-in screen, so a forgotten
+  password couldn't be reset and an invited user could never sign in. They now
+  open a set-new-password step or a verification step, under any base path, and
+  the auth controller gains `verifyEmail`.
+
+### Changed
+
+#### Postgres
+
+- **`rebase db push` asks before a column type change that can lose data.** The
+  destructive gate only looked for DROP and TRUNCATE, so
+  `ALTER COLUMN … TYPE date` or `TYPE integer` was approved automatically, even
+  in CI: every timestamp lost its time of day, and 19.99 became 20. Type changes
+  are now gated like drops unless every value survives: a wider modifier on the
+  same type, `smallint`→`integer`→`bigint` (or a `numeric` with room for their
+  digits), or `varchar`→`text`. Push reads each column's current type from the
+  database to decide, and a column it can't find is gated.
+
+#### Jobs & cron
+
+- **A job worker claims only the tasks it has a handler for.** A worker claimed
+  jobs whose task it could not run, and each claim spent an attempt. During a
+  rolling deploy, pods still on older code dead-lettered the new code's topic
+  and queue jobs with "No handler registered", often before an updated pod got
+  to them. Such jobs now stay pending, their attempts untouched, until an
+  instance that runs them claims them, and a task that no instance implements
+  stays pending rather than being dead-lettered. `JobStore.claim` takes an
+  optional list of tasks.
+
+#### CLI
+
+- **`rebase build --output` refuses a build that produces more than one
+  bundle.** Every app was built into the one directory, and each bundle build
+  empties its directory first. On a stock scaffold the admin's static bundle
+  deleted the backend bundle, and the build still printed "✓ Build complete."
+  The refusal names the apps, and `--output` is now resolved once, against the
+  directory it was typed in.
+
+#### rls-check
+
+- **`policy-always-true` softens a `USING (true)` policy only for a RESTRICTIVE
+  policy that gates the same roles and command.** Supabase's documented MFA gate
+  (`AS RESTRICTIVE TO authenticated`) next to `USING (true) TO anon` came out
+  medium while anon read every row, so the default `--fail-on high` exited 0. A
+  restrictive gate now has to cover the permissive policy's command (`ALL` needs
+  `ALL`) and every exposed role it reaches.
+
+- **`rls-enabled-not-forced` counts roles that are members of the table owner,
+  and can be high or critical.** Postgres exempts them from RLS just as it
+  exempts the owner, so a NOLOGIN owner with a LOGIN member was reported medium
+  with "No caller bypasses policies". It is now high when a login role inherits
+  the owner, and critical when `anon`, `authenticated` or a `--role` owns the
+  table or inherits the owner.
+
 ### Fixed
+
+#### Server & REST
+
+- **A request body that is not a JSON object is a 400.** A body of `null`
+  produced a 500, and `42`, `true`, a string or an array were saved as a row's
+  values.
+
+- **Nested writes honour `If-Match`, `Idempotency-Key` and field-operation
+  checks.** A nested PATCH or DELETE with a stale `If-Match` wrote anyway, a
+  retried nested create inserted twice, and a mistyped field operation reached
+  the driver instead of a 400. Nested writes now go through the same code as
+  root writes, `Prefer: return=minimal` included, and a nested update of a
+  missing row is a 404 naming it. `?on_conflict=` on a nested create is now
+  refused, because an upsert through a parent would move the matched row under
+  that parent.
+
+- **An `Idempotency-Key` covers the query string.** `DELETE /posts/5?hard=true`
+  sent with the key of an earlier soft delete got that delete's 204 back and
+  never purged the row. This also applies to `?on_conflict=`. A request with no
+  query string hashes as before, so keys claimed before the upgrade still
+  replay.
+
+- **A nested `/count` honours `?deleted=`.** It counted the live rows while the
+  trash listing beside it showed the deleted ones.
+
+- **An `If-Match` taken from a `GET` is accepted on a collection with an
+  `on_update` date.** The write side hashed the admin-view row, where the date
+  is a `{ __type: "date" }` object that renders as `[object Object]`, so every
+  conditional PATCH or DELETE with a fresh ETag got a 412. The tag in that 412
+  was also the same for every version of every row, so a client retrying with it
+  overwrote concurrent changes. A GET with `?fields=` or `?include=` handed out
+  a tag no write would match, and a conditional purge (`?hard=true`) of a
+  trashed row always got a 412. Both sides now hash the same row, and nested
+  single-row GETs send the ETag too.
+
+- **Pushed elements and merged keys follow the property's own rules.** Field
+  operations skipped value validation:
+
+  - `$push` could store a value the `enum` does not define, or push more
+    elements than `max` allows;
+  - `$merge` could write map keys the map's properties reject;
+  - a fractional `$inc` could land on an integer property.
+
+  These are now the same 400 `VALIDATION_CONSTRAINT` a plain value gets, at
+  every write entry point.
+
+- **`GET /api/admin/logs?offset=0` is the first page.** It used to be a 400
+  `INVALID_PARAM`.
+
+- **The OpenAPI spec says a `distinct` read has no `meta.total`.** It used to
+  say `total` counted distinct rows, but the listing leaves `total` out on
+  distinct reads.
+
+- **A blank numeric environment variable means unset, not zero.**
+  `REBASE_MAX_BODY_SIZE=""` became 0, which switches off the body limit on every
+  `/api` route, the unauthenticated auth routes included. A blank `PORT` made a
+  production server listen on a random port, and a blank `SMTP_PORT` or
+  `DB_POOL_*` became 0 too. A compose file with `VAR=${UNSET}` is the usual way
+  to hit this. Blank now takes the default, an explicit `0` still counts, and a
+  value that isn't a number fails the boot naming the variable.
+  `configureMiddlewares` also refuses a `maxBodySize` that is not a finite
+  number.
+
+- **Backup downloads stream.** `GET /api/admin/backups/download` read the whole
+  dump into memory, twice for a local destination. A 1 GB dump cost about 2 GB
+  of heap in the API process, and a dump over 2 GiB answered 500
+  (`ERR_FS_FILE_TOO_LARGE`). Local backups now stream from disk with a
+  `Content-Length`, and object-storage backups no longer make a second in-memory
+  copy.
+
+- **The scheduled RLS audit refuses a bad `intervalMs` and never runs two scans
+  at once.** An `intervalMs` of 0, a negative number or `NaN`, or anything over
+  about 24.8 days (the longest delay a Node timer can hold), made the timer fire
+  every millisecond. Each tick started a scan with its own database connection,
+  so a monthly audit or a typo meant about a thousand overlapping scans a
+  second. An invalid interval now leaves the audit off with the reason in its
+  status, and long intervals are honoured. A tick that lands during a running
+  scan is skipped, and `runNow` joins the scan in progress.
+
+- **`backend.shutdown()` stops the metrics sampler.** The stop returned by
+  `metricsHistory.start()` was thrown away. After shutdown the one-minute
+  sampler kept writing to the closed pool, and the event-loop histogram stayed
+  enabled. Anything that boots and shuts a backend down in-process gained one
+  more of each per boot.
+
+#### Auth
+
+- **Custom token claims reach the database on backends with `config.auth`.** On
+  those backends a claim added by `customizeAccessToken` never reached
+  `rebase.jwt()` or claim-based tenancy, over HTTP or WebSocket. A collection
+  with `tenant: { from: { claim } }` failed every create with `TENANT_REQUIRED`
+  and read nothing.
+
+- **Changing a user's email to one another account holds answers 409.**
+  `PUT /admin/users/:uid` returned 500, because neither engine translated the
+  database's duplicate-email error on update. `/auth/anonymous/link` could hit
+  the same 500 when it lost a race.
+
+- **Auth rate limits count in the store `REBASE_RATE_LIMIT_STORE` names.** Every
+  auth limiter kept its own in-memory store: login, reset, email sends, OTP and
+  MFA. So on N replicas each limit was N times looser than configured, while the
+  docs said the counts were shared.
+
+- **A sign-up checks whether it is the first user with two rows, not the whole
+  users table.** Every successful `/register` and first OAuth sign-up loaded
+  every user, password hashes included, just to compare the count with one.
+
+- **Session lifetimes are read the way the token signer reads them, and an
+  unreadable one refuses to boot.** Values like `1w`, `2 weeks`, `1.5h` or
+  `30 days` silently became 400-day refresh tokens. `15 minutes` produced a
+  15-minute token while `accessTokenExpiresAt` said an hour, so clients
+  refreshed 45 minutes too late. Bare numbers, zero and negative values are now
+  refused, and every documented example still parses. A lifetime passed as
+  `undefined` in code no longer replaces the configured one; it used to sign
+  access tokens with no expiry at all.
+
+- **A stored password key of the wrong length is a wrong password, not a 500.**
+  Users imported with a different scrypt key length got a 500 at login and
+  change-password.
+
+- **Invitation and admin-reset emails link to `/reset-password`, not
+  `//reset-password`.** A frontend URL with a trailing slash produced a double
+  slash that a React Router `/reset-password` route does not match. The
+  self-service reset from the same config already linked correctly.
+
+#### Postgres
 
 - **A `beforeQuery` scope now refuses a write to a row it excludes, instead of
   reporting a 500.** An update addressed at a row outside the hook's scope
@@ -24,6 +310,1356 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   checked before the write and answered with the same `404` `delete` has always
   given. Collections that declare no `beforeQuery` are unaffected: the pre-read
   there stays best-effort history enrichment.
+
+- **The driver's `fetchCollection` honours `logical`, `include`, `fields`,
+  `distinct`, `withDeleted` and `searchExplain`.** It passed on only ten of its
+  props. Over the socket, MCP, or the SDK without a REST fetch service, an
+  `or(...)` read returned every row while `COUNT` answered 1, a
+  `withDeleted: "only"` trash view showed live rows, and `include` returned no
+  relation.
+
+- **A composite-key row is read by every key column.** The REST single get, the
+  socket's single reads, `beforeDelete`, `previousValues`, history and the
+  uniqueness check matched only the first key column. On
+  `members(project_id, user_id)`, `p1:::bob` read whichever `p1` row came first,
+  so a `beforeDelete` protecting the owner judged alice and let bob be deleted.
+
+- **A composite-key listing orders and pages on the whole key.** Ties were
+  broken on the first key column only, and the cursor carried only that column,
+  so three members of one project, paged one at a time, came back as one. A
+  cursor naming only part of the key is now a 400 `INVALID_CURSOR`.
+
+- **Cursor paging over a timestamp column returns every row exactly once.**
+  Postgres stores microseconds, but the cursor carried the served millisecond
+  value. Six rows written in one transaction and paged `createdAt:desc` two at a
+  time stopped after page one; ascending paging repeated a row, and at `limit=1`
+  it never ended. This hit REST `?after=`, socket `startAfter` and the SDK's
+  `iterate()`.
+
+- **A vector search reports no `nextCursor`.** Its pages got a cursor that
+  seeked by id under a distance order, so page two was not the next page. A
+  vector listing now pages by offset, and `startAfter` with a vector search is a
+  400 `VECTOR_CURSOR_UNSUPPORTED`.
+
+- **A `beforeSave` hook's result is saved key by key, as returned.** Hook
+  results were deep-merged into the values, so a hook that filtered an array of
+  objects had the dropped elements merged back in, and an order was stored with
+  its last line duplicated. A key the hook returns now replaces the value
+  outright; a key it leaves out is kept.
+
+- **A foreign key references the target's primary-key column, and the linking
+  column has that key's type.** The planner named the key by its property key,
+  so a key like `authorId`, and every table adopted with
+  `rebase schema introspect`, produced `REFERENCES "authors" ("authorId")`.
+  `db push` could not build its schema, and at boot the constraint failed with
+  42703 on every start, junction keys included. Linking columns were also typed
+  from `isId` alone: a key with `columnType: "uuid"` got TEXT columns whose
+  foreign key could never be created, and a `bigint` key got INTEGER ones. The
+  next boot creates the missing constraints. A column an older release created
+  with the wrong type is reported as drift, with the ALTER that fixes it.
+
+- **An enum label added after the first deploy lands even when the type's name
+  is longer than 63 bytes.** Postgres keeps the first 63 bytes of the name, and
+  the plan compared the full name. So every boot after the first tried CREATE
+  TYPE instead of ADD VALUE, the error was taken for a race with another
+  instance, and writes using the new label were rejected. Two columns whose enum
+  type names come out the same (`orders.item_status` and `orders_item.status`)
+  are now refused at plan time, naming both properties; before, the second
+  column silently got the first one's labels.
+
+- **A unique property added to an existing collection is UNIQUE in the database,
+  or is reported as not applied.** Boot applied `validation.unique` only to
+  tables it created in the same run, so a new unique field on a live managed
+  collection accepted duplicates and `onConflict` upserts returned 500. The
+  constraint is now added when the table is empty or the column has no default.
+  Otherwise it is reported as withheld (`kind: "unique"`), with the statement to
+  run once the rows are backfilled.
+
+- **A date default on a `time` or `date` column no longer breaks the schema.**
+  The default was always written as a full ISO timestamp, so a `time` column
+  failed with "invalid input syntax for type time". It is now written in the
+  column's own shape.
+
+- **Boot can close off a mixed-case table when it cannot enable RLS on it.** The
+  fallback REVOKE named the table without quotes, so a table such as Prisma's
+  `"User"` became `public.user`, the revoke failed, and boot refused to start.
+
+- **Deleting a parent row fails as a foreign-key refusal when its tenant link is
+  optional.** An optional `belongsTo` used as `tenant` became NOT NULL but kept
+  `ON DELETE SET NULL`, so the delete failed with 23502, naming the child's
+  column. It now defaults to RESTRICT, and an `onDelete` the author wrote is
+  kept. The same applies when a required property owns the relation's column. A
+  tenant column owned by a property declared after its relation is now actually
+  NOT NULL.
+
+- **Deleting a row other rows still reference answers 409 and names them.** An
+  `ON DELETE RESTRICT` refusal (23001), or a `NO ACTION` one (23503), came back
+  as `500 INTERNAL_ERROR`. It is now a 409 naming the referencing table and
+  constraint, with no key values in production.
+
+- **Two many-to-many relations that would share one junction table with
+  different key columns are refused.** `posts.tags` and `posts.featuredTags`
+  both resolved to `posts_tags`, and `featured_tag_id` was never created, so the
+  second relation failed on every read and write. Planning now names both
+  relations and suggests a separate `through` table. The two sides of one link
+  still share their junction.
+
+- **Querying a many-to-many from either side through `schema.generated.ts`
+  works.** The generated junction relations used a name the far side never
+  declares, so `db.query.tags.findMany({ with: { posts: true } })` threw, and a
+  self-referencing link failed to load at all. The runtime builds its own
+  relations and was not affected.
+
+- **Boot no longer refuses to start over an unmanaged table with an unusual
+  name.** Boot checks which tables already hold rows, and it ran that check on
+  every table in the collections' schemas, including ones Rebase doesn't manage.
+  It refused names like `2024_archive`, `order-items` or `Sales Data`, so on an
+  adopted database one such table stopped the server from starting. Policy setup
+  and the live schema editor ran the same check and failed the same way. The
+  names are now quoted the way introspection quotes them.
+
+- **`rebase schema introspect --schema <name>` writes the schema into each
+  collection.** Collections introspected from a non-public schema had no
+  `schema`, so the runtime served (and boot created) an empty table of the same
+  name in `public`, and the real rows were never read. A junction-shaped table
+  outside `public` is now generated as its own collection rather than a
+  `manyToMany`, because Rebase only reads and creates junction tables in
+  `public`.
+
+- **`rebase doctor` and `db push` look for a many-to-many junction in `public`,
+  where it is created.** The doctor looked in the declaring collection's schema,
+  so a correctly provisioned non-public collection with a many-to-many reported
+  its junction missing and failed CI. `db push` listed the junction under the
+  target's schema, which hid the real `public` junction from Atlas, and Atlas
+  planned to create it again.
+
+- **`db migrate`, `db generate` and `db restore` ignore the flags the CLI
+  relays.** `--docker`, `--database-url <url>` and `--debug` ended up as
+  positional arguments. `rebase db migrate --docker` failed with Atlas's
+  `unknown flag: --docker` after it had already written the auth schema,
+  `db generate --debug` named its migration `--debug`, and
+  `db restore --database-url X latest` looked for a backup called
+  `--database-url`.
+
+- **Boot reports a `numeric` column whose precision differs from its
+  property's.** The check meant to catch a `precision`/`scale` property sitting
+  on an unbounded `numeric` column never ran, because it compared against the
+  wrong name for the type. It now compares the actual precision and scale,
+  reading `NUMERIC(10)` as `(10,0)` the way Postgres does.
+
+- **A scheduled local backup that fails validation is deleted.** Only
+  object-storage temp files were removed. On a local destination the corrupt
+  dump and its sidecar stayed under a valid backup name: `db backups list`
+  showed it, and retention counted it as one of the newest backups to keep while
+  pruning a real one. `rebase db backup` already deleted it; the scheduled job
+  now does too.
+
+- **`db push --dry-run`, `db generate` and `db migrate` no longer leave
+  `<db>_dev_diff` behind.** Only a push that actually applied changes dropped
+  Atlas's scratch database, and `db migrate` created one for a step that never
+  uses it. The scratch database is now created only for the Atlas steps that
+  need it, and dropped after any db command that created it succeeds. A failed
+  command still keeps it for inspection, and one made by hand is left alone.
+
+#### Realtime
+
+- **A realtime socket that comes back re-sends its subscriptions and re-joins
+  its channels.** Whether an open was a reconnect was judged by the backoff
+  counter, and a fresh budget resets that to zero. After retries ran out (a
+  laptop lid, a wifi handover, a rollout longer than about a minute), the socket
+  that returned on `online` or on the next subscribe looked like a first
+  connect: live views froze and channels went quiet with nothing reported. The
+  same happened on the next socket after a sign-out.
+
+- **Subscribes no longer reach the server twice or orphaned.** A listener that
+  left before the socket opened, such as React StrictMode's double mount, still
+  had its queued subscribe sent. A subscribe made during reconnect backoff was
+  sent both from the queue and by the resubscribe pass. Either way the server
+  kept a subscription the client never read or cancelled, and refetched it on
+  every write.
+
+- **Realtime reaches every subscriber of a row, whichever path it was written
+  through.** Without CDC, a post saved via `authors/1/posts` never refreshed
+  `posts` or a `posts/43` subscriber, and a post saved via `posts` never
+  refreshed `authors/1/posts`. With CDC on, the root-table echo of a nested
+  write is no longer delivered twice.
+
+- **Writes made outside the server reach single-row subscribers under CDC.** A
+  key declared apart from its column, or any composite key, was not found on the
+  captured row, so a change made through psql, another service or the SQL editor
+  reached only list subscribers. A row too wide for `pg_notify` now keeps every
+  primary-key column instead of `id` alone. Existing databases pick this up on
+  their next boot.
+
+- **A visitor with no account can `listen()`, `listenById()` and `observe()`.**
+  The socket treated the empty token as a refusal and failed every subscription
+  client-side with "user not logged in", although a server with
+  `requireAuth: false` serves anonymous subscribers and `find()` next to the
+  same `listen()` worked. On a `requireAuth: true` server, the server's
+  `UNAUTHORIZED` now reaches `onError` at once instead of a 30-second
+  "Subscription timed out".
+
+- **`listen()` refuses an undefined filter value and a cursor.** The socket
+  sends filters as JSON, where `undefined` becomes `null`, so `["!=", uid]` with
+  `uid` unset subscribed to every row whose owner is NOT NULL, widening an
+  ownership filter that `find()` refuses. `after` was silently dropped, so page
+  one streamed to a caller who asked for page two. Both now arrive through
+  `onError`, as `INVALID_FILTER` and `CURSOR_NOT_LIVE`, and `observe()` reports
+  such a query once.
+
+#### Storage & email
+
+- **A metadata read on GCS no longer signs a URL.** `GET /metadata/*` asked the
+  controller for a signed URL and threw it away. On GCS without a key file
+  (Cloud Run, GKE, GCE) signing goes through the IAM `signBlob` API, which the
+  runtime account may call only with Token Creator on itself, so every private
+  object's metadata read answered 500 and every `getSignedUrl` on the client
+  failed with it. Controllers can now describe an object with the optional
+  `getMetadata`, which GCS implements without signing.
+
+- **A named bucket keeps serving when production drops the local default.** A
+  project that declared `bucket()` next to `bucket("media", { engine: "s3" })`
+  and bound only media in production got the whole-storage 501 stub, so every
+  upload to media was refused. Storage routes now mount whenever any source is
+  live, and a request that names no source answers 501 `STORAGE_NOT_CONFIGURED`
+  and says which sources exist.
+
+- **Concurrent first emails over SMTP are all sent.** The service marked itself
+  ready before nodemailer had loaded, so a second send in that window threw
+  "Email service not configured", and the first burst after a boot delivered one
+  message. A failed transporter build was also remembered for the life of the
+  process; the next send now retries.
+
+- **`GET /storage/list` answers 400 `INVALID_LIST_OPTIONS` for a bad
+  `maxResults` or `pageToken`.** `maxResults=0`, `-1` or `abc` returned an empty
+  page whose next token was the same one, so a `while (pageToken)` loop never
+  ended. `pageToken=-1` returned 500 on local storage, and a negative `MaxKeys`
+  reached S3.
+
+- **Email refuses to boot unless password-reset, verification and magic links
+  all have an absolute base URL.** A config with only `verifyEmailUrl` booted
+  and sent dead relative links in every password-reset and magic-link email.
+
+- **The invitation email says its link lasts 24 hours, which is how long it
+  lasts.** It used to say 1 hour for a 24-hour token.
+
+#### Jobs & cron
+
+- **A cron catch-up no longer runs when the claims table can't answer.** The
+  cron store answered "claimed" on every error except a unique violation, so the
+  catch-up path could never fail closed. With `rebase.cron_claims` missing or
+  unreadable, or a database blip at boot, every boot of every replica re-ran the
+  job's last slot. Scheduled runs still run when the store can't answer.
+
+- **A deploy no longer re-runs a monthly cron's last slot.** The boot-time claim
+  sweep deleted every claim older than seven days, and a claim is the only
+  record that a slot already ran. A job with a catch-up window longer than seven
+  days (say a 31-day monthly job run on the 1st and redeployed on the 10th) had
+  its slot re-run by the boot that deleted the claim. Each job's latest claim is
+  now kept regardless of age.
+
+- **One job that never finishes no longer stalls the job queue or shutdown.**
+  The worker waited for its whole batch before claiming again, and the reaper
+  only ran inside that poll. One hung handler idled every other slot, stopped
+  stranded jobs being reclaimed, and held `backend.shutdown()` until the process
+  was force-killed with exit code 1. Jobs are now tracked one by one, the reaper
+  runs on its own timer, `jobQueue.stop(timeoutMs)` is bounded, and `shutdown()`
+  gives in-flight work two-thirds of its timeout.
+
+- **Shutdown waits for a cron run in flight.** `backend.shutdown()` stopped the
+  cron timers and moved on, closing the pool under a running handler without
+  aborting its `ctx.signal` or recording the run. It now waits within the
+  shutdown budget, then aborts the run and records it as failed with the reason.
+  A run whose handler ignores its signal also ends on a timeout abort, instead
+  of staying "running".
+
+- **A cron `timeoutSeconds` longer than about 24.8 days, or `Infinity`, no
+  longer fails every run at once.** Node clamps timer delays past 2^31−1 ms to 1
+  ms, so such runs "timed out" a millisecond after starting. Long timeouts now
+  hold, `Infinity` means no timeout, and 0, negative or `NaN` values are refused
+  when the job loads and listed with the rejected jobs.
+
+- **Cron schedules no longer skip or loop across a daylight-saving change.** On
+  a host whose zone has DST, the schedule search stepped in local minutes. When
+  clocks fell back it skipped the repeated hour, and inside that hour it could
+  compute a slot an hour in the past and re-arm every 5 seconds. A job with a
+  `timezone` on such a host was affected too. The search now steps in real
+  minutes.
+
+- **A queued webhook delivery that can never succeed is marked failed.** A
+  delivery refused by the outbound guard, or answered with a redirect, returned
+  normally, so its `rebase.jobs` row ended `succeeded` with no error. It is now
+  dead-lettered after one attempt, with the reason in `last_error`.
+
+#### MCP
+
+- **`/mcp` has the body limit and per-person rate limit the data API has.**
+  `/mcp` is mounted outside `basePath`, so the server-wide body limit and data
+  rate limiter never applied to it, and JSON-RPC batches were unlimited: one
+  POST could run a thousand tool calls. It now applies `maxBodySize` (413) and
+  the data API's `rateLimit`, counted per person the token acts for, since
+  counting per IP would put every user of a hosted client like Claude.ai into
+  one bucket. A batch carries at most 20 messages; a larger one is refused
+  before any of it runs.
+
+- **An MCP refresh that asks for a scope it doesn't hold no longer kills the
+  grant.** The token endpoint used up the refresh token before checking the
+  scope. The client got `invalid_scope` with its only token already spent, and
+  its retry looked like a replay and revoked the whole grant. The scope is now
+  checked first.
+
+- **The MCP destructive-tool gate reads `.env` files the way the CLI does, and
+  spawned commands no longer inherit the server's startup `.env`.** The gate
+  parsed `.env` with its own regex and stopped at the first value, so a
+  `backend/.env` with a localhost line above a production one, or a root `.env`
+  with `export DATABASE_URL=<prod>`, was cleared as local while `rebase db push`
+  connected to production. It now parses every candidate file with dotenv,
+  refuses if any of them names a non-loopback database, and names that file.
+  Separately, every child process inherited the startup project's `.env` as if
+  it were shell environment, which outranks both the branch pointer and the
+  active project's own `.env`: after `rebase_db_branch_switch` the next push
+  still went to the main database, and after `rebase_project_switch` project B
+  ran against project A's `DATABASE_URL`.
+
+- **The MCP destructive gate no longer treats DNS names starting with `127.` as
+  loopback.** `127.0.0.1.db.example.com` counted as local.
+
+- **The MCP `rebase://collections/…` resource can no longer read a sibling
+  directory.** `../collections_private/x` got past the path check.
+
+- **`rebase_auth_reset_password` finds an existing user reliably and reports
+  "not found" as an error.** It searched with `limit: 1` on a substring match,
+  so `ann@x.com` was "not found" when `joann@x.com` sorted first, or when the
+  case differed, and that message came back as a success.
+
+#### Client SDK
+
+- **A tab holding a stale refresh token takes its sibling tab's session instead
+  of signing everyone out.** In json mode all tabs share one stored session, but
+  each refreshes with the token it holds in memory. A background tab would
+  present an already-rotated token, get `TOKEN_ALREADY_USED` on every retry,
+  sign out, and delete the shared session, and the tab that had refreshed was
+  signed out on its next load. Refreshes now re-read storage and adopt a newer
+  session for the same user, and a tab that gives up clears storage only if it
+  still holds its own session.
+
+- **An app opened offline keeps its session.** On load, a stored session with an
+  expired access token was deleted if the refresh failed for any reason,
+  including no network or a restarting backend, although a running app treats
+  those errors as transient. Load now drops the session only when the refresh
+  token itself is refused; otherwise it keeps it and retries. Scheduled
+  refreshes also no longer sign out after five transient failures.
+
+- **With offline mode on, a create whose response was lost is no longer inserted
+  twice.** The online attempt carried no idempotency key. After a dropped
+  connection the write was queued under a new key, and its replay created a
+  second row; `createMany` duplicated the whole batch. Writes are now sent under
+  a key the replay reuses, and the caller's write options are passed through. An
+  offline natural-key `createMany` that was never sent is now refused with
+  `OFFLINE_UPSERT_UNSUPPORTED`, as `upsert` is.
+
+- **With offline mode on, a projected read no longer strips columns from cached
+  rows.** `find({ fields })`, and `listen`/`observe` with `fields` or
+  `distinct`, stored the narrowed rows in place of the full rows, in memory and
+  in IndexedDB, so lists showing the whole row lost their other columns because
+  some other query asked for less. Projected answers are now cached with their
+  query and only refresh the columns they carry on rows already held.
+
+- **An upload retried after a token refresh keeps its multipart boundary.** Only
+  the first attempt stripped the JSON Content-Type from a FormData body. The
+  retry after a 401 sent `application/json` and the server answered "No file
+  provided", so every upload made just after an access token expired failed.
+
+- **`iterate()` and `findAll()` continue from the caller's cursor or offset.**
+  The caller's `after` was sent next to the walk's own `offset=0`, which the
+  server rejects with a 400 (`CURSOR_WITH_OFFSET`), and `.offset(40).iterate()`
+  quietly started over from the top. A caller's `after` now starts a
+  cursor-based walk from that point, and a caller's `offset` is where an offset
+  walk starts, over HTTP and in-process.
+
+- **A `Date` in a REST filter is sent as its ISO instant.** It went out as the
+  viewer's local time string, without milliseconds and with a zone name Postgres
+  cannot parse. Over the socket and in-process the same filter was ISO, so one
+  query compared different instants depending on the path it took.
+
+- **`backups.download()` uses the client's configured `fetch` and headers.** It
+  called the global `fetch` with only an `Authorization` header, so a client
+  with a custom `fetch` or default headers had every call but this one go where
+  it was told. A refusal is now a `RebaseApiError` carrying `status`.
+
+- **`call(endpoint, payload)` sends `false`, `0`, `""` and `null`.** It tested
+  the payload for truthiness, so those valid bodies were dropped, although
+  `functions.invoke()` sends them.
+
+#### Admin (CMS & app)
+
+- **Signing out while `defineRolesFor` is still resolving keeps you signed
+  out.** A slow roles lookup could finish after the sign-out and restore the old
+  user with their roles, with no session behind it and nothing left to fix it.
+
+- **`<Rebase client>` without an `authController` waits for the session
+  restore.** A returning visitor whose refresh token had been revoked was shown
+  as signed in, and every request failed with 401. The app now waits for the
+  SDK's restore and reads the session again.
+
+- **After the first admin signs out, the login view offers sign-in.** The auth
+  config was read once, so on a fresh install the bootstrap form stayed on
+  screen until a reload.
+
+- **The Google sign-in button works when Google's script loads late.** With a
+  stable auth controller, the button stayed dead and said Google couldn't be
+  loaded.
+
+- **Changing your password signs you out once.** Sign-out and `onSignOut` used
+  to fire twice.
+
+- **The Vite plugin finds an absolute `collectionsDir` and ignores test files.**
+  An absolute directory produced an admin with no collections and no error. A
+  `*.test.ts` file beside the collections was bundled and blanked the admin with
+  `describe is not defined`. On Windows the collection transform never ran, so
+  server callbacks shipped to the browser.
+
+- **`useCollection` with inline `filterValues` subscribes once.** Filters
+  written inline, as the hooks guide shows, re-subscribed on every render: an
+  endless loop against the server. `useRelationSelector`'s `fixedFilter` had the
+  same bug.
+
+- **Changing `<Rebase locale>` no longer locks in the language.** The first
+  change of the prop was stored as the user's own choice and overrode every
+  later value, even after a reload.
+
+- **Plugins' `lifecycle.onAuthStateChange` fires.** It was never called; a
+  sign-out unmounted and remounted the plugin instead. Separately,
+  `useRebaseContext` returned the previous render's context.
+
+- **`<Rebase onAnalyticsEvent>` calls the current handler.** The first handler
+  was frozen, so a consent-gated handler kept sending after an opt-out, or never
+  sent after an opt-in.
+
+- **The collection table reads its own URL back as the filter, sort and search
+  it wrote.** Opening a record copies the list's query string onto the record
+  URL, and the table parsed it back into its live filter. `false`, `0` and `""`
+  were written as `null`, so "Active is false" became an IS NULL filter, and
+  "select all matching" then acted on those rows. A two-bound range lost its
+  upper bound, a field whose name contains `_op` (`shop_open`) was dropped on
+  reload, and a search containing `%` crashed the view on reload. A default
+  filter the user had cleared came back on the next record click, and closing a
+  record dropped the default sort to no sort at all.
+
+- **Browser Back from an edited record asks before discarding the edit.** The
+  table rewrote the address bar with `replaceState({}, …)` on every mount, and
+  the login view did the same when it cleaned `?code=` out of the address after
+  a GitHub or LinkedIn sign-in. Either one erased react-router's bookkeeping for
+  that history entry, so Back skipped the unsaved-changes prompt and the edits
+  were lost without warning.
+
+- **Closing or switching a record keeps the list's search, filters and sort.**
+  The split view's close, Escape, tab changes, edit and save kept only the view
+  mode, and so did the detail view's breadcrumb and the compact list's close;
+  each of them emptied the search box and reset the filters. Records opened in a
+  side panel (board, custom views) reset the list to the query it was mounted
+  with.
+
+- **Leaving a full-screen record for one whose id starts with its own asks
+  first.** Going from an edited `/c/products/1` to `/c/products/12` discarded
+  the edits without a prompt.
+
+- **Dismissing the bulk-delete dialog stops the deletes.** Pressing Escape or
+  clicking outside closed the dialog but left the delete queue running, so a
+  select-all delete of thousands of rows kept going with nothing on screen.
+
+- **Deleting a record from its own menu closes the record.** The split view,
+  side panel and dialog stayed open on the deleted record ("Entity not found",
+  or a stale editable form).
+
+- **The collection count is read again after a delete, and after a record is
+  created in the side panel.** The toolbar count is fetched once and re-fetched
+  only when the view is told rows changed. After deleting every matching row the
+  toolbar still showed the old total and offered "All N" over an empty list. A
+  record created or copied in the side panel or a dialog didn't tell it either,
+  so the toolbar and "select all matching" kept the old total, and without
+  realtime the table didn't show the new row.
+
+- **A table or board without realtime shows the newest search, and re-reads
+  after a delete.** An older, slower search result could replace a newer one
+  ("ch" rows under "chair"), in the table and in each board column, and board
+  column counts raced the same way. After a delete or "add existing", the
+  deleted row stayed on screen.
+
+- **A refused kanban move goes back to its column, and the board's refresh
+  reloads it.** A drag whose save was refused (RLS, `beforeSave`) left the card
+  in the target column permanently, with the error only in the console, and the
+  board's refresh actions, including the error banner's refresh button, did
+  nothing. The card now returns and an error message appears.
+
+- **An inline edit of one key inside a map saves the whole map.** Editing an
+  `address.street` column of a `spreadChildren` map sent only `street`, and the
+  save erased `city`. The popup editor for the same cell saved an empty value
+  and reported success. An inline edit of an array item (`tags[1]`) also sends
+  the whole array.
+
+- **The popup editor of a spread map's child validates it.** The popup for an
+  `address.street` column looked the property up as a top-level key, which
+  doesn't exist, so it checked nothing. A value breaking the child's `max` or
+  `matches` was saved and left to the server to refuse. It is now checked, and
+  the error shows on the field.
+
+- **A number-enum filter shows the value it filters by.** After picking a value
+  the select went blank, and a value of `0` lost its clear button and showed a
+  stray "0".
+
+- **An entity action's `isEnabled` also disables it on table and list rows.** It
+  was honoured only in the record form, so a "Publish" limited to drafts could
+  still be clicked from a published row.
+
+- **The relation picker shows the record its value holds after an undo.** Pick
+  A, discard (back to B), then undo (A again): the chip kept showing B while the
+  form saved A.
+
+- **"Add existing" on a junction tab links the rows picked when Done is
+  pressed.** Every checkbox tick linked a row immediately, and unticking a row
+  or pressing Clear removed nothing.
+
+- **The history panel scrolls back to a record's oldest revision.** A pagination
+  check counted the loaded pages twice: 25 revisions stopped at 20, and at 100
+  only 60 were reachable or revertible.
+
+- **A date edited on an existing record is saved.** The form's diff walked into
+  objects, and a `Date` has no keys of its own, so a date-only edit saved
+  nothing and the form snapped back to the stored date without an error;
+  autosave never fired for it. The same diff sent a map, key-value map or
+  geopoint as just the sub-key that changed, and an update replaces the whole
+  property. So editing `address.city` erased `address.street`, removing a
+  key-value entry emptied the map, and moving one geopoint coordinate got a 400.
+  A changed relation went out as a bare `{ id }`. Every changed top-level
+  property is now sent whole.
+
+- **A record form no longer saves over a change made elsewhere.** If someone
+  else saved the record while you had an edit open, the form received their
+  change but kept its own copy of every field, and your next Save wrote the
+  stale values back, reverting their change without a word. Autosave sent the
+  whole record every time. Fields you haven't edited now take the new stored
+  value. Fields you did edit keep your value and show a translated "This value
+  has been updated elsewhere". Autosave sends only what changed.
+
+- **A custom-shaped array (`of: [a, b]`) can be saved.** Every item was checked
+  against every position's schema, so a mixed tuple like `["x", 3]` always
+  failed and Save stayed blocked. Each item is now checked against its own
+  position, and the error shows on that position's field.
+
+- **`trim`, `lowercase` and `uppercase` change the value that is saved, in the
+  form and in the table, and `length` is checked.** They were applied only
+  inside validation, so "  My-Slug " passed the check, was sent as typed, and
+  the server rejected it; the table's inline cell editor and popup editor did
+  the same. `validation.length` was not checked in the form at all. The form and
+  both table editors now save the transformed value, a spread map's child
+  included, and the cell keeps what was typed until it is left.
+
+- **The form checks `email` and `url` the way the server does.** They were
+  checked only on strings that also had a `validation` block, and then an empty
+  string was rejected. So bad emails got through, and clearing an optional email
+  or url blocked Save.
+
+- **Number `lessThan`/`moreThan` messages and the date `max` message name the
+  right bound.** The number messages were swapped, and the date `max` message
+  printed the minimum date.
+
+- **Typing a markdown field back to its stored text restores it.** Type "!" then
+  Backspace: the editor showed "Hello" but the form kept "Hello!", stayed dirty,
+  and Save wrote "Hello!".
+
+- **A disabled relation or reference field that uses a picker dialog can't be
+  changed.** The picker still opened, and the many-valued fields kept Edit and
+  reordering working. A property with no name showed "EDIT UNDEFINED"; the label
+  is now the translated `Edit {{name}}`, falling back to the property key.
+
+- **`clearOnDisabled` gives back a 0, `false` or empty string when the field is
+  enabled again.** A falsy value used to be cleared and never restored.
+
+- **A date-only property (`columnType: "date"`) keeps its day in every timezone,
+  and a property's `timezone` is honoured.** In UTC+1, picking the 15th stored
+  the 14th, and a filter for the 15th searched from the evening of the 14th. In
+  UTC-5, a stored 15th was shown as the 14th. The form, the preview, the table's
+  date cell and the date filter now handle date columns in UTC, and all four use
+  a property's documented `timezone`, which they ignored.
+
+- **An import picks its id column only when the column says it is the id.** The
+  import pre-selected the first column as the row id whenever its header merely
+  contained "id" or "key". A file starting with `width`, `video` or `provider`
+  then upserted each row over the record whose id matched that value, and
+  creating a collection from such a file dropped the column and merged rows that
+  shared a value. Now only a first column named `id`, or one that maps onto the
+  collection's `isId` property, is picked. A newly uploaded file also no longer
+  keeps the previous file's id column.
+
+- **An import skips a column marked "Do not import" and honours a remap.** The
+  mapping was read back by path and with a `??` fallback, so an excluded column
+  was imported anyway, a column remapped onto `price` lost to the file's own
+  `price` column when that came later, and nested remaps were ignored. A column
+  named `toString` crashed the preview.
+
+- **A CSV import reads each cell against the property it lands in.** Cells were
+  `JSON.parse`d before the target was known. String columns lost their exact
+  text (`1.10` became `1.1`, twenty-digit SKUs and ids lost digits, and the word
+  `null` became null), and Excel's and Sheets' `TRUE` imported as false. Blank
+  cells overrode the chosen defaults and sent `""` to enums, and list items kept
+  stray spaces. String columns now keep their text, booleans accept true/false,
+  yes/no and 1/0 in any case, a blank cell sets nothing so the default applies,
+  and list items are trimmed. Creating a collection from a file now infers a
+  hand-typed `[1, 2]` or `{"a": 1}` cell as a string.
+
+- **An export writes a relation as its id and a geopoint as JSON.** Every
+  relation and geopoint cell in a CSV export read `[object Object]`, and the
+  JSON export wrote the full relation object, which the import can't read back.
+  Relations, including to-many relations and relations inside arrays, now export
+  as ids in both formats. Any other object in a CSV cell is written as JSON.
+
+- **An export with both kinds of additional field keeps one row per record.**
+  When `exportable.additionalFields` and `additionalFields` were both set, their
+  per-row values were concatenated: two rows became four, half of them with no
+  id. They are now merged row by row.
+
+- **A re-imported export drops the apostrophe its formula escape added.**
+  `@john`, `+1 555 0100` and `-- draft` came back with a leading `'`. The import
+  now strips an apostrophe that comes before a formula trigger, and
+  `unescapeCsvFormula` is exported next to `escapeCsvFormula`.
+
+- **`BasicExportAction` downloads the format, dates and rows its dialog shows.**
+  Its handler kept the first render's options and data, so JSON and timestamp
+  dates were ignored, and every file was named `export.csv.csv`.
+
+#### Studio
+
+- **The SQL console's Explain no longer executes the statement.** It ran
+  `EXPLAIN (FORMAT JSON, ANALYZE)` on the whole tab, and ANALYZE executes the
+  query: explaining `DELETE FROM posts` deleted the rows without Run's
+  confirmation, and a multi-statement tab ran every statement after the first.
+  Explain now plans without executing, uses the selection when there is one, and
+  refuses more than one statement.
+
+- **The SQL console's automatic LIMIT applies only to a single SELECT.** The
+  "Limit 1000" toggle, on by default, appended `LIMIT 1000` to any text
+  containing the word SELECT. `INSERT INTO … SELECT` and
+  `CREATE TABLE … AS SELECT` quietly copied only 1000 rows, and
+  `SELECT 1; DELETE …` became a syntax error. The limit is now added only when
+  the buffer parses as one top-level SELECT without its own limit.
+
+- **The SQL console's Run button runs the selected text.** Cmd+Enter inside the
+  editor ran the selection, but the Run button, and Cmd+Enter pressed outside
+  the editor, ran the whole buffer, so highlighting one statement and pressing
+  Run executed the entire script.
+
+- **Inline cell edits in the SQL console update the table the query named,
+  schema included.** The generated UPDATE dropped the schema, so editing a row
+  from `SELECT * FROM archive.orders` updated `public.orders` and reported
+  success, and the primary key was looked up in whichever schema had a table of
+  that name first. The UPDATE now targets `"archive"."orders"`, and the same
+  check stops a table in another schema from being offered as a same-named
+  collection's records.
+
+- **RLS rules saved from Studio are filed under the collection's slug.** Saves
+  were addressed by the table name, because Postgres collections have no `id`.
+  When slug and table differ (slug `blog`, table `posts`) the save missed the
+  collection and wrote a new `posts` file containing only the rules, which broke
+  the next boot.
+
+- **Editing a Studio RLS policy that comes from code updates its rule, or says
+  why it can't.** Edits matched rules by `name`. Unnamed rules
+  (`<table>_<op>_<hash>`), rules covering several operations, and the admin
+  baseline policies matched nothing: the rules were saved unchanged and the
+  editor reported success. Renaming an `ownerField` or `access` rule also
+  dropped its condition, leaving a deny-all rule. The rule is now found by the
+  policy names it compiles to and only the changed fields are written.
+  Multi-operation rules, generated policies and database-only policies get an
+  explanatory refusal.
+
+- **An INSERT policy created or imported in the collection editor's RLS tab
+  keeps its WITH CHECK.** The tab kept `withCheck` only when the policy also had
+  a `using`, and an INSERT policy never has one. So it saved as a rule with no
+  condition, which compiles to `WITH CHECK (false)`: creating an INSERT policy
+  in the tab, or importing one from the database, blocked every insert on the
+  table.
+
+- **Editing a rule in the collection editor's RLS tab changes only what was
+  edited.** The edit dialog rebuilt the rule from its form, which has no field
+  for `ownerField`, `access`, a structured `condition`, `operations` or
+  `pgRoles`, so renaming an owner rule saved a rule that denies every row. Rules
+  were also matched by name, so editing an unnamed rule was silently discarded
+  and deleting one unnamed rule deleted all of them.
+
+- **The RLS screens read a collection's live policies from its own table, in its
+  own schema.** The collection editor's RLS tab loaded no live policies for a
+  collection that leaves `table` to its slug, and listed a same-named table's
+  policies from another schema as importable. Studio's RLS editor attributed an
+  unmapped table named like a collection's slug to that collection, and "Import
+  to codebase" filed that table's policies under the wrong collection. Both
+  screens now use `getTableName` in the collection's declared schema, or
+  `public`.
+
+- **The live schema editor can plan a change to a collection that has a
+  relation.** The panel posts the collection as JSON, which drops every
+  relation's `target` thunk, and a relation picked in the property form names
+  its target by slug. So `/api/admin/schema/plan` answered 500 for any change to
+  such a collection, even a new column or an RLS policy, and the dialog could
+  only offer a retry. Targets are now restored from the current relation or
+  looked up by slug, and a target that names no collection is a 400 that says
+  so.
+
+- **A schema change that needs a migration is shown as one, not as a 500.** The
+  Postgres planner rejects an unapplicable change, and the live editor's routes
+  treated that rejection as a server error. Removing a property or moving a
+  table now comes back as a `needs-migration` plan, which the panel can offer to
+  save to source only. A request body that isn't JSON is a 400.
+
+- **Picking a relation target on a property writes a file that boots.** The
+  schema editor wrote a property relation's target as the string literal
+  `target: "authors"`. The panel reported success, and the next boot failed for
+  every collection in the directory. It now writes
+  `target: () => authorsCollection` with its import, as it already did for the
+  collection-level `relations` array. A refused save no longer ends up on disk
+  with the next unrelated save.
+
+- **A relation property built in the property form passes the boot validator.**
+  The form wrote a top-level `relationName: ""`, stored no `kind` while showing
+  "Belongs to", and kept the old kind's `through` or `localKey` after a kind
+  switch; each of these stopped the project from booting. Clearing a key field
+  now falls back to the default column name instead of a column named "".
+
+- **Changing an existing collection's table no longer orphans its rows.**
+  Editing the table name read as "no change" and was applied as `CREATE TABLE`
+  for a new empty table, leaving every row in the old one. The change is now
+  classified `needs-migration`, and the table field is locked once the
+  collection exists, like its ID.
+
+- **Renaming a property in a new collection can't overwrite another property.**
+  The side panel applies edits as they are typed, so typing an existing
+  property's ID replaced that property without warning. Changes with a taken or
+  invalid ID are now held until the ID is fixed, and the error shows right away.
+
+- **`CollectionsStudioView` asks before discarding unsaved edits.** Used on its
+  own, selecting another collection or "+" remounted the editor and dropped
+  whatever had been typed. Studio's routed version was already guarded by its
+  navigation blocker.
+
+- **Try-it requests in the API explorer no longer send an empty `rebase-branch`
+  header.** Every new panel pre-filled a header that nothing on the server
+  reads.
+
+- **"New folder" in the storage browser creates the folder in the selected
+  storage source.** It sent no `storageId`, so with a second source selected the
+  folder was created in the default backend and never appeared in the listing.
+
+- **A cron job whose execution history can't be read says so, instead of "No
+  executions yet".** The failure used to appear only as a snackbar that
+  disappeared after about four seconds. Separately, the API keys "Revoked /
+  Expired" heading was built by gluing English onto a translated verb, which
+  produced "Revocard" in Spanish and "Widerrufend" in German; it is now a single
+  translated string in every locale.
+
+#### UI kit & plugins
+
+- **A disabled boolean in the collection table can no longer be flipped with a
+  click.** The table's switch cell dropped the `disabled` flag, so one click on
+  a boolean marked `admin.disabled` or `conditions.disabled` toggled it and
+  saved it. The text and date cells had already been fixed; this was the switch
+  they missed.
+
+- **A disabled multi-select can no longer be opened or changed.** `MultiSelect`
+  used `disabled` only for its dimmed background. An array-of-enum field marked
+  disabled could still be opened, edited and saved from the form, and its chip
+  remove icons and clear icon still worked.
+
+- **A disabled multiline text field can't be typed in.** Only the single-line
+  field was natively disabled.
+
+- **A disabled icon button no longer fires from the keyboard.** A button that
+  disabled itself on click kept focus, so Enter or Space fired it again; the
+  autofill Send button, for one, started a second run.
+
+- **A number cell holding 0 shows 0 while being edited.** A selected table cell
+  showed 0 as an empty box, and a disabled one could still be typed in.
+
+- **Text fields keep the last keystrokes when you save or close right after
+  typing.** `TextField` dropped callers' `onFocus`/`onBlur`, so
+  `DebouncedTextField` never flushed on blur. In the collection editor, typing
+  and then saving or closing within 150ms lost the last keystrokes. Form fields
+  built on it also never marked themselves touched on blur, so their validation
+  messages may now appear on blur.
+
+- **A select whose chosen option has the value `""` shows that option.** Radix
+  treats `""` as nothing selected, so an "inherit the default" option left the
+  select blank while it was the selected one.
+
+- **The avatar preview shows the finished photo URL.** After one image failed to
+  load, every later URL kept showing the initials. That included the live
+  preview in user settings, which fails on the first keystroke.
+
+- **Times typed near a daylight-saving switch in a date field with `timezone`
+  are stored correctly.** They were off by an hour; no form sets `timezone` yet.
+
+- **A number text field accepts a callback `inputRef`.** It crashed the render;
+  no caller passes one yet.
+
+- **A range slider with two default values shows both handles.** It showed one;
+  nothing in the repo uses `Slider` yet.
+
+- **Autofill no longer fills, or sends the values of, fields the form won't let
+  you edit.** Children of a disabled map were sent as fillable while their
+  values were stripped, so the service saw them as empty and overwrote them.
+  Fields with a literal `conditions.readOnly`, `conditions.disabled` or
+  `conditions.hidden`, and dates with `autoValue`, were fillable too, and their
+  values were sent to the service. Autofill now uses the same rules the form
+  uses to lock a field.
+
+- **Discarding an autofill run cancels it.** A discarded run kept streaming into
+  the next run's review, added its own fields to it pre-ticked, and marked the
+  review ready while the new run was still writing. Each run is now cancelled
+  when it is discarded, applied, replaced, or its form closes.
+
+#### CLI
+
+- **A followed deploy prints its build log whole.** The control plane rewrites a
+  heartbeat line at the end of the log every 30 seconds. The CLI treated the log
+  as append-only, so every new chunk lost about 70 characters and a failed
+  managed deploy printed only the second half of its reason.
+
+- **`rebase cloud deploy` in JSON mode keeps stdout to one JSON value.** Vite,
+  `tsc`, the build's warnings and the static bundle summary went to stdout ahead
+  of the result, so every piped or CI run was unparseable. A failed static or
+  bundle build now answers with a JSON error.
+
+- **A managed deploy uploads the dependencies `rebase build` vendored into the
+  bundle.** The upload excluded `node_modules`, so every deploy paid 35–55
+  seconds for an install that never shipped, and every pod start installed
+  again. An archive that comes out over the 100 MB upload cap with them is
+  packed again without them, with a warning.
+
+- **`rebase cloud deploy` refuses dependency ranges no single version satisfies,
+  as `rebase build` does.** The deploy built its own bundle without the check
+  and shipped what the build refused.
+
+- **`rebase cloud deploy` accepts `--no-static` and `--skip-schema`.** Its own
+  error remedies named them, and both were rejected as unknown options.
+
+- **`rebase cloud logs --json` prints one JSON object.** It printed the human
+  page (emoji header, raw log), so `| jq` always failed.
+
+- **Telemetry `cli.deploy` is recorded for bundle deploys and for failed
+  deploys.** Bundle deploys, the default for every scaffold, recorded nothing,
+  and a failed followed deploy exited before recording on either path.
+
+- **`rebase auth reset-password` resets on the project's own database and exits
+  1 when it cannot.** When no backend was running, the fallback never resolved
+  the managed database: on a stock scaffold it connected to localhost:5432 as
+  the OS user, and any failure printed a stack trace and exited 0. It now
+  resolves the database the way the `db` commands do, and a failure exits 1.
+
+- **`rebase db pull` no longer prints a success tick over a partial or empty
+  database.** `--clean` empties the local database before `pg_restore` runs, and
+  a failed restore was swallowed and followed by "✓ Local database now holds a
+  copy". It also never checked that `pg_restore` was installed. Both tools are
+  now checked before anything is dumped, and a killed, unstartable or erroring
+  restore ends in a red "incomplete copy" line and exit 1, after `--anonymize`
+  has run over whatever arrived.
+
+- **`rebase init --database-url` writes a password containing `$` exactly as
+  given.** The URL was used as a `String.replace` replacement string, so
+  `pa$$w0rd` reached `.env` as `pa$w0rd` and the first `rebase dev` failed to
+  authenticate, and a `$'` spliced the rest of the file into the URL.
+  `rebase eject` substituted the package name the same way and is fixed too.
+
+- **`rebase cloud env pull` writes values that read back unchanged.** Values
+  were quoted with `JSON.stringify`, but dotenv only unescapes `\n` and `\r`, so
+  JSON configs, quoted strings and Windows paths came back with stray
+  backslashes. The command now chooses single quotes, backticks or double quotes
+  to suit the value. A value no quoting can carry is skipped and named, as
+  secrets already are.
+
+- **`rebase doctor` exits 1 when a connection string can't be parsed by
+  PostgreSQL's own tools.** It printed the ✗ finding and exited 0, so a CI gate
+  passed a project whose backups had never worked.
+
+- **`rebase upgrade` moves pnpm catalogs, and no longer claims "already on" when
+  nothing moved.** `catalog:` pins were reported as dist-tags, and the
+  `catalog:`/`catalogs:` blocks were never bumped. When every pin was skipped,
+  the command still printed "✓ This project is already on X". Catalog entries
+  are now moved, a reference to a catalog entry the command cannot find is
+  reported, and "already on" is printed only when nothing was left alone.
+
+- **`rebase dev --help` no longer documents a `devDatabase` key in
+  rebase.json.** The key was never read, so setting it had no effect; `--docker`
+  is the way to choose the compose database.
+
+#### rls-check
+
+- **`rls-check --schema` with a name that does not exist is an error (exit 2).**
+  A typo or wrong case scanned zero tables, printed "No findings" and exited 0.
+
+- **`rls-check` judges views and junction tables against tables in schemas it
+  does not scan.** `CREATE VIEW public.files AS SELECT * FROM storage.objects`
+  granted to anon produced nothing on a default scan, and a junction table
+  pointing at `auth.users` was never considered either.
+
+- **`rls-check` counts column-level grants.**
+  `GRANT SELECT (id, email) ON users TO anon` on a table with RLS off, and
+  Supabase's column-level UPDATE pattern, produced no finding.
+
+- **`rls-check` reports foreign tables granted to exposed roles or to PUBLIC.**
+  Postgres cannot put RLS on a foreign table, so a grant exposes everything the
+  remote server returns (Supabase lint 0017). These tables were read and then
+  ignored.
+
+- **Without `sslmode`, `rls-check` tries TLS before plaintext, as libpq does.**
+  Servers that accept both, such as RDS with `force_ssl` off, were scanned in
+  cleartext.
+
+- **The `rls-check` report's "Exit code" line matches the actual exit code.** A
+  degraded scan printed 0 or 1 and then exited 2.
+
+#### Firebase
+
+- **An update on the Realtime Database keeps the fields it does not name.** The
+  driver saved every write with `set()`, which replaces the whole node, while an
+  update sends only what it changes, both the SDK's `update(id, { name })` and
+  the admin form. So editing one field of a record in the admin wiped the rest.
+  A save of an existing row now uses `update()`, and a `null` removes only that
+  one field.
+
+- **A Firestore save with an empty field inside a list item is accepted.** An
+  `undefined` value became `deleteField()` even inside a map within an array,
+  which Firestore rejects, so any record whose list items had an unset optional
+  field failed to save with "deleteField() is not currently supported inside
+  arrays". Inside an array the key is now left out; a field of the document or
+  of one of its maps is still deleted as before.
+
+- **An ordered Realtime Database read comes back in the order it asked for.**
+  Rows were built from `Object.entries(snapshot.val())`, which lists children by
+  key, not in query order, so `orderBy` was lost on every read and live list,
+  and an offset page dropped the wrong rows. Rows are now read in query order
+  before the offset is applied.
+
+- **A Realtime Database uniqueness check matches the value, not everything after
+  it.** `checkUniqueField` used `startAt(value)`, so any value that sorted below
+  an existing one was reported as taken: with bob@x.io stored, alice@x.io could
+  not be saved in a unique field. It now uses `equalTo` and ignores only the row
+  being edited, so a second row with the same value can no longer hide behind
+  it.
+
+- **A Realtime Database row that is gone reaches its listener as `null`, not an
+  error.** `listenOne` called `onError` for a missing row, so a record deleted
+  while it was open showed an error instead of disappearing, and a read the
+  database refused never reached `onError` at all. Now a missing row arrives as
+  `onUpdate(null)` and a refused read as `onError`.
+
+- **A Firestore search stays live, respects the page window, and one-shot
+  searches are applied.** Four problems are fixed:
+
+  - Cancelling a search before the index answered leaked its document listeners.
+  - Edits to rows already in the results were never delivered, and a deleted row
+    came back on the next update.
+  - The SDK's `.search("x").find()` and its count ignored the search and
+    answered with the whole collection. They now run the configured search, and
+    refuse by name when none is configured.
+  - Live lists and search results now respect `offset` and `limit`, and search
+    hits are read from the collection's own database.
+
+- **`docsToCollectionTree` nests subcollections instead of overflowing the
+  stack.** The `subcollections` function it put on a parent called itself, so
+  calling it on any parent with a child ended in "Maximum call stack size
+  exceeded".
+
+#### MongoDB
+
+- **A `not(...)` filter on MongoDB returns the rows it negates.** A `not` group
+  was compiled as an `and`, so `?not=(status.eq.draft)` returned only the
+  drafts. It now negates as Postgres does, with SQL's null semantics.
+
+- **Field operations on MongoDB change the stored value instead of being
+  stored.** `PATCH {"views":{"$inc":1}}` stored `views: {"$inc":1}`, and
+  `$push`, `$pull` and `$merge` did the same. They now apply inside one update,
+  as on Postgres; an operation on a create is a 400, and a misspelled operator
+  is refused.
+
+### Security
+
+#### Server & REST
+
+- **A nested path is checked against the collection it names, whatever its
+  spelling.** The nested routes found their parent by its exact slug, but the
+  driver also accepts the kebab-case slug and the table name. Through those
+  spellings, `POST /blog-posts/1/comments` wrote fields the caller may not write
+  or that are excluded from the API, and filters on unreadable fields were
+  answered. Nested paths now resolve by the same rule as the driver, and a path
+  that names nothing, an unregistered root collection included, is a 404.
+
+- **An API key on a nested path is checked against the collection it reaches,
+  and must be able to read the parent.** The check used the relation name from
+  the URL, so a key scoped to `notes` read `internal_notes` through
+  `/projects/1/notes`. The route's operation is now checked against the
+  relation's target, and the key needs `read` on every parent in the path; see
+  Breaking.
+
+- **A history revert no longer writes fields the caller cannot write.**
+  `POST /api/data/:slug/:id/history/:historyId/revert` passed the stored
+  snapshot straight to `driver.save`, skipping the `access.write` and
+  `excludeFromApi` checks every other write runs. A caller refused
+  `PATCH { discountPercent: 50 }` could set it by reverting to a version holding
+  50, and server-owned columns went back to their old values. A revert that
+  would change a field closed to the caller now answers the PATCH's
+  `FIELD_NOT_WRITABLE` / `VALIDATION_EXCLUDED_FIELDS`. Closed fields that are
+  unchanged, or that the caller can't read, are left as they are.
+
+- **An `include` can no longer filter or sort by a related field the caller may
+  not read.** `?include={"staff":{"where":{"salary":[">",100000]}}}` and
+  `orderBy`/`limit` inside an include answered questions about a field that
+  `?salary=gt.…` on `staff` itself refuses. Each include level's `where`,
+  `logical`, `orderBy` and `fields` are now checked against the target
+  collection's read rules, and a forbidden field is a 400 `FIELD_NOT_READABLE`.
+
+- **A vector search on a vector the caller may not read is refused.**
+  `?vector_search=` was accepted on an `excludeFromApi` or
+  `access.read`-restricted vector, and `_distance`/`vector_threshold` let a
+  caller locate the hidden vector with repeated probes. It is now a 400
+  `FIELD_NOT_READABLE`, like `orderBy` on that field.
+
+- **A query cannot filter or sort on the foreign key of a to-one relation the
+  caller may not read.** `?bandId=7` (or `band_id`), a `where`, an `orderBy` or
+  a socket filter on it was accepted even when `band` was read-restricted, which
+  let a caller find which rows point at band 7 one filter at a time. It is now
+  refused with `FIELD_NOT_READABLE` by REST, the aggregate route, the socket and
+  MCP, and history and the MongoDB read strip withhold the key too. The row side
+  of this leak is the foreign-key entry under Postgres.
+
+#### Auth
+
+- **An account made for someone else's email is no longer handed to its owner
+  with the maker's way in still on it.** Nothing verifies the address an account
+  is made with. An attacker could sign in with Spotify (which never vouches for
+  an email) as a victim's address, and the victim's later Google sign-in was
+  auto-linked onto that account, with the attacker's Spotify login still
+  working. Or the attacker registered the address with a password, and the
+  victim's magic-link sign-in marked the account verified while the password
+  kept working. OAuth sign-in now refuses to auto-link onto any unverified
+  account, with the new reason `local-account-unverified-passwordless` for one
+  without a password. The first magic link, email code or password reset now
+  removes the password and every linked identity whose provider didn't verify
+  that email, and ends all sessions, before verifying the account. Accounts
+  created with `POST /admin/users` are now stored as verified, so invitees can
+  still use "Sign in with Google". A custom auth repository needs the new
+  optional `unlinkUserIdentity`; see Breaking.
+
+- **A guest session can no longer claim the first admin role, or block the
+  developer from it.** `POST /admin/bootstrap` recognised guests only by the
+  reserved uids `anonymous`/`anon`, but `/auth/anonymous` creates guests with
+  random ids. Outside production a guest could make itself admin, and a guest
+  created on page load locked out the developer who registered next. Bootstrap
+  now uses the user row's `isAnonymous` flag.
+
+- **Upgrading a guest to an account requires the register captcha and runs
+  `beforeUserCreate`.** Calling `/auth/anonymous` then `/auth/anonymous/link`
+  created a password account that passed neither check. `/anonymous/link` now
+  requires the `register` challenge and runs the hook on the email and password
+  hash being set, storing what it returns as `/register` does; guest sign-in
+  itself stays challenge-free. See Breaking.
+
+- **The MFA challenge routes refuse a revoked session.**
+  `POST /auth/mfa/challenge` and `/mfa/challenge/verify` skipped the check that
+  a session was ended by "sign out everywhere" or a password change. A stolen
+  access token could still complete a challenge and get a new aal2 session that
+  the revocation couldn't reach. Both routes now answer `SESSION_REVOKED` for an
+  access token or pending MFA token issued before the revocation.
+
+- **An MFA challenge checks at most five guesses, however many arrive at once.**
+  The attempt cap was check-then-act, so guesses sent in parallel, the shape a
+  brute force takes, all passed it. The attempt is now claimed before the code
+  is judged, and a claim past the cap answers `CHALLENGE_EXHAUSTED`.
+
+- **Magic link, email code and guest sign-in set the refresh cookie in cookie
+  mode.** With `cookieAuth` on, `/magic-link/verify`, `/otp/verify`,
+  `/anonymous` and `/anonymous/link` returned the refresh token in the JSON
+  body, readable by page scripts, and set no cookie. The next page reload then
+  signed the user out with 401 `NO_SESSION`. They now behave like login.
+
+- **Linking an OAuth provider checks `allowedRedirectUris`.**
+  `POST /auth/link/<provider>` skipped the redirect allowlist the sign-in route
+  applies, and echoed the provider's error text, which could include the
+  client_id. A code leaked through a stale redirect URI could be linked to an
+  attacker's account. Both routes now share the check and return a generic 401.
+
+- **A magic-link request no longer reveals whether an account exists, and is
+  limited per address.** `POST /auth/magic-link` waited for the email to send
+  only for real accounts, had no minimum response time and no per-address limit,
+  and called `beforeLogin` only for existing addresses. It now matches `/otp`
+  and `/forgot-password`: it sends in the background, never answers faster than
+  400ms, allows 5 sends per address per 15 minutes, and calls the hook for every
+  request.
+
+- **A refresh in flight during sign-out no longer brings the session back.** A
+  logout or device revoke that landed mid-refresh was undone: the refresh wrote
+  a new live token into the ended session and, in cookie mode, re-set the
+  cookie. The refresh now answers 401 `SESSION_REVOKED` instead.
+
+- **The data plane refuses a request whose roles it cannot read.** When the role
+  lookup failed, the built-in adapter fell back to the roles in the token, so
+  during a database blip a demoted admin's token (up to an hour old) got admin
+  RLS on REST and on the socket. It now answers 503 `ROLE_LOOKUP_FAILED`, as the
+  admin routes already did.
+
+#### Postgres
+
+- **The WebSocket and MCP reads no longer serve fields the caller may not
+  read.** The driver's `fetchCollection` (and text search) parsed rows without
+  the per-field read strip, and so did `fetchOne` when it fell back from
+  drizzle's relational query API. A plain user who sent one `FETCH_COLLECTION`
+  for `users`, or called MCP `query_collection`, received every co-member's
+  password hash, verification token and any `access.read`-restricted column,
+  while `GET /api/data/users` withheld them. Both paths now strip against the
+  caller's roles.
+
+- **A single get's relations respect the target's `beforeQuery` scope and soft
+  delete.** `fetchOne` (socket `FETCH_ONE`, MCP `get_document`) filled relations
+  through drizzle's `with`, so a tenant-scoped user fetching `owners/1` received
+  other tenants' docs, and trashed ones, that `?include=docs` correctly hid.
+  Join-path relations now hide soft-deleted targets as well.
+
+- **A read-restricted to-one relation no longer leaks through its foreign key.**
+  A `band` relation with `access.read: ["hr"]` was withheld from everyone else,
+  but `bandId: 7` was still served beside it on every read. The foreign key is
+  now withheld with the relation.
+
+- **Saving a relation list no longer unlinks rows the caller could not see.**
+  Membership writes compared the new list against every linked row, whatever its
+  tenant and even if trashed. So saving back the list a scoped user was shown
+  set `owner_id = NULL` on another tenant's rows and on trashed ones, and
+  removed junction links to hidden tags. hasMany, hasOne, manyToMany and
+  join-path writes now leave those links alone.
+
+#### Realtime
+
+- **A socket read may no longer filter, sort or project on a field its caller
+  cannot read.** `COUNT`, `FETCH_COLLECTION`, `CHECK_UNIQUE_FIELD` and
+  `subscribe_collection` did not apply the check REST applies, so a `COUNT`
+  filtered with `passwordHash like '$2b$10$A%'` let any signed-in user extract a
+  hash one character at a time. They now answer `FIELD_NOT_READABLE` with the
+  field named, using the same rule as REST, now exported from
+  `@rebasepro/server` as `assertQueryFieldsReadable`.
+
+- **Signing out no longer hands the next user the previous user's live rows.** A
+  sign-out dropped the socket but kept every subscription's cached rows marked
+  as loaded, so the next `listen()` on the same query got the signed-out user's
+  rows immediately and sent no subscribe at all. The cache is now cleared when
+  the socket is dropped, and the next listener asks the server.
+
+- **Signing in as a different account rebuilds the realtime socket.** Signing in
+  over an existing session emits no `SIGNED_OUT`, and the socket was
+  re-authenticated in place. The server keeps each subscription's identity from
+  when it was made, so the previous account's subscriptions kept pushing that
+  account's rows into the new account's page, and a visitor who listened and
+  then signed in stayed anonymous. The socket is now dropped and redialled as
+  the new account, and every live subscription and channel is re-sent.
+
+- **The realtime socket no longer authenticates with the token of an account
+  that just signed out.** Its token getter refreshes a nearly-expired token
+  first, and when that refresh failed it fell back to the session it had read
+  before. A refresh fails exactly when the user signs out while it is in flight,
+  so the socket signed in as the account that had just left. It now reads the
+  current session after a failed refresh.
+
+#### Storage & email
+
+- **The resumable upload route refuses the reserved rendition prefix, and a
+  transform URL serves only an image.** `POST /upload` refused keys under
+  `_rebase/renditions/`, but TUS checked its key separately and never asked.
+  Anyone who could upload could work out the key a transform of a readable image
+  reads from, plant `<script>` there as `text/html` through TUS, and the
+  transform URL served it back inline on the API origin. On macOS and Windows
+  `_REBASE/renditions/…` also got past `POST /upload`. The prefix check now
+  ignores case and treats `\` as a separator, and a stored rendition is only
+  served if its type is the image type its extension names.
+
+- **A write to S3 or GCS can only name a bucket the source serves.** Reads and
+  listings checked `bucket` against the controller's known buckets, but uploads,
+  `POST /folder` and TUS only checked the name's format. On an object store that
+  meant `bucket=prod-db-backups` wrote into any bucket the deployment's
+  credentials could reach, while listing the same bucket answered 404. All three
+  now answer 404 `UNKNOWN_STORAGE_SOURCE`. Local storage still creates a bucket
+  on write.
+
+- **With a single storage controller, TUS refuses a named storage source.** The
+  REST routes already answered 400 for a `storageId` other than the default. TUS
+  asked the `storageAuthorize` hook about the named source and then wrote to the
+  default controller.
+
+- **A resumable upload stores the content type its property limits checked.**
+  When the metadata carried both `filetype` and `contentType`, the check read
+  one and the write stored the other, so a property that accepts only `image/*`
+  could end up holding `text/html`.
+
+#### MCP
+
+- **The MCP query tool refuses a filter or sort on a field the caller cannot
+  read.** `query_collection` only checked that a filter or `orderBy` field
+  existed. A user without `access.read` on `salary` could ask for rows with
+  salary above a bound and narrow it down call by call, or sort by it, and
+  `excludeFromApi` columns could be used the same way. REST already answered
+  these with `FIELD_NOT_READABLE`, and the MCP tool now does too. Its "Known
+  fields" list in errors no longer names fields the caller can't read.
+
+- **The MCP `create_document` and `update_document` tools apply the field write
+  rules.** They passed the model's `values` straight to the driver, so a user
+  could set an `access.write` field their roles don't allow, or any
+  `excludeFromApi` column, by asking a connected MCP client to. Both tools now
+  run the same check as REST and the socket's `SAVE` and return its message to
+  the model as the tool error. They also apply `PATCH`'s field-operation type
+  check and `POST`'s refusal of field operations on a create.
+
+- **An MCP grant answers to sign-out-everywhere, password changes, role changes
+  and account deletion.** The consent page accepted a session token that "sign
+  out everywhere" or a password reset had already revoked. Every refresh
+  re-issued the roles recorded at consent, so a demoted or deleted admin kept
+  admin access through `/mcp` as long as the client kept refreshing, and a guest
+  session could consent, after which its tool calls ran as a full account. Now
+  the consent page refuses revoked sessions and guests. Code redemption and
+  every refresh read the account's current roles and refuse accounts that are
+  gone, and a refresh token issued before the account's revocation watermark is
+  refused and its family revoked. A failed account lookup answers 503 without
+  using up the token. `/api/oauth/grants` also refuses a revoked session.
+
+#### Client SDK
+
+- **A token refresh that answers after sign-out no longer brings the session
+  back.** If a refresh was in flight when the user signed out, its answer was
+  adopted anyway: the session came back in memory, in localStorage and on the
+  transport, and `TOKEN_REFRESHED` fired after `SIGNED_OUT`. The same race could
+  overwrite a sign-in made meanwhile, or sign that new user out when the old
+  token was refused. A refresh whose session has ended now drops its result, and
+  a refused request is not retried as a different user.
+
+#### Admin (CMS & app)
+
+- **Signing out clears every cache that holds the last user's data.** Sign-out
+  used to clear only the fetch cache. The table's scroll cache still held the
+  previous user's rows, so the next user's table showed those rows first and
+  kept them if its own read was refused. Relation titles and edits handed
+  between layouts also survived, and `<Rebase client>` with no `authController`
+  cleared nothing. All of these are now cleared on sign-out, and when a
+  different user signs in. Local drafts survive a sign-out and are dropped when
+  someone else signs in.
+
+- **`useBackendStorageSource` no longer puts the session token in file URLs, and
+  can read private files.** It wrote the session JWT into file URLs (into
+  `<img src>` and access logs) and sent it as a Bearer to `/storage/file/*`,
+  which the server refuses, so every private file got a 401. It now uses the
+  short-lived download token, encodes keys, and lets cached URLs expire.
+
+#### Studio
+
+- **Importing a live RLS policy into the codebase no longer turns a restrictive
+  policy into one everyone passes.** Both "Import to codebase" buttons (Studio's
+  RLS editor and the collection editor's RLS tab) copied a policy's `TO` list,
+  which holds database roles, into `SecurityRule.roles`, which holds application
+  roles. A restrictive `tenant_isolation … TO public USING (tenant_id = …)` came
+  back as `NOT (roles && ARRAY['public']) OR tenant_id = …`, so every user
+  passed the tenant gate, and a permissive import matched nobody. The `TO` list
+  is now written to `pgRoles`, and left out when it is `public`.
+
+- **Importing an existing table in the collection editor writes security rules
+  that compile back to the table's own policies.** The policy metadata was read
+  from `pg_policy`, so the command arrived as a one-letter code the importer
+  didn't recognise, and every rule compiled to FOR ALL: a
+  `SELECT … USING (true)` became a write grant. `TO public` arrived as `-`, the
+  TO list was filed as application `roles`, and restrictive policies came back
+  permissive, so a restrictive tenant gate became a permissive `rebase.roles()`
+  check. An INSERT policy lost its WITH CHECK and blocked every insert. The
+  metadata now comes from `pg_policies`, a command the importer cannot name is
+  refused instead of widened to FOR ALL, and "Import from table", Studio's RLS
+  editor and the RLS tab all build the rule the same way.
+
+- **Editing a policy directly in the database replaces it under its old name,
+  atomically.** In the hosted console, and for unmapped tables locally, an edit
+  dropped the policy under its *new* name and then created it, as two separate
+  commits. Renaming `public_read USING (true)` left the world-readable policy in
+  place next to the new one, and a typo in the new USING clause deleted the
+  policy outright. The old name is dropped now, and the drop and create run as
+  one statement, so a failed create keeps the original.
+
+#### UI kit & plugins
+
+- **Insights never show one user the figures cached for the previous one.** The
+  insights cache survives sign-out, and its key didn't include the user. Anyone
+  signing in on the same tab within `cacheTTL` (60 seconds by default) saw the
+  previous account's numbers, computed under that account's permissions and
+  row-level security.
+
+#### CLI
+
+- **A deploy's source upload respects `.gitignore` outside a git repository, and
+  never carries database dumps, `.rebase/` or dev secrets.** A project with no
+  repo of its own (what `rebase init --yes` makes) was walked with fixed
+  excludes only, so `backups/*.dump` (password hashes included), `uploads/` and
+  `.rebase-dev-secrets.json` were uploaded as the project's source. Git now
+  reads the project's ignore files, and `*.dump`, `.rebase/` and `.rebase-dev-*`
+  are never uploaded, whatever git tracks. Without git, a tree holding a
+  `.gitignore` is not uploaded, and the deploy goes on without its source. A
+  project inside a repository that ignores it uploads the project, not that
+  repository.
+
+- **`rebase cloud deploy --source <dir>` never uploads env files, dumps or
+  anything `.gitignore` names.** It used `tar .` with only the root `.gitignore`
+  as tar globs, so `.env.production` shipped, and from a monorepo subfolder
+  `.env` itself did. It now uses git's reading of every `.gitignore` plus the
+  same never-uploaded filter. `.rebaseignore` is still honoured.
+
+- **A failed command's usage report no longer carries project names or typos.**
+  `cli.error` sent the command and subcommand exactly as typed, so
+  `rebase init acme-payroll-internal --headles` sent
+  `subcommand: "acme-payroll-internal"` to the collector, although the consent
+  screen promises project names are never sent. Both words are now limited to
+  commands and subcommands the CLI dispatches, `"none"` or `"other"`. This only
+  affected users who opted in to usage sharing.
+
+#### rls-check
+
+- **An `rls-check` copy-paste fix can no longer be turned into a different
+  statement by a hostile table, role or routine name.** A table named
+  `x"; DROP TABLE users; --` produced a CREATE POLICY line that ran the DROP
+  when pasted. Names with a line break escaped `--` comments, some table names
+  went into SQL unquoted, and a routine named with `$$` ended the `DO $$` block.
+  Names with control characters are now written as `U&"…"` identifiers, and
+  every identifier is quoted.
+
+#### MongoDB
+
+- **A MongoDB create that names a taken id answers 409 instead of overwriting
+  the row.** A save with `status: "new"` and an `id` was checked as an insert,
+  then written as an upsert, so over the socket a user could name another user's
+  row id and take the row over. A create now inserts, an update touches only its
+  row and answers 404 when it is missing, and a duplicate on any unique index is
+  a 409 naming the fields.
+
+- **Per-field `access` and `excludeFromApi` apply to every row the MongoDB
+  driver serves.** REST reads, socket fetches and subscription pushes returned
+  every field, so an anonymous caller received fields like `salary` and
+  `apiToken`. These fields are now stripped, left out of text search, and
+  refused as a filter or sort key, and the socket's `SAVE` checks `access.write`
+  with the session's roles instead of as the trusted server.
+
+- **A MongoDB uniqueness check compares one value on one declared field.**
+  `CHECK_UNIQUE_FIELD` passed the client's field name and value straight into a
+  query, so a value such as `{ "$regex": "^123" }` read hidden values a prefix
+  at a time, and a name of `$expr` ran an aggregation expression. Operators are
+  now refused, the value must be a scalar compared with `$eq`, and the field
+  must be declared and readable by the caller.
+
+- **A guest on MongoDB is a guest.** The MongoDB user store never saved or read
+  `isAnonymous` or `metadata`, so `POST /auth/anonymous` created a full account
+  that `policy.registered()` let through, and `/auth/anonymous/link` answered
+  `NOT_ANONYMOUS` to every guest.
+
+- **Deleting a user ends their sessions on MongoDB.** A deleted or banned user's
+  refresh token kept producing access tokens for up to 400 days, because only
+  Postgres removed the tokens with the user. The delete endpoints now clear the
+  sessions themselves, and the MongoDB store removes the user's tokens.
 
 ## [0.22.0] - 2026-09-21
 
