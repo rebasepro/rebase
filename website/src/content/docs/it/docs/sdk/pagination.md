@@ -1,5 +1,5 @@
 ---
-sourceHash: f040abfe0eee948c
+sourceHash: 68c72ab1579b2f85
 title: Paginazione
 sidebar_label: Paginazione
 description: Esegui la paginazione di una collezione con limit/offset, numeri di pagina o un cursore keyset — e scopri quando ciascuno smette di essere corretto.
@@ -59,7 +59,7 @@ passarlo direttamente senza dover ribadire l'ordinamento.
 Non analizzarlo (parse) e non costruirne uno: la codifica esiste per essere modificata e
 qualsiasi altra cosa produrrà `INVALID_CURSOR`.
 
-Dalla natura del cursore derivano tre conseguenze:
+Dalla natura del cursore derivano quattro conseguenze:
 
 - **`after` non può essere combinato con `offset` o `page`** (400
   `CURSOR_WITH_OFFSET`). Entrambi indicano dove inizia la pagina, e rispettarli
@@ -67,10 +67,15 @@ Dalla natura del cursore derivano tre conseguenze:
 - **Gli ordinamenti a più chiavi e le chiavi nullable funzionano entrambi.** Il confronto viene costruito su
   ciascuna chiave nell'ordine specificato, con il [posizionamento di NULL](#where-nulls-sort) dichiarato
   dall'ordinamento — non un singolo `>` su una colonna.
-- **La rilevanza non può essere un cursore.** Un valore `_score` viene calcolato per query e non viene memorizzato
-  da nessuna parte, e due query con stringhe di ricerca diverse producono punteggi che non sono
-  sulla stessa scala. Un tale elenco semplicemente non include un `nextCursor`; paginalo
-  con `offset`.
+- **La rilevanza non può essere un cursore.** Un valore `_score` viene calcolato per query e non
+  viene memorizzato da nessuna parte, e due query con stringhe di ricerca diverse producono punteggi
+  che non sono sulla stessa scala. Un tale elenco semplicemente non include un `nextCursor`;
+  paginalo con `offset`. Lo stesso vale per la distanza di una ricerca vettoriale, e un cursore
+  inviato con una di esse viene rifiutato con `VECTOR_CURSOR_UNSUPPORTED`.
+- **Una sottoscrizione non può proseguire da un cursore.** `listen()` riesegue la sua query a ogni
+  scrittura, e `after` indica un punto in una sola di queste esecuzioni, quindi `listen({ after })`
+  viene rifiutato con `CURSOR_NOT_LIVE` prima di inviare qualcosa. Usa `offset` o `page` per una
+  finestra live, oppure `find({ after })` per leggere la pagina una volta.
 
 Su HTTP si tratta di un solo parametro:
 

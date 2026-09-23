@@ -1,5 +1,5 @@
 ---
-sourceHash: 98630809329b42c5
+sourceHash: 149704990d5e02cb
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -104,9 +104,9 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `IDENTITY_ALREADY_LINKED` | 409 | Quell'identità OAuth appartiene a un altro account. | Accedi con essa, oppure scollecala prima da quell'account. |
 | `INVALID_ACCOUNT` | 400 | L'account si trova in uno stato su cui questa operazione non può agire. | Consulta il messaggio. |
 | `INVALID_CHALLENGE` | 400 | La verifica MFA è sconosciuta o scaduta. | Avviane una nuova. |
-| `INVALID_CODE` | 401 | Il codice OTP o MFA non è corretto. | Riprova con il codice attuale. |
+| `INVALID_CODE` | 400 / 401 | Il codice OTP o MFA non è corretto: 400 dall'accesso con codice email (`/auth/otp/verify`), 401 da una registrazione o da un challenge MFA. | Riprova con il codice attuale. |
 | `INVALID_CREDENTIALS` | 401 | Email o password errata — deliberatamente senza specificare quale delle due. | Riprova, o reimposta la password. |
-| `INVALID_TOKEN` | 400 | Un token di verifica, reimpostazione o magic link è malformato o sconosciuto. | Richiedi un nuovo link. |
+| `INVALID_TOKEN` | 400 / 401 | Un token di verifica, reimpostazione o magic link è malformato o sconosciuto (400). Una credenziale di un provider OAuth o un refresh token che non si verifica restituisce 401. | Richiedi un nuovo link, o accedi di nuovo. |
 | `LAST_ADMIN` | 403 | La modifica lascerebbe il progetto senza alcun amministratore. | Promuovi prima qualcun altro. |
 | `MFA_REQUIRED` | 401 | La password era corretta e l'account ha un secondo fattore verificato, quindi l'accesso è completato solo a metà. `details` contiene un token temporaneo limitato alla verifica MFA — non è una sessione. | Apri una verifica e rispondi; la risposta alla verifica rilascia la sessione. |
 | `NO_SESSION` | 401 | Non è stato fornito alcun cookie di sessione o refresh token. Normale al primo caricamento della pagina. | Accedi. |
@@ -116,9 +116,10 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | La destinazione del reindirizzamento non è presente nella lista dei consentiti (allow-list). | Aggiungila alla configurazione del provider. |
 | `REGISTRATION_DISABLED` | 403 | L'auto-registrazione è disabilitata. | Chiedi a un amministratore di creare l'account. |
 | `ROLE_EXISTS` | 409 | Questo nome di ruolo è già occupato. | Scegli un altro nome. |
-| `ROLE_LOOKUP_FAILED` | 503 | Impossibile leggere i ruoli per una richiesta riservata agli amministratori. Si blocca per sicurezza (fail-closed) anziché fidarsi del claim contenuto nel token. | Riprova; controlla il database. |
+| `ROLE_LOOKUP_FAILED` | 503 | Impossibile leggere i ruoli del chiamante — su una route di amministrazione, o su una richiesta di dati in un backend con `config.auth`. Si blocca per sicurezza invece di fidarsi dei ruoli nel token. | Riprova; controlla il database. |
 | `SELF_DELETE` | 400 | Un amministratore ha tentato di eliminare il proprio account. | Fai eseguire l'operazione a un altro amministratore. |
 | `SESSION_REVOKED` | 401 | È stato eseguito il logout dalla sessione altrove, oppure tutte le sessioni sono state revocate. | Accedi nuovamente. |
+| `UNVERIFIED_IDENTITIES` | 409 | Un magic link, un codice via email o un ripristino della password ha dimostrato l'indirizzo di un account non verificato, e l'account ha un'identità di accesso il cui provider non ha mai verificato quell'indirizzo. Il repository di autenticazione non può rimuoverla (non ha `unlinkUserIdentity`), quindi la prova viene rifiutata invece di lasciare quella via d'accesso su un account verificato. | Implementa `unlinkUserIdentity` nel repository di autenticazione personalizzato, o fai verificare l'account da un amministratore. |
 | `SETUP_REQUIRED` | 403 | Il progetto non ha ancora un amministratore, quindi questa route non è disponibile. | Completa la configurazione del primo amministratore. |
 | `TOKEN_ALREADY_USED` | 401 | È stato riutilizzato un token monouso. | Richiedine uno nuovo. |
 | `TOKEN_EXPIRED` | 401 | Il token ha superato la sua durata di validità. | Richiedine uno nuovo. |
@@ -146,10 +147,12 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `IDEMPOTENCY_KEY_REUSED` | 422 | La stessa `Idempotency-Key` è arrivata con un corpo differente. | Usa una nuova chiave, oppure invia il corpo originale. |
 | `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` ha indicato una funzione diversa da `count`, `sum`, `avg`, `min` o `max`. | Usane una tra queste; il messaggio ne riporta l'elenco. |
 | `INVALID_AGGREGATE_SELECT` | 400 | Una voce di `?select=` non rispetta il formato `fn(field)`, oppure a una funzione diversa da `count()` non è stato associato alcun campo. | Utilizza la sintassi `sum(total)`, `count()`, `avg(score)`. |
+| `INVALID_AGGREGATE_WINDOW` | 400 | `offset`, `page` o `orderBy` su un'aggregazione senza `groupBy`, o un cursore su qualsiasi aggregazione. Un'aggregazione non raggruppata è una riga, e un gruppo non è una riga dopo cui un cursore possa proseguire. | Aggiungi `groupBy`, o toglili; pagina i gruppi con `offset` o `page`. Vedi [Aggregazioni](/docs/sdk/aggregates-and-search/#aggregates). |
 | `INVALID_BATCH_BODY` | 400 | Un'operazione in `/_batch` è priva di `op`, `collection`, `values` o `id`, specifica una collection non gestita da questo backend, oppure riutilizza un nome `ref`. | Consulta il messaggio; indica l'operazione in base all'indice. |
 | `INVALID_BATCH_REF` | 400 | Un `{ "$ref": "<name>.<field>" }` non fa riferimento ad alcuna operazione precedente, punta in avanti o richiede un campo non presente nella riga referenziata. Si possono risolvere solo riferimenti all'indietro. | Definisci l'operazione con `ref` *prima* di referenziarla. |
 | `INVALID_BULK_BODY` | 400 | Il corpo della richiesta bulk non presenta il formato atteso. | Invia l'array `items` documentato. |
-| `INVALID_CONFLICT_TARGET` | 400 | Il parametro `on_conflict` / `onConflict` di un upsert indica colonne senza garanzia di unicità, oppure le specifica senza `upsert: true`. In caso contrario, Postgres restituirebbe l'errore 42P10 dall'interno di una transazione che ha già svolto del lavoro. | Dichiara `validation: { unique: true }` o un indice `unique`; il messaggio elenca i target effettivamente disponibili. |
+| `INVALID_CONFLICT_TARGET` | 400 | Il parametro `on_conflict` / `onConflict` di un upsert indica colonne senza garanzia di unicità, le specifica senza `upsert: true`, oppure è inviato su una creazione annidata, dove una riga trovata passerebbe sotto il nuovo parent. In caso contrario, Postgres restituirebbe l'errore 42P10 dall'interno di una transazione che ha già svolto del lavoro. | Dichiara `validation: { unique: true }` o un indice `unique`; il messaggio elenca i target effettivamente disponibili. |
+| `INVALID_CURSOR` | 400 | Il cursore `after` non è leggibile, o indica un id di riga che non corrisponde alle colonne chiave della collection: è stato troncato, ricodificato o costruito a mano. | Restituisci invariato il `meta.nextCursor` della pagina precedente. Vedi [Paginazione](/docs/sdk/pagination/). |
 | `INVALID_DELETED_PARAM` | 400 | `?deleted=` non è né `include` né `only`. Viene rifiutato anziché ignorato: un errore di battitura come `?deleted=true` che nascondesse silenziosamente tutte le righe eliminate sembrerebbe aver funzionato, rispondendo in realtà alla domanda opposta. | Invia `include` (attive ed eliminate) o `only` (solo eliminate). Omettilo per ottenere solo le righe attive. |
 | `INVALID_DISTINCT` | 400 | `?distinct=` non è `true` o `false`. | Invia uno di questi valori; sono accettati anche `1` e `0`. |
 | `INVALID_FIELD_OPERATION` | 400 | È stato utilizzato un operatore `$inc` / `$push` / `$pull` / `$merge` su un tipo di proprietà non compatibile, con un operando dal formato non corretto, con due operatori sullo stesso campo, digitato in modo errato, o in un'operazione di creazione — dove non esiste un valore salvato su cui operare. | Consulta [Scrittura via REST](/docs/backend/writes/#field-operations); il messaggio indica il campo interessato. |
@@ -172,7 +175,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `MISSING_AGGREGATE_SELECT` | 400 | La route di aggregazione è stata chiamata senza `?select=`. | Aggiungine uno, ad es. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | Il progetto non gestisce alcuna collection: nessuna dichiarata nel codice e nessuna tabella da cui ricavarle. | Crea delle tabelle — tramite migrazione, SQL o un file collection seguito da `rebase db push` — e riavvia. |
 | `NOT_FOUND` | 404 | Nessuna riga con questo id in questa collection — oppure una riga nascosta a questo chiamante dalla row-level security. | Controlla l'id, poi le `securityRules` della collection. |
-| `UNKNOWN_RELATION` | 400 | `?include=` indica un elemento che non costituisce una relazione nella collection. Lo stesso codice risponde con **404** quando è invece un *percorso URL* annidato a indicarne una inesistente, ad esempio `/api/data/authors/1/posts` dove `authors` non ne dichiara alcuna — in quel caso l'URL non fa riferimento a nulla, quindi si tratta di una risorsa non trovata anziché di una richiesta malformata. | Controlla il nome della relazione — il messaggio elenca quelle presenti nella collection. Un riferimento inverso deve essere dichiarato sul genitore per essere esplorabile. |
+| `UNKNOWN_RELATION` | 400 / 404 | `?include=` indica un elemento che non costituisce una relazione nella collection. Lo stesso codice risponde con **404** quando è invece un *percorso URL* annidato a indicarne una inesistente, ad esempio `/api/data/authors/1/posts` dove `authors` non ne dichiara alcuna — in quel caso l'URL non fa riferimento a nulla, quindi si tratta di una risorsa non trovata anziché di una richiesta malformata. | Controlla il nome della relazione — il messaggio elenca quelle presenti nella collection. Un riferimento inverso deve essere dichiarato sul genitore per essere esplorabile. |
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | L'ordinamento fa riferimento a una proprietà non ordinabile. | Ordina in base a una proprietà supportata da colonna. |
 | `PAYLOAD_TOO_LARGE` | 413 | Il corpo della richiesta supera il limite configurato. | Invia meno dati, oppure aumenta il limite. |
 | `READ_ONLY_TRANSACTION` | 409 | Un callback `afterRead` ha tentato di eseguire una scrittura. Una lettura con ambito richiesta viene eseguita all'interno di una transazione `READ ONLY`, pertanto né il callback né le funzioni da esso chiamate possono eseguire scritture. | Sposta la scrittura all'esterno dell'operazione di lettura: usa un background job, oppure `rebase.dataAsAdmin` da un cron job o da una custom function. |
@@ -202,6 +205,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `VALIDATION_EXCLUDED_FIELDS` | 400 | Il corpo scrive su una colonna contrassegnata con `excludeFromApi` o `access: { write: [] }` — la stessa regola, con due sintassi diverse. Questi campi sono riservati all'impostazione da parte del server: l'hash di una password, un token di verifica. A differenza di `FIELD_NOT_WRITABLE`, questa risposta è identica per qualsiasi chiamante, `admin` compreso. | Rimuovi il campo. Consulta [Accesso ai campi](/docs/collections/field-access/). |
 | `VALIDATION_INVALID_VALUE` | 400 | Un valore non corrisponde al tipo della proprietà. | Consulta il messaggio; indica la proprietà interessata. |
 | `VALIDATION_UNKNOWN_FIELDS` | 400 | Il corpo specifica un campo non presente nella collection — compreso un argomento `id` su una collection la cui chiave è basata su un altro campo. | Verifica la correttezza del nome; il messaggio elenca i campi noti. |
+| `VECTOR_CURSOR_UNSUPPORTED` | 400 | Un cursore (`after` / `startAfter`) è stato combinato con una ricerca vettoriale. Le righe sono ordinate per una distanza calcolata per ogni query, che non può fare da cursore, quindi un elenco vettoriale non ha `nextCursor`. | Pagina le righe più vicine con `limit`/`offset`. |
 | `WRITE_DENIED` | 403 | Una regola di sicurezza o una policy di row-level security ha rifiutato la scrittura. | Controlla le `securityRules` della collection. |
 
 ## `PG_<SQLSTATE>` — un vincolo rifiutato dal database
@@ -232,16 +236,17 @@ codice SQLSTATE per tutti, e il messaggio indica il vincolo violato.
 
 | Codice | Stato | Significato | Cosa fare |
 | --- | --- | --- | --- |
+| `INVALID_LIST_OPTIONS` | 400 | Il `maxResults` di un elenco dello storage non è un numero intero di almeno 1, o il suo `pageToken` non è stato emesso dalla sorgente. Una dimensione di pagina inferiore a uno restituiva una pagina vuota con lo stesso token, così un ciclo `while (pageToken)` non finiva mai. | Invia un `maxResults` positivo e restituisci `nextPageToken` invariato. |
 | `INVALID_STORAGE_BUCKET` | 400 | Il nome del bucket è malformato. | Controlla il nome. |
 | `INVALID_STORAGE_KEY` | 400 | La chiave dell'oggetto è malformata o esce dal prefisso consentito. | Controlla la chiave. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | I parametri di trasformazione dell'immagine sono fuori scala o contraddittori. | Consulta [Storage](/docs/backend/storage/). |
 | `STORAGE_FILE_TOO_LARGE` | 413 | L'upload supera la dimensione `maxSize` dichiarata dalla proprietà di destinazione. Applicato sul server, non solo nel browser. `details` indica la proprietà, il limite e la dimensione effettiva. | Carica un file più piccolo, o aumenta `maxSize` sulla proprietà. |
 | `STORAGE_FILE_TYPE_REFUSED` | 400 | Il tipo di file caricato non è presente tra i tipi ammessi (`acceptedFiles`) della proprietà. `details` include la proprietà, l'elenco consentito e il content type inviato. | Carica un tipo di file consentito, oppure amplia `acceptedFiles`. |
-| `STORAGE_NOT_CONFIGURED` | 503 | Nessun backend di storage è configurato su questo server. | Configura S3, GCS o lo storage locale. |
+| `STORAGE_NOT_CONFIGURED` | 501 / 503 | Nessun backend di storage è configurato su questo server, oppure nessuno è quello predefinito e la richiesta non nomina alcuna sorgente; il messaggio indica le sorgenti servite (501). Un caricamento riprendibile la cui sorgente è scomparsa prima della fine restituisce 503. | Configura S3, GCS o lo storage locale, o nomina una sorgente con `?storageId=`. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | La sorgente di storage è dichiarata ma non dispone di credenziali su questa istanza. | Imposta le variabili d'ambiente per quella sorgente. |
 | `STORAGE_WRITE_FAILED` | 502 | Il backend di storage ha rifiutato o interrotto la scrittura. | Controlla i relativi log e le credenziali. |
 | `TRANSFORM_OVERLOADED` | 503 | Troppe trasformazioni di immagini simultanee in esecuzione. | Riprova; valuta l'uso di una CDN a monte. |
-| `UNKNOWN_STORAGE_SOURCE` | 400 | La richiesta indica una sorgente di storage (`?storageId=`) non dichiarata da questo progetto. Un `bucket` non gestito da questo deployment restituisce lo stesso codice con stato **404** — ciò che manca è lo store, e `details` elenca i bucket e le sorgenti esistenti. In precedenza entrambi venivano segnalati come "file non trovato", indistinguibili da una chiave semplicemente inesistente. | Dichiara la sorgente in `config/resources.ts`, o controlla `GET /api/storage/sources`. |
+| `UNKNOWN_STORAGE_SOURCE` | 400 / 404 | La richiesta indica una sorgente di storage (`?storageId=`) non dichiarata da questo progetto. Un `bucket` non gestito da questo deployment restituisce lo stesso codice con stato **404** (su un elenco, e su un caricamento, una cartella o un caricamento riprendibile verso S3 o GCS) — ciò che manca è lo store, e `details` elenca i bucket e le sorgenti esistenti. In precedenza entrambi venivano segnalati come "file non trovato", indistinguibili da una chiave semplicemente inesistente. | Dichiara la sorgente in `config/resources.ts`, o controlla `GET /api/storage/sources`. |
 
 ## Custom function
 
@@ -295,8 +300,7 @@ Una route utilizza uno di questi codici quando non è applicabile nulla di più 
 ## Mantenere aggiornata questa pagina
 
 `pnpm verify:docs` fallisce quando un codice che il server può generare è assente da queste
-tabelle, quando una tabella elenca un codice che nulla può generare, quando uno stato dichiarato
-discorda dal codice sorgente o quando una famiglia di codici come `PG_<SQLSTATE>` non ha una riga
+tabelle, quando una tabella elenca un codice che nulla può generare, quando gli stati di una riga non sono esattamente quelli con cui il codice sorgente genera il codice o quando una famiglia di codici come `PG_<SQLSTATE>` non ha una riga
 per un codice SQLSTATE che i chiamanti possono incontrare. Lo stage di verifica è
 `tooling/scripts/docs-verify/check-error-codes.mjs`.
 

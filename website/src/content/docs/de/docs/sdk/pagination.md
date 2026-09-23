@@ -1,5 +1,5 @@
 ---
-sourceHash: f040abfe0eee948c
+sourceHash: 68c72ab1579b2f85
 title: Paginierung
 sidebar_label: Paginierung
 description: Paginieren Sie eine Collection mit Limit/Offset, Seitenzahlen oder einem Keyset-Cursor – und wann die jeweilige Methode nicht mehr korrekt funktioniert.
@@ -58,7 +58,7 @@ die Sortierung erneut anzugeben.
 Parsen Sie ihn nicht und erstellen Sie keinen eigenen: Die Kodierung existiert, um geändert werden zu
 können, und alles andere führt zu `INVALID_CURSOR`.
 
-Aus der Funktionsweise eines Cursors ergeben sich drei Dinge:
+Aus der Funktionsweise eines Cursors ergeben sich vier Dinge:
 
 - **`after` kann nicht mit `offset` oder `page` kombiniert werden** (400
   `CURSOR_WITH_OFFSET`). Beide geben an, wo die Seite beginnt, und die Berücksichtigung beider würde
@@ -66,9 +66,15 @@ Aus der Funktionsweise eines Cursors ergeben sich drei Dinge:
 - **Sortierungen über mehrere Schlüssel und null-fähige Schlüssel funktionieren beide.** Der Vergleich
   wird über jeden Schlüssel der Reihe nach aufgebaut, mit der [NULL-Platzierung](#where-nulls-sort),
   die die Sortierung deklariert hat – nicht ein einzelnes `>` auf einer Spalte.
-- **Relevanz kann kein Cursor sein.** Ein `_score` wird pro Abfrage berechnet und nirgendwo gespeichert,
-  und zwei Abfragen mit unterschiedlichen Suchbegriffen erzeugen Scores, die nicht auf derselben Skala
-  liegen. Eine solche Auflistung enthält schlicht kein `nextCursor`; paginieren Sie diese mit `offset`.
+- **Relevanz kann kein Cursor sein.** Ein `_score` wird pro Abfrage berechnet und nirgendwo
+  gespeichert, und zwei Abfragen mit unterschiedlichen Suchbegriffen erzeugen Scores, die nicht auf
+  derselben Skala liegen. Eine solche Auflistung enthält schlicht kein `nextCursor`; paginieren Sie
+  diese mit `offset`. Mit der Distanz einer Vektorsuche verhält es sich genauso, und ein Cursor, der
+  mit einer gesendet wird, wird mit `VECTOR_CURSOR_UNSUPPORTED` abgelehnt.
+- **Ein Abonnement kann nicht an einem Cursor fortsetzen.** `listen()` führt seine Abfrage bei jedem
+  Schreibvorgang erneut aus, und `after` bezeichnet eine Stelle in einem Durchlauf davon, daher wird
+  `listen({ after })` mit `CURSOR_NOT_LIVE` abgelehnt, bevor etwas gesendet wird. Verwenden Sie
+  `offset` oder `page` für ein Live-Fenster, oder `find({ after })`, um die Seite einmal zu lesen.
 
 Über HTTP ist es ein Parameter:
 

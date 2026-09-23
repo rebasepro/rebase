@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bc50ef7860bac7d
+sourceHash: 529819bf2e68a515
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des Rebase Client SDK — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -201,6 +201,7 @@ Der Client ist kein Replikat Ihrer Datenbank und gibt auch nicht vor, eines zu s
 - **`searchString` wird angenähert** als Teilstringsuche über zwischengespeicherte String-Felder ohne Beachtung der Groß-/Kleinschreibung. Der Server führt eine echte Volltextsuche über die konfigurierten Spalten der Collection aus.
 - **Mit `include` eingebundene Relationen lassen sich lokal nicht auswerten** — die verwandten Zeilen liegen in Collections, die die Abfrage nie geladen hat. Eine solche Abfrage wird immer als `partial` markiert, wenn sie aus dem Cache beantwortet wird.
 - **Das Wiederholen erfolgt mindestens einmal.** Ein Schreibvorgang, der den Server erreicht, dessen Antwort aber verloren geht, kann erneut gesendet werden. Bevorzugen Sie idempotente Schreibvorgänge (`createMany` mit `upsert`), wo Duplikate eine Rolle spielen würden.
+- **Ein Upsert auf einem natürlichen Schlüssel braucht den Server.** Welche Zeile ein `onConflict`-Ziel bezeichnet, kann nur der Server herausfinden, daher werden `upsert()` auf einem natürlichen Schlüssel (oder ohne die ID der Zeile) und ein nie gesendetes `createMany()` mit `onConflict` offline mit `OFFLINE_UPSERT_UNSUPPORTED` abgelehnt. Ein Upsert auf dem Primärschlüssel, mit dem Schlüssel in jeder Zeile, wird in die Warteschlange gestellt.
 - **Lokale Lesevorgänge wenden Postgres-Semantik an, nicht die Daten der Datenbank.** Filter werden so ausgewertet, wie SQL es täte — Vergleiche mit `NULL` sind unbekannt, `ORDER BY` stellt Nullwerte bei aufsteigender Sortierung ans Ende —, aber gegen die Kopie der Zeilen im Client, die veraltet sein kann.
 
 ## Rezept: eine Offline-Anzeige

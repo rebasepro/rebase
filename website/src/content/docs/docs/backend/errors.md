@@ -102,9 +102,9 @@ the ID you got. Read the response header.
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
-| `INVALID_CODE` | 401 | The OTP or MFA code is wrong. | Retry with the current code. |
+| `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
-| `INVALID_TOKEN` | 400 | A verification, reset or magic-link token is malformed or unknown. | Request a fresh link. |
+| `INVALID_TOKEN` | 400 / 401 | A verification, reset or magic-link token is malformed or unknown (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
@@ -114,9 +114,10 @@ the ID you got. Read the response header.
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | The redirect target is not on the allow-list. | Add it to the provider configuration. |
 | `REGISTRATION_DISABLED` | 403 | Self-service sign-up is off. | Have an admin create the account. |
 | `ROLE_EXISTS` | 409 | That role name is taken. | Pick another name. |
-| `ROLE_LOOKUP_FAILED` | 503 | Roles could not be read for an admin-gated request. Fails closed rather than trusting the token's own claim. | Retry; check the database. |
+| `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. | Retry; check the database. |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
 | `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked. | Sign in again. |
+| `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed. | Request a fresh one. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
@@ -144,10 +145,12 @@ the ID you got. Read the response header.
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
 | `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` named a function that is not `count`, `sum`, `avg`, `min` or `max`. | Use one of those; the message lists them. |
 | `INVALID_AGGREGATE_SELECT` | 400 | An `?select=` entry is not `fn(field)`, or a function other than `count()` was given no field. | Write `sum(total)`, `count()`, `avg(score)`. |
+| `INVALID_AGGREGATE_WINDOW` | 400 | `offset`, `page` or `orderBy` on an aggregate without `groupBy`, or a cursor on any aggregate. An ungrouped aggregate is one row, and a group is not a row a cursor can continue after. | Add `groupBy`, or drop them; page groups with `offset` or `page`. See [Aggregates](/docs/sdk/aggregates-and-search/#aggregates). |
 | `INVALID_BATCH_BODY` | 400 | A `/_batch` operation is missing `op`, `collection`, `values` or `id`, names a collection this backend does not serve, or reuses a `ref` name. | See the message; it names the operation by index. |
 | `INVALID_BATCH_REF` | 400 | A `{ "$ref": "<name>.<field>" }` names no earlier operation, points forward, or asks for a field the referenced row does not have. Only backward references resolve. | Name the operation with `ref` *before* referencing it. |
 | `INVALID_BULK_BODY` | 400 | The bulk body is not the expected shape. | Send the documented `items` array. |
-| `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, or names them without `upsert: true`. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. |
+| `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, names them without `upsert: true`, or is sent on a nested create, where a matched row would move under the new parent. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. |
+| `INVALID_CURSOR` | 400 | The `after` cursor cannot be read, or names a row id that does not fit the collection's key columns: it was truncated, re-encoded or built by hand. | Pass back `meta.nextCursor` from the previous page unchanged. See [Pagination](/docs/sdk/pagination/). |
 | `INVALID_DELETED_PARAM` | 400 | `?deleted=` is neither `include` nor `only`. Refused rather than ignored: a mistyped `?deleted=true` that quietly hid every deleted row would look like it worked and answer the opposite question. | Send `include` (live and deleted) or `only` (deleted alone). Omit it for live rows only. |
 | `INVALID_DISTINCT` | 400 | `?distinct=` is not `true` or `false`. | Send one of those; `1` and `0` are accepted too. |
 | `INVALID_FIELD_OPERATION` | 400 | A `$inc` / `$push` / `$pull` / `$merge` was used on a property type it is not defined on, with an operand of the wrong shape, with two operators on one field, misspelled, or on a create — where there is no stored value to operate on. | See [Writing over REST](/docs/backend/writes/#field-operations); the message names the field. |
@@ -170,7 +173,7 @@ the ID you got. Read the response header.
 | `MISSING_AGGREGATE_SELECT` | 400 | The aggregate route was called with no `?select=`. | Add one, e.g. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | The project serves no collections: none declared in code, and no tables to derive them from. | Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart. |
 | `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
-| `UNKNOWN_RELATION` | 400 | `?include=` names something that is not a relation on the collection. The same code answers **404** when a nested *URL path* names one instead, e.g. `/api/data/authors/1/posts` where `authors` declares none — there the URL names nothing, so it is a not-found rather than a malformed request. | Check the relation's name — the message lists the ones the collection has. A back-reference has to be declared on the parent to be traversable. |
+| `UNKNOWN_RELATION` | 400 / 404 | `?include=` names something that is not a relation on the collection. The same code answers **404** when a nested *URL path* names one instead, e.g. `/api/data/authors/1/posts` where `authors` declares none — there the URL names nothing, so it is a not-found rather than a malformed request. | Check the relation's name — the message lists the ones the collection has. A back-reference has to be declared on the parent to be traversable. |
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
@@ -200,6 +203,7 @@ the ID you got. Read the response header.
 | `VALIDATION_EXCLUDED_FIELDS` | 400 | The body writes a column marked `excludeFromApi`, or `access: { write: [] }` — the same rule, two spellings. Those are the server's to set: a password hash, a verification token. Unlike `FIELD_NOT_WRITABLE` this is the same answer for every caller, `admin` included. | Remove the field. See [Field access](/docs/collections/field-access/). |
 | `VALIDATION_INVALID_VALUE` | 400 | A value does not fit its property type. | See the message; it names the property. |
 | `VALIDATION_UNKNOWN_FIELDS` | 400 | The body names a field the collection does not have — including an `id` argument on a collection keyed on something else. | Check the spelling; the message lists the known fields. |
+| `VECTOR_CURSOR_UNSUPPORTED` | 400 | A cursor (`after` / `startAfter`) was combined with a vector search. Rows are ordered by a distance computed per query, which cannot key a cursor, so a vector listing carries no `nextCursor`. | Page nearest rows with `limit`/`offset`. |
 | `WRITE_DENIED` | 403 | A security rule or row-level-security policy refused the write. | Check the collection's `securityRules`. |
 
 ## `PG_<SQLSTATE>` — a constraint the database refused
@@ -230,16 +234,17 @@ the message names the constraint.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
+| `INVALID_LIST_OPTIONS` | 400 | A storage listing's `maxResults` is not a whole number of at least 1, or its `pageToken` is not one the source issued. A page size below one used to answer an empty page carrying the same token, so a `while (pageToken)` loop never ended. | Send a positive `maxResults`, and pass back `nextPageToken` unchanged. |
 | `INVALID_STORAGE_BUCKET` | 400 | The bucket name is malformed. | Check the name. |
 | `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |
 | `STORAGE_FILE_TOO_LARGE` | 413 | The upload exceeds the `maxSize` the target property declares. Enforced on the server, not only in the browser. `details` carries the property, the limit and the actual size. | Upload a smaller file, or raise `maxSize` on the property. |
 | `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`. `details` carries the property, the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles`. |
-| `STORAGE_NOT_CONFIGURED` | 503 | No storage backend is configured on this server. | Configure S3, GCS, or local storage. |
+| `STORAGE_NOT_CONFIGURED` | 501 / 503 | No storage backend is configured on this server, or none is the default and the request names no storage source; the message names the sources that are served (501). A resumable upload whose source disappeared before it finished is a 503. | Configure S3, GCS, or local storage, or name a source with `?storageId=`. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
 | `TRANSFORM_OVERLOADED` | 503 | Too many image transforms are in flight. | Retry; consider a CDN in front. |
-| `UNKNOWN_STORAGE_SOURCE` | 400 | The request named a storage source (`?storageId=`) this project does not declare. A `bucket` this deployment does not serve is the same code at **404** — the store is what is missing, and `details` names the buckets and the sources that do exist. Both used to come back as "file not found", identical to a key that is simply absent. | Declare the source in `config/resources.ts`, or check `GET /api/storage/sources`. |
+| `UNKNOWN_STORAGE_SOURCE` | 400 / 404 | The request named a storage source (`?storageId=`) this project does not declare. A `bucket` this deployment does not serve is the same code at **404** (on a listing, and on an upload, a folder or a resumable upload to S3 or GCS) — the store is what is missing, and `details` names the buckets and the sources that do exist. Both used to come back as "file not found", identical to a key that is simply absent. | Declare the source in `config/resources.ts`, or check `GET /api/storage/sources`. |
 
 ## Custom functions
 
@@ -292,8 +297,8 @@ A route uses one of these when nothing more specific applies.
 ## Keeping this page true
 
 `pnpm verify:docs` fails when a code the server can raise is missing from these
-tables, when a table lists a code nothing can raise, when a stated status
-disagrees with the source, or when a code family like `PG_<SQLSTATE>` has no row
+tables, when a table lists a code nothing can raise, when a row's statuses are not
+exactly the ones the source raises the code with, or when a code family like `PG_<SQLSTATE>` has no row
 for a SQLSTATE callers meet. The stage is
 `tooling/scripts/docs-verify/check-error-codes.mjs`.
 

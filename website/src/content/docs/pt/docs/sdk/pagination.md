@@ -1,5 +1,5 @@
 ---
-sourceHash: f040abfe0eee948c
+sourceHash: 68c72ab1579b2f85
 title: Paginação
 sidebar_label: Paginação
 description: Pagine uma coleção com limit/offset, números de página ou um cursor keyset — e quando cada um deixa de ser correto.
@@ -59,7 +59,7 @@ diretamente de volta sem precisar redefinir a ordenação.
 Não faça o parse dele e não construa um: a codificação existe para ser alterada, e
 qualquer outra coisa resultará em `INVALID_CURSOR`.
 
-Três consequências decorrem do que um cursor é:
+Quatro consequências decorrem do que um cursor é:
 
 - **`after` não pode ser combinado com `offset` ou `page`** (400
   `CURSOR_WITH_OFFSET`). Ambos informam onde a página começa, e honrar ambos
@@ -67,10 +67,15 @@ Três consequências decorrem do que um cursor é:
 - **Ordenações por múltiplas chaves e chaves que aceitam nulo funcionam.** A comparação é construída sobre
   cada chave em ordem, com o [posicionamento de NULL](#where-nulls-sort) que a ordenação
   declarou — não um único `>` em uma coluna.
-- **Relevância não pode ser um cursor.** Um `_score` é calculado por consulta e não é armazenado
-  em lugar nenhum, e duas consultas com strings de busca diferentes produzem pontuações que não
-  estão na mesma escala. Tal listagem simplesmente não carrega `nextCursor`; pagine-a
-  com `offset`.
+- **Relevância não pode ser um cursor.** Um `_score` é calculado por consulta e não é armazenado em
+  lugar nenhum, e duas consultas com strings de busca diferentes produzem pontuações que não estão
+  na mesma escala. Tal listagem simplesmente não carrega `nextCursor`; pagine-a com `offset`. O
+  mesmo vale para a distância de uma busca vetorial, e um cursor enviado com uma é recusado com
+  `VECTOR_CURSOR_UNSUPPORTED`.
+- **Uma assinatura não pode continuar a partir de um cursor.** `listen()` reexecuta sua consulta a
+  cada escrita, e `after` indica um ponto em uma única execução dela, então `listen({ after })` é
+  recusado com `CURSOR_NOT_LIVE` antes de qualquer envio. Use `offset` ou `page` para uma janela ao
+  vivo, ou `find({ after })` para ler a página uma vez.
 
 Via HTTP, é um único parâmetro:
 

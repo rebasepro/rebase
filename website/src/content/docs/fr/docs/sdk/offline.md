@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bc50ef7860bac7d
+sourceHash: 529819bf2e68a515
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK Client de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -201,6 +201,7 @@ Le client n'est pas une réplique de votre base de données, et il ne prétend p
 - **`searchString` est approximé** par un balayage de sous-chaîne insensible à la casse sur les champs texte en cache. Le serveur, lui, exécute une vraie recherche plein texte sur les colonnes configurées de la collection.
 - **Les relations passées à `include` ne peuvent pas être évaluées localement** — les lignes liées vivent dans des collections que la requête n'a jamais chargées. Une telle requête est toujours marquée `partial` lorsqu'elle est servie depuis le cache.
 - **Le rejeu est « au moins une fois ».** Une écriture qui atteint le serveur mais dont la réponse se perd peut être renvoyée. Préférez des écritures idempotentes (`createMany` avec `upsert`) là où des doublons poseraient problème.
+- **Un upsert sur une clé naturelle a besoin du serveur.** Seul le serveur peut trouver la ligne que désigne une cible `onConflict`, donc `upsert()` sur une clé naturelle (ou sans l'identifiant de la ligne), et un `createMany()` avec `onConflict` jamais envoyé, sont refusés hors ligne avec `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sur la clé primaire, avec la clé dans chaque ligne, est mis en file d'attente.
 - **Les lectures locales appliquent la sémantique de Postgres, pas les données de la base.** Les filtres sont évalués comme SQL le ferait — les comparaisons avec `NULL` sont inconnues, `ORDER BY` place les valeurs nulles en dernier en ordre croissant — mais sur la copie des lignes détenue par le client, qui peut être obsolète.
 
 ## Recette : un indicateur hors ligne

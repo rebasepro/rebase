@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bc50ef7860bac7d
+sourceHash: 529819bf2e68a515
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK Client di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -201,6 +201,7 @@ Il client non è una replica del tuo database, e non finge di esserlo:
 - **`searchString` è approssimato** come una scansione di sottostringhe senza distinzione tra maiuscole e minuscole sui campi stringa in cache. Il server esegue una vera ricerca full-text sulle colonne configurate della collezione.
 - **Le relazioni caricate con `include` non possono essere valutate localmente** — le righe correlate vivono in collezioni che la query non ha mai caricato. Una query di questo tipo è sempre contrassegnata come `partial` quando riceve risposta dalla cache.
 - **La ritrasmissione è at-least-once.** Una scrittura che raggiunge il server ma la cui risposta va persa può essere inviata di nuovo. Preferisci scritture idempotenti (`createMany` con `upsert`) dove i duplicati sarebbero un problema.
+- **Un upsert su una chiave naturale ha bisogno del server.** Quale riga indichi un target `onConflict` può scoprirlo solo il server, quindi `upsert()` su una chiave naturale (o senza l'id della riga), e un `createMany()` con `onConflict` mai inviato, vengono rifiutati offline con `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sulla chiave primaria, con la chiave in ogni riga, viene messo in coda.
 - **Le letture locali applicano la semantica di Postgres, non i dati del database.** I filtri vengono valutati come farebbe SQL — i confronti con `NULL` sono ignoti, `ORDER BY` mette i null per ultimi in ordine crescente — ma sulla copia delle righe che ha il client, che può essere obsoleta.
 
 ## Ricetta: un indicatore offline

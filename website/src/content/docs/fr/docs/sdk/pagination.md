@@ -1,5 +1,5 @@
 ---
-sourceHash: f040abfe0eee948c
+sourceHash: 68c72ab1579b2f85
 title: Pagination
 sidebar_label: Pagination
 description: Parcourir une collection par pagination limit/offset, numéros de page ou curseur keyset — et quand chacune cesse d'être exacte.
@@ -59,7 +59,7 @@ directement sans redéfinir le tri.
 Ne l'analysez pas et n'en construisez pas : l'encodage est conçu pour pouvoir changer, et
 toute autre valeur entraînera une erreur `INVALID_CURSOR`.
 
-Trois conséquences découlent de la nature d'un curseur :
+Quatre conséquences découlent de la nature d'un curseur :
 
 - **`after` ne peut pas être combiné avec `offset` ou `page`** (400
   `CURSOR_WITH_OFFSET`). Les deux indiquent où commence la page, et respecter les deux
@@ -67,10 +67,16 @@ Trois conséquences découlent de la nature d'un curseur :
 - **Les tris multi-clés et les clés pouvant être nulles fonctionnent tous les deux.** La comparaison est construite
   sur chaque clé dans l'ordre, avec le [positionnement des valeurs NULL](#where-nulls-sort) déclaré par le tri —
   et non un simple `>` sur une seule colonne.
-- **La pertinence ne peut pas faire l'objet d'un curseur.** Un `_score` est calculé par requête et n'est stocké
-  nulle part, et deux requêtes avec des chaînes de recherche différentes produisent des scores qui ne sont
-  pas sur la même échelle. Une telle liste ne comporte tout simplement aucun `nextCursor` ; pagineza-la
-  avec `offset`.
+- **La pertinence ne peut pas faire l'objet d'un curseur.** Un `_score` est calculé par requête et
+  n'est stocké nulle part, et deux requêtes avec des chaînes de recherche différentes produisent des
+  scores qui ne sont pas sur la même échelle. Une telle liste ne comporte tout simplement aucun
+  `nextCursor` ; pagineza-la avec `offset`. Il en va de même de la distance d'une recherche
+  vectorielle, et un curseur envoyé avec une telle recherche est refusé avec
+  `VECTOR_CURSOR_UNSUPPORTED`.
+- **Un abonnement ne peut pas reprendre à partir d'un curseur.** `listen()` réexécute sa requête à
+  chaque écriture, et `after` désigne un point dans une seule de ces exécutions, donc
+  `listen({ after })` est refusé avec `CURSOR_NOT_LIVE` avant tout envoi. Utilisez `offset` ou
+  `page` pour une fenêtre en direct, ou `find({ after })` pour lire la page une fois.
 
 En HTTP, il s'agit d'un paramètre unique :
 

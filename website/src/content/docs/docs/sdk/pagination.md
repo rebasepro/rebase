@@ -58,7 +58,7 @@ straight back without restating the sort.
 Do not parse it, and do not build one: the encoding exists to be changed, and
 anything else is `INVALID_CURSOR`.
 
-Three things follow from what a cursor is:
+Four things follow from what a cursor is:
 
 - **`after` cannot be combined with `offset` or `page`** (400
   `CURSOR_WITH_OFFSET`). Both say where the page starts, and honouring both
@@ -69,7 +69,12 @@ Three things follow from what a cursor is:
 - **Relevance cannot be a cursor.** A `_score` is computed per query and stored
   nowhere, and two queries with different search strings produce scores that are
   not on the same scale. Such a listing simply carries no `nextCursor`; page it
-  with `offset`.
+  with `offset`. A vector search's distance is the same, and a cursor sent with
+  one is refused with `VECTOR_CURSOR_UNSUPPORTED`.
+- **A subscription cannot continue from one.** `listen()` re-runs its query on
+  every write, and `after` names a place in one run of it, so `listen({ after })`
+  is refused with `CURSOR_NOT_LIVE` before anything is sent. Use `offset` or
+  `page` for a live window, or `find({ after })` to read the page once.
 
 Over HTTP it is one parameter:
 
