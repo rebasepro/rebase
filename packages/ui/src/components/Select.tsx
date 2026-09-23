@@ -135,6 +135,18 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
         return found;
     }, [children, hasValue, renderValue, value]);
 
+    // Radix reads a value of "" as nothing selected and shows the placeholder
+    // slot, whatever the Value's children say. So an item whose value really is
+    // "" (an "inherit the default" choice) is shown through that slot, or the
+    // trigger stays blank while it is the selected one.
+    const emptyItemDisplay = useMemo(() => {
+        if (stringValue !== "") return null;
+        const emptyItem = Children.toArray(children).find((child): child is React.ReactElement<SelectItemProps> =>
+            React.isValidElement<SelectItemProps>(child) && String(child.props.value) === "");
+        if (!emptyItem) return null;
+        return value !== undefined && renderValue ? renderValue(value) : emptyItem.props.children;
+    }, [children, renderValue, stringValue, value]);
+
     return (
         <SelectPrimitive.Root
             name={name}
@@ -220,7 +232,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                                 e.preventDefault();
                                 e.stopPropagation();
                             }}
-                            placeholder={placeholder}
+                            placeholder={emptyItemDisplay ?? placeholder}
                             className={"w-full"}>
 
                             {hasValue && value !== undefined && renderValue

@@ -13,7 +13,9 @@ import {
     IconButton,
     TextField,
     DebouncedTextField,
-    Avatar
+    Avatar,
+    Select,
+    SelectItem
 } from "../src";
 import "@testing-library/jest-dom";
 
@@ -184,6 +186,40 @@ describe("UI Components", () => {
 
             rerender(<Avatar src="https://example.com/me.png" alt="me">J</Avatar>);
             expect(container.querySelector("img")).toHaveAttribute("src", "https://example.com/me.png");
+        });
+    });
+
+    /**
+     * Radix reads a value of `""` as "nothing selected" and shows the
+     * placeholder, so an item whose value is `""` (an "inherit the default"
+     * choice) left the trigger blank while it was the selected one.
+     */
+    describe("Select Component", () => {
+        it("shows the selected item whose value is the empty string", () => {
+            render(<Select aria-label="cpu" value="" placeholder="Pick one" onValueChange={() => { /* noop */ }}>
+                <SelectItem value="">Inherited — 1 CPU</SelectItem>
+                <SelectItem value="2">2 CPU</SelectItem>
+            </Select>);
+
+            expect(screen.getByRole("combobox", { name: "cpu" })).toHaveTextContent("Inherited — 1 CPU");
+        });
+
+        it("still shows the placeholder for an empty value no item has", () => {
+            render(<Select aria-label="cpu" value="" placeholder="Pick one" onValueChange={() => { /* noop */ }}>
+                <SelectItem value="1">1 CPU</SelectItem>
+                <SelectItem value="2">2 CPU</SelectItem>
+            </Select>);
+
+            expect(screen.getByRole("combobox", { name: "cpu" })).toHaveTextContent("Pick one");
+        });
+
+        it("shows a non-empty selected item as before", () => {
+            render(<Select aria-label="cpu" value="2" placeholder="Pick one" onValueChange={() => { /* noop */ }}>
+                <SelectItem value="">Inherited — 1 CPU</SelectItem>
+                <SelectItem value="2">2 CPU</SelectItem>
+            </Select>);
+
+            expect(screen.getByRole("combobox", { name: "cpu" })).toHaveTextContent("2 CPU");
         });
     });
 
