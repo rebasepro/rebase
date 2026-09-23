@@ -226,14 +226,22 @@ When an OAuth user signs in via `POST /api/auth/{provider}`:
 
 1. If an identity record exists for `(provider, providerId)` → log in that user. The email is not consulted.
 2. If no identity exists but a user with the same email exists:
-   - **The provider asserted `emailVerified: true`** → **link** the provider to the existing account and log in as that user. One account, two sign-in methods.
-   - **The provider did NOT verify the email** → reject with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
-3. If neither exists → create a new user, link the identity, assign `defaultRole`.
+   - **The provider asserted `emailVerified: true` and the account's own email is verified** → **link** the provider to the existing account and log in as that user. One account, two sign-in methods.
+   - **Either side is unverified** → reject with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified. `details.reason` is `provider-email-unverified`, `local-account-unverified` (the account has a password) or `local-account-unverified-passwordless`.
+3. If neither exists → create a new user (verified if the provider verified the email), link the identity, assign `defaultRole`.
+
+A magic link, an email code or a password reset proves the address and verifies
+the account. On an unverified account, the first such proof removes the password
+(a reset sets the new one) and every linked identity whose provider did not
+verify that address, and ends every session, before it marks the account
+verified — so whoever made an account for someone else's address keeps no way in. Accounts created with
+`POST /api/admin/users` are stored verified. A custom auth repository without
+`unlinkUserIdentity` refuses such a proof with `409 UNVERIFIED_IDENTITIES`.
 
 > **IMPORTANT FOR AGENTS:** A second account is **never** silently created for
 > an email that already exists. If asked "does signing in with Google create a
-> duplicate user?", the answer is no — it either links (verified) or errors
-> (unverified). This is **not configurable**; there is deliberately no option to
+> duplicate user?", the answer is no — it either links (both sides verified) or
+> errors (either unverified). This is **not configurable**; there is deliberately no option to
 > auto-link on unverified emails, because that would let anyone who can make a
 > provider emit an address they don't own take over the matching account.
 > Google always asserts `email_verified` for real Google accounts, so linking

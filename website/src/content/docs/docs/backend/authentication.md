@@ -182,6 +182,11 @@ accepted; set `tokenField` to use a different body key.
 real user, and credential stuffing is what the rate limiter and account lockout
 are for. Add it to `routes` if you want it.
 
+`POST /auth/anonymous/link`, where a guest gets an email and a password, counts
+as registration: it takes the `register` challenge and runs `beforeUserCreate`,
+as `/auth/register` does. Guest sign-in itself (`POST /auth/anonymous`) takes no
+challenge.
+
 #### It fails closed
 
 If the provider cannot be reached, verification fails and the request is
@@ -287,7 +292,10 @@ The rest of what keeps six digits sufficient:
   cannot be used to ask whether somebody is a customer.
 
 Reading a code out of the inbox proves the address, so a successful sign-in
-marks it verified — exactly as following a magic link does.
+marks it verified — exactly as following a magic link does. On an account that
+was not verified yet, that first proof also removes what nobody proved: the
+password and every linked identity whose provider did not verify the address.
+See [Account Linking](#account-linking-across-sign-in-methods).
 
 ### Branding the default emails
 
@@ -399,19 +407,24 @@ a trailing slash are ignored.
 What happens when someone registers with email/password as `ada@example.com`,
 then later clicks "Sign in with Google" on a Google account with that same
 address? Rebase **links the two into one account** — but only when the provider
-asserts the email as verified. It never silently creates a second account for
-the same address.
+asserts the email as verified *and* the account's own address has been verified.
+It never silently creates a second account for the same address.
 
 On `POST /api/auth/<provider>` the resolution order is:
 
 1. **Known provider identity** — if this exact provider identity has signed in
    before, that user is returned. The email is not consulted.
-2. **Existing account with the same email, provider verified it** — the
-   identity is attached to the existing account and the user is signed in to
-   it. One account, two ways in.
-3. **Existing account with the same email, provider did NOT verify it** —
+2. **Existing account with the same email, both sides verified** — the
+   provider verified the email, and so has the account. The identity is
+   attached to the existing account and the user is signed in to it. One
+   account, two ways in.
+3. **Existing account with the same email, either side unverified** —
    rejected with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
-4. **No account with that email** — a new account is created.
+   `details.reason` says which side: `provider-email-unverified`, or
+   `local-account-unverified` (the account has a password) /
+   `local-account-unverified-passwordless` (it does not).
+4. **No account with that email** — a new account is created, verified if the
+   provider verified the email.
 
 Step 3 is the security-critical case. If an unverified provider email were
 enough to link, anyone who could get a provider to emit an address they don't
@@ -419,6 +432,22 @@ own could take over the matching Rebase account. Google always asserts
 `email_verified` for real Google accounts, so step 2 is the normal path for
 Google sign-in; step 3 mostly catches providers that let users supply an
 arbitrary unconfirmed address.
+
+The account's side matters for the same reason. Nothing verifies the address
+`POST /auth/register` is given, so anyone can register someone else's address
+with a password, or sign in as it through a provider that does not vouch for
+it, and wait. Linking the owner's Google sign-in onto that account would leave
+the other person's way in on it.
+
+A magic link, an email code or a password reset proves the address and
+verifies the account. On an account that was not verified yet, the first such
+proof removes the password (a reset sets the new one) and every linked identity
+whose provider did not verify that address, and ends every session, before it
+marks the account verified. After that, step 2 applies. Accounts created by an
+admin with `POST /api/admin/users` are stored verified, so an invitee can use
+"Sign in with Google" straight away. A custom auth repository without
+`unlinkUserIdentity` refuses such a proof with `409 UNVERIFIED_IDENTITIES` when
+there is an identity to remove.
 
 This behavior is not configurable — there is deliberately no option to link on
 unverified emails.

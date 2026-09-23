@@ -1,5 +1,5 @@
 ---
-sourceHash: cd5be95034e39df6
+sourceHash: 0ac172042bd08b13
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -188,6 +188,11 @@ são aceitos; defina `tokenField` para usar uma chave de corpo diferente.
 usuários reais, e credential stuffing é combatido pelo limitador de taxa e pelo
 bloqueio de conta. Adicione-o a `routes` se desejar.
 
+`POST /auth/anonymous/link`, onde um convidado recebe um e-mail e uma senha, conta
+como cadastro: exige o desafio `register` e executa `beforeUserCreate`, como
+`/auth/register`. O login como convidado em si (`POST /auth/anonymous`) não exige
+desafio.
+
 #### Falha em modo seguro (fail-closed)
 
 Se o provedor não puder ser alcançado, a verificação falha e a requisição é
@@ -303,8 +308,11 @@ O restante do que torna seis dígitos suficientes:
   que não pode ser usado para descobrir se alguém é cliente.
 
 Ler um código da caixa de entrada comprova a titularidade do endereço, portanto um
-login bem-sucedido o marca como verificado — exatamente como ocorre ao clicar em
-um magic link.
+login bem-sucedido o marca como verificado — exatamente como ocorre ao clicar em um
+magic link. Em uma conta que ainda não estava verificada, essa primeira prova também
+remove o que ninguém comprovou: a senha e cada identidade vinculada cujo provedor
+não verificou o endereço. Veja [Vinculação de
+Contas](#vinculação-de-contas-entre-métodos-de-login).
 
 ### Personalizando a marca dos e-mails padrão
 
@@ -418,22 +426,26 @@ final são ignorados.
 
 ### Vinculação de Contas Entre Métodos de Login
 
-O que acontece quando alguém se registra com e-mail/senha como `ada@example.com`
-e, mais tarde, clica em "Entrar com o Google" em uma conta do Google com esse
-mesmo endereço? O Rebase **vincula as duas em uma única conta** — mas somente
-quando o provedor confirmar que o e-mail está verificado. Ele nunca cria
-silenciosamente uma segunda conta para o mesmo endereço.
+O que acontece quando alguém se registra com e-mail/senha como `ada@example.com` e,
+mais tarde, clica em "Entrar com o Google" em uma conta do Google com esse mesmo
+endereço? O Rebase **vincula as duas em uma única conta** — mas somente quando o
+provedor confirmar que o e-mail está verificado *e* o endereço da própria conta
+tiver sido verificado. Ele nunca cria silenciosamente uma segunda conta para o mesmo
+endereço.
 
 Em `POST /api/auth/<provider>`, a ordem de resolução é:
 
 1. **Identidade do provedor conhecida** — se essa identidade exata do provedor já
    tiver feito login antes, esse usuário é retornado. O e-mail não é consultado.
-2. **Conta existente com o mesmo e-mail, verificada pelo provedor** — a
-   identidade é vinculada à conta existente e a sessão do usuário é iniciada nela.
-   Uma conta, duas formas de acesso.
-3. **Conta existente com o mesmo e-mail, NÃO verificada pelo provedor** —
-   rejeitada com `403 EMAIL_NOT_VERIFIED`. Nada é criado ou modificado.
-4. **Nenhuma conta com esse e-mail** — uma nova conta é criada.
+2. **Conta existente com o mesmo e-mail, verificada dos dois lados** — o provedor
+   verificou o e-mail, e a conta também. A identidade é vinculada à conta existente
+   e a sessão do usuário é iniciada nela. Uma conta, duas formas de acesso.
+3. **Conta existente com o mesmo e-mail, algum lado não verificado** — rejeitada com
+   `403 EMAIL_NOT_VERIFIED`. Nada é criado ou modificado. `details.reason` diz qual
+   lado: `provider-email-unverified`, ou `local-account-unverified` (a conta tem
+   senha) / `local-account-unverified-passwordless` (não tem).
+4. **Nenhuma conta com esse e-mail** — uma nova conta é criada, verificada se o
+   provedor verificou o e-mail.
 
 O passo 3 é o caso crítico para a segurança. Se um e-mail de provedor não
 verificado fosse suficiente para a vinculação, qualquer um que conseguisse fazer
@@ -442,6 +454,22 @@ conta correspondente no Rebase. O Google sempre afirma `email_verified` para
 contas reais do Google, portanto o passo 2 é o caminho normal para o login do
 Google; o passo 3 captura principalmente provedores que permitem aos usuários
 fornecer um endereço arbitrário não confirmado.
+
+O lado da conta importa pelo mesmo motivo. Nada verifica o endereço que
+`POST /auth/register` recebe, então qualquer um pode cadastrar o endereço de outra
+pessoa com uma senha, ou entrar com ele por um provedor que não o garante, e
+esperar. Vincular o login com o Google do titular a essa conta deixaria nela a forma
+de acesso da outra pessoa.
+
+Um magic link, um código por e-mail ou uma redefinição de senha comprovam o endereço
+e verificam a conta. Em uma conta que ainda não estava verificada, a primeira dessas
+provas remove a senha (uma redefinição define a nova) e cada identidade vinculada
+cujo provedor não verificou esse endereço, e encerra todas as sessões, antes de
+marcar a conta como verificada. A partir daí vale o passo 2. Contas criadas por um
+administrador com `POST /api/admin/users` são salvas como verificadas, então um
+convidado pode usar "Entrar com o Google" imediatamente. Um repositório de
+autenticação próprio sem `unlinkUserIdentity` recusa essa prova com
+`409 UNVERIFIED_IDENTITIES` quando há uma identidade a remover.
 
 Esse comportamento não é configurável — deliberadamente não existe opção para
 vincular contas com e-mails não verificados.

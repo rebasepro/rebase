@@ -1,5 +1,5 @@
 ---
-sourceHash: cd5be95034e39df6
+sourceHash: 0ac172042bd08b13
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -183,6 +183,11 @@ werden akzeptiert; setzen Sie `tokenField`, um einen anderen Schlüssel im Body 
 echten Benutzer, und gegen Credential Stuffing sind Rate-Limiter und Kontosperren
 gedacht. Fügen Sie es zu `routes` hinzu, wenn Sie es wünschen.
 
+`POST /auth/anonymous/link`, wo ein Gast eine E-Mail-Adresse und ein Passwort
+erhält, zählt als Registrierung: Es verlangt die `register`-Challenge und führt
+`beforeUserCreate` aus, wie `/auth/register`. Die Gast-Anmeldung selbst
+(`POST /auth/anonymous`) verlangt keine Challenge.
+
 #### Fail-Closed-Verhalten
 
 Kann der Provider nicht erreicht werden, schlägt die Verifizierung fehl und die Anfrage wird
@@ -287,8 +292,12 @@ Weitere Maßnahmen, die dafür sorgen, dass sechs Ziffern ausreichend sicher sin
 - `POST /auth/otp` antwortet bei einer Adresse ohne Konto absolut identisch, sodass es nicht
   dazu missbraucht werden kann, herauszufinden, ob jemand registriert ist.
 
-Das Auslesen eines Codes aus dem Postfach bestätigt den Besitz der Adresse. Ein erfolgreicher Login
-markiert sie daher als verifiziert — genau wie das Anklicken eines Magic Links.
+Das Auslesen eines Codes aus dem Postfach bestätigt den Besitz der Adresse. Ein
+erfolgreicher Login markiert sie daher als verifiziert — genau wie das Anklicken
+eines Magic Links. Bei einem noch nicht verifizierten Konto entfernt dieser erste
+Nachweis außerdem, was niemand nachgewiesen hat: das Passwort und jede verknüpfte
+Identität, deren Provider die Adresse nicht verifiziert hat. Siehe
+[Account-Verknüpfung](#account-verknüpfung-über-verschiedene-anmeldemethoden-hinweg).
 
 ### Branding der Standard-E-Mails
 
@@ -398,21 +407,28 @@ verglichen; Query-Parameter, Fragmente und abschließende Slashes werden ignorie
 ### Account-Verknüpfung über verschiedene Anmeldemethoden hinweg
 
 Was passiert, wenn sich jemand mit E-Mail/Passwort als `ada@example.com` registriert
-und später auf „Mit Google anmelden“ mit einem Google-Konto derselben Adresse klickt?
-Rebase **verknüpft beide zu einem einzigen Konto** — jedoch nur, wenn der Provider
-die E-Mail als verifiziert bestätigt. Es wird niemals stillschweigend ein zweites Konto
-für dieselbe Adresse erstellt.
+und später auf „Mit Google anmelden“ mit einem Google-Konto derselben Adresse
+klickt? Rebase **verknüpft beide zu einem einzigen Konto** — jedoch nur, wenn der
+Provider die E-Mail als verifiziert bestätigt *und* die Adresse des Kontos selbst
+verifiziert ist. Es wird niemals stillschweigend ein zweites Konto für dieselbe
+Adresse erstellt.
 
 Bei `POST /api/auth/<provider>` gilt folgende Auflösungsreihenfolge:
 
-1. **Bekannte Provider-Identität** — Hat sich genau diese Provider-Identität schon einmal
-   angemeldet, wird dieser Benutzer zurückgegeben. Die E-Mail-Adresse wird nicht herangezogen.
-2. **Bestehendes Konto mit gleicher E-Mail, vom Provider verifiziert** — Die
-   Identität wird mit dem bestehenden Konto verknüpft und der Benutzer angemeldet.
-   Ein Konto, zwei Zugangswege.
-3. **Bestehendes Konto mit gleicher E-Mail, vom Provider NICHT verifiziert** —
-   Wird mit `403 EMAIL_NOT_VERIFIED` abgewiesen. Es wird nichts erstellt oder geändert.
-4. **Kein Konto mit dieser E-Mail** — Ein neues Konto wird erstellt.
+1. **Bekannte Provider-Identität** — Hat sich genau diese Provider-Identität schon
+   einmal angemeldet, wird dieser Benutzer zurückgegeben. Die E-Mail-Adresse wird
+   nicht herangezogen.
+2. **Bestehendes Konto mit gleicher E-Mail, beide Seiten verifiziert** — Der
+   Provider hat die E-Mail verifiziert, und das Konto ebenfalls. Die Identität wird
+   mit dem bestehenden Konto verknüpft und der Benutzer angemeldet. Ein Konto, zwei
+   Zugangswege.
+3. **Bestehendes Konto mit gleicher E-Mail, eine Seite nicht verifiziert** — Wird
+   mit `403 EMAIL_NOT_VERIFIED` abgewiesen. Es wird nichts erstellt oder geändert.
+   `details.reason` nennt die Seite: `provider-email-unverified`, oder
+   `local-account-unverified` (das Konto hat ein Passwort) /
+   `local-account-unverified-passwordless` (es hat keines).
+4. **Kein Konto mit dieser E-Mail** — Ein neues Konto wird erstellt, als
+   verifiziert, wenn der Provider die E-Mail verifiziert hat.
 
 Schritt 3 ist der sicherheitskritische Fall. Wäre eine unbestätigte Provider-E-Mail
 für eine Verknüpfung ausreichend, könnte jeder, der einen Provider dazu bringt, eine fremde
@@ -420,6 +436,22 @@ Adresse auszugeben, das entsprechende Rebase-Konto übernehmen. Google bestätig
 `email_verified` bei echten Google-Konten immer, weshalb Schritt 2 der Normalfall für
 den Google-Login ist. Schritt 3 fängt vor allem Provider ab, bei denen Benutzer eine
 beliebige unbestätigte Adresse angeben können.
+
+Die Seite des Kontos zählt aus demselben Grund. Nichts verifiziert die Adresse, die
+`POST /auth/register` erhält. Jeder kann also die Adresse einer anderen Person mit
+einem Passwort registrieren oder sich über einen Provider, der nicht für sie bürgt,
+damit anmelden, und abwarten. Würde die Google-Anmeldung des Eigentümers mit diesem
+Konto verknüpft, bliebe der Zugang der anderen Person darauf bestehen.
+
+Ein Magic Link, ein E-Mail-Code oder ein Passwort-Reset weist die Adresse nach und
+verifiziert das Konto. Bei einem noch nicht verifizierten Konto entfernt der erste
+solche Nachweis das Passwort (ein Reset setzt das neue) und jede verknüpfte
+Identität, deren Provider diese Adresse nicht verifiziert hat, und beendet jede
+Sitzung, bevor er das Konto als verifiziert markiert. Danach gilt Schritt 2. Konten,
+die ein Admin mit `POST /api/admin/users` anlegt, werden als verifiziert
+gespeichert, sodass eingeladene Personen „Mit Google anmelden“ sofort nutzen können.
+Ein eigenes Auth-Repository ohne `unlinkUserIdentity` lehnt einen solchen Nachweis
+mit `409 UNVERIFIED_IDENTITIES` ab, wenn eine Identität zu entfernen ist.
 
 Dieses Verhalten ist nicht konfigurierbar — es gibt bewusst keine Option, Verknüpfungen
 anhand unbestätigter E-Mails zuzulassen.

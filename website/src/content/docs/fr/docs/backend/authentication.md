@@ -1,5 +1,5 @@
 ---
-sourceHash: cd5be95034e39df6
+sourceHash: 0ac172042bd08b13
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -154,6 +154,8 @@ Le client envoie le jeton du widget sous la clé `captchaToken` dans le corps JS
 
 **`login` n'est pas protégé par défaut.** Imposer un challenge à chaque connexion pénalise chaque utilisateur légitime, et le bourrage d'identifiants (credential stuffing) est déjà pris en charge par le limiteur de débit et le verrouillage de compte. Ajoutez-le à `routes` si vous le souhaitez.
 
+`POST /auth/anonymous/link`, où un invité obtient une adresse e-mail et un mot de passe, compte comme une inscription : il exige le challenge `register` et exécute `beforeUserCreate`, comme `/auth/register`. La connexion en tant qu'invité elle-même (`POST /auth/anonymous`) n'exige aucun challenge.
+
 #### Échec en mode fermé (fail-closed)
 
 Si le fournisseur ne peut pas être joint, la vérification échoue et la requête est refusée. Un attaquant capable de provoquer cette panne pourrait autrement désactiver la protection, ce qu'un mécanisme de challenge ne doit en aucun cas permettre.
@@ -225,7 +227,7 @@ Les autres éléments qui rendent six chiffres suffisants :
 - **Chiffres uniformes**, issus de `randomInt` plutôt que d'un modulo d'octets aléatoires.
 - `POST /auth/otp` répond de manière identique pour une adresse sans compte, empêchant ainsi de savoir si quelqu'un est client ou non.
 
-La lecture d'un code depuis la boîte de réception prouve la possession de l'adresse, une connexion réussie la marque donc comme vérifiée — exactement comme le fait de suivre un lien magique.
+La lecture d'un code depuis la boîte de réception prouve la possession de l'adresse, une connexion réussie la marque donc comme vérifiée — exactement comme le fait de suivre un lien magique. Sur un compte qui n'était pas encore vérifié, cette première preuve supprime aussi ce que personne n'a prouvé : le mot de passe et chaque identité liée dont le fournisseur n'a pas vérifié l'adresse. Voir [Liaison de comptes](#liaison-de-comptes-entre-méthodes-de-connexion).
 
 ### Personnaliser l'image de marque des e-mails par défaut
 
@@ -306,16 +308,20 @@ Si cette option n'est pas définie, la seule vérification lors d'une redirectio
 
 ### Liaison de comptes entre méthodes de connexion
 
-Que se passe-t-il lorsque quelqu'un s'inscrit avec e-mail/mot de passe en tant que `ada@example.com`, puis clique plus tard sur « Se connecter avec Google » sur un compte Google associé à cette même adresse ? Rebase **lie les deux en un seul compte** — mais uniquement si le fournisseur certifie que l'e-mail est vérifié. Il ne crée jamais silencieusement un deuxième compte pour la même adresse.
+Que se passe-t-il lorsque quelqu'un s'inscrit avec e-mail/mot de passe en tant que `ada@example.com`, puis clique plus tard sur « Se connecter avec Google » sur un compte Google associé à cette même adresse ? Rebase **lie les deux en un seul compte** — mais uniquement si le fournisseur certifie que l'e-mail est vérifié *et* que l'adresse du compte lui-même a été vérifiée. Il ne crée jamais silencieusement un deuxième compte pour la même adresse.
 
 Sur `POST /api/auth/<provider>`, l'ordre de résolution est :
 
 1. **Identité de fournisseur connue** — si cette identité exacte de fournisseur s'est déjà connectée auparavant, cet utilisateur est renvoyé. L'e-mail n'est pas consulté.
-2. **Compte existant avec le même e-mail, vérifié par le fournisseur** — l'identité est rattachée au compte existant et l'utilisateur y est connecté. Un seul compte, deux moyens d'accès.
-3. **Compte existant avec le même e-mail, NON vérifié par le fournisseur** — rejeté avec `403 EMAIL_NOT_VERIFIED`. Rien n'est créé ni modifié.
-4. **Aucun compte avec cet e-mail** — un nouveau compte est créé.
+2. **Compte existant avec le même e-mail, vérifié des deux côtés** — le fournisseur a vérifié l'e-mail, et le compte aussi. L'identité est rattachée au compte existant et l'utilisateur y est connecté. Un seul compte, deux moyens d'accès.
+3. **Compte existant avec le même e-mail, un côté non vérifié** — rejeté avec `403 EMAIL_NOT_VERIFIED`. Rien n'est créé ni modifié. `details.reason` indique quel côté : `provider-email-unverified`, ou `local-account-unverified` (le compte a un mot de passe) / `local-account-unverified-passwordless` (il n'en a pas).
+4. **Aucun compte avec cet e-mail** — un nouveau compte est créé, vérifié si le fournisseur a vérifié l'e-mail.
 
 L'étape 3 est le cas critique pour la sécurité. Si un e-mail de fournisseur non vérifié suffisait pour lier le compte, quiconque parviendrait à faire émettre par un fournisseur une adresse qui ne lui appartient pas pourrait prendre le contrôle du compte Rebase correspondant. Google affirme toujours `email_verified` pour les vrais comptes Google, l'étape 2 est donc le parcours normal pour la connexion Google ; l'étape 3 intercepte principalement les fournisseurs qui permettent aux utilisateurs de renseigner une adresse non confirmée arbitraire.
+
+Le côté du compte compte pour la même raison. Rien ne vérifie l'adresse que reçoit `POST /auth/register` : n'importe qui peut donc inscrire l'adresse de quelqu'un d'autre avec un mot de passe, ou se connecter avec elle via un fournisseur qui ne la garantit pas, et attendre. Lier la connexion Google du propriétaire à ce compte y laisserait le moyen d'accès de l'autre personne.
+
+Un lien magique, un code par e-mail ou une réinitialisation du mot de passe prouvent l'adresse et vérifient le compte. Sur un compte qui n'était pas encore vérifié, la première de ces preuves supprime le mot de passe (une réinitialisation définit le nouveau) et chaque identité liée dont le fournisseur n'a pas vérifié cette adresse, et met fin à toutes les sessions, avant de marquer le compte comme vérifié. Ensuite, l'étape 2 s'applique. Les comptes créés par un administrateur avec `POST /api/admin/users` sont enregistrés comme vérifiés, de sorte qu'une personne invitée peut utiliser « Se connecter avec Google » immédiatement. Un dépôt d'authentification personnalisé sans `unlinkUserIdentity` refuse une telle preuve avec `409 UNVERIFIED_IDENTITIES` lorsqu'il y a une identité à supprimer.
 
 Ce comportement n'est pas configurable — il n'existe délibérément aucune option pour lier des comptes sur la base d'e-mails non vérifiés.
 

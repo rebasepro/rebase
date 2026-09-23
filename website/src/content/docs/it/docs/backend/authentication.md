@@ -1,5 +1,5 @@
 ---
-sourceHash: cd5be95034e39df6
+sourceHash: 0ac172042bd08b13
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -154,6 +154,8 @@ Il client invia il token del widget come `captchaToken` nel corpo JSON o nell'he
 
 **`login` non è protetto per impostazione predefinita.** Un controllo captcha a ogni accesso appesantisce l'esperienza di ogni utente reale; per contrastare il credential stuffing sono previsti il rate limiter e il blocco dell'account. Aggiungilo a `routes` se desideri abilitarlo.
 
+`POST /auth/anonymous/link`, dove un ospite ottiene un'email e una password, conta come registrazione: richiede il controllo `register` ed esegue `beforeUserCreate`, come `/auth/register`. L'accesso come ospite in sé (`POST /auth/anonymous`) non richiede alcun controllo.
+
 #### Modalità fail-closed
 
 Se il provider non è raggiungibile, la verifica fallisce e la richiesta viene rifiutata. Un attaccante in grado di provocare tale disservizio potrebbe altrimenti disattivare la protezione, ed è proprio ciò che un sistema di challenge deve impedire.
@@ -225,7 +227,7 @@ Gli altri elementi che rendono sufficienti sei cifre:
 - **Cifre uniformi**, generate tramite `randomInt` anziché con il modulo di byte casuali.
 - `POST /auth/otp` risponde in modo identico se l'indirizzo non appartiene ad alcun account, impedendo che venga utilizzato per verificare l'esistenza di un cliente.
 
-Leggere un codice dalla casella di posta dimostra la proprietà dell'indirizzo, pertanto un accesso riuscito lo contrassegna come verificato — esattamente come accade seguendo un magic link.
+Leggere un codice dalla casella di posta dimostra la proprietà dell'indirizzo, pertanto un accesso riuscito lo contrassegna come verificato — esattamente come accade seguendo un magic link. Su un account non ancora verificato, questa prima prova rimuove anche ciò che nessuno ha dimostrato: la password e ogni identità collegata il cui provider non ha verificato l'indirizzo. Vedi [Collegamento degli account](#collegamento-degli-account-tra-diversi-metodi-di-accesso).
 
 ### Personalizzazione del brand nelle email predefinite
 
@@ -306,16 +308,20 @@ Se non configurata, l'unico controllo su un redirect OAuth è la corrispondenza 
 
 ### Collegamento degli account tra diversi metodi di accesso
 
-Cosa succede quando qualcuno si registra con email/password come `ada@example.com` e in seguito clicca su "Accedi con Google" con un account Google avente lo stesso indirizzo? Rebase **collega i due accessi in un unico account** — ma solo se il provider certifica l'email come verificata. Non crea mai silenziosamente un secondo account per lo stesso indirizzo.
+Cosa succede quando qualcuno si registra con email/password come `ada@example.com` e in seguito clicca su "Accedi con Google" con un account Google avente lo stesso indirizzo? Rebase **collega i due accessi in un unico account** — ma solo se il provider certifica l'email come verificata *e* l'indirizzo dell'account stesso è stato verificato. Non crea mai silenziosamente un secondo account per lo stesso indirizzo.
 
 Su `POST /api/auth/<provider>` l'ordine di risoluzione è:
 
 1. **Identità del provider nota** — se questa esatta identità del provider ha già effettuato l'accesso in precedenza, viene restituito quell'utente. L'email non viene consultata.
-2. **Account esistente con la stessa email, verificata dal provider** — l'identità viene associata all'account esistente e l'utente vi accede. Un solo account, due modalità di accesso.
-3. **Account esistente con la stessa email, NON verificata dal provider** — la richiesta viene rifiutata con `403 EMAIL_NOT_VERIFIED`. Non viene creato o modificato nulla.
-4. **Nessun account con quell'email** — viene creato un nuovo account.
+2. **Account esistente con la stessa email, verificata da entrambi i lati** — il provider ha verificato l'email, e l'account anche. L'identità viene associata all'account esistente e l'utente vi accede. Un solo account, due modalità di accesso.
+3. **Account esistente con la stessa email, un lato non verificato** — la richiesta viene rifiutata con `403 EMAIL_NOT_VERIFIED`. Non viene creato o modificato nulla. `details.reason` indica quale lato: `provider-email-unverified`, oppure `local-account-unverified` (l'account ha una password) / `local-account-unverified-passwordless` (non ce l'ha).
+4. **Nessun account con quell'email** — viene creato un nuovo account, verificato se il provider ha verificato l'email.
 
 Il punto 3 rappresenta il caso critico per la sicurezza. Se un'email del provider non verificata fosse sufficiente per il collegamento, chiunque riuscisse a farsi emettere da un provider un indirizzo non proprio potrebbe impossessarsi del relativo account Rebase. Google attesta sempre `email_verified` per i veri account Google, quindi il passaggio 2 è il percorso standard per l'accesso con Google; il passaggio 3 intercetta soprattutto i provider che consentono agli utenti di specificare un indirizzo arbitrario non confermato.
+
+Il lato dell'account conta per lo stesso motivo. Nulla verifica l'indirizzo che riceve `POST /auth/register`, quindi chiunque può registrare l'indirizzo di un'altra persona con una password, o accedere con esso tramite un provider che non lo garantisce, e aspettare. Collegare l'accesso con Google del proprietario a quell'account vi lascerebbe la via d'accesso dell'altra persona.
+
+Un magic link, un codice via email o un ripristino della password dimostrano l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato. Da lì in poi vale il passaggio 2. Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come verificati, quindi un invitato può usare "Accedi con Google" subito. Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta questa prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.
 
 Questo comportamento non è configurabile — non esiste intenzionalmente alcuna opzione per collegare account sulla base di email non verificate.
 

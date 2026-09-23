@@ -1,5 +1,5 @@
 ---
-sourceHash: cd5be95034e39df6
+sourceHash: 0ac172042bd08b13
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -154,6 +154,8 @@ El cliente envía el token del widget como `captchaToken` en el cuerpo JSON, o e
 
 **`login` no está protegido por defecto.** Un desafío (challenge) en cada inicio de sesión penaliza a todos los usuarios reales, y el credential stuffing es precisamente para lo que sirven el limitador de tasa y el bloqueo de cuentas. Añádalo a `routes` si lo desea.
 
+`POST /auth/anonymous/link`, donde un invitado obtiene un correo electrónico y una contraseña, cuenta como registro: exige el desafío `register` y ejecuta `beforeUserCreate`, igual que `/auth/register`. El inicio de sesión como invitado en sí (`POST /auth/anonymous`) no exige ningún desafío.
+
 #### Falla en modo cerrado (fail-closed)
 
 Si no se puede contactar al proveedor, la verificación falla y la solicitud es rechazada. De lo contrario, un atacante capaz de provocar dicha interrupción podría desactivar la protección, que es exactamente lo que un desafío no debe permitir.
@@ -225,7 +227,7 @@ El resto de factores que hacen que seis dígitos sean suficientes:
 - **Dígitos uniformes**, generados con `randomInt` en lugar de un módulo de bytes aleatorios.
 - `POST /auth/otp` responde de manera idéntica para una dirección sin cuenta, por lo que no puede utilizarse para averiguar si alguien es cliente.
 
-Leer un código de la bandeja de entrada demuestra la titularidad de la dirección, por lo que un inicio de sesión exitoso la marca como verificada — exactamente igual que al seguir un enlace mágico.
+Leer un código de la bandeja de entrada demuestra la titularidad de la dirección, por lo que un inicio de sesión exitoso la marca como verificada — exactamente igual que al seguir un enlace mágico. En una cuenta que aún no estaba verificada, esa primera prueba también elimina lo que nadie demostró: la contraseña y cada identidad vinculada cuyo proveedor no verificó la dirección. Consulte [Vinculación de cuentas](#vinculación-de-cuentas-entre-métodos-de-inicio-de-sesión).
 
 ### Personalización de marca en los correos predeterminados
 
@@ -306,16 +308,20 @@ Si no se configura, la única comprobación sobre una redirección de OAuth es l
 
 ### Vinculación de cuentas entre métodos de inicio de sesión
 
-¿Qué ocurre cuando alguien se registra con correo/contraseña como `ada@example.com`, y más tarde hace clic en "Iniciar sesión con Google" con una cuenta de Google que tiene esa misma dirección? Rebase **vincula ambas en una sola cuenta** — pero únicamente cuando el proveedor certifica que el correo está verificado. Nunca crea de forma silenciosa una segunda cuenta para la misma dirección.
+¿Qué ocurre cuando alguien se registra con correo/contraseña como `ada@example.com`, y más tarde hace clic en "Iniciar sesión con Google" con una cuenta de Google que tiene esa misma dirección? Rebase **vincula ambas en una sola cuenta** — pero únicamente cuando el proveedor certifica que el correo está verificado *y* la dirección de la propia cuenta ha sido verificada. Nunca crea de forma silenciosa una segunda cuenta para la misma dirección.
 
 En `POST /api/auth/<provider>`, el orden de resolución es:
 
 1. **Identidad de proveedor conocida** — si esta identidad exacta del proveedor ha iniciado sesión antes, se devuelve ese usuario. No se consulta el correo electrónico.
-2. **Cuenta existente con el mismo correo electrónico, proveedor verificado** — la identidad se asocia a la cuenta existente y se inicia sesión con el usuario en ella. Una cuenta, dos vías de acceso.
-3. **Cuenta existente con el mismo correo electrónico, proveedor NO verificado** — rechazada con `403 EMAIL_NOT_VERIFIED`. No se crea ni se modifica nada.
-4. **Sin cuenta con ese correo electrónico** — se crea una nueva cuenta.
+2. **Cuenta existente con el mismo correo electrónico, ambos lados verificados** — el proveedor verificó el correo, y la cuenta también. La identidad se asocia a la cuenta existente y se inicia sesión con el usuario en ella. Una cuenta, dos vías de acceso.
+3. **Cuenta existente con el mismo correo electrónico, algún lado sin verificar** — rechazada con `403 EMAIL_NOT_VERIFIED`. No se crea ni se modifica nada. `details.reason` indica qué lado: `provider-email-unverified`, o `local-account-unverified` (la cuenta tiene contraseña) / `local-account-unverified-passwordless` (no la tiene).
+4. **Sin cuenta con ese correo electrónico** — se crea una nueva cuenta, verificada si el proveedor verificó el correo.
 
 El paso 3 es el caso crítico a nivel de seguridad. Si un correo electrónico de proveedor no verificado bastara para vincular cuentas, cualquiera que lograse que un proveedor emitiera una dirección que no le pertenece podría apoderarse de la cuenta de Rebase correspondiente. Google siempre declara `email_verified` para cuentas reales de Google, por lo que el paso 2 es la ruta habitual para el inicio de sesión con Google; el paso 3 detecta principalmente proveedores que permiten a los usuarios proporcionar una dirección arbitraria sin confirmar.
+
+El lado de la cuenta importa por la misma razón. Nada verifica la dirección que recibe `POST /auth/register`, así que cualquiera puede registrar la dirección de otra persona con una contraseña, o iniciar sesión con ella a través de un proveedor que no la avala, y esperar. Vincular el inicio de sesión con Google del titular a esa cuenta dejaría en ella la vía de acceso de la otra persona.
+
+Un enlace mágico, un código por correo o un restablecimiento de contraseña demuestran la dirección y verifican la cuenta. En una cuenta que aún no estaba verificada, la primera de esas pruebas elimina la contraseña (un restablecimiento establece la nueva) y cada identidad vinculada cuyo proveedor no verificó esa dirección, y cierra todas las sesiones, antes de marcar la cuenta como verificada. A partir de ahí se aplica el paso 2. Las cuentas que crea un administrador con `POST /api/admin/users` se guardan verificadas, por lo que un invitado puede usar "Iniciar sesión con Google" de inmediato. Un repositorio de autenticación propio sin `unlinkUserIdentity` rechaza esa prueba con `409 UNVERIFIED_IDENTITIES` cuando hay una identidad que eliminar.
 
 Este comportamiento no es configurable — deliberadamente no existe ninguna opción para vincular cuentas mediante correos no verificados.
 
