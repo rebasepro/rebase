@@ -141,6 +141,26 @@ user })));
 
     const enabled = allowedHere && serviceAvailable;
 
+    /**
+     * The run whose review is on screen.
+     *
+     * A run outlives the review it was started for: the operator can discard
+     * it, or start another, while its stream is still arriving. Every callback
+     * checks it is still the current run before touching the review, and a run
+     * that stops being current has its request cancelled. Without this, a
+     * discarded run kept writing into the next run's review and, when it ended,
+     * marked that review ready while the new run was still writing.
+     */
+    const currentRunRef = useRef<AbortController | null>(null);
+
+    const cancelCurrentRun = useCallback(() => {
+        currentRunRef.current?.abort();
+        currentRunRef.current = null;
+    }, []);
+
+    // A form closed mid-run has nobody left to review what it produces.
+    useEffect(() => cancelCurrentRun, [cancelCurrentRun]);
+
     /** Add or update one row in the review, preserving arrival order. */
     const upsertField = useCallback((key: string, update: (existing: ProposedField | undefined) => ProposedField) => {
         setReview((current) => {
@@ -171,9 +191,15 @@ fields };
 
         const labelFor = (key: string) => currentProperties[key]?.name ?? key;
 
+        cancelCurrentRun();
+        const run = new AbortController();
+        currentRunRef.current = run;
+        const isCurrent = () => currentRunRef.current === run;
+
         try {
             await autofillStream({
                 endpoint,
+                signal: run.signal,
                 request: {
                     entityName: collection.singularName ?? collection.name,
                     entityDescription: collection.description,
@@ -193,6 +219,7 @@ fields };
                     instructions: params.instructions
                 },
                 onDelta: (key, text) => {
+                    if (!isCurrent()) return;
                     upsertField(key, (existing) => existing
                         ? { ...existing,
 proposed: String(existing.proposed ?? "") + text }
@@ -206,6 +233,7 @@ proposed: String(existing.proposed ?? "") + text }
                         });
                 },
                 onValue: (key, value) => {
+                    if (!isCurrent()) return;
                     const coerced = coerceToProperty(value, getPropertyFromKey(currentProperties, key));
                     upsertField(key, (existing) => ({
                         key,
@@ -220,6 +248,8 @@ proposed: String(existing.proposed ?? "") + text }
                 }
             });
 
+            if (!isCurrent()) return;
+            currentRunRef.current = null;
             setReview((current) => current && {
                 ...current,
                 status: "ready",
@@ -232,6 +262,10 @@ proposed: String(existing.proposed ?? "") + text }
                 fields: current.fields.filter((f) => !f.pending)
             });
         } catch (e: unknown) {
+            // A run that was discarded or replaced fails with the abort, and
+            // has nothing left to report to.
+            if (!isCurrent()) return;
+            currentRunRef.current = null;
             const message = e instanceof Error ? e.message : "Autofill could not be completed";
             // Kept in the review rather than fired into a snackbar: a run that
             // produced three good fields and then failed should still let the
@@ -245,7 +279,7 @@ proposed: String(existing.proposed ?? "") + text }
                 fields: current.fields.filter((f) => !f.pending)
             });
         }
-    }, [collection, endpoint, upsertField]);
+    }, [collection, endpoint, upsertField, cancelCurrentRun]);
 
     const toggleField = useCallback((key: string) => {
         setReview((current) => current && {
@@ -263,9 +297,14 @@ selected }))
         });
     }, []);
 
-    const dismissReview = useCallback(() => setReview(null), []);
+    const dismissReview = useCallback(() => {
+        cancelCurrentRun();
+        setReview(null);
+    }, [cancelCurrentRun]);
 
     const applyReview = useCallback(() => {
+        // Applied mid-stream, the rest of the run has no review to land in.
+        cancelCurrentRun();
         setReview((current) => {
             if (!current) return null;
             for (const field of current.fields) {
@@ -275,7 +314,7 @@ selected }))
             }
             return null;
         });
-    }, [formContext]);
+    }, [formContext, cancelCurrentRun]);
 
     const editorAIController = useEditorAIController({ endpoint });
 

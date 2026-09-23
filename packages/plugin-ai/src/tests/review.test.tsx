@@ -81,6 +81,61 @@ value: undefined }
     };
 }
 
+/**
+ * A `Response` whose body yields only what the test pushes, when it pushes it,
+ * so two runs can be interleaved.
+ */
+function controlledStream() {
+    const encoder = new TextEncoder();
+    const queue: string[] = [];
+    let waiting: ((chunk: { done: boolean, value?: Uint8Array }) => void) | null = null;
+    let closed = false;
+    const push = (text: string) => {
+        if (waiting) {
+            const resolve = waiting;
+            waiting = null;
+            resolve({ done: false,
+value: encoder.encode(text) });
+        } else {
+            queue.push(text);
+        }
+    };
+    const close = () => {
+        closed = true;
+        if (waiting) {
+            const resolve = waiting;
+            waiting = null;
+            resolve({ done: true });
+        }
+    };
+    const response = {
+        ok: true,
+        status: 200,
+        body: {
+            getReader: () => ({
+                read: () => queue.length > 0
+                    ? Promise.resolve({ done: false,
+value: encoder.encode(queue.shift()!) })
+                    : closed
+                        ? Promise.resolve({ done: true })
+                        : new Promise((resolve) => {
+                            waiting = resolve;
+                        })
+            })
+        }
+    };
+    return { response,
+push,
+close };
+}
+
+/** The cancellation signal each `/autofill` request was made with, in order. */
+function autofillSignals() {
+    return jest.mocked(fetch).mock.calls
+        .filter(([url]) => String(url).endsWith("/autofill"))
+        .map(([, init]) => init?.signal);
+}
+
 const AUTOFILL_BODY = [
     'event: suggestion_delta\ndata: {"key":"title","text":"Blue "}',
     'event: suggestion_delta\ndata: {"key":"title","text":"widget"}',
@@ -364,6 +419,114 @@ json: async () => ({ prompts: [] }) });
         const keys = result.current.review?.fields.map(f => f.key);
         expect(keys).toEqual(["stock"]);
         expect(JSON.stringify(result.current.review)).not.toMatch(/FIRST RUN/);
+    });
+
+    it("does not let a discarded run stream into the run that replaced it", async () => {
+        // Discard mid-stream, then ask again. The first run's connection was
+        // never closed and its callbacks wrote into whatever review was current:
+        // its field landed, ticked, in the second review, and when it ended it
+        // marked the second review ready while the second run was still writing.
+        const streams = [controlledStream(), controlledStream()];
+        let call = 0;
+        mockService(() => streams[call++].response);
+        const { result, setFieldValue } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        let first: Promise<void>;
+        let second: Promise<void>;
+        act(() => {
+            first = result.current.generate({ values: {},
+instructions: "fill everything" });
+        });
+        act(() => streams[0].push('event: suggestion_delta\ndata: {"key":"subtitle","text":"Old run"}\n\n'));
+        await waitFor(() => expect(result.current.review?.fields).toHaveLength(1));
+
+        act(() => result.current.dismissReview());
+        // Discarding cancels the request, not only the review.
+        expect(autofillSignals().map(signal => signal?.aborted)).toEqual([true]);
+        act(() => {
+            second = result.current.generate({ values: {},
+instructions: "only the title" });
+        });
+        act(() => streams[1].push('event: suggestion_delta\ndata: {"key":"title","text":"New ti"}\n\n'));
+        await waitFor(() => expect(result.current.review?.fields).toHaveLength(1));
+
+        // The discarded run finishes anyway.
+        await act(async () => {
+            streams[0].push('event: suggestion\ndata: {"key":"subtitle","value":"Old run, done"}\n\n' +
+                'event: done\ndata: {"suggestions":{}}\n\n');
+            streams[0].close();
+            await first!;
+        });
+
+        expect(result.current.review?.status).toBe("generating");
+        expect(result.current.review?.instructions).toBe("only the title");
+        expect(result.current.review?.fields.map(f => f.key)).toEqual(["title"]);
+        // Its request was cancelled when it was discarded.
+        expect(autofillSignals().map(signal => signal?.aborted)).toEqual([true, false]);
+
+        await act(async () => {
+            streams[1].push('event: suggestion\ndata: {"key":"title","value":"New title"}\n\n' +
+                'event: done\ndata: {"suggestions":{}}\n\n');
+            streams[1].close();
+            await second!;
+        });
+
+        expect(result.current.review?.status).toBe("ready");
+        expect(result.current.review?.fields.map(f => [f.key, f.proposed])).toEqual([["title", "New title"]]);
+        act(() => result.current.applyReview());
+        expect(setFieldValue).toHaveBeenCalledTimes(1);
+        expect(setFieldValue).toHaveBeenCalledWith("title", "New title");
+    });
+
+    it("cancels the rest of a run that is applied mid-stream", async () => {
+        const stream = controlledStream();
+        mockService(() => stream.response);
+        const { result, setFieldValue } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        act(() => {
+            void result.current.generate({ values: {} });
+        });
+        act(() => stream.push('event: suggestion\ndata: {"key":"stock","value":9}\n\n'));
+        await waitFor(() => expect(result.current.review?.fields).toHaveLength(1));
+
+        act(() => result.current.applyReview());
+        expect(setFieldValue).toHaveBeenCalledWith("stock", 9);
+        expect(autofillSignals().map(signal => signal?.aborted)).toEqual([true]);
+    });
+
+    it("cancels a run whose form is closed", async () => {
+        const stream = controlledStream();
+        mockService(() => stream.response);
+        const { result, unmount } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        act(() => {
+            void result.current.generate({ values: {} });
+        });
+        await waitFor(() => expect(autofillSignals()).toHaveLength(1));
+        unmount();
+        expect(autofillSignals().map(signal => signal?.aborted)).toEqual([true]);
+    });
+
+    it("cancels the request of a run that is started over", async () => {
+        const streams = [controlledStream(), controlledStream()];
+        let call = 0;
+        mockService(() => streams[call++].response);
+        const { result } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        act(() => {
+            void result.current.generate({ values: {} });
+        });
+        await waitFor(() => expect(call).toBe(1));
+        act(() => {
+            void result.current.generate({ values: {} });
+        });
+        await waitFor(() => expect(call).toBe(2));
+
+        expect(autofillSignals().map(signal => signal?.aborted)).toEqual([true, false]);
     });
 
     it("applies only the fields that finished, if applied mid-stream", async () => {
