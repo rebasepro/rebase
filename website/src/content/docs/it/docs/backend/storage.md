@@ -1,5 +1,5 @@
 ---
-sourceHash: c6ff4a9052df3362
+sourceHash: 68889c97cefde465
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -103,7 +103,7 @@ image: {
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recupera un file da uno specifico backend |
 | `GET` | `/api/storage/metadata/*` | Dimensione, content type e ultima modifica di un oggetto, senza i suoi byte |
 | `DELETE` | `/api/storage/file/*` | Elimina un file |
-| `GET` | `/api/storage/list` | Elenca gli oggetti sotto un prefisso (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `GET` | `/api/storage/list` | Elenca gli oggetti sotto un prefisso (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` inferiore a 1, o un `pageToken` mai emesso dalla sorgente, restituisce `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Crea un marker di cartella vuota |
 | `GET` | `/api/storage/sources` | Le sorgenti di storage servite da questo backend, per chiave |
 | `OPTIONS` | `/api/storage/tus` | Interroga le funzionalità supportate dal protocollo TUS |
@@ -129,6 +129,12 @@ e, per un oggetto privato, il `token` di breve durata;
 `GET /api/storage/sources` con l'array delle sorgenti configurate.
 `DELETE /api/storage/file/*` e `POST /api/storage/folder` contengono solo un
 `message`, poiché non c'è nulla da restituire.
+
+Su S3 e GCS, un `bucket` deve essere uno di quelli serviti dalla sorgente, in
+scrittura come in lettura: un caricamento, un `POST /api/storage/folder` o un
+caricamento TUS che nomina un altro bucket risponde
+`404 UNKNOWN_STORAGE_SOURCE`, come l'elenco. Lo storage locale crea ancora un
+bucket alla prima scrittura.
 
 **Come viene autorizzata la lettura di un file.** Le rotte di lettura — `/api/storage/file/*` e
 `/api/storage/metadata/*` — accettano il token firmato di breve durata generato da
@@ -309,7 +315,7 @@ Indirizza una proprietà a una sorgente con `storageSource`:
 ```
 
 Una sorgente dichiarata ma mai configurata viene **ignorata**, senza conseguenze fatali:
-i caricamenti indirizzati verso di essa rispondono con `501 STORAGE_NOT_CONFIGURED`. La dichiarazione
+i caricamenti indirizzati verso di essa rispondono con `501 STORAGE_SOURCE_NOT_CONFIGURED`. La dichiarazione
 di un bucket avviene solitamente prima che vi venga collegato uno storage, e un errore di
 avvio in questo caso provocherebbe un crash-loop del backend. Una sorgente configurata in modo
 *errato* tramite variabili d'ambiente — un tipo senza bucket o un bucket senza credenziali — viene
@@ -434,7 +440,7 @@ Due aspetti da configurare direttamente sulla CDN:
 :::caution
 **In produzione, `type: "local"` disabilita l'archiviazione dei file anziché utilizzarla.** Su una piattaforma effimera (Cloud Run, Heroku, un pod Kubernetes) il filesystem viene cancellato a ogni deploy, riavvio o eviction — pertanto i caricamenti andrebbero a buon fine, verrebbero letti correttamente, ma svanirebbero al successivo rollout, senza generare alcun errore in nessun momento.
 
-Di conseguenza non viene registrato alcun backend di storage e `/api/storage/*` risponde con **`501 STORAGE_NOT_CONFIGURED`**. I caricamenti falliscono in modo esplicito e recuperabile; il resto dell'applicazione continua a funzionare. L'archiviazione dei file richiede un'abilitazione esplicita in produzione: esiste solo nel momento in cui è presente un bucket.
+Di conseguenza il default locale non viene registrato, e una richiesta a `/api/storage/*` che non nomina alcuna sorgente di storage risponde con **`501 STORAGE_NOT_CONFIGURED`**, indicando le sorgenti servite. Una sorgente con nome configurata, come `bucket("media", { engine: "s3" })`, continua a funzionare. I caricamenti falliscono in modo esplicito e recuperabile; il resto dell'applicazione continua a funzionare. L'archiviazione dei file richiede un'abilitazione esplicita in produzione: esiste solo nel momento in cui è presente un bucket.
 
 Imposta `STORAGE_TYPE=s3` o `gcs`. Se è effettivamente montato un **volume permanente** su `STORAGE_PATH`, imposta `FORCE_LOCAL_STORAGE=true` per specificarlo esplicitamente.
 :::

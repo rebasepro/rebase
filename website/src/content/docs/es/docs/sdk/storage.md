@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a0c74973860c714
+sourceHash: 6f7ff1888738abd2
 title: Almacenamiento y Archivos
 sidebar_label: Almacenamiento
 description: Suba, descargue, liste y elimine archivos con el módulo de almacenamiento del SDK del Cliente de Rebase.
@@ -63,7 +63,7 @@ if (url) {
 ```
 
 :::caution[El argumento `bucket` es hoy un prefijo de ruta]
-En `getSignedUrl`, `getObject` y `deleteObject`, el segundo argumento se pliega dentro de la clave del objeto (`<bucket>/<key>`) y nunca llega al servidor como bucket, así que un nombre que el despliegue no sirve se reporta como *archivo* ausente, no como bucket desconocido — y un archivo escrito con `putObject({ bucket: "media" })` no se lee de vuelta con `getSignedUrl(key, "media")`. Lea un archivo con la misma forma de llamada que lo escribió. El lado del servidor ya responde `404 UNKNOWN_STORAGE_SOURCE` en `/api/storage/list`; el argumento del SDK se está reelaborando para coincidir.
+En `getSignedUrl`, `getObject` y `deleteObject`, el segundo argumento se pliega dentro de la clave del objeto (`<bucket>/<key>`) y nunca llega al servidor como bucket, así que un nombre que el despliegue no sirve se reporta como *archivo* ausente, no como bucket desconocido — y un archivo escrito con `putObject({ bucket: "media" })` no se lee de vuelta con `getSignedUrl(key, "media")`. Lea un archivo con la misma forma de llamada que lo escribió. El lado del servidor ya responde `404 UNKNOWN_STORAGE_SOURCE` para un bucket que no sirve en `/api/storage/list`, y en S3 o GCS también en las subidas; el argumento del SDK se está reelaborando para coincidir.
 :::
 
 Con un bucket específico:

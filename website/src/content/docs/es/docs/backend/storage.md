@@ -1,5 +1,5 @@
 ---
-sourceHash: c6ff4a9052df3362
+sourceHash: 68889c97cefde465
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -103,7 +103,7 @@ image: {
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar un archivo de un backend específico |
 | `GET` | `/api/storage/metadata/*` | Tamaño, tipo de contenido y última modificación de un objeto, sin sus bytes |
 | `DELETE` | `/api/storage/file/*` | Eliminar un archivo |
-| `GET` | `/api/storage/list` | Listar objetos bajo un prefijo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `GET` | `/api/storage/list` | Listar objetos bajo un prefijo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` menor que 1, o un `pageToken` que el origen nunca emitió, es `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Crear un marcador de carpeta vacía |
 | `GET` | `/api/storage/sources` | Los orígenes de almacenamiento que sirve este backend, por clave |
 | `OPTIONS` | `/api/storage/tus` | Consultar las capacidades admitidas del protocolo TUS |
@@ -129,6 +129,12 @@ del objeto y, para un objeto privado, el `token` de corta duración;
 `GET /api/storage/sources` devuelve el array de orígenes configurados.
 `DELETE /api/storage/file/*` y `POST /api/storage/folder` solo contienen un
 `message`, ya que no hay nada que devolver.
+
+En S3 y GCS, un `bucket` tiene que ser uno que el origen sirva, tanto en
+escrituras como en lecturas: una subida, un `POST /api/storage/folder` o una
+subida TUS que nombre cualquier otro bucket responde
+`404 UNKNOWN_STORAGE_SOURCE`, igual que el listado. El almacenamiento local
+sigue creando un bucket en su primera escritura.
 
 **Cómo se autoriza la lectura de un archivo.** Las rutas de lectura — `/api/storage/file/*` y
 `/api/storage/metadata/*` — aceptan el token firmado de corta duración que
@@ -307,7 +313,7 @@ Enrute una propiedad a un origen con `storageSource`:
 ```
 
 Un origen que usted declare pero nunca configure se **omite**, no es fatal: las subidas
-enrutadas hacia él responden `501 STORAGE_NOT_CONFIGURED`. Declarar un bucket suele
+enrutadas hacia él responden `501 STORAGE_SOURCE_NOT_CONFIGURED`. Declarar un bucket suele
 ocurrir antes de que alguien le asocie almacenamiento, y un error de arranque en ese punto
 provocaría un bucle de reinicios en el backend hasta que alguien lo hiciera. Un origen que el entorno configure
 *incorrectamente* —un tipo sin bucket, o un bucket sin credenciales— se rechaza
@@ -430,7 +436,7 @@ Dos cosas que debe configurar en la propia CDN:
 :::caution
 **En producción, `type: "local"` deshabilita el almacenamiento de archivos en lugar de utilizarlo.** En una plataforma efímera (Cloud Run, Heroku, un pod de Kubernetes), el sistema de archivos se borra en cada despliegue, reinicio y desalojo — por lo que las subidas tendrían éxito, se leerían bien y desaparecerían en el siguiente rollout, sin ningún error en ningún momento.
 
-Por lo tanto, no se registra ningún backend de almacenamiento y `/api/storage/*` responde **`501 STORAGE_NOT_CONFIGURED`**. Las subidas fallan de forma ruidosa y recuperable; el resto de la aplicación sigue funcionando. El almacenamiento de archivos requiere confirmación explícita en producción: existe una vez que existe un bucket.
+Por lo tanto, no se registra el valor predeterminado local, y una solicitud a `/api/storage/*` que no nombra ningún origen de almacenamiento responde **`501 STORAGE_NOT_CONFIGURED`**, indicando los orígenes que sí se sirven. Un origen con nombre que está configurado, como `bucket("media", { engine: "s3" })`, sigue funcionando. Las subidas fallan de forma ruidosa y recuperable; el resto de la aplicación sigue funcionando. El almacenamiento de archivos requiere confirmación explícita en producción: existe una vez que existe un bucket.
 
 Configure `STORAGE_TYPE=s3` o `gcs`. Si realmente hay montado un **volumen duradero** en `STORAGE_PATH`, configure `FORCE_LOCAL_STORAGE=true` para indicarlo explícitamente.
 :::

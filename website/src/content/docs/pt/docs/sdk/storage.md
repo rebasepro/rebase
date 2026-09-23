@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a0c74973860c714
+sourceHash: 6f7ff1888738abd2
 title: Armazenamento e Arquivos
 sidebar_label: Armazenamento
 description: Envie, baixe, liste e exclua arquivos usando o módulo de armazenamento do SDK Cliente da Rebase.
@@ -63,7 +63,7 @@ if (url) {
 ```
 
 :::caution[O argumento `bucket` é hoje um prefixo de caminho]
-Em `getSignedUrl`, `getObject` e `deleteObject`, o segundo argumento é dobrado dentro da chave do objeto (`<bucket>/<key>`) e nunca chega ao servidor como bucket, por isso um nome que o deployment não serve é reportado como *ficheiro* em falta, não como bucket desconhecido — e um ficheiro escrito com `putObject({ bucket: "media" })` não é lido de volta com `getSignedUrl(key, "media")`. Leia um ficheiro com a mesma forma de chamada que o escreveu. O lado do servidor já responde `404 UNKNOWN_STORAGE_SOURCE` em `/api/storage/list`; o argumento do SDK está a ser reformulado para corresponder.
+Em `getSignedUrl`, `getObject` e `deleteObject`, o segundo argumento é dobrado dentro da chave do objeto (`<bucket>/<key>`) e nunca chega ao servidor como bucket, por isso um nome que o deployment não serve é reportado como *ficheiro* em falta, não como bucket desconhecido — e um ficheiro escrito com `putObject({ bucket: "media" })` não é lido de volta com `getSignedUrl(key, "media")`. Leia um ficheiro com a mesma forma de chamada que o escreveu. O lado do servidor já responde `404 UNKNOWN_STORAGE_SOURCE` para um bucket que não serve em `/api/storage/list`, e no S3 ou GCS também nos uploads; o argumento do SDK está a ser reformulado para corresponder.
 :::
 
 Com um bucket específico:

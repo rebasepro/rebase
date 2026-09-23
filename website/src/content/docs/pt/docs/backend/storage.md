@@ -1,5 +1,5 @@
 ---
-sourceHash: c6ff4a9052df3362
+sourceHash: 68889c97cefde465
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -103,7 +103,7 @@ image: {
 | `GET` | `/api/storage/file/*?storageId=<key>` | Obter um arquivo de um backend específico |
 | `GET` | `/api/storage/metadata/*` | Tamanho, content-type e última modificação de um objeto, sem os seus bytes |
 | `DELETE` | `/api/storage/file/*` | Excluir um arquivo |
-| `GET` | `/api/storage/list` | Listar objetos sob um prefixo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `GET` | `/api/storage/list` | Listar objetos sob um prefixo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Um `maxResults` menor que 1, ou um `pageToken` que a fonte nunca emitiu, resulta em `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Criar um marcador de pasta vazia |
 | `GET` | `/api/storage/sources` | As fontes de armazenamento atendidas por este backend, por chave |
 | `OPTIONS` | `/api/storage/tus` | Consultar capacidades suportadas do protocolo TUS |
@@ -129,6 +129,11 @@ do objeto e, para um objeto privado, o `token` de curta duração;
 o `GET /api/storage/sources` retorna o array de fontes configuradas.
 O `DELETE /api/storage/file/*` e o `POST /api/storage/folder` trazem apenas uma
 `message`, já que não há nada a retornar.
+
+No S3 e no GCS, um `bucket` precisa ser um que a fonte serve, em escritas como
+em leituras: um upload, um `POST /api/storage/folder` ou um upload TUS que
+nomeie qualquer outro bucket responde `404 UNKNOWN_STORAGE_SOURCE`, como a
+listagem. O armazenamento local continua criando um bucket na primeira escrita.
 
 **Como a leitura de um arquivo é autorizada.** As rotas de leitura — `/api/storage/file/*` e
 `/api/storage/metadata/*` — aceitam o token assinado de curta duração emitido por
@@ -306,7 +311,7 @@ Roteie uma propriedade para uma fonte usando `storageSource`:
 ```
 
 Uma fonte que você declara mas nunca configura é **ignorada**, não fatal: uploads
-roteados para ela respondem com `501 STORAGE_NOT_CONFIGURED`. Declarar um bucket geralmente
+roteados para ela respondem com `501 STORAGE_SOURCE_NOT_CONFIGURED`. Declarar um bucket geralmente
 acontece antes que alguém anexe armazenamento a ele, e um erro de inicialização ali faria
 o backend entrar em crash-loop até que alguém o configurasse. Uma fonte que o ambiente configura
 *incorretamente* — um tipo sem bucket, ou um bucket sem credenciais — é recusada
@@ -429,7 +434,7 @@ Duas coisas para configurar na própria CDN:
 :::caution
 **Em produção, `type: "local"` desativa o armazenamento de arquivos em vez de utilizá-lo.** Em uma plataforma efêmera (Cloud Run, Heroku, um pod do Kubernetes), o sistema de arquivos é apagado a cada deploy, reinicialização e despejo (eviction) — logo, uploads seriam concluídos com sucesso, lidos perfeitamente e sumiriam no próximo rollout, sem nenhum erro em momento algum.
 
-Por isso, nenhum backend de armazenamento é registrado, e `/api/storage/*` responde com **`501 STORAGE_NOT_CONFIGURED`**. Os uploads falham explicitamente e de forma recuperável; o restante do app continua operando. O armazenamento de arquivos é opt-in em produção: ele só existe a partir do momento em que um bucket existir.
+Por isso, o padrão local não é registrado, e uma requisição a `/api/storage/*` que não nomeia nenhuma fonte de armazenamento responde com **`501 STORAGE_NOT_CONFIGURED`**, indicando as fontes servidas. Uma fonte nomeada que está configurada, como `bucket("media", { engine: "s3" })`, continua funcionando. Os uploads falham explicitamente e de forma recuperável; o restante do app continua operando. O armazenamento de arquivos é opt-in em produção: ele só existe a partir do momento em que um bucket existir.
 
 Defina `STORAGE_TYPE=s3` ou `gcs`. Se um **volume persistente** estiver realmente montado em `STORAGE_PATH`, defina `FORCE_LOCAL_STORAGE=true` para declarar isso explicitamente.
 :::

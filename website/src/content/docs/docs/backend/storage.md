@@ -102,7 +102,7 @@ image: {
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
 | `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
 | `DELETE` | `/api/storage/file/*` | Delete a file |
-| `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). A `maxResults` below 1, or a `pageToken` the source never issued, is `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Create an empty folder marker |
 | `GET` | `/api/storage/sources` | The storage sources this backend serves, by key |
 | `OPTIONS` | `/api/storage/tus` | Query supported TUS protocol capabilities |
@@ -128,6 +128,11 @@ metadata and, for a private object, the short-lived `token`;
 `GET /api/storage/sources` the array of configured sources.
 `DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
 `message`, since there is nothing to return.
+
+On S3 and GCS, a `bucket` has to be one the source serves, on writes as on
+reads: an upload, a `POST /api/storage/folder` or a TUS upload naming any other
+bucket answers `404 UNKNOWN_STORAGE_SOURCE`, as the listing does. Local storage
+still creates a bucket on its first write.
 
 **How a file read is authorized.** The read routes — `/api/storage/file/*` and
 `/api/storage/metadata/*` — take the short-lived signed token that
@@ -306,7 +311,7 @@ Route a property to a source with `storageSource`:
 ```
 
 A source you declare but never configure is **skipped**, not fatal: uploads
-routed to it answer `501 STORAGE_NOT_CONFIGURED`. Declaring a bucket usually
+routed to it answer `501 STORAGE_SOURCE_NOT_CONFIGURED`. Declaring a bucket usually
 happens before anyone attaches storage to it, and a boot error there would
 crash-loop the backend until someone did. A source the environment configures
 *wrongly* — a type with no bucket, or a bucket with no credentials — is refused
@@ -429,7 +434,7 @@ Two things to configure on the CDN itself:
 :::caution
 **In production, `type: "local"` disables file storage instead of using it.** On an ephemeral platform (Cloud Run, Heroku, a Kubernetes pod) the filesystem is wiped on every deploy, restart and eviction — so uploads would succeed, read back fine, and be gone at the next rollout, with no error at any point.
 
-So no storage backend is registered, and `/api/storage/*` answers **`501 STORAGE_NOT_CONFIGURED`**. Uploads fail loudly and recoverably; the rest of the app keeps serving. File storage is opt-in in production: it exists once a bucket does.
+So the local default is not registered, and a request to `/api/storage/*` that names no storage source answers **`501 STORAGE_NOT_CONFIGURED`**, naming the sources that are served. A named source that is configured, such as `bucket("media", { engine: "s3" })`, keeps serving. Uploads fail loudly and recoverably; the rest of the app keeps serving. File storage is opt-in in production: it exists once a bucket does.
 
 Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly.
 :::

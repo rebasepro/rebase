@@ -62,7 +62,7 @@ if (url) {
 ```
 
 :::caution[The `bucket` argument is a path prefix today]
-On `getSignedUrl`, `getObject` and `deleteObject` the second argument is folded into the object key (`<bucket>/<key>`) and never reaches the server as a bucket, so a name the deployment does not serve is reported as a missing *file*, not an unknown bucket — and a file written with `putObject({ bucket: "media" })` is not read back with `getSignedUrl(key, "media")`. Read a file back with the same call shape that wrote it. The server side already answers `404 UNKNOWN_STORAGE_SOURCE` on `/api/storage/list`; the SDK argument is being reworked to match.
+On `getSignedUrl`, `getObject` and `deleteObject` the second argument is folded into the object key (`<bucket>/<key>`) and never reaches the server as a bucket, so a name the deployment does not serve is reported as a missing *file*, not an unknown bucket — and a file written with `putObject({ bucket: "media" })` is not read back with `getSignedUrl(key, "media")`. Read a file back with the same call shape that wrote it. The server side already answers `404 UNKNOWN_STORAGE_SOURCE` for a bucket it does not serve on `/api/storage/list`, and on S3 or GCS on uploads too; the SDK argument is being reworked to match.
 :::
 
 With a specific bucket:

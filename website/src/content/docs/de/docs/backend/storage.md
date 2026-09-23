@@ -1,5 +1,5 @@
 ---
-sourceHash: c6ff4a9052df3362
+sourceHash: 68889c97cefde465
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -103,7 +103,7 @@ image: {
 | `GET` | `/api/storage/file/*?storageId=<key>` | Datei von einem bestimmten Backend abrufen |
 | `GET` | `/api/storage/metadata/*` | Größe, Content-Type und letzte Änderung eines Objekts ohne dessen Bytes |
 | `DELETE` | `/api/storage/file/*` | Datei löschen |
-| `GET` | `/api/storage/list` | Objekte unter einem Präfix auflisten (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `GET` | `/api/storage/list` | Objekte unter einem Präfix auflisten (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Ein `maxResults` unter 1 oder ein `pageToken`, den die Quelle nie ausgegeben hat, ergibt `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Leere Ordnermarkierung erstellen |
 | `GET` | `/api/storage/sources` | Die Storage-Quellen, die dieses Backend bedient, nach Schlüssel |
 | `OPTIONS` | `/api/storage/tus` | Unterstützte TUS-Protokollfunktionen abfragen |
@@ -120,6 +120,8 @@ image: {
 ```
 
 `POST /api/storage/upload` antwortet mit `201` und den `{ key, bucket, storageUrl }` des gespeicherten Objekts unter `data`; `GET /api/storage/metadata/*` mit den Metadaten des Objekts und, bei einem privaten Objekt, dem kurzlebigen `token`; `GET /api/storage/sources` mit dem Array der konfigurierten Quellen. `DELETE /api/storage/file/*` und `POST /api/storage/folder` übertragen lediglich eine `message`, da es nichts zurückzugeben gibt.
+
+Bei S3 und GCS muss ein `bucket` einer sein, den die Quelle bedient, bei Schreib- wie bei Lesezugriffen: Ein Upload, ein `POST /api/storage/folder` oder ein TUS-Upload, der einen anderen Bucket nennt, antwortet mit `404 UNKNOWN_STORAGE_SOURCE`, wie die Auflistung. Lokaler Storage legt einen Bucket weiterhin beim ersten Schreiben an.
 
 **Wie ein Lesezugriff auf Dateien autorisiert wird.** Die Lese-Routen — `/api/storage/file/*` und `/api/storage/metadata/*` — akzeptieren das kurzlebige signierte Token, das von [`getSignedUrl()`](/docs/sdk/storage) generiert wird, übergeben als `?token=<token>` oder als `Bearer`. Ein gewöhnliches Zugriffs-JWT wird auf `/file/*` mit `401 Unauthorized: Access JWT not allowed on file routes` **abgelehnt**: Das Token, das auf jeder anderen Route funktioniert, funktioniert hier mit Absicht nicht, da eine Datei-URL etwas ist, das an einen Browser, ein CDN oder ein `<img>`-Tag weitergegeben wird. Alle anderen oben aufgeführten Zeilen akzeptieren das Zugriffs-JWT wie gewohnt.
 
@@ -252,7 +254,7 @@ Leiten Sie eine Eigenschaft mit `storageSource` an eine Quelle weiter:
 }
 ```
 
-Eine Quelle, die Sie deklarieren, aber nie konfigurieren, wird **übersprungen** und führt nicht zu einem fatalen Fehler: Uploads, die an sie weitergeleitet werden, antworten mit `501 STORAGE_NOT_CONFIGURED`. Das Deklarieren eines Buckets erfolgt normalerweise, bevor jemand Speicher daran bindet, und ein Boot-Fehler an dieser Stelle würde das Backend in eine Crash-Schleife versetzen, bis dies nachgeholt wird. Eine Quelle, die von der Umgebung *falsch* konfiguriert wurde — ein Typ ohne Bucket oder ein Bucket ohne Anmeldedaten —, wird beim Booten abgewiesen, da es sich hierbei um einen Fehler und nicht um ein Fehlen handelt.
+Eine Quelle, die Sie deklarieren, aber nie konfigurieren, wird **übersprungen** und führt nicht zu einem fatalen Fehler: Uploads, die an sie weitergeleitet werden, antworten mit `501 STORAGE_SOURCE_NOT_CONFIGURED`. Das Deklarieren eines Buckets erfolgt normalerweise, bevor jemand Speicher daran bindet, und ein Boot-Fehler an dieser Stelle würde das Backend in eine Crash-Schleife versetzen, bis dies nachgeholt wird. Eine Quelle, die von der Umgebung *falsch* konfiguriert wurde — ein Typ ohne Bucket oder ein Bucket ohne Anmeldedaten —, wird beim Booten abgewiesen, da es sich hierbei um einen Fehler und nicht um ein Fehlen handelt.
 
 ### Buckets, die sich ein Konto teilen
 
@@ -339,7 +341,7 @@ Zwei Dinge sollten am CDN selbst konfiguriert werden:
 :::caution
 **In der Produktion deaktiviert `type: "local"` den Dateispeicher, anstatt ihn zu verwenden.** Auf einer kurzlebigen Plattform (Cloud Run, Heroku, ein Kubernetes-Pod) wird das Dateisystem bei jedem Deploy, Neustart und Eviction gelöscht — Uploads wären somit erfolgreich, ließen sich problemlos auslesen und wären beim nächsten Rollout spurlos verschwunden, ohne dass jemals ein Fehler aufgetreten wäre.
 
-Daher wird kein Storage-Backend registriert und `/api/storage/*` antwortet mit **`501 STORAGE_NOT_CONFIGURED`**. Uploads schlagen unübersehbar und wiederherstellbar fehl; der Rest der Anwendung läuft weiter. Dateispeicher ist in der Produktion ein Opt-in-Feature: Er existiert erst, sobald ein Bucket vorhanden ist.
+Daher wird der lokale Standard nicht registriert, und eine Anfrage an `/api/storage/*`, die keine Storage-Quelle nennt, antwortet mit **`501 STORAGE_NOT_CONFIGURED`** und nennt die bedienten Quellen. Eine benannte Quelle, die konfiguriert ist, etwa `bucket("media", { engine: "s3" })`, bedient weiter. Uploads schlagen unübersehbar und wiederherstellbar fehl; der Rest der Anwendung läuft weiter. Dateispeicher ist in der Produktion ein Opt-in-Feature: Er existiert erst, sobald ein Bucket vorhanden ist.
 
 Setzen Sie `STORAGE_TYPE=s3` oder `gcs`. Wenn unter `STORAGE_PATH` tatsächlich ein **persistentes Volume** gemountet ist, setzen Sie `FORCE_LOCAL_STORAGE=true`, um dies explizit anzugeben.
 :::
