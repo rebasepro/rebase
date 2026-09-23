@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { VirtualTableInput } from "../src/components/VirtualTable/fields/VirtualTableInput";
 import { VirtualTableDateField } from "../src/components/VirtualTable/fields/VirtualTableDateField";
+import { VirtualTableSwitch } from "../src/components/VirtualTable/fields/VirtualTableSwitch";
 
 /**
  * `admin: { disabled: true }` on a property, in the table's inline editor.
@@ -73,6 +74,37 @@ describe("inline table fields honour `disabled`", () => {
         />);
 
         expect(container.querySelector("input")).not.toBeDisabled();
+    });
+
+    // The boolean cell renders its switch whether or not the cell is selected,
+    // and refusing to select a disabled cell does not stop the button's own
+    // click, so one click on a disabled boolean saved the flipped value.
+    it("does not flip a disabled boolean cell", () => {
+        const updateValue = jest.fn();
+        render(<VirtualTableSwitch
+            internalValue={false}
+            focused={false}
+            disabled={true}
+            updateValue={updateValue}
+        />);
+
+        const toggle = screen.getByRole("switch");
+        fireEvent.click(toggle);
+        expect(updateValue).not.toHaveBeenCalled();
+        expect(toggle).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("flips an enabled boolean cell", () => {
+        const updateValue = jest.fn();
+        render(<VirtualTableSwitch
+            internalValue={false}
+            focused={false}
+            disabled={false}
+            updateValue={updateValue}
+        />);
+
+        fireEvent.click(screen.getByRole("switch"));
+        expect(updateValue).toHaveBeenCalledWith(true);
     });
 
 });

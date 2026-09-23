@@ -8,7 +8,7 @@ export function VirtualTableSwitch(props: {
     disabled: boolean;
     updateValue: (newValue: (boolean | null)) => void;
 }) {
-    const { internalValue, updateValue, focused } = props;
+    const { internalValue, updateValue, focused, disabled } = props;
     const ref = React.useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
@@ -22,6 +22,7 @@ export function VirtualTableSwitch(props: {
             ref={ref}
             size={"small"}
             value={Boolean(internalValue)}
+            disabled={disabled}
             onValueChange={updateValue}
         />
     );
