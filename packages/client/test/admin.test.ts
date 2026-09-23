@@ -79,6 +79,23 @@ updatedAt: "" }
             expect(mockRequest).toHaveBeenCalledWith("/admin/users", { method: "GET" });
         });
 
+        /**
+         * The route answers a page — 25 users unless told otherwise — and
+         * says how many there are in all. `listUsers()` took no window and
+         * was typed as `{ users }`, so a caller got the first 25 with nothing
+         * saying there were more, and no way to ask for the rest.
+         */
+        it("listUsers takes a window and reports the total the route sends", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValueOnce({ users: [], total: 140, limit: 100, offset: 100 });
+
+            const result = await admin.listUsers({ limit: 100, offset: 100 });
+
+            expect(mockRequest).toHaveBeenCalledWith("/admin/users?limit=100&offset=100", { method: "GET" });
+            expect(result.total).toBe(140);
+            expect(result.offset).toBe(100);
+        });
+
         it("getUser calls GET /admin/users/:id", async () => {
             const admin = createAdmin(transport);
             mockRequest.mockResolvedValueOnce({ user: { uid: "usr_1" } });

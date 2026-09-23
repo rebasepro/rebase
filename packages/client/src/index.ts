@@ -72,7 +72,7 @@ export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions }
 export type { User, RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
 
 // Control-plane client option/DTO types (the client instance exposes the impls).
-export type { CreateAdminOptions } from "./admin";
+export type { CreateAdminOptions, ListUsersOptions } from "./admin";
 export type { AdminUser } from "./admin";
 export type { CreateCronOptions } from "./cron";
 export { createBackups } from "./backups";
