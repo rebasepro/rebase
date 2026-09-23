@@ -724,11 +724,16 @@ function GoogleLoginButton({
     const onErrorRef = useRef(onError);
     onErrorRef.current = onError;
 
-    useEffect(() => {
-        if (!authController.googleLogin) return;
+    /**
+     * Build Google's code client, if its script has arrived. Google's script
+     * tag is `async`, so it routinely lands after this button has mounted:
+     * the click tries again rather than trusting whatever the mount saw.
+     */
+    const ensureCodeClient = useCallback(() => {
+        if (codeClientRef.current || !authController.googleLogin) return codeClientRef.current;
 
         const google = window.google;
-        if (!google || codeClientRef.current) return;
+        if (!google) return null;
 
         codeClientRef.current = google.accounts.oauth2.initCodeClient({
             client_id: googleClientId,
@@ -763,16 +768,22 @@ function GoogleLoginButton({
                 }
             }
         });
+        return codeClientRef.current;
     }, [googleClientId, authController]);
 
+    useEffect(() => {
+        ensureCodeClient();
+    }, [ensureCodeClient]);
+
     const handleClick = () => {
-        if (!codeClientRef.current) {
+        const codeClient = ensureCodeClient();
+        if (!codeClient) {
             console.error("Google Sign-In not loaded");
             onErrorRef.current?.("Google Sign-In could not be loaded. Check your connection or any script blockers, then try again.");
             return;
         }
         onErrorRef.current?.(null);
-        codeClientRef.current.requestCode();
+        codeClient.requestCode();
     };
 
     return (

@@ -416,6 +416,27 @@ enabledProviders: ["github"] }
             expect(mockAuthController.googleLogin).not.toHaveBeenCalled();
         });
 
+        it("works once Google's script arrives after the button did", async () => {
+            // The script tag is `async`, so it routinely lands after the
+            // login view has mounted. The code client used to be built only
+            // in an effect that ran again on nothing but a new client id or
+            // controller — so with a stable controller the button stayed dead
+            // and said Google could not be loaded, although it had been.
+            delete (window as any).google;
+            renderWithGoogle();
+
+            const requestCode = jest.fn();
+            (window as any).google = {
+                accounts: { oauth2: { initCodeClient: () => ({ requestCode }) } }
+            };
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: /Sign in with Google/i }));
+            });
+
+            expect(requestCode).toHaveBeenCalledTimes(1);
+            expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
+        });
+
         it("stays quiet when the visitor closes the popup", () => {
             const google = installGoogleScript();
             renderWithGoogle();
