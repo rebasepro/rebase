@@ -145,7 +145,9 @@ export function generateOpenApiSpec(
             description:
                 "`SELECT DISTINCT` over the returned columns. Only meaningful alongside `fields`: the "
                 + "primary key is always in the projection, so without narrowing it every row is "
-                + "already distinct. `meta.total` counts distinct rows too. Refused (400) alongside "
+                + "already distinct. The response has no `meta.total` — the rows before deduplication "
+                + "are a different set, so their count would not describe the page — and `meta.hasMore` "
+                + "is true when the page came back full. Refused (400) alongside "
                 + "`searchString` or a vector search, which attach a per-row score that makes every row "
                 + "distinct by construction, and (400 DISTINCT_ORDER_BY_NOT_SELECTED) when `orderBy` "
                 + "names a column `fields` does not return.",
@@ -228,7 +230,7 @@ export function generateOpenApiSpec(
                     type: "object",
                     properties: {
                         total: { type: "integer",
-description: "Total number of matching records" },
+description: "Total number of matching records. Absent on a `distinct` read, which has no count of the rows it returns." },
                         limit: { type: "integer",
 description: "Page size used for this query" },
                         offset: { type: "integer",

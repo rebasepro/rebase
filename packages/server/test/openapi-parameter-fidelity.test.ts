@@ -51,6 +51,20 @@ describe("OpenAPI query parameters", () => {
         expect(limit.schema.maximum).toBe(MAX_LIST_LIMIT);
     });
 
+    it("says a distinct read carries no total, which is what the listing answers", () => {
+        // The listing leaves `meta.total` off a `distinct` read — the driver
+        // has no `COUNT(DISTINCT …)`, and a count of the undeduplicated rows
+        // describes a different set — while the spec said it counted distinct
+        // rows, so a generated client read `undefined` where it expected one.
+        const distinct = (spec.paths["/data/posts"].get.parameters as { name: string; description: string }[])
+            .find(p => p.name === "distinct")!;
+        const total = spec.components.schemas.PaginationMeta.properties.total as { description: string };
+
+        expect(distinct.description).not.toContain("counts distinct rows");
+        expect(distinct.description).toContain("no `meta.total`");
+        expect(total.description).toContain("Absent on a `distinct` read");
+    });
+
     it("documents the logical operators the query parser accepts", () => {
         // `?or=(…)` / `?and=(…)` are parsed into `queryOptions.logical` and
         // applied. Undocumented, they are unreachable from a generated client.

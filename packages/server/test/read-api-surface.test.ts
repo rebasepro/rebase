@@ -207,6 +207,13 @@ describe("the REST read surface", () => {
             expect(listOptions().distinct).toBe(true);
         });
 
+        it("answers a distinct read with no `meta.total`, as the OpenAPI says", async () => {
+            // The other half is in openapi-parameter-fidelity.test.ts: the
+            // count the driver has is of the rows before deduplication.
+            const { body } = await json("/posts?distinct=true&fields=status");
+            expect(body.meta).not.toHaveProperty("total");
+        });
+
         it("refuses a `distinct` that is neither true nor false", async () => {
             // Read as "no", a typo'd `?distinct=ture` returns duplicate rows
             // while looking exactly like it worked.
