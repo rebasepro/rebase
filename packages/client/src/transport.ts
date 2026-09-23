@@ -473,13 +473,21 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         ...(config.schemaVersion ? { [SCHEMA_VERSION_HEADER]: config.schemaVersion } : {})
     };
 
-    function getHeaders(activeToken: string | undefined, init?: RequestInit) {
-        return {
+    function getHeaders(activeToken: string | undefined, init?: RequestInit): Record<string, string> {
+        const headers: Record<string, string> = {
             "Content-Type": "application/json",
             ...defaultHeaders,
             ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
             ...((init?.headers as Record<string, string>) || {})
         };
+        // A FormData body needs the multipart Content-Type that fetch writes
+        // itself, boundary included; any other value leaves the server unable
+        // to find the parts. Here rather than at a call site, because the
+        // request path builds headers twice — the first attempt and the
+        // post-refresh retry — and the retry was the one without it: an upload
+        // whose token had expired came back "No file provided".
+        if (init?.body instanceof FormData) delete headers["Content-Type"];
+        return headers;
     }
 
     /**
@@ -583,11 +591,6 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
 
         const headers = getHeaders(activeToken, init);
 
-        // If passing FormData, we MUST let fetch set the boundary, so remove Content-Type
-        if (init?.body instanceof FormData) {
-            delete (headers as Record<string, string>)["Content-Type"];
-        }
-
         const res = await fetchFn(url, { ...init,
 headers });
 
@@ -636,7 +639,7 @@ headers });
                         }
                     } catch (e) { /* ignore */ }
                 }
-                const retryHeaders = getHeaders(retryToken, init) as Record<string, string>;
+                const retryHeaders = getHeaders(retryToken, init);
                 const retryRes = await fetchFn(url, { ...init,
 headers: retryHeaders });
                 // The retry is the response the caller gets, so it is the one
@@ -693,7 +696,7 @@ headers: retryHeaders });
         get apiPath() { return apiPath; },
         get storageUrlOrigin() { return config.storageUrlOrigin?.replace(/\/$/, "") || undefined; },
         get fetchFn() { return fetchFn; },
-        getHeaders: (init?: RequestInit) => getHeaders(token, init) as Record<string, string>,
+        getHeaders: (init?: RequestInit) => getHeaders(token, init),
         resolveToken: async () => {
             if (tokenGetter) {
                 try {

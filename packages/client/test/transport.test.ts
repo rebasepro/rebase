@@ -580,6 +580,36 @@ fetch: fetchMock as typeof globalThis.fetch });
             expect(fetchMock).toHaveBeenCalledTimes(2);
         });
 
+        it("lets fetch set the multipart boundary on the retry too", async () => {
+            // An upload whose token had expired: the first attempt is refused,
+            // the token is refreshed, and the same FormData goes out again.
+            const onUnauthorized = jest.fn<() => Promise<boolean>>().mockResolvedValueOnce(true);
+            const transport = createTransport({
+                baseUrl: "http://localhost",
+                token: "expired",
+                onUnauthorized,
+                fetch: fetchMock as typeof globalThis.fetch
+            });
+            fetchMock.mockResolvedValueOnce({
+                ok: false,
+                status: 401,
+                text: async () => JSON.stringify({ error: { message: "Token expired", code: "TOKEN_EXPIRED" } })
+            });
+            fetchMock.mockResolvedValueOnce({ ok: true, status: 201, text: async () => JSON.stringify({ path: "a.txt" }) });
+            const formData = new FormData();
+            formData.append("file", new Blob(["hi"]), "a.txt");
+
+            await transport.request("/storage/upload", { method: "POST", body: formData });
+
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            for (const [, init] of fetchMock.mock.calls) {
+                const headers = (init as RequestInit).headers as Record<string, string>;
+                // A JSON Content-Type on a multipart body strips the boundary,
+                // and the server answers "No file provided".
+                expect(headers["Content-Type"]).toBeUndefined();
+            }
+        });
+
         it("fails immediately if onUnauthorized returns false", async () => {
             const onUnauthorized = jest.fn<() => Promise<boolean>>().mockResolvedValueOnce(false);
             const transport = createTransport({
