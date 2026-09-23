@@ -1,5 +1,5 @@
 ---
-sourceHash: fd9c410ef80129f3
+sourceHash: 9e712bfba357185d
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -66,6 +66,7 @@ como um único `404 NO_COLLECTIONS`. Consulte [Backend only](/docs/getting-start
 
 | Método | Caminho | Gate | Mais |
 |---|---|---|---|
+| `GET` | `/api/auth/config` | none | O que a tela de login pode oferecer: cadastro, redefinição de senha, magic link, códigos por e-mail, login de convidado, provedores OAuth e se a configuração do primeiro administrador está pendente |
 | `POST` | `/api/auth/register` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/login` | none | [Auth endpoints](/docs/backend/auth-endpoints/) |
 | `POST` | `/api/auth/refresh` | none (um token de atualização) | [Auth endpoints](/docs/backend/auth-endpoints/) |
@@ -138,6 +139,7 @@ não acessa nada disso.
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
 | `GET` | `/api/admin/dev/emails` | dev | E-mails que o transporte de desenvolvimento capturou em vez de enviar |
+| `DELETE` | `/api/admin/dev/emails` | dev | Esvazia a caixa de correio capturada |
 
 `/api/admin/cron`, `/api/admin/logs` e `/api/admin/schema-editor` também são
 disponibilizados em seus caminhos anteriores à versão 0.17 sem o segmento `/admin`. Esses aliases
@@ -154,6 +156,7 @@ existem para projetos que ainda não migraram; escreva código novo usando o cam
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | As fontes de armazenamento nomeadas atendidas por este backend |
+| `OPTIONS` | `/api/storage/tus` | none | Uploads retomáveis: as versões e extensões TUS que este servidor suporta |
 | `POST` | `/api/storage/tus` | session + `storageAuthorize` | Uploads retomáveis: criação |
 | `GET` | `/api/storage/tus/:id` | o proprietário do upload | Uploads retomáveis: offset |
 | `PATCH` | `/api/storage/tus/:id` | o proprietário do upload | Uploads retomáveis: append |

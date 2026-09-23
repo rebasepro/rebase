@@ -65,6 +65,7 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 
 | Method | Path | Gate | More |
 |---|---|---|---|
+| `GET` | `/api/auth/config` | none | What the login screen can offer: registration, password reset, magic link, email codes, guest sign-in, OAuth providers, and whether first-admin setup is pending |
 | `POST` | `/api/auth/register` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/login` | none | [Auth endpoints](/docs/backend/auth-endpoints/) |
 | `POST` | `/api/auth/refresh` | none (a refresh token) | [Auth endpoints](/docs/backend/auth-endpoints/) |
@@ -137,6 +138,7 @@ reaches none of this.
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
 | `GET` | `/api/admin/dev/emails` | dev | Mail the development transport captured instead of sending |
+| `DELETE` | `/api/admin/dev/emails` | dev | Empties the captured mailbox |
 
 `/api/admin/cron`, `/api/admin/logs` and `/api/admin/schema-editor` are also
 served at their pre-0.17 paths without the `/admin` segment. Those aliases are
@@ -153,6 +155,7 @@ for projects that have not moved; write new code against the canonical path.
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | The named storage sources this backend serves |
+| `OPTIONS` | `/api/storage/tus` | none | Resumable uploads: the TUS versions and extensions this server supports |
 | `POST` | `/api/storage/tus` | session + `storageAuthorize` | Resumable uploads: creation |
 | `GET` | `/api/storage/tus/:id` | the upload's owner | Resumable uploads: offset |
 | `PATCH` | `/api/storage/tus/:id` | the upload's owner | Resumable uploads: append |

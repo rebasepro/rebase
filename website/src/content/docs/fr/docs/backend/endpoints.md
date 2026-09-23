@@ -1,5 +1,5 @@
 ---
-sourceHash: fd9c410ef80129f3
+sourceHash: 9e712bfba357185d
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -66,6 +66,7 @@ avec une simple erreur `404 NO_COLLECTIONS`. Voir [Backend uniquement](/docs/get
 
 | Méthode | Chemin | Contrôle | En savoir plus |
 |---|---|---|---|
+| `GET` | `/api/auth/config` | none | Ce que l'écran de connexion peut proposer : inscription, réinitialisation du mot de passe, lien magique, codes par e-mail, connexion invité, fournisseurs OAuth, et si la configuration du premier administrateur est en attente |
 | `POST` | `/api/auth/register` | none | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/login` | none | [Points de terminaison d'authentification](/docs/backend/auth-endpoints/) |
 | `POST` | `/api/auth/refresh` | none (un jeton de rafraîchissement) | [Points de terminaison d'authentification](/docs/backend/auth-endpoints/) |
@@ -138,6 +139,7 @@ ne peut accéder à rien de tout cela.
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
 | `GET` | `/api/admin/dev/emails` | dev | E-mails interceptés par le transport de développement au lieu d'être envoyés |
+| `DELETE` | `/api/admin/dev/emails` | dev | Vide la boîte aux lettres capturée |
 
 `/api/admin/cron`, `/api/admin/logs` et `/api/admin/schema-editor` sont également
 servis sur leurs chemins antérieurs à la version 0.17 sans le segment `/admin`. Ces alias sont
@@ -154,6 +156,7 @@ destinés aux projets qui n'ont pas encore migré ; écrivez le nouveau code en 
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | Les sources de stockage nommées desservies par ce backend |
+| `OPTIONS` | `/api/storage/tus` | none | Téléversements reprenables : les versions et extensions TUS prises en charge par ce serveur |
 | `POST` | `/api/storage/tus` | session + `storageAuthorize` | Téléversements avec reprise : création |
 | `GET` | `/api/storage/tus/:id` | propriétaire du téléversement | Téléversements avec reprise : décalage |
 | `PATCH` | `/api/storage/tus/:id` | propriétaire du téléversement | Téléversements avec reprise : ajout de données |

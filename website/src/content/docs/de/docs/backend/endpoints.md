@@ -1,5 +1,5 @@
 ---
-sourceHash: fd9c410ef80129f3
+sourceHash: 9e712bfba357185d
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -66,6 +66,7 @@ ein einzelnes `404 NO_COLLECTIONS` aus. Siehe [Backend only](/docs/getting-start
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
+| `GET` | `/api/auth/config` | none | Was der Anmeldebildschirm anbieten kann: Registrierung, Passwort-Reset, Magic Link, E-Mail-Codes, Gast-Anmeldung, OAuth-Provider und ob das Einrichten des ersten Admins aussteht |
 | `POST` | `/api/auth/register` | none | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/login` | none | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
 | `POST` | `/api/auth/refresh` | none (ein Refresh-Token) | [Auth-Endpunkte](/docs/backend/auth-endpoints/) |
@@ -138,6 +139,7 @@ Ein Schlüssel, dessen Gültigkeitsbereich auf eine Collection beschränkt ist, 
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
 | `GET` | `/api/admin/dev/emails` | dev | E-Mails, die der Entwicklungs-Transport abgefangen hat, anstatt sie zu senden |
+| `DELETE` | `/api/admin/dev/emails` | dev | Leert das erfasste Postfach |
 
 `/api/admin/cron`, `/api/admin/logs` und `/api/admin/schema-editor` werden auch
 unter ihren Pfaden vor Version 0.17 ohne das `/admin`-Segment bereitgestellt. Diese Aliase
@@ -154,6 +156,7 @@ sind für Projekte gedacht, die noch nicht umgestellt wurden; schreiben Sie neue
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | Die benannten Speicherquellen, die dieses Backend bedient |
+| `OPTIONS` | `/api/storage/tus` | none | Fortsetzbare Uploads: die TUS-Versionen und -Erweiterungen, die dieser Server unterstützt |
 | `POST` | `/api/storage/tus` | session + `storageAuthorize` | Fortsetzbare Uploads: Erstellung |
 | `GET` | `/api/storage/tus/:id` | Eigentümer des Uploads | Fortsetzbare Uploads: Offset |
 | `PATCH` | `/api/storage/tus/:id` | Eigentümer des Uploads | Fortsetzbare Uploads: Anhängen |

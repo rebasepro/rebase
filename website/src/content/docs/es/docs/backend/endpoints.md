@@ -1,5 +1,5 @@
 ---
-sourceHash: fd9c410ef80129f3
+sourceHash: 9e712bfba357185d
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -68,6 +68,7 @@ sirve este prefijo como un único `404 NO_COLLECTIONS`. Consulte
 
 | Método | Ruta | Gate | Más |
 |---|---|---|---|
+| `GET` | `/api/auth/config` | none | Lo que puede ofrecer la pantalla de inicio de sesión: registro, restablecimiento de contraseña, enlace mágico, códigos por correo, sesión de invitado, proveedores OAuth y si falta configurar el primer administrador |
 | `POST` | `/api/auth/register` | none | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/login` | none | [Endpoints de autenticación](/docs/backend/auth-endpoints/) |
 | `POST` | `/api/auth/refresh` | none (un token de actualización) | [Endpoints de autenticación](/docs/backend/auth-endpoints/) |
@@ -141,6 +142,7 @@ de esto.
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
 | `GET` | `/api/admin/dev/emails` | dev | Correos que el transporte de desarrollo capturó en lugar de enviar |
+| `DELETE` | `/api/admin/dev/emails` | dev | Vacía el buzón capturado |
 
 `/api/admin/cron`, `/api/admin/logs` y `/api/admin/schema-editor` también se
 sirven en sus rutas anteriores a la versión 0.17 sin el segmento `/admin`. Esos
@@ -158,6 +160,7 @@ a la ruta canónica.
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | Las fuentes de almacenamiento con nombre que sirve este backend |
+| `OPTIONS` | `/api/storage/tus` | none | Subidas reanudables: las versiones y extensiones de TUS que admite este servidor |
 | `POST` | `/api/storage/tus` | session + `storageAuthorize` | Cargas reanudables: creación |
 | `GET` | `/api/storage/tus/:id` | el propietario de la carga | Cargas reanudables: desplazamiento (offset) |
 | `PATCH` | `/api/storage/tus/:id` | el propietario de la carga | Cargas reanudables: anexar (append) |
