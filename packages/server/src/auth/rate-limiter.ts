@@ -40,7 +40,7 @@ interface RateLimiterOptions {
      * Count in the deployment's shared store once one is configured, under
      * this name. For a limiter declared at module load, which runs before any
      * configuration exists and so cannot be handed a `store` — see
-     * {@link useSharedRateLimitStore}. The name namespaces the limiter's keys
+     * {@link setSharedRateLimitStore}. The name namespaces the limiter's keys
      * there: two limiters keyed by the same IP must not share one count.
      * Ignored when `store` is given.
      */
@@ -140,7 +140,7 @@ let sharedRateLimitStore: RateLimitStore | undefined;
  * operator supplied): the default memory store is swept on the data window,
  * which is not every limiter's window.
  */
-export function useSharedRateLimitStore(store: RateLimitStore | undefined): void {
+export function setSharedRateLimitStore(store: RateLimitStore | undefined): void {
     sharedRateLimitStore = store;
 }
 

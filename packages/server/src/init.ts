@@ -130,7 +130,7 @@ import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
 import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./auth/api-keys/api-key-middleware";
 import { createRequireAuth } from "./auth/middleware";
-import { createDataRateLimiter, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, useSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
+import { createDataRateLimiter, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
@@ -1708,7 +1708,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // They are built at import time, before this setting is read, so they are
     // pointed at it here; set on every boot, so a process that boots again
     // without a shared store does not keep counting in the last one.
-    useSharedRateLimitStore(sharedRateLimitStore);
+    setSharedRateLimitStore(sharedRateLimitStore);
     const rateLimitConfig: DataRateLimitConfig | undefined =
         config.rateLimit?.enabled !== false
             ? { ...config.rateLimit, store: rateLimitStore }
