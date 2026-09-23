@@ -59,6 +59,17 @@ export function acceptsExcludeFlag(domain: string, args: string[]): boolean {
     return domain === "schema" && args.includes("apply");
 }
 
+/**
+ * Does this Atlas invocation plan against the scratch database (`--dev-url`)?
+ *
+ * `schema apply` and `migrate diff` do; `migrate apply`, `hash` and `status`
+ * never read it, so `db migrate` has no reason to create one.
+ */
+export function takesDevUrl(domain: string, args: string[]): boolean {
+    return (domain === "schema" && args.includes("apply"))
+        || (domain === "migrate" && args.includes("diff"));
+}
+
 /** Assemble the full argv, connection flags and all. */
 export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     const { domain, args, url, devUrl, excludes = [] } = invocation;

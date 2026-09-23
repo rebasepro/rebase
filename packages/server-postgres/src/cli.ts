@@ -55,7 +55,8 @@ import {
     describeConflict
 } from "./schema/generated-column-conflicts";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
-import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs } from "./schema/atlas-argv";
+import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
+import { ScratchDatabase } from "./cli-scratch-database";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
@@ -178,7 +179,7 @@ export async function runPluginCommand(args: string[]) {
     assertCollectionsPathExists(collectionsPathIn(args));
 
     if (domain === "db") {
-        await dbCommand(subcommand, args);
+        await scratchDatabase.around(() => dbCommand(subcommand, args));
     } else if (domain === "schema") {
         await schemaCommand(subcommand, args);
     } else if (domain === "doctor") {
@@ -680,17 +681,6 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
-
-                // The push worked, so the throwaway schema copy Atlas planned
-                // against has nothing left to say. It was kept forever, one per
-                // target, and the only notice was `rebase db branch prune`
-                // reporting them. On a failed push we never reach this line —
-                // deliberately: there the scratch database is the evidence.
-                // And only the one this run created: a scratch database the
-                // user made by hand is theirs to keep.
-                if (scratchDatabaseCreatedHere) {
-                    await dropDevDatabase(databaseUrl, getDevDatabaseUrl(databaseUrl));
-                }
             } else {
                 outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
@@ -1292,8 +1282,11 @@ function timeAgo(date: Date): string {
 
 
 
-/** Set when this process created the Atlas scratch database; see `ensureDevDatabaseExists`. */
-let scratchDatabaseCreatedHere = false;
+/**
+ * The Atlas scratch database this process created, dropped once the db
+ * command that needed it succeeds — see `ScratchDatabase`.
+ */
+const scratchDatabase = new ScratchDatabase({ create: ensureDevDatabaseExists, drop: dropDevDatabase });
 
 async function runAtlas(
     domain: "schema" | "migrate",
@@ -1398,10 +1391,9 @@ async function runAtlas(
     await checkDatabaseConnectivity(databaseUrl);
 
     const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
-    // Remember whether the scratch database is ours: one a user created by
-    // hand — the remedy for a role without CREATEDB — must survive the push,
-    // or that user is back at the same refusal next time.
-    if (await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl)) scratchDatabaseCreatedHere = true;
+    // Only for the calls that plan against it: `migrate apply`, `hash` and
+    // `status` never read `--dev-url`, so `db migrate` makes no scratch copy.
+    if (takesDevUrl(domain, args)) await scratchDatabase.ensure(databaseUrl, devDatabaseUrl);
 
     // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
     // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so
