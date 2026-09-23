@@ -151,7 +151,8 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
         // Backups of a large database can take a while; allow up to an hour.
         timeoutSeconds: 3600,
         async handler({ log }) {
-            const { createDump, pruneBackups, uploadBackup, validateDump } = await import("./backup-service");
+            const { createDump, discardPartialDump, pruneBackups, uploadBackup, validateDump } =
+                await import("./backup-service");
             const { destination } = config;
 
             if (destination.kind !== "local" && !config.storage) {
@@ -175,13 +176,13 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
             // the reason the last good backup gets deleted.
             const check = await validateDump(dump.localFile);
             if (!check.ok) {
-                // Clean up the bad temp file for object destinations.
-                if (destination.kind !== "local" && fs.existsSync(dump.localFile)) {
-                    fs.unlinkSync(dump.localFile);
-                }
-                if (dump.globalsFile && destination.kind !== "local" && fs.existsSync(dump.globalsFile)) {
-                    fs.unlinkSync(dump.globalsFile);
-                }
+                // Discarded for every destination, the roles sidecar with it.
+                // On a local one the file *is* the backup: left behind, it
+                // keeps a valid backup's name, and retention — which ranks by
+                // timestamp and never opens a file — counts it among the
+                // newest it keeps while pruning a real backup beneath it.
+                if (dump.globalsFile) discardPartialDump(dump.globalsFile);
+                discardPartialDump(dump.localFile);
                 throw new Error(`New backup failed validation — skipping upload and pruning to protect existing backups. ${check.reason}`);
             }
 
