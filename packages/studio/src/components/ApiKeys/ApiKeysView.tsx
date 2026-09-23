@@ -173,7 +173,7 @@ export function ApiKeysView() {
                         {inactiveKeys.length > 0 && (
                             <>
                                 <div className="px-2 pt-3 pb-1">
-                                    <Typography variant="caption" color="disabled" className="text-[10px] uppercase tracking-wider font-medium">{t("studio_api_keys_revoke")}d / Expired</Typography>
+                                    <Typography variant="caption" color="disabled" className="text-[10px] uppercase tracking-wider font-medium">{t("studio_api_keys_inactive_heading")}</Typography>
                                 </div>
                                 {inactiveKeys.map(key => (
                                     <KeyListItem key={key.id} apiKey={key} selected={selectedId === key.id} onClick={() => setSelectedId(key.id)}/>

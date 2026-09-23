@@ -1191,6 +1191,8 @@ export interface RebaseTranslations {
     studio_cron_denied_title?: string;
     studio_cron_denied_hint?: string;
     studio_cron_read_failed?: string;
+    studio_cron_logs_read_failed?: string;
+    studio_cron_logs_denied_title?: string;
     studio_api_keys_denied_title?: string;
     studio_api_keys_denied_hint?: string;
     studio_api_keys_read_failed?: string;
@@ -1209,6 +1211,7 @@ export interface RebaseTranslations {
     studio_api_keys_status_active?: string;
     studio_api_keys_status_expired?: string;
     studio_api_keys_status_revoked?: string;
+    studio_api_keys_inactive_heading?: string;
     studio_api_keys_stat_status?: string;
     studio_api_keys_stat_last_used?: string;
     studio_api_keys_stat_expires?: string;

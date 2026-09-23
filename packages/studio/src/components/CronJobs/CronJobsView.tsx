@@ -61,6 +61,12 @@ export function CronJobsView() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [logs, setLogs] = useState<CronJobLogEntry[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
+    /**
+     * Why the selected job's executions could not be read. Shown where the
+     * list would be: an empty list reads as "this job has never run", and the
+     * snackbar that used to carry the reason was gone in four seconds.
+     */
+    const [logsFailure, setLogsFailure] = useState<LoadFailure | null>(null);
     const [triggering, setTriggering] = useState<string | null>(null);
     /** Why the job listing failed, classified — see `load-failure.ts`. */
     const [failure, setFailure] = useState<LoadFailure | null>(null);
@@ -132,6 +138,7 @@ export function CronJobsView() {
     useEffect(() => {
         if (!selectedId) {
             setLogs([]);
+            setLogsFailure(null);
             return;
         }
         let cancelled = false;
@@ -139,16 +146,14 @@ export function CronJobsView() {
         if (!c?.cron) return;
 
         setLogsLoading(true);
+        setLogsFailure(null);
         c.cron.getJobLogs(selectedId, { limit: 25 })
             .then(res => { if (!cancelled) setLogs(res.logs); })
             .catch((e: unknown) => {
                 if (cancelled) return;
                 // Same reasoning as `refreshLogs`: an empty log list is a claim.
                 setLogs([]);
-                snackbarRef.current.open({
-                    type: "error",
-                    message: e instanceof Error ? e.message : String(e)
-                });
+                setLogsFailure(classifyLoadFailure(e));
             })
             .finally(() => { if (!cancelled) setLogsLoading(false); });
 
@@ -176,16 +181,14 @@ export function CronJobsView() {
         const c = clientRef.current;
         if (!c?.cron) return;
         setLogsLoading(true);
+        setLogsFailure(null);
         try {
             const res = await c.cron.getJobLogs(id, { limit: 25 });
             setLogs(res.logs);
         } catch (e: unknown) {
             // Clearing the list silently reads as "this job has never run".
             setLogs([]);
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            setLogsFailure(classifyLoadFailure(e));
         }
         finally { setLogsLoading(false); }
     }
@@ -355,6 +358,14 @@ message: e instanceof Error ? e.message : String(e) });
                         <div className="flex-1 overflow-y-auto">
                             {logsLoading ? (
                                 <div className="flex justify-center p-8"><CircularProgress size="small"/></div>
+                            ) : logsFailure ? (
+                                <LoadFailureView
+                                    failure={logsFailure}
+                                    title={t("studio_cron_logs_read_failed")}
+                                    deniedTitle={t("studio_cron_logs_denied_title")}
+                                    deniedHint={t("studio_cron_denied_hint")}
+                                    onRetry={() => refreshLogs(selectedJob.id)}
+                                />
                             ) : logs.length === 0 ? (
                                 <div className="flex items-center justify-center h-32">
                                     <Typography variant="body2" color="disabled">No executions yet</Typography>
