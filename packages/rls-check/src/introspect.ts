@@ -398,7 +398,7 @@ function stripParam(connectionString: string, name: string): string {
 // Reading
 // ---------------------------------------------------------------------------
 
-interface Reader {
+export interface Reader {
     query<R extends Record<string, unknown>>(
         what: string,
         text: string,
@@ -469,9 +469,14 @@ async function readSnapshot(
     const relations = await readRelations(db, schemas);
     const policies = await readPolicies(db, schemas);
     const grants = await readGrants(db, schemas);
-    const views = await readViews(db, schemas, serverVersionNum, relations);
+    const views = await readViews(db, schemas, serverVersionNum);
     const foreignKeys = await readForeignKeys(db, schemas);
     const routines = await readRoutines(db, schemas);
+    // The relations scanned views and foreign keys point at in schemas the scan
+    // does not cover. Checks reach them only through `relationAt`, and every
+    // count and table-level check filters on `schemas`, so they widen what a
+    // view or a junction table can be judged against without widening the scan.
+    const referenced = await readReferencedRelations(db, outOfScopeReferences(relations, views, foreignKeys));
 
     const scannerIsPrivileged = isPrivileged(currentRole, server, roles, relations);
 
@@ -503,7 +508,7 @@ async function readSnapshot(
         schemas,
         exposedRoles,
         platform: detectPlatform(allSchemas, roles),
-        relations,
+        relations: [...relations, ...referenced],
         policies,
         roles,
         grants,
@@ -617,15 +622,7 @@ async function readRoles(db: Reader): Promise<DbRole[]> {
 }
 
 async function readRelations(db: Reader, schemas: string[]): Promise<DbRelation[]> {
-    const rows = await db.query<{
-        schema: string;
-        name: string;
-        kind: string;
-        owner: string;
-        rls_enabled: boolean;
-        rls_forced: boolean;
-        estimated_rows: string | number;
-    }>(
+    const rows = await db.query<RelationRow>(
         "relations",
         `SELECT n.nspname AS schema, c.relname AS name, c.relkind::text AS kind,
                 pg_get_userbyid(c.relowner) AS owner,
@@ -641,7 +638,21 @@ async function readRelations(db: Reader, schemas: string[]): Promise<DbRelation[
 
     const columns = await readColumns(db, schemas);
 
-    return rows.map((r) => ({
+    return rows.map((r) => toRelation(r, columns.get(`${r.schema}.${r.name}`) ?? []));
+}
+
+interface RelationRow extends Record<string, unknown> {
+    schema: string;
+    name: string;
+    kind: string;
+    owner: string;
+    rls_enabled: boolean;
+    rls_forced: boolean;
+    estimated_rows: string | number;
+}
+
+function toRelation(r: RelationRow, columns: DbColumn[]): DbRelation {
+    return {
         schema: r.schema,
         name: r.name,
         kind: RELATION_KINDS[r.kind] ?? "table",
@@ -649,9 +660,63 @@ async function readRelations(db: Reader, schemas: string[]): Promise<DbRelation[
         // Postgres reports these false for views; do not infer anything from it.
         rlsEnabled: Boolean(r.rls_enabled),
         rlsForced: Boolean(r.rls_forced),
-        columns: columns.get(`${r.schema}.${r.name}`) ?? [],
+        columns,
         estimatedRows: Number(r.estimated_rows ?? -1)
-    }));
+    };
+}
+
+/**
+ * Relations a scanned view reads or a scanned foreign key points at that the
+ * scan did not read, each named once.
+ *
+ * View dependencies are read across schemas on purpose, and foreign keys
+ * always were — but a dependency on a relation that is not in the snapshot
+ * resolves to nothing. `CREATE VIEW public.files AS SELECT * FROM
+ * storage.objects`, granted to anon, produced no finding on a default scan
+ * (which leaves `storage` out), and a junction table pointing at `auth.users`
+ * was never considered.
+ */
+export function outOfScopeReferences(
+    relations: DbRelation[],
+    views: DbView[],
+    foreignKeys: DbForeignKey[]
+): { schema: string; name: string }[] {
+    const key = (schema: string, name: string) => JSON.stringify([schema, name]);
+    const known = new Set(relations.map((r) => key(r.schema, r.name)));
+    const out = new Map<string, { schema: string; name: string }>();
+    const add = (schema: string, name: string) => {
+        const k = key(schema, name);
+        if (!known.has(k) && !out.has(k)) out.set(k, { schema, name });
+    };
+    for (const view of views) for (const dep of view.dependsOn) add(dep.schema, dep.table);
+    for (const fk of foreignKeys) add(fk.refSchema, fk.refTable);
+    return [...out.values()];
+}
+
+/**
+ * Read the relations {@link outOfScopeReferences} names. Columns are not read:
+ * nothing judges a referenced relation by its columns, only by whether it has
+ * row-level security.
+ */
+export async function readReferencedRelations(
+    db: Reader,
+    refs: { schema: string; name: string }[]
+): Promise<DbRelation[]> {
+    if (refs.length === 0) return [];
+    const rows = await db.query<RelationRow>(
+        "referenced relations",
+        `SELECT n.nspname AS schema, c.relname AS name, c.relkind::text AS kind,
+                pg_get_userbyid(c.relowner) AS owner,
+                c.relrowsecurity      AS rls_enabled,
+                c.relforcerowsecurity AS rls_forced,
+                c.reltuples::float8   AS estimated_rows
+         FROM unnest($1::text[], $2::text[]) AS ref(schema_name, rel_name)
+         JOIN pg_namespace n ON n.nspname = ref.schema_name
+         JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = ref.rel_name
+         WHERE c.relkind::text = ANY($3)`,
+        [refs.map((r) => r.schema), refs.map((r) => r.name), SCANNED_RELKINDS]
+    );
+    return rows.map((r) => toRelation(r, []));
 }
 
 async function readColumns(db: Reader, schemas: string[]): Promise<Map<string, DbColumn[]>> {
@@ -772,8 +837,7 @@ async function readGrants(db: Reader, schemas: string[]): Promise<DbGrant[]> {
 async function readViews(
     db: Reader,
     schemas: string[],
-    serverVersionNum: number,
-    relations: DbRelation[]
+    serverVersionNum: number
 ): Promise<DbView[]> {
     const rows = await db.query<{
         schema: string;
@@ -792,7 +856,7 @@ async function readViews(
         [schemas]
     );
 
-    const dependencies = await readViewDependencies(db, schemas, relations);
+    const dependencies = await readViewDependencies(db);
 
     return rows.map((r) => ({
         schema: r.schema,
@@ -805,7 +869,7 @@ async function readViews(
             serverVersionNum < 150000 || r.kind === "m"
                 ? null
                 : (r.reloptions ?? []).some((o) => /^security_invoker=(true|on)$/i.test(o)),
-        dependsOn: dependencies.get(`${r.schema}.${r.name}`) ?? []
+        dependsOn: dependencies.get(JSON.stringify([r.schema, r.name])) ?? []
     }));
 }
 
@@ -814,21 +878,13 @@ async function readViews(
  *
  * Deliberately transitive: a view over a view over a protected table is still a
  * path to that table, and the intermediate view's own options do not save it
- * (the outer view still executes as its own owner). Base tables are not filtered
- * to the scanned schemas — a view in `public` reading a hidden schema is exactly
- * the case worth catching.
+ * (the outer view still executes as its own owner). Neither side is filtered to
+ * the scanned schemas — a view in `public` reading a hidden schema is exactly
+ * the case worth catching, and so is one reading it through a view that lives
+ * there. Only the system catalogs' own views are left out.
  */
-async function readViewDependencies(
-    db: Reader,
-    schemas: string[],
-    relations: DbRelation[]
-): Promise<Map<string, { schema: string; table: string }[]>> {
-    const rows = await db.query<{
-        view_schema: string;
-        view_name: string;
-        ref_schema: string;
-        ref_name: string;
-    }>(
+async function readViewDependencies(db: Reader): Promise<Map<string, { schema: string; table: string }[]>> {
+    const rows = await db.query<ViewDependencyRow>(
         "view dependencies",
         `SELECT DISTINCT dn.nspname AS view_schema, dc.relname AS view_name,
                 rn.nspname AS ref_schema, rc.relname AS ref_name
@@ -842,41 +898,49 @@ async function readViewDependencies(
            AND d.refclassid = 'pg_class'::regclass
            AND dc.oid <> rc.oid
            AND dc.relkind = ANY(ARRAY['v','m'])
-           AND rc.relkind::text = ANY($2)
-           AND dn.nspname = ANY($1)`,
-        [schemas, SCANNED_RELKINDS]
+           AND rc.relkind::text = ANY($1)
+           AND dn.nspname <> ALL(ARRAY['pg_catalog', 'information_schema'])`,
+        [SCANNED_RELKINDS]
     );
 
-    const direct = new Map<string, Set<string>>();
+    return resolveViewDependencies(rows);
+}
+
+export interface ViewDependencyRow extends Record<string, unknown> {
+    view_schema: string;
+    view_name: string;
+    ref_schema: string;
+    ref_name: string;
+}
+
+/**
+ * The transitive closure of direct view dependencies, keyed by
+ * `JSON.stringify([schema, name])`.
+ *
+ * Every view with a dependency of its own is expanded, wherever it lives, and
+ * names are kept as pairs: `schema.name` split at the first dot is wrong for a
+ * schema whose name has a dot in it.
+ */
+export function resolveViewDependencies(rows: ViewDependencyRow[]): Map<string, { schema: string; table: string }[]> {
+    const key = (schema: string, name: string) => JSON.stringify([schema, name]);
+    const direct = new Map<string, Map<string, { schema: string; table: string }>>();
     for (const row of rows) {
-        const key = `${row.view_schema}.${row.view_name}`;
-        if (!direct.has(key)) direct.set(key, new Set());
-        direct.get(key)!.add(`${row.ref_schema}.${row.ref_name}`);
+        const k = key(row.view_schema, row.view_name);
+        if (!direct.has(k)) direct.set(k, new Map());
+        direct.get(k)!.set(key(row.ref_schema, row.ref_name), { schema: row.ref_schema, table: row.ref_name });
     }
 
-    const isView = new Set(
-        relations
-            .filter((r) => r.kind === "view" || r.kind === "materialized_view")
-            .map((r) => `${r.schema}.${r.name}`)
-    );
-
     const out = new Map<string, { schema: string; table: string }[]>();
-    for (const key of direct.keys()) {
-        const seen = new Set<string>();
-        const queue = [...(direct.get(key) ?? [])];
+    for (const [view, refs] of direct) {
+        const seen = new Map<string, { schema: string; table: string }>();
+        const queue = [...refs];
         while (queue.length > 0) {
-            const next = queue.shift()!;
-            if (next === key || seen.has(next)) continue;
-            seen.add(next);
-            if (isView.has(next)) queue.push(...(direct.get(next) ?? []));
+            const [next, ref] = queue.shift()!;
+            if (next === view || seen.has(next)) continue;
+            seen.set(next, ref);
+            queue.push(...(direct.get(next) ?? []));
         }
-        out.set(
-            key,
-            [...seen].map((ref) => {
-                const dot = ref.indexOf(".");
-                return { schema: ref.slice(0, dot), table: ref.slice(dot + 1) };
-            })
-        );
+        out.set(view, [...seen.values()]);
     }
     return out;
 }

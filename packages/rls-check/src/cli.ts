@@ -129,7 +129,7 @@ export function exitCodeFor(result: ScanResult, failOn: Severity | "none"): numb
     return exceedsThreshold(result.findings, failOn) ? EXIT_FINDINGS : EXIT_OK;
 }
 
-function buildScanResult(
+export function buildScanResult(
     snapshot: DbSnapshot,
     findings: Finding[],
     meta: {
@@ -140,7 +140,11 @@ function buildScanResult(
     }
 ): ScanResult {
     const target = parseConnectionString(meta.connectionString);
-    const tables = snapshot.relations.filter((relation) => TABLE_KINDS.has(relation.kind));
+    // Relations outside the scanned schemas are in the snapshot only because a
+    // scanned view or foreign key points at them; they were not scanned.
+    const tables = snapshot.relations.filter(
+        (relation) => TABLE_KINDS.has(relation.kind) && snapshot.schemas.includes(relation.schema)
+    );
 
     return {
         scannedAt: meta.scannedAt,
