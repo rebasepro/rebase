@@ -307,6 +307,12 @@ export class FetchService {
      */
     static readonly SCORE_FIELD = "_score";
 
+    /**
+     * The distance a vector search attaches to every row it serves, and to no
+     * other. Like `_score` it is computed per query and stored nowhere.
+     */
+    static readonly DISTANCE_FIELD = "_distance";
+
     private resolveOrderTarget(
         table: PgTable<any>,
         orderBy: string,
@@ -922,6 +928,9 @@ target });
         // scale at all. `buildCursorConditions` refuses such a cursor; issuing
         // one here would be handing out a string whose only use is a 400.
         if (orderBy?.some(([field]) => field === FetchService.SCORE_FIELD)) return undefined;
+        // A vector read orders by distance whatever `orderBy` says, so the same
+        // holds for its rows — which are the ones carrying a distance.
+        if (FetchService.DISTANCE_FIELD in row) return undefined;
         try {
             const collection = getCollectionByPath(collectionPath, this.registry);
             const pks = getPrimaryKeys(collection, this.registry);
@@ -2163,6 +2172,19 @@ relatedTo: hop }, include
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
+
+        // A vector read orders by distance, and a distance is computed per
+        // query and stored nowhere, so there is no value on the cursor row to
+        // seek past. Seeking anyway compared ids under a distance order: page
+        // two was the rows with a smaller id, which is not the next page.
+        if (options.vectorSearch && options.startAfter) {
+            throw ApiError.badRequest(
+                "Cursor pagination (`startAfter`) cannot be combined with a vector search. " +
+                "Its rows are ordered by a distance computed per query, which cannot key a cursor. " +
+                "Use `limit`/`offset` for the next page of nearest rows.",
+                "VECTOR_CURSOR_UNSUPPORTED"
+            );
+        }
 
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
