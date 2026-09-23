@@ -57,7 +57,9 @@ ${chalk.bold("What it changes")}
   in every package.json under the project (node_modules, dist* and hidden
   directories excepted). ^ and ~ are kept. peerDependencies are left alone, and so
   are workspace:, link:, file:, git and tag specs, which are listed with the reason.
-  Overrides in pnpm-workspace.yaml and package.json are bumped the same way.
+  Overrides in pnpm-workspace.yaml and package.json are bumped the same way, and so
+  are the entries of pnpm-workspace.yaml's catalog: and catalogs: blocks, which is
+  where a catalog: pin's version lives.
 
 ${chalk.bold("Examples")}
   rebase upgrade                          Move to the latest release and install
@@ -274,6 +276,29 @@ function printOutcome(
     outcome: { dryRun: boolean; wrote: boolean; installed: boolean; installLine: string }
 ): void {
     const moved = plan.changed.length + plan.overrides.filter(o => o.action !== "kept-local").length;
+    // What the project is not moved off by this command: every pin it left
+    // alone, and every local override that wins over the pins it did move.
+    const leftAlone = plan.skipped.length + plan.overrides.filter(o => o.action === "kept-local").length;
+    const entries = (n: number): string => `${n} entr${n === 1 ? "y" : "ies"}`;
+
+    // Nothing moved is only "already on" the target when nothing was left
+    // alone either. A project whose every pin was skipped — a dist-tag, a
+    // `workspace:` link, a catalog it could not find — is on whatever those
+    // resolve to, and saying otherwise is the one sentence it must not print.
+    if (moved === 0 && leftAlone > 0) {
+        if (plan.unchanged > 0) {
+            console.log(chalk.green(
+                `✓ Every pin this can move is already on ${plan.target}; ${entries(leftAlone)} ${leftAlone === 1 ? "was" : "were"} left alone, above.`));
+        } else if (outcome.dryRun) {
+            console.log(chalk.yellow(
+                `  Nothing to move to ${plan.target}: ${entries(leftAlone)} ${leftAlone === 1 ? "is" : "are"} left alone, above.`));
+        } else {
+            console.log(chalk.yellow(
+                `⚠ Nothing moved to ${plan.target}: ${entries(leftAlone)} ${leftAlone === 1 ? "was" : "were"} left alone, above.`));
+        }
+        console.log("");
+        return;
+    }
 
     if (outcome.dryRun) {
         console.log(chalk.gray(moved === 0

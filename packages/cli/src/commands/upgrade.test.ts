@@ -232,6 +232,25 @@ describe("rebase upgrade, for a person", () => {
         expect(stdout.join("\n")).toContain("already on 0.21.0");
     });
 
+    it("does not say a project that moved nothing is already on the target", async () => {
+        // Every pin left alone is not "already there": the pins below still
+        // say `latest`, and the project is on whatever that resolved to.
+        write(".git/HEAD", "ref: refs/heads/main\n");
+        write("rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" } } }));
+        write("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+        write("backend/package.json", JSON.stringify({ dependencies: { "@rebasepro/server": "latest", "@rebasepro/client": "latest" } }));
+        process.chdir(root);
+
+        for (const line of [["--to", "0.22.0", "--no-install"], ["--to", "0.22.0", "--dry-run"]]) {
+            stdout = [];
+            expect(await run(line, io())).toBe(0);
+
+            const text = stdout.join("\n");
+            expect(text).not.toContain("already on");
+            expect(text).toMatch(/Nothing (moved|to move) to 0\.22\.0: 2 entries (were|are) left alone/);
+        }
+    });
+
     it("rejects an unknown flag before touching anything", async () => {
         project();
         const before = read("package.json");

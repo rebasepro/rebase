@@ -366,6 +366,100 @@ describe("overrides in pnpm-workspace.yaml", () => {
     });
 });
 
+/**
+ * pnpm catalogs.
+ *
+ * A `catalog:` pin names no version — the version is in `pnpm-workspace.yaml`'s
+ * `catalog:` or `catalogs:` block — and both were missed: the pins were
+ * reported as "a dist-tag, not a version", the catalog was never moved, and a
+ * catalog-based project stayed on its old release while the command said it
+ * was already on the new one.
+ */
+describe("pnpm catalogs", () => {
+    it.each([
+        ["catalog:", "default"],
+        ["catalog:default", "default"],
+        ["catalog:legacy", "legacy"]
+    ])("reads %s as a reference to the %s catalog", (spec, catalog) => {
+        expect(classifySpec(spec)).toEqual({ kind: "catalog", catalog });
+    });
+
+    const workspace = [
+        "packages:",
+        "  - backend",
+        "catalog:",
+        "  \"@rebasepro/server\": 0.19.0",
+        "  '@rebasepro/server-postgres': ^0.19.0  # the driver",
+        "  hono: 4.10.0",
+        "catalogs:",
+        "  # Kept for the old admin.",
+        "  legacy:",
+        "    \"@rebasepro/client\": ~0.19.0",
+        "    react: ^18.0.0",
+        "  next:",
+        "    \"@rebasepro/client\": \"0.19.0\"",
+        "linkWorkspacePackages: true",
+        ""
+    ].join("\n");
+    const pkg = JSON.stringify({
+        dependencies: {
+            "@rebasepro/server": "catalog:",
+            "@rebasepro/server-postgres": "catalog:default",
+            "@rebasepro/client": "catalog:legacy"
+        }
+    }, null, 2) + "\n";
+
+    it("moves the default catalog and the named ones, and leaves the references as written", () => {
+        write("pnpm-workspace.yaml", workspace);
+        write("backend/package.json", pkg);
+
+        const plan = planUpgrade(root, "0.22.0");
+        applyUpgradePlan(plan);
+
+        expect(read("backend/package.json")).toBe(pkg);
+        expect(read("pnpm-workspace.yaml")).toBe(workspace
+            .replace("\"@rebasepro/server\": 0.19.0", "\"@rebasepro/server\": 0.22.0")
+            .replace("'@rebasepro/server-postgres': ^0.19.0  # the driver", "'@rebasepro/server-postgres': ^0.22.0  # the driver")
+            .replace("\"@rebasepro/client\": ~0.19.0", "\"@rebasepro/client\": ~0.22.0")
+            .replace("\"@rebasepro/client\": \"0.19.0\"", "\"@rebasepro/client\": \"0.22.0\""));
+        expect(plan.skipped).toEqual([]);
+        expect(plan.changed).toEqual([
+            { file: "pnpm-workspace.yaml", name: "@rebasepro/server", field: "catalog", from: "0.19.0", to: "0.22.0" },
+            { file: "pnpm-workspace.yaml", name: "@rebasepro/server-postgres", field: "catalog", from: "^0.19.0", to: "^0.22.0" },
+            { file: "pnpm-workspace.yaml", name: "@rebasepro/client", field: "catalogs.legacy", from: "~0.19.0", to: "~0.22.0" },
+            { file: "pnpm-workspace.yaml", name: "@rebasepro/client", field: "catalogs.next", from: "0.19.0", to: "0.22.0" }
+        ]);
+    });
+
+    it("reports a catalog entry it cannot move, with the reason", () => {
+        write("pnpm-workspace.yaml", "packages:\n  - backend\ncatalog:\n  \"@rebasepro/server\": latest\n");
+        write("backend/package.json", JSON.stringify({ dependencies: { "@rebasepro/server": "catalog:" } }));
+
+        const plan = planUpgrade(root, "0.22.0");
+
+        expect(plan.writes).toEqual([]);
+        expect(plan.skipped).toEqual([
+            { file: "pnpm-workspace.yaml", name: "@rebasepro/server", field: "catalog", spec: "latest", reason: "a dist-tag, not a version" }
+        ]);
+    });
+
+    it("reports a reference to a catalog entry it cannot find, rather than passing over it", () => {
+        // A project inside a larger workspace keeps its catalog above the
+        // project root, where this does not look.
+        write("backend/package.json", JSON.stringify({ dependencies: { "@rebasepro/server": "catalog:" } }));
+
+        const plan = planUpgrade(root, "0.22.0");
+
+        expect(plan.changed).toEqual([]);
+        expect(plan.skipped).toEqual([expect.objectContaining({
+            file: "backend/package.json",
+            name: "@rebasepro/server",
+            spec: "catalog:",
+            reason: expect.stringMatching(/no catalog under this project defines it/)
+        })]);
+    });
+});
+
 describe("overrides in package.json", () => {
     it("bumps pnpm.overrides, npm overrides and yarn resolutions", () => {
         const original = JSON.stringify({

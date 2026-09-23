@@ -63,6 +63,8 @@ export type SpecClass =
     | { kind: "movable"; prefix: "" | "^" | "~"; version: string }
     /** A path on this machine. As a pin it is left alone; as an override it wins over every pin. */
     | { kind: "local"; protocol: "link:" | "file:" | "portal:" }
+    /** A pnpm `catalog:` reference: the version is in pnpm-workspace.yaml's catalog, and moves there. */
+    | { kind: "catalog"; catalog: string }
     /** Anything else, with the reason it is left alone. */
     | { kind: "other"; reason: string };
 
@@ -83,7 +85,18 @@ export function classifySpec(spec: string): SpecClass {
     for (const protocol of ["link:", "file:", "portal:"] as const) {
         if (spec.startsWith(protocol)) return { kind: "local", protocol };
     }
+    const catalog = /^catalog:(.*)$/.exec(spec.trim());
+    if (catalog) return { kind: "catalog", catalog: catalog[1].trim() || "default" };
     return { kind: "other", reason: otherReason(spec) };
+}
+
+/** Why a spec that does not move is left alone, as the report says it. */
+function leftAloneReason(cls: Exclude<SpecClass, { kind: "movable" }>): string {
+    if (cls.kind === "local") {
+        return `a local ${cls.protocol} path, which points at a checkout on this machine rather than a release`;
+    }
+    if (cls.kind === "catalog") return "a catalog: reference inside a catalog, which pnpm does not resolve";
+    return cls.reason;
 }
 
 function otherReason(spec: string): string {
@@ -160,11 +173,14 @@ export function discoverProjectFiles(projectRoot: string): ProjectFiles {
 
 /* ─── the result ───────────────────────────────────────────────────────────── */
 
+/** Where a catalog pin sits: `catalog`, or `catalogs.<name>` for a named one. */
+export type CatalogField = "catalog" | `catalogs.${string}`;
+
 export interface ChangedPin {
     /** Relative to the project root, POSIX separators. */
     file: string;
     name: string;
-    field: PinField;
+    field: PinField | CatalogField;
     from: string;
     to: string;
 }
@@ -203,6 +219,26 @@ export interface UpgradePlan {
     unreadable: UnreadableFile[];
     /** The files whose content changes, with the new content. */
     writes: Array<{ file: string; absolute: string; content: string }>;
+    /** Pins, overrides and catalog entries that were already on the target. */
+    unchanged: number;
+}
+
+/**
+ * The `catalog:` references a plan met, and the catalog entries it found.
+ *
+ * A reference names no version, so it is not a pin to move: the catalog entry
+ * it resolves to is. But the catalog may not be anywhere this looked — a
+ * project inside a larger workspace keeps it above the project root — and a
+ * reference to an entry nobody moved must be reported, not passed over.
+ */
+interface CatalogLedger {
+    refs: Array<{ file: string; name: string; field: string; spec: string; catalog: string; pkg: string }>;
+    /** `catalogKey(catalog, package)` for every framework entry of every catalog read. */
+    defined: Set<string>;
+}
+
+function catalogKey(catalog: string, pkg: string): string {
+    return `${catalog}\u0000${pkg}`;
 }
 
 export interface PlanOptions {
@@ -224,21 +260,33 @@ export function planUpgrade(projectRoot: string, target: string, options: PlanOp
     if (!isExactVersion(target)) {
         throw new UpgradeError(`"${target}" is not an exact version.`, "target_invalid");
     }
-    const plan: UpgradePlan = { target, changed: [], skipped: [], overrides: [], unreadable: [], writes: [] };
+    const plan: UpgradePlan = { target, changed: [], skipped: [], overrides: [], unreadable: [], writes: [], unchanged: 0 };
+    const ledger: CatalogLedger = { refs: [], defined: new Set() };
     const files = discoverProjectFiles(projectRoot);
 
     for (const absolute of files.packageJsons) {
         const file = relativeTo(projectRoot, absolute);
         const original = fs.readFileSync(absolute, "utf8");
-        const content = planPackageJson(file, original, target, options, plan);
+        const content = planPackageJson(file, original, target, options, plan, ledger);
         if (content !== null && content !== original) plan.writes.push({ file, absolute, content });
     }
 
     for (const absolute of files.workspaceYamls) {
         const file = relativeTo(projectRoot, absolute);
         const original = fs.readFileSync(absolute, "utf8");
-        const content = planWorkspaceYaml(file, original, target, options, plan);
+        const content = planWorkspaceYaml(file, original, target, options, plan, ledger);
         if (content !== original) plan.writes.push({ file, absolute, content });
+    }
+
+    for (const ref of ledger.refs) {
+        if (ledger.defined.has(catalogKey(ref.catalog, ref.pkg))) continue;
+        plan.skipped.push({
+            file: ref.file,
+            name: ref.name,
+            field: ref.field,
+            spec: ref.spec,
+            reason: `a pnpm catalog: reference, and no catalog under this project defines it — move the version where the "${ref.catalog}" catalog is declared`
+        });
     }
 
     return plan;
@@ -259,7 +307,8 @@ function planPackageJson(
     original: string,
     target: string,
     options: PlanOptions,
-    plan: UpgradePlan
+    plan: UpgradePlan,
+    ledger: CatalogLedger
 ): string | null {
     const bom = original.startsWith("﻿") ? "﻿" : "";
     const text = original.slice(bom.length);
@@ -296,15 +345,17 @@ function planPackageJson(
             const cls = classifySpec(spec);
             if (cls.kind === "movable") {
                 const to = `${cls.prefix}${target}`;
-                if (to === spec) continue;
+                if (to === spec) {
+                    plan.unchanged++;
+                    continue;
+                }
                 edits.push({ start: member.value.start, end: member.value.end, replacement: JSON.stringify(to) });
                 setPath(expected, [field, member.key], to);
                 plan.changed.push({ file, name: member.key, field, from: spec, to });
+            } else if (cls.kind === "catalog") {
+                ledger.refs.push({ file, name: member.key, field, spec, catalog: cls.catalog, pkg: member.key });
             } else {
-                const reason = cls.kind === "local"
-                    ? `a local ${cls.protocol} path, which points at a checkout on this machine rather than a release`
-                    : cls.reason;
-                plan.skipped.push({ file, name: member.key, field, spec, reason });
+                plan.skipped.push({ file, name: member.key, field, spec, reason: leftAloneReason(cls) });
             }
         }
     }
@@ -327,12 +378,18 @@ function planPackageJson(
             }
             const spec = member.value.value;
             const cls = classifySpec(spec);
+            const pkg = overrideTarget(member.key);
             if (cls.kind === "movable") {
                 const to = `${cls.prefix}${target}`;
-                if (to === spec) continue;
+                if (to === spec) {
+                    plan.unchanged++;
+                    continue;
+                }
                 edits.push({ start: member.value.start, end: member.value.end, replacement: JSON.stringify(to) });
                 setPath(expected, [...blockPath, member.key], to);
                 plan.overrides.push({ file, name: member.key, spec, action: "bumped", to });
+            } else if (cls.kind === "catalog" && pkg) {
+                ledger.refs.push({ file, name: member.key, field, spec, catalog: cls.catalog, pkg });
             } else if (cls.kind === "local") {
                 if (options.dropLocalOverrides) {
                     removals.push([blockPath, member.key]);
@@ -342,7 +399,7 @@ function planPackageJson(
                     plan.overrides.push({ file, name: member.key, spec, action: "kept-local" });
                 }
             } else {
-                plan.skipped.push({ file, name: member.key, field, spec, reason: cls.reason });
+                plan.skipped.push({ file, name: member.key, field, spec, reason: leftAloneReason(cls) });
             }
         }
     }
@@ -574,7 +631,7 @@ interface YamlOverride {
 }
 
 interface YamlOverridesBlock {
-    /** The `overrides:` line. */
+    /** The block's key line — `overrides:`, `catalog:`. */
     keyLine: number;
     /** The block's lines, `keyLine` excluded: indented, blank or comment-only. */
     lines: number[];
@@ -616,7 +673,8 @@ function readYamlScalar(rest: string): { value: string; start: number; end: numb
 }
 
 /**
- * The top-level `overrides:` block of a `pnpm-workspace.yaml`, read line by line.
+ * A top-level block mapping of a `pnpm-workspace.yaml` — `overrides:`,
+ * `catalog:` — read line by line.
  *
  * Deliberately narrow. The file is YAML, and the CLI carries no YAML parser; the
  * shape pnpm documents and every project writes is a block mapping of one
@@ -624,8 +682,8 @@ function readYamlScalar(rest: string): { value: string; start: number; end: numb
  * block is counted rather than guessed at, and an inline `overrides: { … }` is
  * reported as not handled.
  */
-function readYamlOverrides(lines: string[]): YamlOverridesBlock | null {
-    const keyLine = lines.findIndex(line => /^overrides:\s*(#.*)?$/.test(line));
+function readYamlBlock(lines: string[], key: "overrides" | "catalog"): YamlOverridesBlock | null {
+    const keyLine = lines.findIndex(line => new RegExp(`^${key}:\\s*(#.*)?$`).test(line));
     if (keyLine === -1) return null;
 
     const block: YamlOverridesBlock = { keyLine, lines: [], entries: [], otherContent: 0 };
@@ -635,36 +693,166 @@ function readYamlOverrides(lines: string[]): YamlOverridesBlock | null {
         block.lines.push(index);
         if (line.trim() === "" || /^\s*#/.test(line)) continue;
 
-        const entry = /^(\s+)("[^"]*"|'[^']*'|[^\s"'#][^:#]*?)\s*:(\s+|$)/.exec(line);
-        const valueOffset = entry ? entry[0].length : -1;
-        const scalar = entry ? readYamlScalar(line.slice(valueOffset)) : null;
-        if (!entry || !scalar) {
-            block.otherContent++;
-            continue;
-        }
-        const rawKey = entry[2];
-        const key = /^["']/.test(rawKey) ? rawKey.slice(1, -1) : rawKey;
-        block.entries.push({
-            line: index,
-            key,
-            value: scalar.value,
-            valueStart: valueOffset + scalar.start,
-            valueEnd: valueOffset + scalar.end
-        });
+        const entry = readYamlEntry(line, index);
+        if (entry) block.entries.push(entry);
+        else block.otherContent++;
     }
     return block;
 }
 
+/** One `key: scalar` line of a block mapping, or null when it is anything else. */
+function readYamlEntry(line: string, index: number): YamlOverride | null {
+    const entry = /^(\s+)("[^"]*"|'[^']*'|[^\s"'#][^:#]*?)\s*:(\s+|$)/.exec(line);
+    const valueOffset = entry ? entry[0].length : -1;
+    const scalar = entry ? readYamlScalar(line.slice(valueOffset)) : null;
+    if (!entry || !scalar) return null;
+    const rawKey = entry[2];
+    return {
+        line: index,
+        key: /^["']/.test(rawKey) ? rawKey.slice(1, -1) : rawKey,
+        value: scalar.value,
+        valueStart: valueOffset + scalar.start,
+        valueEnd: valueOffset + scalar.end
+    };
+}
+
+/** One pnpm catalog: `catalog:` is the one named "default". */
+interface YamlCatalog {
+    name: string;
+    field: CatalogField;
+    entries: YamlOverride[];
+}
+
+/**
+ * Every catalog a `pnpm-workspace.yaml` declares: the top-level `catalog:`
+ * block, and each named block under `catalogs:`.
+ *
+ * `catalogs:` is one level deeper — a header line per catalog, its entries
+ * indented under it — and is read with the same one-scalar-per-line rule.
+ */
+function readYamlCatalogs(lines: string[]): YamlCatalog[] {
+    const catalogs: YamlCatalog[] = [];
+    const single = readYamlBlock(lines, "catalog");
+    if (single) catalogs.push({ name: "default", field: "catalog", entries: single.entries });
+
+    const keyLine = lines.findIndex(line => /^catalogs:\s*(#.*)?$/.test(line));
+    if (keyLine === -1) return catalogs;
+
+    let current: YamlCatalog | null = null;
+    let headerIndent = -1;
+    for (let index = keyLine + 1; index < lines.length; index++) {
+        const line = lines[index];
+        if (line.trim() !== "" && !/^\s/.test(line) && !line.startsWith("#")) break;
+        if (line.trim() === "" || /^\s*#/.test(line)) continue;
+
+        const indent = line.length - line.trimStart().length;
+        const header = /^\s+("[^"]*"|'[^']*'|[^\s"'#][^:#]*?)\s*:\s*(#.*)?$/.exec(line);
+        if (header && (headerIndent === -1 || indent === headerIndent)) {
+            headerIndent = indent;
+            const name = /^["']/.test(header[1]) ? header[1].slice(1, -1) : header[1];
+            current = { name, field: `catalogs.${name}`, entries: [] };
+            catalogs.push(current);
+            continue;
+        }
+        if (!current || indent <= headerIndent) continue;
+        const entry = readYamlEntry(line, index);
+        if (entry) current.entries.push(entry);
+    }
+    return catalogs;
+}
+
+/** A `pnpm-workspace.yaml`, with its overrides and then its catalogs moved. */
 function planWorkspaceYaml(
     file: string,
     original: string,
     target: string,
     options: PlanOptions,
-    plan: UpgradePlan
+    plan: UpgradePlan,
+    ledger: CatalogLedger
+): string {
+    const overridden = planYamlOverrides(file, original, target, options, plan, ledger);
+    return planYamlCatalogs(file, overridden, target, plan, ledger);
+}
+
+/**
+ * Move the framework entries of every catalog. Entries are rewritten in place
+ * — a catalog loses no line — and the result is read back and held to what was
+ * meant, like every other rewrite here.
+ */
+function planYamlCatalogs(
+    file: string,
+    original: string,
+    target: string,
+    plan: UpgradePlan,
+    ledger: CatalogLedger
+): string {
+    const lines = splitLines(original);
+    const catalogs = readYamlCatalogs(lines);
+
+    for (const key of ["catalog", "catalogs"]) {
+        const inline = lines.find(line => new RegExp(`^${key}:\\s*[^\\s#]`).test(line));
+        if (inline && inline.includes(FRAMEWORK_SCOPE)) {
+            plan.skipped.push({
+                file,
+                name: key,
+                field: key,
+                spec: inline.slice(key.length + 1).trim(),
+                reason: `an inline ${key} map, which this does not rewrite; write it as a block, or edit it by hand`
+            });
+        }
+    }
+    if (catalogs.length === 0) return original;
+
+    const next = [...lines];
+    const expected: Array<[string, string, string]> = [];
+    for (const catalog of catalogs) {
+        for (const entry of catalog.entries) {
+            const meant: [string, string, string] = [catalog.field, entry.key, entry.value];
+            expected.push(meant);
+            if (!entry.key.startsWith(FRAMEWORK_SCOPE)) continue;
+            ledger.defined.add(catalogKey(catalog.name, entry.key));
+
+            const cls = classifySpec(entry.value);
+            if (cls.kind !== "movable") {
+                plan.skipped.push({ file, name: entry.key, field: catalog.field, spec: entry.value, reason: leftAloneReason(cls) });
+                continue;
+            }
+            const to = `${cls.prefix}${target}`;
+            if (to === entry.value) {
+                plan.unchanged++;
+                continue;
+            }
+            meant[2] = to;
+            const line = next[entry.line];
+            next[entry.line] = line.slice(0, entry.valueStart) + to + line.slice(entry.valueEnd);
+            plan.changed.push({ file, name: entry.key, field: catalog.field, from: entry.value, to });
+        }
+    }
+
+    const content = next.join(original.includes("\r\n") ? "\r\n" : "\n");
+    const after = readYamlCatalogs(splitLines(content))
+        .flatMap(catalog => catalog.entries.map(e => [catalog.field, e.key, e.value]));
+    if (!isDeepStrictEqual(after, expected)) {
+        throw new UpgradeError(
+            `Could not rewrite ${file} without disturbing it; nothing was written.`,
+            "rewrite_failed",
+            "Move its @rebasepro catalog entries by hand, then run `rebase upgrade` again."
+        );
+    }
+    return content;
+}
+
+function planYamlOverrides(
+    file: string,
+    original: string,
+    target: string,
+    options: PlanOptions,
+    plan: UpgradePlan,
+    ledger: CatalogLedger
 ): string {
     const lines = splitLines(original);
     const crlf = original.includes("\r\n");
-    const block = readYamlOverrides(lines);
+    const block = readYamlBlock(lines, "overrides");
 
     if (!block) {
         const inline = lines.find(line => /^overrides:\s*[^\s#]/.test(line));
@@ -690,13 +878,20 @@ function planWorkspaceYaml(
             continue;
         }
         const cls = classifySpec(entry.value);
+        const pkg = overrideTarget(entry.key);
         if (cls.kind === "movable") {
             const to = `${cls.prefix}${target}`;
             expected.set(entry.key, to);
-            if (to === entry.value) continue;
+            if (to === entry.value) {
+                plan.unchanged++;
+                continue;
+            }
             const line = lines[entry.line];
             next[entry.line] = line.slice(0, entry.valueStart) + to + line.slice(entry.valueEnd);
             plan.overrides.push({ file, name: entry.key, spec: entry.value, action: "bumped", to });
+        } else if (cls.kind === "catalog" && pkg) {
+            expected.set(entry.key, entry.value);
+            ledger.refs.push({ file, name: entry.key, field: "overrides", spec: entry.value, catalog: cls.catalog, pkg });
         } else if (cls.kind === "local") {
             if (options.dropLocalOverrides) {
                 removed.add(entry.line);
@@ -707,7 +902,7 @@ function planWorkspaceYaml(
             }
         } else {
             expected.set(entry.key, entry.value);
-            plan.skipped.push({ file, name: entry.key, field: "overrides", spec: entry.value, reason: cls.reason });
+            plan.skipped.push({ file, name: entry.key, field: "overrides", spec: entry.value, reason: leftAloneReason(cls) });
         }
     }
 
@@ -722,7 +917,7 @@ function planWorkspaceYaml(
     // Read back with the same reader, and hold it to what was meant: the same
     // entries, in the same order, with only the intended values changed, and
     // every line outside the block untouched.
-    const after = readYamlOverrides(splitLines(content));
+    const after = readYamlBlock(splitLines(content), "overrides");
     const afterEntries = after ? after.entries.map(e => [e.key, e.value]) : [];
     if (!isDeepStrictEqual(afterEntries, [...expected.entries()])) {
         throw new UpgradeError(
