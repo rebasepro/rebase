@@ -507,7 +507,7 @@ function RebaseInternal({
                 plugins={plugins}
                 scope="root"
                 scopeProps={{ context }}>
-                {authReady && <PluginLifecycleManager plugins={plugins} context={context}/>}
+                <PluginLifecycleManager plugins={plugins} context={context} authReady={authReady}/>
                 {childrenResult}
             </PluginProviderStack>
         );

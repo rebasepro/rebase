@@ -1,14 +1,19 @@
 
 import { useEffect, useRef } from "react";
-import type { User } from "@rebasepro/types";
 import type { RebasePlugin, RebaseContext } from "@rebasepro/cms-types";
 
 /**
  * Render-less component that manages plugin lifecycle hooks.
  *
- * - Calls `lifecycle.onMount(context)` when plugins mount.
- * - Calls `lifecycle.onUnmount()` when plugins unmount.
- * - Subscribes to auth state changes and calls `lifecycle.onAuthStateChange`.
+ * - Calls `lifecycle.onMount(context)` once, the first time auth is ready.
+ * - Calls `lifecycle.onAuthStateChange(user)` on every change of user after
+ *   that — `null` on sign-out, the new user on the next sign-in.
+ * - Calls `lifecycle.onUnmount()` when the Rebase tree unmounts.
+ *
+ * Mounted for as long as there are plugins, signed in or not. It used to be
+ * mounted only while a user was signed in, so a sign-out unmounted it and the
+ * next sign-in mounted a fresh one — `onAuthStateChange` could never see the
+ * user change, and never fired.
  *
  * Mount this component inside the Rebase tree, below PluginProviderStack,
  * so that the RebaseContext is fully available.
@@ -17,19 +22,23 @@ import type { RebasePlugin, RebaseContext } from "@rebasepro/cms-types";
  */
 export function PluginLifecycleManager({
     plugins,
-    context
+    context,
+    authReady
 }: {
     plugins: RebasePlugin[];
     context: RebaseContext;
+    /** Signed in, or sign-in skipped: what `onMount` waits for. */
+    authReady: boolean;
 }) {
     const mountedRef = useRef(false);
-    const prevUserRef = useRef<User | null | undefined>(undefined);
+    const prevUidRef = useRef<string | null>(null);
+    const currentUser = context.authController?.user ?? null;
 
-    // ── Mount / Unmount lifecycle ────────────────────────────────────
+    // ── Mount ────────────────────────────────────────────────────────
     useEffect(() => {
-        // Prevent double-fire in StrictMode
-        if (mountedRef.current) return;
+        if (!authReady || mountedRef.current) return;
         mountedRef.current = true;
+        prevUidRef.current = currentUser?.uid ?? null;
 
         for (const plugin of plugins) {
             if (plugin.lifecycle?.onMount) {
@@ -45,8 +54,13 @@ export function PluginLifecycleManager({
                 }
             }
         }
+        // Once: later changes of user are `onAuthStateChange`'s.
+    }, [authReady]);
 
+    // ── Unmount ──────────────────────────────────────────────────────
+    useEffect(() => {
         return () => {
+            if (!mountedRef.current) return;
             mountedRef.current = false;
             for (const plugin of plugins) {
                 if (plugin.lifecycle?.onUnmount) {
@@ -58,25 +72,18 @@ export function PluginLifecycleManager({
                 }
             }
         };
-        // Only run on mount/unmount — plugins array identity should be stable
+        // Only on unmount — plugins array identity should be stable
     }, []);
 
-    // ── Auth state change lifecycle ──────────────────────────────────
-    const currentUser = context.authController?.user ?? null;
-
+    // ── Auth state change ────────────────────────────────────────────
     useEffect(() => {
-        // Skip the initial call — onMount handles that
-        if (prevUserRef.current === undefined) {
-            prevUserRef.current = currentUser;
-            return;
-        }
+        // Before `onMount` there is nobody to tell.
+        if (!mountedRef.current) return;
 
         // Only fire when the user identity actually changes
-        const prevUid = prevUserRef.current?.uid;
-        const currUid = currentUser?.uid;
-        if (prevUid === currUid) return;
-
-        prevUserRef.current = currentUser;
+        const currUid = currentUser?.uid ?? null;
+        if (prevUidRef.current === currUid) return;
+        prevUidRef.current = currUid;
 
         for (const plugin of plugins) {
             if (plugin.lifecycle?.onAuthStateChange) {

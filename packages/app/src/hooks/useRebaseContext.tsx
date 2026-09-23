@@ -11,7 +11,7 @@ import { useDialogsController } from "./useDialogsController";
 import { useCustomizationController } from "./useCustomizationController";
 import { useAnalyticsController } from "./useAnalyticsController";
 import { useEffectiveRoleController } from "./useEffectiveRoleController";
-import React, { useEffect, useContext } from "react";
+import React, { useContext } from "react";
 
 
 // DatabaseAdmin is provided by <Rebase> via DatabaseAdminContext.
@@ -48,7 +48,11 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     // Will get `databaseAdmin` from context
     const databaseAdmin = useContext(DatabaseAdminContext);
 
-    const rebaseContextRef = React.useRef<RebaseContext<USER, AuthControllerType>>({
+    // Built during render, so it is the context of *this* render. It used to be
+    // kept in a ref and refreshed from an effect, which put every reader one
+    // render behind: a sign-in or sign-out that caused no further render was
+    // never seen by anything that read `context.authController`.
+    return React.useMemo<RebaseContext<USER, AuthControllerType>>(() => ({
         authController,
         data,
         storageSource,
@@ -60,25 +64,7 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
         effectiveRoleController,
         databaseAdmin,
         client: client! // Client should be provided
-    });
-
-    React.useEffect(() => {
-        rebaseContextRef.current = {
-            authController,
-            data,
-            storageSource,
-            snackbarController,
-            userConfigPersistence,
-            dialogsController,
-            customizationController,
-            analyticsController,
-            effectiveRoleController,
-            databaseAdmin,
-            client: client!
-        };
-    }, [authController, data, storageSource, snackbarController, userConfigPersistence,
+    }), [authController, data, storageSource, snackbarController, userConfigPersistence,
         dialogsController, customizationController, analyticsController,
         effectiveRoleController, databaseAdmin, client]);
-
-    return rebaseContextRef.current;
 }
