@@ -8,13 +8,18 @@
  * `previousValues` described another row, and a uniqueness check excluding bob
  * excluded every member of `p1`.
  *
- * A real driver over PGlite, asked for bob.
+ * Paging had the same flaw: the listing broke ties on the first key column
+ * and the cursor carried only that part, so three members of one project,
+ * paged one at a time, came back as one.
+ *
+ * A real driver over PGlite, asked for bob, and asked to page.
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, primaryKey, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, OrderByTuple } from "@rebasepro/types";
+import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -119,5 +124,63 @@ describe("what the read feeds", () => {
         expect(await driver.checkUniqueField("members", "handle", "al", "p1:::bob", members)).toBe(false);
         // bob keeping his own is.
         expect(await driver.checkUniqueField("members", "handle", "bo", "p1:::bob", members)).toBe(true);
+    });
+});
+
+describe("paging a composite-key collection", () => {
+    beforeEach(async () => {
+        // Members of a second project, so the first key column alone ties
+        // three rows and separates two.
+        await db.exec(`
+            INSERT INTO members VALUES
+                ('p2', 'alice', 'member', 'al2'),
+                ('p2', 'dave', 'owner', 'da');
+        `);
+    });
+
+    /** Every member, page by page, following each page's cursor to the end. */
+    async function pageThrough(driver: PostgresBackendDriver, orderBy: OrderByTuple[] | undefined, limit: number): Promise<string[]> {
+        const rest = driver.restFetchService!;
+        const seen: string[] = [];
+        let startAfter: Record<string, unknown> | undefined;
+        // Bounded, so a cursor that never advances fails the test instead of hanging it.
+        for (let page = 0; page < 20; page++) {
+            const rows = await rest.fetchCollectionForRest("members", { orderBy, limit, startAfter });
+            seen.push(...rows.map(row => `${row.projectId}/${row.userId}`));
+            if (rows.length < limit) break;
+            const cursor = rest.cursorFor!("members", rows[rows.length - 1], orderBy);
+            expect(cursor).toBeDefined();
+            startAfter = cursorToStartAfter(decodeCursor(cursor!));
+        }
+        return seen;
+    }
+
+    it.each([
+        ["no orderBy", undefined, 1],
+        ["no orderBy", undefined, 2],
+        ["role asc", [["role", "asc"]] as OrderByTuple[], 1],
+        ["role desc", [["role", "desc"]] as OrderByTuple[], 2]
+    ])("%s, %i at a time, serves every member once, in the listing's order", async (_label, orderBy, limit) => {
+        const driver = driverOver(db);
+        const whole = (await driver.restFetchService!.fetchCollectionForRest("members", { orderBy }))
+            .map(row => `${row.projectId}/${row.userId}`);
+        expect(whole).toHaveLength(5);
+
+        expect(await pageThrough(driver, orderBy, limit)).toEqual(whole);
+    });
+
+    it("the listing is ordered by every key column, so offset pages agree with it", async () => {
+        const driver = driverOver(db);
+        const rest = driver.restFetchService!;
+        const whole = (await rest.fetchCollectionForRest("members", {})).map(row => `${row.projectId}/${row.userId}`);
+        // Both key columns descending: the tie-break the cursor seeks on.
+        expect(whole).toEqual(["p2/dave", "p2/alice", "p1/carol", "p1/bob", "p1/alice"]);
+    });
+
+    it("a cursor that names only part of the key is refused, not read as a row", async () => {
+        const driver = driverOver(db);
+        await expect(driver.restFetchService!.fetchCollectionForRest("members", {
+            limit: 1, startAfter: { id: "p1", values: {} }
+        })).rejects.toMatchObject({ code: "INVALID_CURSOR" });
     });
 });

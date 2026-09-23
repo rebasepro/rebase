@@ -15,7 +15,8 @@ import {
     idCanAddressTable,
     rowIdentityCondition,
     buildCompositeId,
-    COMPOSITE_ID_SEPARATOR
+    COMPOSITE_ID_SEPARATOR,
+    type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
@@ -433,15 +434,17 @@ target });
     }
 
     /**
-     * The full `ORDER BY`: the caller's keys, then the id.
+     * The full `ORDER BY`: the caller's keys, then the primary key.
      *
-     * The id is always last and always descending. It is not decoration — it is
-     * what makes the ordering *total*, and a cursor over a non-total order
-     * repeats and skips rows among the ties. Every keyset comparison built by
-     * {@link buildCursorConditions} ends on the same `id DESC`, and the two have
-     * to agree: they did not, and an ascending sort paged with `id >` against an
-     * `ORDER BY … , id DESC`, so rows sharing a sort value were dropped from
-     * every page after the first.
+     * The key is always last and always descending, every column of it. It is
+     * not decoration — it is what makes the ordering *total*, and a cursor over
+     * a non-total order repeats and skips rows among the ties. Every keyset
+     * comparison built by {@link buildCursorConditions} ends on the same key
+     * `DESC`, and the two have to agree: they did not, and an ascending sort
+     * paged with `id >` against an `ORDER BY … , id DESC`, so rows sharing a
+     * sort value were dropped from every page after the first. Nor is the
+     * first column of a composite key enough: it ties every row that shares
+     * it, which is exactly the rows a cursor then skipped.
      *
      * Where the NULLs go is written out rather than inherited. Postgres already
      * defaults to `NULLS LAST` ascending and `NULLS FIRST` descending, so this
@@ -454,17 +457,16 @@ target });
      */
     private buildOrderExpressions(
         keys: ResolvedOrderKey[],
-        idField: AnyPgColumn,
         /**
-         * Append the primary key as a final tie-breaker.
+         * The primary key columns, appended as the final tie-breaker.
          *
-         * Off for a `SELECT DISTINCT`, which does not select the key: Postgres
+         * Empty for a `SELECT DISTINCT`, which does not select the key: Postgres
          * requires every ORDER BY expression of a distinct read to be in the
          * select list and answers a bare `42P10` otherwise. There is also
          * nothing for it to do there — a distinct read returns a set of values,
          * not rows, so there are no ties between rows to break.
          */
-        tieBreakOnId = true
+        keyColumns: AnyPgColumn[]
     ): SQL[] {
         // Four literal branches rather than a nested `sql` fragment for the
         // placement: a nested fragment renders as a child SQL node, which is
@@ -478,7 +480,7 @@ target });
             }
             return nullsLast ? sql`${key.target} DESC NULLS LAST` : sql`${key.target} DESC NULLS FIRST`;
         });
-        if (tieBreakOnId) expressions.push(desc(idField));
+        for (const column of keyColumns) expressions.push(desc(column));
         return expressions as SQL[];
     }
 
@@ -926,9 +928,11 @@ target });
             if (pks.length === 0) return undefined;
             const address = buildCompositeId(row, pks);
             if (!address || !address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) return undefined;
-            // The single-key value, not the composite token: the keyset
-            // comparison compares it against the id *column*.
-            return encodeCursor(orderBy, row, row[pks[0].fieldName]);
+            // A single key's own value, so it compares against the column as
+            // it came; a composite key's whole address, because the keyset
+            // comparison ends on every key column and the first alone ties
+            // every row that shares it.
+            return encodeCursor(orderBy, row, pks.length === 1 ? row[pks[0].fieldName] : address);
         } catch {
             // A path with no registered collection — a nested or derived one.
             // No cursor is the honest answer; the listing pages by offset.
@@ -996,14 +1000,15 @@ target });
      */
     private buildCursorConditions(
         table: PgTable<any>,
-        idField: AnyPgColumn,
-        idInfo: { fieldName: string; type: "string" | "number" },
+        idInfoArray: PrimaryKeyInfo[],
         options: { orderBy?: string | OrderByTuple[]; order?: "desc" | "asc"; startAfter?: Record<string, unknown> },
-        collectionPath?: string
+        collectionPath: string
     ): SQL[] {
         if (!options.startAfter) return [];
         const cursor = options.startAfter;
         const keys = normalizeDriverOrderBy(options.orderBy, options.order);
+        const keyColumns = FetchService.keyColumns(table, idInfoArray, collectionPath);
+        const cursorKey = FetchService.cursorKey(cursor, idInfoArray, collectionPath);
 
         if (keys) {
             // Relevance is computed per query, not stored, so there is no value
@@ -1021,17 +1026,16 @@ target });
                     { field: FetchService.SCORE_FIELD }
                 );
             }
-            const collection = collectionPath ? getCollectionByPath(collectionPath, this.registry) : undefined;
-            const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
+            const collection = getCollectionByPath(collectionPath, this.registry);
             const resolved = this.resolveOrderKeys(
                 table, keys, collection, undefined, collectionPath,
-                // A null id addresses no row, so pinning a subquery to it would
-                // aggregate over nothing and read as "the cursor row has no
-                // related rows" rather than as the absent cursor it is.
-                startAfterId ?? undefined
+                // An aggregate key correlates on a single key column — a
+                // composite-key collection is refused one — so only a single
+                // key's value can pin its subquery to the cursor row.
+                cursorKey?.length === 1 ? cursorKey[0] : undefined
             );
 
-            if (resolved.length > 0 && startAfterId !== undefined) {
+            if (resolved.length > 0 && cursorKey) {
                 const cursorValues = cursor.values as Record<string, unknown> | undefined;
                 // `in`, not `??`: a cursor row whose sort value is genuinely
                 // NULL is a row this has to be able to page past, and `??`
@@ -1051,20 +1055,77 @@ target });
                 // missing sort value has always done here.
                 if (values.every((value, i) => resolved[i].cursorTarget || value !== undefined)) {
                     const seekValues = values.map((value, i) =>
-                        this.preciseCursorValue(table, resolved[i].target, value, idField, startAfterId));
-                    return [this.buildKeysetComparison(resolved, seekValues, idField, startAfterId)];
+                        this.preciseCursorValue(table, resolved[i].target, value, keyColumns, cursorKey));
+                    return [this.buildKeysetComparison(resolved, seekValues, keyColumns, cursorKey)];
                 }
             }
-        } else {
-            const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
-            if (startAfterId !== undefined && startAfterId !== null) {
-                const idInfoArray = [idInfo] as Array<{ fieldName: string; type: "string" | "number" }>;
-                const parsedStartAfterIdObj = parseIdValues(startAfterId as string | number, idInfoArray);
-                return [lt(idField, parsedStartAfterIdObj[idInfo.fieldName])];
-            }
+        } else if (cursorKey) {
+            return [FetchService.keyAfter(keyColumns, cursorKey)];
         }
 
         return [];
+    }
+
+    /** The table's primary key columns, in key order. */
+    private static keyColumns(table: PgTable<any>, idInfoArray: PrimaryKeyInfo[], collectionPath: string): AnyPgColumn[] {
+        return idInfoArray.map(info => {
+            const column = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
+            if (!column) {
+                throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
+            }
+            return column;
+        });
+    }
+
+    /**
+     * The cursor row's key, one value per key column — or `undefined` for a
+     * cursor that names no row.
+     *
+     * A cursor carries the row's address, which for a composite key is every
+     * part joined (see {@link cursorFor}). One that carries fewer parts than
+     * the key has columns — the first column's value alone, say — cannot say
+     * which row it stopped at, and is refused rather than read as a guess.
+     */
+    private static cursorKey(
+        cursor: Record<string, unknown>,
+        idInfoArray: PrimaryKeyInfo[],
+        collectionPath: string
+    ): unknown[] | undefined {
+        const address = cursor.id;
+        if (idInfoArray.length === 1) {
+            const value = address ?? cursor[idInfoArray[0].fieldName];
+            return value === undefined || value === null ? undefined : [value];
+        }
+        if (address === undefined || address === null) {
+            const parts = idInfoArray.map(info => cursor[info.fieldName]);
+            return parts.some(part => part === undefined || part === null) ? undefined : parts;
+        }
+        let parsed: Record<string, string | number>;
+        try {
+            parsed = parseIdValues(String(address), idInfoArray);
+        } catch {
+            throw ApiError.badRequest(
+                `Invalid cursor: its row id does not name every key column of '${collectionPath}' ` +
+                `(${idInfoArray.map(info => info.fieldName).join(", ")}). Pass back the \`nextCursor\` ` +
+                "from the previous page unchanged — it is opaque and must not be built by hand.",
+                "INVALID_CURSOR"
+            );
+        }
+        return idInfoArray.map(info => parsed[info.fieldName]);
+    }
+
+    /**
+     * "Sorts after the cursor row" on the key alone: the key descending, as the
+     * `ORDER BY` ends.
+     *
+     * Every column runs the same direction, so for a composite key the
+     * row-value comparison is exactly the lexicographic order the `ORDER BY`
+     * produces.
+     */
+    private static keyAfter(keyColumns: AnyPgColumn[], cursorKey: unknown[]): SQL {
+        if (keyColumns.length === 1) return lt(keyColumns[0], cursorKey[0]);
+        const values = keyColumns.map((column, i) => sql.param(cursorKey[i], column));
+        return sql`(${sql.join(keyColumns, sql`, `)}) < (${sql.join(values, sql`, `)})`;
     }
 
     /**
@@ -1089,8 +1150,8 @@ target });
         table: PgTable<any>,
         target: AnyPgColumn | SQL,
         value: unknown,
-        idField: AnyPgColumn,
-        cursorId: unknown
+        keyColumns: AnyPgColumn[],
+        cursorKey: unknown[]
     ): unknown {
         if (value === null || value === undefined) return value;
         if (!is(target, PgTimestamp) && !is(target, PgTimestampString)) return value;
@@ -1100,8 +1161,9 @@ target });
         const stored = sql`CAST(${value instanceof Date ? value.toISOString() : String(value)} AS ${sql.raw(target.getSQLType())})`;
         const alias = sql.identifier("__cursor_row");
         const column = sql`${alias}.${sql.identifier(target.name)}`;
-        const key = sql`${alias}.${sql.identifier(idField.name)}`;
-        return sql`COALESCE((SELECT ${column} FROM ${table} AS ${alias} WHERE ${key} = ${sql.param(cursorId, idField)} AND ${column} >= ${stored} AND ${column} < ${stored} + INTERVAL '1 millisecond' LIMIT 1), ${stored})`;
+        const cursorRow = sql.join(keyColumns.map((key, i) =>
+            sql`${alias}.${sql.identifier(key.name)} = ${sql.param(cursorKey[i], key)}`), sql` AND `);
+        return sql`COALESCE((SELECT ${column} FROM ${table} AS ${alias} WHERE ${cursorRow} AND ${column} >= ${stored} AND ${column} < ${stored} + INTERVAL '1 millisecond' LIMIT 1), ${stored})`;
     }
 
     /**
@@ -1120,13 +1182,13 @@ target });
     private buildKeysetComparison(
         keys: ResolvedOrderKey[],
         values: unknown[],
-        idField: AnyPgColumn,
-        cursorId: unknown,
+        keyColumns: AnyPgColumn[],
+        cursorKey: unknown[],
         index = 0
     ): SQL {
-        // Past the last key, the id settles it. It is ordered `DESC`, so "after"
-        // the cursor row means a smaller id.
-        if (index >= keys.length) return lt(idField, cursorId);
+        // Past the last key, the primary key settles it. It is ordered `DESC`,
+        // so "after" the cursor row means a smaller key.
+        if (index >= keys.length) return FetchService.keyAfter(keyColumns, cursorKey);
 
         const { direction, cursorTarget } = keys[index];
         // Which end the NULLs sort at — the direction's convention unless the
@@ -1141,7 +1203,7 @@ target });
         // here rather than at the call site.
         const target = keys[index].target as AnyPgColumn;
         const value = values[index];
-        const rest = this.buildKeysetComparison(keys, values, idField, cursorId, index + 1);
+        const rest = this.buildKeysetComparison(keys, values, keyColumns, cursorKey, index + 1);
 
         // No stored value to compare against — the cursor row's is recomputed
         // by an expression instead, and whether it is NULL is a question only
@@ -1854,7 +1916,7 @@ idColumn };
         for (const group of groupColumns) {
             if (!named.has(group.field)) keys.push({ field: group.field, direction: "asc", target: group.column });
         }
-        return this.buildOrderExpressions(keys, groupColumns[0].column, false);
+        return this.buildOrderExpressions(keys, []);
     }
 
     /**
@@ -2101,8 +2163,6 @@ relatedTo: hop }, include
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
@@ -2227,12 +2287,12 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         }
 
         // Vector search overrides ORDER BY with distance (ascending = closest first)
+        const keyColumns = FetchService.keyColumns(table, idInfoArray, collectionPath);
         const orderExpressions = vectorMeta
-            ? [asc(vectorMeta.orderBy), desc(idField)]
+            ? [asc(vectorMeta.orderBy), ...keyColumns.map(column => desc(column))]
             : this.buildOrderExpressions(
                 this.resolveOrderKeys(table, sortKeys, collection, options.searchString),
-                idField,
-                !wantsDistinct
+                wantsDistinct ? [] : keyColumns
             );
         if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
 
@@ -2242,7 +2302,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             // `?after=` reached the driver and paged nothing: the cursor was
             // decoded, handed over, and dropped one function short of the
             // comparison built to consume it.
-            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
+            const cursorConditions = this.buildCursorConditions(table, idInfoArray, options, collectionPath);
             if (cursorConditions.length > 0) {
                 allConditions.push(...cursorConditions);
                 const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);

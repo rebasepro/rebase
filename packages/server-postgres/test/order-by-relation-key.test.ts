@@ -118,7 +118,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
                     searchString?: string,
                     collectionPath?: string
                 ): unknown[];
-                buildOrderExpressions(keys: unknown[], idField: AnyPgColumn): unknown[];
+                buildOrderExpressions(keys: unknown[], keyColumns: AnyPgColumn[]): unknown[];
             };
             const keys = service.resolveOrderKeys(
                 postsTable,
@@ -128,7 +128,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
                 "posts"
             );
             const expressions = service.buildOrderExpressions(
-                keys, postsTable.id as unknown as AnyPgColumn
+                keys, [postsTable.id as unknown as AnyPgColumn]
             );
             // Drizzle renders the direction as a string chunk on the SQL
             // object; the id tiebreaker is appended after, so the first
