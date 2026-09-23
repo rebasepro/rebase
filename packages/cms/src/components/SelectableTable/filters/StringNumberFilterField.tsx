@@ -105,6 +105,10 @@ export function StringNumberFilterField({
 
     const isNullOperation = operation === "is-null" || operation === "is-not-null";
 
+    // A single picked value, `0` included: a truthiness check dropped a zero
+    // id's clear button and rendered a stray "0" where it should have been.
+    const hasSingleValue = internalValue !== undefined && internalValue !== null && !Array.isArray(internalValue);
+
     // All renderable operators were filtered out (engine/property narrowing).
     if (possibleOperations.length === 0) return null;
 
@@ -213,12 +217,15 @@ export function StringNumberFilterField({
                         position={"item-aligned"}
                         fullWidth={true}
                         disabled={isNullOperation}
-                        value={typeof internalValue === "string" ? internalValue : ""}
+                        // As a string whatever the enum's type: a number enum
+                        // holds the picked id as a number, which the select
+                        // read as no value at all and showed blank.
+                        value={hasSingleValue ? String(internalValue) : ""}
                         onValueChange={(value) => {
                             if (value !== "")
                                 updateFilter(operation, type === "number" ? parseInt(value as string) : value as string)
                         }}
-                        endAdornment={internalValue && <IconButton
+                        endAdornment={hasSingleValue && <IconButton
                             onClick={(e) => updateFilter(operation, undefined)}>
                             <XIcon/>
                         </IconButton>}
