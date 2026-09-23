@@ -1326,6 +1326,17 @@ description: Every released change to Rebase — new features, fixes, and the br
   MCP, and history and the MongoDB read strip withhold the key too. The row side
   of this leak is the foreign-key entry under Postgres.
 
+- **A caller who may not write a to-one relation can no longer set it through
+  its foreign key.** A `belongsTo` declared `access.write: ["hr"]` refused
+  `band: { id: 7 }` from everyone else but wrote `bandId: 7` (or `band_id` under
+  `strictWrites: false`), and a relation marked `excludeFromApi` had the same
+  hole. The foreign key now follows the relation's write rule under both
+  spellings, answering `FIELD_NOT_WRITABLE` (or `VALIDATION_EXCLUDED_FIELDS`
+  for a relation closed to everyone) at every write door: REST, the socket
+  `SAVE`, MCP and history revert. A revert that would move such a relation used
+  to answer 200 and quietly leave that one change out; it is now a 400 naming
+  the field.
+
 #### Auth
 
 - **An account made for someone else's email is no longer handed to its owner
