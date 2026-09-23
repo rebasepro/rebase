@@ -1312,14 +1312,26 @@ aal: sessionAal };
             }
         }
 
-        await authRepo.createRefreshToken(
+        // Written only while the presented token is still live: a sign-out
+        // that landed after the checks above has revoked this session, and a
+        // token written into it anyway would bring it back — in cookie mode by
+        // re-setting the cookie. The repository decides that in the database
+        // (see `RefreshTokenSession.rotatedFrom`). Not asked when the presented
+        // row was deleted above for want of `markRefreshTokenRotated`: there is
+        // no row left to hold the write to.
+        const presentedKept = Boolean(supersededAt) || typeof authRepo.markRefreshTokenRotated === "function";
+        const minted = await authRepo.createRefreshToken(
             storedToken.uid,
             await hashRefreshToken(newRefreshToken),
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
-            session
+            presentedKept ? { ...session, rotatedFrom: tokenHash } : session
         );
+        if (minted === false) {
+            clearRefreshCookie(c, config.cookieAuth);
+            throw ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
+        }
 
         // Housekeeping, deliberately after the new token exists and never
         // allowed to fail the request: rotation adds a row per refresh, and

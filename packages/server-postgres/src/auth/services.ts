@@ -656,7 +656,7 @@ export class RefreshTokenService {
         userAgent?: string,
         ipAddress?: string,
         session?: RefreshTokenSession
-    ): Promise<void> {
+    ): Promise<boolean> {
         // Empty strings rather than NULLs: the device-session UNIQUE constraint
         // that needed them is gone, but sessions-list UIs already render "" as
         // "unknown device" and would start showing blanks otherwise.
@@ -682,7 +682,32 @@ export class RefreshTokenService {
         // which is the restrictive answer rather than a bypass.
         if (session?.aal && this.has("aal")) values.aal = session.aal;
 
-        await this.db.insert(this.refreshTokensTable).values(values);
+        // A rotation writes only while the token it replaces is live. Without
+        // a `rotatedAt` column `markRotated` deletes that token, so there is
+        // no row left to hold the rotation to and the write goes ahead as it
+        // always did.
+        const parentHash = session?.rotatedFrom && this.has("rotatedAt") ? session.rotatedFrom : undefined;
+        if (!parentHash) {
+            await this.db.insert(this.refreshTokensTable).values(values);
+            return true;
+        }
+        return await this.db.transaction(async (tx) => {
+            // Share-locked until the insert commits. A sign-out that got to
+            // the row first has revoked or deleted it by the time this lock is
+            // granted, so the read finds nothing; one that comes after waits
+            // for this transaction — see `revokeSession`.
+            const live = this.has("revoked")
+                ? sql`${this.refreshTokensTable.tokenHash} = ${parentHash} AND ${this.col("revoked")} IS NOT TRUE`
+                : eq(this.refreshTokensTable.tokenHash, parentHash);
+            const [parent] = await tx
+                .select({ id: this.refreshTokensTable.id })
+                .from(this.refreshTokensTable)
+                .where(live)
+                .for("share");
+            if (!parent) return false;
+            await tx.insert(this.refreshTokensTable).values(values);
+            return true;
+        });
     }
 
     /**
@@ -766,17 +791,35 @@ export class RefreshTokenService {
             .where(eq(this.refreshTokensTable.tokenHash, tokenHash));
     }
 
-    /** Final kill of one sign-in: logout, or revoking a device remotely. */
+    /**
+     * Final kill of one sign-in: logout, or revoking a device remotely.
+     *
+     * Lock first, write second, in one transaction. A rotation in flight
+     * holds a share lock on its parent — a row of this session — until the
+     * token it mints is committed (see `createToken`), so the lock here waits
+     * for it, and the write, being a new statement, reads a snapshot that has
+     * that token in it. A lone UPDATE would work from a snapshot taken before
+     * the token existed and leave it live: the sign-out a refresh in flight
+     * used to undo.
+     */
     async revokeSession(sessionId: string): Promise<void> {
         if (!this.has("sessionId")) return;
-        if (this.has("revoked")) {
-            await this.db
-                .update(this.refreshTokensTable)
-                .set({ revoked: true, ...(this.has("rotatedAt") ? { rotatedAt: new Date() } : {}) })
-                .where(eq(this.col("sessionId"), sessionId));
-            return;
-        }
-        await this.db.delete(this.refreshTokensTable).where(eq(this.col("sessionId"), sessionId));
+        const inSession = eq(this.col("sessionId"), sessionId);
+        await this.db.transaction(async (tx) => {
+            await tx
+                .select({ id: this.refreshTokensTable.id })
+                .from(this.refreshTokensTable)
+                .where(inSession)
+                .for("update");
+            if (this.has("revoked")) {
+                await tx
+                    .update(this.refreshTokensTable)
+                    .set({ revoked: true, ...(this.has("rotatedAt") ? { rotatedAt: new Date() } : {}) })
+                    .where(inSession);
+                return;
+            }
+            await tx.delete(this.refreshTokensTable).where(inSession);
+        });
     }
 
     /**
@@ -1034,8 +1077,8 @@ export class PostgresTokenRepository implements TokenRepository {
 
     // Refresh token operations
 
-    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {
-        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<boolean> {
+        return this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
     }
 
     async markRefreshTokenRotated(tokenHash: string): Promise<void> {
@@ -1272,8 +1315,8 @@ collectionPermissions: null }
 
     // Token operations (delegate to PostgresTokenRepository)
 
-    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {
-        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<boolean> {
+        return this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
     }
 
     async markRefreshTokenRotated(tokenHash: string): Promise<void> {

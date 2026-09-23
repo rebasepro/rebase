@@ -191,6 +191,20 @@ export interface RefreshTokenSession {
      * assurance level is a property of the *sign-in*, not of the account.
      */
     aal?: "aal1" | "aal2";
+    /**
+     * The hash of the token this one replaces, when it is minted by rotating
+     * one. A repository that honours it writes the new token only while that
+     * token is still live — present and not revoked — decided in the same
+     * transaction as the write, and answers `false` from
+     * {@link TokenRepository.createRefreshToken} when it is not.
+     *
+     * That is the sign-out that landed while the rotation was in flight: the
+     * refresh read a live token, the logout revoked every row of the session,
+     * and the refresh then wrote a new, unrevoked row into it — in cookie mode
+     * re-setting the cookie, so the sign-out silently did not happen. A
+     * repository that ignores this keeps that race.
+     */
+    rotatedFrom?: string;
 }
 
 /**
@@ -412,8 +426,12 @@ export interface TokenRepository {
      * optional so that repositories written against an older release keep
      * satisfying this interface; implementations that ignore it degrade to one
      * session per token.
+     *
+     * Resolves `false` when `session.rotatedFrom` names a token that is no
+     * longer live, in which case nothing was written. Anything else means the
+     * token was written.
      */
-    createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void>;
+    createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<boolean | void>;
 
     /**
      * Mark a token as superseded by a rotation, WITHOUT making it unusable.

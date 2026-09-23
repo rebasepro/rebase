@@ -863,7 +863,10 @@ withEmail: false }); // Hack to pass empty list of providers
             // token written before the column existed says nothing about a
             // second factor, and "says nothing" must not read as "was
             // verified". See mfa-enforcement.test.ts for the aal2 direction.
-            expect(session).toEqual({ id: "session-42", startedAt, aal: "aal1" });
+            // `rotatedFrom` names the presented token, so the repository writes
+            // the successor only while that token is still live — see
+            // refresh-after-sign-out.test.ts.
+            expect(session).toEqual({ id: "session-42", startedAt, aal: "aal1", rotatedFrom: await hashRefreshToken("the-token") });
         });
 
         it("falls back to deleting when the repository predates rotation tracking", async () => {
