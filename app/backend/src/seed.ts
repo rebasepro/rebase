@@ -317,16 +317,36 @@ function currentYear(): number { return new Date().getFullYear(); }
 // ── Blog post topics (no PHP, TypeScript-heavy) ───────────────────────
 
 
-const authorPicFiles = [
-    "author_pictures/0phas_Gemini_Generated_Image_.jpeg",
-    "author_pictures/5kuxx_chromaflow_landing_page.png",
-    "author_pictures/9h9s0_Gemini_Generated_Image_hwxqw4hwxqw4hwxq.jpeg",
-    "author_pictures/jbiri_77035b3e-cb2f-42a2-85c9-813d7a9045eb.avif",
-    "author_pictures/nxih4_logo_small.png",
-    "author_pictures/v166u_xvu6k_Frame 45 (1).png",
-    "author_pictures/w48fo_Frame 45.png",
-    "author_pictures/w5l1n_xvu6k_Frame 45 (1).png"
-];
+// ── People's pictures ─────────────────────────────────────────────────
+//
+// Portraits from randomuser.me (https://randomuser.me/copyright: hand-picked
+// from the authorized section of UI Faces), 128×128 JPEG, committed under
+// seed-assets/ so the demo image carries them.
+//
+// Authors each have their own: `author_pictures/<name-slug>.jpg`. Customers are
+// generated with random first names, so they draw from two pools of 32 — the
+// pool that goes with the first name, in order, so no two customers of one
+// seed share a face until a pool runs out.
+
+/** `Mei Lin Chow` → `mei-lin-chow`. */
+function nameSlug(name: string): string {
+    return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function authorPicture(name: string): string {
+    const file = `author_pictures/${nameSlug(name)}.jpg`;
+    // Loud, like the product images below: an author whose picture is missing
+    // would render a broken image on every post they wrote.
+    if (!fs.existsSync(path.join(SEED_ASSETS_DIR, file)))
+        throw new Error(`No picture for author "${name}": seed-assets/${file} does not exist.`);
+    return file;
+}
+
+const CUSTOMER_AVATARS_PER_POOL = 32;
+
+/** The first names below whose customers draw from the women's portraits. */
+const womenFirstNames = new Set(["Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Barbara", "Susan", "Jessica", "Sarah", "Karen"]);
 
 const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen"];
 const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"];
@@ -384,6 +404,9 @@ export async function runSeed() {
 
         await seedAssets("author_pictures", "author_pictures/");
         console.log("  ✅ author pictures");
+
+        await seedAssets("customer_avatars", "customer_avatars/");
+        console.log("  ✅ customer avatars");
 
         const productImagePaths = await seedAssets("product_images", "product_images/");
         console.log(`  ✅ ${productImagePaths.length} product images`);
@@ -598,7 +621,7 @@ export async function runSeed() {
             id: authorIds[i],
             name: a.name,
             email: a.email,
-            picture: authorPicFiles[i % authorPicFiles.length],
+            picture: authorPicture(a.name),
             bio: a.bio,
             twitter: a.twitter,
             github: a.github,
@@ -719,9 +742,12 @@ tag_id: tagIds[t] });
         const streets = ["123 Main St", "456 Oak Ave", "789 Pine Rd", "321 Elm Blvd", "654 Maple Dr", "987 Cedar Ln", "111 Broadway", "222 Market St", "333 Park Ave", "444 Lake Rd"];
         const cities = ["New York, NY 10001", "San Francisco, CA 94102", "Austin, TX 73301", "Chicago, IL 60601", "Seattle, WA 98101", "Miami, FL 33101", "Denver, CO 80201", "Portland, OR 97201", "Boston, MA 02101", "Nashville, TN 37201"];
         const customerValues = [];
+        const avatarsDrawn = { men: 0, women: 0 };
         for (let i = 1; i <= 40; i++) {
             const fn = pick(firstNames);
             const ln = pick(lastNames);
+            const avatarPool = womenFirstNames.has(fn) ? "women" : "men";
+            const avatarNumber = avatarsDrawn[avatarPool]++ % CUSTOMER_AVATARS_PER_POOL + 1;
             const addr = `${pick(streets)}\n${pick(cities)}`;
             const isVip = Math.random() > 0.8;
             const ltv = isVip ? Math.floor(2000 + Math.random() * 8000) : Math.floor(50 + Math.random() * 1500);
@@ -731,6 +757,7 @@ tag_id: tagIds[t] });
                 first_name: fn,
                 last_name: ln,
                 email: `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@example.com`,
+                avatar: `customer_avatars/${avatarPool}-${String(avatarNumber).padStart(2, "0")}.jpg`,
                 phone: `+1-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
                 company: pick(companies),
                 is_vip: isVip,

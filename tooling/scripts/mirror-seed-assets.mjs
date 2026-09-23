@@ -37,6 +37,7 @@ const PREFIXES = {
     hero: "posts/hero",
     content: "posts/content",
     author_pictures: "author_pictures",
+    customer_avatars: "customer_avatars",
     product_images: "product_images",
     exercise_images: "exercise_images"
 };
