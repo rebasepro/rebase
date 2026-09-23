@@ -1,7 +1,7 @@
 
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/app";
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, PlusIcon, Typography } from "@rebasepro/ui";
 import { CollectionEditorDialogProps } from "./CollectionEditorDialog";
 import { AIModifiedPathsProvider } from "./AIModifiedPathsContext";
@@ -19,16 +19,28 @@ export type CollectionStudioViewProps = Omit<CollectionEditorDialogProps, "open"
     onSave?: (collection?: AdminCollection) => void;
 
     /**
+     * Called when the collection on screen gains or loses unsaved edits.
+     *
+     * For whatever decides which collection is on screen: this view is
+     * remounted when that changes, and its edits go with it.
+     */
+    onDirtyChange?: (dirty: boolean) => void;
+
+    /**
      * Called when the user cancels editing.
      * When not provided, cancel is a no-op.
      */
     onCancel?: () => void;
 };
 
-export function CollectionStudioView({ collectionId, onSave, onCancel, ...props }: CollectionStudioViewProps) {
+export function CollectionStudioView({ collectionId, onSave, onCancel, onDirtyChange, ...props }: CollectionStudioViewProps) {
 
     // Form state from the editor
     const [formDirty, setFormDirty] = useState<boolean>(false);
+
+    useEffect(() => {
+        onDirtyChange?.(formDirty);
+    }, [formDirty, onDirtyChange]);
     const [cancelRequested, setCancelRequested] = useState<boolean>(false);
 
     const { dialogProps, triggerDialog } = useUnsavedChangesDialog(

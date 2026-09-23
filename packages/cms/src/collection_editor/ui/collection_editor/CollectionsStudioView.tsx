@@ -1,5 +1,5 @@
 
-import { IconForView } from "@rebasepro/app";
+import { IconForView, UnsavedChangesDialog } from "@rebasepro/app";
 import React, { useState, useEffect } from "react";
 import {
     Button,
@@ -74,6 +74,24 @@ export function CollectionsStudioView({
         }
     };
 
+    // ── Unsaved edits ───────────────────────────────────────────────────
+    // The editor is keyed by the active id, so selecting another collection
+    // remounts it and drops whatever was typed into the one on screen.
+    // Controlled, the selection is the caller's navigation and the caller
+    // guards it — `RouterCollectionsStudioView` is a route change, which the
+    // editor's own navigation blocker asks about. Uncontrolled, it is state
+    // this component owns, and nothing else would ask.
+    const [editorDirty, setEditorDirty] = useState(false);
+    const [pendingSelection, setPendingSelection] = useState<{ id: string | undefined } | null>(null);
+
+    const selectCollection = (id: string | undefined) => {
+        if (!isControlled && editorDirty && id !== activeCollectionId) {
+            setPendingSelection({ id });
+            return;
+        }
+        setActiveCollectionId(id);
+    };
+
     // ── Collections list ────────────────────────────────────────────────
     const collections = collectionsProp ?? configController.collections ?? [];
 
@@ -109,8 +127,9 @@ export function CollectionsStudioView({
                                 <div>
                                     <IconButton
                                         size="small"
+                                        aria-label={"Add collection"}
                                         disabled={configController.readOnly}
-                                        onClick={() => setActiveCollectionId("new")}
+                                        onClick={() => selectCollection("new")}
                                         className={activeCollectionId === "new" ? "text-primary dark:text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark"}
                                     >
                                         <PlusIcon size={iconSize.smallest}/>
@@ -133,7 +152,7 @@ export function CollectionsStudioView({
                                 return (
                                     <div
                                         key={collectionKey}
-                                        onClick={() => setActiveCollectionId(collectionKey)}
+                                        onClick={() => selectCollection(collectionKey)}
                                         className={cls(
                                             "flex items-center gap-2.5 px-3 h-[30px] cursor-pointer rounded-lg text-[13px] font-medium transition-colors",
                                             isSelected
@@ -169,6 +188,9 @@ export function CollectionsStudioView({
                                         setActiveCollectionId(savedCollection.slug);
                                     }
                                 }}
+                                onDirtyChange={setEditorDirty}
+                                // Not through the guard: the editor has already
+                                // asked about its own edits before cancelling.
                                 onCancel={() => setActiveCollectionId(undefined)}
                                 propertyTypePresets={propertyTypePresets}
                                 hiddenPropertyTypes={hiddenPropertyTypes}
@@ -193,6 +215,17 @@ export function CollectionsStudioView({
                         )}
                     </div>
                 }
+            />
+            <UnsavedChangesDialog
+                open={pendingSelection !== null}
+                body={"There are unsaved changes in this collection"}
+                handleOk={() => {
+                    const next = pendingSelection;
+                    setPendingSelection(null);
+                    setEditorDirty(false);
+                    if (next) setActiveCollectionId(next.id);
+                }}
+                handleCancel={() => setPendingSelection(null)}
             />
         </div>
     );
