@@ -347,15 +347,18 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
      * `?count=abc` made `slice(-NaN)` return the *entire* buffer. Three ways to
      * be wrong, none of them visible to the caller. The data plane refuses the
      * same input with a 400 — see `resolveListLimitParam`.
+     *
+     * `min` is 1 for a size and 0 for an offset: `?offset=0` is the first page,
+     * which is where every pager starts, and it was a 400.
      */
-    const window = (raw: string | undefined, what: string, max: number): number | undefined => {
+    const window = (raw: string | undefined, what: string, max: number, min = 1): number | undefined => {
         if (raw === undefined || raw.trim() === "") return undefined;
         const parsed = Number(raw.trim());
-        if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
+        if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
             throw new ApiError(
                 400,
                 "INVALID_PARAM",
-                `Invalid \`${what}\`: ${raw}. Expected a whole number between 1 and ${max}.`,
+                `Invalid \`${what}\`: ${raw}. Expected a whole number between ${min} and ${max}.`,
                 undefined,
                 true
             );
@@ -371,7 +374,7 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
             source: query.source,
             search: query.search,
             limit: window(query.limit, "limit", LOG_WINDOW_MAX),
-            offset: window(query.offset, "offset", Number.MAX_SAFE_INTEGER),
+            offset: window(query.offset, "offset", Number.MAX_SAFE_INTEGER, 0),
             since: query.since
         });
         return c.json(result);

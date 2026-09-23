@@ -91,6 +91,24 @@ total: 0 });
         expect(body.entries.map(e => e.message)).toEqual(["third", "second"]);
     });
 
+    it("takes `offset=0` as the first page, the way every pager starts", async () => {
+        // The offset was bounded like a limit — at least 1 — so the first page
+        // of any pager that sends its offset explicitly was a 400.
+        addLog("info", "system", "first");
+        addLog("info", "system", "second");
+
+        const app = buildApp();
+        const page = async (offset: number) => {
+            const res = await app.request(`/api/logs?source=system&limit=1&offset=${offset}`);
+            expect(res.status).toBe(200);
+            return (await res.json() as { entries: { message: string }[] }).entries.map(e => e.message);
+        };
+
+        expect(await page(0)).toEqual(["second"]);
+        expect(await page(1)).toEqual(["first"]);
+        expect((await app.request("/api/logs?offset=-1")).status).toBe(400);
+    });
+
     it("exposes the latest entries for polling", async () => {
         addLog("info", "system", "recent");
 
