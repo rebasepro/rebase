@@ -410,22 +410,42 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
         });
     }
 
-    for (const extra of EXTRA_ROUTES) routeSpecs.push(extra);
+    for (const extra of EXTRA_ROUTES) {
+        routes.add(extra.path);
+        routeSpecs.push(extra);
+    }
 
     if (routes.size === 0) {
         throw new Error("Extracted no routes at all — the guard is checking nothing.");
     }
 
-    // ── every one of them is in the table ─────────────────────────────────
+    // ── every one of them is in the table, under its own method ───────────
+    //
+    // Keyed `METHOD path`, and read from the table's rows. This used to collect
+    // every backticked path anywhere on the page and compare paths only, so a
+    // route was "in the index" as soon as another method on the same path was:
+    // `DELETE /api/admin/dev/emails` and `OPTIONS /api/storage/tus` were
+    // undocumented with the gate green. The routes in EXTRA_ROUTES — which the
+    // scan cannot see, and which are listed precisely because they are real —
+    // were never checked for completeness at all, and `GET /api/auth/config`
+    // was in no table.
     const page = readFileSync(path.join(root, PAGE), "utf8");
-    // A path in a table cell, as `/api/...` inside backticks.
-    const documented = new Set(
-        [...page.matchAll(/`(\/[A-Za-z0-9_\-./:*{}]*)`/g)].map(m => m[1])
-    );
+    const documentedRows = new Set();
+    for (const line of page.split("\n")) {
+        const row = line.match(ENDPOINT_ROW);
+        if (!row) continue;
+        documentedRows.add(`${row[1]} ${row[2].split("?")[0].replace(/\/$/, "") || "/"}`);
+    }
 
-    for (const route of [...routes].sort()) {
-        if (documented.has(route)) continue;
-        findings.push({ kind: "missing", message: `${route} is mounted and not in the index` });
+    const specs = new Map();
+    for (const spec of routeSpecs) specs.set(`${spec.method} ${spec.path}`, spec);
+    for (const [key, spec] of [...specs].sort(([a], [b]) => a.localeCompare(b))) {
+        // An `all(…)` route answers every method; one row for its path is enough.
+        const documented = spec.method === "ALL"
+            ? [...documentedRows].some(row => row.slice(row.indexOf(" ") + 1) === spec.path)
+            : documentedRows.has(key);
+        if (documented) continue;
+        findings.push({ kind: "missing", message: `${key} is mounted and not in the index` });
     }
 
     // ── and every documented endpoint row resolves to a mounted route ─────
