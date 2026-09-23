@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Avatar,
     Button,
@@ -40,6 +40,20 @@ export function UserSettingsView() {
     const authController = useAuthController() as ExtendedAuthController;
     const user = authController.user;
     const { t } = useTranslation();
+
+    // The controller as of the latest render, for the sign-out after a
+    // password change, which runs on a timer after the render that started it.
+    // A view that is gone by then has nobody left to sign out: it went because
+    // the user did.
+    const authControllerRef = useRef(authController);
+    authControllerRef.current = authController;
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
 
     const hasPasswordChange = !!authController.changePassword;
     const [activeTab, setActiveTab] = useState<ActiveTab>("profile");
@@ -111,10 +125,14 @@ export function UserSettingsView() {
                 setCurrentPassword("");
                 setNewPassword("");
                 setConfirmPassword("");
-                // Backend invalidates all sessions on password change,
-                // so the user will be logged out shortly
+                // The backend ends every session on a password change. Sign
+                // out after the message has been read — unless the controller
+                // already has, as the Rebase one does inside `changePassword`:
+                // a second sign-out fires SIGNED_OUT and `onSignOut` again.
                 setTimeout(() => {
-                    authController.signOut();
+                    if (mountedRef.current && authControllerRef.current.user) {
+                        authControllerRef.current.signOut();
+                    }
                 }, 2000);
             }
         } catch (e: unknown) {
