@@ -1660,7 +1660,7 @@ ${chalk.green.bold("Which database")}
     2. ${chalk.gray("DATABASE_URL")}            in the shell environment
     3. the branch this checkout is switched to ${chalk.gray("(rebase db branch switch)")}
     4. ${chalk.gray("DATABASE_URL")}            in the project's .env
-    5. ${chalk.blue("--docker")}, or ${chalk.gray("devDatabase: \"docker\"")} in rebase.json
+    5. ${chalk.blue("--docker")}                on this command line
     6. the managed development database ${chalk.gray("(PGlite, data in .rebase/)")}
 
   A scaffolded project sets none of 1–5, so it lands on (6): no Docker,

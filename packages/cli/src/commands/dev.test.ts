@@ -19,6 +19,7 @@ import path from "path";
 
 import { DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
+import { validateManifest } from "../manifest";
 
 /**
  * `rebase dev` must notice a function or cron that did not exist when it
@@ -301,6 +302,29 @@ describe("the dev help and the dev flag spec", () => {
         for (const flag of longFlags) {
             expect(help, `${flag} is accepted by the parser but missing from --help`).toContain(flag);
         }
+    });
+
+    it("names only rebase.json keys the manifest carries", async () => {
+        // "Which database" listed `devDatabase: "docker"` in rebase.json as
+        // rung 5. The manifest never modelled the key and no caller read it,
+        // so a project that set it got the managed database anyway.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        for (const [, key, value] of help.matchAll(/(\w+): "([^"]*)"\)? in rebase\.json/g)) {
+            const { manifest } = validateManifest({ rebase: "^1", apps: {}, [key]: value });
+            expect(manifest && key in manifest, `--help names "${key}" in rebase.json, which the manifest drops`).toBe(true);
+        }
+        expect(help).not.toContain("devDatabase");
     });
 
     it("reads --no-db in exactly one place", () => {

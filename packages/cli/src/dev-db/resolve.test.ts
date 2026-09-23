@@ -27,8 +27,7 @@ describe("resolveDevDatabase", () => {
             flagUrl: URL_A,
             flagDocker: true,
             env: { DATABASE_URL: URL_B },
-            envFile: { DATABASE_URL: URL_B },
-            manifestPreference: "docker"
+            envFile: { DATABASE_URL: URL_B }
         });
 
         expect(resolved).toEqual({ kind: "external", url: URL_A, source: "flag" });
@@ -95,14 +94,6 @@ describe("resolveDevDatabase", () => {
             });
         });
 
-        it("is chosen by a manifest preference", () => {
-            expect(resolveDevDatabase({ manifestPreference: "docker", composeUrl: COMPOSE_URL })).toEqual({
-                kind: "docker",
-                source: "docker",
-                url: COMPOSE_URL
-            });
-        });
-
         it("carries a null url when the project has no compose db service", () => {
             // Not a fallback to localhost:5432: a --docker that cannot be
             // honoured has to say so, and a guess would point the project at
@@ -122,10 +113,6 @@ describe("resolveDevDatabase", () => {
                 url: URL_A,
                 source: "environment"
             });
-        });
-
-        it("is overridden back to managed by an explicit manifest preference", () => {
-            expect(resolveDevDatabase({ manifestPreference: "managed" }).kind).toBe("managed");
         });
     });
 });

@@ -13,7 +13,7 @@
  *   2. `DATABASE_URL` in the shell environment
  *   3. the database branch this checkout is switched to
  *   4. `DATABASE_URL` in the project's `.env`
- *   5. `--docker` / a manifest preference of `docker`
+ *   5. `--docker`
  *   6. the managed PGlite database
  *
  * An explicit connection string always wins. That is the whole point of the
@@ -45,7 +45,7 @@ export type DevDatabaseSource =
     | "env-file"
     /** The branch this checkout is switched to, over the base connection. */
     | "branch"
-    /** `--docker`, or `devDatabase: "docker"` in the manifest. */
+    /** `--docker`. */
     | "docker"
     /** Nobody said anything, so the managed database fills in. */
     | "managed";
@@ -85,8 +85,6 @@ export interface ResolveDevDatabaseInput {
     env?: Record<string, string | undefined>;
     /** Parsed `.env` from the project root. Only `DATABASE_URL` is read. */
     envFile?: Record<string, string> | null;
-    /** `devDatabase` from `rebase.json`, if the project recorded a preference. */
-    manifestPreference?: "managed" | "docker" | null;
     /**
      * The compose `db` service's connection string, when the project has one.
      *
@@ -138,7 +136,7 @@ export function resolveDevDatabase(input: ResolveDevDatabaseInput = {}): DevData
     // Only consulted once every explicit connection string is exhausted: asking
     // for Docker is a choice about *how to get* a database, not which one, so a
     // DATABASE_URL that already names one outranks it.
-    if (input.flagDocker || input.manifestPreference === "docker") {
+    if (input.flagDocker) {
         return { kind: "docker", source: "docker", url: present(input.composeUrl) };
     }
 
