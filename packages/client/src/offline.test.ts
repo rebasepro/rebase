@@ -124,10 +124,12 @@ function createFakeServer() {
 function createManager(server: ReturnType<typeof createFakeServer>, options: {
     onSyncError?: (error: Error, mutation: PendingMutation) => void;
     store?: MemoryOfflineStore;
+    /** Default 0: every write is tried on the network before it is queued. */
+    syncIntervalMs?: number;
 } = {}) {
     const store = options.store ?? new MemoryOfflineStore();
     const manager = new OfflineManager(
-        { store, syncIntervalMs: 0, onSyncError: options.onSyncError },
+        { store, syncIntervalMs: options.syncIntervalMs ?? 0, onSyncError: options.onSyncError },
         (slug) => server.client(slug)
     );
     const wrap = (slug: string) => manager.wrap(slug, server.client(slug));
@@ -465,9 +467,13 @@ describe("OfflineManager", () => {
     describe("coalescing", () => {
         it("merges an update into the queued create it edits", async () => {
             const server = createFakeServer();
-            const { manager, wrap } = createManager(server);
+            // A backoff window, and a failure that opens it: the create below
+            // is queued without being tried. One that was tried may have
+            // reached the server, and is never merged into.
+            const { manager, wrap } = createManager(server, { syncIntervalMs: 60_000 });
             const posts = wrap("posts");
             server.state.online = false;
+            await posts.find().catch(() => undefined);
 
             const row = await posts.create({ title: "draft", status: "new" });
             await posts.update(row.id as string, { title: "draft 2" });
@@ -521,9 +527,12 @@ describe("OfflineManager", () => {
 
         it("cancels a queued create (and its updates) when the row is deleted offline", async () => {
             const server = createFakeServer();
-            const { manager, wrap } = createManager(server);
+            // Queued without being tried, as above: only a create the server
+            // cannot have seen can be cancelled out.
+            const { manager, wrap } = createManager(server, { syncIntervalMs: 60_000 });
             const posts = wrap("posts");
             server.state.online = false;
+            await posts.find().catch(() => undefined);
 
             const row = await posts.create({ title: "ephemeral" });
             await posts.update(row.id as string, { title: "edited" });

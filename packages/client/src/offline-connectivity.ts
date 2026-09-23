@@ -60,6 +60,19 @@ export function isIdempotencyInProgressError(error: unknown): boolean {
         && error.code === IDEMPOTENCY_IN_PROGRESS;
 }
 
+/**
+ * Is this key held for a different request than the one just sent with it?
+ *
+ * For a create the queue already sent once, that is an answer rather than a
+ * failure: the key is live only because the first attempt got through and
+ * committed, and only its response went missing.
+ */
+export function isIdempotencyKeyReusedError(error: unknown): boolean {
+    return error instanceof RebaseApiError
+        && error.status === 422
+        && error.code === "IDEMPOTENCY_KEY_REUSED";
+}
+
 /** Is this failure worth another attempt later? */
 export function isRetryableError(error: unknown): boolean {
     if (isNetworkError(error)) return true;

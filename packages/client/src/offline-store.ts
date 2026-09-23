@@ -69,6 +69,25 @@ export interface PendingMutation {
     /** The payload: a row for create/update, an array of rows for createMany. */
     data?: Record<string, unknown> | Record<string, unknown>[];
     upsert?: boolean;
+    /**
+     * The request as it was already sent once, for a create tried online
+     * that failed on the network before it was queued. Nothing says whether
+     * it reached the server — only the answer may have been lost — so replay
+     * keeps its key: sent with the rows as queued (their minted ids, which
+     * later offline writes may reference), the server either takes them, or,
+     * having committed the first attempt, refuses the key as held for a
+     * different request, and this request is sent again for its stored
+     * answer. Replaying under a fresh key wrote the rows a second time.
+     */
+    sent?: {
+        idempotencyKey: string;
+        /** `create`: the row it was called with; `createMany`: the rows. */
+        data: Record<string, unknown> | Record<string, unknown>[];
+        /** `create`: the `id` argument it was called with. */
+        id?: string | number;
+        /** `createMany`: the conflict target the batch was sent with. */
+        onConflict?: readonly string[];
+    };
     queuedAt: number;
     /** How many times replay has been attempted (diagnostics for a stuck queue). */
     attempts?: number;

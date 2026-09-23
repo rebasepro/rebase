@@ -3,6 +3,7 @@ import { OfflineManager, type LiveResult, type OfflineStatus } from "./offline";
 import { MemoryOfflineStore, type PendingMutation } from "./offline-store";
 import { RebaseApiError } from "./transport";
 import type { CollectionClient } from "./collection";
+import type { WriteOptions } from "@rebasepro/types";
 import type { FindParams } from "./transport";
 import { matchesParams, runLocalQuery } from "./offline-query";
 
@@ -853,5 +854,218 @@ describe("replaying a create whose response was lost", () => {
 
         expect(errors).toHaveLength(1);
         expect(manager.api.status().pending).toBe(0);
+    });
+});
+
+/**
+ * A backend that keeps idempotency keys the way the real one does: a key is
+ * claimed for one request — method, path and body — so the same key on the
+ * same request replays the stored answer, and on a different one is refused
+ * with 422 `IDEMPOTENCY_KEY_REUSED`. `loseNextAnswer` commits a write and
+ * then fails the request as the network would: the row exists, the client
+ * never hears so.
+ */
+function createKeyedServer() {
+    const rows = new Map<string, Row>();
+    const keys = new Map<string, { fingerprint: string; answer: unknown }>();
+    const sent: { op: string; key?: string; body: unknown }[] = [];
+    const state = { online: true, loseNextAnswer: false };
+    let serial = 0;
+
+    function keyed<T>(op: string, body: unknown, key: string | undefined, write: () => T): T {
+        sent.push({ op, key, body });
+        if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
+        const fingerprint = `${op} ${JSON.stringify(body)}`;
+        const claimed = key ? keys.get(key) : undefined;
+        if (claimed) {
+            if (claimed.fingerprint !== fingerprint) {
+                throw new RebaseApiError("Idempotency key reused", { status: 422, code: "IDEMPOTENCY_KEY_REUSED" });
+            }
+            return claimed.answer as T;
+        }
+        const answer = write();
+        if (key) keys.set(key, { fingerprint, answer });
+        if (state.loseNextAnswer) {
+            state.loseNextAnswer = false;
+            throw new RebaseApiError("Could not reach the server: socket hang up", { status: 0, code: "NETWORK_ERROR" });
+        }
+        return answer;
+    }
+
+    function insert(data: Row): Row {
+        const id = data.id ?? `srv-${++serial}`;
+        const row = { ...data, id };
+        rows.set(String(id), row);
+        return row;
+    }
+
+    const client = {
+        async create(data: Row, id?: string | number, options?: WriteOptions) {
+            const body = id === undefined ? { ...data } : { ...data, id };
+            return keyed("create", body, options?.idempotencyKey, () => insert(body));
+        },
+        async createMany(data: Row[], options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions) {
+            const body = {
+                rows: data,
+                ...(options?.upsert ? { upsert: true } : {}),
+                ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {})
+            };
+            return keyed("createMany", body, options?.idempotencyKey, () => data.map(insert));
+        },
+        async update(id: string | number, data: Row) {
+            if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
+            const existing = rows.get(String(id));
+            if (!existing) throw new RebaseApiError("Not found", { status: 404 });
+            const row = { ...existing, ...data, id };
+            rows.set(String(id), row);
+            return row;
+        },
+        async delete(id: string | number) {
+            if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
+            rows.delete(String(id));
+        },
+        async findById(id: string | number) {
+            return rows.get(String(id));
+        },
+        async find() {
+            return runLocalQuery([...rows.values()], undefined);
+        },
+        async count() {
+            return rows.size;
+        }
+    };
+
+    function manager(onSyncError?: (error: Error) => void, syncIntervalMs = 0) {
+        const inner = client as unknown as CollectionClient<Row>;
+        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs, onSyncError }, () => inner);
+        return { offline, posts: offline.wrap("posts", inner) };
+    }
+
+    return { rows, sent, state, manager };
+}
+
+describe("a write whose answer was lost before it was queued", () => {
+    it("replays a create under the key and request it was first sent with", async () => {
+        const server = createKeyedServer();
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        // Committed on the server; the response never arrives.
+        server.state.loseNextAnswer = true;
+        const local = await posts.create({ title: "Hello" });
+        await offline.sync();
+
+        // One row, not two. The replay went out under the first attempt's
+        // key; the server, holding that key for the request without the
+        // locally minted id, refused it — and that request, sent again, was
+        // answered from the server's record of the first.
+        expect([...server.rows.values()]).toEqual([{ id: "srv-1", title: "Hello" }]);
+        const key = server.sent[0].key;
+        expect(key).toBeDefined();
+        expect(server.sent.map((s) => s.key)).toEqual([key, key, key]);
+        expect(server.sent[1].body).toEqual({ title: "Hello", id: (local as Row).id });
+        expect(server.sent[2]).toEqual(server.sent[0]);
+        expect(errors).toEqual([]);
+        expect(offline.api.status().pending).toBe(0);
+        // The local row has moved to the id the server gave it.
+        expect(await posts.findById("srv-1")).toMatchObject({ title: "Hello" });
+        expect(await posts.findById(String((local as Row).id))).toBeUndefined();
+    });
+
+    it("sends the caller's own write options, and replays under the caller's key", async () => {
+        const server = createKeyedServer();
+        const { offline, posts } = server.manager();
+
+        server.state.loseNextAnswer = true;
+        await posts.create({ title: "Hello" }, undefined, { idempotencyKey: "caller-key" });
+        await offline.sync();
+
+        expect(new Set(server.sent.map((s) => s.key))).toEqual(new Set(["caller-key"]));
+        expect(server.rows.size).toBe(1);
+    });
+
+    it("keeps the id it was given here when the first attempt never arrived", async () => {
+        const server = createKeyedServer();
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        server.state.online = false;
+        const parent = await posts.create({ title: "Project" });
+        // A later offline write can refer to the row by the id it was handed.
+        await posts.create({ title: "Task", parent_id: (parent as Row).id });
+        server.state.online = true;
+        await offline.sync();
+
+        expect(errors).toEqual([]);
+        expect(server.rows.get(String((parent as Row).id))).toMatchObject({ title: "Project" });
+        expect(server.sent[0].key).toBe(server.sent[2].key);
+    });
+
+    it("replays a createMany under the key and request it was first sent with", async () => {
+        const server = createKeyedServer();
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        server.state.loseNextAnswer = true;
+        await posts.createMany([{ title: "a" }, { title: "b" }]);
+        await offline.sync();
+
+        expect([...server.rows.values()].map((r) => r.title)).toEqual(["a", "b"]);
+        expect(server.sent.at(-1)).toEqual(server.sent[0]);
+        expect(errors).toEqual([]);
+        expect((await posts.findById("srv-1"))?.title).toBe("a");
+        expect((await posts.findById("srv-2"))?.title).toBe("b");
+    });
+
+    it("does not cancel it against a later delete: the server may already hold the row", async () => {
+        const server = createKeyedServer();
+        const { offline, posts } = server.manager();
+
+        server.state.loseNextAnswer = true;
+        const local = await posts.create({ title: "Hello" });
+        // Offline now, so the delete is queued behind the create.
+        await posts.delete((local as Row).id as string);
+        await offline.sync();
+
+        expect(server.rows.size).toBe(0);
+        expect(offline.api.status().pending).toBe(0);
+    });
+
+    it("keeps an edit made after it as a write of its own", async () => {
+        const server = createKeyedServer();
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        server.state.loseNextAnswer = true;
+        const local = await posts.create({ title: "Hello" });
+        await posts.update((local as Row).id as string, { title: "Hello, edited" });
+        await offline.sync();
+
+        expect(errors).toEqual([]);
+        expect([...server.rows.values()]).toEqual([{ id: "srv-1", title: "Hello, edited" }]);
+    });
+
+    it("replays a natural-key upsert batch only as the request it was sent as", async () => {
+        const server = createKeyedServer();
+        const { offline, posts } = server.manager();
+
+        server.state.loseNextAnswer = true;
+        await posts.createMany([{ email: "a@b.c" }], { upsert: true, onConflict: ["email"] });
+        await offline.sync();
+
+        expect(server.sent).toHaveLength(2);
+        expect(server.sent[1]).toEqual(server.sent[0]);
+        expect(server.rows.size).toBe(1);
+    });
+
+    it("refuses a natural-key upsert batch it would have to invent ids for", async () => {
+        const server = createKeyedServer();
+        const { posts } = server.manager(undefined, 60_000);
+        server.state.online = false;
+        // Learn that the network is gone, so the next write is not attempted.
+        await posts.create({ title: "x" });
+
+        await expect(posts.createMany([{ email: "a@b.c" }], { upsert: true, onConflict: ["email"] }))
+            .rejects.toMatchObject({ code: "OFFLINE_UPSERT_UNSUPPORTED" });
     });
 });

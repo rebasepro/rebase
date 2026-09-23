@@ -9,6 +9,7 @@ import {
     ConnectivityMonitor,
     isDuplicateKeyError,
     isIdempotencyInProgressError,
+    isIdempotencyKeyReusedError,
     isNetworkError,
     isRetryableError
 } from "./offline-connectivity";
@@ -569,11 +570,16 @@ export class OfflineManager {
                 return row;
             },
 
-            create: async (data: Partial<M>, id?: string | number) => {
+            create: async (data: Partial<M>, id?: string | number, options?: WriteOptions) => {
                 await this.ensureCollection(slug);
+                // Named before it is sent: if the answer is lost, the queued
+                // replay presents the same key on the same request, and the
+                // server can tell it from a second create.
+                const idempotencyKey = options?.idempotencyKey ?? createMutationId();
+                let sent = false;
                 if (this.connectivity.shouldAttempt()) {
                     try {
-                        const row = await inner.create(data, id);
+                        const row = await inner.create(data, id, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
                         await this.ingest(slug, [row]);
                         this.notifyCollection(slug);
@@ -582,6 +588,7 @@ export class OfflineManager {
                     } catch (error) {
                         if (!isNetworkError(error)) throw error;
                         this.connectivity.markFailure();
+                        sent = true;
                     }
                 }
                 const providedId = id ?? (data as AnyRow).id as string | number | undefined;
@@ -593,6 +600,7 @@ export class OfflineManager {
                     id: rowId,
                     data: row,
                     generatedId: providedId === undefined,
+                    ...(sent ? { sent: { idempotencyKey, data: { ...(data as AnyRow) }, id } } : {}),
                     rollback: { rows: { [String(rowId)]: this.rawLocalRow(slug, rowId) ?? null } }
                 });
                 this.setLocalRow(slug, rowId, row);
@@ -609,9 +617,13 @@ export class OfflineManager {
                     throw new TypeError("createMany expects an array of records.");
                 }
                 if (data.length === 0) return [];
+                // As in `create`: the key the batch is sent under is the key
+                // its replay is sent under.
+                const idempotencyKey = options?.idempotencyKey ?? createMutationId();
+                let sent = false;
                 if (this.connectivity.shouldAttempt()) {
                     try {
-                        const rows = await inner.createMany(data, options);
+                        const rows = await inner.createMany(data, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
                         await this.ingest(slug, rows);
                         this.notifyCollection(slug);
@@ -620,7 +632,20 @@ export class OfflineManager {
                     } catch (error) {
                         if (!isNetworkError(error)) throw error;
                         this.connectivity.markFailure();
+                        sent = true;
                     }
+                }
+                // Refused for the reason `upsert` refuses it: which row a
+                // natural key names is the server's to find, and the rows below
+                // are about to be given ids that name none of them. A batch
+                // already sent is different — its replay is that same request.
+                if (!sent && options?.onConflict?.length) {
+                    throw new RebaseClientError(
+                        `Cannot upsert into "${slug}" while offline: the rows it would replace can only be ` +
+                        "found by the server. Upserting on the primary key, with the key in each row, is " +
+                        "queued; upserting on a natural key is not.",
+                        { code: "OFFLINE_UPSERT_UNSUPPORTED" }
+                    );
                 }
                 const rows = data.map((r) =>
                     optimisticRow<M>(r as AnyRow, ((r as AnyRow).id as string | number) ?? this.mintOfflineId(slug)));
@@ -634,6 +659,15 @@ export class OfflineManager {
                     type: "createMany",
                     data: rows,
                     upsert: options?.upsert,
+                    ...(sent
+                        ? {
+                            sent: {
+                                idempotencyKey,
+                                data: data.map((r) => ({ ...(r as AnyRow) })),
+                                ...(options?.onConflict?.length ? { onConflict: [...options.onConflict] } : {})
+                            }
+                        }
+                        : {}),
                     rollback: { rows: rollback }
                 });
                 for (const row of rows) this.setLocalRow(slug, row.id as string | number, row);
@@ -1552,6 +1586,11 @@ data: u.data as AnyRow })),
                 const tail = this.queue[this.queue.length - 1];
                 if (tail
                     && tail.mutationId !== this.inFlightId
+                    // Not into a create already sent: if that one committed,
+                    // its replay is answered from the server's record of the
+                    // first request, which an edit merged in here predates —
+                    // so the edit stays a write of its own.
+                    && tail.sent === undefined
                     && tail.collection === mutation.collection
                     && (tail.type === "create" || tail.type === "update")
                     && tail.id === mutation.id) {
@@ -1576,9 +1615,12 @@ data: u.data as AnyRow })),
                 // An in-flight create disqualifies the shortcut entirely: the
                 // server is being told about the row as we speak, so "it never
                 // saw it" is false and the delete has to replay after it.
+                // A create already sent once disqualifies it the same way: it
+                // may have reached the server before the connection failed.
                 const hasPendingCreate = this.queue.some((m) =>
                     m.collection === mutation.collection && m.type === "create"
                     && m.id === mutation.id && m.generatedId === true
+                    && m.sent === undefined
                     && m.mutationId !== this.inFlightId);
                 if (hasPendingCreate) {
                     const doomed = this.queue.filter((m) =>
@@ -1754,7 +1796,11 @@ data: u.data as AnyRow })),
                 // the only defence for a table with a server-assigned id: the id
                 // the client chose was never used, so a duplicate is invisible
                 // from here. Ignored by servers that do not support it.
-                row = await inner.create(op.data as AnyRow, undefined, { idempotencyKey: op.mutationId });
+                row = await this.sendQueuedWrite(
+                    op,
+                    (idempotencyKey) => inner.create(op.data as AnyRow, undefined, { idempotencyKey }),
+                    (sent) => inner.create(sent.data as AnyRow, sent.id, { idempotencyKey: sent.idempotencyKey })
+                );
             } catch (error) {
                 // A lost response, not a rejection. The request reached the
                 // server and committed; only the ACK went missing, so the
@@ -1785,10 +1831,24 @@ data: u.data as AnyRow })),
             // whose ACK went missing replays as a second genuine import and
             // duplicates every row it holds, not one. `upsert` masked that for
             // the callers who set it; nothing covered the ones who did not.
-            const rows = await inner.createMany(queued, {
+            const asSent = (sent: NonNullable<PendingMutation["sent"]>) => inner.createMany(sent.data as AnyRow[], {
                 ...(op.upsert ? { upsert: true } : {}),
-                idempotencyKey: op.mutationId
+                ...(sent.onConflict?.length ? { onConflict: sent.onConflict } : {}),
+                idempotencyKey: sent.idempotencyKey
             });
+            // A natural-key upsert is only ever the request already sent: the
+            // ids minted here must not reach a statement that decides for
+            // itself which row each one lands on.
+            const rows = op.sent?.onConflict?.length
+                ? await asSent(op.sent)
+                : await this.sendQueuedWrite(
+                    op,
+                    (idempotencyKey) => inner.createMany(queued, {
+                        ...(op.upsert ? { upsert: true } : {}),
+                        idempotencyKey
+                    }),
+                    asSent
+                );
             for (let i = 0; i < rows.length; i++) {
                 await this.adoptServerRow(op, queued[i]?.id as string | number | undefined, rows[i]);
             }
@@ -1816,6 +1876,29 @@ data: u.data as AnyRow })),
         } else if (op.type === "delete") {
             await inner.delete(op.id!);
             this.removeLocalRow(op.collection, op.id!, true);
+        }
+    }
+
+    /**
+     * Send a queued write under its key.
+     *
+     * A write the queue sent once already, before it was queued, carries that
+     * attempt's key and is sent under it again, as queued. If the server holds
+     * the key for a different request, the difference is the ids minted here
+     * — so the first attempt committed and only its answer was lost, and
+     * sending that request again returns the stored answer instead of a
+     * second copy of the rows.
+     */
+    private async sendQueuedWrite<T>(
+        op: PendingMutation,
+        asQueued: (idempotencyKey: string) => Promise<T>,
+        asSent: (sent: NonNullable<PendingMutation["sent"]>) => Promise<T>
+    ): Promise<T> {
+        try {
+            return await asQueued(op.sent?.idempotencyKey ?? op.mutationId);
+        } catch (error) {
+            if (!op.sent || !isIdempotencyKeyReusedError(error)) throw error;
+            return asSent(op.sent);
         }
     }
 
