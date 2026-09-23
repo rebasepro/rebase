@@ -1,3 +1,23 @@
+import { TextEncoder, TextDecoder } from "util";
+Object.assign(global, { TextEncoder,
+TextDecoder });
+
+// The serializer asks `@rebasepro/app` which fields the form locks, and that
+// module graph probes the viewport on load. Same stub as the other suites here.
+if (typeof window !== "undefined") {
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: jest.fn().mockImplementation(query => ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addEventListener: jest.fn(),
+            removeEventListener: jest.fn(),
+            dispatchEvent: jest.fn()
+        }))
+    });
+}
+
 import { Properties } from "@rebasepro/types";
 import { getValueInPath } from "@rebasepro/utils";
 

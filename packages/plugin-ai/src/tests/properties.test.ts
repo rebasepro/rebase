@@ -1,4 +1,25 @@
+import { TextEncoder, TextDecoder } from "util";
+Object.assign(global, { TextEncoder,
+TextDecoder });
+
+// The serializer asks `@rebasepro/app` which fields the form locks, and that
+// module graph probes the viewport on load. Same stub as the other suites here.
+if (typeof window !== "undefined") {
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: jest.fn().mockImplementation(query => ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addEventListener: jest.fn(),
+            removeEventListener: jest.fn(),
+            dispatchEvent: jest.fn()
+        }))
+    });
+}
+
 import { getSimplifiedProperties } from "../utils/properties";
+import { flatMapEntityValues, omitDisabledValues } from "../utils/values";
 import { Properties } from "@rebasepro/types";
 
 /**
@@ -136,6 +157,124 @@ type: "geopoint" }
 
     it("returns nothing for an absent property map", () => {
         expect(getSimplifiedProperties(undefined as unknown as Properties, {})).toEqual({});
+    });
+});
+
+/**
+ * The form decides which fields are locked with `isReadOnly`, `isDisabled` and
+ * `isHidden`. This used to read `admin.disabled` and `admin.readOnly` only, and
+ * judged each child of a map or block on its own. So the children of a disabled
+ * map, a literal `conditions.readOnly`, and a date the backend stamps all went
+ * out as fillable. Worse, `omitDisabledValues` does drop a disabled map's
+ * children's values, so the service saw those fields as empty and filled them.
+ */
+describe("getSimplifiedProperties — fields the form locks", () => {
+
+    it("locks the children of a disabled map, so their values are neither sent nor refilled", () => {
+        const properties = {
+            title: { name: "Title",
+type: "string" },
+            seo: {
+                name: "SEO",
+                type: "map",
+                admin: { disabled: true },
+                properties: { title: { name: "SEO title",
+type: "string" } }
+            }
+        } as unknown as Properties;
+        const values = { title: "",
+seo: { title: "Hand-written SEO title" } };
+
+        const out = getSimplifiedProperties(properties, values);
+        expect(out["seo.title"].disabled).toBe(true);
+        expect(out.title.disabled).toBe(false);
+
+        // What the service is handed: the only field it may fill is `title`.
+        const sent = omitDisabledValues(flatMapEntityValues(values), out);
+        const fillable = Object.entries(out)
+            .filter(([key, property]) => !property.disabled && property.type === "string" && !sent[key])
+            .map(([key]) => key);
+        expect(fillable).toEqual(["title"]);
+    });
+
+    it("locks a map nested inside a read-only map", () => {
+        const properties = {
+            meta: {
+                name: "Meta",
+                type: "map",
+                admin: { readOnly: true },
+                properties: {
+                    seo: {
+                        name: "SEO",
+                        type: "map",
+                        properties: { title: { name: "Title",
+type: "string" } }
+                    }
+                }
+            }
+        } as unknown as Properties;
+
+        const out = getSimplifiedProperties(properties, {});
+        expect(out["meta.seo"].disabled).toBe(true);
+        expect(out["meta.seo.title"].disabled).toBe(true);
+    });
+
+    it("locks the blocks of a disabled block list", () => {
+        const properties = {
+            content: {
+                name: "Content",
+                type: "array",
+                admin: { disabled: true },
+                oneOf: { properties: { text: { name: "Text",
+type: "string" } } }
+            }
+        } as unknown as Properties;
+
+        const out = getSimplifiedProperties(properties, { content: [{ type: "text",
+value: "Hi" }] });
+        expect(out.content.disabled).toBe(true);
+        expect(out["content.0.value"].disabled).toBe(true);
+    });
+
+    it("reads the literal conditions the form reads", () => {
+        const properties = {
+            code: { name: "Code",
+type: "string",
+conditions: { readOnly: true } },
+            locked: { name: "Locked",
+type: "string",
+conditions: { disabled: true } },
+            secret: { name: "Secret",
+type: "string",
+conditions: { hidden: true } },
+            open: { name: "Open",
+type: "string" }
+        } as unknown as Properties;
+
+        const out = getSimplifiedProperties(properties, {});
+        expect(out.code.disabled).toBe(true);
+        expect(out.locked.disabled).toBe(true);
+        expect(out.secret.disabled).toBe(true);
+        expect(out.open.disabled).toBe(false);
+
+        // And their values stay home.
+        const sent = omitDisabledValues(flatMapEntityValues({ code: "INTERNAL-42",
+open: "x" }), out);
+        expect(sent).toEqual({ open: "x" });
+    });
+
+    it("locks a date the backend stamps", () => {
+        const properties = {
+            updatedAt: { name: "Updated",
+type: "date",
+autoValue: "on_update" },
+            publishedAt: { name: "Published",
+type: "date" }
+        } as unknown as Properties;
+
+        const out = getSimplifiedProperties(properties, {});
+        expect(out.updatedAt.disabled).toBe(true);
+        expect(out.publishedAt.disabled).toBe(false);
     });
 });
 

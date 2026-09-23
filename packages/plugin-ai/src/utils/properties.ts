@@ -3,6 +3,7 @@ import { EnumValues, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { InputProperty } from "../types/data_enhancement_controller";
 import { getValueInPath } from "@rebasepro/utils";
+import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 
 export function getSimplifiedProperties<M extends Record<string, any>>(properties: Properties, values: M, path = ""): Record<string, InputProperty> {
     if (!properties) return {};
@@ -17,7 +18,19 @@ export function getSimplifiedProperties<M extends Record<string, any>>(propertie
 ...b }), {});
 }
 
-function getSimpleProperty(property: Property): InputProperty {
+/**
+ * Whether the form will not let anyone edit this field.
+ *
+ * The same three gates the form lays a field out with, so a literal
+ * `conditions.readOnly` or a date the backend stamps is locked here too. A
+ * locked container locks everything under it: the form disables a map's
+ * children with the map, so they are not the model's to fill either.
+ */
+function isLocked(property: Property, lockedByParent: boolean): boolean {
+    return lockedByParent || isReadOnly(property) || isDisabled(property) || isHidden(property);
+}
+
+function getSimpleProperty(property: Property, lockedByParent = false): InputProperty {
     const fieldId = getFieldId(property);
     if (!fieldId) {
         console.error("No fieldId found for property", property);
@@ -31,12 +44,13 @@ function getSimpleProperty(property: Property): InputProperty {
         enum: "enum" in property && property.enum
             ? getSimpleEnumValues(property.enum)
             : undefined,
-        disabled: Boolean(property.admin?.disabled || property.admin?.readOnly)
+        disabled: isLocked(property, lockedByParent)
     };
 }
 
-function getSimplifiedProperty(property: Property, path: string, value?: unknown): Record<string, InputProperty> {
+function getSimplifiedProperty(property: Property, path: string, value?: unknown, lockedByParent = false): Record<string, InputProperty> {
     if (isPropertyBuilder(property)) return {};
+    const locked = isLocked(property, lockedByParent);
     if (property.type === "array") {
 
         if (property.of && !Array.isArray(property.of) && !isPropertyBuilder(property.of)) {
@@ -45,8 +59,8 @@ function getSimplifiedProperty(property: Property, path: string, value?: unknown
                 description: property.description,
                 type: property.type,
                 fieldConfigId: "repeat",
-                disabled: Boolean(property.admin?.disabled || property.admin?.readOnly),
-                of: getSimpleProperty(property.of as Property)
+                disabled: locked,
+                of: getSimpleProperty(property.of as Property, locked)
             };
 
             const result = { [path]: arrayParentProperty };
@@ -77,12 +91,12 @@ function getSimplifiedProperty(property: Property, path: string, value?: unknown
                 description: property.description,
                 type: property.type,
                 fieldConfigId: "block",
-                disabled: Boolean(property.admin?.disabled || property.admin?.readOnly),
+                disabled: locked,
                 oneOf: {
                     typeField: property.oneOf.typeField,
                     valueField: property.oneOf.valueField,
                     properties: Object.entries(property.oneOf.properties)
-                        .map(([key, prop]) => ({ [key]: getSimpleProperty(prop) }))
+                        .map(([key, prop]) => ({ [key]: getSimpleProperty(prop, locked) }))
                         .reduce((a, b) => ({ ...a,
 ...b }), {})
                 }
@@ -103,7 +117,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: unknown
                     console.error(`No property found for type ${oneOfType}`, property.oneOf!.properties);
                     return {};
                 }
-                const simplifiedProperty = getSimplifiedProperty(childProperty, `${path}.${i}.${valueKey}`, oneOfValue);
+                const simplifiedProperty = getSimplifiedProperty(childProperty, `${path}.${i}.${valueKey}`, oneOfValue, locked);
                 return {
                     [`${path}.${i}.${typeKey}`]: oneOfType,
                     ...simplifiedProperty
@@ -116,7 +130,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: unknown
             const mapProperties: Record<string, InputProperty> = Object.entries(property.properties)
                 .map(([key, childProperty]) => {
                     const childValue = value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
-                    return getSimplifiedProperty(childProperty, key, childValue);
+                    return getSimplifiedProperty(childProperty, key, childValue, locked);
                 })
                 .map(o => attachPathToKeys(o, path))
                 .reduce((a, b) => ({ ...a,
@@ -128,7 +142,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: unknown
                 description: property.description,
                 type: property.type,
                 fieldConfigId: "group",
-                disabled: Boolean(property.admin?.disabled || property.admin?.readOnly)
+                disabled: locked
             };
             return {
                 [path]: mapParentProperty,
@@ -142,7 +156,7 @@ function getSimplifiedProperty(property: Property, path: string, value?: unknown
             return {};
         }
         return {
-            [path]: getSimpleProperty(property)
+            [path]: getSimpleProperty(property, lockedByParent)
         };
     }
     return {};
