@@ -203,14 +203,6 @@ Every check in the pipeline asked whether the packages it FOUND were
 right; none asked whether it had found them all.`
     },
     {
-        run: "check:package-contents",
-        why: `\`files: ["dist", "src"]\` ships the sources on purpose and the tests
-beside them by accident. Invisible from the repository: whether a
-package publishes its tests depends only on whether its author put them
-in \`src/\` or in \`test/\`. @rebasepro/client was shipping twenty-seven of
-them, and these tests are written to name the defect they pin.`
-    },
-    {
         run: "check:lint",
         why: `Nothing in any pipeline ran ESLint. \`verify-quality.sh\` does, but that was
 a script a human chooses to run, so a lint error could sit on main

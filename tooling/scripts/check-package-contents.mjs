@@ -69,11 +69,39 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+/**
+ * A path in a tarball that should not be in a tarball.
+ *
+ * Including what a build emits beside a test: `x.test.d.ts` and the `.map`
+ * files. The rule matched only `.test.ts`/`.test.js`, and a package whose
+ * build compiles its co-located tests — `@rebasepro/common` does — published
+ * their declarations with this gate green.
+ */
+const TEST_PATH = /(^|\/)(__tests__|tests)\/|\.(test|spec)\.(?:d\.)?[cm]?[jt]sx?(?:\.map)?$/;
 
-/** A path in a tarball that should not be in a tarball. */
-const TEST_PATH = /(^|\/)(__tests__|tests)\/|\.(test|spec)\.[cm]?[jt]sx?$/;
+/** @param {string} file a path inside a tarball */
+export function isTestPath(file) {
+    return TEST_PATH.test(file);
+}
+
+/**
+ * A package that publishes `dist` and has none to publish.
+ *
+ * The test-file rule reads what the BUILD put in `dist`, and this gate ran in
+ * `ci:static`, before anything is built: there the tarball is a manifest and a
+ * licence, and "no test files in it" is true of nothing. So a package that
+ * ships `dist` with no `dist` on disk is refused rather than passed, and the
+ * gate runs with the build gates.
+ *
+ * @param {{ files?: string[] }} manifest
+ * @param {string[]} packed the paths `npm pack --dry-run` would include
+ */
+export function unbuilt(manifest, packed) {
+    const shipsDist = (manifest.files ?? []).some((entry) => /^(\.\/)?dist(\/|$)/.test(entry));
+    return shipsDist && !packed.some((file) => file.startsWith("dist/"));
+}
 
 /** Sources, which every `dist/*.map` already carries as `sourcesContent`. */
 const SRC_PATH = /^src\//;
@@ -87,99 +115,119 @@ const SRC_PATH = /^src\//;
  */
 const CANDIDATE_DIRS = ["packages", "tooling"];
 
-const licenceText = fs.readFileSync(path.join(root, "LICENSE"));
+function main() {
+    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+    const licenceText = fs.readFileSync(path.join(root, "LICENSE"));
 
-const shippingTests = [];
-const shippingSources = [];
-const licenceProblems = [];
-let checked = 0;
+    const shippingTests = [];
+    const shippingSources = [];
+    const notBuilt = [];
+    const licenceProblems = [];
+    let checked = 0;
 
-for (const parent of CANDIDATE_DIRS) {
-    const parentDir = path.join(root, parent);
-    if (!fs.existsSync(parentDir)) continue;
+    for (const parent of CANDIDATE_DIRS) {
+        const parentDir = path.join(root, parent);
+        if (!fs.existsSync(parentDir)) continue;
 
-    for (const entry of fs.readdirSync(parentDir).sort()) {
-        const dir = path.join(parentDir, entry);
-        const manifestPath = path.join(dir, "package.json");
-        if (!fs.existsSync(manifestPath)) continue;
+        for (const entry of fs.readdirSync(parentDir).sort()) {
+            const dir = path.join(parentDir, entry);
+            const manifestPath = path.join(dir, "package.json");
+            if (!fs.existsSync(manifestPath)) continue;
 
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        if (manifest.private === true) continue;
-        const rel = `${parent}/${entry}`;
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            if (manifest.private === true) continue;
+            const rel = `${parent}/${entry}`;
 
-        let packed;
-        try {
-            const raw = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
-                cwd: dir,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "ignore"]
-            });
-            const parsed = JSON.parse(raw);
-            packed = (Array.isArray(parsed) ? parsed : Object.values(parsed))[0].files.map((f) => f.path);
-        } catch (err) {
-            console.error(`✗ ${manifest.name}: could not ask npm what it would pack — ${err.message}`);
-            process.exit(1);
-        }
+            let packed;
+            try {
+                const raw = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+                    cwd: dir,
+                    encoding: "utf8",
+                    stdio: ["ignore", "pipe", "ignore"]
+                });
+                const parsed = JSON.parse(raw);
+                packed = (Array.isArray(parsed) ? parsed : Object.values(parsed))[0].files.map((f) => f.path);
+            } catch (err) {
+                console.error(`✗ ${manifest.name}: could not ask npm what it would pack — ${err.message}`);
+                process.exit(1);
+            }
 
-        checked++;
+            checked++;
 
-        const bad = packed.filter((f) => TEST_PATH.test(f));
-        if (bad.length > 0) shippingTests.push({ name: manifest.name, rel, bad });
+            if (unbuilt(manifest, packed)) notBuilt.push(`${manifest.name} (${rel})`);
 
-        const sources = packed.filter((f) => SRC_PATH.test(f));
-        if (sources.length > 0) shippingSources.push({ name: manifest.name, rel, count: sources.length });
+            const bad = packed.filter(isTestPath);
+            if (bad.length > 0) shippingTests.push({ name: manifest.name, rel, bad });
 
-        // npm includes a LICENSE regardless of `files`, so a package missing it
-        // from the tarball is a package missing it from disk.
-        if (!packed.some((f) => /^LICEN[CS]E(\.\w+)?$/i.test(f))) {
-            licenceProblems.push(`${manifest.name} (${rel}): no LICENSE in the tarball`);
-            continue;
-        }
-        const own = path.join(dir, "LICENSE");
-        if (!fs.existsSync(own) || !fs.readFileSync(own).equals(licenceText)) {
-            licenceProblems.push(`${manifest.name} (${rel}): LICENSE differs from the root LICENSE`);
+            const sources = packed.filter((f) => SRC_PATH.test(f));
+            if (sources.length > 0) shippingSources.push({ name: manifest.name, rel, count: sources.length });
+
+            // npm includes a LICENSE regardless of `files`, so a package missing it
+            // from the tarball is a package missing it from disk.
+            if (!packed.some((f) => /^LICEN[CS]E(\.\w+)?$/i.test(f))) {
+                licenceProblems.push(`${manifest.name} (${rel}): no LICENSE in the tarball`);
+                continue;
+            }
+            const own = path.join(dir, "LICENSE");
+            if (!fs.existsSync(own) || !fs.readFileSync(own).equals(licenceText)) {
+                licenceProblems.push(`${manifest.name} (${rel}): LICENSE differs from the root LICENSE`);
+            }
         }
     }
-}
 
-if (shippingTests.length > 0) {
-    console.error("");
-    console.error(`✗ ${shippingTests.length} package(s) would publish test files:`);
-    for (const { name, rel, bad } of shippingTests) {
-        console.error(`\n  ${name}  (${bad.length} file(s))`);
-        for (const f of bad.slice(0, 5)) console.error(`    ${f}`);
-        if (bad.length > 5) console.error(`    … and ${bad.length - 5} more`);
-        console.error(`    Fix: add the negations to "files" in ${rel}/package.json:`);
-        console.error(`      "!src/**/*.test.ts", "!src/**/*.test.tsx", "!src/**/__tests__/**", "!src/tests/**"`);
+    if (notBuilt.length > 0) {
+        console.error("");
+        console.error(`✗ ${notBuilt.length} package(s) publish dist/ and have none built:`);
+        for (const p of notBuilt) console.error(`    ${p}`);
+        console.error("");
+        console.error("  Whether a tarball carries test files is decided by the build, so checking");
+        console.error("  one without a build proves nothing. Run \`pnpm run build\` first.");
+        console.error("");
     }
-    console.error("");
-}
 
-if (shippingSources.length > 0) {
-    console.error("");
-    console.error(`✗ ${shippingSources.length} package(s) would publish src/ a second time:`);
-    for (const { name, rel, count } of shippingSources) {
-        console.error(`    ${name} (${rel}): ${count} file(s) under src/`);
+    if (shippingTests.length > 0) {
+        console.error("");
+        console.error(`✗ ${shippingTests.length} package(s) would publish test files:`);
+        for (const { name, rel, bad } of shippingTests) {
+            console.error(`\n  ${name}  (${bad.length} file(s))`);
+            for (const f of bad.slice(0, 5)) console.error(`    ${f}`);
+            if (bad.length > 5) console.error(`    … and ${bad.length - 5} more`);
+            console.error(`    Fix: keep tests out of the build that fills dist/ — \`exclude\` them in the`);
+            console.error(`    tsconfig ${rel} builds with — or out of "files" in ${rel}/package.json.`);
+        }
+        console.error("");
     }
-    console.error("");
-    console.error("  Every dist/*.map already embeds the full sources as `sourcesContent`, so");
-    console.error("  this is a duplicate copy — for @rebasepro/cms it was 2.85 MB of a 2.86 MB");
-    console.error("  package. Fix: drop \"src\" from \"files\".");
-    console.error("");
+
+    if (shippingSources.length > 0) {
+        console.error("");
+        console.error(`✗ ${shippingSources.length} package(s) would publish src/ a second time:`);
+        for (const { name, rel, count } of shippingSources) {
+            console.error(`    ${name} (${rel}): ${count} file(s) under src/`);
+        }
+        console.error("");
+        console.error("  Every dist/*.map already embeds the full sources as `sourcesContent`, so");
+        console.error("  this is a duplicate copy — for @rebasepro/cms it was 2.85 MB of a 2.86 MB");
+        console.error("  package. Fix: drop \"src\" from \"files\".");
+        console.error("");
+    }
+
+    if (licenceProblems.length > 0) {
+        console.error("");
+        console.error(`✗ ${licenceProblems.length} package(s) would publish without the project's licence:`);
+        for (const p of licenceProblems) console.error(`    ${p}`);
+        console.error("");
+        console.error("  `\"license\": \"MIT\"` in a manifest is a claim; the LICENSE file is the grant.");
+        console.error("  Fix: cp LICENSE <package>/LICENSE");
+        console.error("");
+    }
+
+    if (notBuilt.length > 0 || shippingTests.length > 0 || shippingSources.length > 0 || licenceProblems.length > 0) {
+        process.exit(1);
+    }
+
+    console.log(
+        `✓ ${checked} publishable package(s): no tests, no duplicated src/, all carrying the project licence.`
+    );
 }
 
-if (licenceProblems.length > 0) {
-    console.error("");
-    console.error(`✗ ${licenceProblems.length} package(s) would publish without the project's licence:`);
-    for (const p of licenceProblems) console.error(`    ${p}`);
-    console.error("");
-    console.error("  `\"license\": \"MIT\"` in a manifest is a claim; the LICENSE file is the grant.");
-    console.error("  Fix: cp LICENSE <package>/LICENSE");
-    console.error("");
-}
-
-if (shippingTests.length > 0 || shippingSources.length > 0 || licenceProblems.length > 0) process.exit(1);
-
-console.log(
-    `✓ ${checked} publishable package(s): no tests, no duplicated src/, all carrying the project licence.`
-);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

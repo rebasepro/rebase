@@ -165,6 +165,16 @@ the dist, which is dominated by legitimately lazy routes and would therefore
 punish the fix. Reads \`app/frontend/dist\`, hence after the build.`
     },
     {
+        run: "check:package-contents",
+        why: `\`files: ["dist", "src"]\` shipped the sources on purpose and the tests
+beside them by accident; the rule that polices that reads what \`npm pack\`
+would include, and for a package that ships \`dist\` that is whatever the
+build put there. It ran in \`ci:static\`, before the build, where every
+tarball is a manifest and a licence — so it could not see
+\`@rebasepro/common\` publishing \`dist/util/*.test.d.ts\`. It now refuses
+to run on an unbuilt package, and runs here.`
+    },
+    {
         run: "test:gates",
         why: `The API-surface gate's own tests, over a fixture barrel. It spent its whole
 life unable to see a member disappear from \`const rebase\` — a bare entry has

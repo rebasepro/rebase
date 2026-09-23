@@ -82,7 +82,6 @@ this list, in this order.
 | `check:names` | A package rename leaking into a bare string, a `.astro` file, an `.env.example` or a Tailwind `@source` path. | — |
 | `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting — and no two of them ask for majors of one dependency that a user cannot install together (chalk 4 and chalk 5 both reached a real install). | — |
 | `check:publishable-set` | The release derives its own package set from the workspace instead of enumerating it. | — |
-| `check:package-contents` | What each published tarball actually contains — tests shipped by accident, sources shipped on purpose. | — |
 | `check:lint` | ESLint errors (`--quiet`) over `packages/`, `app/`, `tests/` and `tooling/scripts/`, which no pipeline ran at all until one sat on main. `website/`, `examples/` and `tooling/videos/` are ignored, each with its reason and its measured error count in `eslint.config.mjs`. | — |
 | `check:hooks` | A ratchet over `exhaustive-deps` warnings: 183 candidate stale closures, and the 184th would have hidden among them. | `pnpm check:hooks --update` |
 | `check:unused` | A ratchet over values computed and discarded — where the bugs are, not the tidiness. | `pnpm check:unused --update` |
@@ -130,6 +129,7 @@ this list, in this order.
 | `check:legacy-rls` | Whether the legacy RLS path is finally removable, so it does not outlive its reason. | — |
 | `check:generated` | `llms.txt`, `llms-full.txt`, `sitemap.md` and the per-locale changelog mirrors are current. | `pnpm -C website generate-all` |
 | `check:llms-coverage` | Every English docs page is *in* those mirrors — the direction the regenerate-and-diff above cannot see. Runs inside `check:generated`. | — |
+| `check:package-contents` | What each published tarball actually contains — tests shipped by accident (a build's `.test.d.ts` included), sources shipped on purpose. Reads `dist`, so it runs after the build. | — |
 | `test:gates` | The gate scripts' own unit tests. | — |
 | `check:config-paths` | Every alias target in every loadable `vite.config.*` exists. Four pointed at nothing: three at a `packages/ui/index.css` that never existed, one at a package deleted from the repo. A dead alias resolves through nothing until a reorder makes it first, and then it is a dev server that will not start. `website/astro.config.mjs` is the known gap — Vite's loader cannot read it. After the build, not in the static job: it loads each config for real, and `app/frontend/vite.config.ts` imports `@rebasepro/app/dist/vitePlugin.js`. | Delete the entry; it is dead, not broken |
 
