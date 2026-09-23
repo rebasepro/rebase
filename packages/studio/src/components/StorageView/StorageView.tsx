@@ -736,7 +736,13 @@ message: `Folder "${name}" already exists` });
                     "Content-Type": "application/json",
                     ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 },
-                body: JSON.stringify({ path: folderPath })
+                // The selected source, as every other action here routes by
+                // it: without `storageId` the folder went to the default
+                // backend whichever one was being browsed.
+                body: JSON.stringify({
+                    path: folderPath,
+                    ...(selectedSourceKey !== DEFAULT_STORAGE_SOURCE_KEY ? { storageId: selectedSourceKey } : {})
+                })
             });
 
             if (!response.ok) {
@@ -755,7 +761,7 @@ message: e instanceof Error ? e.message : String(e) });
         } finally {
             setCreatingFolder(false);
         }
-    }, [newFolderName, currentPath, apiConfig, apiBase, snackbarController, fetchContents, folders]);
+    }, [newFolderName, currentPath, apiConfig, apiBase, snackbarController, fetchContents, folders, selectedSourceKey]);
 
     // Drag-and-drop on main view
     const handleDropFiles = useCallback(async (droppedFiles: File[]) => {
