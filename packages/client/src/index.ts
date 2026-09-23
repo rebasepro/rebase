@@ -712,9 +712,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // on the shape it fires on. A caller who wants `.data` can write
             // it; a caller whose function legitimately returns a `data` field
             // could not get it back at all.
+            //
+            // For the same reason the body goes out whenever there is one, as
+            // `invoke()` sends it: `false`, `0`, `""` and `null` are all bodies
+            // a function can switch on, and a truthiness test sent none.
             return transport.request<T>(`${prefix}${endpoint}`, {
                 method: "POST",
-                body: payload ? JSON.stringify(payload) : undefined
+                body: payload !== undefined ? JSON.stringify(payload) : undefined
             });
         },
         batch: async (operations: unknown[], options?: WriteOptions): Promise<BatchResult> => {

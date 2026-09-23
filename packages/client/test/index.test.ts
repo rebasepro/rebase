@@ -235,6 +235,26 @@ meta: { total: 0 } }),
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
             expect(typeof client.call).toBe("function");
         });
+
+        /**
+         * `call()` is documented as the shorthand for `functions.invoke()`,
+         * which sends any payload that is not `undefined`. `call()` tested for
+         * truthiness instead, so `false`, `0`, `""` and `null` — all valid JSON
+         * bodies a function can switch on — arrived as no body at all.
+         */
+        it("sends a falsy payload, as functions.invoke() does", async () => {
+            const bodies: Array<BodyInit | null | undefined> = [];
+            const mockFetch = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+                bodies.push(init?.body);
+                return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+            }) as unknown as typeof globalThis.fetch;
+            const client = createRebaseClient({ baseUrl: "http://localhost", fetch: mockFetch, realtime: false });
+
+            for (const payload of [false, 0, "", null]) await client.call("/toggle", payload);
+            await client.call("/toggle");
+
+            expect(bodies).toEqual(["false", "0", "\"\"", "null", undefined]);
+        });
     });
 
     // -----------------------------------------------------------------------
