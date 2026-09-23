@@ -110,6 +110,8 @@ Las expresiones cron utilizan el **formato estándar de 5 campos**:
 
 Se admiten valores de intervalo o pasos (`*/n`), rangos (`a-b`) y listas (`a,b,c`).
 
+Una programación se compara con la hora local de su zona. En un cambio de horario de verano, eso significa que una tarea a hora fija dentro de la hora repetida (`30 2 * * *` donde los relojes se atrasan a las 03:00) se ejecuta en las dos pasadas de esa hora, y una dentro de la hora que se salta, cuando los relojes se adelantan, no se ejecuta ese día.
+
 ## Referencia de CronJobDefinition
 
 `timezone` es nuevo; en la versión 0.17.3 una programación siempre se lee en la zona horaria propia del host. Todo lo demás en esta interfaz ya ha sido lanzado.
@@ -134,7 +136,8 @@ interface CronJobDefinition {
     // Whether the job starts enabled (default: true)
     enabled?: boolean;
 
-    // Max execution time in seconds (default: 300)
+    // Max execution time in seconds (default: 300). Infinity means no
+    // timeout; 0, a negative number or NaN is refused when the job loads.
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
@@ -161,7 +164,8 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
-    // Aborted when the run exceeds `timeoutSeconds`
+    // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
+    // wait for it runs out
     signal: AbortSignal;
 
     // The server-side Rebase singleton — the same object `import { rebase }
@@ -319,7 +323,7 @@ Una tarea que nunca se dispara no aparece en `jobs` (nada la registró), por lo 
 
 `rejected` nombra la tarea y el motivo. Un archivo que falló al *cargar* solo tiene un recuento: el fallo ocurrió antes de que hubiera una tarea que nombrar, por lo que el motivo está en los registros del servidor.
 
-La entrada más común aquí es la de arriba: seis campos, a partir de una expresión copiada de una herramienta que admite segundos. Rebase acepta cinco; elimina el primer campo.
+La entrada más común aquí es la de arriba: seis campos, a partir de una expresión copiada de una herramienta que admite segundos. Rebase acepta cinco; elimina el primer campo. Un `timeoutSeconds` de cero, un número negativo o `NaN` también aparece aquí.
 
 ### Ejemplo: Activar una tarea manualmente
 
@@ -410,6 +414,8 @@ Tres cosas a tener en cuenta:
 
 En el caso habitual —un reinicio minutos después de que un intervalo se ejecutara normalmente—, el intervalo más reciente ya está reclamado, por lo que catch-up solo cuesta una comprobación de reclamación por tarea en cada inicio y no hace nada.
 
+Al arrancar se eliminan las reclamaciones de más de siete días, pero siempre se conserva la más reciente de cada tarea, sea cual sea su antigüedad. Esa reclamación es el registro de que el intervalo ya se ejecutó, así que un despliegue el día 10 no vuelve a ejecutar una tarea mensual con una ventana de catch-up de un mes.
+
 Una ejecución recuperada es una entrada normal en `cron_logs` (`manual` es `false`), con una primera línea de registro indicando el intervalo que recuperó y cuánto retraso tuvo:
 
 ```
@@ -441,9 +447,10 @@ En cualquier caso, se escribe una fila en `rebase.cron_logs`, por lo que la omis
 
 ## Tiempos de espera y aislamiento de errores
 
-- **Carrera de tiempo de espera forzado (Forced Timeout Race)**: Los bloques de ejecución están envueltos en un `Promise.race` contra un temporizador de tiempo de espera derivado de `timeoutSeconds` (por defecto: `300` segundos / 5 minutos). Si el handler se queda colgado superando este umbral, `ctx.signal` se aborta y la promesa se rechaza, lanzando:
+- **Carrera de tiempo de espera forzado (Forced Timeout Race)**: Los bloques de ejecución están envueltos en un `Promise.race` contra un temporizador de tiempo de espera derivado de `timeoutSeconds` (por defecto: `300` segundos / 5 minutos; `Infinity` para ningún límite). Si el handler se queda colgado superando este umbral, `ctx.signal` se aborta y la promesa se rechaza, lanzando:
   `Error: Cron job "<id>" timed out after <N>ms`
   El aborto es la parte que detiene el *trabajo*; el rechazo solo detiene la espera del programador. Un handler que ignore `ctx.signal` seguirá ejecutándose más allá de su propia ejecución.
+- **Apagado**: `backend.shutdown()` espera a una ejecución en curso, dentro del mismo presupuesto que la cola de trabajos (dos tercios del tiempo de espera de apagado). Si la ejecución sigue en marcha cuando se agota, `ctx.signal` se aborta y se registra como fallida, con el motivo. Su intervalo sigue reclamado, así que ninguna otra instancia lo vuelve a ejecutar.
 - **Try/Catch a prueba de fallos**: El handler de cada tarea se ejecuta dentro de un contenedor aislado. Cualquier excepción no capturada es interceptada, formateando el seguimiento de errores (traceback) en una cadena, estableciendo el estado de la tarea en `"error"` y actualizando los contadores de fallos de `rebase.cron_logs`. Un fallo dentro de una sola tarea cron nunca hará caer el bucle del programador ni el servidor web HTTP principal de Hono.
 - **Búfer circular en memoria**: El programador mantiene un búfer circular que contiene las últimas **50 ejecuciones** por tarea. Este búfer se mantiene en memoria para permitir lecturas casi instantáneas desde Rebase Studio.
 

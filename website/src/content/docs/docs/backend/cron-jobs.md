@@ -111,6 +111,12 @@ Cron expressions use the standard **5-field format**:
 
 Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
+A schedule is matched against the wall clock of its zone. Across a
+daylight-saving change that means a fixed-time job inside the repeated hour
+(`30 2 * * *` where clocks fall back at 03:00) runs in both passes of that hour,
+and one inside the skipped hour, when clocks spring forward, does not run that
+day.
+
 ## CronJobDefinition Reference
 
 `timezone` is new — on 0.17.3 a schedule is always read in the
@@ -136,7 +142,8 @@ interface CronJobDefinition {
     // Whether the job starts enabled (default: true)
     enabled?: boolean;
 
-    // Max execution time in seconds (default: 300)
+    // Max execution time in seconds (default: 300). Infinity means no
+    // timeout; 0, a negative number or NaN is refused when the job loads.
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
@@ -163,7 +170,8 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
-    // Aborted when the run exceeds `timeoutSeconds`
+    // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
+    // wait for it runs out
     signal: AbortSignal;
 
     // The server-side Rebase singleton — the same object `import { rebase }
@@ -346,7 +354,7 @@ the server log.
 
 The commonest entry here is the one above — six fields, from an expression
 copied out of a tool that supports seconds. Rebase takes five; drop the leading
-field.
+field. A `timeoutSeconds` of zero, a negative number or `NaN` is listed here too.
 
 ### Example: Trigger a Job Manually
 
@@ -437,6 +445,8 @@ Three things to know:
 
 In the ordinary case — a restart minutes after a slot ran normally — the most recent slot is already claimed, so catch-up costs one claim check per job per boot and does nothing.
 
+Boot deletes claims older than seven days, but always keeps each job's latest one, whatever its age. That claim is the record that the slot already ran, so a monthly job with a month-wide catch-up window is not re-run by a deploy on the 10th.
+
 A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a first log line recording the slot it recovered and how late it was:
 
 ```
@@ -471,9 +481,10 @@ and that is a pattern you can only see if the skips are recorded.
 
 ## Timeouts & Error Isolation
 
-- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes). If the handler hangs past this threshold, `ctx.signal` is aborted and the promise is rejected, throwing:
+- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes; `Infinity` for none). If the handler hangs past this threshold, `ctx.signal` is aborted and the promise is rejected, throwing:
   `Error: Cron job "<id>" timed out after <N>ms`
   The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
+- **Shutdown**: `backend.shutdown()` waits for a run in flight, within the same budget as the job queue (two-thirds of the shutdown timeout). A run still going when it runs out has `ctx.signal` aborted and is recorded as failed, with the reason. Its slot stays claimed, so no other instance re-runs it.
 - **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
 - **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from Rebase Studio.
 

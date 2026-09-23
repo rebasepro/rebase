@@ -112,6 +112,8 @@ Les expressions cron utilisent le **format standard à 5 champs** :
 
 Les pas (`*/n`), les plages (`a-b`) et les listes (`a,b,c`) sont tous pris en charge.
 
+Une planification est comparée à l'heure locale de son fuseau. Lors d'un changement d'heure, cela signifie qu'une tâche à heure fixe dans l'heure répétée (`30 2 * * *` là où les horloges reculent à 03:00) s'exécute lors des deux passages de cette heure, et qu'une tâche dans l'heure sautée, quand les horloges avancent, ne s'exécute pas ce jour-là.
+
 ## Référence de CronJobDefinition
 
 `timezone` est nouveau — sur la version 0.17.3, une planification est toujours interprétée dans le
@@ -137,7 +139,8 @@ interface CronJobDefinition {
     // Whether the job starts enabled (default: true)
     enabled?: boolean;
 
-    // Max execution time in seconds (default: 300)
+    // Max execution time in seconds (default: 300). Infinity means no
+    // timeout; 0, a negative number or NaN is refused when the job loads.
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
@@ -164,7 +167,8 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
-    // Aborted when the run exceeds `timeoutSeconds`
+    // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
+    // wait for it runs out
     signal: AbortSignal;
 
     // The server-side Rebase singleton — the same object `import { rebase }
@@ -347,7 +351,7 @@ les journaux du serveur.
 
 L'entrée la plus fréquente ici est celle ci-dessus — six champs, issus d'une expression
 copiée depuis un outil qui prend en charge les secondes. Rebase en accepte cinq ; supprimez le premier
-champ.
+champ. Un `timeoutSeconds` égal à zéro, négatif ou `NaN` y figure aussi.
 
 ### Exemple : Déclencher une tâche manuellement
 
@@ -438,6 +442,8 @@ Trois points à retenir :
 
 Dans le cas habituel — un redémarrage quelques minutes après qu'un créneau s'est exécuté normalement — le créneau le plus récent est déjà réclamé, donc le rattrapage ne coûte qu'une vérification de réservation par tâche par démarrage et ne fait rien de plus.
 
+Au démarrage, les réservations de plus de sept jours sont supprimées, mais la plus récente de chaque tâche est toujours conservée, quel que soit son âge. Cette réservation est la preuve que le créneau a déjà tourné : une tâche mensuelle avec une fenêtre de rattrapage d'un mois n'est donc pas réexécutée par un déploiement le 10.
+
 Une exécution récupérée constitue une entrée normale dans `cron_logs` (`manual` vaut `false`), avec une première ligne de journal indiquant le créneau récupéré et son retard :
 
 ```
@@ -472,9 +478,10 @@ et c'est un schéma qu'il est impossible de repérer si ces omissions ne sont pa
 
 ## Délais d'expiration (Timeouts) et isolation des erreurs
 
-- **Course de timeout forcé** : Les blocs d'exécution sont enveloppés dans un `Promise.race` face à un timer d'expiration dérivé de `timeoutSeconds` (par défaut : `300` secondes / 5 minutes). Si le gestionnaire reste bloqué au-delà de ce seuil, `ctx.signal` est annulé et la promesse est rejetée, levant l'erreur :
+- **Course de timeout forcé** : Les blocs d'exécution sont enveloppés dans un `Promise.race` face à un timer d'expiration dérivé de `timeoutSeconds` (par défaut : `300` secondes / 5 minutes ; `Infinity` pour aucun timeout). Si le gestionnaire reste bloqué au-delà de ce seuil, `ctx.signal` est annulé et la promesse est rejetée, levant l'erreur :
   `Error: Cron job "<id>" timed out after <N>ms`
   L'annulation est la partie qui interrompt le *travail* ; le rejet empêche seulement le planificateur de continuer à attendre. Un gestionnaire qui ignore `ctx.signal` continue de tourner au-delà de sa propre exécution.
+- **Arrêt** : `backend.shutdown()` attend une exécution en cours, dans le même budget que la file de jobs (les deux tiers du timeout d'arrêt). Si l'exécution tourne encore quand il est épuisé, `ctx.signal` est annulé et elle est enregistrée comme échouée, avec la raison. Son créneau reste réservé, donc aucune autre instance ne la réexécute.
 - **Try/Catch sécurisé** : Chaque gestionnaire de tâche s'exécute au sein d'une enveloppe isolée. Toute exception non interceptée est capturée, formatant la trace d'erreur en une chaîne, définissant le statut de la tâche sur `"error"` et mettant à jour les compteurs d'échecs de `rebase.cron_logs`. Un plantage au sein d'une tâche cron individuelle ne fera jamais planter la boucle du planificateur ni le serveur web HTTP principal sous Hono.
 - **Mémoire tampon circulaire en mémoire** : Le planificateur maintient un ring buffer contenant les **50 dernières exécutions** par tâche. Cette mémoire tampon est conservée en mémoire vive pour permettre des lectures quasi instantanées depuis Rebase Studio.
 

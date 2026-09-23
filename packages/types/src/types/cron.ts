@@ -55,7 +55,9 @@ export interface CronJobDefinition {
 
     /**
      * Maximum number of seconds the handler may run before being
-     * considered timed-out. Default: 300 (5 min).
+     * considered timed-out. Default: 300 (5 min). `Infinity` means no
+     * timeout. Zero, a negative number or `NaN` is refused when the job
+     * loads, and the job is listed as rejected.
      */
     timeoutSeconds?: number;
 
@@ -114,7 +116,8 @@ export interface CronJobContext {
     log: (...args: unknown[]) => void;
 
     /**
-     * Aborted when the run exceeds `timeoutSeconds`.
+     * Aborted when the run exceeds `timeoutSeconds`, or when the server
+     * shuts down and the run has not finished within the shutdown's wait.
      *
      * The timeout has always stopped the scheduler *waiting* — it loses the
      * race and the run is recorded as failed. It has never stopped the handler:

@@ -110,6 +110,8 @@ Cron-Ausdrücke verwenden das standardmäßige **5-Felder-Format**:
 
 Schrittwerte (`*/n`), Bereiche (`a-b`) und Listen (`a,b,c`) werden vollständig unterstützt.
 
+Ein Zeitplan wird mit der Uhrzeit seiner Zeitzone abgeglichen. Bei einer Zeitumstellung bedeutet das: Ein Job mit fester Uhrzeit in der wiederholten Stunde (`30 2 * * *`, wo die Uhren um 03:00 zurückgestellt werden) läuft in beiden Durchgängen dieser Stunde, und einer in der übersprungenen Stunde, wenn die Uhren vorgestellt werden, läuft an diesem Tag nicht.
+
 ## CronJobDefinition-Referenz
 
 `timezone` ist neu – in Version 0.17.3 wird ein Zeitplan immer in der Zone des Hosts selbst interpretiert. Alles andere an dieser Schnittstelle ist bereits veröffentlicht.
@@ -134,7 +136,8 @@ interface CronJobDefinition {
     // Whether the job starts enabled (default: true)
     enabled?: boolean;
 
-    // Max execution time in seconds (default: 300)
+    // Max execution time in seconds (default: 300). Infinity means no
+    // timeout; 0, a negative number or NaN is refused when the job loads.
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
@@ -161,7 +164,8 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
-    // Aborted when the run exceeds `timeoutSeconds`
+    // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
+    // wait for it runs out
     signal: AbortSignal;
 
     // The server-side Rebase singleton — the same object `import { rebase }
@@ -320,7 +324,7 @@ Ein Job, der nie ausgelöst wird, ist nicht in `jobs` enthalten – nichts hat i
 
 `rejected` nennt den Job und den Grund. Eine Datei, die beim *Laden* fehlgeschlagen ist, hat nur eine Zählung: Der Fehler trat auf, bevor ein Job benannt werden konnte, der Grund steht also im Server-Log.
 
-Der häufigste Eintrag hier ist der obige – sechs Felder aus einem Ausdruck, der aus einem Tool kopiert wurde, das Sekunden unterstützt. Rebase akzeptiert fünf; entfernen Sie das führende Feld.
+Der häufigste Eintrag hier ist der obige – sechs Felder aus einem Ausdruck, der aus einem Tool kopiert wurde, das Sekunden unterstützt. Rebase akzeptiert fünf; entfernen Sie das führende Feld. Ein `timeoutSeconds` von null, eine negative Zahl oder `NaN` wird hier ebenfalls aufgeführt.
 
 ### Beispiel: Einen Job manuell auslösen
 
@@ -411,6 +415,8 @@ Drei wichtige Dinge dazu:
 
 Im Normalfall – ein Neustart wenige Minuten nachdem ein Slot regulär ausgeführt wurde – ist der jüngste Slot bereits beansprucht, sodass das Nachholen lediglich eine Claim-Prüfung pro Job beim Start erfordert und nichts weiter unternimmt.
 
+Beim Start werden Claims gelöscht, die älter als sieben Tage sind, der jüngste Claim jedes Jobs bleibt jedoch immer erhalten, unabhängig von seinem Alter. Dieser Claim ist der Nachweis, dass der Slot bereits ausgeführt wurde, sodass ein monatlicher Job mit einem monatsweiten Nachholfenster nicht durch ein Deployment am 10. erneut ausgeführt wird.
+
 Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist `false`), wobei die erste Log-Zeile den nachgeholten Slot und die Verspätung festhält:
 
 ```
@@ -442,9 +448,10 @@ In beiden Fällen wird eine Zeile in `rebase.cron_logs` geschrieben, sodass das 
 
 ## Timeouts & Fehlerisolation
 
-- **Erzwungene Timeout-Race**: Ausführungsblöcke werden in ein `Promise.race` gegen einen Timeout-Timer gekapselt, der von `timeoutSeconds` abgeleitet ist (Standard: `300` Sekunden / 5 Minuten). Wenn der Handler diese Schwelle überschreitet, wird `ctx.signal` abgebrochen und das Promise rejected mit dem Fehler:
+- **Erzwungene Timeout-Race**: Ausführungsblöcke werden in ein `Promise.race` gegen einen Timeout-Timer gekapselt, der von `timeoutSeconds` abgeleitet ist (Standard: `300` Sekunden / 5 Minuten; `Infinity` für kein Timeout). Wenn der Handler diese Schwelle überschreitet, wird `ctx.signal` abgebrochen und das Promise rejected mit dem Fehler:
   `Error: Cron job "<id>" timed out after <N>ms`
   Der Abbruch ist der Teil, der die *Arbeit* stoppt; die Rejection beendet lediglich das Warten des Schedulers. Ein Handler, der `ctx.signal` ignoriert, läuft über seinen eigenen Durchlauf hinaus weiter.
+- **Herunterfahren**: `backend.shutdown()` wartet auf eine laufende Ausführung, innerhalb desselben Budgets wie die Job-Warteschlange (zwei Drittel des Shutdown-Timeouts). Bei einer Ausführung, die danach noch läuft, wird `ctx.signal` abgebrochen, und sie wird mit dem Grund als fehlgeschlagen protokolliert. Ihr Slot bleibt beansprucht, sodass keine andere Instanz ihn erneut ausführt.
 - **Fail-Safe Try/Catch**: Jeder Job-Handler läuft in einem isolierten Wrapper. Alle nicht abgefangenen Exceptions werden abgefangen, der Traceback des Fehlers in einen String formatiert, der Jobstatus auf `"error"` gesetzt und die Fehlerzähler in `rebase.cron_logs` aktualisiert. Ein Absturz innerhalb eines einzelnen Cron-Tasks bringt niemals die Scheduler-Schleife oder den primären Hono-HTTP-Webserver zum Absturz.
 - **In-Memory-Ringpuffer**: Der Scheduler verwaltet einen Ringpuffer mit den letzten **50 Ausführungen** pro Job. Dieser Puffer wird im Speicher gehalten, um nahezu verzögerungsfreie Lesevorgänge aus Rebase Studio zu ermöglichen.
 

@@ -110,6 +110,8 @@ Le espressioni cron utilizzano il **formato standard a 5 campi**:
 
 I valori di step (`*/n`), gli intervalli (`a-b`) e gli elenchi (`a,b,c`) sono tutti supportati.
 
+Una pianificazione viene confrontata con l'ora locale del suo fuso. Durante un cambio dell'ora legale, questo significa che un job a orario fisso nell'ora ripetuta (`30 2 * * *` dove gli orologi tornano indietro alle 03:00) viene eseguito in entrambi i passaggi di quell'ora, mentre uno nell'ora saltata, quando gli orologi vanno avanti, quel giorno non viene eseguito.
+
 ## Riferimento a CronJobDefinition
 
 `timezone` è una novità: nella versione 0.17.3 una pianificazione viene sempre interpretata nel fuso orario dell'host. Tutto il resto in questa interfaccia è già rilasciato.
@@ -134,7 +136,8 @@ interface CronJobDefinition {
     // Whether the job starts enabled (default: true)
     enabled?: boolean;
 
-    // Max execution time in seconds (default: 300)
+    // Max execution time in seconds (default: 300). Infinity means no
+    // timeout; 0, a negative number or NaN is refused when the job loads.
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
@@ -161,7 +164,8 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
-    // Aborted when the run exceeds `timeoutSeconds`
+    // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
+    // wait for it runs out
     signal: AbortSignal;
 
     // The server-side Rebase singleton — the same object `import { rebase }
@@ -319,7 +323,7 @@ Un job che non viene mai attivato non è presente in `jobs` — nulla lo ha regi
 
 `rejected` riporta il nome del job e il motivo. Un file che non è stato possibile *caricare* ha solo un conteggio: l'errore si è verificato prima che ci fosse un job da nominare, quindi il motivo si trova nei log del server.
 
-Il caso più comune è quello sopra indicato: sei campi, derivati da un'espressione copiata da uno strumento che supporta i secondi. Rebase ne accetta cinque; rimuovi il primo campo.
+Il caso più comune è quello sopra indicato: sei campi, derivati da un'espressione copiata da uno strumento che supporta i secondi. Rebase ne accetta cinque; rimuovi il primo campo. Qui compare anche un `timeoutSeconds` pari a zero, negativo o `NaN`.
 
 ### Esempio: Avviare manualmente un job
 
@@ -410,6 +414,8 @@ Tre cose da sapere:
 
 Nel caso tipico — un riavvio pochi minuti dopo la normale esecuzione di uno slot — lo slot più recente è già stato reclamato, quindi il recupero costa un solo controllo di claim per job a ogni avvio e non intraprende alcuna azione.
 
+All'avvio vengono eliminati i claim più vecchi di sette giorni, ma quello più recente di ogni job viene sempre mantenuto, qualunque sia la sua età. Quel claim è la prova che lo slot è già stato eseguito, quindi un job mensile con una finestra di recupero di un mese non viene rieseguito da un deploy il giorno 10.
+
 Un'esecuzione recuperata è una voce normale in `cron_logs` (`manual` è `false`), con una prima riga di log che indica lo slot recuperato e il relativo ritardo:
 
 ```
@@ -441,9 +447,10 @@ In entrambi i casi viene scritta una riga in `rebase.cron_logs`, così che l'omi
 
 ## Timeout e isolamento degli errori
 
-- **Forced Timeout Race**: I blocchi di esecuzione sono racchiusi in una `Promise.race` con un timer di timeout derivato da `timeoutSeconds` (predefinito: `300` secondi / 5 minuti). Se l'handler si blocca oltre questa soglia, `ctx.signal` viene interrotto e la promise viene rifiutata, generando:
+- **Forced Timeout Race**: I blocchi di esecuzione sono racchiusi in una `Promise.race` con un timer di timeout derivato da `timeoutSeconds` (predefinito: `300` secondi / 5 minuti; `Infinity` per nessun timeout). Se l'handler si blocca oltre questa soglia, `ctx.signal` viene interrotto e la promise viene rifiutata, generando:
   `Error: Cron job "<id>" timed out after <N>ms`
   L'abort è la metà che interrompe il *lavoro*; il rifiuto interrompe solo l'attesa dello scheduler. Un handler che ignora `ctx.signal` continuerà a essere eseguito oltre la sua stessa esecuzione.
+- **Arresto**: `backend.shutdown()` attende un'esecuzione in corso, entro lo stesso budget della coda dei job (due terzi del timeout di arresto). Se l'esecuzione è ancora in corso quando il budget si esaurisce, `ctx.signal` viene interrotto e l'esecuzione viene registrata come fallita, con il motivo. Il suo slot resta reclamato, quindi nessun'altra istanza la riesegue.
 - **Try/Catch a prova di errore**: Ogni job handler viene eseguito all'interno di un wrapper isolato. Eventuali eccezioni non rilevate vengono intercettate, formattando il traceback dell'errore in una stringa, impostando lo stato del job su `"error"` e aggiornando i contatori dei fallimenti in `rebase.cron_logs`. Un arresto anomalo all'interno di un singolo cron task non causerà mai il crash del ciclo dello scheduler né del server web HTTP principale Hono.
 - **Ring buffer in memoria**: Lo scheduler mantiene un ring buffer contenente le ultime **50 esecuzioni** per ogni job. Questo buffer viene conservato in memoria per consentire letture quasi istantanee da Rebase Studio.
 
