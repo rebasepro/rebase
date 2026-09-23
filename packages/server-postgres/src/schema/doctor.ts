@@ -18,7 +18,7 @@ import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./
 import { columnPgType } from "./plan/plan-schema";
 import type { PgType } from "./plan/types";
 import { generateTypedefs } from "@rebasepro/codegen";
-import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, relationalCollections, resolveJunctionSpecs } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { loadCollectionsFromDirectory } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
@@ -552,6 +552,7 @@ export async function checkCollectionsVsDatabase(
         // ── Compare each collection against the database ─────────────────
 
         const postgresCollections = relationalCollections(collections);
+        const junctionSpecs = resolveJunctionSpecs(postgresCollections);
 
         for (const collection of postgresCollections) {
             const tableName = getTableName(collection);
@@ -733,12 +734,15 @@ export async function checkCollectionsVsDatabase(
                 }
             }
 
-            // Also check junction tables for many-to-many relations
+            // Also check junction tables for many-to-many relations — where
+            // `resolveJunctionSpecs` says they are, which is where boot and
+            // `db push` create them: `public`, whatever schema the declaring
+            // collection is in, under the name with any schema prefix removed.
             const resolvedRelations = resolveCollectionRelations(collection);
             for (const relation of Object.values(resolvedRelations)) {
                 if (isManyToMany(relation)) {
-                    const junctionTable = relation.through.table;
-                    const junctionSchema = (collection as { schema?: string }).schema || "public";
+                    const junctionTable = relation.through.table.split(".").pop() ?? relation.through.table;
+                    const junctionSchema = junctionSpecs.get(junctionTable)?.schema ?? "public";
                     const fullJunctionTable = junctionSchema === "public" ? junctionTable : `${junctionSchema}.${junctionTable}`;
                     if (!existingTables.has(fullJunctionTable)) {
                         issues.push({

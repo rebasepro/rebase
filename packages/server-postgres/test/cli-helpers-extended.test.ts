@@ -281,7 +281,7 @@ describe("CLI Helpers — Extended", () => {
             expect(includes).toContain("public.posts_to_tags");
         });
 
-        it("should include junction tables with custom schema from target collection", async () => {
+        it("should include a junction in public, where it is created, whatever schema its endpoints are in", async () => {
             const categoriesCollection: CollectionConfig = {
                 slug: "categories",
                 table: "categories",
@@ -312,8 +312,23 @@ describe("CLI Helpers — Extended", () => {
             const includes = await getTableIncludesFromCollections([productsCollection, categoriesCollection]);
             expect(includes).toContain("public.products");
             expect(includes).toContain("catalog.categories");
-            // Junction table uses the target collection's schema
-            expect(includes).toContain("catalog.products_categories");
+            // Junctions live in `public` (`resolveJunctionSpecs`), which is
+            // where boot and `schema.sql` create them. Listing the target's
+            // schema instead left the real junction on the exclude list, so
+            // Atlas could not see it and planned to create it again.
+            expect(includes).toContain("public.products_categories");
+            expect(includes).not.toContain("catalog.products_categories");
+
+            const excludes = await getTableExcludes("postgres://x/db", "/collections", {
+                getIncludes: async () => includes,
+                queryExistingTables: async () => [
+                    "public.products", "catalog.categories", "public.products_categories",
+                    "catalog.products_categories"
+                ],
+            });
+            expect(excludes).not.toContain("public.products_categories");
+            // A table of that name in `catalog` is somebody else's, and stays protected.
+            expect(excludes).toContain("catalog.products_categories");
         });
 
         it("should handle collection without explicit table (uses slug)", async () => {

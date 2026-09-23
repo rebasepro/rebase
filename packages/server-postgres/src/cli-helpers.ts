@@ -1,4 +1,3 @@
-import { isManyToMany } from "@rebasepro/types";
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
@@ -10,7 +9,7 @@ import { isRebaseIndexName } from "./schema/collection-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { out, outWarn } from "./cli-output";
-import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
 
 
@@ -270,7 +269,7 @@ export function resolveLocalBin(binName: string): string | null {
 }
 
 export async function getTableIncludesFromCollections(allCollections: CollectionConfig[]): Promise<string[]> {
-    const { getTableName, resolveCollectionRelations, relationalCollections } = await import("@rebasepro/common");
+    const { getTableName, relationalCollections, resolveJunctionSpecs } = await import("@rebasepro/common");
     const { isPostgresCollectionConfig } = await import("@rebasepro/types");
 
     // The include list is the inverse of {@link getTableExcludes}: a name on it
@@ -286,18 +285,14 @@ export async function getTableIncludesFromCollections(allCollections: Collection
         if (tableName) {
             includes.push(`${schema}.${tableName}`);
         }
-
-        const resolvedRelations = resolveCollectionRelations(col);
-        for (const relation of Object.values(resolvedRelations) as ResolvedRelation[]) {
-            if (isManyToMany(relation)) {
-                const junctionTableName = relation.through.table;
-                const targetCollection = relation.target();
-                const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
-                includes.push(`${targetSchema}.${junctionTableName}`);
-            }
-        }
     }
-    
+    // Junctions where they are created — `public`, whatever schema either
+    // endpoint is in. Qualifying one with an endpoint's schema left the real
+    // junction excluded, invisible to Atlas, and planned for creation again.
+    for (const junction of resolveJunctionSpecs(collections).values()) {
+        includes.push(`${junction.schema}.${junction.table}`);
+    }
+
     return Array.from(new Set(includes));
 }
 
