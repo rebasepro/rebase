@@ -1263,8 +1263,38 @@ export function composeBundleManifest(input: ComposeManifestInput): RebaseBundle
     };
 }
 
+/**
+ * What a build refusing on {@link detectDeclaredDepConflicts} says: every name,
+ * both ranges and where each is declared.
+ */
+export function describeDepConflicts(conflicts: DeclaredDepConflict[]): string {
+    const lines = [`${conflicts.length} dependency range(s) no single version satisfies:`];
+    for (const { name, declarations: [first, second] } of conflicts) {
+        lines.push(`    ${name}`, `      ${first.range}  (${first.file})`, `      ${second.range}  (${second.file})`);
+    }
+    lines.push(
+        "  The bundle installs one range; the other half of the project was built against the other.",
+        "  Declare one range, in the app that uses it."
+    );
+    return lines.join("\n");
+}
+
 export async function buildBundle(options: BuildBundleOptions): Promise<BuildBundleResult> {
     const { projectRoot, app, appName } = options;
+
+    /* Two of this project's manifests want versions of one package that no
+       single release satisfies.
+
+       Fatal, and fatal before anything is built, because the bundle can only
+       carry one of them: whichever manifest is read last wins, and the other
+       half of the project was compiled against something the runtime will
+       never install. There is no correct bundle to produce. Here rather than
+       in a command, because every command that builds a bundle has to refuse
+       it: `rebase cloud deploy` builds its own, and shipped what `rebase
+       build` refused. */
+    const conflicts = detectDeclaredDepConflicts(projectRoot);
+    if (conflicts.length > 0) throw new Error(describeDepConflicts(conflicts));
+
     const paths = resolveBackendPaths(app, projectRoot);
     const outDir = path.resolve(projectRoot, options.outDir ?? DEFAULT_BUNDLE_DIR);
 

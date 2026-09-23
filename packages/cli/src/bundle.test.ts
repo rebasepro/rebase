@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+    buildBundle,
     collectDeclaredDependencies,
     detectDeclaredDepConflicts,
     detectFrameworkDepDrift,
@@ -730,6 +731,22 @@ file: "package.json" });
         write("backend/package.json", JSON.stringify({ dependencies: { hono: "^4.12.27" } }));
 
         expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    /*
+     * The refusal lived in `rebase build` alone, and `rebase cloud deploy` builds
+     * its own bundle: the same project was refused by one and deployed by the
+     * other, with half of it compiled against a version that will never be
+     * installed. In the builder, every caller gets it.
+     */
+    it("is refused by the builder itself, before anything is built", async () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+        write("config/collections/posts.ts", "export default {};");
+
+        await expect(buildBundle({ projectRoot: scratch, appName: "backend", app: { type: "backend" }, runtimeRange: "^1" }))
+            .rejects.toThrow(/dotenv\n.*\^16\.0\.0 {2}\(package\.json\)\n.*\^17\.4\.2 {2}\(backend\/package\.json\)/);
+        expect(fs.existsSync(path.join(scratch, "dist-bundle"))).toBe(false);
     });
 
     it("ignores a range it cannot parse rather than refusing the build", () => {

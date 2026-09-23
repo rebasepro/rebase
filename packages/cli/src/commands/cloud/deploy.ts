@@ -282,16 +282,23 @@ app: target.app as RebaseBackendAppConfig };
                 resourceIssues.map(i => `  ${i.path}  ${i.message}`).join("\n")
             );
         }
-        const result = await buildBundle({
-            projectRoot,
-            appName: backend.name,
-            app: backend.app,
-            runtimeRange: loaded.manifest.rebase,
-            resources: resourceGraph,
-            skipTypeCheck: opts.skipTypeCheck,
-            log: (m: string) => progress(chalk.gray(m)),
-            quietStdout: isJsonMode()
-        });
+        // A build that fails is the deploy's answer, in either output mode: in
+        // JSON mode an error thrown past here reached stdout as nothing at all.
+        let result: Awaited<ReturnType<typeof buildBundle>>;
+        try {
+            result = await buildBundle({
+                projectRoot,
+                appName: backend.name,
+                app: backend.app,
+                runtimeRange: loaded.manifest.rebase,
+                resources: resourceGraph,
+                skipTypeCheck: opts.skipTypeCheck,
+                log: (m: string) => progress(chalk.gray(m)),
+                quietStdout: isJsonMode()
+            });
+        } catch (err) {
+            fail(err instanceof Error ? err.message : String(err), undefined, "build_failed");
+        }
         bundleDir = result.outDir;
 
         /* Fold the frontend in, exactly as `rebase build` does. This path builds

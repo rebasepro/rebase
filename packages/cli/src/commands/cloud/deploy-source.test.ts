@@ -313,6 +313,29 @@ describe("a vendored bundle", () => {
 });
 
 /**
+ * `rebase build` refused a project whose manifests declare ranges of one
+ * dependency that no single version satisfies; `rebase cloud deploy` builds its
+ * own bundle and shipped it, half the project compiled against a version the
+ * runtime will never install.
+ */
+describe("a deploy that builds its own bundle", () => {
+    it("refuses dependency ranges no single version satisfies, before anything is uploaded", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" } } }));
+        write(project, "package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write(project, "backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+        write(project, "config/collections/posts.ts", "export default {};\n");
+        controlPlane();
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--no-follow"], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        expect(said.join("\n")).toMatch(/no single version satisfies[\s\S]*dotenv/);
+        expect(requests).toEqual([]);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+});
+
+/**
  * `--source <dir>` uploads a build context, and the control plane keeps it as
  * the project's source archive. It used to be `tar .` with the root
  * `.gitignore` read as tar globs: `.env.production` went up under the stock
