@@ -1,6 +1,6 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
 import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
-import { collectAllPages, paginateFind } from "@rebasepro/common";
+import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
@@ -229,6 +229,29 @@ function optimisticRow<M>(fields: AnyRow, id: string | number): M {
     return { ...fields, id } as unknown as M;
 }
 
+/**
+ * Whether a query answers with something narrower than whole rows: `fields`
+ * returns only the columns it names (and the key), and `distinct` collapses
+ * rows into their distinct projections. Either way what comes back is not a
+ * row of the collection, and must not be stored as one.
+ */
+function isProjection(params?: FindParams): boolean {
+    return (params?.fields?.length ?? 0) > 0 || params?.distinct === true;
+}
+
+/** `row` narrowed to `keys`: a local row in the shape a projection has. */
+function pick(row: AnyRow, keys: readonly string[]): AnyRow {
+    const out: AnyRow = {};
+    for (const key of keys) if (key in row) out[key] = row[key];
+    return out;
+}
+
+/** A snapshot as read back from the store, its projected rows revived. */
+function readSnapshot(value: unknown): QuerySnapshot {
+    const snapshot = value as QuerySnapshot;
+    return snapshot.rows ? { ...snapshot, rows: snapshot.rows.map((row) => hydrateRow<AnyRow>(row)) } : snapshot;
+}
+
 /** What the server said about one query, as ids into the local row database. */
 interface QuerySnapshot {
     ids: (string | number)[];
@@ -236,6 +259,13 @@ interface QuerySnapshot {
     limit: number;
     offset: number;
     hasMore: boolean;
+    /**
+     * For a projected query (`fields`, `distinct`): the rows the server
+     * answered with, as it sent them. They carry only the columns asked for,
+     * so they are kept with the answer rather than in the row store, where
+     * they would replace the full rows every other query reads.
+     */
+    rows?: AnyRow[];
 }
 
 interface RowEntry {
@@ -493,7 +523,7 @@ export class OfflineManager {
                     try {
                         const res = await inner.find(params);
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, res.data ?? []);
+                        await this.ingest(slug, res.data ?? [], isProjection(params));
                         const snapshot = this.recordSnapshot(slug, params, res);
                         const answer = this.answer<M>(slug, params, snapshot);
                         this.notifyCollection(slug, false);
@@ -959,7 +989,8 @@ data: u.data as AnyRow })),
             wrapped.listen = (params, onUpdate, onError) => inner.listen(
                 params,
                 (response) => {
-                    void this.ingest(slug, response.data ?? []).then(() => this.notifyCollection(slug, false));
+                    void this.ingest(slug, response.data ?? [], isProjection(params))
+                        .then(() => this.notifyCollection(slug, false));
                     onUpdate(response);
                 },
                 onError
@@ -1038,7 +1069,7 @@ data: u.data as AnyRow })),
 
         if (options?.realtime !== false && !isUnsupported(inner.listen)) {
             unlisten = inner.listen(params, (response) => {
-                void this.ingest(slug, response.data ?? []).then(() => {
+                void this.ingest(slug, response.data ?? [], isProjection(params)).then(() => {
                     this.recordSnapshot(slug, params, response);
                     this.notifyCollection(slug, false);
                 });
@@ -1132,7 +1163,11 @@ data: u.data as AnyRow })),
         const state = this.collections.get(slug);
         const parts = rows.map((row) => {
             const key = String(row.id);
-            return `${key}:${state?.rows.get(key)?.rev ?? 0}`;
+            const entry = state?.rows.get(key);
+            // A stored row is told apart by its revision; anything else — a
+            // projection, as served or narrowed from a local row — by what it
+            // holds, since nothing revises it.
+            return entry?.row === row ? `${key}:${entry.rev}` : `${key}=${JSON.stringify(row)}`;
         });
         return `${total}|${parts.join(",")}`;
     }
@@ -1194,7 +1229,7 @@ data: u.data as AnyRow })),
                 }
                 for (const entry of snapshots) {
                     const key = entry.key.slice(`${scope}|q|${slug}|`.length);
-                    if (entry.value) state.snapshots.set(key, entry.value as QuerySnapshot);
+                    if (entry.value) state.snapshots.set(key, readSnapshot(entry.value));
                 }
                 for (const entry of absent) {
                     state.absent.add(entry.key.slice(`${scope}|abs|${slug}|`.length));
@@ -1250,6 +1285,7 @@ data: u.data as AnyRow })),
                 partial: true
             };
         }
+        if (snapshot.rows) return this.projectedAnswer<M>(slug, params, snapshot, snapshot.rows, fromCache);
 
         const rows: M[] = [];
         const seen = new Set<string>();
@@ -1324,6 +1360,82 @@ data: u.data as AnyRow })),
             // Not the page that was asked for if either the membership
             // decision or the order could not be reproduced here.
             partial: !exact || !orderIsLocal
+        };
+    }
+
+    /**
+     * Answer a projected query (`fields`, `distinct`) from the server's own
+     * answer to it.
+     *
+     * The server's rows are the answer. The local database contributes only
+     * what it knows better: a row with unsynced writes shows them, narrowed to
+     * the columns the server sent, or drops out if it was deleted here or
+     * edited out of a filter this side can evaluate; and rows created here
+     * join the first page when there is somewhere to put them. A distinct
+     * query, or an order on a column the projection does not carry, leaves
+     * them out, and the result says it is partial.
+     */
+    private projectedAnswer<M extends AnyRow>(
+        slug: string,
+        params: FindParams | undefined,
+        snapshot: QuerySnapshot,
+        served: AnyRow[],
+        fromCache: boolean
+    ): LiveResult<M> {
+        const state = this.collectionState(slug);
+        const exact = isExactlyEvaluable(params);
+        const rows: AnyRow[] = [];
+        const seen = new Set<string>();
+        let removed = 0;
+        for (const row of served) {
+            const key = row.id === undefined || row.id === null ? undefined : String(row.id);
+            if (key !== undefined) seen.add(key);
+            if (key === undefined || !this.hasPending(slug, key)) {
+                rows.push(row);
+                continue;
+            }
+            const local = state.rows.get(key)?.row;
+            if (!local || (exact && !matchesParams(local, params))) {
+                removed++;
+                continue;
+            }
+            rows.push(pick(local, Object.keys(row)));
+        }
+
+        let added = 0;
+        let unplaced = false;
+        const offset = snapshot.offset ?? 0;
+        if (exact && offset === 0) {
+            const shape = served.length > 0 ? Object.keys(served[0]) : ["id", ...(params?.fields ?? [])];
+            const placeable = !params?.distinct
+                && (normalizeOrderBy(params?.orderBy) ?? []).every(([field]) => shape.includes(field));
+            for (const [key, entry] of state.rows) {
+                if (seen.has(key) || !this.hasPending(slug, key)) continue;
+                if (!this.isLocallyCreated(slug, key)) continue;
+                if (!matchesParams(entry.row, params)) continue;
+                if (!placeable) {
+                    unplaced = true;
+                    continue;
+                }
+                rows.push(pick(entry.row, shape));
+                added++;
+            }
+        }
+        const orderIsLocal = added === 0 || isLocallySortable(rows, params?.orderBy);
+        if (added > 0 && params?.orderBy && orderIsLocal) sortRows(rows, params.orderBy);
+
+        return {
+            data: rows as M[],
+            meta: {
+                total: Math.max(rows.length, snapshot.total - removed + added),
+                limit: snapshot.limit,
+                offset,
+                hasMore: snapshot.hasMore
+            },
+            fromCache,
+            hasPendingWrites: rows.some((row) => row.id !== undefined && row.id !== null
+                && this.hasPending(slug, row.id as string | number)),
+            partial: !exact || !orderIsLocal || unplaced
         };
     }
 
@@ -1418,8 +1530,14 @@ data: u.data as AnyRow })),
      * Rows that came back unchanged keep their identity and revision, so a
      * refetch that changed nothing does not re-render every live query that
      * touches them — or rewrite them all to disk.
+     *
+     * A `projection` (see {@link isProjection}) only refreshes the columns it
+     * carries on rows already held, and never creates one. It is not a row:
+     * stored as one, it replaced the full row every other query reads and
+     * wrote the narrowed copy to disk, so a list lost its columns because a
+     * dropdown elsewhere asked for titles.
      */
-    private async ingest(slug: string, rows: AnyRow[]): Promise<void> {
+    private async ingest(slug: string, rows: AnyRow[], projection = false): Promise<void> {
         if (rows.length === 0) return;
         const state = await this.ensureCollection(slug);
         const cachedAt = Date.now();
@@ -1428,9 +1546,12 @@ data: u.data as AnyRow })),
         for (const raw of rows) {
             if (!raw || raw.id === undefined || raw.id === null) continue;
             const key = String(raw.id);
+            const existing = state.rows.get(key);
+            if (projection && !existing) continue;
+            const base = projection && existing ? { ...existing.row, ...raw } : { ...raw };
             const merged = this.hasPending(slug, key)
-                ? this.applyPendingToRow(slug, key, { ...raw })
-                : { ...raw };
+                ? this.applyPendingToRow(slug, key, base)
+                : base;
             if (merged === undefined) {
                 // A queued delete says this row is gone; do not resurrect it.
                 state.rows.delete(key);
@@ -1438,8 +1559,8 @@ data: u.data as AnyRow })),
                 continue;
             }
             this.forgetTombstone(slug, key);
-            state.freshRows.add(key);
-            const existing = state.rows.get(key);
+            // Only a whole row is the server's word on the row.
+            if (!projection) state.freshRows.add(key);
             if (existing && JSON.stringify(existing.row) === JSON.stringify(merged)) {
                 existing.cachedAt = cachedAt;
                 continue;
@@ -1493,13 +1614,17 @@ data: u.data as AnyRow })),
             total: meta.total ?? result.data?.length ?? 0,
             limit: meta.limit ?? window.limit,
             offset: meta.offset ?? window.offset,
-            hasMore: meta.hasMore ?? false
+            hasMore: meta.hasMore ?? false,
+            ...(isProjection(params) ? { rows: (result.data ?? []).map((row) => ({ ...row })) } : {})
         };
         const state = this.collectionState(slug);
         const key = buildQueryString(params);
         state.snapshots.set(key, snapshot);
         state.fresh.add(key);
-        void this.writeCache(`${this.scope}|q|${slug}|${key}`, snapshot);
+        void this.writeCache(
+            `${this.scope}|q|${slug}|${key}`,
+            snapshot.rows ? { ...snapshot, rows: snapshot.rows.map((row) => dehydrateRow(row)) } : snapshot
+        );
         this.evictSnapshots(slug);
         return snapshot;
     }
@@ -2108,7 +2233,7 @@ data: u.data as AnyRow })),
         state.snapshots = new Map();
         for (const entry of snapshots) {
             const key = entry.key.slice(`${scope}|q|${slug}|`.length);
-            if (entry.value) state.snapshots.set(key, entry.value as QuerySnapshot);
+            if (entry.value) state.snapshots.set(key, readSnapshot(entry.value));
         }
         state.absent = new Set(absent.map((entry) => entry.key.slice(`${scope}|abs|${slug}|`.length)));
         this.notifyCollection(slug, false);

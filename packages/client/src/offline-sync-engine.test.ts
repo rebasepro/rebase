@@ -1,10 +1,11 @@
 import { jest } from "@jest/globals";
-import { OfflineManager, type LiveResult, type OfflineStatus } from "./offline";
+import { OfflineManager, type LiveResult, type OfflineStatus, type RowSnapshotMeta } from "./offline";
 import { MemoryOfflineStore, type PendingMutation } from "./offline-store";
 import { RebaseApiError } from "./transport";
 import type { CollectionClient } from "./collection";
 import type { WriteOptions } from "@rebasepro/types";
 import type { FindParams } from "./transport";
+import { GeoPoint, type FindResult } from "@rebasepro/types";
 import { matchesParams, runLocalQuery } from "./offline-query";
 
 type Row = Record<string, unknown>;
@@ -1067,5 +1068,234 @@ describe("a write whose answer was lost before it was queued", () => {
 
         await expect(posts.createMany([{ email: "a@b.c" }], { upsert: true, onConflict: ["email"] }))
             .rejects.toMatchObject({ code: "OFFLINE_UPSERT_UNSUPPORTED" });
+    });
+});
+
+/**
+ * A backend that honours `fields` the way the real one does: only the columns
+ * asked for, plus the key. `push` delivers a realtime frame to whoever is
+ * listening, projected the same way.
+ */
+function createProjectingServer() {
+    const rows = new Map<string, Row>([
+        ["1", { id: 1, title: "A", body: "long text", author_id: 7 }],
+        ["2", { id: 2, title: "B", body: "more text", author_id: 8 }]
+    ]);
+    const state = { online: true };
+    const listeners: { params?: FindParams; onUpdate: (result: FindResult<Row>) => void }[] = [];
+
+    function unreachable() {
+        return new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
+    }
+
+    function project(row: Row, params?: FindParams): Row {
+        if (!params?.fields?.length) return { ...row };
+        const keep = new Set(["id", ...params.fields]);
+        return Object.fromEntries(Object.entries(row).filter(([key]) => keep.has(key)));
+    }
+
+    function answer(params?: FindParams): FindResult<Row> {
+        const result = runLocalQuery([...rows.values()], params);
+        return { ...result, data: result.data.map((row) => project(row, params)) };
+    }
+
+    const client = {
+        async find(params?: FindParams) {
+            if (!state.online) throw unreachable();
+            return answer(params);
+        },
+        async findById(id: string | number) {
+            if (!state.online) throw unreachable();
+            const row = rows.get(String(id));
+            return row ? { ...row } : undefined;
+        },
+        async create(data: Row, id?: string | number) {
+            if (!state.online) throw unreachable();
+            const row = { ...data, id: id ?? data.id ?? rows.size + 1 };
+            rows.set(String(row.id), row);
+            return { ...row };
+        },
+        async update(id: string | number, data: Row) {
+            if (!state.online) throw unreachable();
+            const row = { ...rows.get(String(id)), ...data, id };
+            rows.set(String(id), row);
+            return { ...row };
+        },
+        async count() {
+            return rows.size;
+        },
+        listen(params: FindParams | undefined, onUpdate: (result: FindResult<Row>) => void) {
+            const entry = { params, onUpdate };
+            listeners.push(entry);
+            return () => { listeners.splice(listeners.indexOf(entry), 1); };
+        }
+    };
+
+    function manager(store = new MemoryOfflineStore()) {
+        const inner = client as unknown as CollectionClient<Row>;
+        const offline = new OfflineManager({ store, syncIntervalMs: 0 }, () => inner);
+        return { offline, store, posts: offline.wrap("posts", inner) };
+    }
+
+    return {
+        rows,
+        state,
+        manager,
+        push() { for (const { params, onUpdate } of [...listeners]) onUpdate(answer(params)); }
+    };
+}
+
+describe("a projected read", () => {
+    it("does not overwrite the full rows every other query shows", async () => {
+        const server = createProjectingServer();
+        const { posts, store } = server.manager();
+        const emissions: Row[][] = [];
+        const stop = posts.observe(undefined, (result) => emissions.push(result.data as Row[]));
+        await settle();
+        expect(Object.keys(emissions.at(-1)![0]).sort()).toEqual(["author_id", "body", "id", "title"]);
+
+        // A dropdown elsewhere asks for titles only.
+        const titles = await posts.find({ fields: ["title"] });
+        await settle();
+
+        expect(titles.data).toEqual([{ id: 1, title: "A" }, { id: 2, title: "B" }]);
+        expect(emissions.at(-1)).toEqual([...server.rows.values()]);
+        stop();
+
+        // …and nothing narrower was written to disk either.
+        server.state.online = false;
+        const reopened = server.manager(store).posts;
+        expect(await reopened.findById(1)).toEqual(server.rows.get("1"));
+    });
+
+    it("answers from the server's projection, and serves it again offline", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+
+        expect((await posts.find({ fields: ["title"] })).data).toEqual([{ id: 1, title: "A" }, { id: 2, title: "B" }]);
+
+        server.state.online = false;
+        const cached = await posts.find({ fields: ["title"] });
+        expect(cached.data).toEqual([{ id: 1, title: "A" }, { id: 2, title: "B" }]);
+        // A projection is not a row: nothing was stored to answer this from.
+        await expect(posts.findById(1)).rejects.toThrow(/not in the local database/);
+    });
+
+    it("refreshes the columns it carries on rows already held", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+        await posts.find();
+        server.rows.set("1", { ...server.rows.get("1"), title: "A, renamed" });
+
+        await posts.find({ fields: ["title"] });
+
+        server.state.online = false;
+        expect(await posts.findById(1)).toEqual({ id: 1, title: "A, renamed", body: "long text", author_id: 7 });
+    });
+
+    it("shows a local edit in the shape the server answered", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+        await posts.find();
+        await posts.find({ fields: ["title"] });
+
+        server.state.online = false;
+        await posts.update(1, { title: "A, edited offline" });
+        const cached = await posts.find({ fields: ["title"] });
+
+        expect(cached.data).toEqual([{ id: 1, title: "A, edited offline" }, { id: 2, title: "B" }]);
+    });
+
+    it("lists a row created here in a projected list it belongs to, narrowed like the rest", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+        await posts.find({ fields: ["title"] });
+
+        server.state.online = false;
+        const created = await posts.create({ title: "C", body: "drafted offline" });
+        const cached = await posts.find({ fields: ["title"] });
+
+        expect(cached.data).toEqual([{ id: 1, title: "A" }, { id: 2, title: "B" }, { id: (created as Row).id, title: "C" }]);
+    });
+
+    it("says a projection is partial when a row created here cannot be placed in it", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+        // Ordered on a column the projection does not carry.
+        const params: FindParams = { fields: ["title"], orderBy: [["author_id", "asc"]] };
+        await posts.find(params);
+
+        server.state.online = false;
+        await posts.create({ title: "C", author_id: 1 });
+        const results: LiveResult<Row>[] = [];
+        const stop = posts.observe(params, (result) => results.push(result));
+        await settle();
+        stop();
+
+        expect(results.at(-1)?.data.map((row) => row.title)).toEqual(["A", "B"]);
+        expect(results.at(-1)?.partial).toBe(true);
+    });
+
+    it("keeps a projected answer across a reload, values revived", async () => {
+        const server = createProjectingServer();
+        server.rows.set("1", { ...server.rows.get("1"), where: new GeoPoint(41.9, 12.5) });
+        const { posts, store } = server.manager();
+        await posts.find({ fields: ["where"] });
+
+        server.state.online = false;
+        const reopened = server.manager(store).posts;
+        const cached = await reopened.find({ fields: ["where"] });
+
+        expect(cached.data[0].where).toBeInstanceOf(GeoPoint);
+        expect(cached.data[0]).toEqual({ id: 1, where: new GeoPoint(41.9, 12.5) });
+    });
+
+    it("does not vouch for a whole row it carried only part of", async () => {
+        const server = createProjectingServer();
+        const first = server.manager();
+        await first.posts.find();
+        // A reload: the rows are on disk, none of them confirmed this session.
+        const { posts } = server.manager(first.store);
+        await posts.find({ fields: ["title"] });
+
+        server.state.online = false;
+        const metas: RowSnapshotMeta[] = [];
+        const stop = posts.observeById(1, (_row, meta) => metas.push(meta));
+        await settle();
+        stop();
+
+        expect(metas.at(-1)?.fromCache).toBe(true);
+    });
+
+    it("re-emits a projected live query when the server's values change", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+        const emissions: Row[][] = [];
+        const stop = posts.observe({ fields: ["title"] }, (result) => emissions.push(result.data as Row[]));
+        await settle();
+        expect(emissions.at(-1)).toEqual([{ id: 1, title: "A" }, { id: 2, title: "B" }]);
+
+        server.rows.set("2", { ...server.rows.get("2"), title: "B, renamed" });
+        server.push();
+        await settle();
+
+        expect(emissions.at(-1)).toEqual([{ id: 1, title: "A" }, { id: 2, title: "B, renamed" }]);
+        stop();
+    });
+
+    it("keeps full rows when a realtime frame carries a projection", async () => {
+        const server = createProjectingServer();
+        const { posts } = server.manager();
+        await posts.find();
+        const frames: Row[][] = [];
+        const stop = posts.listen({ fields: ["title"] }, (result) => frames.push(result.data as Row[]));
+
+        server.push();
+        await settle();
+        stop();
+
+        expect(frames).toEqual([[{ id: 1, title: "A" }, { id: 2, title: "B" }]]);
+        server.state.online = false;
+        expect(await posts.findById(2)).toEqual(server.rows.get("2"));
     });
 });
