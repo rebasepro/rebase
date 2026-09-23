@@ -130,6 +130,46 @@ describe("restrictedFieldNames", () => {
     });
 });
 
+describe("restrictedFieldNames over a withheld to-one relation", () => {
+    const bands = {
+        slug: "bands",
+        table: "bands",
+        properties: { id: { type: "number", isId: "increment" }, label: { type: "string" } }
+    } as unknown as CollectionConfig;
+    const collection = {
+        slug: "staff",
+        table: "staff",
+        properties: {
+            name: { type: "string" },
+            band: {
+                type: "relation",
+                access: { read: ["hr"] },
+                relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    it("withholds the foreign key that names it, in both spellings", () => {
+        // `bandId: 7` names the band exactly as `band: { id: 7 }` does, so a
+        // filter on it is the same disclosure one predicate at a time.
+        const { refused } = restrictedFieldNames(collection, { roles: ["staff"] }, "read");
+        expect([...refused].sort()).toEqual(["band", "bandId", "band_id"]);
+    });
+
+    it("keeps the foreign key for a caller who may read the relation", () => {
+        expect(restrictedFieldNames(collection, { roles: ["hr"] }, "read").refused.size).toBe(0);
+    });
+
+    it("lists a foreign key that is itself a declared property among `declared`", () => {
+        const declaredKey = {
+            ...collection,
+            properties: { ...collection.properties, bandId: { type: "number", columnName: "band_id" } }
+        } as unknown as CollectionConfig;
+        const { declared } = restrictedFieldNames(declaredKey, { roles: ["staff"] }, "read");
+        expect(declared.sort()).toEqual(["band", "bandId"]);
+    });
+});
+
 describe("hasFieldAccessRules", () => {
     it("is false for the collection that has none, which is almost all of them", () => {
         expect(hasFieldAccessRules({ properties: { a: { type: "string" } } } as unknown as CollectionConfig))

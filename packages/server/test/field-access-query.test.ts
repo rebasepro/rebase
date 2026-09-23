@@ -105,6 +105,43 @@ describe("a query the caller may make", () => {
     });
 });
 
+describe("the foreign key of a withheld to-one relation", () => {
+    /**
+     * `bandId: 7` names the band exactly as `band: { id: 7 }` does. The row
+     * strip withholds both; the query side has to refuse both, or `?bandId=7`
+     * answers "which staff sit in band 7" for a caller who may not see a band.
+     */
+    const bands = {
+        slug: "bands",
+        table: "bands",
+        properties: { id: { type: "number", isId: "increment" } }
+    } as unknown as CollectionConfig;
+    const banded = {
+        ...staff,
+        properties: {
+            ...staff.properties,
+            band: {
+                type: "relation",
+                access: { read: ["hr"] },
+                relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    it("is refused as a filter, under its wire name and its column name", () => {
+        const viewer = { roles: ["staff"] };
+        expect(refusal(() => parseQueryOptions({ bandId: "eq.7" }, {}, { collection: banded, viewer })).code)
+            .toBe("FIELD_NOT_READABLE");
+        expect(refusal(() => parseQueryOptions({ band_id: "eq.7" }, {}, { collection: banded, viewer })).code)
+            .toBe("FIELD_NOT_READABLE");
+    });
+
+    it("is answered for a caller who may read the relation", () => {
+        expect(() => parseQueryOptions({ bandId: "eq.7" }, {}, { collection: banded, viewer: { roles: ["hr"] } }))
+            .not.toThrow();
+    });
+});
+
 describe("sort keys that are not columns", () => {
     /**
      * `comments.count()` is a relation aggregate and `_score` is a search

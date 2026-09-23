@@ -1,4 +1,5 @@
 import type { CollectionConfig, FieldAccess, Property } from "@rebasepro/types";
+import { fieldKeyForColumn, findRelation, resolveCollectionRelations } from "../util/relations";
 
 /**
  * Field-level access control: one mechanism, read by every enforcement point.
@@ -106,6 +107,11 @@ export function canWriteField(property: Property | undefined, viewer: FieldViewe
  * who knows the table can send `password_hash` as readily as `passwordHash`, and
  * a rule that only knew the wire name would be one rename away from useless.
  *
+ * A restricted to-one relation takes its foreign key with it. `bandId: 7` names
+ * the band exactly as `band: { id: 7 }` does, and the row carries the column
+ * beside the relation — so a rule on the relation that left the key alone
+ * withheld the value from the row and still let `?bandId=7` ask for it.
+ *
  * `kind` picks which half of the rule is read; nothing else differs.
  */
 export function restrictedFieldNames(
@@ -116,13 +122,29 @@ export function restrictedFieldNames(
     const declared: string[] = [];
     const refused = new Set<string>();
     const allowed = kind === "read" ? canReadField : canWriteField;
+    const properties = collection.properties ?? {};
+    // Resolved only when a restricted property is a relation, which is rare:
+    // the read strip runs this on every row.
+    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
 
-    for (const [name, property] of Object.entries(collection.properties ?? {})) {
-        if (allowed(property as Property, viewer)) continue;
-        declared.push(name);
+    const restrict = (name: string) => {
+        if (name in properties && !declared.includes(name)) declared.push(name);
         refused.add(name);
+    };
+
+    for (const [name, property] of Object.entries(properties)) {
+        if (allowed(property as Property, viewer)) continue;
+        restrict(name);
         const columnName = (property as Property).columnName;
         if (columnName) refused.add(columnName);
+        if ((property as Property).type === "relation") {
+            relations ??= resolveCollectionRelations(collection);
+            const relation = findRelation(relations, name);
+            if (relation?.kind === "belongsTo") {
+                restrict(fieldKeyForColumn(collection, relation.localKey));
+                refused.add(relation.localKey);
+            }
+        }
     }
     return { declared, refused };
 }
