@@ -4,6 +4,7 @@ import "@testing-library/jest-dom";
 import { VirtualTableInput } from "../src/components/VirtualTable/fields/VirtualTableInput";
 import { VirtualTableDateField } from "../src/components/VirtualTable/fields/VirtualTableDateField";
 import { VirtualTableSwitch } from "../src/components/VirtualTable/fields/VirtualTableSwitch";
+import { VirtualTableNumberInput } from "../src/components/VirtualTable/fields/VirtualTableNumberInput";
 
 /**
  * `admin: { disabled: true }` on a property, in the table's inline editor.
@@ -107,4 +108,51 @@ describe("inline table fields honour `disabled`", () => {
         expect(updateValue).toHaveBeenCalledWith(true);
     });
 
+    it("disables a number cell", () => {
+        const { container } = render(<VirtualTableNumberInput
+            value={3}
+            focused={false}
+            disabled={true}
+            updateValue={() => { /* noop */ }}
+        />);
+
+        expect(container.querySelector("input")).toBeDisabled();
+    });
+
+});
+
+/**
+ * The number cell read its value with `value && …` and `value ? … : null`, so a
+ * selected cell holding 0 showed an empty box: the stock of zero someone had
+ * entered looked like no stock at all.
+ */
+describe("the inline number cell", () => {
+    it.each([true, false])("shows 0 as 0 (focused: %s)", (focused) => {
+        const { container } = render(<VirtualTableNumberInput
+            value={0}
+            focused={focused}
+            disabled={false}
+            updateValue={() => { /* noop */ }}
+        />);
+
+        expect(container.querySelector("input")).toHaveValue("0");
+    });
+
+    it("shows 0 when the value changes to it", () => {
+        const updateValue = jest.fn();
+        const { container, rerender } = render(<VirtualTableNumberInput
+            value={5}
+            focused={true}
+            disabled={false}
+            updateValue={updateValue}
+        />);
+        rerender(<VirtualTableNumberInput
+            value={0}
+            focused={true}
+            disabled={false}
+            updateValue={updateValue}
+        />);
+
+        expect(container.querySelector("input")).toHaveValue("0");
+    });
 });

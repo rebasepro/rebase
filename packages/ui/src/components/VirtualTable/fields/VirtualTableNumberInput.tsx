@@ -12,14 +12,15 @@ export function VirtualTableNumberInput(props: {
     focused: boolean;
     disabled: boolean;
 }) {
-    const { align = "left", value, updateValue, focused } = props;
-    const propStringValue = (value && typeof value === "number") ? value.toString() : "";
+    const { align = "left", value, updateValue, focused, disabled } = props;
+    // Not `value && …`: 0 is a value, and it used to render as an empty cell.
+    const propStringValue = typeof value === "number" ? value.toString() : "";
     const [internalValue, setInternalValue] = useState<string | null>(propStringValue);
     const prevValue = useRef<number | null>(value);
 
     useEffect(() => {
         if (prevValue.current !== value && String(value) !== internalValue)
-            setInternalValue(value ? value.toString() : null);
+            setInternalValue(value !== undefined && value !== null ? value.toString() : null);
         prevValue.current = value;
     }, [value]);
 
@@ -56,6 +57,7 @@ export function VirtualTableNumberInput(props: {
         <TextField
             inputRef={inputRef}
             invisible={true}
+            disabled={disabled}
             size="small"
             className="w-full"
             inputClassName={cls("p-0 m-0 bg-transparent border-none outline-hidden font-normal leading-normal text-unset", focusedDisabled)}
