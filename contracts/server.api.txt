@@ -322,7 +322,7 @@ interface RebaseBackendInstance { auth, collectionRegistry, cronScheduler, drive
 interface RebaseFunctionContext { rebase }
 interface RecoveryCode { id, uid, usedAt }
 interface RefreshTokenInfo { aal, createdAt, expiresAt, id, ipAddress, revoked, rotatedAt, sessionId, sessionStartedAt, tokenHash, uid, userAgent }
-interface RefreshTokenSession { aal, id, startedAt }
+interface RefreshTokenSession { aal, id, rotatedFrom, startedAt }
 interface ResolveContext { defaultBasePath, production }
 interface ResolveStorageOptions { production }
 interface ResolvedDataSourceConfig { adminConnectionString, connectionString, driverPackage, engine, isDefault, key, poolConfig, readConnectionString }
@@ -547,7 +547,7 @@ interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, u
 interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, getCapabilities, id, initialize, prepareUserCreation, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
 interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement }
 interface AuthClaimPolicyOperand { kind, name }
-interface AuthClient { canRestoreSession, getSession, getSessions, getUser, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
+interface AuthClient { canRestoreSession, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
 interface AuthCollectionConfig { actions, enabled, onCreateUser, onResetPassword }
 interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
 interface AuthCollectionCreateResult { invitationSent, temporaryPassword, values }
@@ -702,6 +702,7 @@ interface QueueHandle { engine, enqueue, handler, key, kind, label, options, toS
 interface QueueOptions { engine, label, maxAttempts, transport }
 interface QueueRuntime { enqueue }
 interface RawPolicyExpression { kind, sql }
+interface RawSQLCheckOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
 interface RealtimeChannelsConfig { bus, channels }
@@ -778,7 +779,7 @@ interface TableColumnInfo { character_maximum_length, column_default, column_nam
 interface TableForeignKeyInfo { column_name, foreign_column_name, foreign_table_name }
 interface TableJunctionInfo { junction_table_name, source_column_name, target_column_name, target_table_name }
 interface TableMetadata { columns, foreignKeys, junctions, policies }
-interface TablePolicyInfo { cmd, policy_name, qual, roles, with_check }
+interface TablePolicyInfo { cmd, permissive, policy_name, qual, roles, with_check }
 interface TenantClaimSource { claim }
 interface TenantMembershipSource { membership }
 interface TopicHandle { engine, key, kind, label, options, publish, subscription, toString, transport, usedBy }
@@ -981,6 +982,7 @@ interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent 
 interface FindResult { data, meta }
 interface FunctionInvokeOptions { headers, method, path }
 interface FunctionsClient { invoke }
+interface ListUsersOptions { limit, offset, orderBy, orderDir, search }
 interface LiveResult { data, error, fromCache, hasPendingWrites, meta, partial }
 interface MutationRollback { rows }
 interface ObserveOptions { realtime }
@@ -992,7 +994,7 @@ interface OfflineStatus { lastError, lastSyncedAt, online, pending, syncing }
 interface OfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
 interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
-interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, queuedAt, rollback, type, updates, upsert }
+interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, queuedAt, rollback, sent, type, updates, upsert }
 interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
@@ -1138,6 +1140,7 @@ function paginateFind
 function parseIdValues
 function parseOrderBySpecStrict
 function policyToPostgres
+function policyToSecurityRule
 function primaryOrderBy
 function reconcileCursorOrder
 function registerConditionOperations
