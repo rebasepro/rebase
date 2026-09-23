@@ -86,6 +86,7 @@ displayName: data.displayName,
 passwordHash: data.passwordHash }))
         ),
         listUsers: jest.fn().mockResolvedValue([]),
+        listUsersPaginated: jest.fn().mockResolvedValue({ users: [], total: 0, limit: 2, offset: 0 }),
         getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
         getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),

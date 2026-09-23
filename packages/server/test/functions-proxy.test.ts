@@ -71,7 +71,9 @@ const bootstrapper: BackendBootstrapper = {
         } as unknown as InitializedDriver;
     },
     async initializeAuth() {
-        return { userService: {}, authRepository: {} };
+        // The adapter reads a caller's roles from here on every request and
+        // refuses one it cannot read, rather than trusting the token's claim.
+        return { userService: {}, authRepository: { getUserRoleIds: async () => ["editor"] } };
     }
 } as unknown as BackendBootstrapper;
 
