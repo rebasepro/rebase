@@ -1,5 +1,5 @@
 ---
-sourceHash: 2535b00e3193eca2
+sourceHash: c51e1e9ddc344c0a
 slug: it/docs/upgrading
 title: Aggiornamento
 description: Cosa si interrompe quando si passa da un'app esistente alla versione attuale, e cosa fare per ciascun problema.
@@ -7,10 +7,11 @@ description: Cosa si interrompe quando si passa da un'app esistente alla version
 
 # Aggiornamento di un'app esistente
 
-Cinque passaggi, a partire dal più recente. Inizia da quello immediatamente superiore alla versione che stai utilizzando e procedi verso il basso — oppure, se provieni dalla versione 0.12, inizia dal fondo e procedi verso l'alto.
+Sei passaggi, a partire dal più recente. Inizia da quello immediatamente superiore alla versione che stai utilizzando e procedi verso il basso — oppure, se provieni dalla versione 0.12, inizia dal fondo e procedi verso l'alto.
 
 | Sei sulla | Leggi | Cosa comporta per te |
 |---|---|---|
+| **0.21 – 0.22** | [0.21 → next](/docs/upgrading/0-21-to-next/) | Non ancora rilasciato: ciò che è stato unito su `main` ed è già descritto in questa documentazione. Una chiave API su un percorso annidato richiede `read` sui parent, variabili numeriche e durate di sessione illeggibili impediscono l'avvio, un repository di autenticazione personalizzato richiede `unlinkUserIdentity`, e trasformare un ospite in account richiede il captcha `register`. 0.22 non dichiara modifiche incompatibili, quindi è un solo passaggio da 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` non compila più all'interno di una callback di collection — esegui le query tramite `context.data` — e `selectedEntities` lascia il posto a una selezione che può rappresentare righe che nessuno ha caricato. Le versioni 0.19 e 0.20 non dichiarano breaking change, quindi questo è un singolo passaggio a partire da 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Undici breaking change, per la maggior parte errori di compilazione anziché modifiche silenziose del comportamento. `rebase.data` scompare a runtime, i range dei peer si restringono ai caret, e il requisito minimo di Node sale a 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | I pacchetti admin vengono rinominati, le risorse sono dichiarate anziché configurate, e un bundle compilato in precedenza non si avvierà su un runtime attuale. La 0.15 e la 0.16 non interrompono nulla, quindi questo è un singolo passaggio a partire da 0.14. |

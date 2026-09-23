@@ -1,5 +1,5 @@
 ---
-sourceHash: 2535b00e3193eca2
+sourceHash: c51e1e9ddc344c0a
 slug: pt/docs/upgrading
 title: Atualização
 description: O que quebra ao migrar um aplicativo existente para a versão atual e o que fazer em cada caso.
@@ -7,10 +7,11 @@ description: O que quebra ao migrar um aplicativo existente para a versão atual
 
 # Atualizando um aplicativo existente
 
-Cinco etapas, da mais recente para a mais antiga. Comece na etapa logo acima da versão em que você está e desça — ou, se você estiver vindo da 0.12, comece de baixo e suba.
+Seis etapas, da mais recente para a mais antiga. Comece na etapa logo acima da versão em que você está e desça — ou, se você estiver vindo da 0.12, comece de baixo e suba.
 
 | Você está na versão | Leia | O que isso impacta |
 |---|---|---|
+| **0.21 – 0.22** | [0.21 → next](/docs/upgrading/0-21-to-next/) | Ainda não lançado: o que está mesclado em `main` e já descrito nesta documentação. Uma chave de API em um caminho aninhado precisa de `read` nos pais, variáveis numéricas e durações de sessão ilegíveis impedem a inicialização, um repositório de autenticação próprio precisa de `unlinkUserIdentity`, e transformar um convidado em conta exige o captcha de `register`. A 0.22 não declara nenhuma mudança incompatível, então esta é uma única etapa a partir da 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` deixa de compilar em um callback de coleção — faça consultas por meio de `context.data` — e `selectedEntities` dá lugar a uma seleção que pode representar linhas que ninguém carregou. As versões 0.19 e 0.20 não declaram breaking changes, portanto este é um único salto a partir da 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Onze breaking changes, a maioria sendo erros de compilação em vez de alterações silenciosas de comportamento. `rebase.data` desaparece em tempo de execução, os intervalos de peer dependencies se restringem a circunflexos (carets) e a versão mínima do Node passa a ser 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Os pacotes de admin foram renomeados, os recursos são declarados em vez de configurados e um bundle construído anteriormente não inicializará em um runtime atual. As versões 0.15 e 0.16 não quebram nada, portanto este é um único salto a partir da 0.14. |

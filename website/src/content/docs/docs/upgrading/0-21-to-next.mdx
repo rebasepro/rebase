@@ -1,0 +1,140 @@
+---
+slug: docs/upgrading/0-21-to-next
+title: Upgrading 0.21 to the next release
+sidebar_label: 0.21 → next
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists.
+---
+
+# Upgrading 0.21 → next
+
+**Nothing here is released yet.** These are the `### Breaking` entries of the
+changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
+this documentation site publishes from `main`, so they are described here before
+the version that carries them exists on npm. If you installed from npm you are
+on 0.22 and none of this has reached you — read it to know what is coming, and
+come back when you move. 0.22 declares no breaking change, so this is one hop
+from 0.21.
+
+Three of these refuse at boot, naming the setting, rather than change behaviour
+quietly. The other four change who can sign in or what a key can reach: read
+those first if your app has API keys on nested paths, a custom auth repository,
+or guests that become accounts.
+
+---
+
+## 33. An API key on a nested path needs `read` on every parent collection
+
+A key was checked against the last segment of a nested URL, which names a
+relation rather than a collection, and the parent collection was never checked
+at all. Now the route's operation is checked against the collection the path
+reaches, and every collection the path passes through needs `read`. A key scoped
+only to `posts` that calls `/api/data/authors/1/posts` gets
+`403 API_KEY_FORBIDDEN` naming `authors` until it can read `authors` too.
+
+**What to change:** give each key that uses nested paths `read` on the parents
+(`PUT /api/admin/api-keys/:id`), or have it call the child collection's own
+route with a filter instead.
+
+```json
+[
+    { "collection": "posts", "operations": ["read", "write"] },
+    { "collection": "authors", "operations": ["read"] }
+]
+```
+
+See [API keys](/docs/backend/api-keys/#permissions-and-rls-two-independent-gates).
+
+## 34. A numeric environment variable that is not a number fails the boot
+
+`PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` and the `DB_POOL_*` variables used to
+pass `NaN` on, or read a blank value as `0`. A blank `REBASE_MAX_BODY_SIZE`
+removed the body limit from every route, and a blank `PORT` made a production
+server listen on a random port. A blank value now means unset and takes the
+default, an explicit `0` still counts, and anything that is not a number stops
+the boot, naming the variable.
+
+**What to change:** nothing, unless the boot now names a variable. Then fix its
+value, or unset it.
+
+```bash
+grep -nE "^(PORT|SMTP_PORT|REBASE_MAX_BODY_SIZE|DB_POOL_[A-Z_]+)=" .env*
+```
+
+## 35. A session lifetime the token signer cannot read refuses to boot
+
+`auth.accessExpiresIn` and `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+`JWT_REFRESH_EXPIRES_IN`) were checked against `^\d+[dhms]$` while the token
+signer read them another way, and anything in between fell back silently:
+`1w`, `2 weeks` or `30 days` became a 400-day refresh token. Both now take a
+positive number and a unit, such as `15m`, `1h`, `30d` or `2 weeks`. A bare
+number, zero, a negative value, or a value the signer cannot read stops the boot
+and names the setting.
+
+**What to change:** give every lifetime a unit. `3600` is not an hour — the
+signer reads a bare number as milliseconds — so write `1h`.
+
+```bash
+grep -rnE "(EXPIRES_IN|ExpiresIn)" .env* config
+```
+
+## 36. A custom auth repository needs `unlinkUserIdentity`, or some sign-ins are refused
+
+The first time someone proves an unverified account's address, by magic link,
+email code or password reset, Rebase removes every linked sign-in identity whose
+provider did not verify that address ([37](#37-an-unverified-account-loses-what-nobody-proved-the-first-time-its-address-is-proven)).
+It does that through the repository's new optional `unlinkUserIdentity`. A
+repository without it answers such a sign-in with `409 UNVERIFIED_IDENTITIES`
+rather than leave the identity in place. `updatePassword` must also accept
+`null`, which removes the password.
+
+**What to change:** in a custom `AuthRepository`, implement
+`unlinkUserIdentity(uid, provider, providerId)` and let `updatePassword` take
+`null`. The Postgres store implements both. The MongoDB store has no
+`unlinkUserIdentity` yet, so on MongoDB such a sign-in is refused.
+
+## 37. An unverified account loses what nobody proved the first time its address is proven
+
+Nothing verifies the address an account is registered with, so anyone could
+register someone else's address with a password, or sign in as it through a
+provider that does not vouch for it, and wait for the owner. The first magic
+link, email code or password reset on an unverified account now removes its
+password (a reset sets the new one) and every linked identity whose provider did
+not verify that address, and ends all its sessions, before marking it verified.
+OAuth sign-in no longer links onto an unverified account at all: it answers
+`403 EMAIL_NOT_VERIFIED`, with `details.reason` naming which side was
+unverified.
+
+**What to change:** nothing in code. Expect that someone who registered with a
+password, never verified, and then signs in by magic link or code has to set a
+password again, and is signed out on their other devices. Accounts created with
+`POST /api/admin/users` are stored verified, so invitees can still use "Sign in
+with Google". See
+[Account linking](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 38. With captcha protecting `register`, upgrading a guest needs a solved challenge
+
+`POST /auth/anonymous/link` turns a guest into an account with an email and a
+password, which is registration, and it skipped both the `register` captcha and
+`beforeUserCreate`. It now takes the `register` challenge and runs the hook, as
+`/auth/register` does. `register` is one of the default captcha routes. Guest
+sign-in itself (`POST /auth/anonymous`) still takes no challenge.
+
+**What to change:** an app that turns guests into accounts sends the widget's
+token on `/auth/anonymous/link` too — as `captchaToken` in the body, or in the
+`cf-turnstile-response` / `h-captcha-response` header — the way it does for
+`/auth/register`. See [Bot protection](/docs/backend/authentication/#bot-protection).
+
+## 39. Email refuses to boot without an absolute password-reset base URL
+
+Verification and magic links fall back to `auth.email.resetPasswordUrl`, and
+nothing falls back to `verifyEmailUrl` or `magicLinkUrl`. A config that set only
+those booted, and sent a dead relative link in every password-reset email. Now
+email refuses to start unless every emailed link kind resolves to an absolute
+`http(s)` base, and says which one does not.
+
+**What to change:** set `FRONTEND_URL`, or `auth.email.resetPasswordUrl`, to an
+absolute URL such as `https://app.example.com`.
+
+```bash
+grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
+```

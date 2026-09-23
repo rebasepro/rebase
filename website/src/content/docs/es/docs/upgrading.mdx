@@ -1,5 +1,5 @@
 ---
-sourceHash: 2535b00e3193eca2
+sourceHash: c51e1e9ddc344c0a
 slug: es/docs/upgrading
 title: Actualización
 description: Qué deja de funcionar cuando migras una aplicación existente a la versión actual y qué hacer en cada caso.
@@ -7,10 +7,11 @@ description: Qué deja de funcionar cuando migras una aplicación existente a la
 
 # Actualizar una aplicación existente
 
-Cinco saltos, de los más recientes a los más antiguos. Empieza en el que esté por encima de tu versión actual y avanza hacia abajo; o, si vienes de la versión 0.12, empieza desde abajo y avanza hacia arriba.
+Seis saltos, de los más recientes a los más antiguos. Empieza en el que esté por encima de tu versión actual y avanza hacia abajo; o, si vienes de la versión 0.12, empieza desde abajo y avanza hacia arriba.
 
 | Estás en | Leer | Qué efectos tiene |
 |---|---|---|
+| **0.21 – 0.22** | [0.21 → next](/docs/upgrading/0-21-to-next/) | Aún no publicado: lo que está fusionado en `main` y ya se describe en esta documentación. Una clave de API en una ruta anidada necesita `read` sobre sus padres, las variables numéricas y las duraciones de sesión ilegibles impiden el arranque, un repositorio de autenticación propio necesita `unlinkUserIdentity`, y convertir un invitado en cuenta exige el captcha de `register`. 0.22 no declara ningún cambio incompatible, así que es un solo salto desde 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` deja de compilar en un callback de colección —consulta a través de `context.data`— y `selectedEntities` da paso a una selección que puede representar filas que nadie ha cargado. 0.19 y 0.20 no declaran cambios incompatibles, por lo que este es un solo salto desde 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Once cambios incompatibles, la mayoría son errores de compilación en lugar de cambios silenciosos de comportamiento. `rebase.data` desaparece en tiempo de ejecución, los rangos de dependencias peer se restringen a intercalaciones (^), y la versión mínima de Node pasa a 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Los paquetes de administración se renombran, los recursos se declaran en lugar de configurarse y un bundle compilado antes no arrancará en un entorno de ejecución actual. 0.15 y 0.16 no rompen nada, por lo que este es un solo salto desde 0.14. |

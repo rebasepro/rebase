@@ -102,6 +102,7 @@ export default defineConfig({
                             collapsed: true,
                             items: [
                                 { label: "Which hop", slug: "docs/upgrading" },
+                                { label: "0.21 → next", slug: "docs/upgrading/0-21-to-next" },
                                 { label: "0.18 → 0.21", slug: "docs/upgrading/0-18-to-0-21" },
                                 { label: "0.17 → 0.18", slug: "docs/upgrading/0-17-to-0-18" },
                                 { label: "0.14 → 0.17", slug: "docs/upgrading/0-14-to-0-17" },

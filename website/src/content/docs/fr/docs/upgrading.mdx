@@ -1,5 +1,5 @@
 ---
-sourceHash: 2535b00e3193eca2
+sourceHash: c51e1e9ddc344c0a
 slug: fr/docs/upgrading
 title: Mise à niveau
 description: Ce qui casse lorsque vous migrez une application existante vers la version actuelle, et comment traiter chaque problème.
@@ -7,10 +7,11 @@ description: Ce qui casse lorsque vous migrez une application existante vers la 
 
 # Mettre à niveau une application existante
 
-Cinq étapes, de la plus récente à la plus ancienne. Commencez par celle qui se trouve juste au-dessus de votre version actuelle et descendez — ou, si vous partez de la version 0.12, commencez par le bas et remontez.
+Six étapes, de la plus récente à la plus ancienne. Commencez par celle qui se trouve juste au-dessus de votre version actuelle et descendez — ou, si vous partez de la version 0.12, commencez par le bas et remontez.
 
 | Vous êtes en | À lire | Ce que cela implique |
 |---|---|---|
+| **0.21 – 0.22** | [0.21 → next](/docs/upgrading/0-21-to-next/) | Pas encore publié : ce qui est fusionné sur `main` et déjà décrit dans cette documentation. Une clé d'API sur un chemin imbriqué a besoin de `read` sur ses parents, les variables numériques et durées de session illisibles empêchent le démarrage, un dépôt d'authentification personnalisé a besoin de `unlinkUserIdentity`, et la conversion d'un invité en compte exige le captcha `register`. 0.22 ne déclare aucun changement incompatible : c'est donc une seule étape depuis 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` ne compile plus dans un callback de collection — effectuez vos requêtes via `context.data` — et `selectedEntities` cède la place à une sélection qui peut désigner des lignes que personne n'a chargées. Les versions 0.19 et 0.20 ne déclarent aucun changement cassant, il s'agit donc d'une seule étape depuis la 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Onze changements cassants, la plupart étant des erreurs de compilation plutôt que des changements de comportement silencieux. `rebase.data` disparaît au runtime, les plages de peer dependencies sont restreintes aux carets (^), et la version minimale de Node passe à 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Les paquets admin sont renommés, les ressources sont déclarées plutôt que configurées, et un bundle compilé avant cela ne démarrera pas sur un runtime actuel. Les versions 0.15 et 0.16 ne cassent rien, il s'agit donc d'une seule étape depuis la 0.14. |
