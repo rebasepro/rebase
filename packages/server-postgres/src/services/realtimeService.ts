@@ -18,6 +18,7 @@ import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
+import { isNestedPath } from "./nested-path";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
@@ -940,6 +941,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // same committed change is echoed back to this instance via the WAL /
         // trigger stream. Record app emits so we can drop that echo here; deliver
         // any CDC event we did not originate (external writes, other instances).
+        // The same row under the other paths a subscriber can address it by —
+        // see `aliasPaths`.
+        const aliases = this.aliasPaths(path);
+
         if (this.cdcActive) {
             const key = this.dedupKey(path, id, databaseId);
             if (origin === "cdc") {
@@ -949,6 +954,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 }
             } else {
                 this.markAppEmit(key);
+                // CDC reports the change under the table's own collection, so a
+                // write through a nested path echoes back under the root one.
+                // The aliases below have already delivered it there.
+                if (isNestedPath(path)) {
+                    const root = aliases.find(alias => !isNestedPath(alias));
+                    if (root) this.markAppEmit(this.dedupKey(root, id, databaseId));
+                }
             }
         }
 
@@ -965,6 +977,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // Process each path that needs notification
         for (const notifyPath of pathsToNotify) {
             await this.notifyPathUpdate(notifyPath, path, id, row, databaseId);
+        }
+
+        // Each alias is an address of this very row, so its single-row
+        // subscribers match by id exactly as the written path's do.
+        for (const alias of aliases) {
+            await this.notifyPathUpdate(alias, alias, id, row, databaseId);
         }
 
         // Broadcast to other instances via pg_notify (only for local mutations).
@@ -1666,6 +1684,43 @@ roles: ["anon"] };
      * Extract parent paths from a nested path like "posts/70/tags"
      * Returns ["posts", "posts/70"] for the example above
      */
+    /**
+     * The other paths a subscriber can address the row written at `path` by.
+     *
+     * `authors/1/posts` and `posts` are two addresses for the same rows, and
+     * subscriptions were matched by the written path's exact string. So a post
+     * saved through `authors/1/posts` never reached a subscriber of `posts` or
+     * of `posts/43`, and one saved through `posts` never reached a subscriber
+     * of `authors/1/posts`, whose list it may just have joined or left.
+     *
+     * The aliases are the target collection's root path, and every nested path
+     * a live subscription holds that lands on the same collection. Each still
+     * refetches under its own scope and its own parent, so naming a path here
+     * decides only who is asked to look again — never what they are shown.
+     */
+    private aliasPaths(path: string): string[] {
+        const slug = this.collectionSlugAt(path);
+        if (!slug) return [];
+        const aliases = new Set<string>();
+        if (slug !== path) aliases.add(slug);
+        for (const subscription of this._subscriptions.values()) {
+            if (subscription.path === path || aliases.has(subscription.path) || !isNestedPath(subscription.path)) continue;
+            if (this.collectionSlugAt(subscription.path) === slug) aliases.add(subscription.path);
+        }
+        return [...aliases];
+    }
+
+    /** The slug of the collection a path lands on, or `undefined` for one that names none. */
+    private collectionSlugAt(path: string): string | undefined {
+        try {
+            return this.registry.getCollectionByPath(path)?.slug;
+        } catch {
+            // A malformed or stale path names no collection, and a
+            // notification is not the place to refuse it.
+            return undefined;
+        }
+    }
+
     private getParentPaths(path: string): string[] {
         const segments = path.split("/").filter(s => s.length > 0);
         const parentPaths: string[] = [];
