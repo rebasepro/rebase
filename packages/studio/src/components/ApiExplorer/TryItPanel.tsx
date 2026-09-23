@@ -42,8 +42,8 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
     });
     const [customHeaders, setCustomHeaders] = useState<Array<{ key: string; value: string }>>(() => {
         try { const v = localStorage.getItem(`${storageKey}_headers`); if (v) return JSON.parse(v); } catch { /* ignore */ }
-        return [{ key: "rebase-branch",
-value: "" }];
+        // None until the caller adds one: every header here is sent.
+        return [];
     });
     const [body, setBody] = useState(() => {
         try { const v = localStorage.getItem(`${storageKey}_body`); if (v) return JSON.parse(v); } catch { /* ignore */ }
