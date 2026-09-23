@@ -51,7 +51,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-measure": "^2.0.12",
     "@vitejs/plugin-react": "^6.0.4",
-    "hono": "^4.13.0",
+    "hono": "^4.13.5",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.12",
     "typescript": "^6.0.3",

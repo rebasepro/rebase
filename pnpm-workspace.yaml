@@ -128,7 +128,10 @@ overrides:
   # Build tooling only (postcss, via Astro and Remotion). Capped below 4 for the
   # reason at the top of this block; 3.x is what the tree's postcss asks for.
   nanoid: ">=3.3.17 <4"
-  nodemailer: ">=9.0.1 <10"
+  # GHSA advisories through 9.1.0 (quadratic addressparser, IDN allow-list and
+  # RFC 5322 comment bypasses, resolveContent file access). Reaches a shipped
+  # runtime: the server's SMTP email service.
+  nodemailer: ">=9.1.1 <10"
   form-data: ">=4.0.6 <5"
   tmp: ">=0.2.7 <0.3"
   ws: ">=8.21.0 <9"
@@ -142,7 +145,9 @@ overrides:
   # Floor raised for GHSA-5p4m-2wfm-xmqj, quadratic CPU in `!!omap` resolution.
   # 4.3.0 was itself the vulnerable version, so the floor was pinning the tree
   # to it — a floor only helps when it sits above the range it names.
-  js-yaml: ">=4.3.1 <5"
+  # Raised again to 4.3.2: maxTotalMergeKeys did not bound CPU for empty merge
+  # sources (high), the same `<5` cap for the same Astro reason.
+  js-yaml: ">=4.3.2 <5"
   # Not in the tree right now; kept so it lands patched if anything pulls it back.
   tar: ">=7.5.16 <8"
   esbuild: ">=0.28.1 <0.29"
@@ -184,4 +189,10 @@ overrides:
   # attacker-controlled `isBuffer`. Reaches `@rebasepro/mcp` at runtime through
   # @modelcontextprotocol/sdk, and express independently.
   qs: ">=6.16.0 <7"
+  # removeScripts let executable links and foreign-object HTML through (one
+  # high, one moderate). Website build tooling only, via Astro's SVG handling.
+  svgo: ">=4.1.0 <5"
+  # A DoS on malformed input. Website build tooling only, via Astro; capped
+  # below 6 because 6.x is the next major and nothing here asks for it.
+  devalue: ">=5.9.2 <6"
 verifyDepsBeforeRun: false
