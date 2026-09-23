@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
+import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { afterEach, describe, expect, it } from "vitest";
 import { assertBuiltForPath, foldableApps, staticBuildEnv } from "./fold-static";
@@ -231,7 +232,10 @@ describe("the environment every static app is built with", () => {
  */
 describe("a caller whose stdout carries a JSON result", () => {
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const tsx = path.resolve(here, "../node_modules/.bin/tsx");
+    // Resolved, not a hard-coded `node_modules/.bin/tsx`: the CLI does not declare
+    // tsx, the repository root does, and a stale shim under packages/cli is what
+    // made the hard-coded path work on one machine and not on a fresh CI install.
+    const tsxCli = createRequire(import.meta.url).resolve("tsx/cli");
     let root: string;
 
     afterEach(() => {
@@ -256,7 +260,7 @@ describe("a caller whose stdout carries a JSON result", () => {
             process.stdout.write(JSON.stringify({ success: true }) + "\\n");
         `);
 
-        const run = spawnSync(tsx, [script], { cwd: root, encoding: "utf8" });
+        const run = spawnSync(process.execPath, [tsxCli, script], { cwd: root, encoding: "utf8" });
 
         expect(run.status, run.stderr).toBe(0);
         expect(run.stdout).toBe("{\"success\":true}\n");

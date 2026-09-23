@@ -16,9 +16,9 @@
  */
 import { EventEmitter } from "events";
 import fs from "fs";
+import { createRequire } from "module";
 import os from "os";
 import path from "path";
-import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -55,7 +55,8 @@ const { authCommand, resetPasswordScript } = await import("./auth");
 const { prepareDatabaseEnv } = await import("../dev-db/prepare");
 const { spawnSync } = await vi.importActual<typeof import("child_process")>("child_process");
 
-const TSX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../node_modules/.bin/tsx");
+/** tsx is the repository root's, not the CLI's: resolve it rather than name a shim path. */
+const TSX_CLI = createRequire(import.meta.url).resolve("tsx/cli");
 
 describe("the direct-database reset", () => {
     let savedBaseUrl: string | undefined;
@@ -110,7 +111,7 @@ describe("the direct-database reset", () => {
 
             const script = path.join(dir, "reset.ts");
             fs.writeFileSync(script, resetPasswordScript(false));
-            const run = spawnSync(TSX, [script], {
+            const run = spawnSync(process.execPath, [TSX_CLI, script], {
                 cwd: dir,
                 encoding: "utf8",
                 env: { ...process.env, REBASE_RESET_EMAIL: "admin@example.com", REBASE_RESET_PASSWORD: "x" }
