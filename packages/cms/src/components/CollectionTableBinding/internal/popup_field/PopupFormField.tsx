@@ -41,6 +41,29 @@ interface PopupFormFieldProps<M extends Record<string, unknown>> {
     onCellValueChange?: (params: OnCellValueChangeParams<any, any>) => Promise<void> | void;
 }
 
+/**
+ * The properties that judge one cell: the property at `propertyKey`, under the
+ * maps its key goes through, and nothing beside it.
+ *
+ * A spread map's child is `address.street`, a path into `properties` rather
+ * than a key of it; looked up as a key it found nothing, and the popup
+ * validated nothing. The maps on the way carry only the edited child and none
+ * of their own rules: the popup shows one field, and an error anywhere else
+ * would block the save where no one could see it.
+ */
+function propertiesOfCell(properties: Properties, propertyKey: string): Properties {
+    if (propertyKey in properties) return { [propertyKey]: properties[propertyKey] };
+    const dot = propertyKey.indexOf(".");
+    if (dot === -1) return {};
+    const mapKey = propertyKey.slice(0, dot);
+    const map = properties[mapKey];
+    if (map?.type !== "map" || !map.properties) return {};
+    const children = propertiesOfCell(map.properties, propertyKey.slice(dot + 1));
+    return Object.keys(children).length > 0
+        ? { [mapKey]: { type: "map", properties: children } }
+        : {};
+}
+
 export function PopupFormField<M extends Record<string, unknown>>(props: PopupFormFieldProps<M>) {
     if (!props.open) return null;
     return <PopupFormFieldLoading {...props}/>;
@@ -203,9 +226,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         if (!collection || !entityId) return;
         return getEntitySchema(
             entityId,
-            propertyKey && collection.properties[propertyKey as string]
-                ? { [propertyKey]: collection.properties[propertyKey as string] } as Properties
-                : {} as Properties,
+            propertyKey ? propertiesOfCell(collection.properties, propertyKey as string) : {},
             customFieldValidator);
     }, [collection, entityId, propertyKey, customFieldValidator]);
 
