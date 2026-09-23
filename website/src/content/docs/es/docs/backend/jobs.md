@@ -1,5 +1,5 @@
 ---
-sourceHash: 9dc4adc1ff3c773b
+sourceHash: 348b6c433874e80b
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
 description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.

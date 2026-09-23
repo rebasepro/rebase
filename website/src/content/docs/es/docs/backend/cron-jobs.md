@@ -1,5 +1,5 @@
 ---
-sourceHash: 82a8f59c5a0c5325
+sourceHash: 63794b5b1f8c0af6
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
