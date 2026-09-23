@@ -207,6 +207,8 @@ async function deployBundle(opts: {
     uploadSource: boolean;
     /** `--allow-downgrade`: deploy a bundle built on an older release than the project runs. */
     allowDowngrade: boolean;
+    /** When the command started, for the `cli.deploy` event's duration. */
+    startedAt: number;
 }): Promise<void> {
     // Nothing here reads client/url/projectId/projectRef any more: everything
     // that needs them is reached through `uploadAndTrigger({ ...opts })`, which
@@ -377,9 +379,21 @@ async function uploadAndTrigger(opts: {
     timeoutMs: number;
     uploadSource: boolean;
     allowDowngrade: boolean;
+    /** When the command started, for the `cli.deploy` event's duration. */
+    startedAt: number;
 }): Promise<void> {
     const { client, url, projectId, projectRef, projectRoot, bundleDir } = opts;
     const manifest = readBundleManifest(bundleDir);
+    // `cli.deploy`, recorded for a bundle deploy as for a source build: this is
+    // the default deploy of every scaffold, and it recorded nothing.
+    const record = (followed: boolean, status: string): Promise<void> => recordDeploy({
+        followed,
+        status,
+        deduplicated: false,
+        frameworkVersion: manifest.runtime?.builtAgainst,
+        startedAt: opts.startedAt,
+        projectRoot
+    });
 
     // Native modules cannot run on the managed runtime — the server rejects them
     // at intake anyway, but catching it here saves a pointless upload of a bundle
@@ -522,6 +536,7 @@ managed,
 sourceUploaded: rebuildSource !== null,
 following: false }
         );
+        await record(false, "not_followed");
         return;
     }
 
@@ -535,7 +550,8 @@ following: false }
         quiet: isJsonMode(),
         timeoutMs: opts.timeoutMs,
         projectId,
-        url
+        url,
+        onTerminal: (ended) => record(true, ended)
     });
     emit(() => {}, { success: true,
 deploymentId,
@@ -1077,6 +1093,8 @@ async function recordDeploy(o: {
     deduplicated: boolean;
     frameworkVersion?: string | null;
     startedAt: number;
+    /** The project deployed; the working directory when the command has none. */
+    projectRoot?: string;
 }): Promise<void> {
     await recordEvent("cli.deploy", {
         followed: o.followed,
@@ -1084,7 +1102,7 @@ async function recordDeploy(o: {
         deduplicated: o.deduplicated,
         framework_version: o.frameworkVersion ?? null,
         duration: durationBucket(Date.now() - o.startedAt)
-    }, { projectRoot: process.cwd() });
+    }, { projectRoot: o.projectRoot ?? process.cwd() });
 }
 
 export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
@@ -1160,7 +1178,8 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             follow: args["--no-follow"] !== true,
             timeoutMs: resolveDeployTimeout(args["--timeout"]),
             uploadSource: args["--no-source"] !== true,
-            allowDowngrade: args["--allow-downgrade"] === true
+            allowDowngrade: args["--allow-downgrade"] === true,
+            startedAt
         });
         return;
     }
@@ -1271,13 +1290,17 @@ following: false,
     // result object would make neither parseable. The deploy is still followed
     // to completion — a caller waiting on the exit code still waits — and the
     // one object printed at the end carries the outcome.
+    //
+    // Recorded as the follow ends, whatever it ends in: a failed build exits
+    // non-zero from inside the follow, and recording after it only ever
+    // recorded successes.
     const { status } = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
-        url
+        url,
+        onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, frameworkVersion, startedAt })
     });
-    await recordDeploy({ followed: true, status, deduplicated, frameworkVersion, startedAt });
     emit(
         () => {},
         { deploymentId,
@@ -1491,7 +1514,17 @@ export function nextLogChunk(printed: string, rowLogs: string): { chunk: string;
 async function streamBuildLogs(
     client: CloudClient,
     deploymentId: string,
-    opts: { quiet?: boolean; timeoutMs?: number; projectId?: string; url?: string } = {}
+    opts: {
+        quiet?: boolean;
+        timeoutMs?: number;
+        projectId?: string;
+        url?: string;
+        /**
+         * Called once with the state the follow ended in (a terminal status, or
+         * `timeout`) before anything else happens, a non-zero exit included.
+         */
+        onTerminal?: (status: string) => Promise<void>;
+    } = {}
 ): Promise<{ status: string; logs: string }> {
     const quiet = opts.quiet === true;
     const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
@@ -1512,6 +1545,7 @@ async function streamBuildLogs(
         printed = next.printed;
 
         if (dep.status && dep.status !== "deploying") {
+            await opts.onTerminal?.(dep.status);
             if (dep.status !== "success") {
                 if (quiet) {
                     // The failure still has to be reportable, and in JSON mode
@@ -1551,6 +1585,7 @@ async function streamBuildLogs(
         }
 
         if (Date.now() - started > timeoutMs) {
+            await opts.onTerminal?.("timeout");
             if (!quiet) console.log("");
             fail(
                 `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the build to finish.`,

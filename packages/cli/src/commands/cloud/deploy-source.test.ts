@@ -24,6 +24,12 @@ vi.mock("./context", async (importOriginal) => {
     };
 });
 
+// Telemetry stood in, so a test can see which events a deploy records.
+vi.mock("../../telemetry", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../../telemetry")>();
+    return { ...actual, recordEvent: vi.fn(async () => undefined) };
+});
+
 // The real builder unless a test says otherwise, so a test can see what it was asked for.
 vi.mock("../../bundle", async (importOriginal) => {
     const actual = await importOriginal<typeof import("../../bundle")>();
@@ -33,6 +39,7 @@ vi.mock("../../bundle", async (importOriginal) => {
 import * as context from "./context";
 import { deployCommand } from "./deploy";
 import { buildBundle } from "../../bundle";
+import { recordEvent } from "../../telemetry";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -386,6 +393,73 @@ describe("the build flags a deploy's remedies name", () => {
             .rejects.toMatchObject({ code: 1 });
         expect(said.join("\n")).toContain("\"web\" is a static app");
         expect(requests).toEqual([]);
+    });
+});
+
+/**
+ * `cli.deploy` is the event that says whether anyone ever ships, and it was
+ * recorded on the source-build path alone. A bundle deploy (the default for
+ * every scaffold, which declares `runtime: managed`) never recorded one, and a
+ * followed deploy that failed exited before recording anything on either path,
+ * so the event could not say how often a deploy fails.
+ */
+describe("the cli.deploy event", () => {
+    /** A client whose deployment row reads back as `status`. */
+    function deploymentEnds(status: string): void {
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok" }) },
+                data: {
+                    collection: (name: string) => ({
+                        findById: async () => (name === "deployments" ? { id: "d1", status, logs: "built\n" } : undefined)
+                    })
+                },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+    }
+
+    function recorded(): Array<Record<string, unknown>> {
+        return vi.mocked(recordEvent).mock.calls
+            .filter(([event]) => event === "cli.deploy")
+            .map(([, properties]) => properties as Record<string, unknown>);
+    }
+
+    it("is recorded for a bundle deploy", async () => {
+        bundle("backend");
+        controlPlane();
+
+        await deploy("--no-source");
+
+        expect(recorded()).toEqual([expect.objectContaining({
+            followed: false,
+            status: "not_followed",
+            deduplicated: false,
+            framework_version: "0.21.0"
+        })]);
+    });
+
+    it("records a followed bundle deploy that failed, before exiting non-zero", async () => {
+        bundle("backend");
+        controlPlane();
+        deploymentEnds("failed");
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--bundle", "--bundle-dir", bundleDir, "--no-source"], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        expect(recorded()).toEqual([expect.objectContaining({ followed: true, status: "failed" })]);
+    });
+
+    it("records a followed source deploy that failed", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+        controlPlane();
+        deploymentEnds("failed");
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--source", "."], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        expect(recorded()).toEqual([expect.objectContaining({ followed: true, status: "failed" })]);
     });
 });
 
