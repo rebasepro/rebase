@@ -180,3 +180,82 @@ describe("the realtime socket across a change of account", () => {
         expect(socket.sent.filter(f => f.type === "subscribe_collection")).toHaveLength(1);
     });
 });
+
+/**
+ * The socket authenticates from `getAuthToken`, which refreshes a token that is
+ * about to expire first. It used to hold on to the session it read *before*
+ * that refresh and fall back to its token whenever the refresh failed — and a
+ * refresh fails with NOT_SIGNED_IN precisely because the user signed out while
+ * it was in flight. The socket then authenticated as the account that had just
+ * signed out.
+ */
+describe("the socket's token when the session ends during its refresh", () => {
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it("is no one's, not the token of the account that signed out", async () => {
+        let answerRefresh!: (response: Response) => void;
+        const refreshAnswered = new Promise<Response>((resolve) => { answerRefresh = resolve; });
+        const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+            const path = String(input);
+            if (path.endsWith("/auth/login")) {
+                // Inside the socket's ten-second refresh window from the start.
+                return new Response(JSON.stringify({
+                    tokens: { accessToken: "token-of-u1", refreshToken: "refresh-of-u1", accessTokenExpiresAt: Date.now() + 5_000 },
+                    user: { uid: "u1" }
+                }), { status: 200, headers: { "content-type": "application/json" } });
+            }
+            if (path.endsWith("/auth/refresh")) return refreshAnswered;
+            return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+        });
+        const rebase = createRebaseClient({
+            baseUrl: "http://api.test",
+            fetch: fetchMock as typeof fetch,
+            auth: { persistSession: false, autoRefresh: false }
+        });
+        try {
+            await rebase.auth.signInWithEmail("u1@example.test", "pw");
+
+            const token = rebase.ws!.getAuthToken!();
+            await rebase.auth.signOut();
+            // The refresh answers for a session that has ended; the SDK drops
+            // it and reports NOT_SIGNED_IN.
+            answerRefresh(new Response(JSON.stringify({
+                tokens: { accessToken: "token-after-sign-out", refreshToken: "r2", accessTokenExpiresAt: Date.now() + 3_600_000 },
+                user: { uid: "u1" }
+            }), { status: 200, headers: { "content-type": "application/json" } }));
+
+            expect(await token).toBe("");
+        } finally {
+            rebase.close();
+        }
+    });
+
+    it("keeps the held token when the refresh only failed to reach the server", async () => {
+        const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+            const path = String(input);
+            if (path.endsWith("/auth/login")) {
+                return new Response(JSON.stringify({
+                    tokens: { accessToken: "token-of-u1", refreshToken: "refresh-of-u1", accessTokenExpiresAt: Date.now() + 5_000 },
+                    user: { uid: "u1" }
+                }), { status: 200, headers: { "content-type": "application/json" } });
+            }
+            if (path.endsWith("/auth/refresh")) throw new TypeError("fetch failed");
+            return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+        });
+        const rebase = createRebaseClient({
+            baseUrl: "http://api.test",
+            fetch: fetchMock as typeof fetch,
+            auth: { persistSession: false, autoRefresh: false }
+        });
+        try {
+            await rebase.auth.signInWithEmail("u1@example.test", "pw");
+
+            // Still signed in, and the token has seconds left: worth trying.
+            expect(await rebase.ws!.getAuthToken!()).toBe("token-of-u1");
+        } finally {
+            rebase.close();
+        }
+    });
+});

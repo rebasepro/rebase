@@ -430,7 +430,15 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 if (session && session.expiresAt <= Date.now() + 10000) {
                     try {
                         session = await auth.refreshSession();
-                    } catch (e) { /* ignore */ }
+                    } catch (e) {
+                        // Whatever session there is now — not the one read
+                        // before the refresh. A refresh that failed because
+                        // the user signed out meanwhile would otherwise hand
+                        // the socket the signed-out account's token. One that
+                        // only failed to reach the server leaves the session in
+                        // place, and its token is still worth trying.
+                        session = auth.getSession();
+                    }
                 }
                 return session?.accessToken || options.token || "";
             },
