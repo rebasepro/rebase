@@ -200,17 +200,26 @@ hour12: false,
                 // No timezone specified: interpret input as local time (backward compatible)
                 resultDate = new Date(year, month - 1, day, hours, minutes);
             } else {
-                // Timezone specified: interpret input as that timezone and convert to UTC
-                // We need to find the UTC equivalent of the entered time in the target timezone
+                // Timezone specified: interpret input as that timezone and convert to UTC.
+                // If the user entered 00:00 in Mexico (UTC-6, offset=-360), the
+                // wall-clock time read as UTC is 00:00Z, and subtracting -360
+                // minutes gives 06:00 UTC.
+                const wallClockAsUtc = Date.UTC(year, month - 1, day, hours, minutes);
 
-                // Create a reference UTC date to calculate the offset for this moment
-                const refUtcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-                const offsetMinutes = getTimezoneOffsetMinutes(refUtcDate, timezone);
+                // The offset belongs to the instant being entered, not to the
+                // wall-clock time read as UTC: within hours of a DST switch those
+                // two sit on opposite sides of it. So the offset at the wall
+                // clock is only a first guess, and the offset at the instant it
+                // points to is the one that applies.
+                const firstGuess = getTimezoneOffsetMinutes(new Date(wallClockAsUtc), timezone);
+                const offsetMinutes = getTimezoneOffsetMinutes(new Date(wallClockAsUtc - firstGuess * 60000), timezone);
+                resultDate = new Date(wallClockAsUtc - offsetMinutes * 60000);
 
-                // Convert from target timezone to UTC:
-                // If user entered 00:00 in Mexico (UTC-6, offset=-360), we subtract the offset
-                // Date.UTC gives us 00:00 UTC, subtracting -360 minutes (= adding 360 min) gives 06:00 UTC
-                resultDate = new Date(Date.UTC(year, month - 1, day, hours, minutes) - offsetMinutes * 60000);
+                // A time the spring switch skips (02:30 in New York) has no
+                // instant of its own; it moves forward across the gap.
+                if (getTimezoneOffsetMinutes(resultDate, timezone) !== offsetMinutes) {
+                    resultDate = new Date(wallClockAsUtc - firstGuess * 60000);
+                }
             }
 
             if (isNaN(resultDate.getTime())) {

@@ -15,7 +15,8 @@ import {
     DebouncedTextField,
     Avatar,
     Select,
-    SelectItem
+    SelectItem,
+    DateTimeField
 } from "../src";
 import "@testing-library/jest-dom";
 
@@ -220,6 +221,38 @@ describe("UI Components", () => {
             </Select>);
 
             expect(screen.getByRole("combobox", { name: "cpu" })).toHaveTextContent("2 CPU");
+        });
+    });
+
+    /**
+     * With a `timezone`, a typed wall-clock time is converted to UTC with that
+     * zone's offset. The offset was taken at the wall-clock time read as if it
+     * were UTC, which is a different instant: within a few hours of a DST switch
+     * it is the other side of the switch, so the stored time was an hour out
+     * and read back as a different time from the one typed.
+     */
+    describe("DateTimeField in a named timezone", () => {
+        const typeIn = (timezone: string, wallClock: string) => {
+            const onChange = jest.fn();
+            const { container } = render(<DateTimeField aria-label="when" mode="date_time" timezone={timezone}
+                                                        value={null} onChange={onChange}/>);
+            fireEvent.change(container.querySelector("input")!, { target: { value: wallClock } });
+            expect(onChange).toHaveBeenCalledTimes(1);
+            return (onChange.mock.calls[0][0] as Date).toISOString();
+        };
+
+        it.each([
+            // Hours after the spring switch: EDT, not the EST of 04:00 UTC.
+            ["America/New_York", "2024-03-10T04:00", "2024-03-10T08:00:00.000Z"],
+            // Half an hour before the autumn switch: CEST, not the CET of 01:30 UTC.
+            ["Europe/Berlin", "2024-10-27T01:30", "2024-10-26T23:30:00.000Z"],
+            // Away from any switch.
+            ["America/New_York", "2024-07-01T12:00", "2024-07-01T16:00:00.000Z"],
+            ["Asia/Kolkata", "2024-01-15T09:30", "2024-01-15T04:00:00.000Z"],
+            // A time the spring switch skips moves forward, as before.
+            ["America/New_York", "2024-03-10T02:30", "2024-03-10T07:30:00.000Z"]
+        ])("stores %s %s as %s", (timezone, wallClock, utc) => {
+            expect(typeIn(timezone, wallClock)).toBe(utc);
         });
     });
 
