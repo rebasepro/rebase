@@ -1119,11 +1119,15 @@
   of the result, so every piped or CI run was unparseable. A failed static or
   bundle build now answers with a JSON error.
 
-- **A managed deploy uploads the dependencies `rebase build` vendored into the
-  bundle.** The upload excluded `node_modules`, so every deploy paid 35–55
-  seconds for an install that never shipped, and every pod start installed
-  again. An archive that comes out over the 100 MB upload cap with them is
-  packed again without them, with a warning.
+- **`rebase cloud deploy` no longer spends 35–55 seconds installing
+  dependencies it does not upload.** A deploy that builds its own bundle ran the
+  build's `npm install` into it, then packed the bundle without `node_modules`,
+  so the time bought nothing. It now builds without installing. The upload
+  still leaves `node_modules` out on purpose, even from a prebuilt `--bundle-dir`
+  (with a warning when that bundle had a vendored tree): the control plane reads
+  a bundle into memory on every pod start, and a vendored one is tens of MB
+  instead of a few hundred kB. Pods install their dependencies when they start,
+  as they always have.
 
 - **`rebase cloud deploy` refuses dependency ranges no single version satisfies,
   as `rebase build` does.** The deploy built its own bundle without the check

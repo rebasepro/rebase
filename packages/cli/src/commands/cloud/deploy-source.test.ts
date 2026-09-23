@@ -293,13 +293,13 @@ function archiveEntries(archive: Buffer | undefined): string[] {
 }
 
 /**
- * `rebase build` vendors the bundle's dependencies so a pod untars and boots,
- * rather than spending 35-55s of every start in `npm install`. The upload left
- * `node_modules` out, so the install was paid at every deploy and still at
- * every pod start.
+ * The control plane reads each bundle into memory on every pod start, and a
+ * runtime rollout restarts every tenant's pods together — so a managed upload
+ * stays small: no `node_modules`, and a deploy that builds its own bundle does
+ * not spend 35-55s installing a tree the upload would leave out.
  */
 describe("a vendored bundle", () => {
-    it("uploads the dependency tree the build installed", async () => {
+    it("is uploaded without its dependency tree, and the deploy says why", async () => {
         bundle("backend", { declared: { pg: "^8.22.0" }, vendored: true, vendorTarget: { os: "linux", cpu: "x64", node: "22" } });
         write(bundleDir, "node_modules/pg/package.json", "{\"name\":\"pg\"}");
         write(bundleDir, "node_modules/pg/node_modules/pg-types/index.js", "module.exports = {};");
@@ -307,12 +307,8 @@ describe("a vendored bundle", () => {
 
         await deploy("--no-source");
 
-        expect(archiveEntries(bundleArchive)).toEqual([
-            "config/index.js",
-            "manifest.json",
-            "node_modules/pg/node_modules/pg-types/index.js",
-            "node_modules/pg/package.json"
-        ]);
+        expect(archiveEntries(bundleArchive)).toEqual(["config/index.js", "manifest.json"]);
+        expect(said.join("\n")).toContain("installed dependencies are not uploaded");
     });
 
     it("uploads no node_modules the build did not vendor", async () => {
@@ -380,7 +376,7 @@ describe("the build flags a deploy's remedies name", () => {
 
         await deployCommand(["node", "rebase", "cloud", "deploy", "--no-static", "--skip-schema", "--no-source", "--no-follow"], "shop");
 
-        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ skipSchema: true });
+        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ skipSchema: true, vendor: false });
         // The frontend's build fails, so the deploy only got here without it.
         expect(triggered().bundleId).toBe("b1");
     });

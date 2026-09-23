@@ -72,18 +72,23 @@ COPYFILE_DISABLE: "1" } }
 }
 
 /**
- * Pack a bundle for upload, carrying the dependency tree `rebase build`
- * vendored into it.
+ * Pack a bundle for upload — without `node_modules`, even a vendored tree.
  *
- * Vendoring exists so a pod untars and boots: the runtime skips its own
- * `npm install` when the bundle already holds `node_modules`, and that install
- * is 35-55 seconds of every pod start. Only a bundle whose manifest says it was
- * vendored carries its tree — the build installed it for the runtime's platform.
+ * Vendoring exists so a pod untars and boots rather than spending 35-55s of
+ * every start in `npm install`, and a deploy did carry the tree for one night
+ * (c36ea4637). It is left out again because of what the control plane does
+ * with the archive: `GET /bundle/:projectId/:bundleId` reads the whole object
+ * into memory on every pod start, and a runtime rollout restarts every tenant's
+ * pods at once. Bundles it was sized against are a few hundred kB; a vendored
+ * one is tens of MB, up to the 100 MB cap — N pods starting together would hold
+ * N of them. A slower cold start per pod is the status quo every deploy has
+ * shipped with; a control plane out of memory is every tenant's outage. The
+ * platform's own rebuilds build with `--no-vendor` for the same shape of
+ * reason. When the control plane streams bundles, this is the one switch to
+ * flip, and `rebase cloud deploy` builds with `vendor: false` until then.
  *
- * The build already declines to vendor a tree too large to upload, but it
- * measures the tree on disk and guesses at compression. When the archive still
- * comes out over the cap, it is packed again without the tree: a bundle that
- * installs at boot is better than one refused at the door.
+ * `modulesLeftOut` says a tree the build DID vendor was not uploaded — a
+ * prebuilt `--bundle-dir` from a plain `rebase build`, which vendors by default.
  */
 export async function packBundleForUpload(
     bundleDir: string,
@@ -92,12 +97,15 @@ export async function packBundleForUpload(
     maxBytes: number = MAX_BUNDLE_UPLOAD_BYTES
 ): Promise<{ bytes: number; modulesLeftOut: boolean }> {
     const vendored = manifest.deps?.vendored === true;
-    await packBundle(bundleDir, outPath, { withModules: vendored });
-    const bytes = fs.statSync(outPath).size;
-    if (!vendored || bytes <= maxBytes) return { bytes, modulesLeftOut: false };
-
     await packBundle(bundleDir, outPath, { withModules: false });
-    return { bytes: fs.statSync(outPath).size, modulesLeftOut: true };
+    const bytes = fs.statSync(outPath).size;
+    if (bytes > maxBytes) {
+        throw new Error(
+            `The bundle is ${(bytes / 1024 / 1024).toFixed(1)} MB without its dependencies, over the ` +
+            `${Math.round(maxBytes / 1024 / 1024)} MB upload limit.`
+        );
+    }
+    return { bytes, modulesLeftOut: vendored };
 }
 
 /**

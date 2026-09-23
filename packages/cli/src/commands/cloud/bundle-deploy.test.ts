@@ -90,10 +90,9 @@ message: "ship it" });
 });
 
 /**
- * `rebase build` installs the bundle's dependencies into it, so a pod untars
- * and boots instead of spending 35-55s of every start in `npm install`. The
- * archive then left `node_modules` out, so every deploy paid for the install
- * and no pod ever got it.
+ * A managed upload never carries `node_modules`, even one `rebase build`
+ * vendored: the control plane holds each bundle in memory on every pod start,
+ * so an upload stays the size it was sized against (see packBundleForUpload).
  */
 describe("packing a bundle for upload", () => {
     function bundleWithModules(): void {
@@ -112,39 +111,37 @@ describe("packing a bundle for upload", () => {
     const out = (): string => path.join(scratch, "..", `out-${path.basename(scratch)}.tar.gz`);
     afterEach(() => fs.rmSync(out(), { force: true }));
 
-    it("carries the dependency tree the build vendored, nested installs included", async () => {
+    it("leaves out even a tree the build vendored, and says so", async () => {
+        // The control plane reads each bundle into memory on every pod start;
+        // until it streams them, an upload stays the size it was sized against.
         bundleWithModules();
 
         const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }));
 
-        expect(packed.modulesLeftOut).toBe(false);
-        const listing = entries(out());
-        expect(listing).toContain("./config/index.js");
-        expect(listing).toContain("./node_modules/pg/index.js");
-        expect(listing).toContain("./node_modules/pg/node_modules/pg-types/index.js");
-    });
-
-    it("leaves out a node_modules the build did not vendor", async () => {
-        // Installed by hand into a prebuilt bundle, for whatever machine it ran on.
-        bundleWithModules();
-
-        await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" } } }));
-
+        expect(packed.modulesLeftOut).toBe(true);
+        expect(packed.bytes).toBe(fs.statSync(out()).size);
         const listing = entries(out());
         expect(listing).toContain("./config/index.js");
         expect(listing.some(entry => entry.includes("node_modules"))).toBe(false);
     });
 
-    it("leaves the vendored tree out when it takes the archive over the upload cap", async () => {
-        // A bundle refused at the door is worse than one that installs at boot.
+    it("leaves out a node_modules the build did not vendor, with nothing to report", async () => {
+        // Installed by hand into a prebuilt bundle, for whatever machine it ran on.
         bundleWithModules();
-        fs.writeFileSync(path.join(scratch, "node_modules", "pg", "blob.bin"), crypto.randomBytes(64 * 1024));
 
-        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }), 32 * 1024);
+        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" } } }));
 
-        expect(packed.modulesLeftOut).toBe(true);
-        expect(packed.bytes).toBe(fs.statSync(out()).size);
-        expect(entries(out()).some(entry => entry.includes("node_modules"))).toBe(false);
+        expect(packed.modulesLeftOut).toBe(false);
+        const listing = entries(out());
+        expect(listing).toContain("./config/index.js");
+        expect(listing.some(entry => entry.includes("node_modules"))).toBe(false);
+    });
+
+    it("refuses a bundle over the upload cap before uploading it", async () => {
+        bundleWithModules();
+        fs.writeFileSync(path.join(scratch, "config", "blob.bin"), crypto.randomBytes(64 * 1024));
+
+        await expect(packBundleForUpload(scratch, out(), manifest({}), 32 * 1024)).rejects.toThrow(/over the .* upload limit/);
     });
 });
 
