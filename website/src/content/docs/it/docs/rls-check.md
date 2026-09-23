@@ -1,5 +1,5 @@
 ---
-sourceHash: 7262803dd6cb2e95
+sourceHash: 3165c5299e4bc1f3
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Di sola lettura, nessuna registrazione, nessun Rebase richiesto.
@@ -67,10 +67,13 @@ all'host con la password `pa@ss`. Codificarli comunque non è mai sbagliato.
 | `--quiet` | Mostra solo i problemi rilevati — nessun banner, nessun riepilogo |
 | `--no-color` | Disabilita i colori ANSI (rispetta anche `NO_COLOR` e uno stdout non-TTY) |
 
-Un ID sconosciuto passato a `--only` o `--skip` produce un errore anziché un'operazione ignorata silenziosamente, poiché
-un errore di battitura indebolirebbe la scansione senza avvisare. Un `--role` non presente in `pg_roles` genera un errore per
-lo stesso motivo: ogni controllo si basa su privilegi concessi a un ruolo esposto, quindi un nome che non corrisponde
-a nulla rimuoverebbe copertura in modo trasparente.
+Un ID sconosciuto passato a `--only` o `--skip` produce un errore anziché un'operazione ignorata
+silenziosamente, poiché un errore di battitura indebolirebbe la scansione senza avvisare. Un
+`--role` non presente in `pg_roles` genera un errore per lo stesso motivo: ogni controllo si basa su
+privilegi concessi a un ruolo esposto, quindi un nome che non corrisponde a nulla rimuoverebbe
+copertura in modo trasparente. Lo stesso vale per un `--schema` che non indica alcuno schema, che
+altrimenti non scansionerebbe nulla e lo segnalerebbe come pulito. I nomi degli schemi distinguono
+maiuscole e minuscole: `Public` non è `public`.
 
 L'intestazione del report indica i ruoli che l'esecuzione ha considerato esposti, così puoi verificare a colpo d'occhio
 se `No findings` includeva il ruolo con cui si connette la tua applicazione:
@@ -240,6 +243,10 @@ La tabella ha la RLS disabilitata *e* concede `SELECT`/`INSERT`/`UPDATE`/`DELETE
 un chiamante non attendibile (`anon`, `PUBLIC`, `web_anon`, `rebase_user`). Postgres non applica
 alcun filtro per riga, quindi le policy — se presenti — non vengono mai consultate.
 
+Viene segnalata anche una foreign table con un privilegio simile. Postgres non può abilitare la RLS
+su di essa, quindi il privilegio consegna tutto ciò che restituisce il server remoto, e la
+correzione suggerita revoca invece il privilegio.
+
 Una tabella con RLS disattivata ma senza privilegi concessi a un ruolo esposto *non* viene segnalata. Non è raggiungibile,
 e segnalarla genererebbe solo rumore.
 
@@ -259,9 +266,12 @@ Una policy permissiva la cui espressione `USING` o `WITH CHECK` è una costante 
 `(true)`, `1 = 1`. Le policy permissive vengono combinate con operatore OR, pertanto una sola di esse soddisfa
 il filtro di riga della tabella a prescindere da quanto siano restrittive tutte le altre.
 
-Se una policy `RESTRICTIVE` copre lo stesso comando, la gravità viene declassata a media e
-segnalata come elemento da verificare anziché come certezza, poiché le policy restrittive vengono applicate con AND
-dopo che quelle permissive sono state valutate in OR.
+Se policy `RESTRICTIVE` sullo stesso comando (`ALL` per un `ALL` permissivo) si applicano a ogni
+ruolo esposto raggiunto dalla policy permissiva, la gravità viene declassata a media e segnalata
+come elemento da verificare anziché come certezza, poiché le policy restrittive vengono applicate
+con AND dopo che quelle permissive sono state valutate in OR. Una policy restrittiva che protegge
+altri ruoli o un altro comando non conta: lascia la policy permissiva aperta a tutti quelli che non
+copre.
 
 ```sql
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -411,11 +421,14 @@ pubblica, usa `--skip junction-table-unprotected`.
 
 ### rls-enabled-not-forced
 
-**RLS abilitata ma non forzata per il proprietario della tabella.** Media o alta.
+**RLS abilitata ma non forzata per il proprietario della tabella.** Media, alta o critica.
 
-Senza `FORCE`, il proprietario della tabella è esente dalle proprie policy. Questo è innocuo quando il
-proprietario è un ruolo di provisioning con cui non si connette nessuno, ma è grave se la tua applicazione si connette
-come proprietario — pertanto è **alta** quando il ruolo proprietario può effettuare il login, e **media** in caso contrario.
+Senza `FORCE`, il proprietario della tabella è esente dalle proprie policy, e lo è anche ogni membro
+del ruolo proprietario. Questo è innocuo quando il proprietario è un ruolo di provisioning con cui
+non si connette nessuno, ma è grave se la tua applicazione si connette come proprietario — pertanto
+è **critica** quando un ruolo con cui arriva un chiamante non attendibile possiede la tabella o è
+membro del ruolo proprietario, **alta** quando il ruolo proprietario può effettuare il login o un
+ruolo che può farlo ne è membro, e **media** in caso contrario.
 
 Se il proprietario è un superuser o dispone di `BYPASSRLS`, rimane a livello medio e lo indica chiaramente: `FORCE` non può
 vincolare un ruolo di questo tipo, e suggerire il contrario sarebbe fuorviante.
@@ -448,8 +461,9 @@ in cui le richieste arrivano in realtà con un altro ruolo.
 
 **Privilegi di tabella concessi a PUBLIC.** Media.
 
-Un privilegio DML concesso a `PUBLIC`. Anche con la RLS abilitata, questo amplia i soggetti per i quali le
-policy vengono valutate, e quasi mai si tratta di una scelta intenzionale.
+Un privilegio DML concesso a `PUBLIC`, su una tabella o una foreign table. Anche con la RLS
+abilitata, questo amplia i soggetti per i quali le policy vengono valutate, e quasi mai si tratta di
+una scelta intenzionale.
 
 ```sql
 REVOKE ALL ON "public"."your_table" FROM PUBLIC;

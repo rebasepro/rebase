@@ -69,7 +69,9 @@ to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 An unknown id passed to `--only` or `--skip` is an error rather than a silent no-op, because
 a typo there quietly weakens the scan. A `--role` that is not in `pg_roles` is an error for
 the same reason: every check gates on a grant to an exposed role, so a name that matches
-nothing removes coverage without saying so.
+nothing removes coverage without saying so. So is a `--schema` that names no schema, which
+would otherwise scan nothing and report it clean. Schema names are case-sensitive: `Public`
+is not `public`.
 
 The report's header names the roles the run treated as exposed, so you can see at a glance
 whether `No findings` covered the role your application connects as:
@@ -240,6 +242,10 @@ The table has RLS disabled *and* grants `SELECT`/`INSERT`/`UPDATE`/`DELETE` to a
 untrusted caller can reach (`anon`, `PUBLIC`, `web_anon`, `rebase_user`). Postgres applies
 no per-row filter at all, so policies — if any exist — are never consulted.
 
+A foreign table with such a grant is reported too. Postgres cannot enable RLS on one, so the
+grant hands over whatever the remote server returns, and the suggested fix revokes the
+grant instead.
+
 A table with RLS off but no grant to an exposed role is *not* reported. It is not reachable,
 and flagging it would be noise.
 
@@ -259,9 +265,11 @@ A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth
 `(true)`, `1 = 1`. Permissive policies are ORed together, so a single one of these satisfies
 the table's row filter no matter how strict every other policy is.
 
-If a `RESTRICTIVE` policy covers the same command, this is downgraded to medium and
-reported as something to verify rather than a certainty, because restrictive policies AND
-after the permissive ones OR.
+If `RESTRICTIVE` policies on the same command (`ALL` for a permissive `ALL`) apply to every
+exposed role the permissive policy reaches, this is downgraded to medium and reported as
+something to verify rather than a certainty, because restrictive policies AND after the
+permissive ones OR. A restrictive policy that gates other roles or another command does not
+count: it leaves the permissive one open to everyone it misses.
 
 ```sql
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -411,11 +419,14 @@ public, `--skip junction-table-unprotected`.
 
 ### rls-enabled-not-forced
 
-**RLS enabled but not forced for the table owner.** Medium, or high.
+**RLS enabled but not forced for the table owner.** Medium, high, or critical.
 
-Without `FORCE`, the table's owner is exempt from its own policies. That is harmless when the
-owner is a provisioning role nothing connects as, and serious when your application connects
-as the owner — so this is **high** when the owning role can log in, and **medium** otherwise.
+Without `FORCE`, the table's owner is exempt from its own policies, and so is every member
+of the owning role. That is harmless when the owner is a provisioning role nothing connects
+as, and serious when your application connects as the owner — so this is **critical** when a
+role an untrusted caller arrives as owns the table or is a member of the owning role,
+**high** when the owning role can log in or a role that can is a member of it, and
+**medium** otherwise.
 
 If the owner is a superuser or has `BYPASSRLS`, it stays medium and says so: `FORCE` cannot
 constrain such a role, and implying otherwise would be misleading.
@@ -448,8 +459,8 @@ whose requests actually arrive as some other role.
 
 **Table privileges granted to PUBLIC.** Medium.
 
-A DML privilege granted to `PUBLIC`. Even with RLS enabled this widens *who* policies get
-evaluated for, and it is almost never deliberate.
+A DML privilege granted to `PUBLIC`, on a table or a foreign table. Even with RLS enabled this
+widens *who* policies get evaluated for, and it is almost never deliberate.
 
 ```sql
 REVOKE ALL ON "public"."your_table" FROM PUBLIC;

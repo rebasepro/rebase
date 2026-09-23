@@ -1,5 +1,5 @@
 ---
-sourceHash: 7262803dd6cb2e95
+sourceHash: 3165c5299e4bc1f3
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -67,11 +67,13 @@ mit dem Host `host` unter Verwendung des Passworts `pa@ss`. Sie dennoch zu kodie
 | `--quiet` | Nur Ergebnisse – kein Banner, keine Zusammenfassung |
 | `--no-color` | Deaktiviert ANSI-Farben (berücksichtigt auch `NO_COLOR` und ein Nicht-TTY-stdout) |
 
-Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, ist ein Fehler und kein stiller No-Op,
-da ein Tippfehler an dieser Stelle den Scan unbemerkt schwächen würde. Eine `--role`, die nicht in
-`pg_roles` vorhanden ist, führt aus demselben Grund zu einem Fehler: Jede Prüfung basiert auf einem
-Grant an eine exponierte Rolle. Ein Name, der auf nichts zutrifft, würde daher unbemerkt die Abdeckung
-verringern.
+Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, ist ein Fehler und kein stiller
+No-Op, da ein Tippfehler an dieser Stelle den Scan unbemerkt schwächen würde. Eine `--role`, die
+nicht in `pg_roles` vorhanden ist, führt aus demselben Grund zu einem Fehler: Jede Prüfung basiert
+auf einem Grant an eine exponierte Rolle. Ein Name, der auf nichts zutrifft, würde daher unbemerkt
+die Abdeckung verringern. Dasselbe gilt für ein `--schema`, das kein Schema benennt: Es würde sonst
+nichts scannen und das als sauber melden. Schemanamen unterscheiden Groß- und Kleinschreibung:
+`Public` ist nicht `public`.
 
 Der Header des Berichts nennt die Rollen, die beim Durchlauf als exponiert behandelt wurden, sodass Sie
 auf einen Blick sehen können, ob `No findings` auch die Rolle abgedeckt hat, mit der sich Ihre Anwendung
@@ -248,6 +250,10 @@ die ein nicht vertrauenswürdiger Aufrufer erreichen kann (`anon`, `PUBLIC`, `we
 Postgres wendet keinerlei zeilenbasierte Filter an, sodass Policies – falls vorhanden – niemals
 konsultiert werden.
 
+Eine Foreign Table mit einem solchen Grant wird ebenfalls gemeldet. Postgres kann auf ihr kein RLS
+aktivieren, sodass der Grant alles herausgibt, was der entfernte Server liefert; der vorgeschlagene
+Fix entzieht stattdessen den Grant.
+
 Eine Tabelle mit deaktivierter RLS, aber ohne Berechtigung für eine exponierte Rolle, wird *nicht*
 gemeldet. Sie ist nicht erreichbar, und ein Hinweis darauf wäre reines Rauschen.
 
@@ -267,9 +273,12 @@ Eine permissive Policy, deren `USING`- oder `WITH CHECK`-Ausdruck eine konstante
 `(true)`, `1 = 1`. Permissive Policies werden mit ODER verknüpft, sodass eine einzige dieser Regeln
 den Zeilenfilter der Tabelle erfüllt, ganz gleich, wie streng jede andere Policy ist.
 
-Wenn eine `RESTRICTIVE`-Policy denselben Befehl abdeckt, wird dies auf "medium" herabgestuft und als
-etwas gemeldet, das überprüft werden sollte, statt als Gewissheit, da restriktive Policies mit UND
-nach den mit ODER verknüpften permissiven Policies angewendet werden.
+Wenn `RESTRICTIVE`-Policies für denselben Befehl (`ALL` für ein permissives `ALL`) für jede
+exponierte Rolle gelten, die die permissive Policy erreicht, wird dies auf "medium" herabgestuft und
+als etwas gemeldet, das überprüft werden sollte, statt als Gewissheit, da restriktive Policies mit
+UND nach den mit ODER verknüpften permissiven Policies angewendet werden. Eine restriktive Policy,
+die andere Rollen oder einen anderen Befehl absichert, zählt nicht: Sie lässt die permissive Policy
+für alle offen, die sie nicht erfasst.
 
 ```sql
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -420,12 +429,14 @@ Heuristisch, da eine Junction-Table anhand ihrer Struktur abgeleitet wird. Wenn 
 
 ### rls-enabled-not-forced
 
-**RLS aktiviert, aber für den Tabelleneigentümer nicht erzwungen.** Medium oder High.
+**RLS aktiviert, aber für den Tabelleneigentümer nicht erzwungen.** Medium, High oder Critical.
 
-Ohne `FORCE` ist der Eigentümer der Tabelle von den eigenen Policies ausgenommen. Das ist harmlos, wenn
-der Eigentümer eine Provisioning-Rolle ist, mit der sich nichts verbindet, und schwerwiegend, wenn sich
-Ihre Anwendung als Eigentümer verbindet – daher ist dies **high**, wenn sich die Eigentümerrolle einloggen
-kann, und andernfalls **medium**.
+Ohne `FORCE` ist der Eigentümer der Tabelle von den eigenen Policies ausgenommen, ebenso jedes
+Mitglied der Eigentümerrolle. Das ist harmlos, wenn der Eigentümer eine Provisioning-Rolle ist, mit
+der sich nichts verbindet, und schwerwiegend, wenn sich Ihre Anwendung als Eigentümer verbindet –
+daher ist dies **critical**, wenn eine Rolle, als die ein nicht vertrauenswürdiger Aufrufer ankommt,
+die Tabelle besitzt oder Mitglied der Eigentümerrolle ist, **high**, wenn sich die Eigentümerrolle
+einloggen kann oder eine Rolle, die das kann, Mitglied von ihr ist, und andernfalls **medium**.
 
 Wenn der Eigentümer ein Superuser ist oder `BYPASSRLS` besitzt, bleibt es auf "medium" mit entsprechendem
 Hinweis: `FORCE` kann eine solche Rolle nicht einschränken, und etwas anderes zu suggerieren, wäre
@@ -459,8 +470,9 @@ Der klassische Fall sind Policies, die mit `TO authenticated` geschrieben wurden
 
 **Tabellenberechtigungen an PUBLIC vergeben.** Medium.
 
-Ein DML-Privileg, das an `PUBLIC` vergeben wurde. Selbst bei aktivierter RLS erweitert dies den Kreis
-derer, für die Policies ausgewertet werden, und ist fast nie beabsichtigt.
+Ein DML-Privileg, das an `PUBLIC` vergeben wurde, auf einer Tabelle oder einer Foreign Table. Selbst
+bei aktivierter RLS erweitert dies den Kreis derer, für die Policies ausgewertet werden, und ist
+fast nie beabsichtigt.
 
 ```sql
 REVOKE ALL ON "public"."your_table" FROM PUBLIC;

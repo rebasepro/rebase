@@ -152,7 +152,7 @@ Run `npx @rebasepro/rls-check --list-checks` for the catalog on your installed v
 
 | id | typical severity | confidence | what it looks for |
 | --- | --- | --- | --- |
-| `rls-disabled` | critical | certain | A table with RLS off that grants SELECT/INSERT/UPDATE/DELETE to a role an untrusted caller can reach. |
+| `rls-disabled` | critical | certain | A table with RLS off that grants SELECT/INSERT/UPDATE/DELETE to a role an untrusted caller can reach, or a foreign table (which cannot have RLS) with such a grant. |
 | `policy-always-true` | critical | certain | A permissive policy whose `USING` or `WITH CHECK` expression is always true. Downgraded to medium, and to heuristic, when `RESTRICTIVE` policies on the same command apply to every role it reaches. |
 | `view-bypasses-rls` | critical | certain | A view granted to an untrusted role that selects from an RLS-protected table and runs with its owner's privileges. Heuristic on servers before PG15, where `security_invoker` does not exist. |
 | `policy-anonymous-tautology` | varies | heuristic | An `auth.uid() IS NOT NULL`-shaped policy: it separates signed-in from signed-out callers and scopes no rows. Critical on Supabase-shaped databases, lower elsewhere. |
@@ -161,7 +161,7 @@ Run `npx @rebasepro/rls-check --list-checks` for the catalog on your installed v
 | `matview-bypasses-rls` | high | certain | A materialized view granted to an untrusted role whose defining query reads an RLS-protected table. Materialized views have no `security_invoker`. |
 | `unqualified-column-in-subquery` | high | heuristic | A bare column name in an `EXISTS`/`IN` subquery that exists on both the inner relation and the policy's own table, so Postgres binds it to the inner one. |
 | `junction-table-unprotected` | high | heuristic | A table that is essentially two foreign keys pointing at RLS-protected tables, with no row-level security of its own. |
-| `grant-to-public` | medium | certain | A table privilege granted to `PUBLIC`, which includes roles that do not exist yet. |
+| `grant-to-public` | medium | certain | A table or foreign-table privilege granted to `PUBLIC`, which includes roles that do not exist yet. |
 | `rls-enabled-no-policies` | medium | certain | RLS enabled and not a single policy defined, so the table denies everything. |
 | `rls-enabled-not-forced` | medium | certain | RLS enabled without `FORCE`, so the owning role is exempt from its own policies. |
 | `policy-role-unreachable` | medium | certain | Every policy on a table names roles that do not exist, cannot log in, and that no login role inherits. |

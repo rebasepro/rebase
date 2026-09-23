@@ -1,5 +1,5 @@
 ---
-sourceHash: 7262803dd6cb2e95
+sourceHash: 3165c5299e4bc1f3
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -67,10 +67,13 @@ se connecte à `host` avec le mot de passe `pa@ss`. Les encoder malgré tout n'e
 | `--quiet` | Constats uniquement — pas de bannière, pas de résumé |
 | `--no-color` | Désactive les couleurs ANSI (respecte également `NO_COLOR` et un stdout qui n'est pas un TTY) |
 
-Un identifiant inconnu passé à `--only` ou `--skip` génère une erreur plutôt qu'une opération sans effet silencieuse,
-car une faute de frappe affaiblirait discrètement l'analyse. Un `--role` qui ne figure pas dans `pg_roles` est une
-erreur pour la même raison : chaque vérification s'appuie sur un privilège (grant) accordé à un rôle exposé, donc
-un nom qui ne correspond à rien réduirait la couverture sans avertir.
+Un identifiant inconnu passé à `--only` ou `--skip` génère une erreur plutôt qu'une opération sans
+effet silencieuse, car une faute de frappe affaiblirait discrètement l'analyse. Un `--role` qui ne
+figure pas dans `pg_roles` est une erreur pour la même raison : chaque vérification s'appuie sur un
+privilège (grant) accordé à un rôle exposé, donc un nom qui ne correspond à rien réduirait la
+couverture sans avertir. Il en va de même d'un `--schema` qui ne désigne aucun schéma, qui sinon
+n'analyserait rien et le signalerait comme sain. Les noms de schéma sont sensibles à la casse :
+`Public` n'est pas `public`.
 
 L'en-tête du rapport liste les rôles que l'exécution a considérés comme exposés, afin que vous puissiez voir d'un coup
 d'œil si `No findings` couvrait bien le rôle avec lequel votre application se connecte :
@@ -238,6 +241,10 @@ La table a le RLS désactivé *et* accorde les privilèges `SELECT`/`INSERT`/`UP
 appelant non approuvé peut accéder (`anon`, `PUBLIC`, `web_anon`, `rebase_user`). Postgres n'applique aucun filtre
 par ligne, de sorte que les stratégies — s'il en existe — ne sont jamais consultées.
 
+Une table étrangère (foreign table) avec un tel privilège est également signalée. Postgres ne peut
+pas activer le RLS sur une telle table, donc le privilège livre tout ce que renvoie le serveur
+distant, et le correctif proposé révoque plutôt le privilège.
+
 Une table avec le RLS désactivé mais sans privilège accordé à un rôle exposé n'est *pas* signalée. Elle n'est
 pas accessible, et la signaler ne ferait qu'ajouter du bruit.
 
@@ -257,9 +264,12 @@ Une stratégie permissive dont l'expression `USING` ou `WITH CHECK` est une cons
 `(true)`, `1 = 1`. Les stratégies permissives sont combinées avec un opérateur OU (OR), de sorte qu'une seule d'entre
 elles suffit à satisfaire le filtre de ligne de la table, quelle que soit la rigueur de toutes les autres stratégies.
 
-Si une stratégie `RESTRICTIVE` couvre la même commande, ce constat est rétrogradé au niveau moyen et signalé
-comme un élément à vérifier plutôt que comme une certitude, car les stratégies restrictives s'appliquent avec un
-ET (AND) après la combinaison OU des stratégies permissives.
+Si des stratégies `RESTRICTIVE` sur la même commande (`ALL` pour un `ALL` permissif) s'appliquent à
+chaque rôle exposé qu'atteint la stratégie permissive, ce constat est rétrogradé au niveau moyen et
+signalé comme un élément à vérifier plutôt que comme une certitude, car les stratégies restrictives
+s'appliquent avec un ET (AND) après la combinaison OU des stratégies permissives. Une stratégie
+restrictive qui protège d'autres rôles ou une autre commande ne compte pas : elle laisse la
+stratégie permissive ouverte à tous ceux qu'elle ne couvre pas.
 
 ```sql
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -408,12 +418,15 @@ utilisez `--skip junction-table-unprotected`.
 
 ### rls-enabled-not-forced
 
-**RLS activé mais non forcé pour le propriétaire de la table.** Moyen ou élevé.
+**RLS activé mais non forcé pour le propriétaire de la table.** Moyen, élevé ou critique.
 
-Sans `FORCE`, le propriétaire de la table est dispensé de ses propres stratégies. Cela est sans danger lorsque le
-propriétaire est un rôle de provisionnement avec lequel rien ne se connecte, mais grave lorsque votre application
-se connecte en tant que propriétaire — ce constat est donc **élevé** (high) lorsque le rôle propriétaire peut se
-connecter, et **moyen** (medium) dans le cas contraire.
+Sans `FORCE`, le propriétaire de la table est dispensé de ses propres stratégies, tout comme chaque
+membre du rôle propriétaire. Cela est sans danger lorsque le propriétaire est un rôle de
+provisionnement avec lequel rien ne se connecte, mais grave lorsque votre application se connecte en
+tant que propriétaire — ce constat est donc **critique** (critical) lorsqu'un rôle sous lequel
+arrive un appelant non approuvé possède la table ou est membre du rôle propriétaire, **élevé**
+(high) lorsque le rôle propriétaire peut se connecter ou qu'un rôle qui le peut en est membre, et
+**moyen** (medium) dans le cas contraire.
 
 Si le propriétaire est un superutilisateur ou possède `BYPASSRLS`, il reste moyen et le mentionne : `FORCE` ne
 peut pas contraindre un tel rôle, et laisser entendre le contraire serait trompeur.
@@ -446,8 +459,9 @@ base de données dont les requêtes arrivent en réalité sous un autre rôle.
 
 **Privilèges de table accordés à PUBLIC.** Moyen.
 
-Un privilège DML accordé à `PUBLIC`. Même lorsque le RLS est activé, cela élargit les personnes pour lesquelles
-les stratégies sont évaluées, et ce n'est presque jamais délibéré.
+Un privilège DML accordé à `PUBLIC`, sur une table ou une table étrangère. Même lorsque le RLS est
+activé, cela élargit les personnes pour lesquelles les stratégies sont évaluées, et ce n'est presque
+jamais délibéré.
 
 ```sql
 REVOKE ALL ON "public"."your_table" FROM PUBLIC;
