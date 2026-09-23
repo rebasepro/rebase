@@ -1,7 +1,7 @@
 export const es = {
   "hero.badge": "Backend open-source · MIT · Cualquier Postgres",
   "hero.title.part1": "Un backend para tu Postgres.",
-  "hero.title.part2": "Y el panel que nunca escribes.",
+  "hero.title.part2": "Y un panel de administración que no tienes que construir.",
   "hero.subtitle":
     "REST, un SDK tipado, realtime, auth y storage para tu app; hojas de cálculo, multimedia, relaciones y roles para tu equipo. Nuestro propio CRM son veintitrés colecciones y ni una sola pantalla escrita a mano.",
   "hero.cta.demo": "Probar la demo",

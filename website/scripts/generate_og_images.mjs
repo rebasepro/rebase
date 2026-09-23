@@ -65,8 +65,8 @@ const CARDS = [
         // The home page's own H1 (`hero.title.*`). This card kept the retired
         // headline for eleven days after the hero changed, so every shared link
         // to the home page promised something the page no longer said.
-        title: "A backend for your Postgres. And the panel you never write.",
-        sub: "REST, a typed SDK, realtime, auth and storage for your app — and the admin panel your team works in."
+        title: "A backend for your Postgres. And an admin panel you don't have to build.",
+        sub: "REST, typed SDK, auth, realtime."
     },
     {
         slug: "docs",
