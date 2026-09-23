@@ -25,10 +25,13 @@ const AvatarInner: React.ForwardRefRenderFunction<HTMLButtonElement, AvatarProps
     },
     ref
 ) => {
-    const [isImageError, setIsImageError] = useState(false);
+    // The source that failed, not a flag: a flag outlived it, so once one URL
+    // failed every later one showed the initials too.
+    const [failedSrc, setFailedSrc] = useState<string | undefined>(undefined);
+    const isImageError = src !== undefined && failedSrc === src;
 
     const handleImageError = () => {
-        setIsImageError(true);
+        setFailedSrc(src);
     };
 
     return (

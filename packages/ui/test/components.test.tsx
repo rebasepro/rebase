@@ -12,7 +12,8 @@ import {
     MultiSelectItem,
     IconButton,
     TextField,
-    DebouncedTextField
+    DebouncedTextField,
+    Avatar
 } from "../src";
 import "@testing-library/jest-dom";
 
@@ -159,7 +160,23 @@ describe("UI Components", () => {
                 jest.useRealTimers();
             }
         });
+    });
 
+    /**
+     * One failed image left the avatar on its initials for good. The photo URL
+     * box in the user settings feeds the preview as you type, so the first
+     * keystroke failed to load and the finished URL never showed.
+     */
+    describe("Avatar Component", () => {
+        it("shows a new image after an earlier one failed", () => {
+            const { container, rerender } = render(<Avatar src="h" alt="me">J</Avatar>);
+            fireEvent.error(container.querySelector("img")!);
+            expect(container.querySelector("img")).toBeNull();
+            expect(screen.getByText("J")).toBeInTheDocument();
+
+            rerender(<Avatar src="https://example.com/me.png" alt="me">J</Avatar>);
+            expect(container.querySelector("img")).toHaveAttribute("src", "https://example.com/me.png");
+        });
     });
 
     /**
