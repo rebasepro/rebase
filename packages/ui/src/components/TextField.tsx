@@ -114,20 +114,14 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
             }
         }, []);
 
-        useEffect(() => {
-            if (type !== "number") return;
-            const handleWheel = (event: any) => {
-                if (event.target instanceof HTMLElement) event.target.blur();
-            };
-
-            const element = "current" in inputRef ? inputRef.current : inputRef;
-
-            element?.addEventListener("wheel", handleWheel);
-
-            return () => {
-                element?.removeEventListener("wheel", handleWheel);
-            };
-        }, [inputRef, type]);
+        // A focused number input steps its value on wheel, so scrolling the page
+        // past one edited it. It gives up the focus instead. A React handler
+        // rather than a listener on `inputRef.current`: a callback ref has no
+        // `current`, and reading one crashed the render.
+        const handleWheel = (event: React.WheelEvent<HTMLInputElement>) => {
+            if (type === "number") event.currentTarget.blur();
+            inputProps.onWheel?.(event);
+        };
 
         const input = multiline ? (
             <textarea
@@ -214,6 +208,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 autoFocus={autoFocus}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
+                onWheel={handleWheel}
                 type={type}
                 value={type === "number" && Number.isNaN(value) ? "" : value ?? ""}
                 onChange={onChange}

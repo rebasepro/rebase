@@ -171,6 +171,33 @@ describe("UI Components", () => {
                                                     onChange={() => { /* noop */ }}/>);
             expect(container.querySelector(multiline ? "textarea" : "input")).toBeDisabled();
         });
+
+        // A number field blurs itself on wheel, so scrolling the page past it does
+        // not change the number. It found the element through `inputRef.current`,
+        // and a callback ref has none: the render crashed.
+        it("takes a callback inputRef on a number field, and still blurs on wheel", () => {
+            let element: HTMLInputElement | null = null;
+            render(<TextField aria-label="stock" type="number" value={1} onChange={() => { /* noop */ }}
+                              inputRef={(node: HTMLInputElement | null) => { element = node; }}/>);
+
+            const field = screen.getByLabelText("stock");
+            expect(element).toBe(field);
+            act(() => field.focus());
+            fireEvent.wheel(field);
+            expect(field).not.toHaveFocus();
+        });
+
+        it("blurs a number field on wheel with the default ref too, and still calls the caller's onWheel", () => {
+            const onWheel = jest.fn();
+            render(<TextField aria-label="stock" type="number" value={1} onChange={() => { /* noop */ }}
+                              onWheel={onWheel}/>);
+
+            const field = screen.getByLabelText("stock");
+            act(() => field.focus());
+            fireEvent.wheel(field);
+            expect(field).not.toHaveFocus();
+            expect(onWheel).toHaveBeenCalledTimes(1);
+        });
     });
 
     /**
