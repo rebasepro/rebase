@@ -195,3 +195,71 @@ describe("a tenancy membership read", () => {
         expect(stored.rows).toEqual([{ org_id: "o1" }]);
     });
 });
+
+describe("a withheld relation, on the driver's reads", () => {
+    const bandsTable = pgTable("bands", { id: serial("id").primaryKey(), label: varchar("label") });
+    const peopleTable = pgTable("people", {
+        id: serial("id").primaryKey(),
+        name: varchar("name"),
+        bandId: integer("band_id")
+    });
+
+    function bands(): CollectionConfig {
+        return {
+            name: "Bands", slug: "bands", table: "bands",
+            properties: {
+                id: { name: "ID", type: "number", isId: "increment" },
+                label: { name: "Label", type: "string" }
+            }
+        } as unknown as CollectionConfig;
+    }
+
+    function people(): CollectionConfig {
+        return {
+            name: "People", slug: "people", table: "people",
+            properties: {
+                id: { name: "ID", type: "number", isId: "increment" },
+                name: { name: "Name", type: "string" },
+                band: {
+                    name: "Salary band", type: "relation", access: { read: ["hr"] },
+                    relation: { kind: "belongsTo", target: () => bands(), localKey: "band_id" }
+                }
+            }
+        } as unknown as CollectionConfig;
+    }
+
+    function peopleDriver(): PostgresBackendDriver {
+        const registry = new PostgresCollectionRegistry();
+        registry.registerMultiple([people(), bands()]);
+        registry.registerTable(peopleTable, "people");
+        registry.registerTable(bandsTable, "bands");
+        const orm = drizzle(db, { schema: { people: peopleTable, bands: bandsTable } }) as never;
+        return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
+    }
+
+    beforeEach(async () => {
+        await db.exec(`
+            CREATE TABLE bands (id serial PRIMARY KEY, label varchar);
+            CREATE TABLE people (id serial PRIMARY KEY, name varchar, band_id integer REFERENCES bands(id));
+            INSERT INTO bands (id, label) VALUES (7, 'director');
+            INSERT INTO people (name, band_id) VALUES ('ann', 7);
+        `);
+    });
+
+    it("is withheld, foreign key and all, from a single get and a listing", async () => {
+        const driver = await peopleDriver().withAuth(PLAIN_USER);
+        const one = await driver.fetchOne({ path: "people", id: 1 });
+        expect(one?.name).toBe("ann");
+        expect(one).not.toHaveProperty("band");
+        expect(one).not.toHaveProperty("bandId");
+        const [listed] = await driver.fetchCollection({ path: "people" });
+        expect(listed).not.toHaveProperty("band");
+        expect(listed).not.toHaveProperty("bandId");
+    });
+
+    it("is served to a caller holding the role", async () => {
+        const one = await (await peopleDriver().withAuth(HR_USER)).fetchOne({ path: "people", id: 1 });
+        expect(one?.bandId).toBe(7);
+        expect(one?.band).toMatchObject({ __type: "relation", id: "7", path: "bands" });
+    });
+});

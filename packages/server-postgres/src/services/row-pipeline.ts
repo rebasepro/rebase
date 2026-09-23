@@ -1,5 +1,5 @@
 import { CollectionConfig, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
-import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData } from "@rebasepro/common";
+import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn } from "@rebasepro/common";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
@@ -169,6 +169,11 @@ export function toRestValues(
  * an `update` that echoes the row back overwrite the real value with the null it
  * was handed.
  *
+ * A withheld to-one relation takes its foreign key with it. `bandId: 7` names
+ * the salary band exactly as `band: { id: 7 }` does, and the row carries the
+ * column beside the relation — so withholding only the relation withheld
+ * nothing.
+ *
  * `_matches` is filtered rather than deleted: it is the list of fields a text
  * search hit, and a field the caller cannot read must not appear in it even
  * though the array itself is theirs to see.
@@ -182,14 +187,25 @@ export function stripUnreadable(
 
     const viewer = currentFieldViewer();
     const hidden = new Set<string>();
+    const hide = (name: string) => {
+        hidden.add(name);
+        delete row[name];
+    };
+    // Resolved only when a withheld property is a relation, which is rare: this
+    // runs on every row of every read.
+    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
 
     for (const [key, property] of Object.entries(properties)) {
         if (canReadField(property, viewer)) continue;
-        hidden.add(key);
-        delete row[key];
-        if (property.columnName) {
-            hidden.add(property.columnName);
-            delete row[property.columnName];
+        hide(key);
+        if (property.columnName) hide(property.columnName);
+        if (property.type === "relation") {
+            relations ??= resolveCollectionRelations(collection);
+            const relation = findRelation(relations, key);
+            if (relation?.kind === "belongsTo") {
+                hide(fieldKeyForColumn(collection, relation.localKey));
+                hide(relation.localKey);
+            }
         }
     }
 

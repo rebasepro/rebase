@@ -212,3 +212,48 @@ describe("the ambient viewer", () => {
         });
     });
 });
+
+describe("a withheld to-one relation", () => {
+    /**
+     * The foreign key is the same fact as the relation it holds: `bandId: 7`
+     * names the salary band exactly as `band: { id: 7 }` does. Withholding the
+     * relation and serving the column beside it withheld nothing.
+     */
+    const bands = {
+        name: "Bands",
+        slug: "bands",
+        properties: {
+            id: { name: "Id", type: "number", isId: "increment" },
+            label: { name: "Label", type: "string" }
+        }
+    } as unknown as CollectionConfig;
+
+    const people = {
+        name: "People",
+        slug: "people",
+        properties: {
+            id: { name: "Id", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" },
+            band: {
+                name: "Salary band",
+                type: "relation",
+                access: { read: ["hr"] },
+                relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    const person = () => ({ id: 1, name: "Ann", bandId: 7 });
+
+    it("takes its foreign key with it, under the wire name and the column name", () => {
+        const rest = withFieldViewer({ roles: ["staff"] }, () => toRestRow(person(), people, registry));
+        expect(rest).toEqual({ id: 1, name: "Ann" });
+        const raw = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable({ id: 1, band_id: 7 }, people));
+        expect(raw).toEqual({ id: 1 });
+    });
+
+    it("keeps it for a caller who may read the relation", () => {
+        const rest = withFieldViewer({ roles: ["hr"] }, () => toRestRow(person(), people, registry));
+        expect(rest.bandId).toBe(7);
+    });
+});
