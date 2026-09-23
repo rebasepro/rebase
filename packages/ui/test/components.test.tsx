@@ -16,7 +16,8 @@ import {
     Avatar,
     Select,
     SelectItem,
-    DateTimeField
+    DateTimeField,
+    Slider
 } from "../src";
 import "@testing-library/jest-dom";
 
@@ -280,6 +281,20 @@ describe("UI Components", () => {
             ["America/New_York", "2024-03-10T02:30", "2024-03-10T07:30:00.000Z"]
         ])("stores %s %s as %s", (timezone, wallClock, utc) => {
             expect(typeIn(timezone, wallClock)).toBe(utc);
+        });
+    });
+
+    // The thumbs were counted from `value` alone, so an uncontrolled range
+    // slider rendered one thumb for its two values.
+    describe("Slider Component", () => {
+        it("renders a thumb per value when uncontrolled", () => {
+            render(<Slider defaultValue={[20, 80]}/>);
+            expect(screen.getAllByRole("slider")).toHaveLength(2);
+        });
+
+        it("renders a thumb per value when controlled", () => {
+            render(<Slider value={[10, 50, 90]} onValueChange={() => { /* noop */ }}/>);
+            expect(screen.getAllByRole("slider")).toHaveLength(3);
         });
     });
 

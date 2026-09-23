@@ -94,7 +94,7 @@ const Slider = React.forwardRef<
                     />
                 </SliderPrimitive.Track>
 
-                {(props.value ?? [0]).map((_, index) => <SliderThumb
+                {(props.value ?? props.defaultValue ?? [0]).map((_, index) => <SliderThumb
                     key={index}
                     index={index}
                     props={props}
