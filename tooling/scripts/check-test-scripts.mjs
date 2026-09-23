@@ -2,8 +2,8 @@
 /**
  * Every workspace package declares a way to run its tests — once, and watching.
  *
- * `packages/firebase` is the one that does not, and the consequence is the
- * reason this gate exists rather than a lint rule: it *has* tests —
+ * `packages/firebase` was the one that did not, and the consequence is the
+ * reason this gate exists rather than a lint rule: it *had* tests —
  * `test/firestore.test.ts`, five of them, importing `@jest/globals`, which is a
  * declared devDependency — and they have never executed. Not once, in any
  * pipeline. `pnpm -r test` walks the packages that define the script, so a
@@ -22,6 +22,10 @@
  *
  * The list is exact: a package that gains a test script fails until it is taken
  * off, so the file cannot quietly describe a repository that has moved on.
+ *
+ * The firebase entry came off on 2026-09-23, when a bug sweep wrote 60 more tests
+ * there and wired `jest` + `ts-jest` (pinned to the versions the lockfile already
+ * held) from the primary checkout. The list is empty now; keep it that way.
  *
  * ## And `test:watch`
  *
@@ -45,11 +49,7 @@ const PACKAGES = path.join(ROOT, "packages");
  *
  * Not a place to add things. Every entry is tests that cannot run.
  */
-const KNOWN_WITHOUT_TESTS = {
-    firebase:
-        "has test/firestore.test.ts (5 tests, written against @jest/globals) and no runner to execute " +
-        "them. Needs `vitest` or `jest`+`ts-jest` as a devDependency, which needs a lockfile update."
-};
+const KNOWN_WITHOUT_TESTS = {};
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
