@@ -359,7 +359,7 @@ export const postsTagsRelations = drizzleRelations(postsTags, ({ one, many }) =>
     "tag_id": one(tags, {
         fields: [postsTags.tag_id],
         references: [tags.id],
-        relationName: "posts_tags_tag_id"
+        relationName: "posts"
     })
 }));
 
