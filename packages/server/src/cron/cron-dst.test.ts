@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
+/** @jest-environment ./test/helpers/madrid-tz-environment.cjs */
+import { describe, it, expect } from "@jest/globals";
 import { parseCronExpression, findMostRecentSlot } from "./cron-scheduler";
 
 /**
@@ -14,22 +15,15 @@ import { parseCronExpression, findMostRecentSlot } from "./cron-scheduler";
  * for an hour. A schedule that named its zone went the same way, since only the
  * matching read the zone; the stepping was still the host's.
  *
- * `TZ` is changed for this file only, and restored: Node re-reads it when it is
- * assigned, and every `Date` below the assignment sees it.
+ * The host zone is set to Europe/Madrid by the environment named in the
+ * docblock above, not here: Jest hands a test file its own copy of
+ * `process.env`, so assigning `TZ` in the file never reached Node — the file
+ * passed on a machine already on Madrid time and failed in CI's UTC. The guard
+ * below is what caught it.
  */
 
+/** The zone the environment sets, and the one the zone-naming schedules below name. */
 const HOST_ZONE = "Europe/Madrid";
-let originalTz: string | undefined;
-
-beforeAll(() => {
-    originalTz = process.env.TZ;
-    process.env.TZ = HOST_ZONE;
-});
-
-afterAll(() => {
-    if (originalTz === undefined) delete process.env.TZ;
-    else process.env.TZ = originalTz;
-});
 
 const MINUTE = 60_000;
 
