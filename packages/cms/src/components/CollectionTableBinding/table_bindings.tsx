@@ -15,7 +15,7 @@ import { TableReferenceField } from "./fields/TableReferenceField";
 import { TableRelationField } from "./fields/TableRelationField";
 import { TableRelationSelectorField } from "./fields/TableRelationSelectorField";
 
-import { getPreviewSizeFrom } from "../../preview/util";
+import { getDatePropertyMode, getDatePropertyTimezone, getPreviewSizeFrom } from "../../preview/util";
 
 export interface TableFieldBindingProps<T = unknown> {
     propertyKey: string;
@@ -197,7 +197,8 @@ export function getTableBindingForProperty(
                         error={validationError ?? error}
                         disabled={disabled}
                         small={getPreviewSizeFrom(size) !== "medium"}
-                        mode={(property as DateProperty).mode}
+                        mode={getDatePropertyMode(property as DateProperty)}
+                        timezone={getDatePropertyTimezone(property as DateProperty)}
                         focused={selected}
                         internalValue={internalValue as Date}
                         updateValue={updateValue}

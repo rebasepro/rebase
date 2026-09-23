@@ -17,6 +17,7 @@ import { BooleanFilterField } from "./BooleanFilterField";
 import { DateTimeFilterField } from "./DateTimeFilterField";
 import { ReferenceFilterField } from "./ReferenceFilterField";
 import { RelationFilterField } from "./RelationFilterField";
+import { getDatePropertyMode, getDatePropertyTimezone } from "../../../preview/util";
 
 export interface FilterFieldBindingInput {
     /** Key of the property being filtered (the column id). */
@@ -180,7 +181,8 @@ function DefaultFilterField({
         return <DateTimeFilterField value={value}
             setValue={setValue}
             name={propertyKey}
-            mode={property.mode}
+            mode={getDatePropertyMode(property)}
+            timezone={getDatePropertyTimezone(property)}
             isArray={isArray}
             operators={operators}
             title={title}/>;
