@@ -320,3 +320,19 @@ describe("the exit-code line", () => {
         expect(render({}, { ...OPTIONS, failOn: "none" })).toContain("--fail-on none, so findings never fail the run");
     });
 });
+
+describe("the footer's exit code", () => {
+    it("says 2 for a degraded scan, which is what the process exits with", () => {
+        const html = render({
+            findings: [],
+            diagnostics: {
+                degraded: [{ what: "table privileges", error: "permission denied" }],
+                tlsVerificationDisabled: false,
+                excludedSchemas: [],
+                unrecognizedGrantees: []
+            }
+        });
+        expect(html).toContain("Exit code 2");
+        expect(html).not.toContain("Exit code 0");
+    });
+});

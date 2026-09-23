@@ -25,17 +25,12 @@ import { join } from "node:path";
 import { CHECKS, runChecks } from "./checks";
 import { introspectWithDiagnostics, UnknownRoleError, UnknownSchemaError, unsupportedConnectionKeywords } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
-import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
+import { EXIT_ERROR, EXIT_OK, exitCodeFor, renderCheckCatalog, renderJson, renderReport } from "./report";
 import { renderHtml } from "./report-html";
 import type { DbSnapshot, Finding, ScanResult, Severity } from "./types";
 import { SEVERITIES } from "./types";
 
-/** Clean, or nothing at or above `--fail-on`. */
-export const EXIT_OK = 0;
-/** Findings at or above `--fail-on`. */
-export const EXIT_FINDINGS = 1;
-/** The scan did not happen: bad arguments, bad connection, timeout. */
-export const EXIT_ERROR = 2;
+export { EXIT_OK, EXIT_FINDINGS, EXIT_ERROR, exitCodeFor } from "./report";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_FAIL_ON: Severity = "high";
@@ -109,24 +104,6 @@ export function selectCheckIds(options: { only?: string[]; skip?: string[] }): s
     return CHECKS.filter((check) => (only === null || only.has(check.id)) && !skip.has(check.id)).map(
         (check) => check.id
     );
-}
-
-/**
- * The verdict, as an exit code.
- *
- * Pulled out of `runCli` so it can be tested: `runCli` needs a database, and
- * the one line that decides whether CI goes red had no coverage at all —
- * deleting it broke no test.
- *
- * A degraded scan exits 2, the same code a crash uses, rather than 0. Checks
- * whose catalogue reads failed return no findings, which is indistinguishable
- * from finding none, so exiting 0 would have the scanner answer "no problems"
- * to a question it never managed to ask. Both codes mean the same thing here:
- * no verdict.
- */
-export function exitCodeFor(result: ScanResult, failOn: Severity | "none"): number {
-    if (result.diagnostics.degraded.length > 0) return EXIT_ERROR;
-    return exceedsThreshold(result.findings, failOn) ? EXIT_FINDINGS : EXIT_OK;
 }
 
 export function buildScanResult(

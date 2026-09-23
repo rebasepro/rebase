@@ -772,4 +772,23 @@ describe("exitCodeFor", () => {
     it("is 2 for a degraded scan even when findings would not meet the threshold", () => {
         expect(exitCodeFor(result({ findings: [], diagnostics: broken }), "none")).toBe(2);
     });
+
+    // The summary names the code the process exits with. It was worked out
+    // on its own, without the degraded rule, so an incomplete scan printed
+    // "Exit code 0" or "Exit code 1" and then exited 2.
+    it.each([
+        ["a clean scan", [], clean, "high"],
+        ["a finding at the threshold", [finding()], clean, "high"],
+        ["--fail-on none", [finding()], clean, "none"],
+        ["a degraded scan", [], broken, "high"],
+        ["a degraded scan with findings", [finding()], broken, "high"],
+        ["a degraded scan under --fail-on none", [finding()], broken, "none"]
+    ] as const)("is the code the summary prints, for %s", (_label, findings, diagnostics, failOn) => {
+        const scan = result({ findings: [...findings], diagnostics });
+        const code = exitCodeFor(scan, failOn);
+        const text = renderReport(scan, { color: false, failOn, width: 88 });
+
+        expect(text).toContain(`Exit code ${code}`);
+        expect(text.match(/Exit code \d/g)).toEqual([`Exit code ${code}`]);
+    });
 });

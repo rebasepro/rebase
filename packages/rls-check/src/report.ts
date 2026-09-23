@@ -50,6 +50,54 @@ export function exceedsThreshold(findings: readonly Finding[], failOn: Severity 
     return findings.some((finding) => severityRank(finding.severity) >= threshold);
 }
 
+/** Clean, or nothing at or above `--fail-on`. */
+export const EXIT_OK = 0;
+/** Findings at or above `--fail-on`. */
+export const EXIT_FINDINGS = 1;
+/** The scan did not happen: bad arguments, bad connection, timeout. */
+export const EXIT_ERROR = 2;
+
+/**
+ * The verdict, as an exit code.
+ *
+ * Pulled out of `runCli` so it can be tested: `runCli` needs a database, and
+ * the one line that decides whether CI goes red had no coverage at all —
+ * deleting it broke no test.
+ *
+ * A degraded scan exits 2, the same code a crash uses, rather than 0. Checks
+ * whose catalogue reads failed return no findings, which is indistinguishable
+ * from finding none, so exiting 0 would have the scanner answer "no problems"
+ * to a question it never managed to ask. Both codes mean the same thing here:
+ * no verdict.
+ */
+export function exitCodeFor(result: ScanResult, failOn: Severity | "none"): number {
+    if ((result.diagnostics?.degraded.length ?? 0) > 0) return EXIT_ERROR;
+    return exceedsThreshold(result.findings, failOn) ? EXIT_FINDINGS : EXIT_OK;
+}
+
+/**
+ * The summary's last word: the code the process exits with, and why.
+ *
+ * Both reports print it, and both used to work it out for themselves from the
+ * findings alone, so a degraded scan printed "Exit code 0" or "Exit code 1"
+ * and then exited 2. It comes from {@link exitCodeFor} now, the same function
+ * the CLI exits with.
+ */
+export function exitVerdict(result: ScanResult, failOn: Severity | "none"): { code: number; reason: string } {
+    const code = exitCodeFor(result, failOn);
+    if (code === EXIT_ERROR) {
+        const failed = result.diagnostics?.degraded.length ?? 0;
+        return {
+            code,
+            reason: `the scan was incomplete (${failed} catalogue ${failed === 1 ? "read" : "reads"} failed), so there is no verdict.`
+        };
+    }
+    if (failOn === "none") return { code, reason: "--fail-on none, so findings never fail the run." };
+    return code === EXIT_FINDINGS
+        ? { code, reason: `at least one finding is "${failOn}" or worse (--fail-on ${failOn}).` }
+        : { code, reason: `nothing at or above "${failOn}" (--fail-on ${failOn}).` };
+}
+
 // ---------------------------------------------------------------------------
 // Colour
 // ---------------------------------------------------------------------------
@@ -567,22 +615,8 @@ function renderSummary(
     }
     out.push("");
 
-    const failing = exceedsThreshold(result.findings, options.failOn);
-    if (options.failOn === "none") {
-        out.push(`  ${style.dim("Exit code 0 — --fail-on none, so findings never fail the run.")}`);
-    } else if (failing) {
-        out.push(
-            `  ${style.bold("Exit code 1")} ${style.dim(
-                `— at least one finding is "${options.failOn}" or worse (--fail-on ${options.failOn}).`
-            )}`
-        );
-    } else {
-        out.push(
-            `  ${style.bold("Exit code 0")} ${style.dim(
-                `— nothing at or above "${options.failOn}" (--fail-on ${options.failOn}).`
-            )}`
-        );
-    }
+    const verdict = exitVerdict(result, options.failOn);
+    out.push(`  ${style.bold(`Exit code ${verdict.code}`)} ${style.dim(`— ${verdict.reason}`)}`);
     out.push(`  ${style.dim(`Scanned ${result.scannedAt} · read-only, and nothing left this machine.`)}`);
     out.push("");
     out.push(style.dim("rls-check is free and maintained by the team behind Rebase — https://rebase.pro"));

@@ -41,7 +41,7 @@
 
 import type { Finding, ScanResult, Severity } from "./types";
 import { SEVERITIES } from "./types";
-import { formatTarget, severityRank } from "./report";
+import { exitVerdict, formatTarget, severityRank } from "./report";
 
 /**
  * The one primitive this whole file rests on.
@@ -405,15 +405,8 @@ function renderFindingGroups(findings: readonly Finding[], opts: { headings?: bo
 }
 
 function renderFooter(result: ScanResult, options: HtmlRenderOptions): string {
-    const failing = options.failOn !== "none" &&
-        result.findings.some((finding) => severityRank(finding.severity) >= severityRank(options.failOn as Severity));
-
-    const exitLine =
-        options.failOn === "none"
-            ? "Exit code 0 — --fail-on none, so findings never fail the run."
-            : failing
-                ? `Exit code 1 — at least one finding is "${options.failOn}" or worse (--fail-on ${options.failOn}).`
-                : `Exit code 0 — nothing at or above "${options.failOn}" (--fail-on ${options.failOn}).`;
+    const verdict = exitVerdict(result, options.failOn);
+    const exitLine = `Exit code ${verdict.code} — ${verdict.reason}`;
 
     return `<footer><p>${escapeHtml(exitLine)}</p><p>${escapeHtml(
         `Scanned ${result.scannedAt} · read-only, and nothing left this machine. This file makes no network requests.`
