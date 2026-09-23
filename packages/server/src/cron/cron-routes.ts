@@ -1,8 +1,18 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { HonoEnv } from "../api/types";
-import type { CronScheduler } from "./cron-scheduler";
+import { isAlreadyExecutingSkip, type CronScheduler } from "./cron-scheduler";
 import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
+import { logger } from "../utils/logger.js";
+
+/** Who made a change, as `cron_job_state.updated_by` records it. */
+function actorOf(c: Context<HonoEnv>): string | undefined {
+    const user = c.get("user");
+    if (typeof user === "object" && user !== null && typeof user.uid === "string") return user.uid;
+    const apiKey = c.get("apiKey");
+    return apiKey ? `api-key:${apiKey.id}` : undefined;
+}
 
 /**
  * Create admin REST routes for managing cron jobs.
@@ -12,7 +22,12 @@ import { resolveListLimitParam } from "../api/rest/query-parser";
  *   GET    /:id       → get a single job's status
  *   POST   /:id/trigger → manually trigger a job
  *   GET    /:id/logs  → get execution logs for a job
- *   PUT    /:id       → update job (enable/disable)
+ *   PUT    /:id       → update job (enable/disable, or `null` to follow the code)
+ *
+ * Every answer about a job's state is read from the store, not from this
+ * process's memory: the process serving these routes is often not the one
+ * running the jobs (the `api` role never starts its scheduler), and is only
+ * ever one replica of several.
  */
 export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
@@ -21,8 +36,8 @@ export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<Ho
     router.onError(errorHandler);
 
     // List all jobs
-    router.get("/", (c) => {
-        const jobs = scheduler.listJobs();
+    router.get("/", async (c) => {
+        const jobs = await scheduler.fetchJobs();
         // A file that failed to load is not a job, so it appears nowhere in
         // this list — and "my job is missing" and "my job is not scheduled"
         // look identical from here. Say how many were dropped, as the
@@ -56,9 +71,9 @@ export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<Ho
     });
 
     // Get single job
-    router.get("/:id", (c) => {
+    router.get("/:id", async (c) => {
         const id = c.req.param("id");
-        const job = scheduler.getJob(id);
+        const job = await scheduler.fetchJob(id);
         if (!job) {
             throw ApiError.notFound(`Cron job "${id}" not found`);
         }
@@ -74,8 +89,19 @@ export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<Ho
         }
 
         const log = await scheduler.triggerJob(id);
+        // Nothing ran, so this is not a success: the job is executing already —
+        // on this process, or on whichever one holds its run lease (the worker,
+        // seen from the api role). The skip is in the run history either way;
+        // `details.log` carries it, and its line names the process.
+        if (log && isAlreadyExecutingSkip(log)) {
+            throw ApiError.conflict(
+                `Cron job "${id}" is already executing — try again when that run has finished`,
+                "CRON_JOB_ALREADY_EXECUTING",
+                { log }
+            );
+        }
         return c.json({ log,
-job: scheduler.getJob(id) });
+job: await scheduler.fetchJob(id) });
     });
 
     // Get job logs
@@ -97,21 +123,33 @@ job: scheduler.getJob(id) });
         return c.json({ logs });
     });
 
-    // Enable/disable a job
+    // Enable/disable a job — for every process, and across redeploys
     router.put("/:id", async (c) => {
         const id = c.req.param("id");
-        const body = await c.req.json().catch(() => ({})) as { enabled: boolean };
+        const body: unknown = await c.req.json().catch(() => ({}));
+        const enabled = typeof body === "object" && body !== null && "enabled" in body ? body.enabled : undefined;
 
-        if (typeof body.enabled !== "boolean") {
-            throw ApiError.badRequest("Missing 'enabled' boolean in body");
+        if (typeof enabled !== "boolean" && enabled !== null) {
+            throw ApiError.badRequest(
+                "Missing 'enabled' in body: true or false to override the job's code, or null to follow it again"
+            );
         }
 
-        const job = scheduler.setJobEnabled(id, body.enabled);
-        if (!job) {
+        if (!scheduler.getJob(id)) {
             throw ApiError.notFound(`Cron job "${id}" not found`);
         }
 
-        return c.json({ job });
+        try {
+            await scheduler.persistJobEnabled(id, enabled, actorOf(c));
+        } catch (err) {
+            logger.error(`[cron] Could not save the enabled state of "${id}"`, { error: err });
+            throw ApiError.serviceUnavailable(
+                `The change to cron job "${id}" could not be saved, so no process was changed. ` +
+                "The server log has the reason."
+            );
+        }
+
+        return c.json({ job: await scheduler.fetchJob(id) });
     });
 
     return router;

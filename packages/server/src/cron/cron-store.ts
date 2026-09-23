@@ -6,11 +6,14 @@ import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper, hasInCauseChain } from "../boot/ddl-bootstrap.js";
 
 /**
- * Persistence layer for cron job execution logs.
+ * Persistence layer for cron: the run history (`rebase.cron_logs`), the slot
+ * claims that keep replicas from running the same slot twice
+ * (`rebase.cron_claims`), and each job's shared state — the enabled override
+ * and the run lease — in `rebase.cron_job_state`.
  *
- * Uses the DataDriver's `admin.executeSql` capability to store logs in a
- * `rebase.cron_logs` table. Falls back gracefully if the driver doesn't
- * support SQL (e.g. MongoDB) — in that case, no persistence occurs.
+ * Uses the DataDriver's `admin.executeSql` capability. Falls back gracefully if
+ * the driver doesn't support SQL (e.g. MongoDB) — in that case, no persistence
+ * occurs, and a pause or a trigger's "already executing" is per process.
  */
 export interface CronStore {
     /** Ensure the backing table exists. Called once on startup. */
@@ -54,12 +57,94 @@ export interface CronStore {
      * uncoordinated (always run).
      */
     tryClaimRun?(jobId: string, slot: string): Promise<boolean>;
+
+    // ─── Fleet-wide job state ────────────────────────────────────────
+    //
+    // Everything below lives in `rebase.cron_job_state`, one row per job that
+    // has ever been paused, resumed or run under a lease. It exists because the
+    // alternative — each process's memory — is per process: a pause served by
+    // one replica stopped only that replica, and on a split deployment the
+    // process serving the admin API is not the one whose timers fire, so a
+    // pause there stopped nothing at all.
+    //
+    // Optional, like `tryClaimRun`, so a custom store written against the
+    // older interface keeps working: without them a pause is local to the
+    // process that served it and a manual trigger is guarded only in-process.
+
+    /**
+     * Persist a job's enabled override: `true` or `false`, or `null` to hand the
+     * decision back to the code's own `enabled`. Survives restarts and
+     * redeploys — that is the point. Throws when the write fails.
+     */
+    saveEnabledOverride?(jobId: string, enabled: boolean | null, updatedBy?: string): Promise<void>;
+
+    /**
+     * The persisted state of the jobs asked about. A job with no row has no
+     * override. `runningBy` is set only while a lease is live.
+     *
+     * Throws when the store cannot tell. The scheduler falls back to the code's
+     * `enabled` then — a scheduled run fails open — and a listing falls back to
+     * what this process knows.
+     */
+    fetchJobStates?(jobIds: readonly string[]): Promise<Map<string, CronJobPersistedState>>;
+
+    /**
+     * Take the job's run lease unless another process holds a live one.
+     *
+     * The cross-process half of "already executing": a manual trigger, a
+     * scheduled run and a catch-up all take it, so none of them overlaps a run
+     * another replica — or the worker, from the api role — is making. The lease
+     * expires on its own after `ttlSeconds`, which is what frees a job whose
+     * holder crashed.
+     *
+     * Throws when the store cannot tell.
+     */
+    tryAcquireRunLease?(jobId: string, holder: string, ttlSeconds: number): Promise<CronRunLease>;
+
+    /** Release a lease taken with {@link tryAcquireRunLease} — only if `holder` still holds it. */
+    releaseRunLease?(jobId: string, holder: string): Promise<void>;
+
+    /**
+     * Run count, failure count and last run of each job, read from
+     * `cron_logs` — for a process whose scheduler is not started (the `api`
+     * role), which runs nothing and so counts nothing of its own.
+     */
+    fetchRunSummaries?(jobIds: readonly string[]): Promise<Map<string, CronJobRunSummary>>;
+}
+
+/** One job's row in `rebase.cron_job_state`, as the scheduler reads it. */
+export interface CronJobPersistedState {
+    /** The override, or `null` to follow the code's `enabled`. */
+    enabled: boolean | null;
+    /** Who holds the run lease, when a live one is held. */
+    runningBy?: string;
+}
+
+/** The outcome of {@link CronStore.tryAcquireRunLease}. */
+export type CronRunLease =
+    | { acquired: true }
+    | { acquired: false; holder?: string };
+
+/** A job's run history in brief, read from `cron_logs`. */
+export interface CronJobRunSummary {
+    totalRuns: number;
+    totalFailures: number;
+    lastRunAt?: string;
+    lastDurationMs?: number;
+    lastSuccess?: boolean;
+    lastError?: string;
 }
 
 // ─── SQL-based implementation ────────────────────────────────────────
 
 const TABLE = "rebase.cron_logs";
 const CLAIMS_TABLE = "rebase.cron_claims";
+const STATE_TABLE = "rebase.cron_job_state";
+
+/** `$1, $2, …` for `count` values, starting at `$first`. */
+function placeholders(count: number, first = 1): string {
+    return Array.from({ length: count }, (_, i) => `$${first + i}`).join(", ");
+}
 
 /**
  * Claims older than this are garbage-collected on startup — all but each
@@ -94,7 +179,7 @@ function isUniqueViolation(err: unknown): boolean {
     );
 }
 
-export function createCronStore(driver: DataDriver): CronStore | undefined {
+export function createCronStore(driver: DataDriver): Required<CronStore> | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
         logger.warn("⚠️ [cron-store] DataDriver does not support SQL admin — cron logs will not be persisted.");
@@ -136,12 +221,37 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                 ON ${TABLE}(job_id, started_at DESC)
             `);
 
+            // What a process whose scheduler is not started reads to show a
+            // job's failure count. Partial, so it holds only the failed runs:
+            // the count reads those and nothing else, and a healthy job's
+            // inserts never touch it.
+            await ddl.ensureObject("Creating idx_cron_logs_job_failures", `
+                CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures
+                ON ${TABLE}(job_id) WHERE NOT success
+            `);
+
             await ddl.ensureObject(`Creating ${CLAIMS_TABLE}`, `
                 CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
                     job_id TEXT NOT NULL,
                     slot TIMESTAMPTZ NOT NULL,
                     claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                     PRIMARY KEY (job_id, slot)
+                )
+            `);
+
+            // One row per job that has been paused, resumed or run under a
+            // lease. `enabled` NULL means "follow the code"; `updated_at` and
+            // `updated_by` say who last set it, and stay NULL on a row that has
+            // only ever held a lease. Created here rather than by a migration,
+            // so a database that predates it gains it on its next boot.
+            await ddl.ensureObject(`Creating ${STATE_TABLE}`, `
+                CREATE TABLE IF NOT EXISTS ${STATE_TABLE} (
+                    job_id TEXT PRIMARY KEY,
+                    enabled BOOLEAN,
+                    updated_at TIMESTAMPTZ,
+                    updated_by TEXT,
+                    running_until TIMESTAMPTZ,
+                    running_by TEXT
                 )
             `);
 
@@ -152,9 +262,10 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
             // privilege revocation, leaving the claims table writable by end
             // users on an instance that reported nothing but a warning about
             // log persistence.
-            const [logsReady, claimsReady] = await Promise.all([
+            const [logsReady, claimsReady, stateReady] = await Promise.all([
                 ddl.isReadable(TABLE),
-                ddl.isReadable(CLAIMS_TABLE)
+                ddl.isReadable(CLAIMS_TABLE),
+                ddl.isReadable(STATE_TABLE)
             ]);
 
             if (claimsReady) {
@@ -222,8 +333,15 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                 await ddl.step("Revoking end-user access to cron_claims", () =>
                     exec(revokeInternalTableSql("rebase", "cron_claims")));
             }
+            // A writable `cron_job_state` would let any signed-in user pause a
+            // job for the whole fleet, or hold its run lease so that nothing
+            // runs it.
+            if (stateReady) {
+                await ddl.step("Revoking end-user access to cron_job_state", () =>
+                    exec(revokeInternalTableSql("rebase", "cron_job_state")));
+            }
 
-            if (logsReady && claimsReady) {
+            if (logsReady && claimsReady && stateReady) {
                 logger.info("✅ Cron logs table ready");
                 return;
             }
@@ -238,6 +356,13 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
             }
             if (!logsReady) {
                 logger.warn(`⚠️ [cron-store] ${TABLE} is unavailable — cron run history will not be persisted.`);
+            }
+            if (!stateReady) {
+                logger.warn(
+                    `⚠️ [cron-store] ${STATE_TABLE} is unavailable — pausing a job reaches only the process ` +
+                    "that served the request, and jobs run as their code declares on every other one. " +
+                    "A manual trigger is not kept off a run another process is making."
+                );
             }
         },
 
@@ -332,11 +457,127 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                 // failing closed.
                 throw err;
             }
+        },
+
+        async saveEnabledOverride(jobId: string, enabled: boolean | null, updatedBy?: string): Promise<void> {
+            await exec(
+                `INSERT INTO ${STATE_TABLE} (job_id, enabled, updated_at, updated_by)
+                 VALUES ($1, $2::boolean, now(), $3)
+                 ON CONFLICT (job_id) DO UPDATE
+                     SET enabled = EXCLUDED.enabled, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+                { params: [jobId, enabled, updatedBy ?? null] }
+            );
+        },
+
+        async fetchJobStates(jobIds: readonly string[]): Promise<Map<string, CronJobPersistedState>> {
+            const states = new Map<string, CronJobPersistedState>();
+            if (jobIds.length === 0) return states;
+            const rows = await exec(
+                `SELECT job_id, enabled,
+                        CASE WHEN running_until > now() THEN running_by END AS running_by
+                 FROM ${STATE_TABLE}
+                 WHERE job_id IN (${placeholders(jobIds.length)})`,
+                { params: [...jobIds] }
+            );
+            for (const row of rows ?? []) {
+                states.set(String(row.job_id), {
+                    enabled: typeof row.enabled === "boolean" ? row.enabled : null,
+                    runningBy: typeof row.running_by === "string" ? row.running_by : undefined
+                });
+            }
+            return states;
+        },
+
+        async tryAcquireRunLease(jobId: string, holder: string, ttlSeconds: number): Promise<CronRunLease> {
+            // One statement, always one row. The insert covers a job that has
+            // no row yet; the conditional update covers one whose lease is
+            // absent or expired, and does nothing over a live one — so of two
+            // processes racing, the second waits on the first's row and then
+            // finds it held. The outer SELECT sees the table as it was before
+            // this statement, which is exactly the holder that refused us.
+            const rows = await exec(
+                `WITH attempt AS (
+                     INSERT INTO ${STATE_TABLE} AS s (job_id, running_until, running_by)
+                     VALUES ($1, now() + make_interval(secs => $2::double precision), $3)
+                     ON CONFLICT (job_id) DO UPDATE
+                         SET running_until = EXCLUDED.running_until, running_by = EXCLUDED.running_by
+                         WHERE s.running_until IS NULL OR s.running_until <= now()
+                     RETURNING s.job_id
+                 )
+                 SELECT EXISTS (SELECT 1 FROM attempt) AS acquired,
+                        (SELECT running_by FROM ${STATE_TABLE}
+                         WHERE job_id = $1 AND running_until > now()) AS holder`,
+                { params: [jobId, ttlSeconds, holder] }
+            );
+            const row = rows?.[0];
+            if (!row) {
+                throw new Error(`The run lease for "${jobId}" got no answer from the database`);
+            }
+            if (row.acquired === true) return { acquired: true };
+            return {
+                acquired: false,
+                holder: typeof row.holder === "string" ? row.holder : undefined
+            };
+        },
+
+        async releaseRunLease(jobId: string, holder: string): Promise<void> {
+            await exec(
+                `UPDATE ${STATE_TABLE}
+                 SET running_until = NULL, running_by = NULL
+                 WHERE job_id = $1 AND running_by = $2`,
+                { params: [jobId, holder] }
+            );
+        },
+
+        async fetchRunSummaries(jobIds: readonly string[]): Promise<Map<string, CronJobRunSummary>> {
+            const summaries = new Map<string, CronJobRunSummary>();
+            if (jobIds.length === 0) return summaries;
+            // Per job, never a GROUP BY over the whole table: each subquery
+            // reads one job's range of `idx_cron_logs_job` (the failures, the
+            // partial `idx_cron_logs_job_failures`), and the last run is one
+            // index probe. Jobs no longer registered are never read at all.
+            const rows = await exec(
+                `SELECT j.job_id,
+                        (SELECT count(*)::int FROM ${TABLE} l WHERE l.job_id = j.job_id) AS total_runs,
+                        (SELECT count(*)::int FROM ${TABLE} l WHERE l.job_id = j.job_id AND NOT l.success) AS total_failures,
+                        last.started_at, last.duration_ms, last.success, last.error
+                 FROM (VALUES ${jobIds.map((_, i) => `($${i + 1}::text)`).join(", ")}) AS j(job_id)
+                 LEFT JOIN LATERAL (
+                     SELECT l.started_at, l.duration_ms, l.success, l.error
+                     FROM ${TABLE} l
+                     WHERE l.job_id = j.job_id
+                     ORDER BY l.started_at DESC
+                     LIMIT 1
+                 ) AS last ON true`,
+                { params: [...jobIds] }
+            );
+            for (const row of rows ?? []) {
+                const summary: CronJobRunSummary = {
+                    totalRuns: Number(row.total_runs ?? 0),
+                    totalFailures: Number(row.total_failures ?? 0)
+                };
+                const lastRunAt = toIsoString(row.started_at);
+                if (lastRunAt) {
+                    summary.lastRunAt = lastRunAt;
+                    summary.lastDurationMs = Number(row.duration_ms);
+                    summary.lastSuccess = row.success === true;
+                    if (typeof row.error === "string") summary.lastError = row.error;
+                }
+                summaries.set(String(row.job_id), summary);
+            }
+            return summaries;
         }
     };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+/** A TIMESTAMPTZ as the driver returned it — a `Date` or a string — in ISO form. */
+function toIsoString(value: unknown): string | undefined {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === "string" || typeof value === "number") return new Date(value).toISOString();
+    return undefined;
+}
 
 function rowToLogEntry(row: Record<string, unknown>): CronJobLogEntry {
     return {

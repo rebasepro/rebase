@@ -6,8 +6,10 @@ import type {
     CronJobContext
 } from "@rebasepro/types";
 import type { RebaseServerClient } from "@rebasepro/types";
+import { hostname } from "node:os";
+import { randomUUID } from "node:crypto";
 import type { LoadedCronJob } from "./cron-loader";
-import type { CronStore } from "./cron-store";
+import type { CronJobRunSummary, CronStore } from "./cron-store";
 import { logger, redactSensitiveText } from "../utils/logger.js";
 import { buildScaleToZeroWarning } from "./scale-to-zero.js";
 
@@ -326,6 +328,45 @@ function setLongTimeout(callback: () => void, delayMs: number): () => void {
     return () => clearTimeout(handle);
 }
 
+/** A run's timeout when its definition names none. */
+const DEFAULT_TIMEOUT_SECONDS = 300;
+
+/**
+ * How long a run lease outlasts the run's own timeout.
+ *
+ * The lease is timed on the database's clock from the moment it is taken, the
+ * timeout on this process's from a moment later; without a margin a lease
+ * could lapse a beat before its run is aborted and released, and another
+ * process start the job alongside it.
+ */
+const LEASE_GRACE_SECONDS = 30;
+
+/**
+ * The lease a run with no timeout (`timeoutSeconds: Infinity`) holds.
+ *
+ * A lease is released when its run ends, so this only matters in two cases.
+ * The holder crashed: the job is blocked — every trigger answered "already
+ * executing", every slot skipped — until the lease lapses, so it must lapse
+ * within an hour rather than never. The run is still going after an hour:
+ * from then on another process may start the job beside it. A job that
+ * legitimately runs for hours should say so with a finite `timeoutSeconds`,
+ * which its lease then follows.
+ */
+const MAX_UNBOUNDED_LEASE_SECONDS = 3600;
+
+/**
+ * Whether a log entry records a run that did not happen because one was
+ * already executing — on this process, or on another that holds the job's run
+ * lease. The shape is the documented marker of a skip, the one the Studio
+ * panel reads.
+ */
+export function isAlreadyExecutingSkip(entry: CronJobLogEntry): boolean {
+    const result = entry.result;
+    return typeof result === "object" && result !== null
+        && "skipped" in result && result.skipped === true
+        && "reason" in result && result.reason === "already_executing";
+}
+
 /**
  * Why `timeoutSeconds` cannot be used, or `undefined` when it can. Infinity is
  * a timeout that never fires; zero, a negative number or NaN would fail every
@@ -357,6 +398,26 @@ interface RegisteredJob {
 }
 
 /**
+ * What this process learned from the store about a job, for a listing: another
+ * process running it, and — on a process whose scheduler is not started — its
+ * run history and the slot the scheduler will fire next.
+ */
+interface FleetView {
+    runningElsewhere?: boolean;
+    summary?: CronJobRunSummary;
+    nextRunAt?: Date;
+}
+
+/**
+ * Whether a run may go ahead. `token` is the lease to release when it ends —
+ * absent when no lease was taken, because the store has none or could not
+ * answer.
+ */
+type LeaseOutcome =
+    | { acquired: true; token?: string }
+    | { acquired: false; holder?: string };
+
+/**
  * A job the scheduler refused, and why.
  *
  * It is not a `CronJobStatus`: it has no state, no next run and no counters,
@@ -383,6 +444,12 @@ export class CronScheduler {
     private inFlight = new Set<Promise<unknown>>();
     /** The controller that ends each executing run — what `stop()` aborts. */
     private runControllers = new Set<AbortController>();
+    /**
+     * This process, as a run lease names it: what "already executing on …"
+     * tells an operator. Each run adds its own suffix, so a release can only
+     * ever clear the lease that run took.
+     */
+    private readonly instanceLabel = `${hostname()}:${process.pid}`;
 
     /**
      * Set the server singleton to make it available to cron job handlers.
@@ -476,7 +543,7 @@ export class CronScheduler {
 
             const enabled = loaded.definition.enabled !== false;
 
-            this.jobs.set(loaded.id, {
+            const job: RegisteredJob = {
                 id: loaded.id,
                 definition: loaded.definition,
                 enabled,
@@ -485,10 +552,11 @@ export class CronScheduler {
                 totalFailures: 0,
                 logs: [],
                 executing: false
-            });
+            };
+            this.jobs.set(loaded.id, job);
 
             // If the scheduler is already running, auto-schedule new jobs
-            if (this.started && enabled) {
+            if (this.started && this.shouldArm(job)) {
                 this.scheduleNext(loaded.id);
             }
         }
@@ -520,7 +588,7 @@ export class CronScheduler {
         }
 
         for (const [id, job] of this.jobs) {
-            if (job.enabled) {
+            if (this.shouldArm(job)) {
                 this.scheduleNext(id);
             }
         }
@@ -607,6 +675,33 @@ export class CronScheduler {
     }
 
     /**
+     * {@link listJobs}, as the fleet sees it rather than this process alone.
+     *
+     * Reads the store: every job's enabled state — a pause another replica
+     * made — and whether another process holds its run lease. On a process
+     * whose scheduler is not started (the `api` role) it also reads each job's
+     * run count and last run from `cron_logs`, since that process runs nothing
+     * and its own counters would say 0 runs for a job the worker has run a
+     * thousand times.
+     *
+     * A store that cannot answer leaves this process's own view, with a
+     * warning: a listing is not worth failing.
+     */
+    async fetchJobs(): Promise<CronJobStatus[]> {
+        const jobs = [...this.jobs.values()];
+        const views = await this.readFleet(jobs);
+        return jobs.map(job => this.toStatus(job, views.get(job.id)));
+    }
+
+    /** {@link getJob}, as {@link fetchJobs} reads it. */
+    async fetchJob(id: string): Promise<CronJobStatus | undefined> {
+        const job = this.jobs.get(id);
+        if (!job) return undefined;
+        const views = await this.readFleet([job]);
+        return this.toStatus(job, views.get(id));
+    }
+
+    /**
      * Get log entries for a job.
      */
     getJobLogs(id: string, limit?: number): CronJobLogEntry[] {
@@ -630,31 +725,59 @@ export class CronScheduler {
     }
 
     /**
-     * Enable or disable a job at runtime.
+     * Enable or disable a job in this process only. `null` returns it to what
+     * its code declares.
+     *
+     * {@link persistJobEnabled} is what the admin API calls: this alone is
+     * forgotten on restart and reaches no other replica.
      */
-    setJobEnabled(id: string, enabled: boolean): CronJobStatus | undefined {
+    setJobEnabled(id: string, enabled: boolean | null): CronJobStatus | undefined {
         const job = this.jobs.get(id);
         if (!job) return undefined;
 
-        job.enabled = enabled;
+        const effective = enabled ?? this.codeEnabled(job);
+        this.applyEnabled(job, effective);
 
-        if (enabled && this.started) {
-            job.state = "idle";
+        if (effective && this.started) {
             this.scheduleNext(id);
-        } else if (!enabled) {
+        } else if (!this.shouldArm(job)) {
             this.stopJob(id);
-            job.state = "disabled";
         }
 
         return this.toStatus(job);
     }
 
     /**
+     * Enable or disable a job for every process that runs it, and keep it that
+     * way across restarts and redeploys: `true` or `false` overrides the code's
+     * `enabled`, `null` hands the decision back to it.
+     *
+     * The override is written to the store first, and only then applied here,
+     * so a write that fails throws and changes nothing — a pause that only the
+     * replica serving the request would honour is the failure this exists to
+     * end. Every scheduler reads the override when a slot comes due, before it
+     * claims the slot.
+     *
+     * Without a store that keeps the state (a driver with no SQL, persistence
+     * switched off, a custom store) this is {@link setJobEnabled}: local, and
+     * gone on restart.
+     */
+    async persistJobEnabled(id: string, enabled: boolean | null, updatedBy?: string): Promise<CronJobStatus | undefined> {
+        if (!this.jobs.has(id)) return undefined;
+        if (this.store?.saveEnabledOverride) {
+            await this.store.saveEnabledOverride(id, enabled, updatedBy);
+        }
+        return this.setJobEnabled(id, enabled);
+    }
+
+    /**
      * Manually trigger a job execution immediately.
      *
      * Returns `undefined` if the job doesn't exist.
-     * If the job is currently executing, returns the log entry with
-     * a `skipped: true` result rather than running concurrently.
+     * If the job is currently executing — here, or on another process that
+     * holds its run lease — returns the log entry with a `skipped: true`
+     * result rather than running concurrently; {@link isAlreadyExecutingSkip}
+     * recognises it.
      */
     async triggerJob(id: string): Promise<CronJobLogEntry | undefined> {
         const job = this.jobs.get(id);
@@ -683,8 +806,9 @@ export class CronScheduler {
      * `success: true` is deliberate: nothing failed. The `result.skipped` flag
      * and the reason are what distinguishes it, and the Studio panel reads them.
      */
-    private recordSkip(job: RegisteredJob, reason: string, manual: boolean): CronJobLogEntry {
+    private recordSkip(job: RegisteredJob, reason: string, manual: boolean, runningOn?: string): CronJobLogEntry {
         const now = new Date().toISOString();
+        const why = reason === "already_executing" ? "the previous run has not finished" : reason;
         const logEntry: CronJobLogEntry = {
             jobId: job.id,
             startedAt: now,
@@ -692,21 +816,183 @@ export class CronScheduler {
             durationMs: 0,
             success: true,
             result: { skipped: true, reason },
-            logs: [`Skipped: ${reason === "already_executing" ? "the previous run has not finished" : reason}`],
+            logs: [`Skipped: ${why}${runningOn ? ` — it is running on ${runningOn}` : ""}`],
             manual
         };
 
         job.logs.push(logEntry);
         if (job.logs.length > MAX_LOGS_PER_JOB) job.logs.shift();
 
-        this.store?.insertLog(logEntry).catch((persistErr) => {
-            logger.error(`[cron] Failed to persist skip for "${job.id}"`, { error: persistErr });
-        });
+        // Tracked like a run's own write, so a shutdown does not close the pool
+        // under it.
+        if (this.store) {
+            this.track(this.store.insertLog(logEntry).catch((persistErr) => {
+                logger.error(`[cron] Failed to persist skip for "${job.id}"`, { error: persistErr });
+            }));
+        }
 
         return logEntry;
     }
 
     // ─── Internal ────────────────────────────────────────────────────
+
+    /** What the job's own definition says, before any override. */
+    private codeEnabled(job: RegisteredJob): boolean {
+        return job.definition.enabled !== false;
+    }
+
+    /**
+     * Whether the enabled state lives in the store, where every process reads
+     * it, rather than in this process alone.
+     */
+    private sharesEnabledState(): boolean {
+        return Boolean(this.store?.fetchJobStates && this.store.saveEnabledOverride);
+    }
+
+    /**
+     * Whether a job gets a timer here. A job paused in this process's memory
+     * needs none — nothing but this process can resume it. A job whose state
+     * the store keeps does, paused or not: another replica may resume it, and
+     * reading the state when its slot comes due is how this one finds out.
+     */
+    private shouldArm(job: RegisteredJob): boolean {
+        return job.enabled || this.sharesEnabledState();
+    }
+
+    /** Set a job's enabled flag, and its state with it unless a run is in progress. */
+    private applyEnabled(job: RegisteredJob, enabled: boolean): void {
+        job.enabled = enabled;
+        if (job.executing) return;
+        if (!enabled) job.state = "disabled";
+        else if (job.state === "disabled") job.state = "idle";
+    }
+
+    /**
+     * Whether a job may run now: the store's override when it keeps one, else
+     * the code's `enabled`.
+     *
+     * One query per fire, before the slot is claimed — a paused job does not
+     * spend its slot. A store that cannot answer falls back to the code's
+     * `enabled`, with a warning: a scheduled run fails open, as it does when
+     * the claims table cannot answer, because a broken state table must not
+     * silently stop every job.
+     */
+    private async isEnabledNow(job: RegisteredJob): Promise<boolean> {
+        if (!this.store?.fetchJobStates || !this.sharesEnabledState()) return job.enabled;
+        try {
+            const state = (await this.store.fetchJobStates([job.id])).get(job.id);
+            const enabled = state?.enabled ?? this.codeEnabled(job);
+            this.applyEnabled(job, enabled);
+            return enabled;
+        } catch (err) {
+            const enabled = this.codeEnabled(job);
+            logger.warn(
+                `[cron] Could not read the enabled state of "${job.id}" — falling back to the code's ` +
+                `enabled (${enabled}); a pause made from the admin API is not being honoured`,
+                { error: err }
+            );
+            return enabled;
+        }
+    }
+
+    /**
+     * How long a run's lease lasts: the run's timeout and a grace, so that a
+     * crashed holder frees the job once its run would have been aborted
+     * anyway. No timeout gets {@link MAX_UNBOUNDED_LEASE_SECONDS}.
+     */
+    private leaseSeconds(job: RegisteredJob): number {
+        const timeout = job.definition.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
+        return Number.isFinite(timeout) ? timeout + LEASE_GRACE_SECONDS : MAX_UNBOUNDED_LEASE_SECONDS;
+    }
+
+    /**
+     * Take the job's run lease, the cross-process half of "already
+     * executing". A store without leases, or one that cannot answer, lets the
+     * run go ahead unleased — with a warning in the second case — the same way
+     * a claim that cannot answer does.
+     */
+    private async acquireLease(job: RegisteredJob): Promise<LeaseOutcome> {
+        if (!this.store?.tryAcquireRunLease) return { acquired: true };
+        const token = `${this.instanceLabel}#${randomUUID().slice(0, 8)}`;
+        try {
+            const lease = await this.store.tryAcquireRunLease(job.id, token, this.leaseSeconds(job));
+            return lease.acquired ? { acquired: true, token } : lease;
+        } catch (err) {
+            logger.warn(
+                `[cron] Could not take the run lease for "${job.id}" — running without it, ` +
+                "so another process may run it at the same time",
+                { error: err }
+            );
+            return { acquired: true };
+        }
+    }
+
+    /** Release a lease this run took. A release that fails leaves it to lapse. */
+    private async releaseLease(job: RegisteredJob, token: string): Promise<void> {
+        try {
+            await this.store?.releaseRunLease?.(job.id, token);
+        } catch (err) {
+            logger.warn(
+                `[cron] Could not release the run lease for "${job.id}" — it lapses on its own ` +
+                `within ${this.leaseSeconds(job)}s`,
+                { error: err }
+            );
+        }
+    }
+
+    /**
+     * What the store says about `jobs` beyond this process — see
+     * {@link fetchJobs}. Applies the enabled state it reads, and returns the
+     * rest as a view for {@link toStatus}. Never throws.
+     */
+    private async readFleet(jobs: RegisteredJob[]): Promise<Map<string, FleetView>> {
+        const views = new Map<string, FleetView>();
+        const viewOf = (id: string): FleetView => {
+            let view = views.get(id);
+            if (!view) {
+                view = {};
+                views.set(id, view);
+            }
+            return view;
+        };
+        const store = this.store;
+        const ids = jobs.map(job => job.id);
+
+        if (store?.fetchJobStates && this.sharesEnabledState() && ids.length > 0) {
+            try {
+                const states = await store.fetchJobStates(ids);
+                for (const job of jobs) {
+                    const state = states.get(job.id);
+                    this.applyEnabled(job, state?.enabled ?? this.codeEnabled(job));
+                    if (state?.runningBy && !job.executing) viewOf(job.id).runningElsewhere = true;
+                }
+            } catch (err) {
+                logger.warn("[cron] Could not read the jobs' shared state — listing what this process knows", { error: err });
+            }
+        }
+
+        // Only where nothing is scheduled: a started scheduler has its own next
+        // slots, and counts its own runs, seeded from the same table at start.
+        if (!this.started) {
+            const now = new Date();
+            for (const job of jobs) {
+                try {
+                    viewOf(job.id).nextRunAt = parseCronExpression(job.definition.schedule, now, job.definition.timezone);
+                } catch {
+                    // A schedule with no reachable slot has no next run to show.
+                }
+            }
+            if (store?.fetchRunSummaries && ids.length > 0) {
+                try {
+                    const summaries = await store.fetchRunSummaries(ids);
+                    for (const [id, summary] of summaries) viewOf(id).summary = summary;
+                } catch (err) {
+                    logger.warn("[cron] Could not read the jobs' run history — listing what this process knows", { error: err });
+                }
+            }
+        }
+        return views;
+    }
 
     /**
      * Warn once at start when the process looks like it is running on a
@@ -741,7 +1027,7 @@ export class CronScheduler {
      */
     private scheduleNext(id: string): void {
         const job = this.jobs.get(id);
-        if (!job || !job.enabled || !this.started) return;
+        if (!job || !this.started || !this.shouldArm(job)) return;
 
         // Clear any previously scheduled timer to prevent double-firing
         this.stopJob(id);
@@ -764,7 +1050,7 @@ export class CronScheduler {
             // cron expression stays the source of truth across the hops.
             if (delay > MAX_TIMER_DELAY_MS) {
                 const hop = setTimeout(() => {
-                    if (this.started && job.enabled) this.scheduleNext(id);
+                    if (this.started && this.shouldArm(job)) this.scheduleNext(id);
                 }, MAX_TIMER_DELAY_MS);
                 if (hop && typeof hop === "object" && "unref" in hop) {
                     hop.unref();
@@ -774,21 +1060,9 @@ export class CronScheduler {
             }
 
             const timer = setTimeout(async () => {
-                // Re-check state: scheduler may have been stopped or job disabled
-                // between when we scheduled and when we fire
-                if (!job.enabled || !this.started) return;
-
-                // Concurrency guard: if somehow we're already executing, skip
-                if (job.executing) {
-                    logger.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
-                    // Recorded as well as logged: a job that keeps overlapping
-                    // has outgrown its schedule, and that is visible in the run
-                    // history or nowhere.
-                    this.recordSkip(job, "already_executing", false);
-                    // Re-schedule to try again later
-                    this.scheduleNext(id);
-                    return;
-                }
+                // Re-check state: the scheduler may have been stopped between
+                // when we scheduled and when we fire
+                if (!this.started) return;
 
                 // A timer can wake before its slot: a delay past the 32-bit
                 // ceiling, a clock stepped backwards by NTP, a VM resuming from
@@ -798,6 +1072,28 @@ export class CronScheduler {
                 // clock and re-arm instead; only the fire that is genuinely due
                 // may claim.
                 if (Date.now() < nextRun.getTime()) {
+                    this.scheduleNext(id);
+                    return;
+                }
+
+                // Paused or resumed — perhaps by another replica, perhaps
+                // before this process started. Asked of the store at every
+                // fire, and before the claim, so a paused job leaves its slot
+                // unspent.
+                if (!(await this.isEnabledNow(job))) {
+                    if (this.started && this.shouldArm(job)) this.scheduleNext(id);
+                    return;
+                }
+                if (!this.started) return;
+
+                // Concurrency guard: if somehow we're already executing, skip
+                if (job.executing) {
+                    logger.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
+                    // Recorded as well as logged: a job that keeps overlapping
+                    // has outgrown its schedule, and that is visible in the run
+                    // history or nowhere.
+                    this.recordSkip(job, "already_executing", false);
+                    // Re-schedule to try again later
                     this.scheduleNext(id);
                     return;
                 }
@@ -818,17 +1114,20 @@ export class CronScheduler {
                     }
                     if (!claimed) {
                         logger.info(`[cron] Slot ${nextRun.toISOString()} for "${id}" claimed by another instance — skipping`);
-                        if (this.started && job.enabled) {
+                        if (this.started && this.shouldArm(job)) {
                             this.scheduleNext(id);
                         }
                         return;
                     }
                 }
 
+                // Takes the run lease: a manual trigger in progress on another
+                // process — the api role's, say — turns this slot into a
+                // recorded skip rather than a second run beside it.
                 await this.executeJob(job, false);
 
-                // Schedule the next tick (only if still started + enabled)
-                if (this.started && job.enabled) {
+                // Schedule the next tick (only if still started + armed)
+                if (this.started && this.shouldArm(job)) {
                     this.scheduleNext(id);
                 }
             }, delay);
@@ -864,8 +1163,12 @@ export class CronScheduler {
      * otherwise ticking correctly.
      */
     private async catchUpMissedSlots(): Promise<void> {
+        // Every job with a window whose state the store may override, not only
+        // the ones enabled here: a job the code disables can be resumed from
+        // the admin API, and one it enables can be paused there. Each is asked
+        // below, before its claim.
         const candidates = [...this.jobs.values()].filter(
-            job => job.enabled && (job.definition.catchUpWindowSeconds ?? 0) > 0
+            job => this.shouldArm(job) && (job.definition.catchUpWindowSeconds ?? 0) > 0
         );
         if (candidates.length === 0) return;
 
@@ -885,7 +1188,10 @@ export class CronScheduler {
 
         for (const job of candidates) {
             try {
-                if (!this.started || !job.enabled || job.executing) continue;
+                if (!this.started || job.executing) continue;
+                // The persisted pause outlives the deploy that is catching up.
+                if (!(await this.isEnabledNow(job))) continue;
+                if (!this.started || job.executing) continue;
 
                 const windowSeconds = job.definition.catchUpWindowSeconds!;
                 const from = new Date(now.getTime() - windowSeconds * 1000);
@@ -973,15 +1279,31 @@ export class CronScheduler {
         abort: AbortController,
         seedLog?: string
     ): Promise<CronJobLogEntry> {
+        // Checked here as well as by each caller, because each caller awaits
+        // something (a claim, a state read) between its own check and this.
+        if (job.executing) {
+            return this.recordSkip(job, "already_executing", manual);
+        }
+        // Set executing flag — prevents concurrent runs. Taken before the lease
+        // is awaited, so a second trigger on this process cannot slip in.
+        job.executing = true;
+
+        // The lease is what keeps the other processes off: the worker's
+        // scheduled run and the api role's manual trigger never saw each
+        // other's in-process flag.
+        const lease = await this.acquireLease(job);
+        if (!lease.acquired) {
+            job.executing = false;
+            logger.warn(`[cron] Skipping ${manual ? "manual trigger" : "scheduled run"} of "${job.id}" — it is running on ${lease.holder ?? "another process"}`);
+            return this.recordSkip(job, "already_executing", manual, lease.holder ?? "another process");
+        }
+
         const startedAt = new Date();
         // A caller-supplied first line, stored with the run's own output. A
         // catch-up uses it to say so in the persisted log, where an operator
         // reading `cron_logs` will actually see it — `manual` is the only other
         // provenance the entry carries, and a catch-up is not manual.
         const capturedLogs: string[] = seedLog ? [seedLog] : [];
-
-        // Set executing flag — prevents concurrent runs
-        job.executing = true;
 
         const ctx: CronJobContext = {
             jobId: job.id,
@@ -1025,7 +1347,7 @@ export class CronScheduler {
             // Race with timeout. Past the 32-bit timer ceiling a plain
             // setTimeout fires after 1ms, so a month-long timeout would fail
             // every run at once; Infinity is no timeout at all.
-            const timeout = (job.definition.timeoutSeconds ?? 300) * 1000;
+            const timeout = (job.definition.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) * 1000;
             const cancelTimeout = Number.isFinite(timeout)
                 ? setLongTimeout(
                     () => abort.abort(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)),
@@ -1048,6 +1370,9 @@ export class CronScheduler {
             error = redactSensitiveText(err instanceof Error ? err.message : String(err));
             job.totalFailures++;
         } finally {
+            // The lease before the flag: in between, a trigger on this process
+            // would pass the flag and then find its own process's lease held.
+            if (lease.token) await this.releaseLease(job, lease.token);
             // Always clear executing flag — even on catastrophic errors
             job.executing = false;
         }
@@ -1094,7 +1419,19 @@ export class CronScheduler {
         return logEntry;
     }
 
-    private toStatus(job: RegisteredJob): CronJobStatus {
+    /**
+     * A job's status: this process's own record, overlaid with what `view`
+     * read from the store. A paused job shows no next run, even where its
+     * timer stays armed to read the state again at that slot.
+     */
+    private toStatus(job: RegisteredJob, view: FleetView = {}): CronJobStatus {
+        const summary = view.summary;
+        const nextRunAt = job.enabled ? (job.nextRunAt ?? view.nextRunAt) : undefined;
+        let state = job.state;
+        if (!job.executing) {
+            if (view.runningElsewhere) state = "running";
+            else if (summary && job.enabled) state = summary.lastSuccess === false ? "error" : "idle";
+        }
         return {
             id: job.id,
             // Same fallback the two `listJobs` paths already applied: `name` is
@@ -1103,13 +1440,13 @@ export class CronScheduler {
             description: job.definition.description,
             schedule: job.definition.schedule,
             enabled: job.enabled,
-            state: job.state,
-            lastRunAt: job.lastRunAt?.toISOString(),
-            nextRunAt: job.nextRunAt?.toISOString(),
-            lastDurationMs: job.lastDurationMs,
-            lastError: job.lastError,
-            totalRuns: job.totalRuns,
-            totalFailures: job.totalFailures
+            state,
+            lastRunAt: summary ? summary.lastRunAt : job.lastRunAt?.toISOString(),
+            nextRunAt: nextRunAt?.toISOString(),
+            lastDurationMs: summary ? summary.lastDurationMs : job.lastDurationMs,
+            lastError: summary ? (summary.lastSuccess === false ? summary.lastError : undefined) : job.lastError,
+            totalRuns: summary ? summary.totalRuns : job.totalRuns,
+            totalFailures: summary ? summary.totalFailures : job.totalFailures
         };
     }
 }

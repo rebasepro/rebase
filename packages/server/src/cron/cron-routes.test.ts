@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { CronScheduler } from "./cron-scheduler";
 import { createCronRoutes } from "./cron-routes";
 import type { LoadedCronJob } from "./cron-loader";
+import type { CronRunLease, CronStore } from "./cron-store";
 import type { CronJobDefinition } from "@rebasepro/types";
+import type { HonoEnv } from "../api/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -30,6 +32,54 @@ function makeJob(
 async function jsonBody(res: Response): Promise<Record<string, unknown>> {
     return res.json() as Promise<Record<string, unknown>>;
 }
+
+/**
+ * The fleet-wide half of a cron store: what the routes reach through the
+ * scheduler when another process shares the database. `leaseHolder` set means
+ * another process is running every job.
+ */
+function makeStateStore(options: { leaseHolder?: string; overrides?: Record<string, boolean | null> } = {}) {
+    const overrides = new Map<string, boolean | null>(Object.entries(options.overrides ?? {}));
+    return {
+        overrides,
+        ensureTable: async () => {},
+        insertLog: async () => {},
+        fetchLogs: async () => [],
+        fetchJobStats: async () => new Map(),
+        tryClaimRun: async () => true,
+        saveEnabledOverride: jest.fn(async (jobId: string, enabled: boolean | null, _updatedBy?: string) => {
+            overrides.set(jobId, enabled);
+        }),
+        fetchJobStates: async (jobIds: readonly string[]) => new Map(
+            jobIds.filter(id => overrides.has(id)).map(id => [id, { enabled: overrides.get(id) ?? null }])
+        ),
+        tryAcquireRunLease: async (): Promise<CronRunLease> => options.leaseHolder
+            ? { acquired: false, holder: options.leaseHolder }
+            : { acquired: true },
+        releaseRunLease: async () => {},
+        fetchRunSummaries: async () => new Map()
+    } satisfies Required<CronStore> & { overrides: Map<string, boolean | null> };
+}
+
+/** The routes over a scheduler with `store`, behind a stand-in for the admin gate's identity. */
+function appWithStore(store: CronStore, jobs: LoadedCronJob[]): { app: Hono<HonoEnv>; scheduler: CronScheduler } {
+    const scheduler = new CronScheduler();
+    scheduler.setStore(store);
+    scheduler.registerJobs(jobs);
+    const app = new Hono<HonoEnv>();
+    app.use("*", async (c, next) => {
+        c.set("user", { uid: "admin-1", roles: ["admin"] });
+        await next();
+    });
+    app.route("/cron", createCronRoutes(scheduler));
+    return { app, scheduler };
+}
+
+const put = (enabled: unknown): RequestInit => ({
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled })
+});
 
 // ─── Tests ──────────────────────────────────────────────────────────
 
@@ -180,6 +230,37 @@ description: "First job" }),
             });
             expect(res.status).toBe(404);
         });
+
+        it("answers 409 while another process is running the job", async () => {
+            // The api role triggering a job the worker is running used to start
+            // a second run beside it; the lease now says no, and says where.
+            const store = makeStateStore({ leaseHolder: "worker-7:1#ab12cd34" });
+            let ran = false;
+            const { app: fleetApp } = appWithStore(store, [makeJob("job-a", { handler: () => { ran = true; } })]);
+
+            const res = await fleetApp.request("/cron/job-a/trigger", { method: "POST" });
+
+            expect(res.status).toBe(409);
+            const error = (await jsonBody(res)).error as Record<string, unknown>;
+            expect(error.code).toBe("CRON_JOB_ALREADY_EXECUTING");
+            expect(error.message).toMatch(/already executing/);
+            const log = (error.details as Record<string, unknown>).log as Record<string, unknown>;
+            expect((log.logs as string[]).join("\n")).toContain("worker-7:1#ab12cd34");
+            expect(ran).toBe(false);
+        });
+
+        it("answers 409 while this process is running the job", async () => {
+            let release!: () => void;
+            const gate = new Promise<void>(r => { release = r; });
+            scheduler.registerJobs([makeJob("slow", { handler: async () => { await gate; } })]);
+
+            const first = app.request("/cron/slow/trigger", { method: "POST" });
+            const second = await app.request("/cron/slow/trigger", { method: "POST" });
+
+            expect(second.status).toBe(409);
+            release();
+            expect((await first).status).toBe(200);
+        });
     });
 
     // ── GET /:id/logs ───────────────────────────────────────────────
@@ -278,6 +359,71 @@ description: "First job" }),
                 body: JSON.stringify({ enabled: false })
             });
             expect(res.status).toBe(404);
+        });
+
+        it("saves the change for every process, with who made it", async () => {
+            const store = makeStateStore();
+            const { app: fleetApp } = appWithStore(store, [makeJob("job-a")]);
+
+            const res = await fleetApp.request("/cron/job-a", put(false));
+
+            expect(res.status).toBe(200);
+            expect(store.saveEnabledOverride).toHaveBeenCalledWith("job-a", false, "admin-1");
+            expect(((await jsonBody(res)).job as Record<string, unknown>).enabled).toBe(false);
+        });
+
+        it("hands a job back to its code with null", async () => {
+            const store = makeStateStore({ overrides: { "job-a": true } });
+            const { app: fleetApp } = appWithStore(store, [makeJob("job-a", { enabled: false })]);
+
+            const res = await fleetApp.request("/cron/job-a", put(null));
+
+            expect(res.status).toBe(200);
+            expect(store.saveEnabledOverride).toHaveBeenCalledWith("job-a", null, "admin-1");
+            // The code says disabled, so that is what it is again.
+            expect(((await jsonBody(res)).job as Record<string, unknown>).enabled).toBe(false);
+        });
+
+        it("refuses anything but true, false or null", async () => {
+            const res = await app.request("/cron/job-a", put("no"));
+            expect(res.status).toBe(400);
+        });
+
+        it("answers 503 and changes nothing when the change cannot be saved", async () => {
+            // A 200 here would be a pause only the replica serving it honours —
+            // the failure the saved state exists to end.
+            const store = makeStateStore();
+            store.saveEnabledOverride.mockRejectedValue(new Error("relation \"rebase.cron_job_state\" does not exist"));
+            const { app: fleetApp, scheduler: fleetScheduler } = appWithStore(store, [makeJob("job-a")]);
+
+            const res = await fleetApp.request("/cron/job-a", put(false));
+
+            expect(res.status).toBe(503);
+            const error = (await jsonBody(res)).error as Record<string, unknown>;
+            expect(error.message).toMatch(/could not be saved/i);
+            expect(fleetScheduler.getJob("job-a")?.enabled).toBe(true);
+        });
+    });
+
+    describe("reading the shared state", () => {
+        it("lists a pause another process made", async () => {
+            const store = makeStateStore({ overrides: { "job-a": false } });
+            const { app: fleetApp } = appWithStore(store, [makeJob("job-a"), makeJob("job-b")]);
+
+            const body = await jsonBody(await fleetApp.request("/cron"));
+            const jobs = body.jobs as Array<Record<string, unknown>>;
+
+            expect(jobs.find(j => j.id === "job-a")?.enabled).toBe(false);
+            expect(jobs.find(j => j.id === "job-b")?.enabled).toBe(true);
+        });
+
+        it("shows it for a single job too", async () => {
+            const store = makeStateStore({ overrides: { "job-a": false } });
+            const { app: fleetApp } = appWithStore(store, [makeJob("job-a")]);
+
+            const body = await jsonBody(await fleetApp.request("/cron/job-a"));
+
+            expect((body.job as Record<string, unknown>).state).toBe("disabled");
         });
     });
 

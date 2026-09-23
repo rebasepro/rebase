@@ -9,7 +9,7 @@ class ApiError { badRequest, code, conflict, details, expected, forbidden, inter
 class BlockedUrlError
 class BundleError { hint }
 class CollectionConfigError { hint }
-class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
+class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class GCSStorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
@@ -263,7 +263,9 @@ interface CountOptions { databaseId, filter, logical, searchString }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface CreateRoleData { collectionPermissions, defaultPermissions, id, isAdmin, name }
 interface CreateUserData { displayName, email, emailVerified, isAnonymous, metadata, passwordHash, photoUrl }
-interface CronStore { ensureTable, fetchJobStats, fetchLogs, insertLog, tryClaimRun }
+interface CronJobPersistedState { enabled, runningBy }
+interface CronJobRunSummary { lastDurationMs, lastError, lastRunAt, lastSuccess, totalFailures, totalRuns }
+interface CronStore { ensureTable, fetchJobStates, fetchJobStats, fetchLogs, fetchRunSummaries, insertLog, releaseRunLease, saveEnabledOverride, tryAcquireRunLease, tryClaimRun }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
 interface DatabaseConnection { close, isConnected, type }
@@ -367,6 +369,7 @@ type BackendStorageConfig
 type BackupDestination
 type ConditionBuilderStatic { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 type CorsOriginResolver
+type CronRunLease
 type DrizzleClient
 type EmailLinkKind
 type EmailVerificationTemplateFunction

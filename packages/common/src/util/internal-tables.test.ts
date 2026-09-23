@@ -37,6 +37,7 @@ describe("internal table access", () => {
                 "channel_messages",
                 "channel_presence",
                 "cron_claims",
+                "cron_job_state",
                 "cron_logs",
                 "entity_history",
                 "idempotency_keys",

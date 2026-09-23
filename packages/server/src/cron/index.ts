@@ -5,4 +5,4 @@ export { CronScheduler, validateCronExpression } from "./cron-scheduler";
 export { createCronRoutes } from "./cron-routes";
 export { createCronStore } from "./cron-store";
 export { detectFreezableRuntime, buildScaleToZeroWarning, CRON_ALWAYS_ON_ENV } from "./scale-to-zero";
-export type { CronStore } from "./cron-store";
+export type { CronStore, CronJobPersistedState, CronRunLease, CronJobRunSummary } from "./cron-store";
