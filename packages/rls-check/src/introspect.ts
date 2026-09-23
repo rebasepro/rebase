@@ -797,13 +797,18 @@ async function readPolicies(db: Reader, schemas: string[]): Promise<DbPolicy[]> 
     }));
 }
 
-async function readGrants(db: Reader, schemas: string[]): Promise<DbGrant[]> {
-    const rows = await db.query<{
-        schema: string;
-        table_name: string;
-        grantee: string;
-        privilege_type: string;
-    }>(
+/**
+ * Privileges on each scanned relation, from the relation's ACL and from its
+ * columns' ACLs.
+ *
+ * A column privilege is a privilege on the relation for what these checks ask:
+ * `GRANT SELECT (id, email) ON users TO anon` on a table with RLS off hands
+ * anon those columns of every row, and a column-level UPDATE grant next to a
+ * `USING (true)` policy lets anon rewrite them. Reading `relacl` alone missed
+ * both, so `rls-disabled` and `anonymous-write-allowed` said nothing.
+ */
+export async function readGrants(db: Reader, schemas: string[]): Promise<DbGrant[]> {
+    const tableRows = await db.query<GrantRow>(
         "table privileges",
         `SELECT n.nspname AS schema, c.relname AS table_name,
                 CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee,
@@ -814,13 +819,28 @@ async function readGrants(db: Reader, schemas: string[]): Promise<DbGrant[]> {
          WHERE c.relkind::text = ANY($2) AND n.nspname = ANY($1)`,
         [schemas, SCANNED_RELKINDS]
     );
+    // A column with no privileges of its own has a NULL attacl, and a column
+    // has no default ACL to fall back to: the relation's covers it.
+    const columnRows = await db.query<GrantRow>(
+        "column privileges",
+        `SELECT DISTINCT n.nspname AS schema, c.relname AS table_name,
+                CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee,
+                a.privilege_type
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute att ON att.attrelid = c.oid
+         CROSS JOIN LATERAL aclexplode(att.attacl) a
+         WHERE att.attnum > 0 AND NOT att.attisdropped AND att.attacl IS NOT NULL
+           AND c.relkind::text = ANY($2) AND n.nspname = ANY($1)`,
+        [schemas, SCANNED_RELKINDS]
+    );
 
     const known = new Set(["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]);
     const map = new Map<string, DbGrant>();
-    for (const row of rows) {
+    for (const row of [...tableRows, ...columnRows]) {
         // PG17 added MAINTAIN; anything unknown is not exposure and is dropped.
         if (!known.has(row.privilege_type)) continue;
-        const key = `${row.schema}.${row.table_name}.${row.grantee}`;
+        const key = JSON.stringify([row.schema, row.table_name, row.grantee]);
         if (!map.has(key)) {
             map.set(key, {
                 schema: row.schema,
@@ -829,9 +849,18 @@ async function readGrants(db: Reader, schemas: string[]): Promise<DbGrant[]> {
                 privileges: []
             });
         }
-        map.get(key)!.privileges.push(row.privilege_type as DbGrant["privileges"][number]);
+        const privileges = map.get(key)!.privileges;
+        const privilege = row.privilege_type as DbGrant["privileges"][number];
+        if (!privileges.includes(privilege)) privileges.push(privilege);
     }
     return [...map.values()];
+}
+
+interface GrantRow extends Record<string, unknown> {
+    schema: string;
+    table_name: string;
+    grantee: string;
+    privilege_type: string;
 }
 
 async function readViews(
