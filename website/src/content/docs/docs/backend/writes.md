@@ -117,6 +117,21 @@ the column as a JSON document. Operations apply to updates only: over a row that
 does not exist yet there is nothing to operate on, so they are refused on
 `POST`, on `/bulk` creates, and on upserts.
 
+An operation answers to the property's `validation` as a value does. Pushed
+elements are judged by the element rules, merged keys by the map's properties,
+and the value an operation *produces* by the declared bounds: a number's `min`,
+`max`, `moreThan`, `lessThan`, `positive` and `negative`, an array's `min` and
+`max` items. That last check is a condition on the same `UPDATE`, not a read
+before it. On `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }`
+succeeds while the stock is at least 1 and is refused at 0 with the `400`
+(`VALIDATION_CONSTRAINT`) that `{ "stock": -1 }` gets, naming the field and the
+bound. Two concurrent decrements of a stock of 1 cannot both succeed, because
+the second is judged against the row the first committed. An unset number counts
+as `0` and an unset array as empty. A refused operation writes nothing, not even
+the plain values beside it in the body. Because the check is part of the
+statement, it also holds for in-process writes through `rebase.data`, which skip
+the request-level validation.
+
 ### Upsert on a natural key
 
 `POST /api/data/:slug?on_conflict=email` writes

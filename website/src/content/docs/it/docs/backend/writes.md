@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c14dccf5288e553
+sourceHash: e87f3694489cd571
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -126,6 +126,8 @@ campo: un errore di battitura non viene mai salvato nella colonna come documento
 JSON. Le operazioni si applicano solo agli aggiornamenti: su una riga che non
 esiste ancora non c'è nulla su cui operare, pertanto vengono rifiutate su `POST`,
 sulle creazioni con `/bulk` e sugli upsert.
+
+Un'operazione risponde alla `validation` della proprietà come un valore. Gli elementi aggiunti sono giudicati dalle regole dell'elemento, le chiavi unite dalle proprietà della mappa e il valore che un'operazione *produce* dai limiti dichiarati: `min`, `max`, `moreThan`, `lessThan`, `positive` e `negative` di un numero, il numero minimo e massimo di elementi (`min`, `max`) di un array. Quest'ultimo controllo è una condizione dello stesso `UPDATE`, non una lettura precedente. Su `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }` riesce finché lo stock è almeno 1 e viene rifiutato a 0 con lo stesso `400` (`VALIDATION_CONSTRAINT`) che riceve `{ "stock": -1 }`, indicando il campo e il limite. Due decrementi concorrenti di uno stock pari a 1 non possono riuscire entrambi, perché il secondo è giudicato sulla riga confermata dal primo. Un numero non impostato vale `0` e un array non impostato è vuoto. Un'operazione rifiutata non scrive nulla, nemmeno i valori semplici che la accompagnano nel corpo. Poiché il controllo fa parte dell'istruzione, vale anche per le scritture interne al processo tramite `rebase.data`, che saltano la validazione a livello di richiesta.
 
 ### Upsert su una chiave naturale
 

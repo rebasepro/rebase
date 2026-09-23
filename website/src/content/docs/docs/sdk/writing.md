@@ -99,6 +99,15 @@ exist yet there is nothing to operate on, so an operation in a `create`,
 misspelled `$operator`, is a 400 naming the field — never a JSON document
 written into the column.
 
+An operation answers to the property's `validation` as a value does, and that
+includes the value it produces. `{ stock: { $inc: -1 } }` on a `stock` with
+`validation: { min: 0 }` succeeds while the stock is at least 1 and is refused
+at 0 with the same 400 (`VALIDATION_CONSTRAINT`) that `{ stock: -1 }` gets. The
+same goes for `max`, `moreThan`, `lessThan`, `positive` and `negative`, and for
+an array's `min` and `max` items after a `$push` or `$pull`. The check is part
+of the update statement, so two concurrent decrements of a stock of 1 cannot
+both succeed, and a refused update writes nothing.
+
 While offline they are refused rather than queued: an operation is evaluated
 against a stored value the device has no current copy of, and an optimistic row
 could only show the marker itself until the queue drained.

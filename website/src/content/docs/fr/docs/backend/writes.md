@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c14dccf5288e553
+sourceHash: e87f3694489cd571
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -73,6 +73,8 @@ curl -X PATCH /api/data/posts/p1 -d '{
 L'intérêt réside dans la lecture que l'appelant n'a plus besoin d'effectuer. Exprimer `views + 1` sous forme de valeur implique de la lire au préalable, et deux requêtes lisant chacune `4`, ajoutant un et écrivant `5` aboutiront à `5` — sans que rien dans l'une ou l'autre réponse n'indique qu'une incrémentation a été perdue. Compilée dans l'instruction SQL, l'opération arithmétique a lieu au sein du verrou de ligne et ne peut pas échouer.
 
 Un seul opérateur est autorisé par champ. Un opérateur sur un type de propriété pour lequel il n'est pas défini, un `$operator` inconnu, ou un opérande dont le format est incorrect renvoie un `400` (`INVALID_FIELD_OPERATION`) nommant le champ concerné — une faute de frappe n'est jamais écrite dans la colonne sous forme de document JSON. Les opérations s'appliquent uniquement aux mises à jour : sur une ligne qui n'existe pas encore, il n'y a rien à modifier, elles sont donc refusées sur `POST`, sur les créations via `/bulk` et sur les opérations d'upsert.
+
+Une opération obéit à la `validation` de la propriété comme une valeur. Les éléments ajoutés sont jugés par les règles de l'élément, les clés fusionnées par les propriétés de la map et la valeur qu'une opération *produit* par les bornes déclarées : `min`, `max`, `moreThan`, `lessThan`, `positive` et `negative` pour un nombre, nombre minimal et maximal d'éléments (`min`, `max`) pour un tableau. Cette dernière vérification est une condition du même `UPDATE`, pas une lecture préalable. Sur `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }` réussit tant que le stock vaut au moins 1 et est refusé à 0 avec le même `400` (`VALIDATION_CONSTRAINT`) que `{ "stock": -1 }`, qui nomme le champ et la borne. Deux décréments concurrents d'un stock de 1 ne peuvent pas réussir tous les deux, car le second est jugé sur la ligne que le premier a validée. Un nombre non renseigné compte pour `0` et un tableau non renseigné pour vide. Une opération refusée n'écrit rien, pas même les valeurs simples qui l'accompagnent dans le corps. Comme la vérification fait partie de l'instruction, elle s'applique aussi aux écritures internes au processus via `rebase.data`, qui ne passent pas par la validation au niveau de la requête.
 
 ### Upsert sur une clé naturelle
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: a31d37ab40b701e5
+sourceHash: 659f1391627611c5
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lots et écriture entre collections dans une seule transaction.
@@ -98,6 +98,8 @@ n'existe pas encore, il n'y a rien à manipuler, donc une opération dans un `cr
 `createMany` ou `upsert` renvoie une 400. Un opérateur sur un mauvais type de propriété, ou un
 `$operator` mal orthographié, renvoie une 400 mentionnant le champ — jamais un document JSON
 écrit dans la colonne.
+
+Une opération obéit à la `validation` de la propriété comme une valeur, y compris pour la valeur qu'elle produit. `{ stock: { $inc: -1 } }` sur un `stock` avec `validation: { min: 0 }` réussit tant que le stock vaut au moins 1 et est refusé à 0 avec la même 400 (`VALIDATION_CONSTRAINT`) que `{ stock: -1 }`. Il en va de même pour `max`, `moreThan`, `lessThan`, `positive` et `negative`, et pour le nombre minimal et maximal d'éléments (`min`, `max`) d'un tableau après un `$push` ou un `$pull`. La vérification fait partie de l'instruction de mise à jour : deux décréments concurrents d'un stock de 1 ne peuvent donc pas réussir tous les deux, et une mise à jour refusée n'écrit rien.
 
 En mode hors ligne, elles sont refusées plutôt que mises en file d'attente : une opération est évaluée
 par rapport à une valeur stockée dont l'appareil n'a pas de copie à jour, et une ligne optimiste

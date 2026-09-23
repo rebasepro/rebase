@@ -1,5 +1,5 @@
 ---
-sourceHash: a31d37ab40b701e5
+sourceHash: 659f1391627611c5
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -98,6 +98,8 @@ gibt es nichts zu manipulieren, daher ist eine Operation in einem `create`, `cre
 `upsert` ein 400-Fehler. Ein Operator auf dem falschen Eigenschaftstyp oder ein falsch geschriebener
 `$operator` ist ein 400-Fehler, der das Feld benennt – niemals ein JSON-Dokument, das in die Spalte
 geschrieben wird.
+
+Eine Operation unterliegt der `validation` der Eigenschaft wie ein Wert, und das schließt den Wert ein, den sie erzeugt. `{ stock: { $inc: -1 } }` auf einem `stock` mit `validation: { min: 0 }` gelingt, solange der Bestand mindestens 1 beträgt, und wird bei 0 mit demselben 400 (`VALIDATION_CONSTRAINT`) abgelehnt, den `{ stock: -1 }` erhält. Dasselbe gilt für `max`, `moreThan`, `lessThan`, `positive` und `negative` sowie für die Mindest- und Höchstzahl an Elementen (`min`, `max`) eines Arrays nach einem `$push` oder `$pull`. Die Prüfung ist Teil der Update-Anweisung, daher können zwei gleichzeitige Verringerungen eines Bestands von 1 nicht beide gelingen, und ein abgelehntes Update schreibt nichts.
 
 Im Offline-Modus werden sie abgelehnt, anstatt in die Warteschlange eingereiht zu werden: Eine
 Operation wird anhand eines gespeicherten Werts ausgewertet, von dem das Gerät keine aktuelle Kopie

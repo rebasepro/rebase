@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c14dccf5288e553
+sourceHash: e87f3694489cd571
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -117,6 +117,8 @@ definido, um `$operator` desconhecido ou um operando com formato incorreto resul
 na coluna como um documento JSON. As operações se aplicam apenas a atualizações: em uma linha
 que ainda não existe não há nada sobre o que operar, portanto elas são recusadas em `POST`,
 em criações via `/bulk` e em upserts.
+
+Uma operação responde à `validation` da propriedade como um valor. Os elementos adicionados são julgados pelas regras do elemento, as chaves mescladas pelas propriedades do mapa e o valor que uma operação *produz* pelos limites declarados: `min`, `max`, `moreThan`, `lessThan`, `positive` e `negative` de um número, e a quantidade mínima e máxima de itens (`min`, `max`) de um array. Esta última verificação é uma condição do mesmo `UPDATE`, não uma leitura prévia. Em `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }` tem sucesso enquanto o estoque for pelo menos 1 e é recusado em 0 com o mesmo `400` (`VALIDATION_CONSTRAINT`) que `{ "stock": -1 }` recebe, indicando o campo e o limite. Dois decrementos concorrentes de um estoque de 1 não podem ambos ter sucesso, porque o segundo é julgado contra a linha que o primeiro confirmou. Um número não definido conta como `0` e um array não definido como vazio. Uma operação recusada não grava nada, nem mesmo os valores simples ao lado dela no corpo. Como a verificação faz parte da instrução, ela também vale para escritas internas ao processo via `rebase.data`, que ignoram a validação no nível da requisição.
 
 ### Upsert em uma chave natural
 

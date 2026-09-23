@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c14dccf5288e553
+sourceHash: e87f3694489cd571
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -73,6 +73,8 @@ curl -X PATCH /api/data/posts/p1 -d '{
 Der Vorteil liegt darin, dass der Aufrufer den Wert nicht mehr vorher lesen muss. Den Ausdruck `views + 1` als konkreten Wert zu übermitteln bedeutet, ihn zuerst lesen zu müssen; zwei Anfragen, die jeweils `4` lesen, eins addieren und `5` schreiben, enden bei `5` – ohne dass eine der beiden Antworten darauf hinweist, dass ein Inkrement verloren ging. Direkt in das Statement kompiliert, findet die Arithmetik innerhalb der Zeilensperre (Row Lock) statt und kann nicht verloren gehen.
 
 Genau ein Operator pro Feld. Ein Operator auf einem Eigenschaftstyp, für den er nicht definiert ist, ein unbekannter `$operator` oder ein Operand mit falscher Struktur führt zu einem `400` (`INVALID_FIELD_OPERATION`), der das Feld benennt – ein Tippfehler wird niemals als JSON-Dokument in die Spalte geschrieben. Operationen gelten nur für Aktualisierungen: Bei einer Zeile, die noch nicht existiert, gibt es nichts zu manipulieren, weshalb sie bei `POST`, `/bulk`-Erstellungen und Upserts abgelehnt werden.
+
+Eine Operation unterliegt der `validation` der Eigenschaft wie ein Wert. Hinzugefügte Elemente werden nach den Regeln der Elemente geprüft, zusammengeführte Schlüssel nach den Eigenschaften der Map und der Wert, den eine Operation *erzeugt*, nach den deklarierten Grenzen: bei einer Zahl `min`, `max`, `moreThan`, `lessThan`, `positive` und `negative`, bei einem Array die Mindest- und Höchstzahl an Elementen (`min`, `max`). Diese letzte Prüfung ist eine Bedingung desselben `UPDATE`, kein vorheriges Lesen. Bei `stock: { validation: { min: 0 } }` gelingt `{ "stock": { "$inc": -1 } }`, solange der Bestand mindestens 1 beträgt, und wird bei 0 mit demselben `400` (`VALIDATION_CONSTRAINT`) abgelehnt, den `{ "stock": -1 }` erhält – mit Feld und Grenze benannt. Zwei gleichzeitige Verringerungen eines Bestands von 1 können nicht beide gelingen, weil die zweite an der Zeile gemessen wird, die die erste festgeschrieben hat. Eine nicht gesetzte Zahl zählt als `0`, ein nicht gesetztes Array als leer. Eine abgelehnte Operation schreibt nichts, auch nicht die einfachen Werte daneben im Body. Da die Prüfung Teil der Anweisung ist, gilt sie auch für prozessinterne Schreibvorgänge über `rebase.data`, die die Validierung auf Anfrageebene überspringen.
 
 ### Upsert über einen natürlichen Schlüssel
 

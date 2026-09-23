@@ -1,5 +1,5 @@
 ---
-sourceHash: a31d37ab40b701e5
+sourceHash: 659f1391627611c5
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.
@@ -98,6 +98,8 @@ esiste ancora non c'è nulla su cui operare, quindi un'operazione in un `create`
 `createMany` o `upsert` restituisce un errore 400. Un operatore applicato al tipo di proprietà errato, o un
 `$operator` con errore di digitazione, restituisce un 400 che specifica il campo — mai un documento JSON
 scritto all'interno della colonna.
+
+Un'operazione risponde alla `validation` della proprietà come un valore, e questo include il valore che produce. `{ stock: { $inc: -1 } }` su uno `stock` con `validation: { min: 0 }` riesce finché lo stock è almeno 1 e viene rifiutato a 0 con lo stesso 400 (`VALIDATION_CONSTRAINT`) che riceve `{ stock: -1 }`. Lo stesso vale per `max`, `moreThan`, `lessThan`, `positive` e `negative`, e per il numero minimo e massimo di elementi (`min`, `max`) di un array dopo un `$push` o un `$pull`. Il controllo fa parte dell'istruzione di aggiornamento, quindi due decrementi concorrenti di uno stock pari a 1 non possono riuscire entrambi, e un aggiornamento rifiutato non scrive nulla.
 
 In modalità offline vengono rifiutate anziché accodate: un'operazione viene valutata
 rispetto a un valore memorizzato di cui il dispositivo non possiede una copia aggiornata, e una riga ottimistica
