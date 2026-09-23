@@ -80,6 +80,18 @@ export interface CreateAuthOptions {
     authFlowMode?: "json" | "cookie";
 }
 
+/**
+ * Finishing a sign-in that the server refused with `MFA_REQUIRED`.
+ *
+ * That refusal carries `details.mfaToken` — proof the first factor was
+ * accepted, good for five minutes and for nothing but the two challenge routes
+ * — and `details.factors`, the factors the account can answer with.
+ */
+export interface MfaPendingOptions {
+    /** `details.mfaToken` of the `MFA_REQUIRED` refusal. */
+    mfaToken?: string;
+}
+
 export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const opts = options || {};
     const storage = opts.storage || detectStorage();
@@ -1055,32 +1067,71 @@ refreshToken: session.refreshToken };
             );
         },
 
-        /** Open a challenge against a verified factor. Expires in five minutes. */
-        async challenge(factorId: string) {
-            return transport.request<{ challengeId: string; factorId: string; expiresAt: string }>(
-                authPath + "/mfa/challenge",
-                { method: "POST", body: JSON.stringify({ factorId }) }
-            );
+        /**
+         * Open a challenge against a verified factor. Expires in five minutes.
+         *
+         * Pass `mfaToken` to finish a sign-in that was refused with
+         * `MFA_REQUIRED`: it is the `details.mfaToken` of that refusal, and the
+         * challenge is opened with it as this one request's credential. Without
+         * it, the challenge steps up the session this client already holds.
+         */
+        async challenge(factorId: string, options?: MfaPendingOptions) {
+            type Challenge = { challengeId: string; factorId: string; expiresAt: string };
+            const payload = JSON.stringify({ factorId });
+            if (options?.mfaToken) {
+                return withPendingToken<Challenge>("/mfa/challenge", payload, options.mfaToken);
+            }
+            return transport.request<Challenge>(authPath + "/mfa/challenge", { method: "POST", body: payload });
         },
 
         /**
          * Answer a challenge with a TOTP code or a recovery code.
          *
          * This is where an MFA-enrolled account's real session is minted, at
-         * `aal2` — so the returned tokens replace the ones the sign-in handed
-         * back, and this client adopts them.
+         * `aal2` — so this client adopts the returned tokens and announces
+         * `SIGNED_IN`, exactly as any other sign-in does. Pass the same
+         * `mfaToken` the challenge was opened with when finishing a sign-in.
          */
-        async verifyChallenge(challengeId: string, code: string) {
-            const body = await transport.request<{ tokens: AuthTokens; user: Record<string, unknown> }>(
-                authPath + "/mfa/challenge/verify",
-                { method: "POST", body: JSON.stringify({ challengeId, code }) }
-            );
+        async verifyChallenge(challengeId: string, code: string, options?: MfaPendingOptions) {
+            type Minted = { tokens: AuthTokens; user: Record<string, unknown> };
+            const payload = JSON.stringify({ challengeId, code });
+            const body = options?.mfaToken
+                ? await withPendingToken<Minted>("/mfa/challenge/verify", payload, options.mfaToken)
+                : await transport.request<Minted>(authPath + "/mfa/challenge/verify", { method: "POST", body: payload });
             const session = handleAuthResponse(body, "SIGNED_IN");
             return { user: session.user,
 accessToken: session.accessToken,
 refreshToken: session.refreshToken };
         }
     };
+
+    /**
+     * POST to a challenge route with a sign-in's pending token as the credential.
+     *
+     * Straight to `fetch`, like the sign-in routes, and never through the
+     * transport: the token is a credential for these two requests only. Set on
+     * the transport it would go out on every request the app made while the
+     * code step was open — and stay there if the step were abandoned. It would
+     * also displace a session the client already holds, and a refused code
+     * (401 `INVALID_CODE`) would be taken for an expired session and refreshed
+     * and re-sent, spending a second of the challenge's attempts on it.
+     */
+    async function withPendingToken<T>(endpoint: string, payload: string, mfaToken: string): Promise<T> {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl(endpoint), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${mfaToken}`
+            },
+            body: payload,
+            // The verify route sets the refresh cookie in cookie mode.
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        return body as T;
+    }
 
     async function getSessions(): Promise<DeviceSession[]> {
         const data = await transport.request<{ sessions: DeviceSession[] }>(authPath + "/sessions", { method: "GET" });
