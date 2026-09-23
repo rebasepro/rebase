@@ -54,6 +54,7 @@ const IconButtonInner = <C extends React.ElementType = "button">({
                                                                      disabled,
                                                                      toggled,
                                                                      component,
+                                                                     onClick,
                                                                      ...props
                                                                  }: IconButtonProps<C>, ref: React.ForwardedRef<HTMLButtonElement>) => {
 
@@ -78,8 +79,13 @@ const IconButtonInner = <C extends React.ElementType = "button">({
             type={isNativeButton ? "button" : undefined}
             role={isNativeButton ? undefined : "button"}
             ref={ref}
+            // Natively disabled, not only `aria-disabled`: a button that disables
+            // itself on click keeps the focus, and Enter or Space fired it again.
+            disabled={isNativeButton ? disabled : undefined}
             aria-disabled={disabled || undefined}
             tabIndex={disabled ? -1 : undefined}
+            // Any other element has no native `disabled`, so the click is dropped here.
+            onClick={disabled ? undefined : onClick}
             {...props}
             className={cls(
                 disabled ? "opacity-50 pointer-events-none" : "cursor-pointer",

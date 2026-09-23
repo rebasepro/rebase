@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
     Button,
     Badge,
@@ -8,7 +9,8 @@ import {
     Card,
     Typography,
     MultiSelect,
-    MultiSelectItem
+    MultiSelectItem,
+    IconButton
 } from "../src";
 import "@testing-library/jest-dom";
 
@@ -111,6 +113,62 @@ describe("UI Components", () => {
             const header = screen.getByRole("heading", { level: 1 });
             expect(header).toBeInTheDocument();
             expect(header).toHaveTextContent("Header Text");
+        });
+    });
+
+    /**
+     * A disabled `IconButton` was only `aria-disabled` with pointer events off.
+     * A button that disables itself on click keeps the focus, so Enter or Space
+     * fired it again: the autofill Send button started a second run that way.
+     */
+    describe("IconButton Component", () => {
+        function SendOnce({ component }: { component?: "div" }) {
+            const [sending, setSending] = React.useState(false);
+            const [sent, setSent] = React.useState(0);
+            return <>
+                <IconButton
+                    aria-label="send"
+                    component={component}
+                    disabled={sending}
+                    onClick={() => {
+                        setSent((count) => count + 1);
+                        setSending(true);
+                    }}>
+                    <span>x</span>
+                </IconButton>
+                <output>{sent}</output>
+            </>;
+        }
+
+        it("does not fire again from the keyboard once it disables itself", async () => {
+            const user = userEvent.setup();
+            render(<SendOnce/>);
+            const button = screen.getByRole("button", { name: "send" });
+
+            await user.click(button);
+            await user.keyboard("{Enter}");
+            await user.keyboard(" ");
+
+            expect(screen.getByRole("status")).toHaveTextContent("1");
+            expect(button).toBeDisabled();
+        });
+
+        it("fires from the keyboard while enabled", async () => {
+            const user = userEvent.setup();
+            const onClick = jest.fn();
+            render(<IconButton aria-label="add" onClick={onClick}><span>+</span></IconButton>);
+
+            screen.getByRole("button", { name: "add" }).focus();
+            await user.keyboard("{Enter}");
+            expect(onClick).toHaveBeenCalledTimes(1);
+        });
+
+        it("drops the click of a disabled non-button element", () => {
+            const onClick = jest.fn();
+            render(<IconButton aria-label="open" component="div" disabled onClick={onClick}><span>o</span></IconButton>);
+
+            fireEvent.click(screen.getByRole("button", { name: "open" }));
+            expect(onClick).not.toHaveBeenCalled();
         });
     });
 
