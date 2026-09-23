@@ -154,10 +154,14 @@ export const MultiSelect = React.forwardRef<
             setSelectedValues(value ?? []);
         }, [value]);
 
+        // Every edit goes through here: the options, (Select All), Backspace in
+        // the search box, and the chip and clear icons, which sit inside the
+        // trigger and so are not stopped by the button's native `disabled`.
         const updateValues = React.useCallback((values: string[]) => {
+            if (disabled) return;
             setSelectedValues(values);
             onValueChange?.(values);
-        }, [onValueChange]);
+        }, [onValueChange, disabled]);
 
         const onItemClick = React.useCallback((newValue: MultiSelectValue) => {
             let newSelectedValues: string[];
@@ -232,6 +236,7 @@ export const MultiSelect = React.forwardRef<
                     <PopoverPrimitive.Trigger asChild>
                         <button
                             ref={inputRef ?? ref}
+                            disabled={disabled}
                             aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
                             onClick={handleTogglePopover}
                             className={cls(

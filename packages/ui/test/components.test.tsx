@@ -1,7 +1,26 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { Button, Badge, Alert, Checkbox, Card, Typography } from "../src";
+import {
+    Button,
+    Badge,
+    Alert,
+    Checkbox,
+    Card,
+    Typography,
+    MultiSelect,
+    MultiSelectItem
+} from "../src";
 import "@testing-library/jest-dom";
+
+// jsdom has neither: Radix measures a popover's content and cmdk scrolls the
+// active option into view.
+class NoopResizeObserver implements ResizeObserver {
+    observe() { /* noop */ }
+    unobserve() { /* noop */ }
+    disconnect() { /* noop */ }
+}
+globalThis.ResizeObserver = NoopResizeObserver;
+Element.prototype.scrollIntoView = function () { /* noop */ };
 
 describe("UI Components", () => {
     describe("Button Component", () => {
@@ -92,6 +111,46 @@ describe("UI Components", () => {
             const header = screen.getByRole("heading", { level: 1 });
             expect(header).toBeInTheDocument();
             expect(header).toHaveTextContent("Header Text");
+        });
+    });
+
+    /**
+     * `disabled` only picked the dimmed background. The trigger stayed a live
+     * button, so an array-of-enum property with `admin.disabled` could be opened,
+     * changed and saved from the form, and each chip's remove icon and the clear
+     * icon kept working on the closed field.
+     */
+    describe("MultiSelect Component", () => {
+        const renderTags = (disabled: boolean, onValueChange: jest.Mock) => render(
+            <MultiSelect disabled={disabled} value={["a"]} onValueChange={onValueChange} aria-label="tags">
+                <MultiSelectItem value="a">Alpha</MultiSelectItem>
+                <MultiSelectItem value="b">Beta</MultiSelectItem>
+            </MultiSelect>
+        );
+
+        it("does not open or change its value when disabled", () => {
+            const onValueChange = jest.fn();
+            const { container } = renderTags(true, onValueChange);
+
+            const trigger = screen.getByRole("button", { name: "tags" });
+            fireEvent.click(trigger);
+            expect(screen.queryAllByRole("option")).toHaveLength(0);
+
+            // The chip's remove icon and the clear icon sit inside the trigger.
+            container.querySelectorAll("svg").forEach((icon) => fireEvent.click(icon));
+            expect(onValueChange).not.toHaveBeenCalled();
+            expect(trigger).toBeDisabled();
+        });
+
+        it("opens and changes its value when enabled", () => {
+            const onValueChange = jest.fn();
+            renderTags(false, onValueChange);
+
+            fireEvent.click(screen.getByRole("button", { name: "tags" }));
+            const beta = screen.getAllByRole("option").find((option) => option.textContent?.includes("Beta"));
+            expect(beta).toBeDefined();
+            fireEvent.click(beta!);
+            expect(onValueChange).toHaveBeenCalledWith(["a", "b"]);
         });
     });
 });
