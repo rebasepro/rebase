@@ -141,6 +141,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 aria-labelledby={label ? labelId : inputProps["aria-labelledby"]}
                 aria-invalid={error || undefined}
                 aria-disabled={disabled || undefined}
+                disabled={disabled}
                 placeholder={focused || hasValue || !label ? placeholder : undefined}
                 autoFocus={autoFocus}
                 rows={typeof minRows === "string" ? parseInt(minRows) : (minRows ?? 3)}

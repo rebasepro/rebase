@@ -160,6 +160,14 @@ describe("UI Components", () => {
                 jest.useRealTimers();
             }
         });
+
+        // The single-line branch passed `disabled` to the input; the multiline
+        // branch only set `aria-disabled`, so a disabled textarea took typing.
+        it.each([false, true])("is natively disabled (multiline: %s)", (multiline) => {
+            const { container } = render(<TextField aria-label="notes" multiline={multiline} disabled value="x"
+                                                    onChange={() => { /* noop */ }}/>);
+            expect(container.querySelector(multiline ? "textarea" : "input")).toBeDisabled();
+        });
     });
 
     /**
