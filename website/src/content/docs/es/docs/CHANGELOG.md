@@ -73,6 +73,13 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### Server & REST
 
+- **The cron scheduler and store expose the shared job state.** `CronScheduler`
+  gains `persistJobEnabled()`, `fetchJobs()` and `fetchJob()`; `CronStore` gains
+  optional `saveEnabledOverride`, `fetchJobStates`, `tryAcquireRunLease`,
+  `releaseRunLease` and `fetchRunSummaries` — a custom store without them keeps
+  the per-process behaviour — and `CronJobPersistedState`, `CronRunLease` and
+  `CronJobRunSummary` are exported.
+
 - **A grouped aggregate can be paged, and its order is stable.** `/aggregate`
   used to drop `offset`, `page` and `orderBy`, and its query had no ORDER BY, so
   every page was the same arbitrary set of groups. It now accepts
@@ -136,6 +143,15 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   database to decide, and a column it can't find is gated.
 
 #### Jobs & cron
+
+- **A manual trigger of a cron job that is already running answers 409
+  `CRON_JOB_ALREADY_EXECUTING`, not 200 with a skipped log.** That holds whether
+  the run is on the same process or on another one holding the job's lease.
+  `client.cron.triggerJob()` and the MCP `cron_trigger_job` tool now reject; the
+  skip is still written to the run history and is in `details.log`, naming the
+  process running the job. `PUT /api/admin/cron/:id` also accepts
+  `enabled: null`, and answers 503 without changing anything when the change
+  cannot be saved.
 
 - **A job worker claims only the tasks it has a handler for.** A worker claimed
   jobs whose task it could not run, and each claim spent an attempt. During a
@@ -298,6 +314,18 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   self-service reset from the same config already linked correctly.
 
 #### Postgres
+
+- **A field operation can no longer take a value past the property's declared
+  bounds.** `{ stock: { $inc: -1000 } }` on `stock: { validation: { min: 0 } }`
+  stored `-995` while `{ stock: -5 }` was a 400; a `$push` past
+  `validation.max` onto a non-empty array and a `$pull` below `validation.min`
+  also went through. The operation's result is now a condition on the UPDATE
+  that applies it, so a decrement that stays in range still succeeds, one that
+  would cross the bound is the same 400 `VALIDATION_CONSTRAINT` naming the field
+  and the bound, and two concurrent decrements cannot both get past the floor.
+  Numbers get `min`, `max`, `moreThan`, `lessThan`, `positive` and `negative`,
+  arrays their `min`/`max` item counts, and it holds for in-process writes
+  through `rebase.data` too. MongoDB does not check an operation's result yet.
 
 - **A `beforeQuery` scope now refuses a write to a row it excludes, instead of
   reporting a 500.** An update addressed at a row outside the hook's scope
@@ -544,6 +572,22 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   lasts.** It used to say 1 hour for a 24-hour token.
 
 #### Jobs & cron
+
+- **Pausing a cron job reaches every process and survives redeploys, a manual
+  trigger no longer runs beside a run on another process, and Studio shows real
+  run counts on the api role.** Enable/disable, the trigger's "already
+  executing" guard and the run counters lived in one process's memory: with
+  several replicas a `PUT /api/admin/cron/:id` with `{"enabled": false}`
+  stopped only the replica that served it, and on a split deployment the api
+  process never starts its scheduler, so a pause there stopped nothing. The
+  state now lives in a new internal table, `rebase.cron_job_state`, created at
+  boot (an existing database gains it on its next deploy). Every scheduler reads
+  the override — `true`, `false`, or `null` to follow the job's own `enabled` —
+  before claiming a slot, and catch-up does too; if it cannot be read, the job
+  runs as its code declares, with a warning. Every run takes a lease there that
+  lapses after `timeoutSeconds` plus 30 seconds (an hour for `Infinity`), so a
+  crashed holder frees the job on its own. MongoDB has no cron store, so there a
+  pause stays per process. See the new page, Cron across instances.
 
 - **A cron catch-up no longer runs when the claims table can't answer.** The
   cron store answered "claimed" on every error except a unique violation, so the
@@ -1128,11 +1172,15 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   of the result, so every piped or CI run was unparseable. A failed static or
   bundle build now answers with a JSON error.
 
-- **A managed deploy uploads the dependencies `rebase build` vendored into the
-  bundle.** The upload excluded `node_modules`, so every deploy paid 35–55
-  seconds for an install that never shipped, and every pod start installed
-  again. An archive that comes out over the 100 MB upload cap with them is
-  packed again without them, with a warning.
+- **`rebase cloud deploy` no longer spends 35–55 seconds installing
+  dependencies it does not upload.** A deploy that builds its own bundle ran the
+  build's `npm install` into it, then packed the bundle without `node_modules`,
+  so the time bought nothing. It now builds without installing. The upload
+  still leaves `node_modules` out on purpose, even from a prebuilt `--bundle-dir`
+  (with a warning when that bundle had a vendored tree): the control plane reads
+  a bundle into memory on every pod start, and a vendored one is tens of MB
+  instead of a few hundred kB. Pods install their dependencies when they start,
+  as they always have.
 
 - **`rebase cloud deploy` refuses dependency ranges no single version satisfies,
   as `rebase build` does.** The deploy built its own bundle without the check
@@ -1477,6 +1525,15 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   current session after a failed refresh.
 
 #### Storage & email
+
+- **The peer and security floors move past this month's advisories:** `hono`
+  4.13.5 (fragment-aware query parsing, bounded `parseBody()` nesting),
+  `nodemailer` 9.1.1 (a quadratic address parser, allow-list and recipient-domain
+  bypasses, `resolveContent` file access) and `sharp` 0.35.4 (libheif). The
+  server's peer ranges now start at those versions, so a project on an older one
+  gets a peer warning on install; the repository's own lockfile resolves them
+  all, along with `js-yaml` 4.3.2, `svgo` 4.1.0 and `devalue` 5.9.4 in build
+  tooling.
 
 - **The resumable upload route refuses the reserved rendition prefix, and a
   transform URL serves only an image.** `POST /upload` refused keys under
