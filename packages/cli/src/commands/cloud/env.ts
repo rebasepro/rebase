@@ -392,6 +392,33 @@ value: res.value }
     }
 }
 
+/**
+ * One `KEY=value` line that dotenv reads back as exactly `value`, or null when
+ * no quoting can carry it.
+ *
+ * dotenv's quoting is not JSON's, and `JSON.stringify` was what this used: a
+ * double-quoted value has only `\n` and `\r` unescaped, so every other
+ * backslash stayed and `{"a":1}` came back as `{\"a\":1}`. Single quotes and
+ * backticks are literal — nothing inside is unescaped, and either may span
+ * lines — so they carry any value without their own quote character. Double
+ * quotes come last: they cannot hold a `"` or a literal backslash-n, and they
+ * are the only way to carry a carriage return, which dotenv folds into a
+ * newline everywhere else.
+ */
+export function dotenvLine(key: string, value: string): string | null {
+    // Unquoted, a value is cut at `#`, trimmed, and read as quoted when it
+    // starts with a quote character.
+    if (!/[\s#'"`\\]/.test(value)) return `${key}=${value}`;
+    if (!value.includes("\r")) {
+        if (!value.includes("'")) return `${key}='${value}'`;
+        if (!value.includes("`")) return `${key}=\`${value}\``;
+    }
+    if (!value.includes("\"") && !/\\[nr]/.test(value)) {
+        return `${key}="${value.replace(/\r/g, "\\r").replace(/\n/g, "\\n")}"`;
+    }
+    return null;
+}
+
 async function pullEnv(rawArgs: string[]): Promise<void> {
     // Strict: this writes a file, and the permissive parse accepted
     // `env pull --ouput creds.env` by ignoring the typo and overwriting `.env`.
@@ -438,10 +465,13 @@ reason: "secret (write-only)" });
 key: v.key },
                 { path: "reveal" }
             );
-            // Quote values that contain whitespace or a hash so a dotenv reader
-            // keeps them intact.
-            const needsQuote = /[\s#'"]/.test(revealed.value);
-            lines.push(`${v.key}=${needsQuote ? JSON.stringify(revealed.value) : revealed.value}`);
+            const line = dotenvLine(v.key, revealed.value);
+            if (line === null) {
+                skipped.push({ key: v.key,
+reason: "no .env quoting carries this value unchanged" });
+                continue;
+            }
+            lines.push(line);
             written.push(v.key);
         }
 
@@ -451,7 +481,7 @@ key: v.key },
             () => {
                 success(`Wrote ${written.length} variable${written.length === 1 ? "" : "s"} to ${outPath}`);
                 if (skipped.length) {
-                    console.log(chalk.gray(`  Skipped ${skipped.length} secret variable(s): ${skipped.map((s) => s.key).join(", ")}`));
+                    for (const s of skipped) console.log(chalk.gray(`  Skipped ${s.key}: ${s.reason}`));
                     console.log("");
                 }
             },
