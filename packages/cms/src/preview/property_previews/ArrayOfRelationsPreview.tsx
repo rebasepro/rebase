@@ -32,7 +32,7 @@ export function ArrayOfRelationsPreview({
     const relationTargetPath = getRelationTargetPath(ofProperty);
 
     // See ArrayOfReferencesPreview: nested lists stay on one wrapping line.
-    if (nested || textOnly) {
+    if (nested || textOnly || size === "small") {
         const relations = ((value ?? []) as unknown[])
             .map(relation => normalizeToEntityRelation(relation, "relation", relationTargetPath))
             .filter((relation): relation is EntityRelation => Boolean(relation));

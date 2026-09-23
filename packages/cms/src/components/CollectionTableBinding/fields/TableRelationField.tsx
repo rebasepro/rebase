@@ -1,7 +1,7 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
 
 import { getCollectionDataPath } from "@rebasepro/types";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { RelationPreview } from "../../../preview";
@@ -40,6 +40,14 @@ type TableRelationFieldProps = {
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
+    /** The cell is selected. */
+    selected?: boolean;
+    /**
+     * Set by the cell's opener: opens the selection dialog, and is handed
+     * back as closed at once — the dialog keeps its own state from there.
+     */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 };
 
 export function TableRelationField(props: TableRelationFieldProps) {
@@ -61,6 +69,9 @@ export function TableRelationField(props: TableRelationFieldProps) {
             fixedFilter={props.fixedFilter}
             includeId={props.includeId}
             includeEntityLink={props.includeEntityLink}
+            selected={props.selected}
+            open={props.open}
+            onOpenChange={props.onOpenChange}
         />;
     }
 
@@ -84,7 +95,10 @@ export const TableRelationFieldInternal = React.memo(
             fixedFilter,
             collection,
             includeId,
-            includeEntityLink
+            includeEntityLink,
+            selected,
+            open,
+            onOpenChange
         } = props;
 
         const onSingleEntitySelected = useCallback((entity: Entity<any>) => {
@@ -117,6 +131,15 @@ export const TableRelationFieldInternal = React.memo(
                 return;
             relationDialogController.open();
         };
+
+        // The cell's opener asks for the dialog. It is a request, not a state:
+        // the dialog closes itself, so the request is handed straight back.
+        useEffect(() => {
+            if (!open) return;
+            onOpenChange?.(false);
+            handleOpen();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [open]);
 
         const valueNotSet = !internalValue || (Array.isArray(internalValue) && internalValue.length === 0);
 
@@ -172,9 +195,8 @@ export const TableRelationFieldInternal = React.memo(
             const items = !internalValue ? [] : (Array.isArray(internalValue) ? internalValue : [internalValue]);
             return <CompactEntityCellField empty={valueNotSet}
                 disabled={disabled}
-                onEdit={handleOpen}
-                onClear={() => updateValue(multiselect ? [] : null)}
-                emptyLabel={title}>
+                selected={selected}
+                onClear={() => updateValue(multiselect ? [] : null)}>
                 {items.map((item, index) => {
                     const relationItem = normalizeToEntityRelation(item);
                     if (!relationItem) return null;

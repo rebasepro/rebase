@@ -28,8 +28,10 @@ export function ArrayOfReferencesPreview({
     const ofProperty = property.of as ReferenceProperty;
 
     // Stacked cards inside another preview (or a title slot) turn a list into a
-    // wall of boxes: keep it to one wrapping line of links.
-    if (nested || textOnly) {
+    // wall of boxes: keep it to one wrapping line of links. So does a small
+    // preview — a table's text row — where a stacked list showed its first
+    // item and the top half of the second.
+    if (nested || textOnly || size === "small") {
         return <InlineEntityListPreview
             items={(value ?? []) as EntityReference[]}
             renderItem={(reference, index) => <ReferencePreview

@@ -42,6 +42,11 @@ export type SelectProps<T extends SelectValue = string> = {
     inputRef?: React.Ref<HTMLButtonElement>,
     padding?: boolean,
     invisible?: boolean,
+    /**
+     * Whether the trigger draws its own chevron. A table cell turns it off:
+     * the cell draws one opener for every kind of editor, in the same place.
+     */
+    chevron?: boolean,
     children?: React.ReactNode;
     dataType?: "string" | "number" | "boolean";
     portalContainer?: HTMLElement | null; // Explicitly added to props type if missing
@@ -79,6 +84,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
     position = "item-aligned",
     endAdornment,
     invisible,
+    chevron = true,
     children,
     dataType = "string",
     portalContainer: manualContainer, // Rename to avoid confusion
@@ -243,13 +249,13 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         </SelectPrimitive.Value>
                     </div>
 
-                    <SelectPrimitive.Icon asChild>
+                    {chevron && <SelectPrimitive.Icon asChild>
                         <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                             className={cls("transition", open ? "rotate-180" : "", {
                                 "px-2": size === "large",
                                 "px-1": size === "medium" || size === "small"
                             })}/>
-                    </SelectPrimitive.Icon>
+                    </SelectPrimitive.Icon>}
                 </SelectPrimitive.Trigger>
 
                 {endAdornment && (

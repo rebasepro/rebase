@@ -17,10 +17,10 @@ import { EntityTableCellActions } from "./internal/EntityTableCellActions";
 
 import { useSelectableTableController } from "../SelectableTable/SelectableTableContext";
 import { useClearRestoreValue } from "../../form/useClearRestoreValue";
-import { getRowHeight } from "@rebasepro/app";
+import { getRowHeight, useTranslation } from "@rebasepro/app";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
-import { TableRelationField } from "./fields/TableRelationField";
-import { TableRelationSelectorField } from "./fields/TableRelationSelectorField";
+import { EntityTableCellOpener } from "./internal/EntityTableCell";
+import { TableCellOpenerKind } from "./internal/TableCellOpener";
 
 export interface PropertyTableCellProps<T> {
     propertyKey: string;
@@ -75,6 +75,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             select,
             setPopupCell
         } = useSelectableTableController();
+        const { t } = useTranslation();
 
         const dummySelectionStore = useMemo(() => createSelectionStore(), []);
         const activeSelectionStore = selectionStore || dummySelectionStore;
@@ -235,6 +236,71 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             () => getTableBindingForProperty(property, selected),
             [property, selected]);
 
+        // The editor the cell opens, whether or not it is mounted yet. A picker
+        // is only mounted once its cell is selected (see table_bindings), but
+        // the opener that reveals it is there from rest.
+        const editorBinding = useMemo(
+            () => getTableBindingForProperty(property, true),
+            [property]);
+
+        // Whether the cell's floating editor is open: the dropdown, the picker
+        // dialog, the date picker. Held here rather than inside the editor so
+        // the opener can open it in the same click that selects the cell —
+        // before the editor exists.
+        const [editorOpen, setEditorOpen] = useState(false);
+        useEffect(() => {
+            if (!selected) setEditorOpen(false);
+        }, [selected]);
+
+        // What a floating editor is positioned against: the cell, not the
+        // editor's own trigger, which the cell may clip.
+        const cellRef = useRef<HTMLDivElement>(null);
+
+        // What the cell shows at rest. A picker renders the same node as its
+        // trigger, so selecting the cell changes its frame and nothing else.
+        const preview = <PropertyPreview width={width}
+            height={height}
+            propertyKey={propertyKey as string}
+            value={internalValue}
+            property={property}
+            size={getPreviewSizeFrom(size)}
+        />;
+
+        let openerKind: TableCellOpenerKind | undefined;
+        if (!disabled && !readOnlyProperty) {
+            if (!customField && editorBinding)
+                openerKind = editorBinding.opener;
+            else if (enablePopupIcon && setPopupCell)
+                openerKind = "expand";
+        }
+
+        const onOpenerToggleRef = useRef<(open: boolean, cellRect: DOMRect | undefined) => void>(() => undefined);
+        onOpenerToggleRef.current = (open, cellRect) => {
+            if (openerKind === "expand") {
+                if (open) openPopup(cellRect);
+            } else {
+                setEditorOpen(open);
+            }
+        };
+        // Stable: `EntityTableCell` compares its props field by field and would
+        // otherwise hold on to the first one it was given.
+        const onOpenerToggle = useCallback((open: boolean, cellRect: DOMRect | undefined) =>
+            onOpenerToggleRef.current(open, cellRect), []);
+
+        const opener: EntityTableCellOpener | undefined = openerKind
+            ? {
+                kind: openerKind,
+                open: editorOpen,
+                // A dropdown's own trigger takes the focus, and Enter opens it.
+                // The rest have no trigger in the cell; the opener stands in.
+                focusOnSelect: openerKind !== "dropdown",
+                label: openerKind === "expand"
+                    ? t("expand")
+                    : t("edit_name", { name: property.name ?? propertyKey }),
+                onToggle: onOpenerToggle
+            }
+            : undefined;
+
         let innerComponent: React.ReactNode | undefined;
         let allowScroll = false;
         let showExpandIcon = false;
@@ -289,6 +355,10 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     entity={entity}
                     path={path}
                     openPopup={setPopupCell ? openPopup : undefined}
+                    open={editorOpen}
+                    onOpenChange={setEditorOpen}
+                    preview={preview}
+                    anchorRef={cellRef}
                 />;
 
                 allowScroll = tableBinding.allowScroll ?? false;
@@ -302,16 +372,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
         if (!innerComponent) {
             allowScroll = false;
-            showExpandIcon = enablePopupIcon && selected && !innerComponent && !disabled && !readOnlyProperty;
-            innerComponent = (
-                <PropertyPreview width={width}
-                    height={height}
-                    propertyKey={propertyKey as string}
-                    value={internalValue}
-                    property={property}
-                    size={getPreviewSizeFrom(size)}
-                />
-            );
+            innerComponent = preview;
         }
 
         return (
@@ -332,6 +393,8 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 showExpandIcon={showExpandIcon}
                 value={internalValue}
                 hideOverflow={hideOverflow}
+                opener={opener}
+                cellRef={cellRef}
                 sortableNodeRef={sortableNodeRef}
                 sortableStyle={sortableStyle}
                 sortableAttributes={sortableAttributes}

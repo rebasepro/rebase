@@ -6,6 +6,20 @@ import { cls, Tooltip, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MinusCircleIcon } from "@rebasepro/ui";
 import { getRowHeight, TableSize } from "@rebasepro/app";
 import { ErrorTooltip } from "@rebasepro/app";
+import { TableCellOpener, TableCellOpenerKind } from "./TableCellOpener";
+
+export interface EntityTableCellOpener {
+    kind: TableCellOpenerKind;
+    open: boolean;
+    /** See {@link TableCellOpener}'s `focusOnSelect`. */
+    focusOnSelect: boolean;
+    label: string;
+    /**
+     * Whether the editor should now be open, and the cell's rect for editors
+     * positioned against it. The cell is selected before this is called.
+     */
+    onToggle: (open: boolean, cellRect: DOMRect | undefined) => void;
+}
 
 interface EntityTableCellProps {
     children: React.ReactNode;
@@ -27,6 +41,14 @@ interface EntityTableCellProps {
     fullHeight?: boolean;
     selected?: boolean;
     hideOverflow?: boolean;
+    /**
+     * The control that opens the cell's editor, revealed on hover and kept
+     * shown while the cell is selected. The cell keeps a slot for it at its
+     * trailing edge either way, so it never moves the value.
+     */
+    opener?: EntityTableCellOpener;
+    /** The cell's element, for editors that float and are positioned against it. */
+    cellRef?: React.RefObject<HTMLDivElement | null>;
     onSelect?: (cellRect: DOMRect | undefined) => void;
     // Sortable props for dnd-kit integration
     sortableNodeRef?: (node: HTMLElement | null) => void;
@@ -88,6 +110,8 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         allowScroll,
         removePadding,
         fullHeight,
+        opener,
+        cellRef,
         onSelect,
         width,
         hideOverflow = true,
@@ -101,7 +125,8 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
     }: EntityTableCellProps) {
 
         const [measureRef, bounds] = useMeasure();
-        const ref = useRef<HTMLDivElement>(null);
+        const internalRef = useRef<HTMLDivElement>(null);
+        const ref = cellRef ?? internalRef;
 
         const maxHeight = useMemo(() => getRowHeight(size), [size]);
 
@@ -169,6 +194,13 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
             }
         }, [ref, onSelect, selected, disabled]);
 
+        const onOpenerToggle = useCallback((open: boolean) => {
+            if (!opener) return;
+            const cellRect = ref.current?.getBoundingClientRect();
+            if (open) onSelectCallback();
+            opener.onToggle(open, cellRect);
+        }, [opener, onSelectCallback, ref]);
+
         const onFocus = useCallback((event: React.SyntheticEvent<HTMLDivElement>) => {
             event.stopPropagation();
             event.preventDefault();
@@ -196,10 +228,33 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 ? "border-primary"
                 : "border-transparent";
 
+        const content = <ErrorBoundary>
+
+            {fullHeight && !faded && children}
+
+            {(!fullHeight || faded) && <TableCellInner
+                fullHeight={fullHeight ?? false}
+                justifyContent={justifyContent}
+                scrollable={scrollable ?? false}
+                faded={faded}>
+
+                {!fullHeight && <div ref={measureRef}
+                    style={{
+                        display: "flex",
+                        width: "100%",
+                        justifyContent,
+                        height: fullHeight ? "100%" : undefined
+                    }}>
+                    {children}
+                </div>}
+
+            </TableCellInner>}
+        </ErrorBoundary>;
+
         const result = <>
             <div
                 className={cls(
-                    "transition-colors duration-500",
+                    "group/cell transition-colors duration-500",
                     `flex relative h-full rounded-md p-${p} border-4`,
                     showSaved ? "bg-primary/20 dark:bg-primary/20" : (onHover && !disabled ? "bg-surface-hover" : ""),
                     hideOverflow ? "overflow-hidden" : "",
@@ -220,28 +275,27 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
                 onMouseLeave={setOnHoverFalse}
             >
 
-                <ErrorBoundary>
+                {opener
+                    // The value and the opener side by side. The wrapper takes
+                    // over what the cell itself does for a cell without one:
+                    // aligning the value, and centring it when it fits.
+                    ? <div className={"flex flex-1 min-w-0 self-stretch"}
+                        style={{
+                            justifyContent,
+                            alignItems: disabled || !isOverflowing ? "center" : undefined
+                        }}>
+                        {content}
+                    </div>
+                    : content}
 
-                    {fullHeight && !faded && children}
-
-                    {(!fullHeight || faded) && <TableCellInner
-                        fullHeight={fullHeight ?? false}
-                        justifyContent={justifyContent}
-                        scrollable={scrollable ?? false}
-                        faded={faded}>
-
-                        {!fullHeight && <div ref={measureRef}
-                            style={{
-                                display: "flex",
-                                width: "100%",
-                                justifyContent,
-                                height: fullHeight ? "100%" : undefined
-                            }}>
-                            {children}
-                        </div>}
-
-                    </TableCellInner>}
-                </ErrorBoundary>
+                {opener && <div className={"shrink-0 self-center flex items-center pl-1"}>
+                    <TableCellOpener kind={opener.kind}
+                        open={opener.open}
+                        selected={Boolean(selected)}
+                        focusOnSelect={opener.focusOnSelect}
+                        label={opener.label}
+                        onToggle={onOpenerToggle}/>
+                </div>}
 
                 {actions}
 
@@ -303,6 +357,10 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
             a.removePadding === b.removePadding &&
             a.fullHeight === b.fullHeight &&
             a.selected === b.selected &&
+            a.opener?.kind === b.opener?.kind &&
+            a.opener?.open === b.opener?.open &&
+            a.opener?.focusOnSelect === b.opener?.focusOnSelect &&
+            a.opener?.label === b.opener?.label &&
             a.isDragging === b.isDragging &&
             a.isDraggable === b.isDraggable &&
             a.frozen === b.frozen;

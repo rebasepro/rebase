@@ -24,6 +24,7 @@ import { User } from "@rebasepro/types";
 import { apiBaseOf, useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/app";
 import { EmptyValue } from "../preview";
 import { useResolvedUser } from "../hooks/useResolvedUsers";
+import { PickerTrigger } from "./PickerTrigger";
 
 interface UserSelectorItem {
     uid: string;
@@ -167,10 +168,17 @@ export interface UserSelectorProps {
     searchPlaceholder?: string;
     noResultsText?: string;
     loadingText?: string;
+    /** See `RelationSelector`'s `open`. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    /** See `RelationSelector`'s `triggerContent`. */
+    triggerContent?: React.ReactNode;
+    /** See `RelationSelector`'s `anchorRef`. */
+    anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const UserSelector = React.forwardRef<
-    HTMLButtonElement,
+    HTMLElement,
     UserSelectorProps
 >(
     (
@@ -186,7 +194,11 @@ export const UserSelector = React.forwardRef<
             pageSize,
             searchPlaceholder = "Search users...",
             noResultsText = "No users found.",
-            loadingText = "Loading..."
+            loadingText = "Loading...",
+            open: openProp,
+            onOpenChange,
+            triggerContent,
+            anchorRef
         },
         ref
     ) => {
@@ -200,16 +212,33 @@ export const UserSelector = React.forwardRef<
             getUser
         } = useUserSelector({ pageSize });
 
-        const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+        const [isPopoverOpen, setIsPopoverOpenState] = useState(false);
+        const isPopoverOpenRef = useRef(false);
+        const onOpenChangeRef = useRef(onOpenChange);
+        onOpenChangeRef.current = onOpenChange;
+        const setIsPopoverOpen = useCallback((next: boolean, notify = true) => {
+            const changed = isPopoverOpenRef.current !== next;
+            isPopoverOpenRef.current = next;
+            setIsPopoverOpenState(next);
+            if (changed && notify) onOpenChangeRef.current?.(next);
+        }, []);
+        useEffect(() => {
+            if (openProp === undefined || openProp === isPopoverOpenRef.current) return;
+            if (openProp && disabled) {
+                onOpenChangeRef.current?.(false);
+                return;
+            }
+            setIsPopoverOpen(openProp, false);
+        }, [openProp, disabled, setIsPopoverOpen]);
         const [searchString, setSearchString] = useState<string>("");
         const contextPortalContainer = usePortalContainer();
 
         const scrollContainerRef = useRef<HTMLDivElement>(null);
         const sentinelRef = useRef<HTMLDivElement>(null);
         const observerRef = useRef<IntersectionObserver | null>(null);
-        const localTriggerRef = useRef<HTMLButtonElement | null>(null);
+        const localTriggerRef = useRef<HTMLElement | null>(null);
 
-        const handleButtonRef = useCallback((node: HTMLButtonElement | null) => {
+        const handleButtonRef = useCallback((node: HTMLElement | null) => {
             localTriggerRef.current = node;
             if (typeof ref === "function") {
                 ref(node);
@@ -298,7 +327,7 @@ export const UserSelector = React.forwardRef<
                 onValueChange?.(item.uid);
             }
             setIsPopoverOpen(false);
-        }, [value, onValueChange]);
+        }, [value, onValueChange, setIsPopoverOpen]);
 
         const handleClear = useCallback((e: React.MouseEvent) => {
             e.stopPropagation();
@@ -306,10 +335,15 @@ export const UserSelector = React.forwardRef<
             onValueChange?.(null);
         }, [onValueChange]);
 
+        const toggleOpen = useCallback(() => {
+            if (disabled) return;
+            setIsPopoverOpen(!isPopoverOpenRef.current);
+        }, [disabled, setIsPopoverOpen]);
+
         const handleRootOpenChange = useCallback((next: boolean) => {
             if (disabled) return;
             if (next) setIsPopoverOpen(true);
-        }, [disabled]);
+        }, [disabled, setIsPopoverOpen]);
 
         // Outside click + Escape handling
         useEffect(() => {
@@ -334,7 +368,7 @@ export const UserSelector = React.forwardRef<
                 document.removeEventListener("mousedown", handlePointerDown, true);
                 document.removeEventListener("keydown", handleKey, true);
             };
-        }, [isPopoverOpen]);
+        }, [isPopoverOpen, setIsPopoverOpen]);
 
         const resolvedPlaceholder = placeholder || <EmptyValue className={"ml-2"}/>;
         // See RelationSelector: a modal dialog cancels wheel events outside its
@@ -344,68 +378,88 @@ export const UserSelector = React.forwardRef<
         return (
             <>
                 <PopoverPrimitive.Root open={isPopoverOpen} onOpenChange={handleRootOpenChange} modal={false}>
-                    <PopoverPrimitive.Trigger asChild>
-                        <button
-                            ref={handleButtonRef}
-                            type="button"
-                            aria-haspopup="listbox"
-                            aria-expanded={isPopoverOpen}
-                            data-user-selector-trigger
-                            disabled={disabled}
-                            onClick={() => {
-                                if (disabled) return;
-                                setIsPopoverOpen(o => !o);
-                            }}
-                            className={cls(
-                                {
-                                    "min-h-[42px] py-1 px-2": size === "small",
-                                    "min-h-[56px] py-2 px-4": size === "medium",
-                                    "min-h-[48px] py-1 px-4": size === "large"
-                                },
-                                // `rounded-lg` like every other field box —
-                                // `rounded-md` made this the one control in a
-                                // row with a different corner.
-                                "w-full select-none rounded-lg text-sm relative flex items-center",
-                                invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
-                                disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
-                                className
-                            )}
-                        >
-                            <div className="flex justify-between items-center w-full">
-                                {resolvedUser ? (
-                                    <div className="flex flex-row items-center gap-1 truncate flex-1 min-w-0 mr-2">
-                                        <UserDisplay user={resolvedUser}/>
-                                    </div>
-                                ) : value ? (
-                                    // A uid we could not resolve — deleted, or
-                                    // hidden from this viewer. Show it raw: the
-                                    // placeholder here would claim the field is
-                                    // unset, which is the one thing it is not.
-                                    <span className="text-sm truncate text-text-primary dark:text-text-primary-dark">
-                                        {value}
-                                    </span>
-                                ) : (
-                                    <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                        {resolvedPlaceholder}
-                                    </span>
-                                )}
-
-                                <div className="flex-shrink-0 flex items-center gap-1">
-                                    {clearable && !disabled && value && (
-                                        <IconButton
-                                            size="small"
-                                            onClick={handleClear}>
-                                            <XIcon size={iconSize.small}/>
-                                        </IconButton>
-                                    )}
-                                    <ChevronDownIcon
-                                        size={size === "small" ? iconSize.small : iconSize.medium}
-                                        className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
-                                    />
-                                </div>
+                    <PickerTrigger anchorRef={anchorRef}>
+                        {triggerContent !== undefined
+                            // Bare: the caller frames it. No box, no padding,
+                            // no height of its own — the node it passed,
+                            // exactly where it would be anyway. A `div`, not a
+                            // `button`: what it wraps can hold buttons of its
+                            // own (a record card's open button, at tall rows).
+                            ? <div
+                                ref={handleButtonRef}
+                                role="button"
+                                tabIndex={disabled ? -1 : 0}
+                                aria-disabled={disabled || undefined}
+                                aria-haspopup="listbox"
+                                aria-expanded={isPopoverOpen}
+                                data-user-selector-trigger
+                                onClick={toggleOpen}
+                                onKeyDown={(event) => {
+                                    if (event.key !== "Enter" && event.key !== " ") return;
+                                    event.preventDefault();
+                                    toggleOpen();
+                                }}
+                                className={cls("w-full select-none text-left text-sm relative flex items-center outline-none", className)}>
+                                {triggerContent}
                             </div>
-                        </button>
-                    </PopoverPrimitive.Trigger>
+                            : <button
+                                ref={handleButtonRef}
+                                type="button"
+                                aria-haspopup="listbox"
+                                aria-expanded={isPopoverOpen}
+                                data-user-selector-trigger
+                                disabled={disabled}
+                                onClick={toggleOpen}
+                                className={cls(
+                                    {
+                                        "min-h-[42px] py-1 px-2": size === "small",
+                                        "min-h-[56px] py-2 px-4": size === "medium",
+                                        "min-h-[48px] py-1 px-4": size === "large"
+                                    },
+                                    // `rounded-lg` like every other field box —
+                                    // `rounded-md` made this the one control in a
+                                    // row with a different corner.
+                                    "w-full select-none rounded-lg text-sm relative flex items-center",
+                                    invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
+                                    disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                                    className
+                                )}
+                            >
+                                <div className="flex justify-between items-center w-full">
+                                    {resolvedUser ? (
+                                        <div className="flex flex-row items-center gap-1 truncate flex-1 min-w-0 mr-2">
+                                            <UserDisplay user={resolvedUser}/>
+                                        </div>
+                                    ) : value ? (
+                                        // A uid we could not resolve — deleted, or
+                                        // hidden from this viewer. Show it raw: the
+                                        // placeholder here would claim the field is
+                                        // unset, which is the one thing it is not.
+                                        <span className="text-sm truncate text-text-primary dark:text-text-primary-dark">
+                                            {value}
+                                        </span>
+                                    ) : (
+                                        <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                            {resolvedPlaceholder}
+                                        </span>
+                                    )}
+
+                                    <div className="flex-shrink-0 flex items-center gap-1">
+                                        {clearable && !disabled && value && (
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleClear}>
+                                                <XIcon size={iconSize.small}/>
+                                            </IconButton>
+                                        )}
+                                        <ChevronDownIcon
+                                            size={size === "small" ? iconSize.small : iconSize.medium}
+                                            className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
+                                        />
+                                    </div>
+                                </div>
+                            </button>}
+                    </PickerTrigger>
                     <PopoverPrimitive.Portal container={portalContainer}>
                         <PopoverPrimitive.Content
                             ref={contentRef}

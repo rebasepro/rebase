@@ -15,6 +15,16 @@ export function VirtualTableSelect(props: {
     valueType: "string" | "number";
     updateValue: (newValue: (string | number | string[] | number[] | null)) => void;
     focused: boolean;
+    /** Whether the list is open. Set by the cell's opener as well as the trigger. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    /**
+     * What the cell shows at rest. The trigger shows the same node, so a
+     * selected cell looks like an unselected one; the chevron is the cell's.
+     */
+    preview?: React.ReactNode;
+    /** The cell: the list opens against it rather than against the trigger. */
+    anchorRef?: React.RefObject<HTMLElement | null>;
     onBlur?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>;
 }) {
 
@@ -26,7 +36,11 @@ export function VirtualTableSelect(props: {
         focused,
         updateValue,
         multiple,
-        valueType
+        valueType,
+        open,
+        onOpenChange,
+        preview,
+        anchorRef
     } = props;
 
     const validValue = (Array.isArray(internalValue) && multiple) ||
@@ -60,6 +74,7 @@ export function VirtualTableSelect(props: {
     const resolvedEnumValues = resolveEnumValues(enumValues);
 
     const renderValue = (enumKey?: string | number) => {
+        if (preview !== undefined) return preview;
         return <EnumValuesChip
             key={`${enumKey}`}
             enumKey={String(enumKey)}
@@ -68,25 +83,35 @@ export function VirtualTableSelect(props: {
     };
 
     // When the dropdown closes (including on escape), restore focus to the trigger
-    const handleOpenChange = useCallback((open: boolean) => {
-        if (!open && ref.current) {
+    const handleOpenChange = useCallback((nextOpen: boolean) => {
+        onOpenChange?.(nextOpen);
+        if (!nextOpen && ref.current) {
             // Use setTimeout to ensure focus is restored after Radix finishes its cleanup
             setTimeout(() => {
                 ref.current?.focus({ preventScroll: true });
             }, 0);
         }
-    }, []);
+    }, [onOpenChange]);
 
     return (
         multiple
             ? <MultiSelect
                 invisible={true}
                 inputRef={ref}
+                // No padding and no chevron of its own: the cell pads it and
+                // draws the opener, so the chips sit where they sit at rest.
+                // The smallest control height, so it fits a text row's cell.
+                size={"smallest"}
                 className="w-full h-full p-0 bg-transparent outline-none"
                 position={"item-aligned"}
                 disabled={disabled}
                 includeClear={false}
+                chevron={preview === undefined}
+                anchorRef={anchorRef}
                 useChips={false}
+                open={open}
+                renderValues={preview !== undefined ? () => preview : undefined}
+                placeholder={preview}
                 value={validValue
                     ? ((internalValue as (string | number)[]).map(v => v.toString()))
                     : ([])}
@@ -115,9 +140,13 @@ export function VirtualTableSelect(props: {
                 position={"item-aligned"}
                 disabled={disabled}
                 padding={false}
+                size={"smallest"}
+                chevron={preview === undefined}
+                open={open}
                 value={validValue
                     ? internalValue?.toString()
                     : ""}
+                placeholder={preview}
                 onValueChange={onChange}
                 onOpenChange={handleOpenChange}
                 renderValue={renderValue}>

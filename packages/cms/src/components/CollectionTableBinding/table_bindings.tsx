@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ArrayProperty, DateProperty, Entity, EntityReference, EntityRelation, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
 import { TableSize, useCustomizationController } from "@rebasepro/app";
 import {
@@ -16,6 +16,7 @@ import { TableRelationField } from "./fields/TableRelationField";
 import { TableRelationSelectorField } from "./fields/TableRelationSelectorField";
 
 import { getDatePropertyMode, getDatePropertyTimezone, getPreviewSizeFrom } from "../../preview/util";
+import { TableCellOpenerKind } from "./internal/TableCellOpener";
 
 export interface TableFieldBindingProps<T = unknown> {
     propertyKey: string;
@@ -31,10 +32,33 @@ export interface TableFieldBindingProps<T = unknown> {
     entity: Entity<Record<string, unknown>>;
     path: string;
     openPopup?: (cellRect: DOMRect | undefined) => void;
+    /**
+     * Whether the cell's floating editor is open — its dropdown, its selection
+     * dialog, its date picker. The cell's opener sets it as well as the
+     * editor's own trigger, and it can be set before the editor has mounted.
+     */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    /**
+     * What the cell shows at rest. An editor with a trigger shows this same
+     * node in it, so selecting the cell changes its frame and nothing else.
+     */
+    preview?: React.ReactNode;
+    /**
+     * The cell's element. A floating editor opens against it rather than
+     * against its own trigger, which can be taller than the cell clipping it.
+     */
+    anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export interface TableFieldConfig {
     Component: React.ComponentType<TableFieldBindingProps>;
+    /**
+     * The opener the cell reveals on hover, and keeps shown while selected,
+     * to open this editor in one click. None for editors that are the value
+     * itself (a text input, a switch) or that draw their own (storage).
+     */
+    opener?: TableCellOpenerKind;
     fullHeight?: boolean;
     allowScroll?: boolean;
     removePadding?: boolean;
@@ -92,7 +116,7 @@ export function getTableBindingForProperty(
         const numberProperty = property as NumberProperty;
         if (numberProperty.enum) {
             return {
-                Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: TableFieldBindingProps) => (
+                Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue, open, onOpenChange, preview, anchorRef }: TableFieldBindingProps) => (
                     <VirtualTableSelect
                         name={propertyKey}
                         multiple={false}
@@ -104,9 +128,13 @@ export function getTableBindingForProperty(
                         error={validationError ?? error}
                         internalValue={internalValue as string | number}
                         updateValue={updateValue}
+                        open={open}
+                        onOpenChange={onOpenChange}
+                        preview={preview}
+                        anchorRef={anchorRef}
                     />
                 ),
-                fullHeight: true
+                opener: "dropdown"
             };
         } else {
             return {
@@ -127,7 +155,7 @@ export function getTableBindingForProperty(
         const stringProperty = property as StringProperty;
         if (stringProperty.enum) {
             return {
-                Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: TableFieldBindingProps) => (
+                Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue, open, onOpenChange, preview, anchorRef }: TableFieldBindingProps) => (
                     <VirtualTableSelect
                         name={propertyKey}
                         multiple={false}
@@ -139,13 +167,17 @@ export function getTableBindingForProperty(
                         error={validationError ?? error}
                         internalValue={internalValue as string | number}
                         updateValue={updateValue}
+                        open={open}
+                        onOpenChange={onOpenChange}
+                        preview={preview}
+                        anchorRef={anchorRef}
                     />
                 ),
-                fullHeight: true
+                opener: "dropdown"
             };
         } else if (stringProperty.userSelect) {
             return {
-                Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: TableFieldBindingProps) => (
+                Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue, open, onOpenChange, preview, anchorRef }: TableFieldBindingProps) => (
                     <VirtualTableUserSelect
                         name={propertyKey}
                         multiple={false}
@@ -155,9 +187,13 @@ export function getTableBindingForProperty(
                         error={validationError ?? error}
                         internalValue={internalValue as string}
                         updateValue={updateValue}
+                        open={open}
+                        onOpenChange={onOpenChange}
+                        preview={preview}
+                        anchorRef={anchorRef}
                     />
                 ),
-                fullHeight: true
+                opener: "dropdown"
             };
         } else if (stringProperty.admin?.markdown || !stringProperty.storage) {
             const multiline = Boolean(stringProperty.admin?.multiline) || Boolean(stringProperty.admin?.markdown);
@@ -189,23 +225,8 @@ export function getTableBindingForProperty(
         };
     } else if (property.type === "date") {
         return {
-            Component: ({ propertyKey, error, validationError, disabled, selected, size, property, internalValue, updateValue }: TableFieldBindingProps) => {
-                const { locale } = useCustomizationController();
-                return (
-                    <VirtualTableDateField
-                        name={propertyKey}
-                        error={validationError ?? error}
-                        disabled={disabled}
-                        small={getPreviewSizeFrom(size) !== "medium"}
-                        mode={getDatePropertyMode(property as DateProperty)}
-                        timezone={getDatePropertyTimezone(property as DateProperty)}
-                        focused={selected}
-                        internalValue={internalValue as Date}
-                        updateValue={updateValue}
-                        locale={locale}
-                    />
-                );
-            },
+            Component: DateBindingComponent,
+            opener: "calendar",
             fullHeight: true,
             hideOverflow: false,
             allowScroll: false
@@ -213,10 +234,13 @@ export function getTableBindingForProperty(
     } else if (property.type === "reference") {
         if ((property as ReferenceProperty).path) {
             return {
-                Component: ({ propertyKey, internalValue, updateValue, disabled, size, property }: TableFieldBindingProps) => {
+                Component: ({ propertyKey, internalValue, updateValue, disabled, size, property, selected, open, onOpenChange }: TableFieldBindingProps) => {
                     return (
                     <TableReferenceField
                         name={propertyKey}
+                        selected={selected}
+                        open={open}
+                        onOpenChange={onOpenChange}
                         internalValue={internalValue as EntityReference}
                         updateValue={updateValue}
                         disabled={disabled}
@@ -231,6 +255,7 @@ export function getTableBindingForProperty(
                     />
                     );
                 },
+                opener: "dialog",
                 allowScroll: false
             };
         }
@@ -239,6 +264,7 @@ export function getTableBindingForProperty(
             if ((property as RelationProperty).admin?.widget === "dialog") {
                 return {
                     Component: RelationDialogBindingComponent,
+                    opener: "dialog",
                     allowScroll: false
                 };
             } else if (selected) {
@@ -250,6 +276,7 @@ export function getTableBindingForProperty(
                 // asked to see. Unselected cells fall through to PropertyPreview.
                 return {
                     Component: RelationSelectorBindingComponent,
+                    opener: "dropdown",
                     allowScroll: false
                 };
             }
@@ -264,7 +291,7 @@ export function getTableBindingForProperty(
             if (ofProp.type === "string" || ofProp.type === "number") {
                 if (selected && ofProp.enum) {
                     return {
-                        Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue }: TableFieldBindingProps) => (
+                        Component: ({ propertyKey, disabled, selected, size, error, validationError, internalValue, updateValue, open, onOpenChange, preview, anchorRef }: TableFieldBindingProps) => (
                             <VirtualTableSelect
                                 name={propertyKey}
                                 multiple={true}
@@ -276,20 +303,25 @@ export function getTableBindingForProperty(
                                 error={validationError ?? error}
                                 internalValue={internalValue as string | number}
                                 updateValue={updateValue}
+                                open={open}
+                                onOpenChange={onOpenChange}
+                                preview={preview}
+                                anchorRef={anchorRef}
                             />
                         ),
-                        allowScroll: true,
-                        fullHeight: true,
-                        hideOverflow: false
+                        opener: "dropdown"
                     };
                 }
             } else if (ofProp.type === "reference") {
                 const refOfProp = ofProp as ReferenceProperty;
                 if (refOfProp.path) {
                     return {
-                        Component: ({ propertyKey, disabled, internalValue, updateValue, size }: TableFieldBindingProps) => (
+                        Component: ({ propertyKey, disabled, internalValue, updateValue, size, selected, open, onOpenChange }: TableFieldBindingProps) => (
                             <TableReferenceField
                                 name={propertyKey}
+                                selected={selected}
+                                open={open}
+                                onOpenChange={onOpenChange}
                                 disabled={disabled}
                                 internalValue={internalValue as EntityReference[]}
                                 updateValue={updateValue}
@@ -303,6 +335,7 @@ export function getTableBindingForProperty(
                                 includeEntityLink={refOfProp.admin?.includeEntityLink}
                             />
                         ),
+                        opener: "dialog",
                         allowScroll: false
                     };
                 }
@@ -313,12 +346,57 @@ export function getTableBindingForProperty(
     return undefined;
 }
 
+/**
+ * Stable component for date cells. The input is always there, at rest too, so
+ * a date can be typed into; the cell's opener shows the picker through it.
+ */
+function DateBindingComponent({ propertyKey, error, validationError, disabled, selected, size, property, internalValue, updateValue, open, onOpenChange }: TableFieldBindingProps) {
+    const { locale } = useCustomizationController();
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // The native picker has no open state to report back: showing it is a
+    // one-off request, handed straight back as closed. `showPicker` needs the
+    // click that asked for it, which is still the current task here.
+    useEffect(() => {
+        if (!open) return;
+        onOpenChange?.(false);
+        const input = inputRef.current;
+        if (!input) return;
+        try {
+            input.showPicker();
+        } catch {
+            input.focus();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    return (
+        <VirtualTableDateField
+            name={propertyKey}
+            error={validationError ?? error}
+            disabled={disabled}
+            small={getPreviewSizeFrom(size) !== "medium"}
+            mode={getDatePropertyMode(property as DateProperty)}
+            timezone={getDatePropertyTimezone(property as DateProperty)}
+            focused={selected}
+            internalValue={internalValue as Date}
+            updateValue={updateValue}
+            locale={locale}
+            pickerButton={onOpenChange === undefined}
+            inputRef={inputRef}
+        />
+    );
+}
+
 /** Stable component for relation fields rendered with the dialog widget */
-function RelationDialogBindingComponent({ propertyKey, internalValue, updateValue, disabled, size, property }: TableFieldBindingProps) {
+function RelationDialogBindingComponent({ propertyKey, internalValue, updateValue, disabled, size, property, selected, open, onOpenChange }: TableFieldBindingProps) {
     const relProp = property as RelationProperty;
     return (
         <TableRelationField
             name={propertyKey}
+            selected={selected}
+            open={open}
+            onOpenChange={onOpenChange}
             internalValue={internalValue as EntityRelation}
             updateValue={updateValue}
             disabled={disabled}
@@ -335,17 +413,21 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
 }
 
 /** Stable component for relation fields rendered with the inline selector */
-function RelationSelectorBindingComponent({ propertyKey, internalValue, updateValue, disabled, property, size }: TableFieldBindingProps) {
+function RelationSelectorBindingComponent({ propertyKey, internalValue, updateValue, disabled, property, selected, open, onOpenChange, preview, anchorRef }: TableFieldBindingProps) {
     const relProp = property as RelationProperty;
     return (
         <TableRelationSelectorField
-            size={getPreviewSizeFrom(size) === "small" ? "compact" : "medium"}
             name={propertyKey}
             internalValue={internalValue as EntityRelation}
             updateValue={updateValue}
             disabled={disabled}
             relation={relProp.relation!}
             fixedFilter={relProp.admin?.fixedFilter}
+            focused={selected}
+            open={open}
+            onOpenChange={onOpenChange}
+            preview={preview}
+            anchorRef={anchorRef}
         />
     );
 }

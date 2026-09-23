@@ -61,6 +61,17 @@ interface MultiSelectProps<T extends MultiSelectValue = string> {
     inputRef?: React.Ref<HTMLButtonElement>,
     padding?: boolean,
     invisible?: boolean,
+    /**
+     * Whether the trigger draws its own chevron. A table cell turns it off:
+     * the cell draws one opener for every kind of editor, in the same place.
+     */
+    chevron?: boolean,
+    /**
+     * Positions the list against this element instead of the trigger. A
+     * table cell passes itself: chips that wrap make the trigger taller than
+     * the cell that clips it, and the list belongs under what can be seen.
+     */
+    anchorRef?: React.RefObject<HTMLElement | null>,
     children: React.ReactNode;
     renderValues?: (values: T[]) => React.ReactNode;
     portalContainer?: HTMLElement | null;
@@ -76,6 +87,25 @@ interface MultiSelectProps<T extends MultiSelectValue = string> {
     "aria-label"?: string;
 }
 
+/**
+ * The popover's trigger, or — given an anchor — a plain child beside a
+ * `Popover.Anchor` on that element. Not both: Radix's trigger registers itself
+ * as the anchor through a ref callback, which under StrictMode runs again
+ * after the custom anchor's effect and wins, leaving the list anchored to a
+ * trigger the custom anchor then unmounts. The button toggles the list itself.
+ */
+function MultiSelectTrigger({ anchorRef, children }: {
+    anchorRef?: React.RefObject<HTMLElement | null>;
+    children: React.ReactElement;
+}) {
+    if (!anchorRef)
+        return <PopoverPrimitive.Trigger asChild>{children}</PopoverPrimitive.Trigger>;
+    return <>
+        <PopoverPrimitive.Anchor virtualRef={anchorRef}/>
+        {children}
+    </>;
+}
+
 // Use generic type for the forwarded ref
 export const MultiSelect = React.forwardRef<
     HTMLButtonElement,
@@ -89,6 +119,8 @@ export const MultiSelect = React.forwardRef<
             error,
             onValueChange,
             invisible,
+            chevron = true,
+            anchorRef,
             disabled,
             placeholder,
             modalPopover = true,
@@ -233,7 +265,7 @@ export const MultiSelect = React.forwardRef<
                     onOpenChange={onPopoverOpenChange}
                     modal={modalPopover}
                 >
-                    <PopoverPrimitive.Trigger asChild>
+                    <MultiSelectTrigger anchorRef={anchorRef}>
                         <button
                             ref={inputRef ?? ref}
                             disabled={disabled}
@@ -312,10 +344,10 @@ export const MultiSelect = React.forwardRef<
                                                 handleClear();
                                             }}
                                         />}
-                                        <div className={cls("px-2 h-full flex items-center")}>
+                                        {chevron && <div className={cls("px-2 h-full flex items-center")}>
                                             <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                                                 className={cls("transition", isPopoverOpen ? "rotate-180" : "")}/>
-                                        </div>
+                                        </div>}
                                     </div>
                                 </div>
                             ) : (
@@ -323,14 +355,14 @@ export const MultiSelect = React.forwardRef<
                                     <span className="text-sm">
                                         {placeholder}
                                     </span>
-                                    <div className={cls("px-2 h-full flex items-center")}>
+                                    {chevron && <div className={cls("px-2 h-full flex items-center")}>
                                         <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                                             className={cls("transition", isPopoverOpen ? "rotate-180" : "")}/>
-                                    </div>
+                                    </div>}
                                 </div>
                             )}
                         </button>
-                    </PopoverPrimitive.Trigger>
+                    </MultiSelectTrigger>
                     <PopoverPrimitive.Portal container={finalContainer}>
                         <PopoverPrimitive.Content
                             data-multi-select-content

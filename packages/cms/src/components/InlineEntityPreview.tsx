@@ -93,6 +93,11 @@ export function InlineEntityPreview({
     const content = <span
         tabIndex={interactive ? 0 : undefined}
         role={interactive ? "button" : undefined}
+        // A press on the link does not move the focus. Inside a table cell the
+        // focus is what selects the cell, and selecting it re-renders the cell
+        // between this press and its click: the click then landed on the new
+        // cell and the record never opened. Keyboard focus is unaffected.
+        onMouseDown={interactive ? (event) => event.preventDefault() : undefined}
         onClick={interactive ? handleClick : undefined}
         onKeyDown={interactive
             ? (event) => {

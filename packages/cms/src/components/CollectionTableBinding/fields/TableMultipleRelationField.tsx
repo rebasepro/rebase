@@ -1,7 +1,7 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
 
 import { getCollectionDataPath } from "@rebasepro/types";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals";
 
 import { cls, PencilIcon } from "@rebasepro/ui";
@@ -28,6 +28,11 @@ type TableMultipleRelationFieldProps = {
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
+    /** The cell is selected. */
+    selected?: boolean;
+    /** See `TableRelationField`. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 };
 
 export function TableMultipleRelationField(props: TableMultipleRelationFieldProps) {
@@ -50,7 +55,10 @@ export const TableMultipleRelationFieldInternal = React.memo(
             collection,
             includeId,
             includeEntityLink,
-            size
+            size,
+            selected,
+            open,
+            onOpenChange
         } = props;
 
         const value = Array.isArray(internalValue) ? internalValue : [];
@@ -76,6 +84,15 @@ export const TableMultipleRelationFieldInternal = React.memo(
                 return;
             relationDialogController.open();
         };
+
+        // The cell's opener asks for the dialog. It is a request, not a state:
+        // the dialog closes itself, so the request is handed straight back.
+        useEffect(() => {
+            if (!open) return;
+            onOpenChange?.(false);
+            handleOpen();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [open]);
 
         const valueNotSet = !internalValue || (Array.isArray(internalValue) && internalValue.length === 0);
 
@@ -115,9 +132,8 @@ export const TableMultipleRelationFieldInternal = React.memo(
         if (getPreviewSizeFrom(size) === "small") {
             return <CompactEntityCellField empty={valueNotSet}
                 disabled={disabled}
-                onEdit={handleOpen}
-                onClear={() => updateValue([])}
-                emptyLabel={title}>
+                selected={selected}
+                onClear={() => updateValue([])}>
                 {value.map((item, index) => {
                     const relationItem = normalizeToEntityRelation(item);
                     if (!relationItem) return null;

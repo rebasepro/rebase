@@ -131,6 +131,24 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Changed
 
+#### Admin (CMS & app)
+
+- **A table cell looks the same selected as at rest, and opens its editor in one
+  click.** Selecting a picker cell (a relation, an enum, a multi-select, a user)
+  swapped its value for the editor's own boxed field, so the value moved and a
+  relation's title stopped being a link. The cell now keeps showing its value.
+  Hovering it reveals one control at its trailing edge: a chevron for a list or
+  a selection dialog, a calendar for a date, an expand icon for values edited in
+  the popup. A click on it opens the editor straight from rest. On a selected
+  cell, Enter opens it and Escape closes the list before it clears the
+  selection, and the list opens under the cell rather than under whatever part
+  of the value the cell clips. A relation's title opens the record in the side
+  panel on the first click. Empty date cells no longer show the `dd/mm/yyyy`
+  mask, and a to-many relation in a text row lists on one line with a `+N`.
+  The UI kit's `Select` and `MultiSelect` gain `chevron`, `MultiSelect` gains
+  `anchorRef`, and `DateTimeField` and `VirtualTableDateField` gain
+  `pickerButton` and `inputRef`.
+
 #### Postgres
 
 - **`rebase db push` asks before a column type change that can lose data.** The

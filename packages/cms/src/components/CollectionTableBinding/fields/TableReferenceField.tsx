@@ -1,6 +1,6 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { ReferencePreview } from "../../../preview";
@@ -28,6 +28,14 @@ type TableReferenceFieldProps = {
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
+    /** The cell is selected. */
+    selected?: boolean;
+    /**
+     * Set by the cell's opener: opens the selection dialog, and is handed
+     * back as closed at once — the dialog keeps its own state from there.
+     */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 };
 
 const DefaultMissingReference: React.FC<{ path: string }> = () => null;
@@ -85,7 +93,10 @@ export const TableReferenceFieldInternal = React.memo(
             fixedFilter,
             collection,
             includeId,
-            includeEntityLink
+            includeEntityLink,
+            selected,
+            open,
+            onOpenChange
         } = props;
 
         const onSingleEntitySelected = useCallback((entity: Entity<any>) => {
@@ -118,6 +129,15 @@ export const TableReferenceFieldInternal = React.memo(
                 return;
             referenceDialogController.open();
         };
+
+        // The cell's opener asks for the dialog. It is a request, not a state:
+        // the dialog closes itself, so the request is handed straight back.
+        useEffect(() => {
+            if (!open) return;
+            onOpenChange?.(false);
+            handleOpen();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [open]);
 
         const valueNotSet = !internalValue || (Array.isArray(internalValue) && internalValue.length === 0);
 
@@ -168,16 +188,15 @@ export const TableReferenceFieldInternal = React.memo(
         if (!collection)
             return <ErrorView error={"The specified collection does not exist"}/>;
 
-        // Text rows: the resting inline line stays (its title opens the record),
-        // plus a pencil to pick and a cross to clear. The card layout below is
+        // Text rows: the inline line (each title opens its record), with the
+        // cell's opener to pick and a cross to clear. The card layout below is
         // for the rows tall enough to hold it.
         if (getPreviewSizeFrom(size) === "small") {
             const refs: EntityReference[] = !internalValue ? [] : (Array.isArray(internalValue) ? internalValue : [internalValue]);
             return <CompactEntityCellField empty={valueNotSet}
                 disabled={disabled}
-                onEdit={handleOpen}
-                onClear={() => updateValue(multiselect ? [] : null)}
-                emptyLabel={title}>
+                selected={selected}
+                onClear={() => updateValue(multiselect ? [] : null)}>
                 {refs.map((reference, index) =>
                     reference && reference.isEntityReference && reference.isEntityReference()
                         ? <ReferencePreview key={`compact_ref__`}

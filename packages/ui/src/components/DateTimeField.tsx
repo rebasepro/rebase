@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useId, useRef, useState } from "react";
+import React, { useCallback, useId, useRef, useState } from "react";
 import { CalendarIcon, XIcon, AlertCircleIcon } from "lucide-react";
 import { iconSize } from "../icons/Icon";
 import { IconButton } from "./IconButton";
@@ -24,6 +24,14 @@ export type DateTimeFieldProps = {
     style?: React.CSSProperties;
     inputClassName?: string;
     invisible?: boolean;
+    /**
+     * Whether the field draws its own calendar button. A table cell turns it
+     * off: the cell draws one opener for every kind of editor, in the same
+     * place, and opens the picker through `inputRef`.
+     */
+    pickerButton?: boolean;
+    /** The native input, for a caller that opens the picker itself (`showPicker()`). */
+    inputRef?: React.Ref<HTMLInputElement>;
     locale?: string;
     /**
      * IANA timezone string (e.g., "America/New_York", "Europe/London").
@@ -52,10 +60,17 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     style,
     inputClassName,
     invisible,
+    pickerButton = true,
+    inputRef: inputRefProp,
     timezone,
     "aria-label": ariaLabel
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
+    const setInputRef = useCallback((node: HTMLInputElement | null) => {
+        inputRef.current = node;
+        if (typeof inputRefProp === "function") inputRefProp(node);
+        else if (inputRefProp) inputRefProp.current = node;
+    }, [inputRefProp]);
     const [focused, setFocused] = useState(false);
     // The label was decorative: an InputLabel with no `htmlFor` beside an input
     // with no `id`, so a date field announced itself by its value even when it
@@ -290,7 +305,7 @@ hour12: false,
                 )}
 
                 <input
-                    ref={inputRef}
+                    ref={setInputRef}
                     id={inputId}
                     aria-labelledby={label ? labelId : undefined}
                     aria-label={label ? undefined : ariaLabel}
@@ -302,7 +317,8 @@ hour12: false,
                     disabled={disabled}
                     className={cls(
                         "w-full outline-hidden bg-transparent leading-normal text-sm px-3",
-                        clearable ? "pr-14" : "pr-12",
+                        // Room for the adornments drawn over the input's right end.
+                        pickerButton ? (clearable ? "pr-14" : "pr-12") : (clearable ? "pr-12" : ""),
                         "rounded-lg",
                         {
                             "min-h-[28px]": size === "smallest",
@@ -321,7 +337,7 @@ hour12: false,
                         "border border-transparent outline-hidden opacity-50 dark:opacity-50 text-surface-accent-600 dark:text-surface-accent-500"
                     )}
                 />
-                <IconButton
+                {pickerButton && <IconButton
                     size={adornmentSize}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -330,7 +346,7 @@ hour12: false,
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-surface-accent-500!"
                 >
                     <CalendarIcon/>
-                </IconButton>
+                </IconButton>}
                 {clearable && value && (
                     <IconButton
                         size={adornmentSize}

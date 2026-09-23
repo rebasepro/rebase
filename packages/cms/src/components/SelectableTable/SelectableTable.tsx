@@ -215,9 +215,15 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     // on ESC key press
     useEffect(() => {
         const escFunction = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                unselect();
-            }
+            if (event.key !== "Escape") return;
+            // A key pressed inside something the table opened — a cell's
+            // dropdown, portaled out of the table — is that layer's Escape: it
+            // closes the list and leaves the cell selected. The next one, from
+            // the cell itself, clears the selection.
+            const target = event.target;
+            if (target instanceof Node && target !== document.body && ref.current && !ref.current.contains(target))
+                return;
+            unselect();
         };
         document.addEventListener("keydown", escFunction, false);
         return () => {

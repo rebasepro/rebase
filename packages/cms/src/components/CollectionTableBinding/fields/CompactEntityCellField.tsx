@@ -1,75 +1,54 @@
 import React from "react";
-import { cls, IconButton, PencilIcon, Tooltip, XIcon } from "@rebasepro/ui";
+import { cls, IconButton, Tooltip, XIcon } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
+import { EmptyValue } from "../../../preview";
 
 /**
- * The one-line editor a reference or relation cell shows while selected, at
- * the row sizes that carry small previews (`xs`, `s`, `m`).
+ * A reference or relation cell, at the row sizes that carry small previews
+ * (`xs`, `s`, `m`), for the pickers that open a selection dialog.
  *
- * The flow it replaces: at 48px the selected cell swapped its resting inline
- * line for the card editor built for 140px rows, which was clipped to its top
- * third and whose only click opened the picker — there was no way to look at
- * the record. Here the line stays (its title opens the record in the side
- * panel, exactly as it does at rest), a pencil opens the picker and a cross
- * clears the value. Click the name to see it, click the pencil to change it.
+ * The value is one line of inline previews, the same at rest and selected:
+ * each title opens its record in the side panel. The cell's opener — the
+ * chevron it reveals on hover — opens the dialog, and a cross beside it clears
+ * the value. The cross follows the opener: hidden at rest, shown on hover and
+ * while the cell is selected.
  */
 export function CompactEntityCellField({
     children,
     empty,
     disabled,
-    onEdit,
-    onClear,
-    emptyLabel
+    selected,
+    onClear
 }: {
     /** The inline previews of the current value or values. */
     children?: React.ReactNode;
-    /** No value: the line becomes the select prompt. */
+    /** No value: the line shows the empty marker every other empty cell shows. */
     empty: boolean;
     disabled: boolean;
-    onEdit: () => void;
+    /** The cell is selected: the cross is shown whether or not it is hovered. */
+    selected?: boolean;
     onClear: () => void;
-    /** Shown in place of the previews when empty. Defaults to "Select reference". */
-    emptyLabel?: string;
 }) {
     const { t } = useTranslation();
     return (
         <div className={"w-full min-w-0 flex items-center gap-0.5 min-h-8"}>
             <div className={"grow min-w-0 flex items-center gap-x-3 overflow-hidden text-sm"}>
-                {empty
-                    ? <button type="button"
-                        disabled={disabled}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit();
-                        }}
-                        className={cls("truncate text-left text-text-secondary dark:text-text-secondary-dark",
-                            !disabled && "cursor-pointer hover:text-text-primary dark:hover:text-text-primary-dark")}>
-                        {emptyLabel ?? t("select_reference")}
-                    </button>
-                    : children}
+                {empty ? <EmptyValue/> : children}
             </div>
-            {!disabled && <>
-                <Tooltip title={t("edit")}>
-                    <IconButton size={"small"}
-                        aria-label={t("edit")}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit();
-                        }}>
-                        <PencilIcon/>
-                    </IconButton>
-                </Tooltip>
-                {!empty && <Tooltip title={t("clear")}>
-                    <IconButton size={"small"}
-                        aria-label={t("clear")}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClear();
-                        }}>
-                        <XIcon/>
-                    </IconButton>
-                </Tooltip>}
-            </>}
+            {!disabled && !empty && <Tooltip title={t("clear")}>
+                <IconButton size={"smallest"}
+                    shape={"square"}
+                    aria-label={t("clear")}
+                    className={cls("w-6 !h-6 min-w-6 min-h-6 p-0 hover:scale-100 transition-opacity duration-100",
+                        selected ? "opacity-100" : "opacity-0 group-hover/cell:opacity-100 focus-visible:opacity-100")}
+                    onMouseDown={(e: React.MouseEvent) => e.preventDefault()}
+                    onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        onClear();
+                    }}>
+                    <XIcon size={14}/>
+                </IconButton>
+            </Tooltip>}
         </div>
     );
 }

@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
 import { EntityPreviewBindingData } from "./EntityPreviewBinding";
-import { InlineEntityPreview } from "./InlineEntityPreview";
+import { PickerTrigger } from "./PickerTrigger";
 import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
@@ -64,13 +64,10 @@ export interface RelationSelectorProps {
      * scale, so a relation picker lines up with the text field beside it.
      *
      * `small` and `medium` predate that scale (42 and 56) and are kept as they
-     *
-     * `compact` is the 32px trigger for a selected table cell in a text row:
-     * the chosen records as inline lines (each opens its record), a chevron,
-     * nothing else.
-     * are because the table cells and the filter row are built around them.
+     * are because the filter row is built around them. A table cell passes
+     * `triggerContent` instead, and has no size of its own.
      */
-    size?: "compact" | "small" | "medium" | "large";
+    size?: "small" | "medium" | "large";
     useChips?: boolean;
     disabled?: boolean;
     invisible?: boolean;
@@ -110,6 +107,26 @@ export interface RelationSelectorProps {
     emptyCollectionText?: string;
     loadingText?: string;
     /**
+     * Whether the list is open, for a caller that opens it from outside the
+     * trigger — a table cell's opener. Every open and close the selector
+     * makes itself is reported through `onOpenChange`, controlled or not.
+     */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    /**
+     * Replaces everything the trigger draws — the value, the box, its padding
+     * and the chevron — with this node. For a caller that frames the picker
+     * itself: a table cell passes the preview it shows at rest, so the cell
+     * looks the same whether the picker is mounted, closed or open.
+     */
+    triggerContent?: React.ReactNode;
+    /**
+     * Positions the list against this element instead of the trigger. A
+     * table cell passes itself: the trigger inside it can be taller than the
+     * cell that clips it, and the list belongs under what can be seen.
+     */
+    anchorRef?: React.RefObject<HTMLElement | null>;
+    /**
      * Whether the open list offers to create a row in the target collection.
      * Defaults to `true`. The offer is shown only when the user could actually
      * insert into that collection — the same permission check the selection
@@ -120,7 +137,7 @@ export interface RelationSelectorProps {
 }
 
 export const RelationSelector = React.forwardRef<
-    HTMLButtonElement,
+    HTMLElement,
     RelationSelectorProps
 >(
     (
@@ -143,7 +160,11 @@ export const RelationSelector = React.forwardRef<
             emptyText = "Select…",
             emptyCollectionText,
             loadingText = "Loading...",
-            allowCreate = true
+            allowCreate = true,
+            open: openProp,
+            onOpenChange,
+            triggerContent,
+            anchorRef
         },
         ref
     ) => {
@@ -157,7 +178,7 @@ export const RelationSelector = React.forwardRef<
         const contextPortalContainer = usePortalContainer();
         const multiple = multipleOverride ?? relationCardinality(relation) === "many";
 
-        const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+        const [isPopoverOpen, setIsPopoverOpenState] = useState(false);
         const isPopoverOpenRef = useRef(false);
         // The list is only worth fetching once the picker has been opened. A
         // table cell mounts one of these per row, and the selected value is
@@ -167,6 +188,7 @@ export const RelationSelector = React.forwardRef<
         const [selectedItems, setSelectedItems] = useState<RelationItem[]>([]);
         const [isLoadingSelectedItems, setIsLoadingSelectedItems] = useState(false);
         const [searchString, setSearchString] = useState<string>("");
+
         // Track IDs that were set via local user interaction (onItemClick / handleClear / handleRemoveItem).
         // When an incoming value change matches these IDs exactly, we skip async re-resolution.
         const localSelectionIdsRef = useRef<string | null>(null);
@@ -174,6 +196,42 @@ export const RelationSelector = React.forwardRef<
         // Used to sort the dropdown list so selected items appear at the top.
         // Stays stable for the entire popover session so items don't jump around.
         const pinnedIdsRef = useRef<Set<string> | null>(null);
+
+        const selectedItemsForPinRef = useRef<RelationItem[]>([]);
+        selectedItemsForPinRef.current = selectedItems;
+        const onOpenChangeRef = useRef(onOpenChange);
+        onOpenChangeRef.current = onOpenChange;
+
+        // Every open and close goes through here. Opening pins the current
+        // selection to the top of the list for as long as it stays open, and
+        // is what first requests the list at all.
+        const setPopoverOpen = useCallback((next: boolean, notify = true) => {
+            if (next) {
+                // From the value as well as the resolved items: a picker a
+                // table cell mounts already open has not resolved them yet.
+                pinnedIdsRef.current = new Set([
+                    ...selectedItemsForPinRef.current.map(i => String(i.id)),
+                    ...relationsArrayRef.current.map(rel =>
+                        String(typeof rel === "string" || typeof rel === "number" ? rel : rel.id))
+                ]);
+                setListRequested(true);
+            } else {
+                pinnedIdsRef.current = null;
+            }
+            const changed = isPopoverOpenRef.current !== next;
+            isPopoverOpenRef.current = next;
+            setIsPopoverOpenState(next);
+            if (changed && notify) onOpenChangeRef.current?.(next);
+        }, []);
+
+        useEffect(() => {
+            if (openProp === undefined || openProp === isPopoverOpenRef.current) return;
+            if (openProp && disabled) {
+                onOpenChangeRef.current?.(false);
+                return;
+            }
+            setPopoverOpen(openProp, false);
+        }, [openProp, disabled, setPopoverOpen]);
 
         const {
             items: availableItems,
@@ -193,9 +251,9 @@ export const RelationSelector = React.forwardRef<
         const scrollContainerRef = useRef<HTMLDivElement>(null);
         const sentinelRef = useRef<HTMLDivElement>(null);
         const observerRef = useRef<IntersectionObserver | null>(null);
-        const localTriggerRef = useRef<HTMLButtonElement | null>(null);
+        const localTriggerRef = useRef<HTMLElement | null>(null);
 
-        const handleButtonRef = useCallback((node: HTMLButtonElement | null) => {
+        const handleButtonRef = useCallback((node: HTMLElement | null) => {
             localTriggerRef.current = node;
             if (typeof ref === "function") {
                 ref(node);
@@ -438,16 +496,14 @@ relation } as RelationItem;
                     : [...selectedItems, item];
             } else {
                 newSelected = [item];
-                setIsPopoverOpen(false);
-                isPopoverOpenRef.current = false;
-                pinnedIdsRef.current = null;
+                setPopoverOpen(false);
             }
             setSelectedItems(newSelected);
             // Mark this fingerprint so the resolution effect skips async work
             // when the parent echoes the same IDs back via props.
             localSelectionIdsRef.current = computeSelectionFingerprint(newSelected);
             emitValueChange(newSelected);
-        }, [multiple, selectedItems, emitValueChange, computeSelectionFingerprint]);
+        }, [multiple, selectedItems, emitValueChange, computeSelectionFingerprint, setPopoverOpen]);
 
         const handleClear = useCallback(() => {
             setSelectedItems([]);
@@ -465,15 +521,9 @@ relation } as RelationItem;
         const handleRootOpenChange = useCallback((next: boolean) => {
             if (disabled) return;
             // We control open manually; only allow opening attempts from Radix (e.g. trigger press)
-            if (next) {
-                // Capture current selection so we can pin those items to the top of the list
-                pinnedIdsRef.current = new Set(selectedItems.map(i => String(i.id)));
-                setListRequested(true);
-                setIsPopoverOpen(true);
-                isPopoverOpenRef.current = true;
-            }
+            if (next) setPopoverOpen(true);
             // Ignore close attempts here; outside click/Escape handled manually; single select closes explicitly on selection.
-        }, [disabled, selectedItems]);
+        }, [disabled, setPopoverOpen]);
 
         // Outside click + Escape handling (simple and reliable)
         useEffect(() => {
@@ -486,17 +536,11 @@ relation } as RelationItem;
                 if (triggerEl?.contains(target)) return;
                 if (contentEl?.contains(target)) return;
                 // Outside
-                setIsPopoverOpen(false);
-                isPopoverOpenRef.current = false;
-                pinnedIdsRef.current = null;
+                setPopoverOpen(false);
             }
 
             function handleKey(ev: KeyboardEvent) {
-                if (ev.key === "Escape") {
-                    setIsPopoverOpen(false);
-                    isPopoverOpenRef.current = false;
-                    pinnedIdsRef.current = null;
-                }
+                if (ev.key === "Escape") setPopoverOpen(false);
             }
 
             document.addEventListener("mousedown", handlePointerDown, true);
@@ -505,13 +549,14 @@ relation } as RelationItem;
                 document.removeEventListener("mousedown", handlePointerDown, true);
                 document.removeEventListener("keydown", handleKey, true);
             };
-        }, [isPopoverOpen]);
+        }, [isPopoverOpen, setPopoverOpen]);
 
-        const closePopover = useCallback(() => {
-            setIsPopoverOpen(false);
-            isPopoverOpenRef.current = false;
-            pinnedIdsRef.current = null;
-        }, []);
+        const closePopover = useCallback(() => setPopoverOpen(false), [setPopoverOpen]);
+
+        const toggleOpen = useCallback(() => {
+            if (disabled) return;
+            setPopoverOpen(!isPopoverOpenRef.current);
+        }, [disabled, setPopoverOpen]);
 
         // Pointing at a row that does not exist yet.
         //
@@ -607,154 +652,153 @@ relation } as RelationItem;
         return (
             <>
                 <PopoverPrimitive.Root open={isPopoverOpen} onOpenChange={handleRootOpenChange} modal={false}>
-                    <PopoverPrimitive.Trigger asChild>
-                        <button
-                            ref={handleButtonRef}
-                            type="button"
-                            aria-haspopup="listbox"
-                            aria-expanded={isPopoverOpen}
-                            data-relation-selector-trigger
-                            disabled={disabled}
-                            onClick={() => {
-                                if (disabled) return;
-                                // Unconditional: the toggle can only close a
-                                // popover that was opened, which requested the
-                                // list already.
-                                setListRequested(true);
-                                setIsPopoverOpen(o => {
-                                    const next = !o;
-                                    isPopoverOpenRef.current = next;
-                                    if (next) {
-                                        pinnedIdsRef.current = new Set(selectedItems.map(i => String(i.id)));
-                                    } else {
-                                        pinnedIdsRef.current = null;
-                                    }
-                                    return next;
-                                });
-                            }}
-                            className={cls(
-                                {
-                                    "min-h-8 py-0.5 px-2": size === "compact",
-                                    "min-h-[42px] py-1 px-2": size === "small",
-                                    "min-h-[56px] py-2 px-4": size === "medium",
-                                    "min-h-[48px] py-1 px-4": size === "large"
-                                },
-                                // `rounded-lg` like every other field box —
-                                // `rounded-md` made this the one control in a
-                                // row with a different corner.
-                                "w-full select-none rounded-lg text-sm relative flex items-center",
-                                invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
-                                disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
-                                className
-                            )}
-                        >
-                            <div className="flex justify-between items-center w-full">
-                                {isLoadingSelectedItems ? (
-                                    <div className="flex items-center gap-2">
-                                        <CircularProgress size="smallest"/>
-                                        <span className="text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
-                                    </div>
-                                ) : selectedItems.length > 0 ? (
-                                    <div
-                                        className="flex flex-wrap items-center gap-1.5 text-start flex-1 min-w-0 mr-2">
-                                        {selectedItems.map((item) => {
-                                            if (!useChips || !multiple) {
-                                                if (size === "compact") {
-                                                    return item.data
-                                                        ? <InlineEntityPreview key={String(item.id)}
-                                                            entity={item.data}
-                                                            onClick={() => {
-                                                                closePopover();
-                                                                sidePanelController.open({
-                                                                    entityId: item.data!.id,
-                                                                    path: item.data!.path,
-                                                                    collection,
-                                                                    updateUrl: true
-                                                                });
-                                                            }}/>
-                                                        : <span key={String(item.id)} className="text-sm truncate">{item.label}</span>;
+                    <PickerTrigger anchorRef={anchorRef}>
+                        {triggerContent !== undefined
+                            // Bare: the caller frames it. No box, no padding,
+                            // no height of its own — the node it passed,
+                            // exactly where it would be anyway. A `div`, not a
+                            // `button`: what it wraps can hold buttons of its
+                            // own (a record card's open button, at tall rows).
+                            ? <div
+                                ref={handleButtonRef}
+                                role="button"
+                                tabIndex={disabled ? -1 : 0}
+                                aria-disabled={disabled || undefined}
+                                aria-haspopup="listbox"
+                                aria-expanded={isPopoverOpen}
+                                data-relation-selector-trigger
+                                onClick={toggleOpen}
+                                // A record's title in the value opens that
+                                // record, and the list has no business staying
+                                // open over it.
+                                onClickCapture={(event) => {
+                                    const target = event.target;
+                                    if (!(target instanceof Element) || !isPopoverOpenRef.current) return;
+                                    const interactive = target.closest("a, button, [role=\"button\"]");
+                                    if (interactive && interactive !== event.currentTarget) setPopoverOpen(false);
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key !== "Enter" && event.key !== " ") return;
+                                    event.preventDefault();
+                                    toggleOpen();
+                                }}
+                                className={cls("w-full select-none text-left text-sm relative flex items-center outline-none", className)}>
+                                {triggerContent}
+                            </div>
+                            : <button
+                                ref={handleButtonRef}
+                                type="button"
+                                aria-haspopup="listbox"
+                                aria-expanded={isPopoverOpen}
+                                data-relation-selector-trigger
+                                disabled={disabled}
+                                onClick={toggleOpen}
+                                className={cls(
+                                    {
+                                        "min-h-[42px] py-1 px-2": size === "small",
+                                        "min-h-[56px] py-2 px-4": size === "medium",
+                                        "min-h-[48px] py-1 px-4": size === "large"
+                                    },
+                                    // `rounded-lg` like every other field box —
+                                    // `rounded-md` made this the one control in a
+                                    // row with a different corner.
+                                    "w-full select-none rounded-lg text-sm relative flex items-center",
+                                    invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
+                                    disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                                    className
+                                )}
+                            >
+                                <div className="flex justify-between items-center w-full">
+                                    {isLoadingSelectedItems ? (
+                                        <div className="flex items-center gap-2">
+                                            <CircularProgress size="smallest"/>
+                                            <span className="text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
+                                        </div>
+                                    ) : selectedItems.length > 0 ? (
+                                        <div
+                                            className="flex flex-wrap items-center gap-1.5 text-start flex-1 min-w-0 mr-2">
+                                            {selectedItems.map((item) => {
+                                                if (!useChips || !multiple) {
+                                                    return (
+                                                        <div key={String(item.id)}
+                                                            className="flex flex-row items-center gap-1 truncate">
+                                                            {item.data ? (
+                                                                <EntityPreviewBindingData size={"medium"}
+                                                                    entity={item.data}
+                                                                    includeEntityLink={false}
+                                                                    includeId={false}
+                                                                    onSidePanelClick={closePopover}
+                                                                />
+                                                            ) : (
+                                                                <span className="text-sm truncate">{item.label}</span>
+                                                            )}
+                                                        </div>
+                                                    );
                                                 }
-
                                                 return (
-                                                    <div key={String(item.id)}
-                                                        className="flex flex-row items-center gap-1 truncate">
+                                                    <Chip
+                                                        size={"small"}
+                                                        key={String(item.id)}
+                                                        className={cls("flex flex-row items-center gap-1 truncate")}
+                                                    >
                                                         {item.data ? (
-                                                            <EntityPreviewBindingData size={"medium"}
-                                                                entity={item.data}
+                                                            <EntityPreviewBindingData size={"smallest"} entity={item.data}
                                                                 includeEntityLink={false}
-                                                                includeId={false}
-                                                                onSidePanelClick={closePopover}
-                                                            />
+                                                                includeId={false}/>
                                                         ) : (
                                                             <span className="text-sm truncate">{item.label}</span>
                                                         )}
-                                                    </div>
+                                                        <XIcon
+                                                            size={iconSize.smallest}
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                handleRemoveItem(item);
+                                                            }}
+                                                        />
+                                                    </Chip>
                                                 );
-                                            }
-                                            return (
-                                                <Chip
+                                            })}
+                                        </div>
+                                    ) :
+                                        (
+                                            <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                                {resolvedPlaceholder}
+                                            </span>
+                                        )}
+
+                                    <div className="flex items-center flex-shrink-0">
+                                        {!multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
+                                            <Tooltip title={`Open ${selectedItems[0].label}`}>
+                                                <IconButton
+                                                    component={"div"}
                                                     size={"small"}
-                                                    key={String(item.id)}
-                                                    className={cls("flex flex-row items-center gap-1 truncate")}
-                                                >
-                                                    {item.data ? (
-                                                        <EntityPreviewBindingData size={"smallest"} entity={item.data}
-                                                            includeEntityLink={false}
-                                                            includeId={false}/>
-                                                    ) : (
-                                                        <span className="text-sm truncate">{item.label}</span>
-                                                    )}
-                                                    <XIcon
-                                                        size={iconSize.smallest}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            handleRemoveItem(item);
-                                                        }}
-                                                    />
-                                                </Chip>
-                                            );
-                                        })}
+                                                    color={"inherit"}
+                                                    className="opacity-60 hover:opacity-100"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        const entity = selectedItems[0].data!;
+                                                        setPopoverOpen(false);
+                                                        sidePanelController.open({
+                                                            entityId: entity.id,
+                                                            path: entity.path,
+                                                            collection,
+                                                            updateUrl: true
+                                                        });
+                                                    }}>
+                                                    <ArrowRightToLineIcon size={iconSize.small}/>
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        <ChevronDownIcon
+                                            size={size === "small" ? iconSize.small : iconSize.medium}
+                                            className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
+                                        />
                                     </div>
-                                ) :
-                                    (
-                                        <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                            {resolvedPlaceholder}
-                                        </span>
-                                    )}
-
-                                <div className="flex items-center flex-shrink-0">
-                                    {size !== "compact" && !multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
-                                        <Tooltip title={`Open ${selectedItems[0].label}`}>
-                                            <IconButton
-                                                component={"div"}
-                                                size={"small"}
-                                                color={"inherit"}
-                                                className="opacity-60 hover:opacity-100"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    const entity = selectedItems[0].data!;
-                                                    setIsPopoverOpen(false);
-                                                    sidePanelController.open({
-                                                        entityId: entity.id,
-                                                        path: entity.path,
-                                                        collection,
-                                                        updateUrl: true
-                                                    });
-                                                }}>
-                                                <ArrowRightToLineIcon size={iconSize.small}/>
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                    <ChevronDownIcon
-                                        size={size === "small" || size === "compact" ? iconSize.small : iconSize.medium}
-                                        className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
-                                    />
                                 </div>
-                            </div>
 
-                        </button>
-                    </PopoverPrimitive.Trigger>
+                            </button>}
+                    </PickerTrigger>
                     <PopoverPrimitive.Portal container={portalContainer}>
                         <PopoverPrimitive.Content
                             ref={contentRef}

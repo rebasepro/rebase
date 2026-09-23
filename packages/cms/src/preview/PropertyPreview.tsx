@@ -259,7 +259,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 textOnly={props.textOnly}
             />;
 
-            content = nested || props.textOnly
+            content = nested || props.textOnly || size === "small"
                 // See ArrayOfReferencesPreview: nested lists stay on one line.
                 ? <InlineEntityListPreview items={relations}
                     renderItem={renderRelation}/>

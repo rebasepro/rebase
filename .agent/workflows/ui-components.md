@@ -48,7 +48,7 @@ description: Rules for creating UI components in the Rebase codebase
 
 4. **Let text fill its container naturally**. Use `truncate` for overflow. Do NOT hardcode `max-w-[Npx]` on text elements.
 
-5. **Interactive controls must always be visible**. Never hide checkboxes, toggles, or action buttons behind hover states.
+5. **Interactive controls must always be visible**. Never hide checkboxes, toggles, or action buttons behind hover states. The one exception is a collection table cell's opener (`TableCellOpener`): the chevron, calendar or expand icon a cell reveals on hover and keeps shown while selected. The cell itself is the control there — it looks the same at rest and selected, and Enter opens its editor — and one opener per row per column would bury the values.
 
 ---
 
