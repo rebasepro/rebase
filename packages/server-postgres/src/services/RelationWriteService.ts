@@ -23,7 +23,8 @@ import {
     bindThroughJunction,
     removeJunctionLink,
     updateJunctionPivot,
-    type JunctionLinkWrite
+    type JunctionLinkWrite,
+    type VisibleTargets
 } from "./junction-writes";
 import { serializePropertyToServer } from "../data-transformer";
 
@@ -247,6 +248,25 @@ export class RelationWriteService {
     }
 
 
+    /**
+     * The target rows of `relation` this caller can see, for a junction diff —
+     * or `undefined` when that is all of them. See
+     * {@link RelationService.visibleTargetCondition}.
+     */
+    private async visibleTargets(
+        parentCollection: CollectionConfig,
+        relation: ResolvedRelation,
+        parentId: string | number
+    ): Promise<VisibleTargets | undefined> {
+        const condition = await this.reads.visibleTargetCondition(parentCollection, relation, parentId);
+        if (!condition) return undefined;
+        const targetCollection = relation.target();
+        const table = getTableForCollection(targetCollection, this.registry);
+        const [idInfo] = requirePrimaryKeys(targetCollection, this.registry);
+        const idColumn = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
+        return { table, idColumn, condition };
+    }
+
     /** A collection's id, parsed to the type its primary key column holds. */
     private parsedId(collection: CollectionConfig, id: string | number): unknown {
         const pks = requirePrimaryKeys(collection, this.registry);
@@ -322,14 +342,16 @@ export class RelationWriteService {
                     this.parsedId(collection, id),
                     // A `via` declares no payload, so `{}` refuses a `_pivot`
                     // sent through one rather than storing it nowhere.
-                    this.parsedLinks(targetCollection, elements, {}, label)
+                    this.parsedLinks(targetCollection, elements, {}, label),
+                    await this.visibleTargets(collection, relation, id)
                 );
             } else if (relation.kind === "manyToMany") {
                 await applyJunctionMembership(
                     tx,
                     bindThroughJunction(this.registry, relation.through, label),
                     this.parsedId(collection, id),
-                    this.parsedLinks(targetCollection, elements, relation.through.properties, label)
+                    this.parsedLinks(targetCollection, elements, relation.through.properties, label),
+                    await this.visibleTargets(collection, relation, id)
                 );
             } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
@@ -363,6 +385,13 @@ export class RelationWriteService {
                     );
                 }
 
+                // Only the rows the caller could have seen linked are theirs to
+                // unlink: the list they send back is the list they were shown,
+                // which the target's scope and soft delete had already
+                // narrowed. Clearing by the foreign key alone set it to NULL on
+                // another tenant's rows and on the trashed ones.
+                const visible = await this.reads.visibleTargetCondition(collection, relation, id);
+
                 // Clear existing links not in the new set
                 if (targetEntityIds.length > 0) {
                     const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
@@ -376,7 +405,7 @@ export class RelationWriteService {
                         // which renders `NOT IN ($1$2$3)`. That is a syntax
                         // error, so writing a `hasMany` relation with two or
                         // more children aborted the whole save transaction.
-                        .where(and(eq(fkCol, parentKeyValue), notInArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[])));
+                        .where(and(eq(fkCol, parentKeyValue), notInArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]), visible));
 
                     // Set FK for the provided targets
                     await tx
@@ -388,7 +417,7 @@ export class RelationWriteService {
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: null })
-                        .where(eq(fkCol, parentKeyValue));
+                        .where(and(eq(fkCol, parentKeyValue), visible));
                 }
             } else {
                 // Every to-many kind in the union is handled above — TypeScript
@@ -499,11 +528,16 @@ export class RelationWriteService {
                     );
                 }
 
+                // The same reading as the to-many clear: the row this one
+                // points at now is only the caller's to detach if they could
+                // have seen it.
+                const visible = await this.reads.visibleTargetCondition(sourceCollection, relation, sourceEntityId);
+
                 if (newValue === null || newValue === undefined) {
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: null })
-                        .where(eq(foreignKeyColumn, sourceKeyValue));
+                        .where(and(eq(foreignKeyColumn, sourceKeyValue), visible));
                 } else {
                     const parsedNewTargetIdObj = parseIdValues(newValue as string | number, targetPks);
                     const parsedNewTargetId = parsedNewTargetIdObj[targetIdInfo.fieldName];
@@ -513,7 +547,7 @@ export class RelationWriteService {
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: null })
-                        .where(eq(foreignKeyColumn, sourceKeyValue));
+                        .where(and(eq(foreignKeyColumn, sourceKeyValue), visible));
 
                     // Then, update the new target row to point to this source row
                     await tx
@@ -581,7 +615,8 @@ export class RelationWriteService {
                 tx,
                 binding,
                 this.parsedId(sourceCollection, sourceEntityId),
-                this.parsedLinks(targetCollection, elements, {}, `${sourceCollection.slug}.${relation.relationName}`)
+                this.parsedLinks(targetCollection, elements, {}, `${sourceCollection.slug}.${relation.relationName}`),
+                await this.visibleTargets(sourceCollection, relation, sourceEntityId)
             );
         } catch (error) {
             logger.error(`Failed to update inverse joinPath relation '${relation.relationName}'`, { error: error });
@@ -612,7 +647,8 @@ export class RelationWriteService {
                 tx,
                 bindThroughJunction(this.registry, junctionInfo, label),
                 this.parsedId(sourceCollection, sourceEntityId),
-                this.parsedLinks(targetCollection, elements, junctionInfo.properties, label)
+                this.parsedLinks(targetCollection, elements, junctionInfo.properties, label),
+                await this.visibleTargets(sourceCollection, relation, sourceEntityId)
             );
         } catch (error) {
             logger.error(`Failed to update many-to-many inverse relation '${relation.relationName}'`, { error: error });

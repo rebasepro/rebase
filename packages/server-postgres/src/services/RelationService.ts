@@ -212,6 +212,30 @@ export class RelationService {
     }
 
     /**
+     * The target rows a caller may see through `relation`: the target's
+     * `beforeQuery` scope and its soft delete, as one condition on the target
+     * table, or `undefined` when neither applies.
+     *
+     * What every loader here narrows a read by, exposed for the membership
+     * writes. A write that diffs a new link set against "what is linked now"
+     * has to diff against what the caller could have read — otherwise saving
+     * back the list they were shown unlinks every row they were not.
+     */
+    async visibleTargetCondition(
+        parentCollection: CollectionConfig,
+        relation: ResolvedRelation,
+        parentId?: string | number
+    ): Promise<SQL | undefined> {
+        const targetCollection = relation.target();
+        const targetTable = getTableForCollection(targetCollection, this.registry);
+        return andSoftDelete(
+            await this.narrowTargetRead(parentCollection, relation, parentId),
+            targetCollection,
+            targetTable
+        );
+    }
+
+    /**
      * One target row, as the {@link RelatedRow} everything here returns.
      *
      * Eight sites built this by hand, which is how the address came to be the

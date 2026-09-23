@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
 import type { Properties, ResolvedVia } from "@rebasepro/types";
@@ -54,6 +54,20 @@ export interface JunctionLinkWrite {
     id: unknown;
     /** Payload values keyed by property key, already serialized for the driver. */
     pivot?: Record<string, unknown>;
+}
+
+/**
+ * The target rows a membership write can see, when that is not all of them —
+ * the target's `beforeQuery` scope and its soft delete.
+ *
+ * The diff reads "what is linked now" through it, so a link to a row the caller
+ * was never shown is in neither list and is left alone rather than unlinked.
+ */
+export interface VisibleTargets {
+    table: PgTable;
+    /** The target column the junction's `targetColumn` holds values of. */
+    idColumn: AnyPgColumn;
+    condition: SQL;
 }
 
 /** A junction that cannot be resolved is a broken relation, not a no-op. */
@@ -221,8 +235,10 @@ export async function removeJunctionLink(
  *    the form runs under RLS, so a user who may edit the parent but cannot see
  *    some of the linked rows gets a shorter list — and writing it back deleted
  *    the links they were never shown. The select that drives the diff runs in
- *    this same transaction under the same policies, so a link the caller cannot
- *    read is in neither list and survives the save.
+ *    this same transaction under the same policies, and through
+ *    `visibleTargets` — the target's `beforeQuery` scope and soft delete, which
+ *    RLS knows nothing of — so a link the caller cannot read is in neither list
+ *    and survives the save.
  *  - **Junction payload columns.** A junction carrying its own columns
  *    (`position`, `role`, `created_at`) lost them on every save, because every
  *    row was re-inserted with only the two keys. Untouched links are left alone.
@@ -249,12 +265,19 @@ export async function applyJunctionMembership(
     tx: DrizzleClient,
     binding: JunctionBinding,
     parentId: unknown,
-    links: JunctionLinkWrite[]
+    links: JunctionLinkWrite[],
+    visibleTargets?: VisibleTargets
 ): Promise<void> {
-    const existingRows = await tx
-        .select({ targetId: binding.targetColumn })
-        .from(binding.table)
-        .where(eq(binding.parentColumn, parentId));
+    const existingRows = visibleTargets
+        ? await tx
+            .select({ targetId: binding.targetColumn })
+            .from(binding.table)
+            .innerJoin(visibleTargets.table, eq(binding.targetColumn, visibleTargets.idColumn))
+            .where(and(eq(binding.parentColumn, parentId), visibleTargets.condition))
+        : await tx
+            .select({ targetId: binding.targetColumn })
+            .from(binding.table)
+            .where(eq(binding.parentColumn, parentId));
 
     // Keyed by `String(...)` because a junction key can come back from the
     // driver as a string where the parsed value is a number, and a diff that
