@@ -364,11 +364,15 @@ async function main() {
         console.log('Replaying src/i18n history to find stale keys...');
         ({ stale: staleByLang } = findStaleKeys(TARGET_LANGUAGES));
 
-        // Drop anything a previous run confirmed against this exact English.
+        // Drop anything a previous run confirmed against this exact English, and
+        // anything English no longer has: the history walk still flags a key
+        // that was deleted from en.ts (the removed `hero-message` arms), and
+        // there is nothing to translate it from — that is the orphan report's
+        // job below.
         for (const lang of TARGET_LANGUAGES) {
             const checked = checkpoint[lang] ?? {};
             staleByLang[lang] = staleByLang[lang].filter(
-                ({ key }) => checked[key] !== fingerprint(english[key])
+                ({ key }) => key in english && checked[key] !== fingerprint(english[key])
             );
         }
     }

@@ -1,24 +1,10 @@
 export const fr = {
-  "hero.badge": "Open-source · MIT · N'importe quel Postgres",
-  "hero.title.part1": "Le backend qui ne peut pas oublier",
-  "hero.title.part2": "un contrôle de permissions.",
+  "hero.badge": "Backend open-source · MIT · N'importe quel Postgres",
+  "hero.title.part1": "Un backend pour votre Postgres.",
+  "hero.title.part2": "Et le panel que vous n'écrivez jamais.",
   "hero.subtitle":
-    "Un fichier TypeScript par collection vous donne le schéma, l'API REST, le SDK typé et le panneau. Les règles d'accès de ce même fichier sont compilées en row-level security Postgres, si bien que toutes les routes, toutes les tâches, tous les scripts et tous les agents se heurtent au même mur.",
+    "REST, SDK typé, temps réel, auth et stockage pour votre app ; tableurs, médias, relations et rôles pour votre équipe. Notre propre CRM compte vingt-trois collections et pas un seul écran codé à la main.",
   "hero.cta.demo": "Tester la démo",
-  // Bras de `hero-message` (scripts/ab-testing.ts) ; hero.title.* et hero.subtitle ci-dessus sont le contrôle.
-  "hero.agent.title.part1": "Laissez l'agent écrire le backend.",
-  "hero.agent.title.part2": "La base de données fait respecter les règles.",
-  "hero.agent.subtitle":
-    "Un fichier TypeScript par collection, c'est tout ce qu'un agent doit produire. Le schéma, l'API REST, le SDK typé et le panneau en sont générés, et ses règles d'accès sont compilées en row-level security Postgres. Ce que le modèle oublie, la base de données ne l'oublie pas.",
-  "hero.onefile.title.part1": "Écrivez la collection.",
-  "hero.onefile.title.part2": "Rebase écrit le reste.",
-  "hero.onefile.subtitle":
-    "Schéma, API REST, SDK typé, panneau et règles d'accès sortent d'un seul fichier TypeScript et évoluent avec lui. Les règles sont compilées en row-level security Postgres, si bien que le backend que vous avez généré est aussi celui qui est appliqué.",
-  "hero.panel.title.part1": "Votre app reçoit l'API.",
-  "hero.panel.title.part2": "Votre équipe reçoit le panneau.",
-  "hero.panel.subtitle":
-    "Un fichier TypeScript par collection produit les deux : l'API REST et le SDK typé que votre code appelle, et le CMS dans lequel votre équipe travaille, à travers les mêmes politiques. Rien n'est construit deux fois, et aucune porte dérobée ne contourne les règles.",
-
   "rlscheck.title": "Ne nous croyez pas sur parole.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lit le catalogue de votre base de données et rapporte ce qui est réellement exposé — des tables servies avec la sécurité au niveau des lignes désactivée, des politiques vraies pour tout le monde, des vues qui contournent la RLS de leurs tables de base. Quinze contrôles. N'importe quel Postgres : Supabase, Neon, RDS, votre propre serveur. Il est en lecture seule, ne demande aucun compte, et se moque de savoir si vous utilisez Rebase.",
   "rlscheck.note": "Des SELECT sur les catalogues système et rien d'autre. Aucune télémétrie, aucun envoi, et il ne lit jamais vos données.",
@@ -39,9 +25,10 @@ export const fr = {
   "recognition.oneNote": "une règle, dans Postgres, sur chaque chemin",
   // Beat 04 — the panel that ships with the backend (carousel + the three products).
   "panel.badge": "Le panneau, livré avec",
-  "panel.title": "Le panneau, généré depuis la même définition.",
+  "panel.title": "Et l'interface que votre équipe ouvre chaque matin.",
   "engine.badge": "Ce que vous obtenez",
-  "engine.title": "Tout ce que votre app appelle, et le panneau où travaille votre équipe.",
+  "engine.title":
+    "Des API opérationnelles sur votre base de données, dès la première minute.",
   "engine.subtitle":
     "Un SDK typé pour vos collections, du REST sur chaque table et du temps réel via WebSocket, branchés sur votre base de données dès la première minute.",
   "engine.link": "Explorer le backend",
@@ -49,7 +36,8 @@ export const fr = {
   "agentera.title": "Le backend qu'un agent ne peut pas casser",
   "agentera.p1": "Un agent IA peut échafauder un backend en une heure. Il ne peut pas vous dire si ce backend est sûr. Les agents excellent à produire des backends <em>plausibles</em> — et sont notoirement mauvais pour en produire de <em>sûrs</em>. Rebase fait du résultat sûr le seul résultat possible, par construction.",
   "agentera.link": "Découvrir les fonctions IA et agents",
-  "modes.subtitle": "Il lit vos données via la même API et les mêmes politiques que votre application. Votre app parle au backend, votre équipe travaille dans le panneau, et les deux voient les mêmes règles.",
+  "modes.subtitle":
+    "Édition façon tableur, médias, relations, rôles et workflows — une interface que vous pouvez confier à un non-développeur dès son premier jour. C'est un client de votre API comme un autre : tout ce qu'il peut voir, vos politiques l'ont autorisé.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "Le serveur que votre app appelle : REST, un SDK typé, le temps réel, l'auth et le stockage sur votre propre Postgres.",
@@ -63,8 +51,9 @@ export const fr = {
   "modes.full.tag": "La moitié développeur du panneau",
   "showcase.badge": "Conçu pour des produits réels",
   "showcase.title.part1": "Sept produits.",
-  "showcase.title.part2": "Une définition.",
-  "showcase.subtitle": "Un <b>dispositif médical certifié</b>, un <b>programme de fidélité retail</b>, une <b>marketplace à deux faces</b>, des <b>données publiques</b>, un agent commercial outbound, un outil de design et un CRM — des produits très différents, le même fichier de collection en dessous.",
+  "showcase.title.part2": "Tous en production.",
+  "showcase.subtitle":
+    "Un <b>dispositif médical certifié</b>, un <b>programme de fidélité retail</b>, une <b>marketplace à deux faces</b>, des <b>données publiques</b>, un agent commercial outbound, un outil de design et un CRM — certains sont les nôtres, d'autres ceux de nos clients.",
   "showcase.nolink": "Outil interne — pas de site public",
   "showcase.case0.badge": "Éditeur vectoriel · Créé par l'équipe Rebase",
   "showcase.case0.title": "Dadaki",
@@ -103,7 +92,8 @@ export const fr = {
   "cta.lane.cloud.link": "Demander un accès",
   "cta.button.demo": "Tester la démo",
   "cta.button.docs": "Lire la doc",
-  "engine.plus": "Plus l'auth et les rôles, le stockage compatible S3, les tâches planifiées, les fonctions serverless et les sauvegardes, le tout sous les mêmes politiques.",
+  "engine.plus":
+    "Plus l'auth et les rôles, le stockage compatible S3, les tâches planifiées, les fonctions serverless et les sauvegardes. Aucun service séparé auquel souscrire ou à interconnecter.",
   "personas.badge": "Qui y touche",
   "personas.title": "Trois personnes y touchent. Aucune de la même façon.",
   "personas.dev.title": "La développeuse ou le développeur qui possède la base de données",
@@ -120,7 +110,7 @@ export const fr = {
   "security.badge": "Sécurité d'abord",
   "security.title": "Écrit en TypeScript. Appliqué par Postgres.",
   "security.desc":
-    "Row-level security définie dans le même fichier TypeScript que la collection, compilée en véritables politiques Postgres. Granulaire par collection, par champ, par rôle — et appliquée directement par la base de données, pas par un middleware que l'on doit penser à appeler.",
+    "Vos règles d'accès sont compilées en véritables politiques Postgres — granulaires par collection, par champ, par rôle. La base de données les applique sur chaque point d'accès : vos routes, votre tâche nocturne, le script de backfill lancé une seule fois, l'agent muni d'une clé. Pas un middleware qu'il faut penser à appeler.",
   "security.link": "Comment la sécurité fonctionne",
   "security.postLink": "À lire : la sécurité de votre backend ne devrait pas dépendre d’une vérification qu’on oublie",
   "opensource.badge": "Open source",
@@ -138,10 +128,10 @@ export const fr = {
   "showcase.sync.tab2.desc": "L'UI ne vous limite jamais. Ouvrez l'éditeur SQL intégré pour des requêtes brutes — onglets multiples, autocomplétion, EXPLAIN — directement sur votre base, avec des résultats éditables sur place.",
   "showcase.sync.tab3.title": "Éditeur visuel, vrai TypeScript",
   "showcase.sync.tab3.desc": "Concevez votre modèle de données visuellement dans Rebase Studio. Chaque modification est réécrite dans vos fichiers TypeScript locaux via AST — votre code reste propre, votre équipe reste synchronisée.",
-  "power.title": "Une collection.<br/>Tout est généré.",
+  "power.title": "Vous écrivez ce fichier.<br/>Vous n'écrivez pas le reste.",
   "power.subtitle":
-    "Un seul fichier TypeScript par collection comme unique point d'entrée. Le schéma de base de données, l'API REST, le SDK typé, les formulaires et chaque vue admin en découlent — et évoluent avec lui.",
-  "power.badge": "Le code comme source de vérité",
+    "Le schéma, l'API REST, le SDK typé, les formulaires d'édition et chaque vue du panneau en découlent, et évoluent avec lui. Aucun second modèle de données à synchroniser, aucun écran CRUD à maintenir lorsqu'un champ change de nom.",
+  "power.badge": "Comment ça marche",
   "power.appcode": "Code de l'app",
   "power.generates": "→ génère tout ce qui suit",
   "power.mobile.generates": "→ génère schéma DB · API REST · SDK typé · formulaires d'entité · vues admin",
@@ -254,7 +244,7 @@ export const fr = {
   "footer.waitlistInvalid": "Veuillez saisir une adresse e-mail valide.",
   "footer.waitlistError": "Une erreur s'est produite. Veuillez réessayer.",
   "footer.tagline": "Le backend Postgres open-source · Conçu en Europe",
-  "footer.rights": "© 2026 Rebase. Tous droits réservés.",
+  "footer.rights": "© 2026 FireCMS S.L. Tous droits réservés.",
   "footer.builtBy.html": "Conçu et maintenu par <a href=\"https://camberi.com?utm_source=rebase&amp;utm_medium=referral&amp;utm_campaign=built-by\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"hover:underline hover:text-primary-light transition-colors duration-200\">Camberi</a>, un studio d’ingénierie produit à Madrid et Munich qui travaille aussi pour des clients.",
   "kd.title": "Programme Kit Digital — Rebase en tant qu'Agent Digitaliseur",
   "kd.desc": "Rebase est un Agent Digitaliseur adhérant au Programme Kit Digital. Découvrez nos solutions de numérisation subventionnées pour les PME et indépendants en Espagne.",
@@ -1030,10 +1020,10 @@ export const fr = {
   "securitypage.47": "Lisez ceci d'abord — presque chaque affirmation de cette page dépend de celui que vous exploitez. En auto-hébergé, nous ne voyons jamais vos données. Sur Rebase Cloud, nous les hébergeons pour vous, ce qui fait de nous un sous-traitant. Rebase Cloud est <b class=\"text-white\">en bêta privée</b> : il fait tourner de vrais clients aujourd'hui et s'ouvre par vagues, et tout ce qui suit décrit ce qui tourne maintenant.",
   "securitypage.48": "Vous exploitez tout",
   "securitypage.49": "Vous installez le serveur Rebase open source et le pointez vers une base PostgreSQL qui vous appartient. Vos données ne touchent jamais nos serveurs, il n'y a aucun sous-traitant tiers dans le circuit, et vous êtes le seul responsable de traitement.",
-  "securitypage.50": "Les sections Souveraineté des données et Déployez&nbsp;selon&nbsp;vos&nbsp;règles ci-dessous décrivent ce modèle.",
+  "securitypage.50": "Les sections Souveraineté des données et Déployez\u00a0selon\u00a0vos\u00a0règles ci-dessous décrivent ce modèle.",
   "securitypage.51": "Nous l'exploitons pour vous",
   "securitypage.52": "Rebase Cloud est notre hébergement managé. Nous hébergeons votre base et votre application sur notre infrastructure, ce qui signifie que <b class=\"text-white\">Rebase agit comme sous-traitant</b> pour votre compte, avec Google Cloud comme sous-traitant ultérieur. Rien sur cette page ne prétend le contraire.",
-  "securitypage.53": "La section Rebase&nbsp;Cloud ci-dessous décrit exactement où ces données vivent et comment elles sont isolées.",
+  "securitypage.53": "La section Rebase\u00a0Cloud ci-dessous décrit exactement où ces données vivent et comment elles sont isolées.",
   "securitypage.54": "Quand nous l'hébergeons, voici ce que cela signifie",
   "securitypage.55": "Voici l'architecture qui tourne aujourd'hui : votre base et votre application sur une infrastructure que nous exploitons, avec Rebase comme sous-traitant des données que vous y mettez et vous comme responsable de traitement. Rebase Cloud est en bêta privée — il fait tourner de vrais clients aujourd'hui et s'ouvre par vagues. <a href=\"/pricing\" class=\"text-primary hover:underline\">Demandez un accès</a>.",
   "securitypage.56": "Hébergé dans l'UE",
@@ -1942,7 +1932,27 @@ export const fr = {
   "devpage.link.sdk": "Le SDK client",
   "devpage.link.ai": "L'histoire des agents en entier",
   "uipage.link.browse": "Parcourir les composants",
-  "rlscheck.link.fix": "Comment corriger &rarr;",
+  "rlscheck.link.fix": "Comment corriger\u00a0→",
+  "rlscheck.faq.safe.q":
+    "Peut-on l'exécuter en toute sécurité sur une base de production ?",
+  "rlscheck.faq.safe.a":
+    "Il fonctionne en lecture seule stricte. Il exécute uniquement des SELECT sur les catalogues système — pg_class, pg_policies, pg_proc, information_schema — et rien d'autre. Il ne lit jamais vos données, n'écrit rien, ne modifie aucun paramètre et n'effectue aucune requête réseau en dehors de la chaîne de connexion fournie. Aucune télémétrie, aucun envoi de données.",
+  "rlscheck.faq.rebase.q": "Faut-il utiliser Rebase ?",
+  "rlscheck.faq.rebase.a":
+    "Non. Il ignore tout de votre framework et n'a aucun besoin de votre codebase — il lit directement la base de données. Il fonctionne avec Supabase, Neon, RDS, Cloud SQL, un conteneur sur votre machine ou tout ce qui supporte le protocole réseau Postgres. Il n'a aucunement besoin de Rebase.",
+  "rlscheck.faq.role.q": "Avec quel rôle doit-il se connecter ?",
+  "rlscheck.faq.role.a":
+    "Un rôle capable de lire les catalogues — généralement un superuser, le propriétaire de la table ou un rôle avec BYPASSRLS. C'est délibéré et le rapport l'indique d'emblée : le scan lit le catalogue réel précisément parce que le RLS ne peut pas le restreindre, afin que les résultats décrivent ce que subissent les autres rôles, et non le comportement de cette connexion.",
+  "rlscheck.faq.linter.q": "En quoi est-ce différent du linter de Supabase ?",
+  "rlscheck.faq.linter.a":
+    "Il y a un réel recoupement sur les cas évidents, et exécuter les deux est utile. Les vérifications proposées ici qui n'apparaissent généralement pas ailleurs concernent les cas indirects : une vue ou vue matérialisée qui contourne le RLS de sa table sous-jacente car elle s'exécute avec les droits de son propriétaire, une table de jointure many-to-many laissée sans protection entre deux entités protégées, ou une colonne non préfixée dans une sous-requête EXISTS que Postgres lie à la table interne — transformant un filtre de tenant en tautologie tout en semblant parfaitement correcte.",
+  "rlscheck.faq.ci.q": "Peut-on l'exécuter dans la CI ?",
+  "rlscheck.faq.ci.a":
+    "Oui — c'est même son cas d'usage principal. Il renvoie un code de sortie non nul si des anomalies atteignent ou dépassent le seuil choisi, génère du JSON pour l'automatisation et permet d'ignorer des vérifications spécifiques par id pour qu'une exception délibérée ne fasse pas échouer chaque build. Les id constituent une API publique stable précisément pour cette raison.",
+  "rlscheck.faq.why.q":
+    "Pourquoi une entreprise de backend offre-t-elle un scanner de sécurité ?",
+  "rlscheck.faq.why.a":
+    "Parce que la thèse de Rebase est que l'autorisation a sa place dans la base de données plutôt que dans la couche située en amont, et qu'un outil qui audite le RLS Postgres concrétise cet argument sous une forme exécutable sur vos propres données plutôt qu'à travers un simple texte. Il est réellement utile, que vous consultiez ou non le reste de ce site — et s'il ne trouve rien, c'est une bonne après-midi et vous ne nous devez rien.",
   "sdkpage.f1": "Généré automatiquement depuis vos définitions de collection",
   "sdkpage.f2": "IntelliSense complet pour",
   "sdkpage.f3": "Types de property, enums et relations inclus",

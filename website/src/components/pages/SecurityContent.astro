@@ -43,7 +43,7 @@ import { DEMO_URL } from "../../utils/links";
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <div class="rounded-2xl border border-surface-700/80 bg-surface-900/60 px-6 py-10 sm:px-10 sm:py-12">
                     <div class="text-center">
-                        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs font-medium text-primary">{t("securitypage.04")}</span>
+                        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs font-medium text-primary-light">{t("securitypage.04")}</span>
                         <h2 class="mt-5 text-2xl sm:text-3xl text-white">{t("securitypage.05")}</h2>
                         <p class="mt-lead text-base leading-7 text-surface-400" set:html={t("securitypage.06")}></p>
                     </div>
@@ -54,7 +54,7 @@ import { DEMO_URL } from "../../utils/links";
                         <div class="relative rounded-xl bg-surface-950/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                             <div class="px-5 py-4 flex items-center justify-between">
                                 <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                    <span class="text-primary mr-3">~</span>
+                                    <span class="text-primary-light mr-3">~</span>
                                     <span class="text-white">{t("securitypage.07")}</span>
                                 </div>
                                 <button data-track-copy="security-rls-check" data-command="npx @rebasepro/rls-check"
@@ -75,7 +75,7 @@ import { DEMO_URL } from "../../utils/links";
 
                     <div class="mt-6 text-center">
                         <a href="/rls-check"
-                           class="inline-flex items-center gap-x-2 text-sm font-medium text-primary hover:underline">
+                           class="inline-flex items-center gap-x-2 text-sm font-medium text-primary-light hover:underline">
                             {t("rlscheck.cta")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -433,7 +433,7 @@ import { DEMO_URL } from "../../utils/links";
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 md:p-12 ring-1 ring-inset ring-surface-800">
                     <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-6">
-                        <svg class="lucide lucide-bug text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88" /><path d="M14.12 3.88 16 2" /><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" /><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6" /><path d="M12 20v-9" /><path d="M6.53 9C4.6 8.8 3 7.1 3 5" /><path d="M6 13H2" /><path d="M3 21c0-2.1 1.7-3.9 3.8-4" /><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4" /><path d="M22 13h-4" /><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4" /></svg>
+                        <svg class="lucide lucide-bug text-primary-light" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88" /><path d="M14.12 3.88 16 2" /><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" /><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6" /><path d="M12 20v-9" /><path d="M6.53 9C4.6 8.8 3 7.1 3 5" /><path d="M6 13H2" /><path d="M3 21c0-2.1 1.7-3.9 3.8-4" /><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4" /><path d="M22 13h-4" /><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4" /></svg>
                     </div>
                     <h2 class="text-3xl text-white mb-4">{t("securitypage.88")}</h2>
                     <p class="text-lg text-surface-300 mb-6" set:html={t("securitypage.80")}></p>

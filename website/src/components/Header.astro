@@ -201,7 +201,7 @@ const flatNavLinks = [
                                                 {column.items.map(subLink => (
                                                         <a href={subLink.href}
                                                            class="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
-                                                            <svg class="w-6 h-6 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <svg class="w-6 h-6 text-primary-light shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                                 <path d={iconSvgPaths[subLink.icon] || ""} />
                                                             </svg>
                                                             <div>
@@ -217,7 +217,7 @@ const flatNavLinks = [
                     ) : (
                             <a
                                     href={link.href}
-                                    class={`p-3 transition-colors hover:text-primary ${currentPath === link.href ? "text-primary" : "text-surface-300"}`}
+                                    class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-surface-300"}`}
                             >
                                 {link.label}
                             </a>
@@ -230,7 +230,7 @@ const flatNavLinks = [
                 {flatNavLinks.map(link => (
                     <a
                         href={link.href}
-                        class={`p-3 transition-colors hover:text-primary ${currentPath === link.href ? "text-primary" : "text-surface-300"}`}
+                        class={`p-3 transition-colors hover:text-primary-light ${currentPath === link.href ? "text-primary-light" : "text-surface-300"}`}
                     >
                         {link.label}
                     </a>
@@ -326,7 +326,7 @@ const flatNavLinks = [
                                                     href={subLink.href}
                                                     class={`block text-xl font-medium transition-colors w-full text-center py-2 rounded-lg ${
                                                         currentPath === subLink.href
-                                                            ? "bg-primary/20 text-primary"
+                                                            ? "bg-primary/20 text-primary-light"
                                                             : "text-surface-400 hover:bg-white/10 hover:text-white"
                                                     }`}
                                             >
@@ -340,7 +340,7 @@ const flatNavLinks = [
                                     href={link.href}
                                     class={`block text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg ${
                                         currentPath === link.href
-                                            ? "bg-primary/20 text-primary"
+                                            ? "bg-primary/20 text-primary-light"
                                             : "text-surface-300 hover:bg-white/10 hover:text-white"
                                     }`}
                             >
@@ -388,7 +388,7 @@ const flatNavLinks = [
                             href={link.href}
                             class={`block text-2xl font-semibold transition-colors w-full text-center py-3 rounded-lg ${
                                 currentPath === link.href
-                                    ? "bg-primary/20 text-primary"
+                                    ? "bg-primary/20 text-primary-light"
                                     : "text-surface-300 hover:bg-white/10 hover:text-white"
                             }`}
                         >

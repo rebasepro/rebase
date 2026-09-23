@@ -15,9 +15,9 @@ const translatePath = useTranslatedPath(getLangFromUrl(Astro.url));
             <div class="mb-3 sm:mb-4">
                 <h2 class="text-base sm:text-lg text-surface-900 dark:text-white mb-1.5 sm:mb-2">{t("cookies.title")}</h2>
                 <p class="text-xs sm:text-sm leading-relaxed text-surface-800 dark:text-surface-200 m-0">
-                    <Fragment set:html={t("cookies.body")} />
+                    <Fragment set:html={t("cookies.body")} />{" "}
                     <a href="/policy/cookies_policy" target="_blank"
-                       class="text-primary-light hover:text-primary underline transition-colors">{t("cookies.link")}</a>.
+                       class="text-primary-light hover:text-white underline transition-colors">{t("cookies.link")}</a>.
                 </p>
             </div>
             <div class="flex flex-row gap-3">

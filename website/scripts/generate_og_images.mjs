@@ -62,8 +62,11 @@ const CARDS = [
     {
         slug: "home",
         eyebrow: "Open source · MIT",
-        title: "The backend that can't forget a permission check",
-        sub: "Access rules compiled into Postgres row‑level security. Open source, on the Postgres you already have."
+        // The home page's own H1 (`hero.title.*`). This card kept the retired
+        // headline for eleven days after the hero changed, so every shared link
+        // to the home page promised something the page no longer said.
+        title: "A backend for your Postgres. And the panel you never write.",
+        sub: "REST, a typed SDK, realtime, auth and storage for your app — and the panel your team works in."
     },
     {
         slug: "docs",

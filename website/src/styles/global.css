@@ -181,7 +181,9 @@
     gap: 0.5rem;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-primary);
+    /* Text, so the light blue: #0070F4 is 4.36:1 on the page ground and fails
+       AA at this size; #359AFF passes. #0070F4 stays the fill colour. */
+    color: var(--color-primary-light);
     transition: opacity 0.2s ease;
 }
 
@@ -991,6 +993,16 @@
 }
 
 @plugin "@tailwindcss/typography";
+
+/* The typography plugin wraps inline code in literal backticks (a
+   `code::before`/`::after` content rule), so every blog post showed
+   `requireOwner` with the ticks. The chip styling already marks it as code.
+   Unlayered, so it beats the plugin's rule of equal specificity. */
+.prose :where(code)::before,
+.prose :where(code)::after {
+    content: none;
+}
+
 @custom-variant dark (&:is([data-theme=dark], [data-theme=dark] *));
 
 

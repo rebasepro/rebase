@@ -49,31 +49,14 @@ const SEVERITY_STYLE: Record<string, string> = {
     medium: "text-surface-300 border-surface-600 bg-surface-800/60"
 };
 
+// i18n KEYS, not sentences: ComparisonFaq resolves them per locale.
 const faqs = [
-    {
-        q: "Is it safe to run against a production database?",
-        a: "It is read-only, and narrowly so. It issues SELECTs against the system catalogues — pg_class, pg_policies, pg_proc, information_schema — and nothing else. It never reads your data, writes nothing, changes no setting, and makes no network request beyond the connection string you give it. There is no telemetry and no upload."
-    },
-    {
-        q: "Do I need to be using Rebase?",
-        a: "No. It knows nothing about your framework and asks nothing of your codebase — it reads the database. It works against Supabase, Neon, RDS, Cloud SQL, a container on your laptop, or anything else that speaks the Postgres wire protocol. It needs no Rebase and asks about none."
-    },
-    {
-        q: "What does it need to connect as?",
-        a: "A role that can read the catalogues — usually a superuser, the table owner, or something with BYPASSRLS. That is deliberate and the report says so at the top: the scan reads the true catalogue precisely because row-level security cannot constrain it, so the findings describe what *other* roles experience, not what this connection does."
-    },
-    {
-        q: "How is this different from Supabase's own linter?",
-        a: "There is real overlap on the obvious cases, and both are worth running. The checks here that tend not to appear elsewhere are the indirect ones: a view or materialized view reading past its base table's RLS because it runs as its owner, a many-to-many join table left unprotected between two protected endpoints, and a bare column inside an EXISTS subquery that Postgres binds to the inner table — which turns a tenant filter into a tautology while looking completely correct."
-    },
-    {
-        q: "Can I run it in CI?",
-        a: "Yes — that is the intended home for it. It exits non-zero when findings at or above a threshold you choose are present, emits JSON for machine consumption, and supports skipping individual checks by id so a deliberate exception does not fail every build. The ids are a stable public API for exactly this reason."
-    },
-    {
-        q: "Why is a backend company giving away a security scanner?",
-        a: "Because the argument Rebase makes is that authorization belongs in the database rather than in the layer in front of it, and a tool that audits Postgres RLS is that argument in a form you can run against your own data instead of read. It is genuinely useful whether or not you ever look at the rest of this site — and if it finds nothing, that is a good afternoon and you owe us nothing."
-    }
+    { q: "rlscheck.faq.safe.q", a: "rlscheck.faq.safe.a" },
+    { q: "rlscheck.faq.rebase.q", a: "rlscheck.faq.rebase.a" },
+    { q: "rlscheck.faq.role.q", a: "rlscheck.faq.role.a" },
+    { q: "rlscheck.faq.linter.q", a: "rlscheck.faq.linter.a" },
+    { q: "rlscheck.faq.ci.q", a: "rlscheck.faq.ci.a" },
+    { q: "rlscheck.faq.why.q", a: "rlscheck.faq.why.a" }
 ];
 
 const appSchema = {
@@ -112,7 +95,7 @@ const appSchema = {
                 <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                     <div class="px-5 py-4 flex items-center justify-between gap-4">
                         <div class="font-mono text-xs sm:text-sm flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                            <span class="text-primary mr-3">~</span>
+                            <span class="text-primary-light mr-3">~</span>
                             <span class="text-white">{COMMAND}</span>
                         </div>
                         <button data-track-copy="rls-check-hero" data-command={COMMAND}

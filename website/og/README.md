@@ -6,9 +6,9 @@ files. Check which one owns an image before you re-render it.
 | Output | Size | Rendered by | Used by |
 | --- | --- | --- | --- |
 | `../public/img/social-preview.png` | 1280×640 | `og/render.mjs`, from `og/card.html` | GitHub repo → **Settings → Social preview** (uploaded by hand; GitHub has no API for it) |
-| `../public/img/teaser.png` | 1200×630 | `scripts/og/render.mjs`, from `scripts/og/teaser.html` | The default `ogImage` in `src/layouts/Layout.astro` — `og:image`, `twitter:image` and the JSON-LD `screenshot` of any page that passes none |
+| `../public/img/teaser.png` | 1200×630 | `scripts/og/render.mjs`, from `scripts/og/teaser.html` | Nothing in `src/` since 2026-09-23: its tagline drifted from the hero, so the default `ogImage` is now `og/home.png` |
 | `../public/img/twitter_teaser.png` | 1200×630 | `scripts/og/render.mjs`, as a copy of `teaser.png` | Nothing in `src/`: `twitter:image` follows `ogImage` now |
-| `../public/img/og/*.png` | 1200×630 | `scripts/generate_og_images.mjs` | The per-route cards pages pass as `ogImage`, and the docs' `og:image` in `astro.config.mjs` |
+| `../public/img/og/*.png` | 1200×630 | `scripts/generate_og_images.mjs` | The per-route cards pages pass as `ogImage`; `og/home.png` is also the default for any page that passes none (and the JSON-LD `screenshot`); the docs' `og:image` in `astro.config.mjs` |
 
 This directory's template, `card.html`, now owns only the GitHub social preview.
 From the repo root:

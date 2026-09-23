@@ -1,8 +1,12 @@
 {
   "de": {
+    "agencies.features.f5.title": "731385352686",
+    "cta.button.demo": "38cfaf72c1d2",
+    "cta.button.docs": "d4a74b503a15",
     "modes.badge": "61e5aff9c6fb",
     "nav.ai": "eaa72d89e321",
     "nav.cli": "c73bf357840d",
+    "nav.tryDemo": "38cfaf72c1d2",
     "showcase.badge": "937a522b5b04",
     "showcase.title.part1": "a454f4cd0590"
   },
@@ -11,7 +15,13 @@
     "showcase.title.part1": "a454f4cd0590"
   },
   "fr": {
+    "agencies.features.f1.title": "cd5579e438b8",
+    "agencies.features.f3.title": "02fd15a66576",
+    "agencies.features.f5.title": "731385352686",
+    "cta.button.demo": "38cfaf72c1d2",
+    "cta.button.docs": "d4a74b503a15",
     "modes.badge": "61e5aff9c6fb",
+    "nav.tryDemo": "38cfaf72c1d2",
     "showcase.badge": "937a522b5b04",
     "showcase.title.part1": "a454f4cd0590"
   }

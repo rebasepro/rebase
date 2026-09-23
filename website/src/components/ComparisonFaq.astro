@@ -51,7 +51,17 @@ const { competitor, faqs: faqKeys, pageUrl, heading } = Astro.props as Props;
 // `faqs` carries i18n KEYS, not sentences — see src/data/comparison-faqs.ts.
 // Resolving them here keeps the data file one list rather than four.
 const t = useTranslations(getLangFromUrl(Astro.url));
-const faqs = faqKeys.map((f) => ({ q: t(f.q), a: t(f.a) }));
+// A key with no translation resolves to undefined and renders an empty row —
+// rls-check shipped six of them, and empty FAQPage JSON-LD, by passing
+// sentences here. Fail the build instead.
+const faqs = faqKeys.map((f) => {
+    const q = t(f.q);
+    const a = t(f.a);
+    if (!q || !a) {
+        throw new Error(`ComparisonFaq: no translation for "${q ? f.a : f.q}" — faqs takes i18n keys, not sentences`);
+    }
+    return { q, a };
+});
 
 /**
  * FAQPage structured data.

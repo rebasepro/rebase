@@ -234,6 +234,77 @@ for (const [route, file] of pages) {
     }
 }
 
+/* 9. Text a visitor reads that nobody wrote. All three shipped at once and were
+      found by looking at the live site (2026-09-23), on every page:
+
+      - An entity escaped twice (`&amp;rarr;`). An i18n value holding `&rarr;`
+        or `&nbsp;`, rendered through `{t()}` rather than `set:html`, prints the
+        entity: "How to fix it &rarr;" ×15 on /rls-check, "Deploy&nbsp;on…"
+        on /security, "AI &AMP; AGENTS" on /ai.
+      - A <summary> with no text. ComparisonFaq resolves i18n KEYS; /rls-check
+        passed it sentences and shipped six blank FAQ rows (and an empty
+        FAQPage schema).
+      - A word glued to a link. Astro drops the line break between `{expr}` and
+        a following `<a>`, so the cookie banner on every page read "you consent
+        toour use of cookies". `{" "}` is the fix.
+
+      Every page, docs included — the cookie banner and the chrome are on all
+      of them. Code is exempt: a code sample may spell an entity on purpose. */
+/** Every defect of the three kinds above in one page's HTML, as [check, detail]. */
+function textDefects(html) {
+    const text = html
+        .replace(/<script[\s\S]*?<\/script>/g, "")
+        .replace(/<style[\s\S]*?<\/style>/g, "")
+        .replace(/<pre[\s\S]*?<\/pre>/g, "")
+        .replace(/<code[\s\S]*?<\/code>/g, "")
+        .replace(/<!--[\s\S]*?-->/g, "")
+        // Attribute values are not text: an island's `props` carries code
+        // samples with their quotes escaped, `&amp;quot;` and all.
+        .replace(/\s[\w:.@-]+="[^"]*"/g, "");
+    const around = (i) => text.slice(Math.max(0, i - 40), i + 40).replace(/\s+/g, " ");
+    const found = [];
+
+    const entity = /&amp;(?:[a-zA-Z]{2,8}|#\d{2,5});/.exec(text);
+    if (entity) found.push(["escaped-entity", around(entity.index)]);
+
+    for (const m of text.matchAll(/<summary\b[^>]*>([\s\S]*?)<\/summary>/g)) {
+        if (!m[1].replace(/<[^>]+>/g, "").trim()) {
+            found.push(["empty-summary", around(m.index)]);
+            break;
+        }
+    }
+
+    const glued = /[a-z]<a\b[^>]*>[a-z]|<\/a>[a-z]{2}/.exec(text);
+    if (glued) found.push(["text-glued-to-link", around(glued.index)]);
+    return found;
+}
+
+/* Self-test, for the same reason as the link one: each shipped defect must
+   still be caught, and each look-alike that is fine must still pass. */
+{
+    const cases = [
+        ['<a href="/x">How to fix it &amp;rarr;</a>', "escaped-entity"],
+        ["<p>Deploy&amp;nbsp;on&amp;nbsp;Your&amp;nbsp;Terms</p>", "escaped-entity"],
+        ['<summary class="flex"><span></span><svg viewBox="0 0 24 24"><path d="M12 5v14"/></svg></summary>', "empty-summary"],
+        ['<p>you consent to<a href="/policy" target="_blank">our use of cookies</a>.</p>', "text-glued-to-link"],
+        ['<astro-island props="{&quot;code&quot;:[0,&quot;variant=&amp;quot;{v}&amp;quot;&quot;]}"></astro-island>', null],
+        ["<pre>&amp;rarr; is spelled like this</pre>", null],
+        ['<summary><span>Is it safe?</span></summary>', null],
+        ['<p>the <a href="/security">security page</a>s and <a href="/x">links</a>.</p>', null],
+    ];
+    for (const [html, want] of cases) {
+        const got = textDefects(html).map(([check]) => check);
+        if (want ? !got.includes(want) : got.length) {
+            console.error(`check_site self-test failed: ${want ?? "no defect"} expected for ${html} — got ${got.join(", ") || "none"}`);
+            process.exit(2);
+        }
+    }
+}
+
+for (const [route, file] of linkPages) {
+    for (const [check, detail] of textDefects(readFileSync(file, "utf8"))) fail(route, check, detail);
+}
+
 const byCheck = {};
 for (const f of failures) (byCheck[f.check] ??= []).push(f);
 

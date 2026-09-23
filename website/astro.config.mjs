@@ -33,6 +33,10 @@ export default defineConfig({
         }),
         starlight({
             title: "Rebase Docs",
+            // The site's 404 is src/pages/404.astro. Starlight's own sent every
+            // mistyped rebase.pro URL to a docs-shell page whose way out was
+            // "Back to rebase.pro ↗" — an external-link icon, on rebase.pro.
+            disable404Route: true,
             // Starlight emits og:title, og:type, og:url and og:description and
             // no og:image at all, so every documentation page previewed as a
             // bare text card. One image for the whole section: a page-specific

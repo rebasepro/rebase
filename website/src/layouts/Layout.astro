@@ -29,6 +29,8 @@ export interface Props {
     showBanner?: boolean;
     ogImage?: string;
     ogType?: string;
+    /** Keep the page out of search results (the 404). */
+    noindex?: boolean;
 }
 
 
@@ -45,8 +47,9 @@ const {
     breadcrumbs,
     lang = getLangFromUrl(Astro.url),
     showBanner = false,
-    ogImage = "https://rebase.pro/img/teaser.png",
-    ogType = "website"
+    ogImage = "https://rebase.pro/img/og/home.png",
+    ogType = "website",
+    noindex = false
 } = Astro.props;
 
 // The English pair, for the JSON-LD graph: structured data describes the
@@ -88,7 +91,7 @@ const siteSchema = {
             operatingSystem: "Web",
             description: schemaDescription,
             url: "https://rebase.pro",
-            screenshot: "https://rebase.pro/img/teaser.png",
+            screenshot: "https://rebase.pro/img/og/home.png",
             offers: {
                 "@type": "Offer",
                 price: "0",
@@ -316,7 +319,7 @@ const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
     <meta name="description" content={description}>
     <meta name="keywords"
           content="Postgres backend, row-level security, open-source backend, Postgres REST API, typed SDK, Postgres realtime, admin panel for Postgres, self-hosted backend">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content={noindex ? "noindex, follow" : "index, follow"}>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="sitemap" href="/sitemap-index.xml"/>
     <!-- Open Graph Meta Tags -->

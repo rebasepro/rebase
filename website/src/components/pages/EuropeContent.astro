@@ -81,7 +81,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <span class="ml-auto text-3xs font-semibold tracking-wide text-surface-500">zsh</span>
                 </div>
                 <div class="flex items-center gap-2 p-5 text-left">
-                    <span class="select-none font-semibold text-primary">&gt;</span>
+                    <span class="select-none font-semibold text-primary-light">&gt;</span>
                     <span class="select-all font-medium text-white">pnpm dlx @rebasepro/cli init</span>
                     <span class="inline-block h-4 w-1.5 animate-pulse bg-primary align-middle"></span>
                 </div>
@@ -116,7 +116,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("europe.10")}></p>
                     <p class="mb-6 text-base leading-relaxed text-surface-400">{t("europe.11")}</p>
                     <a href="/docs/deployment/self-hosting"
-                       class="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
+                       class="inline-flex items-center gap-2 text-sm font-medium text-primary-light transition-colors hover:text-primary/80">
                         {t("europe.link.selfhost")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -198,7 +198,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                 <p class="mt-8 border-t border-surface-800/60 pt-6 text-sm leading-relaxed text-surface-400">
                     {t("europe.panelNote")}
-                    <a href={translatePath("/cms")} class="ml-1 text-primary hover:underline">{t("europe.link.panel")}</a>.
+                    <a href={translatePath("/cms")} class="ml-1 text-primary-light hover:underline">{t("europe.link.panel")}</a>.
                 </p>
             </div>
         </div>
@@ -254,8 +254,8 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <p class="mt-8 max-w-[38rem] text-xs leading-relaxed text-surface-500">
-                {t("europe.legal")}
-                <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">{t("europe.link.security")}</a>{" "}
+                {t("europe.legal")}{" "}
+                <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary-light">{t("europe.link.security")}</a>{" "}
                 {t("europe.legal2")}
             </p>
         </div>

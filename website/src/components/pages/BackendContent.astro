@@ -194,7 +194,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.02")}></p>
                     <p class="text-base text-surface-400 leading-relaxed mb-6" set:html={t("backendpage.03")}></p>
                     <a href={translatePath("/sdk")}
-                       class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                       class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                         {t("backendpage.link.sdk")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -267,7 +267,7 @@ import ClosingCta from "../ClosingCta.astro";
                          style="background: radial-gradient(500px 260px at 70% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
                     <div class="relative px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">{t("backendpage.12")}</span>
-                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">generated</span>
+                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary-light ring-1 ring-inset ring-primary/20">generated</span>
                     </div>
                     <pre class="relative p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={policyCode}></code></pre>
                 </div>
@@ -275,7 +275,7 @@ import ClosingCta from "../ClosingCta.astro";
 
             <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <a href={translatePath("/security")}
-                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                     {t("backendpage.link.security")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -351,9 +351,9 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={honoCode}></code></pre>
                     <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f1")}</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f2")}</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f3")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f1")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f2")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f3")}</li>
                     </ul>
                 </div>
 
@@ -364,9 +364,9 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={drizzleCode}></code></pre>
                     <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f1")}</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f2")}</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f3")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f1")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f2")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary-light"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f3")}</li>
                     </ul>
                 </div>
             </div>
@@ -384,7 +384,7 @@ import ClosingCta from "../ClosingCta.astro";
             <SplitLayerDemo client:visible/>
             <div class="mt-10 text-center">
                 <a href={translatePath("/cms")}
-                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary-light hover:text-primary/80 transition-colors">
                     {t("backendpage.link.panel")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

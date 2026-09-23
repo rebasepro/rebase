@@ -97,7 +97,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 
         <div class="relative z-10 mx-auto max-w-6xl px-4 lg:px-12">
             <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">
-                <a href={translatePath("/backend")} class="transition-colors hover:text-primary">{t("aipage.27")}</a>
+                <a href={translatePath("/backend")} class="transition-colors hover:text-primary-light">{t("aipage.27")}</a>
                 <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">{t("aipage.00")}</span>
             </p>
             <div class="mx-auto mb-6 inline-flex items-center rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
@@ -152,7 +152,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                                 <span class="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-primary/10 ring-1 ring-inset ring-primary/20">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                         stroke-linejoin="round" class="text-primary">
+                                         stroke-linejoin="round" class="text-primary-light">
                                         <path d={group.icon}/>
                                     </svg>
                                 </span>
@@ -197,7 +197,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.18")}></p>
                     <p class="text-base leading-relaxed text-surface-400">{t("aipage.19")}</p>
                     <a href={translatePath("/security")}
-                       class="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
+                       class="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary-light transition-colors hover:text-primary/80">
                         {t("aipage.link.policies")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -266,7 +266,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
             <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.24")}</h2>
             <p class="mb-8 text-lg leading-relaxed text-surface-400">{t("aipage.25")}</p>
             <div class="mb-8 inline-flex items-center gap-3 rounded-xl border border-surface-800 bg-[#0c0d10] px-5 py-3.5 font-mono text-sm">
-                <span class="select-none font-semibold text-primary">&gt;</span>
+                <span class="select-none font-semibold text-primary-light">&gt;</span>
                 <span class="select-all text-white">{t("aipage.26")}</span>
             </div>
             <div class="flex flex-col justify-center gap-4 sm:flex-row">
