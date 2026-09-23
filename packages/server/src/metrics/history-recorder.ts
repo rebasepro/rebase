@@ -8,7 +8,7 @@
  */
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { logger } from "../utils/logger.js";
-import type { DataDriver } from "@rebasepro/types";
+import { isSQLAdmin, type DataDriver } from "@rebasepro/types";
 import {
     ensureMetricsHistory,
     recordSamples,
@@ -29,12 +29,11 @@ export interface MetricsHistory {
     read(series: MetricSeries, sinceMinutes: number): Promise<SeriesPoint[]>;
 }
 
-/** Narrow structural check, matching how the job store decides the same thing. */
+/** The driver's SQL executor, when its admin can run SQL at all. */
 function sqlExecutorOf(driver: DataDriver): Exec | undefined {
-    const admin = (driver as { admin?: { executeSql?: unknown } }).admin;
-    if (!admin || typeof admin.executeSql !== "function") return undefined;
-    const executeSql = admin.executeSql as (sql: string, opts?: { params?: unknown[] }) => Promise<unknown>;
-    return (sql, params) => executeSql(sql, params ? { params } : undefined);
+    const admin = driver.admin;
+    if (!isSQLAdmin(admin)) return undefined;
+    return (sql, params) => admin.executeSql(sql, params ? { params } : undefined);
 }
 
 /**
