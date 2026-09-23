@@ -440,7 +440,12 @@ describe("isLoopbackHost", () => {
         // Near-misses that must not be mistaken for the real thing.
         "notlocalhost",
         "localhost.evil.com",
-        "1127.0.0.1"
+        "1127.0.0.1",
+        // A DNS name that merely starts with `127.` resolves wherever its
+        // owner points it.
+        "127.0.0.1.db.example.com",
+        "127.evil.com",
+        "127.0.0.999"
     ])("treats %s as remote", (host) => {
         expect(isLoopbackHost(host)).toBe(false);
     });

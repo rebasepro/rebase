@@ -830,7 +830,17 @@ export function isLoopbackHost(host: string): boolean {
         || h.endsWith(".localhost")
         || h === "::1"
         || h === "0.0.0.0"
-        || /^127\./.test(h);
+        || isLoopbackIPv4(h);
+}
+
+/**
+ * A dotted-quad IPv4 literal in 127.0.0.0/8. A literal, not a prefix: a DNS
+ * name such as `127.0.0.1.db.example.com` starts the same way and resolves
+ * wherever its owner points it.
+ */
+function isLoopbackIPv4(host: string): boolean {
+    const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+    return octets !== null && octets.slice(1).every((octet) => Number(octet) <= 255);
 }
 
 /**
