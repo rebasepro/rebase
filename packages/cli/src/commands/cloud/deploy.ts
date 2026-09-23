@@ -195,6 +195,10 @@ async function deployBundle(opts: {
     appName?: string;
     /** Compile without type checking, exactly as `rebase build` does. */
     skipTypeCheck?: boolean;
+    /** Keep the committed Drizzle schema rather than regenerating it, as `rebase build --skip-schema` does. */
+    skipSchema?: boolean;
+    /** Leave the static apps out of the backend bundle, as `rebase build --no-static` does. */
+    noStatic?: boolean;
     /** Follow the deployment to a terminal state. Default on; `--no-follow` off. */
     follow: boolean;
     /** Ceiling on the follow, in milliseconds. */
@@ -228,6 +232,15 @@ async function deployBundle(opts: {
         } catch (err) {
             fail(err instanceof Error ? err.message : String(err));
             return;
+        }
+
+        if (target.app.type === "static" && opts.noStatic) {
+            fail(
+                `--no-static leaves a backend's frontend out of its bundle, and "${target.name}" is a static app: ` +
+                    "its bundle is nothing but its frontend.",
+                "Deploy it without --no-static.",
+                "usage"
+            );
         }
 
         if (target.app.type === "static") {
@@ -293,6 +306,7 @@ app: target.app as RebaseBackendAppConfig };
                 runtimeRange: loaded.manifest.rebase,
                 resources: resourceGraph,
                 skipTypeCheck: opts.skipTypeCheck,
+                skipSchema: opts.skipSchema,
                 log: (m: string) => progress(chalk.gray(m)),
                 quietStdout: isJsonMode()
             });
@@ -306,25 +320,27 @@ app: target.app as RebaseBackendAppConfig };
            no site in it — the managed pod then served the API perfectly and 404'd
            every page, which is precisely the failure folding exists to prevent.
            Two callers producing the same artefact have to share the step that
-           completes it. */
-        try {
-            const folded = await foldFrontendIntoBundle({
-                projectRoot,
-                manifest: loaded.manifest as never,
-                bundleDir,
-                log: (m: string) => progress(m),
-                quietStdout: isJsonMode()
-            });
-            for (const outcome of folded) {
-                progress(chalk.gray(
-                    `  folded ${outcome.appName} in (${outcome.fileCount} file(s), served at ${outcome.path})`
-                ));
+           completes it, and the same way out of it: `--no-static`. */
+        if (!opts.noStatic) {
+            try {
+                const folded = await foldFrontendIntoBundle({
+                    projectRoot,
+                    manifest: loaded.manifest as never,
+                    bundleDir,
+                    log: (m: string) => progress(m),
+                    quietStdout: isJsonMode()
+                });
+                for (const outcome of folded) {
+                    progress(chalk.gray(
+                        `  folded ${outcome.appName} in (${outcome.fileCount} file(s), served at ${outcome.path})`
+                    ));
+                }
+            } catch (err) {
+                fail(
+                    err instanceof Error ? err.message : String(err),
+                    "Fix the frontend build, or pass --no-static to deploy the API alone."
+                );
             }
-        } catch (err) {
-            fail(
-                err instanceof Error ? err.message : String(err),
-                "Fix the frontend build, or pass --no-static to deploy the API alone."
-            );
         }
     }
 
@@ -980,6 +996,12 @@ export const DEPLOY_FLAGS = {
        only way to deploy a bundle without type checking was to run the build
        by hand and then point `--bundle-dir` at the result. */
     "--skip-type-check": Boolean,
+    /* `rebase build`'s other two, which the deploy's own remedies name: a
+       frontend that fails to fold says to deploy the API alone with
+       `--no-static`, and a schema that fails to generate says `--skip-schema`
+       for one that is hand-maintained. */
+    "--no-static": Boolean,
+    "--skip-schema": Boolean,
     /* Leave the managed runtime on purpose. The ONLY way to build a container
        image for a project the platform runs as managed — for the bare form and
        for `--source` alike, because neither of those says so by itself. See
@@ -1133,6 +1155,8 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             message: args["--message"],
             appName,
             skipTypeCheck: args["--skip-type-check"] === true,
+            skipSchema: args["--skip-schema"] === true,
+            noStatic: args["--no-static"] === true,
             follow: args["--no-follow"] !== true,
             timeoutMs: resolveDeployTimeout(args["--timeout"]),
             uploadSource: args["--no-source"] !== true,

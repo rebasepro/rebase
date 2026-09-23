@@ -24,8 +24,15 @@ vi.mock("./context", async (importOriginal) => {
     };
 });
 
+// The real builder unless a test says otherwise, so a test can see what it was asked for.
+vi.mock("../../bundle", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../../bundle")>();
+    return { ...actual, buildBundle: vi.fn(actual.buildBundle) };
+});
+
 import * as context from "./context";
 import { deployCommand } from "./deploy";
+import { buildBundle } from "../../bundle";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -332,6 +339,53 @@ describe("a deploy that builds its own bundle", () => {
         expect(said.join("\n")).toMatch(/no single version satisfies[\s\S]*dotenv/);
         expect(requests).toEqual([]);
         expect(invoke).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * Two of the deploy's own remedies named flags it refused: a frontend that
+ * failed to fold said "pass --no-static", and a schema that failed to
+ * generate said "pass --skip-schema", and each answered "unknown or
+ * unexpected option". They are `rebase build`'s flags, and a deploy builds
+ * its own bundle.
+ */
+describe("the build flags a deploy's remedies name", () => {
+    function projectWithFailingFrontend(): void {
+        write(project, "rebase.json", JSON.stringify({
+            rebase: "^1",
+            apps: {
+                backend: { type: "backend", runtime: "managed" },
+                web: { type: "static", root: "frontend", build: "exit 7", output: "frontend/dist", path: "/" }
+            }
+        }));
+    }
+
+    it("deploys the API alone with --no-static, and skips the schema with --skip-schema", async () => {
+        projectWithFailingFrontend();
+        bundle("backend");
+        vi.mocked(buildBundle).mockImplementationOnce(async () => ({
+            outDir: bundleDir,
+            manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
+            collectionCount: 0,
+            vendor: { vendored: false, skipped: "the bundle declares no dependencies" }
+        }));
+        controlPlane();
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "--no-static", "--skip-schema", "--no-source", "--no-follow"], "shop");
+
+        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ skipSchema: true });
+        // The frontend's build fails, so the deploy only got here without it.
+        expect(triggered().bundleId).toBe("b1");
+    });
+
+    it("refuses --no-static for a static app, which is nothing but its frontend", async () => {
+        projectWithFailingFrontend();
+        controlPlane();
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "web", "--no-static", "--no-follow"], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+        expect(said.join("\n")).toContain("\"web\" is a static app");
+        expect(requests).toEqual([]);
     });
 });
 

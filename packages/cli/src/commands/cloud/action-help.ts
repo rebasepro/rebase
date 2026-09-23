@@ -190,6 +190,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--bundle-dir <path>", "Deploy a bundle that is already built"],
             ["--source <path>", "Upload this directory and build a container image from it"],
             ["--skip-type-check", "Compile without type checking, as `rebase build` does"],
+            ["--skip-schema", "Keep the committed database schema instead of regenerating it"],
+            ["--no-static", "Deploy the backend without folding the static apps into its bundle"],
             ["--no-source", "Do not upload the project's source beside a backend bundle"],
             ["--allow-downgrade", "Deploy a bundle built on an older framework release than the project runs"],
             ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
