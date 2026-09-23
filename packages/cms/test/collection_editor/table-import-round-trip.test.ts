@@ -101,15 +101,17 @@ describe("importing a table and saving the collection", () => {
     it("names policy operations in SQL, which is what SecurityOperation takes", () => {
         expect(imported.securityRules?.[0]).toMatchObject({
             name: "posts_owner_select",
-            operations: ["select"],
+            operation: "select",
+            // The `TO` list: database roles, not the application roles `roles`
+            // compiles into a `rebase.roles()` check.
+            pgRoles: ["authenticated"],
             // The fixture's `qual` is the pre-1.0 spelling, because that is what
             // a database provisioned before the move actually holds. It is
             // normalised on import: copying it through would write a call to a
             // function 1.0 no longer creates into the project's own config.
             using: "author_id = rebase.uid()"
         });
-        // Not the CRUD verbs the discarded copy emitted, which compile to nothing.
-        expect(imported.securityRules?.[0]?.operations).not.toContain("read");
+        expect(imported.securityRules?.[0]?.roles).toBeUndefined();
     });
 
     it("survives the save the editor performs on it", () => {

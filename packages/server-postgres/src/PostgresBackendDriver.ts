@@ -2178,15 +2178,22 @@ export class PostgresBackendDriver implements DataDriver {
         const junctions = junctionsResult.rows as TableJunctionInfo[];
 
         // 4. Fetch RLS Policies
+        //
+        // From `pg_policies`, not `pg_policy`: the importer writes each row
+        // into a security rule, and needs the command named (`pg_policy.polcmd`
+        // is `r`, `a`, `*`), `TO public` spelled `public` (the raw oid list
+        // casts it to `-`) and whether the policy is restrictive, which a
+        // rule read back as permissive would OR with every grant beside it.
         const policiesResult = await this.db.execute(drizzleSql`
-            SELECT 
-                polname as policy_name, 
-                polcmd as cmd, 
-                polroles::regrole[]::text[] as roles, 
-                pg_get_expr(polqual, polrelid) as qual, 
-                pg_get_expr(polwithcheck, polrelid) as with_check
-            FROM pg_policy
-            WHERE polrelid = (SELECT oid FROM pg_class WHERE relname = ${safeName} AND relnamespace = 'public'::regnamespace);
+            SELECT
+                policyname AS policy_name,
+                permissive,
+                cmd,
+                roles::text[] AS roles,
+                qual,
+                with_check
+            FROM pg_policies
+            WHERE schemaname = 'public' AND tablename = ${safeName};
         `);
         // SAFETY: Raw SQL result rows match TablePolicyInfo shape from the SELECT aliases
         const policies = policiesResult.rows as TablePolicyInfo[];

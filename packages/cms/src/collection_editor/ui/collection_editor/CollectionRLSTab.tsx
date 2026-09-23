@@ -1,6 +1,6 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getGeneratedPolicyNames, getTableName } from "@rebasepro/common";
+import { getGeneratedPolicyNames, getTableName, policyToSecurityRule } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**
@@ -64,10 +64,9 @@ type CollectionWithSecurity = AdminCollection & {
  * edit carries over from the rule it changes.
  *
  * Wider than any one `SecurityRule` variant on purpose — the same shape as
- * Studio's `PolicyRule`: a policy with only a `WITH CHECK` clause, which is
- * every INSERT-only policy, carries `withCheck` and no `using`. The raw-SQL
- * variant requires `using` and the roles-only one forbids `withCheck`, but the
- * generator compiles the pair exactly as written.
+ * Studio's `PolicyRule`: an edit starts from the rule as written and deletes
+ * and assigns the fields that changed one at a time, and the variants are
+ * exclusive about which fields go together.
  */
 type PolicyRule = SecurityRuleBase & {
     using?: string;
@@ -110,13 +109,12 @@ function toSecurityMode(permissive: PostgresPolicy["permissive"] | undefined): S
 }
 
 /**
- * Build a rule from a `pg_policies` row, or from what the inline editor saved.
+ * Build a rule from what the inline editor saved. Its `roles` are application
+ * roles; a live policy's are its `TO` list, which `policyToSecurityRule` reads.
  *
- * The WITH CHECK is kept whether or not there is a USING. It used to be kept
- * only beside one, because the raw-SQL `SecurityRule` requires `using` — so
- * every INSERT-only policy, which has only a check, came out as a roles-only
- * rule, and a roles-only rule with no roles compiles to `WITH CHECK (false)`:
- * saved or imported here, the policy stopped every insert.
+ * The WITH CHECK is kept whether or not there is a USING: every INSERT-only
+ * policy has only a check, and a roles-only rule with no roles compiles to
+ * `WITH CHECK (false)`, which stops every insert.
  */
 function toSecurityRule(policy: Partial<PostgresPolicy>): PolicyRule {
     return {
@@ -127,27 +125,6 @@ function toSecurityRule(policy: Partial<PostgresPolicy>): PolicyRule {
         ...(policy.qual ? { using: policy.qual } : {}),
         ...(policy.with_check ? { withCheck: policy.with_check } : {})
     };
-}
-
-/**
- * Build a {@link SecurityRule} from a live `pg_policies` row, for "Import to
- * codebase".
- *
- * Not {@link toSecurityRule}: that one reads `roles` as the inline editor
- * fills it, with *application* roles. A live policy's `roles` is its `TO`
- * list — *database* roles — which is `pgRoles`. Imported as `roles`, `TO
- * public` became a `rebase.roles()` check no user passes, and on a restrictive
- * policy, which compiles to `NOT (roles) OR condition`, a gate every user
- * passes.
- *
- * `pgRoles` is omitted at the `public` default, so a rule that targets every
- * connection — nearly all of them — carries no advanced field it does not need.
- */
-function livePolicyToSecurityRule(policy: PostgresPolicy): PolicyRule {
-    const { roles, ...rest } = policy;
-    const rule = toSecurityRule(rest);
-    const targetsEveryone = roles.length === 0 || (roles.length === 1 && roles[0] === "public");
-    return targetsEveryone ? rule : { ...rule, pgRoles: [...roles] };
 }
 
 /**
@@ -448,7 +425,10 @@ export function CollectionRLSTab() {
                                         <Tooltip title={readOnly ? readOnlyTitle : undefined}>
                                             <div>
                                                 <Button size="small" variant="outlined" color="primary" disabled={readOnly} onClick={() => {
-                                                    const rule: PolicyRule = livePolicyToSecurityRule(dp);
+                                                    // Not `toSecurityRule`: the inline editor's `roles`
+                                                    // are application roles, and a live policy's are its
+                                                    // `TO` list — database roles, `pgRoles`.
+                                                    const rule: SecurityRule = policyToSecurityRule(dp);
                                                     setFieldValue("securityRules", [...rules, rule]);
                                                 }}>
                                                     Import to codebase

@@ -60,6 +60,7 @@ export type SecurityRule =
     | PublicSecurityRule
     | StructuredSecurityRule
     | RawSQLSecurityRule
+    | RawSQLCheckOnlySecurityRule
     | RolesOnlySecurityRule;
 
 /**
@@ -315,6 +316,35 @@ export interface RawSQLSecurityRule extends SecurityRuleBase {
      */
     withCheck?: string;
 
+    ownerField?: never;
+    access?: never;
+    condition?: never;
+    check?: never;
+}
+
+/**
+ * Security rule with a raw SQL `WITH CHECK` clause and no `USING` clause — the
+ * shape of every INSERT policy, which checks the row being written and has no
+ * existing row to filter.
+ *
+ * On an operation that takes a `USING` clause, the missing one grants no rows,
+ * as a Postgres policy without one does.
+ *
+ * @example
+ * // Anyone may insert a row they own
+ * { operation: "insert", withCheck: "{owner_id} = rebase.uid()" }
+ *
+ * @group Models
+ */
+export interface RawSQLCheckOnlySecurityRule extends SecurityRuleBase {
+    /**
+     * Raw SQL expression for the `WITH CHECK` clause.
+     * This controls which *new/updated* row values are allowed.
+     * Applied to INSERT and UPDATE.
+     */
+    withCheck: string;
+
+    using?: never;
     ownerField?: never;
     access?: never;
     condition?: never;

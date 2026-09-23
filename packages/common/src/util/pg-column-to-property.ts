@@ -1,17 +1,18 @@
-import { rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import type {
     ArrayProperty,
     NumberProperty,
+    PostgresPolicy,
     PostgresProperties,
     Property,
     Relation,
-    SecurityOperation,
     SecurityRule,
     StringProperty,
     TableColumnInfo,
-    TableMetadata
+    TableMetadata,
+    TablePolicyInfo
 } from "@rebasepro/types";
 import { firstFreeKey, prettifyIdentifier, toWireKey } from "@rebasepro/utils";
+import { policyToSecurityRule } from "./policy/policyToSecurityRule";
 
 /**
  * A collection as introspection can describe it: the table, its columns, the
@@ -31,6 +32,27 @@ export interface IntrospectedCollection {
     propertiesOrder: string[];
     relations?: Relation[];
     securityRules?: SecurityRule[];
+}
+
+const POLICY_COMMANDS: readonly PostgresPolicy["cmd"][] = ["SELECT", "INSERT", "UPDATE", "DELETE", "ALL"];
+
+/**
+ * A policy's command, as `pg_policies.cmd` names it.
+ *
+ * Anything else is refused rather than guessed at. A rule with no operation
+ * compiles to FOR ALL, where the USING doubles as the WITH CHECK — so a
+ * `SELECT ... USING (true)` whose command went unrecognised (`pg_policy.polcmd`
+ * spells it `r`) would come back a write grant.
+ */
+function policyCommand(policy: TablePolicyInfo, tableName: string): PostgresPolicy["cmd"] {
+    const cmd = POLICY_COMMANDS.find(c => c === policy.cmd);
+    if (!cmd) {
+        throw new Error(
+            `Policy "${policy.policy_name}" on "${tableName}" has the command "${policy.cmd}", ` +
+            `not one of ${POLICY_COMMANDS.join(", ")}, so it cannot be imported as a security rule.`
+        );
+    }
+    return cmd;
 }
 
 /**
@@ -328,39 +350,14 @@ export function buildCollectionFromTableMetadata(
     // Parse RLS Policies
     if (metadata.policies) {
         for (const policy of metadata.policies) {
-            // Attempt to map typical cmds to operations.
-            // Postgres cmd: SELECT, INSERT, UPDATE, DELETE, ALL
-            let operations: SecurityOperation[] = [];
-            switch (policy.cmd) {
-                case "ALL": operations = ["all"]; break;
-                case "SELECT": operations = ["select"]; break;
-                case "INSERT": operations = ["insert"]; break;
-                case "UPDATE": operations = ["update"]; break;
-                case "DELETE": operations = ["delete"]; break;
-            }
-            // Normalised on the way in, the same way `sqlToPolicy` normalises
-            // what the admin UI reads back. Without it, importing a table from a
-            // database provisioned before 1.0 copies `auth.uid()` straight into
-            // the project's config — a call to a function the framework no
-            // longer creates, which then boots with a legacy-helper warning
-            // forever and holds the `auth` schema open.
-            const qual = policy.qual ? rewriteLegacyRlsFunctions(policy.qual) : undefined;
-            const withCheck = policy.with_check ? rewriteLegacyRlsFunctions(policy.with_check) : undefined;
-            if (qual) {
-                securityRules.push({
-                    name: policy.policy_name,
-                    operations,
-                    roles: policy.roles ?? [],
-                    using: qual,
-                    ...(withCheck ? { withCheck } : {})
-                });
-            } else {
-                securityRules.push({
-                    name: policy.policy_name,
-                    operations,
-                    roles: policy.roles ?? []
-                });
-            }
+            securityRules.push(policyToSecurityRule({
+                policyname: policy.policy_name,
+                cmd: policyCommand(policy, tableName),
+                permissive: policy.permissive,
+                roles: policy.roles,
+                qual: policy.qual ?? null,
+                with_check: policy.with_check ?? null
+            }));
         }
     }
 

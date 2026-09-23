@@ -30,10 +30,10 @@ import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, Con
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, getTableName } from "@rebasepro/common";
 import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
-import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
+import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules, policyToSecurityRule } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
-import { applyPolicyEdit, policyToRule, type PolicyEditRefusal } from "./policyRules";
+import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -891,12 +891,12 @@ totalPolicies };
                                     if (activeCollection && hasCodebase) {
                                         // Collection-mapped table: save via schema-editor API.
                                         // The editor edits a `PostgresPolicy`, whose `roles`
-                                        // is the `TO` list — `policyToRule` files it under
-                                        // `pgRoles`, never `roles`.
+                                        // is the `TO` list — `policyToSecurityRule` files it
+                                        // under `pgRoles`, never `roles`.
                                         const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                         let newRules;
                                         if (editingPolicy === "new") {
-                                            newRules = [...existingRules, policyToRule(newPolicy)];
+                                            newRules = [...existingRules, policyToSecurityRule(newPolicy)];
                                         } else {
                                             // Back to the rule the policy compiles from, or
                                             // a refusal that says why there is none — never
@@ -1121,7 +1121,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     // check nobody passes — and on a restrictive
                                                                     // policy, which compiles to `NOT (roles) OR …`,
                                                                     // a gate everybody passes.
-                                                                    const rule = policyToRule(policy);
+                                                                    const rule = policyToSecurityRule(policy);
 
                                                                     const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                                                     const newRules = [...existingRules, rule];

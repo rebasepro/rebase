@@ -60,8 +60,18 @@ export interface TableJunctionInfo {
  */
 export interface TablePolicyInfo {
     policy_name: string;
+    /**
+     * The policy's `TO` list — *database* roles, `public` for every
+     * connection — as `pg_policies.roles` reports it.
+     */
     roles: string[];
+    /** `SELECT`, `INSERT`, `UPDATE`, `DELETE` or `ALL`, as `pg_policies.cmd` reports it. */
     cmd: string;
+    /**
+     * `pg_policies.permissive`. Absent means `PERMISSIVE`, Postgres's own
+     * default.
+     */
+    permissive?: "PERMISSIVE" | "RESTRICTIVE";
     qual?: string;
     with_check?: string;
 }
