@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c622813c5a4eca9
+sourceHash: 5c14dccf5288e553
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -9,7 +9,9 @@ Die Verben finden Sie auf der Seite [REST API](/docs/backend/api/). Hier geht es
 
 ## Schreiben
 
-Über die Verben hinaus akzeptieren die Schreib-Routen fünf Parameter, die das Verhalten eines Schreibvorgangs verändern. Alle fünf sind pro Anfrage optional (Opt-in), sodass sich für Anfragen, die diese nicht anfordern, nichts ändert.
+Über die Verben hinaus akzeptieren die Schreib-Routen fünf Parameter, die das Verhalten eines Schreibvorgangs verändern. Alle fünf sind pro Anfrage optional (Opt-in), sodass sich für Anfragen, die diese nicht anfordern, nichts ändert. Die verschachtelten Routen (`/api/data/authors/42/posts`) laufen durch denselben Schreibcode wie die Root-Routen, daher gilt alles in diesem Abschnitt auch für sie, außer `?on_conflict=`.
+
+Der Body eines Schreibvorgangs muss ein JSON-Objekt sein. `null`, eine Zahl, ein String oder ein Array ergibt `400 BAD_REQUEST`.
 
 ### Idempotenz
 
@@ -23,7 +25,7 @@ curl -X POST /api/data/orders \
 
 Ein Client, der keine Antwort erhält, kann nicht wissen, ob der Schreibvorgang erfolgreich ausgeführt wurde. Daher wiederholt er ihn – und ohne einen Schlüssel kann der Server diesen Wiederholungsversuch nicht von einem zweiten echten Schreibvorgang unterscheiden. In einer Tabelle mit einer vom Server vergebenen ID führt dies zu einer doppelten Zeile, da die vom Client generierte ID nie verwendet wurde.
 
-Ein Schlüssel identifiziert **eine einzige Anfrage**: Er speichert die Methode, den Pfad und den Body, für den er beansprucht wurde. Wird exakt dieselbe Anfrage erneut gesendet, wird deren Antwort wiedergegeben; wird eine andere Anfrage unter demselben Schlüssel gesendet, wird sie mit `IDEMPOTENCY_KEY_REUSED` (422) abgelehnt, anstatt das Ergebnis der ersten zurückzugeben. Ein Wiederholungsversuch, der eintrifft, während der erste noch verarbeitet wird, erhält `IDEMPOTENCY_KEY_IN_PROGRESS` (409) – senden Sie ihn erneut, sobald der erste abgeschlossen ist.
+Ein Schlüssel identifiziert **eine einzige Anfrage**: Er speichert die Methode, den Pfad, den Query-String und den Body, für den er beansprucht wurde. Wird exakt dieselbe Anfrage erneut gesendet, wird deren Antwort wiedergegeben; wird eine andere Anfrage unter demselben Schlüssel gesendet, wird sie mit `IDEMPOTENCY_KEY_REUSED` (422) abgelehnt, anstatt das Ergebnis der ersten zurückzugeben. Ein Wiederholungsversuch, der eintrifft, während der erste noch verarbeitet wird, erhält `IDEMPOTENCY_KEY_IN_PROGRESS` (409) – senden Sie ihn erneut, sobald der erste abgeschlossen ist. Der Query-String zählt, weil er ändert, was eine Anfrage tut: `DELETE /api/data/posts/5?hard=true` unter dem Schlüssel eines früheren Soft-Deletes ist eine andere Anfrage, keine Wiederholung. Die Reihenfolge seiner Parameter spielt keine Rolle.
 
 Wird bei `POST`, `PATCH`, `DELETE`, allen drei `/bulk`-Routen sowie `/_batch` unterstützt. Schlüssel sind 24 Stunden lang gültig und an den angemeldeten Aufrufer gebunden; eine nicht authentifizierte Anfrage hat keinen Prinzipal, an den der Schlüssel gebunden werden könnte, daher wird der Header dort ignoriert. Ein Backend, das keine Schlüssel speichern kann, ignoriert den Header, anstatt den Schreibvorgang abzulehnen.
 
@@ -31,7 +33,7 @@ Wird bei `POST`, `PATCH`, `DELETE`, allen drei `/bulk`-Routen sowie `/_batch` un
 
 ### Optimistische Nebenläufigkeit: `ETag` und `If-Match`
 
-`GET /api/data/:slug/:id` gibt ein `ETag` zurück. Wird dieses bei einem späteren `PATCH` oder `DELETE` als `If-Match` zurückgesendet, wird der Schreibvorgang mit `412` abgelehnt, falls sich die Zeile in der Zwischenzeit geändert hat.
+`GET /api/data/:slug/:id` gibt ein `ETag` zurück, ebenso das verschachtelte `GET` einer einzelnen Zeile. Wird dieses bei einem späteren `PATCH` oder `DELETE` als `If-Match` zurückgesendet, wird der Schreibvorgang mit `412` abgelehnt, falls sich die Zeile in der Zwischenzeit geändert hat.
 
 ```bash
 # read
@@ -90,6 +92,8 @@ curl -X POST /api/data/users/bulk -d '{
 Das Ziel muss eine Eindeutigkeitsgarantie bieten, die die Datenbank abgleichen kann: der Primärschlüssel (der Standard, wenn keiner angegeben ist), eine Eigenschaft mit `validation: { unique: true }` oder die Spalten eines `unique: true`-[Index](/docs/backend/indexes/). Alles andere führt zu einem `400` (`INVALID_CONFLICT_TARGET`), der die tatsächlich vorhandenen Ziele auflistet – Postgres würde andernfalls innerhalb einer Transaktion, die bereits Arbeit verrichtet hat, mit *there is no unique or exclusion constraint matching the ON CONFLICT specification* antworten.
 
 Die Angabe eines Ziels ohne `upsert: true` bei einem Bulk-Schreibvorgang führt ebenfalls zu einem `400`: Ein stillschweigendes Ignorieren würde einen wiederholbaren Import in einen duplizierenden Vorgang verwandeln.
+
+`?on_conflict=` wird bei einem verschachtelten Create abgelehnt (`INVALID_CONFLICT_TARGET`). Die Zeile, die es trifft, könnte unter einem anderen Parent liegen, und das Upsert würde sie unter diesen verschieben. Senden Sie das Upsert an die eigene Route der Collection.
 
 Eine Zeile, die bereits existierte, behält ihren `on_create`-Zeitstempel. Ein Konflikt bedeutet, dass die Erstellung der Zeile ein Fakt der Vergangenheit ist; ein nächtlicher Re-Import, der `createdAt` bei jedem berührten Datensatz zurücksetzte, würde jede „Neu diese Woche“-Abfrage verfälschen.
 

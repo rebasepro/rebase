@@ -35,6 +35,23 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 Results are keyed by function and field — `count()` becomes `count`,
 `sum(total)` becomes `sum_total`.
 
+Groups page like a listing's rows. `limit` bounds them, `offset` (or `page`)
+skips them, and `orderBy` sorts them by a `groupBy` field or a result key. The
+order always ends on the group keys, so every page boundary falls in the same
+place. With a `limit`, the response says whether there are more:
+
+```bash
+GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20
+```
+
+```json
+{ "data": [ … ], "meta": { "limit": 20, "offset": 20, "hasMore": true } }
+```
+
+`offset`, `page` or `orderBy` without a `groupBy`, or a cursor on any aggregate,
+is a `400 INVALID_AGGREGATE_WINDOW`: an ungrouped aggregate has one row, and a
+group is not a row a cursor can continue after.
+
 It takes the same filters as the list endpoint, so an aggregate can be narrowed
 the same way a listing is:
 

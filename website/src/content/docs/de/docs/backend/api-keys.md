@@ -1,5 +1,5 @@
 ---
-sourceHash: 87d15c9eb4314422
+sourceHash: 166b0a87f16459a1
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description:"\"Geltungsbereichsbezogene, widerrufbare Schlüssel für maschinelle Aufrufer: Worauf ein Schlüssel zugreifen kann, wie Scopes mit Row-Level Security interagieren und die Admin-Endpunkte zu deren Verwaltung.\""
@@ -50,6 +50,12 @@ Die Anfrage eines API-Schlüssels durchläuft **zwei** Autorisierungsprüfungen,
 Ein Nicht-Admin-Schlüssel mit `"*"`-Berechtigungen kann daher trotzdem leere Ergebnisse erhalten – das
 ist die Funktionsweise von RLS, kein Fehler. Gewähren Sie der Rolle `service` entweder
 Zugriff in den Sicherheitsregeln der jeweiligen Collections oder verwenden Sie einen Admin-Schlüssel.
+
+Auf einem verschachtelten Pfad wird die Berechtigungsliste gegen jede Collection geprüft,
+die der Pfad nennt. Die Operation wird gegen die Collection geprüft, bei der der Pfad
+endet, und jeder Parent, den er durchläuft, braucht `read`: Ein Schlüssel, der nur auf
+`posts` beschränkt ist, wird bei `/api/data/authors/1/posts` abgelehnt, bis er auch
+`authors` lesen kann.
 
 ### Benutzerdefinierte Funktionen
 

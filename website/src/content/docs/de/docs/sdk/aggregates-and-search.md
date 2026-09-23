@@ -1,5 +1,5 @@
 ---
-sourceHash: 6774e2ad2b2e95b0
+sourceHash: df84abf06690d9ce
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."
@@ -35,6 +35,25 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 
 Die Ergebnisse sind nach Funktion und Feld benannt — `count()` wird zu `count`,
 `sum(total)` wird zu `sum_total`.
+
+Gruppen werden wie die Zeilen einer Auflistung paginiert. `limit` begrenzt sie,
+`offset` (oder `page`) überspringt sie, und `orderBy` sortiert sie nach einem
+`groupBy`-Feld oder einem Ergebnisschlüssel. Die Reihenfolge endet immer auf den
+Gruppenschlüsseln, sodass jede Seitengrenze an derselben Stelle liegt. Mit einem
+`limit` sagt die Antwort, ob es weitere gibt:
+
+```bash
+GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20
+```
+
+```json
+{ "data": [ … ], "meta": { "limit": 20, "offset": 20, "hasMore": true } }
+```
+
+`offset`, `page` oder `orderBy` ohne `groupBy` oder ein Cursor bei irgendeinem
+Aggregat ergibt `400 INVALID_AGGREGATE_WINDOW`: Ein ungruppiertes Aggregat hat
+eine Zeile, und eine Gruppe ist keine Zeile, nach der ein Cursor fortsetzen
+könnte.
 
 Es akzeptiert dieselben Filter wie der List-Endpunkt, sodass ein Aggregat auf die
 gleiche Weise wie eine Auflistung eingegrenzt werden kann:

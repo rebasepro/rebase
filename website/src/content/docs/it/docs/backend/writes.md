@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c622813c5a4eca9
+sourceHash: 5c14dccf5288e553
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -13,10 +13,15 @@ comporta esattamente come ha sempre fatto.
 
 ## Scrittura
 
-Oltre ai verbi, le rotte di scrittura accettano cinque parametri che modificano
-il comportamento di una scrittura. Tutti e cinque sono facoltativi su base
-richiesta, quindi nulla di quanto descritto qui altera il comportamento di una
-richiesta che non ne fa uso.
+Oltre ai verbi, le rotte di scrittura accettano cinque parametri che modificano il
+comportamento di una scrittura. Tutti e cinque sono facoltativi su base richiesta,
+quindi nulla di quanto descritto qui altera il comportamento di una richiesta che
+non ne fa uso. Le rotte annidate (`/api/data/authors/42/posts`) eseguono lo stesso
+codice di scrittura di quelle radice, quindi tutto ciò che è in questa sezione vale
+anche per loro, tranne `?on_conflict=`.
+
+Il corpo di una scrittura deve essere un oggetto JSON. `null`, un numero, una
+stringa o un array restituisce `400 BAD_REQUEST`.
 
 ### Idempotenza
 
@@ -35,13 +40,16 @@ tentativo da una seconda scrittura autentica. Su una tabella con ID assegnato da
 server, ciò genera una riga duplicata, poiché l'ID generato dal client non è mai
 stato utilizzato.
 
-Una chiave identifica **una sola richiesta**: registra il metodo, il percorso e il
-corpo per cui è stata dichiarata. Inviando nuovamente la stessa identica richiesta,
-la risposta viene riprodotta; inviando una richiesta diversa con la stessa chiave,
-questa verrà rifiutata con `IDEMPOTENCY_KEY_REUSED` (422) anziché rispondere con il
-risultato della prima. Un nuovo tentativo che arriva mentre la prima richiesta è
-ancora in corso riceve `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — invialo di nuovo una
-volta completata la prima.
+Una chiave identifica **una sola richiesta**: registra il metodo, il percorso, la
+query string e il corpo per cui è stata dichiarata. Inviando nuovamente la stessa
+identica richiesta, la risposta viene riprodotta; inviando una richiesta diversa con
+la stessa chiave, questa verrà rifiutata con `IDEMPOTENCY_KEY_REUSED` (422) anziché
+rispondere con il risultato della prima. Un nuovo tentativo che arriva mentre la
+prima richiesta è ancora in corso riceve `IDEMPOTENCY_KEY_IN_PROGRESS` (409) —
+invialo di nuovo una volta completata la prima. La query string conta perché cambia
+ciò che fa una richiesta: `DELETE /api/data/posts/5?hard=true` con la chiave di una
+precedente eliminazione logica è una richiesta diversa, non una ripetizione.
+L'ordine dei suoi parametri non conta.
 
 È supportata su `POST`, `PATCH`, `DELETE`, su tutte e tre le rotte `/bulk` e su
 `/_batch`. Le chiavi rimangono valide per 24 ore e sono associate al chiamante
@@ -57,9 +65,10 @@ il `204`.
 
 ### Concorrenza ottimistica: `ETag` e `If-Match`
 
-`GET /api/data/:slug/:id` restituisce un `ETag`. Inviandolo nuovamente come
-`If-Match` in una successiva richiesta `PATCH` o `DELETE`, la scrittura viene
-rifiutata con `412` se la riga è stata modificata nel frattempo.
+`GET /api/data/:slug/:id` restituisce un `ETag`, e lo stesso fa il `GET` annidato di
+una singola riga. Inviandolo nuovamente come `If-Match` in una successiva richiesta
+`PATCH` o `DELETE`, la scrittura viene rifiutata con `412` se la riga è stata
+modificata nel frattempo.
 
 ```bash
 # read
@@ -149,6 +158,11 @@ delle operazioni.
 Anche specificare un target senza `upsert: true` in una scrittura bulk genera un
 `400`: ignorarlo silenziosamente trasformerebbe un'importazione rieseguibile in una
 che genera duplicati.
+
+`?on_conflict=` viene rifiutato su una creazione annidata
+(`INVALID_CONFLICT_TARGET`). La riga che troverebbe potrebbe trovarsi sotto un altro
+parent, e l'upsert la sposterebbe sotto questo. Invia l'upsert alla rotta propria
+della collezione.
 
 Una riga già esistente mantiene il proprio timestamp `on_create`. Un conflitto
 implica che la creazione della riga sia un evento passato, e una reimportazione

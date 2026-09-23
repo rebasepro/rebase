@@ -471,8 +471,9 @@ overwritten value if it went unchecked.
 `limit` bounds the number of **groups** (grouping by a high-cardinality column
 is a whole table's worth of rows in one response) and is ignored without a
 `groupBy`, since an ungrouped aggregate is one row. `orderBy`, `include` and the
-page do not apply: an aggregate has no rows to sort, no relations to load and no
-page to continue.
+page are not sent with an aggregate: it has no relations to load, and the SDK
+does not yet sort or page groups. Over HTTP a grouped aggregate can be sorted and
+paged — see [Aggregates and search](/docs/sdk/aggregates-and-search/).
 
 The whole point is not to fetch rows in order to reduce them. "Revenue by
 status" over a million orders is one query and one row per status here, and a

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6774e2ad2b2e95b0
+sourceHash: df84abf06690d9ce
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et regroupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -35,6 +35,25 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 
 Les résultats sont indexés par fonction et par champ — `count()` devient `count`,
 `sum(total)` devient `sum_total`.
+
+Les groupes se paginent comme les lignes d'un listage. `limit` les borne,
+`offset` (ou `page`) les saute et `orderBy` les trie par un champ de `groupBy`
+ou une clé de résultat. L'ordre se termine toujours sur les clés de groupe, donc
+chaque limite de page tombe au même endroit. Avec un `limit`, la réponse indique
+s'il en reste :
+
+```bash
+GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20
+```
+
+```json
+{ "data": [ … ], "meta": { "limit": 20, "offset": 20, "hasMore": true } }
+```
+
+`offset`, `page` ou `orderBy` sans `groupBy`, ou un curseur sur n'importe quel
+agrégat, donne un `400 INVALID_AGGREGATE_WINDOW` : un agrégat non groupé n'a
+qu'une ligne, et un groupe n'est pas une ligne après laquelle un curseur
+pourrait reprendre.
 
 Il accepte les mêmes filtres que le point de terminaison de liste, de sorte qu'un
 agrégat peut être restreint de la même manière qu'un listing :

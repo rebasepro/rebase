@@ -13,7 +13,12 @@ does not ask for any of this behaves exactly as it always has.
 
 Beyond the verbs, the write routes take five things that change how a write
 behaves. All five are opt-in per request, so nothing here changes what a
-request that does not ask for it does.
+request that does not ask for it does. The nested routes
+(`/api/data/authors/42/posts`) run the same write code as the root ones, so
+everything in this section applies to them too, except `?on_conflict=`.
+
+A write's body must be a JSON object. `null`, a number, a string or an array is
+a `400 BAD_REQUEST`.
 
 ### Idempotency
 
@@ -31,12 +36,15 @@ it retries — and without a key the server cannot tell that retry from a second
 genuine write. On a table with a server-assigned id that is a duplicate row,
 because the id the client invented was never used.
 
-A key names **one request**: it records the method, the path and the body it was
-claimed for. Re-send that exact request and its answer is replayed; send a
+A key names **one request**: it records the method, the path, the query string
+and the body it was claimed for. Re-send that exact request and its answer is replayed; send a
 different one under the same key and it is refused with `IDEMPOTENCY_KEY_REUSED`
 (422) rather than answered with the first one's result. A retry that arrives
 while the first is still in flight gets `IDEMPOTENCY_KEY_IN_PROGRESS` (409) —
-send it again once the first has landed.
+send it again once the first has landed. The query string counts because it
+changes what a request does: `DELETE /api/data/posts/5?hard=true` under the key of an
+earlier soft delete is a different request, not a replay. The order of its
+parameters does not matter.
 
 Honoured on `POST`, `PATCH`, `DELETE`, all three `/bulk` routes and `/_batch`.
 Keys live for 24 hours and are scoped to the signed-in caller; an
@@ -51,9 +59,9 @@ the `204`.
 
 ### Optimistic concurrency: `ETag` and `If-Match`
 
-`GET /api/data/:slug/:id` returns an `ETag`. Send it back as `If-Match` on a
-later `PATCH` or `DELETE` and the write is refused with `412` if the row has
-changed in between.
+`GET /api/data/:slug/:id` returns an `ETag`, and so does the nested single-row
+`GET`. Send it back as `If-Match` on a later `PATCH` or `DELETE` and the write is
+refused with `412` if the row has changed in between.
 
 ```bash
 # read
@@ -137,6 +145,10 @@ CONFLICT specification* from inside a transaction that has already done work.
 
 Naming a target without `upsert: true` on a bulk write is also a `400`: silently
 ignoring it turns a re-runnable import into a duplicating one.
+
+`?on_conflict=` is refused on a nested create (`INVALID_CONFLICT_TARGET`). The
+row it matched could live under another parent, and the upsert would move it
+under this one. Send the upsert to the collection's own route.
 
 A row that already existed keeps its `on_create` timestamp. A conflict means the
 row's creation is a fact about the past, and a nightly re-import that reset

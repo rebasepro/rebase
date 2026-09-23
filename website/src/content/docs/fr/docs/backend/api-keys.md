@@ -1,5 +1,5 @@
 ---
-sourceHash: 87d15c9eb4314422
+sourceHash: 166b0a87f16459a1
 title: Clés API
 sidebar_label: Clés API
 description:"\"Clés restreintes et révocables pour les appelants machine : ce à quoi une clé peut accéder, comment les portées s'articulent avec la sécurité au niveau des lignes (RLS), et les endpoints d'administration qui les gèrent.\""
@@ -50,6 +50,11 @@ La requête d'une clé API passe par **deux** vérifications d'autorisation, et 
 Ainsi, une clé non-admin avec les permissions `"*"` peut toujours obtenir des résultats vides — c'est
 le RLS qui fonctionne normalement, pas un bug. Accordez le rôle `service` dans les
 règles de sécurité des collections concernées, ou utilisez une clé admin.
+
+Sur un chemin imbriqué, la liste de permissions est vérifiée pour chaque collection que
+nomme le chemin. L'opération est vérifiée sur la collection où aboutit le chemin, et
+chaque parent traversé exige `read` : une clé limitée à `posts` est refusée sur
+`/api/data/authors/1/posts` tant qu'elle ne peut pas aussi lire `authors`.
 
 ### Fonctions personnalisées
 

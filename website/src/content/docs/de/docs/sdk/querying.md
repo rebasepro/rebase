@@ -1,5 +1,5 @@
 ---
-sourceHash: 3cba57377cf922df
+sourceHash: 9512a14f5c723020
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem Rebase Client SDK.
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Ergebnisschlüssel werden **abgeleitet**, nicht frei gewählt: `sum(total)` wird als `sum_total` zurückgegeben, ein einfaches `count()` als `count`. Eine freie Benennung würde erfordern zu prüfen, dass der Name nicht gleichzeitig ein `groupBy`-Feld ist – eine Regel, die kaum jemand erwarten würde, und ein stillschweigend überschriebener Wert, wenn dies ungeprüft bliebe.
 
-`limit` begrenzt die Anzahl der **Gruppen** (eine Gruppierung nach einer Spalte mit hoher Kardinalität entspräche dem gesamten Inhalt einer Tabelle in einer einzigen Antwort) und wird ohne `groupBy` ignoriert, da ein ungruppiertes Aggregat aus genau einer Zeile besteht. `orderBy`, `include` und Paginierung sind hier nicht anwendbar: Ein Aggregat hat keine Zeilen zum Sortieren, keine Relationen zum Laden und keine Seite zum Fortsetzen.
+`limit` begrenzt die Anzahl der **Gruppen** (eine Gruppierung nach einer Spalte mit hoher Kardinalität entspräche dem gesamten Inhalt einer Tabelle in einer einzigen Antwort) und wird ohne `groupBy` ignoriert, da ein ungruppiertes Aggregat aus genau einer Zeile besteht. `orderBy`, `include` und Paginierung werden bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden, und das SDK sortiert und paginiert Gruppen noch nicht. Über HTTP lässt sich ein gruppiertes Aggregat sortieren und paginieren — siehe [Aggregate und Suche](/docs/sdk/aggregates-and-search/).
 
 Der eigentliche Sinn besteht darin, Zeilen nicht erst abrufen zu müssen, um sie anschließend zu aggregieren. „Umsatz nach Status“ über eine Million Bestellungen ist hier eine einzige Abfrage mit einer Zeile pro Status – anderswo hingegen ein `findAll()` samt Schleife, was bei einem `limit` falsch und ohne ein solches nicht tragbar ist. Die Ausführung erfolgt über denselben anforderungsbezogenen Handle wie jeder andere Lesevorgang, sodass Row-Level Security auch für die aggregierten Zeilen gilt.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 87d15c9eb4314422
+sourceHash: 166b0a87f16459a1
 title: Chiavi API
 sidebar_label: Chiavi API
 description:"\"Chiavi con ambito limitato e revocabili per chiamanti automatici: cosa può raggiungere una chiave, come gli ambiti si combinano con la sicurezza a livello di riga (RLS) e gli endpoint di amministrazione per gestirle.\""
@@ -50,6 +50,11 @@ La richiesta di una chiave API passa attraverso **due** controlli di autorizzazi
 Quindi una chiave non admin con permessi `"*"` può comunque ottenere risultati vuoti — è il
 normale funzionamento della RLS, non un bug. È necessario concedere il ruolo `service` nelle
 regole di sicurezza delle collezioni pertinenti, oppure utilizzare una chiave admin.
+
+Su un percorso annidato, l'elenco dei permessi viene verificato su ogni collezione
+nominata dal percorso. L'operazione viene verificata sulla collezione in cui termina il
+percorso, e ogni parent attraversato richiede `read`: una chiave limitata solo a `posts`
+viene rifiutata su `/api/data/authors/1/posts` finché non può leggere anche `authors`.
 
 ### Funzioni personalizzate
 

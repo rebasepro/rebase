@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c622813c5a4eca9
+sourceHash: 5c14dccf5288e553
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -9,7 +9,9 @@ Los verbos se encuentran en la página de la [REST API](/docs/backend/api/). Est
 
 ## Escritura
 
-Más allá de los verbos, las rutas de escritura admiten cinco elementos que cambian el comportamiento de una escritura. Los cinco son opcionales por petición, por lo que nada de lo aquí expuesto cambia lo que hace una petición que no los solicite.
+Más allá de los verbos, las rutas de escritura admiten cinco elementos que cambian el comportamiento de una escritura. Los cinco son opcionales por petición, por lo que nada de lo aquí expuesto cambia lo que hace una petición que no los solicite. Las rutas anidadas (`/api/data/authors/42/posts`) ejecutan el mismo código de escritura que las raíz, así que todo lo de esta sección se les aplica también, excepto `?on_conflict=`.
+
+El cuerpo de una escritura debe ser un objeto JSON. `null`, un número, una cadena o un array es un `400 BAD_REQUEST`.
 
 ### Idempotencia
 
@@ -23,7 +25,7 @@ curl -X POST /api/data/orders \
 
 Un cliente que nunca recibe una respuesta no puede saber si la escritura se confirmó, por lo que reintenta — y sin una clave, el servidor no puede distinguir ese reintento de una segunda escritura genuina. En una tabla con un id asignado por el servidor, esto genera una fila duplicada, ya que el id inventado por el cliente nunca se utilizó.
 
-Una clave identifica **una sola petición**: registra el método, la ruta y el cuerpo para los que fue solicitada. Si se vuelve a enviar esa petición exacta, su respuesta se reproduce; si se envía una diferente bajo la misma clave, se rechaza con `IDEMPOTENCY_KEY_REUSED` (422) en lugar de responder con el resultado de la primera. Un reintento que llega mientras la primera aún está en curso recibe `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — envíela de nuevo una vez que la primera haya finalizado.
+Una clave identifica **una sola petición**: registra el método, la ruta, la cadena de consulta y el cuerpo para los que fue solicitada. Si se vuelve a enviar esa petición exacta, su respuesta se reproduce; si se envía una diferente bajo la misma clave, se rechaza con `IDEMPOTENCY_KEY_REUSED` (422) en lugar de responder con el resultado de la primera. Un reintento que llega mientras la primera aún está en curso recibe `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — envíela de nuevo una vez que la primera haya finalizado. La cadena de consulta cuenta porque cambia lo que hace una petición: `DELETE /api/data/posts/5?hard=true` bajo la clave de un borrado lógico anterior es una petición distinta, no una repetición. El orden de sus parámetros no importa.
 
 Se admite en `POST`, `PATCH`, `DELETE`, las tres rutas `/bulk` y `/_batch`. Las claves duran 24 horas y se limitan al emisor autenticado; una petición no autenticada no tiene una entidad principal a la que asociarla, por lo que el encabezado se ignora en ese caso. Un backend que no pueda almacenar claves ignora el encabezado en lugar de rechazar la escritura.
 
@@ -31,7 +33,7 @@ Se admite en `POST`, `PATCH`, `DELETE`, las tres rutas `/bulk` y `/_batch`. Las 
 
 ### Concurrencia optimista: `ETag` e `If-Match`
 
-`GET /api/data/:slug/:id` devuelve un `ETag`. Envíelo de vuelta como `If-Match` en un `PATCH` o `DELETE` posterior y la escritura se rechazará con `412` si la fila ha cambiado en el ínterin.
+`GET /api/data/:slug/:id` devuelve un `ETag`, y también lo hace el `GET` anidado de una sola fila. Envíelo de vuelta como `If-Match` en un `PATCH` o `DELETE` posterior y la escritura se rechazará con `412` si la fila ha cambiado en el ínterin.
 
 ```bash
 # read
@@ -90,6 +92,8 @@ curl -X POST /api/data/users/bulk -d '{
 El objetivo debe contar con una garantía de unicidad con la que la base de datos pueda coincidir: la clave primaria (el valor por defecto si no se especifica ninguno), una propiedad con `validation: { unique: true }` o las columnas de un [índice](/docs/backend/indexes/) `unique: true`. Cualquier otra cosa produce un error `400` (`INVALID_CONFLICT_TARGET`) listando los objetivos que sí existen; de lo contrario, Postgres respondería *there is no unique or exclusion constraint matching the ON CONFLICT specification* desde el interior de una transacción que ya ha realizado operaciones.
 
 Especificar un objetivo sin `upsert: true` en una escritura masiva también genera un `400`: ignorarlo silenciosamente transformaría una importación reejecutable en una que duplica registros.
+
+`?on_conflict=` se rechaza en una creación anidada (`INVALID_CONFLICT_TARGET`). La fila con la que coincidiera podría estar bajo otro padre, y el upsert la movería bajo este. Envíe el upsert a la ruta propia de la colección.
 
 Una fila que ya existía conserva su marca de tiempo `on_create`. Un conflicto implica que la creación de la fila es un hecho del pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que modificara alteraría por completo cualquier consulta de «nuevos esta semana».
 

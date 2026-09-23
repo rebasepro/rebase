@@ -1,5 +1,5 @@
 ---
-sourceHash: 87d15c9eb4314422
+sourceHash: 166b0a87f16459a1
 title: Claves de API
 sidebar_label: Claves de API
 description:"\"Claves con alcance limitado y revocables para clientes máquina: a qué puede acceder una clave, cómo se combinan los alcances con la seguridad a nivel de fila y los endpoints de administración que las gestionan.\""
@@ -50,6 +50,11 @@ La solicitud de una clave de API pasa por **dos** comprobaciones de autorizació
 Por lo tanto, una clave sin privilegios de administrador con permisos `"*"` aún puede obtener resultados vacíos: eso es
 RLS funcionando, no un error. Otorgue el rol `service` en las reglas de seguridad
 de las colecciones pertinentes o utilice una clave de administrador.
+
+En una ruta anidada, la lista de permisos se comprueba contra cada colección que nombra la
+ruta. La operación se comprueba contra la colección en la que termina la ruta, y cada
+padre por el que pasa necesita `read`: una clave limitada solo a `posts` recibe un rechazo
+en `/api/data/authors/1/posts` hasta que también pueda leer `authors`.
 
 ### Funciones personalizadas
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3cba57377cf922df
+sourceHash: 9512a14f5c723020
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK de cliente de Rebase.
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Las claves del resultado son **derivadas**, no elegidas: `sum(total)` se devuelve como `sum_total`, y un `count()` simple como `count`. Permitir nombres personalizados requeriría validar que no coincidan con campos de `groupBy` (una regla poco intuitiva que, de omitirse, sobrescribiría valores silenciosamente).
 
-`limit` delimita el número de **grupos** (agrupar por una columna de alta cardinalidad puede generar el equivalente a una tabla completa en una sola respuesta) y se ignora si no hay un `groupBy`, ya que un agregado sin agrupar produce una única fila. `orderBy`, `include` y la paginación no se aplican: una agregación no contiene filas que ordenar, relaciones que cargar ni páginas que continuar.
+`limit` delimita el número de **grupos** (agrupar por una columna de alta cardinalidad puede generar el equivalente a una tabla completa en una sola respuesta) y se ignora si no hay un `groupBy`, ya que un agregado sin agrupar produce una única fila. `orderBy`, `include` y la paginación no se envían con una agregación: no tiene relaciones que cargar, y el SDK todavía no ordena ni pagina grupos. Por HTTP, una agregación agrupada sí se puede ordenar y paginar — consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
 
 El propósito principal es evitar la descarga de filas para procesarlas en memoria. Calcular los "ingresos por estado" sobre un millón de órdenes requiere aquí una sola consulta y una fila por estado, frente a un `findAll()` con un bucle en otros entornos (lo cual falla con un `limit` y resulta inasumible sin él). Se ejecuta a través del mismo contexto de solicitud que el resto de lecturas, por lo que la seguridad a nivel de fila se aplica a los registros agregados.
 

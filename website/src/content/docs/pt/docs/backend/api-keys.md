@@ -1,5 +1,5 @@
 ---
-sourceHash: 87d15c9eb4314422
+sourceHash: 166b0a87f16459a1
 title: Chaves de API
 sidebar_label: Chaves de API
 description:"\"Chaves revogáveis e com escopo para chamadores automatizados: o que uma chave pode acessar, como os escopos se combinam com a segurança em nível de linha (RLS) e os endpoints administrativos para gerenciá-las.\""
@@ -50,6 +50,11 @@ A requisição de uma chave de API passa por **duas** verificações de autoriza
 Portanto, uma chave não administrativa com permissões `"*"` ainda pode receber resultados vazios — isso é o
 RLS funcionando, não um bug. Conceda o papel `service` nas regras de segurança
 das coleções relevantes ou use uma chave de administrador.
+
+Em um caminho aninhado, a lista de permissões é verificada contra cada coleção que o
+caminho nomeia. A operação é verificada contra a coleção em que o caminho termina, e cada
+pai pelo qual ele passa precisa de `read`: uma chave limitada apenas a `posts` é recusada
+em `/api/data/authors/1/posts` até poder ler também `authors`.
 
 ### Funções Personalizadas
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c622813c5a4eca9
+sourceHash: 5c14dccf5288e553
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -9,7 +9,9 @@ Les verbes sont détaillés sur la page de l'[API REST](/docs/backend/api/). Cel
 
 ## Écriture
 
-Au-delà des verbes, les routes d'écriture acceptent cinq éléments qui modifient le comportement d'une écriture. Tous les cinq sont optionnels par requête, ainsi rien de ce qui suit ne modifie le fonctionnement d'une requête qui ne les sollicite pas.
+Au-delà des verbes, les routes d'écriture acceptent cinq éléments qui modifient le comportement d'une écriture. Tous les cinq sont optionnels par requête, ainsi rien de ce qui suit ne modifie le fonctionnement d'une requête qui ne les sollicite pas. Les routes imbriquées (`/api/data/authors/42/posts`) passent par le même code d'écriture que les routes racines, donc tout ce qui suit dans cette section s'y applique aussi, sauf `?on_conflict=`.
+
+Le corps d'une écriture doit être un objet JSON. `null`, un nombre, une chaîne ou un tableau donne un `400 BAD_REQUEST`.
 
 ### Idempotence
 
@@ -23,7 +25,7 @@ curl -X POST /api/data/orders \
 
 Un client qui ne reçoit jamais de réponse ne peut pas savoir si l'écriture a été validée, il réessaie donc — et sans clé, le serveur ne peut distinguer cette nouvelle tentative d'une deuxième écriture légitime. Sur une table avec un identifiant attribué par le serveur, cela crée une ligne en double, car l'identifiant inventé par le client n'a jamais été utilisé.
 
-Une clé désigne **une seule requête** : elle enregistre la méthode, le chemin et le corps pour lesquels elle a été réclamée. Renvoyez cette requête exacte et sa réponse est rejouée ; envoyez-en une différente sous la même clé et elle est refusée avec `IDEMPOTENCY_KEY_REUSED` (422) au lieu de renvoyer le résultat de la première. Une tentative qui arrive alors que la première est toujours en cours reçoit `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — renvoyez-la une fois que la première a abouti.
+Une clé désigne **une seule requête** : elle enregistre la méthode, le chemin, la chaîne de requête et le corps pour lesquels elle a été réclamée. Renvoyez cette requête exacte et sa réponse est rejouée ; envoyez-en une différente sous la même clé et elle est refusée avec `IDEMPOTENCY_KEY_REUSED` (422) au lieu de renvoyer le résultat de la première. Une tentative qui arrive alors que la première est toujours en cours reçoit `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — renvoyez-la une fois que la première a abouti. La chaîne de requête compte parce qu'elle change ce que fait une requête : `DELETE /api/data/posts/5?hard=true` sous la clé d'une suppression logique antérieure est une requête différente, pas une répétition. L'ordre de ses paramètres n'a pas d'importance.
 
 Pris en charge sur `POST`, `PATCH`, `DELETE`, sur les trois routes `/bulk` et sur `/_batch`. Les clés sont valables 24 heures et sont limitées à l'appelant authentifié ; une requête non authentifiée n'ayant pas d'entité principale à laquelle se rattacher, l'en-tête y est ignoré. Un backend incapable de stocker les clés ignore l'en-tête au lieu de refuser l'écriture.
 
@@ -31,7 +33,7 @@ Le cas de `DELETE` mérite une attention particulière. Rejouée sans clé, la s
 
 ### Concurrence optimiste : `ETag` et `If-Match`
 
-`GET /api/data/:slug/:id` renvoie un `ETag`. Renvoyez-le dans l'en-tête `If-Match` lors d'un `PATCH` ou d'un `DELETE` ultérieur et l'écriture sera refusée avec un code `412` si la ligne a été modifiée entre-temps.
+`GET /api/data/:slug/:id` renvoie un `ETag`, tout comme le `GET` imbriqué d'une seule ligne. Renvoyez-le dans l'en-tête `If-Match` lors d'un `PATCH` ou d'un `DELETE` ultérieur et l'écriture sera refusée avec un code `412` si la ligne a été modifiée entre-temps.
 
 ```bash
 # read
@@ -90,6 +92,8 @@ curl -X POST /api/data/users/bulk -d '{
 La cible doit comporter une garantie d'unicité sur laquelle la base de données peut faire une correspondance : la clé primaire (valeur par défaut si aucune n'est précisée), une propriété avec `validation: { unique: true }`, ou les colonnes d'un [index](/docs/backend/indexes/) avec `unique: true`. Tout autre élément renvoie un `400` (`INVALID_CONFLICT_TARGET`) énumérant les cibles existantes — sans quoi Postgres répondrait *there is no unique or exclusion constraint matching the ON CONFLICT specification* depuis l'intérieur d'une transaction ayant déjà effectué du travail.
 
 Indiquer une cible sans `upsert: true` lors d'une écriture en masse renvoie également un `400` : l'ignorer silencieusement transformerait un import rejouable en une opération générant des doublons.
+
+`?on_conflict=` est refusé sur une création imbriquée (`INVALID_CONFLICT_TARGET`). La ligne qu'il trouverait pourrait se trouver sous un autre parent, et l'upsert la déplacerait sous celui-ci. Envoyez l'upsert à la route propre de la collection.
 
 Une ligne qui existait déjà conserve son horodatage `on_create`. Un conflit signifie que la création de la ligne est un fait passé, et un réimport nocturne réinitialisant `createdAt` sur chaque élément touché fausserait toutes les requêtes du type « nouveautés de la semaine ».
 

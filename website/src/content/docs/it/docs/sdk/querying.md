@@ -1,5 +1,5 @@
 ---
-sourceHash: 3cba57377cf922df
+sourceHash: 9512a14f5c723020
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK client Rebase.
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Le chiavi dei risultati sono **derivate**, non personalizzabili: `sum(total)` viene restituito come `sum_total`, un semplice `count()` come `count`. Consentire di rinominarle comporterebbe dover verificare che il nome scelto non coincida con un campo presente in `groupBy` — una regola controintuitiva che, se ignorata, porterebbe a sovrascrivere silenziosamente dei valori.
 
-`limit` vincola il numero di **gruppi** (il raggruppamento su una colonna ad alta cardinalità potrebbe restituire l'equivalente di un'intera tabella di righe in un'unica risposta) e viene ignorato in assenza di `groupBy`, poiché un'aggregazione non raggruppata produce una sola riga. `orderBy`, `include` e la paginazione non si applicano: un'aggregazione non ha righe da ordinare, relazioni da caricare né pagine da continuare.
+`limit` vincola il numero di **gruppi** (il raggruppamento su una colonna ad alta cardinalità potrebbe restituire l'equivalente di un'intera tabella di righe in un'unica risposta) e viene ignorato in assenza di `groupBy`, poiché un'aggregazione non raggruppata produce una sola riga. `orderBy`, `include` e la paginazione non vengono inviati con un'aggregazione: non ha relazioni da caricare, e l'SDK non ordina né pagina ancora i gruppi. Via HTTP un'aggregazione raggruppata si può ordinare e paginare — vedi [Aggregazioni e ricerca](/docs/sdk/aggregates-and-search/).
 
 Il vantaggio fondamentale consiste nell'evitare di scaricare le righe solo per aggregarle. Il "fatturato per stato" su un milione di ordini corrisponde in questo modo a un'unica query e a una sola riga per stato, mentre altrove richiederebbe una `findAll()` seguita da un ciclo — approccio non corretto in presenza di un `limit` e insostenibile senza di esso. L'operazione viene eseguita attraverso lo stesso handle contestuale alla richiesta usato da ogni altra lettura, per cui la sicurezza a livello di riga (RLS) si applica anche alle righe aggregate.
 

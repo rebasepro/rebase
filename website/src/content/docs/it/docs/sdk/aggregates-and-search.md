@@ -1,5 +1,5 @@
 ---
-sourceHash: 6774e2ad2b2e95b0
+sourceHash: df84abf06690d9ce
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -35,6 +35,25 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 
 I risultati sono indicizzati per funzione e campo — `count()` diventa `count`,
 `sum(total)` diventa `sum_total`.
+
+I gruppi si paginano come le righe di un elenco. `limit` li limita, `offset` (o
+`page`) li salta e `orderBy` li ordina per un campo di `groupBy` o per una
+chiave del risultato. L'ordine termina sempre sulle chiavi del gruppo, quindi
+ogni confine di pagina cade nello stesso punto. Con un `limit`, la risposta
+indica se ce ne sono altri:
+
+```bash
+GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20
+```
+
+```json
+{ "data": [ … ], "meta": { "limit": 20, "offset": 20, "hasMore": true } }
+```
+
+`offset`, `page` o `orderBy` senza `groupBy`, o un cursore su qualsiasi
+aggregazione, restituisce `400 INVALID_AGGREGATE_WINDOW`: un'aggregazione non
+raggruppata ha una sola riga, e un gruppo non è una riga dopo cui un cursore
+possa proseguire.
 
 Accetta gli stessi filtri dell'endpoint di elenco, quindi un'aggregazione può essere
 ristretta nello stesso modo in cui si filtra un elenco:

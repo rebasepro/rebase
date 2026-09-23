@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c622813c5a4eca9
+sourceHash: 5c14dccf5288e553
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -12,9 +12,14 @@ que não solicita nada disso se comporta exatamente como sempre se comportou.
 
 ## Escrita
 
-Além dos verbos, as rotas de escrita aceitam cinco coisas que alteram o comportamento
-da escrita. Todas as cinco são opcionais por requisição, portanto nada aqui altera o que
-uma requisição que não as solicita faz.
+Além dos verbos, as rotas de escrita aceitam cinco coisas que alteram o
+comportamento da escrita. Todas as cinco são opcionais por requisição, portanto nada
+aqui altera o que uma requisição que não as solicita faz. As rotas aninhadas
+(`/api/data/authors/42/posts`) executam o mesmo código de escrita que as rotas raiz,
+então tudo nesta seção vale para elas também, exceto `?on_conflict=`.
+
+O corpo de uma escrita precisa ser um objeto JSON. `null`, um número, uma string ou
+um array resulta em `400 BAD_REQUEST`.
 
 ### Idempotência
 
@@ -32,12 +37,16 @@ ele tenta novamente — e, sem uma chave, o servidor não consegue distinguir es
 uma segunda escrita legítima. Em uma tabela com ID atribuído pelo servidor, isso resulta em uma
 linha duplicada, porque o ID inventado pelo cliente nunca foi usado.
 
-Uma chave identifica **uma requisição**: ela registra o método, o caminho e o corpo para os quais
-foi reivindicada. Reenvie essa requisição exata e sua resposta será reproduzida; envie uma
-diferente sob a mesma chave e ela será recusada com `IDEMPOTENCY_KEY_REUSED` (422) em vez de ser
-respondida com o resultado da primeira. Uma nova tentativa que chegue enquanto a primeira ainda
-estiver em andamento recebe `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — envie-a novamente assim que a
-primeira for concluída.
+Uma chave identifica **uma requisição**: ela registra o método, o caminho, a query
+string e o corpo para os quais foi reivindicada. Reenvie essa requisição exata e sua
+resposta será reproduzida; envie uma diferente sob a mesma chave e ela será recusada
+com `IDEMPOTENCY_KEY_REUSED` (422) em vez de ser respondida com o resultado da
+primeira. Uma nova tentativa que chegue enquanto a primeira ainda estiver em
+andamento recebe `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — envie-a novamente assim que a
+primeira for concluída. A query string conta porque muda o que uma requisição faz:
+`DELETE /api/data/posts/5?hard=true` sob a chave de uma exclusão lógica anterior é
+uma requisição diferente, não uma repetição. A ordem dos seus parâmetros não
+importa.
 
 Suportado em `POST`, `PATCH`, `DELETE`, em todas as três rotas `/bulk` e em `/_batch`.
 As chaves duram 24 horas e têm escopo restrito ao chamador autenticado; uma requisição não
@@ -51,9 +60,9 @@ foi bem-sucedida. Com uma chave, a resposta `204` é reproduzida.
 
 ### Concorrência otimista: `ETag` e `If-Match`
 
-`GET /api/data/:slug/:id` retorna uma `ETag`. Envie-a de volta como `If-Match` em um
-`PATCH` ou `DELETE` posterior e a escrita será recusada com `412` se a linha tiver sido
-alterada nesse intervalo.
+`GET /api/data/:slug/:id` retorna uma `ETag`, assim como o `GET` aninhado de uma
+única linha. Envie-a de volta como `If-Match` em um `PATCH` ou `DELETE` posterior e
+a escrita será recusada com `412` se a linha tiver sido alterada nesse intervalo.
 
 ```bash
 # read
@@ -138,6 +147,10 @@ transação que já realizou trabalho.
 Especificar um destino sem `upsert: true` em uma escrita em lote também resulta em `400`:
 ignorá-lo silenciosamente transformaria uma importação que pode ser executada novamente em
 uma que duplica dados.
+
+`?on_conflict=` é recusado em uma criação aninhada (`INVALID_CONFLICT_TARGET`). A
+linha que ele encontrasse poderia estar sob outro pai, e o upsert a moveria para
+este. Envie o upsert para a rota própria da coleção.
 
 Uma linha que já existia mantém seu timestamp `on_create`. Um conflito significa que a
 criação da linha é um fato do passado, e uma reimportação noturna que redefinisse `createdAt`

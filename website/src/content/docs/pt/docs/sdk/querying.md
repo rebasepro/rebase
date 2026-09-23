@@ -1,5 +1,5 @@
 ---
-sourceHash: 3cba57377cf922df
+sourceHash: 9512a14f5c723020
 title: Consultando Dados
 sidebar_label: Consultando Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, ordenação, seleção de colunas e agregações com o Rebase Client SDK.
@@ -391,7 +391,7 @@ const rows = await client.data.orders
 
 As chaves do resultado são **derivadas**, não escolhidas: `sum(total)` retorna como `sum_total`, um `count()` puro como `count`. Permitir a personalização dos nomes exigiria validar se o nome escolhido não coincide com um campo do `groupBy` — uma regra que ninguém adivinharia, gerando sobrescrita silenciosa de valores caso não fosse verificada.
 
-`limit` restringe o número de **grupos** (agrupar por uma coluna de alta cardinalidade retornaria uma tabela inteira de linhas em uma só resposta) e é ignorado sem um `groupBy`, já que uma agregação sem agrupamento é sempre uma única linha. `orderBy`, `include` e parâmetros de página não se aplicam: uma agregação não tem linhas para ordenar, nem relações para carregar, nem página para continuar.
+`limit` restringe o número de **grupos** (agrupar por uma coluna de alta cardinalidade retornaria uma tabela inteira de linhas em uma só resposta) e é ignorado sem um `groupBy`, já que uma agregação sem agrupamento é sempre uma única linha. `orderBy`, `include` e parâmetros de página não são enviados com uma agregação: ela não tem relações para carregar, e o SDK ainda não ordena nem pagina grupos. Via HTTP, uma agregação agrupada pode ser ordenada e paginada — veja [Agregações e busca](/docs/sdk/aggregates-and-search/).
 
 O objetivo principal é evitar a busca de linhas apenas para reduzi-las na aplicação. "Receita por status" em um milhão de pedidos é resolvido aqui com uma consulta e uma linha por status, enquanto em outros lugares exigiria um `findAll()` com um loop — o que é incorreto com um `limit` e impraticável sem ele. Essa operação é executada sob o mesmo handle de requisição de qualquer outra leitura, garantindo a aplicação de row-level security às linhas agregadas.
 

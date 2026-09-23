@@ -50,6 +50,11 @@ So a non-admin key with `"*"` permissions can still get empty results — that's
 RLS working, not a bug. Either grant the `service` role in the relevant
 collections' security rules, or use an admin key.
 
+On a nested path the permission list is checked against every collection the
+path names. The operation is checked against the collection the path ends at,
+and each parent it passes through needs `read`: a key scoped to `posts` alone
+is refused `/api/data/authors/1/posts` until it can also read `authors`.
+
 ### Custom Functions
 
 Function invocations are scoped like collections, under the `functions`

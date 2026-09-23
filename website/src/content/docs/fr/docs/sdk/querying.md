@@ -1,5 +1,5 @@
 ---
-sourceHash: 3cba57377cf922df
+sourceHash: 9512a14f5c723020
 title: Interroger les données
 sidebar_label: Interroger les données
 description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK client Rebase.
@@ -391,7 +391,7 @@ const rows = await client.data.orders
 
 Les clés des résultats sont **dérivées**, et non choisies : `sum(total)` est renvoyé sous la forme `sum_total`, un simple `count()` sous la forme `count`. Vous permettre de les nommer impliquerait de vérifier que le nom ne correspond pas également à un champ de `groupBy` — une règle que personne ne devinerait, avec le risque d'écraser silencieusement une valeur si ce contrôle n'était pas fait.
 
-`limit` restreint le nombre de **groupes** (un regroupement sur une colonne à forte cardinalité peut représenter l'équivalent de toute une table dans une seule réponse) et est ignoré en l'absence de `groupBy`, car un agrégat non groupé ne produit qu'une seule ligne. `orderBy`, `include` et la pagination ne s'appliquent pas : un agrégat n'a pas de lignes à trier, pas de relations à charger et pas de page à continuer.
+`limit` restreint le nombre de **groupes** (un regroupement sur une colonne à forte cardinalité peut représenter l'équivalent de toute une table dans une seule réponse) et est ignoré en l'absence de `groupBy`, car un agrégat non groupé ne produit qu'une seule ligne. `orderBy`, `include` et la pagination ne sont pas envoyés avec un agrégat : il n'a pas de relations à charger, et le SDK ne trie ni ne pagine encore les groupes. En HTTP, un agrégat groupé peut être trié et paginé — voir [Agrégats et recherche](/docs/sdk/aggregates-and-search/).
 
 Tout l'intérêt est de ne pas récupérer les lignes pour ensuite les réduire. « Le chiffre d'affaires par statut » sur un million de commandes correspond ici à une seule requête et une seule ligne par statut, contre un `findAll()` suivi d'une boucle ailleurs — ce qui s'avère erroné en présence d'un `limit` et hors de prix sans lui. Cela passe par le même gestionnaire limité à la requête que toutes les autres lectures, de sorte que la sécurité au niveau des lignes s'applique aux lignes agrégées.
 
