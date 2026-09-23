@@ -84,7 +84,32 @@ export function useRebaseAuthController(
             }
         };
 
+        // Fetched at mount and again on every sign-in and sign-out. The config
+        // is not fixed for the life of the tab: `needsSetup` turns false the
+        // moment the first admin is created, and a stale `true` showed only
+        // the bootstrap form to the next person to sign out — no way to sign
+        // in until a reload. Only the latest answer is applied.
+        let latestConfigRequest = 0;
+        function loadAuthConfig() {
+            if (!auth) return;
+            const request = ++latestConfigRequest;
+            auth.getAuthConfig().then((config: AuthConfigResponse) => {
+                if (isMountedRef.current && request === latestConfigRequest) setAuthConfig(config);
+            }).catch((e: unknown) => {
+                // Swallowed entirely before. This is what tells the login view which
+                // providers exist, so losing it renders a login form that is wrong
+                // rather than one that is broken — the hardest kind to report. Not
+                // promoted to `authError`, which blanks the whole app: a signed-in
+                // user is unaffected by this failing.
+                console.warn("[Rebase] Could not load the backend auth configuration; " +
+                    "the login view will fall back to defaults.", e);
+            });
+        }
+
         const syncState = async (event: AuthChangeEvent, session: RebaseSession | null) => {
+            if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+                loadAuthConfig();
+            }
             if (event === "SIGNED_OUT") {
                 // What the session that just ended read. The caches are
                 // module-level and keyed by path only, so without this the next
@@ -115,17 +140,7 @@ export function useRebaseAuthController(
         });
 
         // Fetch backend auth configuration
-        auth.getAuthConfig().then((config: AuthConfigResponse) => {
-            if (isMountedRef.current) setAuthConfig(config);
-        }).catch((e: unknown) => {
-            // Swallowed entirely before. This is what tells the login view which
-            // providers exist, so losing it renders a login form that is wrong
-            // rather than one that is broken — the hardest kind to report. Not
-            // promoted to `authError`, which blanks the whole app: a signed-in
-            // user is unaffected by this failing.
-            console.warn("[Rebase] Could not load the backend auth configuration; " +
-                "the login view will fall back to defaults.", e);
-        });
+        loadAuthConfig();
 
         const unsubscribe = auth.onAuthStateChange(syncState);
 

@@ -209,6 +209,60 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         });
     });
 
+    // ─── Auth config ─────────────────────────────────────────────────
+
+    describe("auth config", () => {
+        /**
+         * `/auth/config` was read once per mount, so `needsSetup` stayed true
+         * after the first admin had been created. Signing out in the same tab
+         * then showed the bootstrap "create your admin account" form and no way
+         * to sign in, until a reload.
+         */
+        it("reads the backend's config again when the user signs in or out", async () => {
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
+            const config = { needsSetup: true, registrationEnabled: true, enabledProviders: [] as string[] };
+            mockAuth.getAuthConfig.mockImplementation(async () => ({ ...config }));
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            await act(async () => { await Promise.resolve(); });
+            expect(result.current.needsSetup).toBe(true);
+
+            // The bootstrap form creates the first admin, who is signed in.
+            config.needsSetup = false;
+            await act(async () => {
+                authListener("SIGNED_IN", mockSession);
+                await Promise.resolve();
+            });
+            await act(async () => {
+                authListener("SIGNED_OUT", null);
+                await Promise.resolve();
+            });
+
+            expect(result.current.needsSetup).toBe(false);
+        });
+
+        it("does not ask again on a token refresh", async () => {
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
+
+            renderHook(() => useRebaseAuthController({ client: mockClient }));
+            await act(async () => { await Promise.resolve(); });
+            await act(async () => {
+                authListener("TOKEN_REFRESHED", mockSession);
+                await Promise.resolve();
+            });
+
+            expect(mockAuth.getAuthConfig).toHaveBeenCalledTimes(1);
+        });
+    });
+
     // ─── defineRolesFor ──────────────────────────────────────────────
 
     describe("defineRolesFor", () => {
