@@ -302,6 +302,42 @@ export function clientConfigFromKeywords(keywords: Map<string, string>): ClientC
 }
 
 /**
+ * The TLS postures to try, in order, for an `sslmode`. Each entry says whether
+ * certificate verification had to be given up to get there.
+ */
+export function connectionAttempts(sslmode: string | undefined): { ssl: SslOption; downgraded: boolean }[] {
+    switch (sslmode) {
+        case "disable":
+            return [{ ssl: false, downgraded: false }];
+        case "require":
+        case "no-verify":
+            // libpq's `require` encrypts without verifying. Honouring that is not
+            // a downgrade — it is what the connection string asked for.
+            return [{ ssl: { rejectUnauthorized: false }, downgraded: false }];
+        case "verify-ca":
+        case "verify-full":
+            // An explicit request to verify is never quietly relaxed.
+            return [{ ssl: { rejectUnauthorized: true }, downgraded: false }];
+        case "allow":
+            // libpq's `allow`: plaintext, and TLS only if the server insists.
+            return [
+                { ssl: false, downgraded: false },
+                { ssl: { rejectUnauthorized: false }, downgraded: false }
+            ];
+        default:
+            // libpq's default, `prefer`: TLS first, plaintext only when the
+            // server will not do TLS at all. Plaintext used to come first, so a
+            // server that accepts both was scanned in cleartext. Verification is
+            // tried before it is given up, and giving it up is reported.
+            return [
+                { ssl: { rejectUnauthorized: true }, downgraded: false },
+                { ssl: { rejectUnauthorized: false }, downgraded: true },
+                { ssl: false, downgraded: false }
+            ];
+    }
+}
+
+/**
  * Connect, negotiating TLS the way libpq would.
  *
  * `pg` lets the connection string override an explicit `ssl` option, so the
@@ -320,30 +356,7 @@ async function connect(connectionString: string): Promise<{ client: Client; tlsV
         ? clientConfigFromKeywords(keywords)
         : { connectionString: stripParam(connectionString, "sslmode") };
 
-    // Each entry is (ssl option, did we give up verification to get here?).
-    let attempts: { ssl: SslOption; downgraded: boolean }[];
-    switch (sslmode) {
-        case "disable":
-            attempts = [{ ssl: false, downgraded: false }];
-            break;
-        case "require":
-        case "no-verify":
-            // libpq's `require` encrypts without verifying. Honouring that is not
-            // a downgrade — it is what the connection string asked for.
-            attempts = [{ ssl: { rejectUnauthorized: false }, downgraded: false }];
-            break;
-        case "verify-ca":
-        case "verify-full":
-            // An explicit request to verify is never quietly relaxed.
-            attempts = [{ ssl: { rejectUnauthorized: true }, downgraded: false }];
-            break;
-        default:
-            attempts = [
-                { ssl: false, downgraded: false },
-                { ssl: { rejectUnauthorized: true }, downgraded: false },
-                { ssl: { rejectUnauthorized: false }, downgraded: true }
-            ];
-    }
+    const attempts = connectionAttempts(sslmode);
 
     let lastError: unknown;
     for (const attempt of attempts) {
