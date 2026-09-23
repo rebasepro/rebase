@@ -17,6 +17,7 @@ import {
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
+import { confirmAddressOwnership } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /**
@@ -172,15 +173,17 @@ export function mountMagicLinkRoutes(deps: {
         await authRepo.markMagicLinkTokenUsed(tokenHash);
 
         // Get user
-        const user = await authRepo.getUserById(storedToken.uid);
+        let user = await authRepo.getUserById(storedToken.uid);
         if (!user) {
             throw ApiError.badRequest("Invalid or expired magic link", "INVALID_TOKEN");
         }
 
-        // Clicking a magic link proves email ownership — auto-verify
+        // Clicking a magic link proves email ownership. On an account whose
+        // address nobody had proven, that proof also removes whatever way in
+        // somebody else left on it — see `confirmAddressOwnership`.
         if (!user.emailVerified) {
-            await authRepo.setEmailVerified(user.id, true);
-            user.emailVerified = true;
+            await confirmAddressOwnership(authRepo, user, null);
+            user = { ...user, emailVerified: true, passwordHash: null };
         }
 
         // Create session

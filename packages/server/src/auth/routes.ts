@@ -32,6 +32,7 @@ import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { mountOtpRoutes } from "./otp-routes";
 import { isBootstrapWindowOpen, isSteadyStateRegistrationOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
+import { confirmAddressOwnership, identityProfileData } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
@@ -695,7 +696,9 @@ displayName: user.displayName });
                             // and names the endpoint. A login screen shows its
                             // own words instead, chosen by `details.reason`:
                             // "local-account-unverified" means the account
-                            // behind this address signs in with a password.
+                            // behind this address signs in with a password, and
+                            // "local-account-unverified-passwordless" that it
+                            // does not.
                             throw new ApiError(
                                 403,
                                 "EMAIL_NOT_VERIFIED",
@@ -707,7 +710,7 @@ displayName: user.displayName });
                             );
                         }
                         // Link Provider to existing account
-                        await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
+                        await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, identityProfileData(externalUser));
 
                         // Optional: Update profile info from external provider if empty
                         await authRepo.updateUser(user.id, {
@@ -756,7 +759,7 @@ displayName: user.displayName });
                             emailVerified: externalUser.emailVerified === true
                         });
 
-                        await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
+                        await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, identityProfileData(externalUser));
 
                         // Fire afterUserCreate hook
                         if (ops.afterUserCreate) {
@@ -860,7 +863,7 @@ displayName: user.displayName });
                     userCtx.uid,
                     provider.id,
                     externalUser.providerId,
-                    { email: externalUser.email }
+                    identityProfileData(externalUser)
                 );
 
                 return c.json({
@@ -991,8 +994,19 @@ displayName: user.displayName }, appName, logoUrl);
         // reset is that someone else may be holding a token and actively
         // refreshing it; see `replaceUserPassword` for why deleting the rows
         // alone does not catch them.
+        //
+        // The link was read out of the inbox, so on an account whose address
+        // nobody had proven this is the owner proving it: the identities
+        // somebody else may have signed up with go too, and the account is
+        // verified — see `confirmAddressOwnership`. It is also how an invited
+        // user accepts the invitation.
         const passwordHash = await ops.hashPassword(password);
-        await replaceUserPassword(authRepo, storedToken.uid, passwordHash);
+        const account = await authRepo.getUserById(storedToken.uid);
+        if (account && !account.emailVerified) {
+            await confirmAddressOwnership(authRepo, account, passwordHash);
+        } else {
+            await replaceUserPassword(authRepo, storedToken.uid, passwordHash);
+        }
 
         // Mark token as used
         await authRepo.markPasswordResetTokenUsed(tokenHash);

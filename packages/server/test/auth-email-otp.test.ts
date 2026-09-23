@@ -93,6 +93,11 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string } = {}) {
         getUserRoleIds: jest.fn(async () => ["editor"]),
         getUserWithRoles: jest.fn(async () => ({ user, roles: [] })),
         setEmailVerified: jest.fn(async () => { user.emailVerified = true; }),
+        // Reading a code is the first proof of this unverified address, which
+        // removes the password nobody proved and ends the sessions.
+        updatePassword: jest.fn(async () => undefined),
+        deleteAllRefreshTokensForUser: jest.fn(async () => undefined),
+        setTokensValidAfter: jest.fn(async () => undefined),
         createRefreshToken: jest.fn(async () => undefined),
         getTokensValidAfter: jest.fn(async () => null),
         getUserIdentities: jest.fn(async () => [])

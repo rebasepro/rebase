@@ -298,12 +298,18 @@ offset: 0 });
         // developers to use this hook instead. A hook that skips the path its
         // own documentation sends people to is worse than no hook: they wrote
         // the validation, and it silently does not run here.
+        // `emailVerified` is kept as well: an administrator names the address,
+        // and the built-in prepare step marks it verified, as the collection
+        // REST route already stored it. Dropped here, the invited account sat
+        // unverified, and an OAuth sign-in onto an unverified account is
+        // refused — so the invitee could not use "Sign in with Google".
         let createData = {
             email: prepResult.values.email as string,
             passwordHash: prepResult.values.passwordHash as string | undefined,
             displayName: prepResult.values.displayName as string | undefined,
             photoUrl: prepResult.values.photoUrl as string | undefined,
-            metadata: prepResult.values.metadata as Record<string, unknown> | undefined
+            metadata: prepResult.values.metadata as Record<string, unknown> | undefined,
+            emailVerified: prepResult.values.emailVerified === true
         };
 
         if (ops.beforeUserCreate) {

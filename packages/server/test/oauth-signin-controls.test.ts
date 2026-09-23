@@ -152,7 +152,8 @@ beforeEach(() => {
 describe("decideOAuthAutoLink", () => {
     const cases: Array<[string, Parameters<typeof decideOAuthAutoLink>[0], boolean, string | undefined]> = [
         ["provider verified + local verified", { providerEmailVerified: true, existingUser: { emailVerified: true, passwordHash: "h" } }, true, undefined],
-        ["provider verified + local has no password", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: null } }, true, undefined],
+        ["provider verified + local has no password, never verified", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: null } }, false, "local-account-unverified-passwordless"],
+        ["provider verified + local has no password, verified", { providerEmailVerified: true, existingUser: { emailVerified: true, passwordHash: null } }, true, undefined],
         ["provider verified + local password never verified", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: "h" } }, false, "local-account-unverified"],
         ["provider unverified", { providerEmailVerified: false, existingUser: { emailVerified: true, passwordHash: "h" } }, false, "provider-email-unverified"],
         ["provider omitted the flag entirely", { providerEmailVerified: undefined, existingUser: { emailVerified: true, passwordHash: "h" } }, false, "provider-email-unverified"]
@@ -306,9 +307,28 @@ describe("POST /auth/<provider> — auto-linking onto an existing account", () =
         expect(repo.linkUserIdentity).toHaveBeenCalledWith("pw-user", "acme", "acme-1", expect.any(Object));
     });
 
-    it("links when the local account has no password at all", async () => {
+    it("refuses when the local account has no password but its address was never verified either", async () => {
+        // The account an attacker makes by signing in, as the victim's
+        // address, through a provider that does not vouch for it. "No
+        // password" is not "nothing planted": the attacker's own identity is
+        // on it, and linking the victim's here shares the account with them.
         const app = createApp();
         repo.getUserByEmail.mockResolvedValue(mockUser({ id: "oauth-user", passwordHash: null, emailVerified: false }));
+
+        const res = await signIn(app);
+
+        expect(res.status).toBe(403);
+        const { error } = (await res.json()) as { error: { code: string; details?: { reason?: string } } };
+        expect(error.code).toBe("EMAIL_NOT_VERIFIED");
+        // Its own reason, so a login screen does not tell its owner to use a
+        // password the account does not have.
+        expect(error.details?.reason).toBe("local-account-unverified-passwordless");
+        expect(repo.linkUserIdentity).not.toHaveBeenCalled();
+    });
+
+    it("links when the local account has no password and its address was verified", async () => {
+        const app = createApp();
+        repo.getUserByEmail.mockResolvedValue(mockUser({ id: "oauth-user", passwordHash: null, emailVerified: true }));
 
         const res = await signIn(app);
 

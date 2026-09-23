@@ -291,6 +291,16 @@ export interface UserRepository {
     linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void>;
 
     /**
+     * Detach one OAuth identity from a user.
+     *
+     * Used when the owner of an address proves it for the first time, to
+     * remove the identities someone attached to the account before anyone had
+     * proven the address. Optional: a repository without it cannot do that,
+     * and such a proof is refused rather than leaving the identities in place.
+     */
+    unlinkUserIdentity?(uid: string, provider: string, providerId: string): Promise<void>;
+
+    /**
      * Update a user
      */
     updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null>;
@@ -311,9 +321,10 @@ export interface UserRepository {
     listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult>;
 
     /**
-     * Update user's password hash
+     * Update user's password hash. `null` removes the password: the account
+     * then signs in only by link, code or provider.
      */
-    updatePassword(id: string, passwordHash: string): Promise<void>;
+    updatePassword(id: string, passwordHash: string | null): Promise<void>;
 
     /**
      * Set email verification status

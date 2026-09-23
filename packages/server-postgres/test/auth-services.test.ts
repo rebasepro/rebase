@@ -431,6 +431,21 @@ email: "test@example.com" }));
             });
         });
 
+        describe("unlinkUserIdentity", () => {
+            it("deletes exactly that identity, and only from that user", async () => {
+                await userService.unlinkUserIdentity("user-123", "spotify", "sp-1");
+
+                expect(db.delete).toHaveBeenCalledWith(userIdentities);
+                const { text, values } = readSql(mockDeleteWhere.mock.calls[0][0]);
+                expect(text).toBe("? = ? AND ? = ? AND ? = ?");
+                expect(values).toEqual([
+                    userIdentities.uid, "user-123",
+                    userIdentities.provider, "spotify",
+                    userIdentities.providerId, "sp-1"
+                ]);
+            });
+        });
+
         describe("updateUser", () => {
             it("should update user and return updated record", async () => {
                 const updatedUser = {
@@ -531,6 +546,14 @@ email: "user2@example.com" })
                     passwordHash: "new-hash",
                     updatedAt: expect.any(Date)
                 }));
+            });
+
+            it("removes the password when handed null", async () => {
+                mockUpdateWhere.mockResolvedValueOnce(undefined);
+
+                await userService.updatePassword("user-123", null);
+
+                expect(mockUpdateSet).toHaveBeenCalledWith(expect.objectContaining({ passwordHash: null }));
             });
         });
 

@@ -290,6 +290,11 @@ export class MemoryAuthStore {
             getUnusedRecoveryCodeCount: async () => 0,
             deleteAllRecoveryCodes: async () => undefined
         };
+        if (this.options.unlinkIdentities !== false) {
+            repo.unlinkUserIdentity = async (uid, provider, providerId) => {
+                this.identities = this.identities.filter(i => !(i.uid === uid && i.provider === provider && i.providerId === providerId));
+            };
+        }
         return repo as AuthRepository;
     }
 }

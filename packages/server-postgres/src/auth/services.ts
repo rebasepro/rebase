@@ -328,6 +328,17 @@ export class UserService implements UserRepository {
         }));
     }
 
+    /**
+     * @see UserRepository.unlinkUserIdentity — scoped to the user as well as
+     * the identity, so it can only ever detach an identity from the account
+     * it names.
+     */
+    async unlinkUserIdentity(uid: string, provider: string, providerId: string): Promise<void> {
+        await this.withServerContext(async (db) => db.delete(this.userIdentitiesTable).where(
+            sql`${this.userIdentitiesTable.uid} = ${uid} AND ${this.userIdentitiesTable.provider} = ${provider} AND ${this.userIdentitiesTable.providerId} = ${providerId}`
+        ));
+    }
+
     async linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
         await this.withServerContext(async (db) => db.insert(this.userIdentitiesTable).values({
             uid,
@@ -439,9 +450,9 @@ export class UserService implements UserRepository {
     }
 
     /**
-     * Update user's password hash
+     * Update user's password hash; `null` removes the password.
      */
-    async updatePassword(id: string, passwordHash: string): Promise<void> {
+    async updatePassword(id: string, passwordHash: string | null): Promise<void> {
         const idCol = getColumn(this.usersTable, "id");
         if (!idCol) return;
         const passwordHashColKey = getColumnKey(this.usersTable, "passwordHash", "password_hash") || "passwordHash";
@@ -1147,6 +1158,10 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.linkUserIdentity(uid, provider, providerId, profileData);
     }
 
+    async unlinkUserIdentity(uid: string, provider: string, providerId: string): Promise<void> {
+        await this.userService.unlinkUserIdentity(uid, provider, providerId);
+    }
+
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
         return this.userService.updateUser(id, data);
     }
@@ -1163,7 +1178,7 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.listUsersPaginated(options);
     }
 
-    async updatePassword(id: string, passwordHash: string): Promise<void> {
+    async updatePassword(id: string, passwordHash: string | null): Promise<void> {
         await this.userService.updatePassword(id, passwordHash);
     }
 

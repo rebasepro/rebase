@@ -119,11 +119,14 @@ export async function revokeAllSessions(
  * `test/password-change-revokes-sessions.test.ts` holds every route that sets a
  * password to this, and fails if anything but this function calls
  * `updatePassword`.
+ *
+ * `null` removes the password instead, for the same reason and with the same
+ * revocation: see `confirmAddressOwnership`.
  */
 export async function replaceUserPassword(
     authRepo: Pick<AuthRepository, "updatePassword" | "deleteAllRefreshTokensForUser" | "setTokensValidAfter">,
     uid: string,
-    passwordHash: string
+    passwordHash: string | null
 ): Promise<void> {
     await authRepo.updatePassword(uid, passwordHash);
     await revokeAllSessions(authRepo, uid);

@@ -14,7 +14,16 @@ export type AutoLinkRefusal =
      * address. Attaching a provider identity to it would hand the session to
      * whoever registered the address first — the classic pre-hijack.
      */
-    | "local-account-unverified";
+    | "local-account-unverified"
+    /**
+     * The local account has no password, and its address was never proven
+     * either: it was made by a sign-in through a provider that did not vouch
+     * for the address, or by someone who never had to. Its sign-in methods are
+     * whatever that someone attached, so this is the same pre-hijack as a
+     * password would be. Reported apart from `local-account-unverified` only
+     * so a login screen does not tell its owner to use a password.
+     */
+    | "local-account-unverified-passwordless";
 
 export type AutoLinkDecision =
     | { allowed: true }
@@ -29,17 +38,25 @@ export interface AutoLinkExistingUser {
 /**
  * May an OAuth identity be attached to a pre-existing account found *by email*?
  *
- * Both sides have to be trustworthy, and only one of them used to be checked:
+ * Both sides have to be trustworthy:
  *
  *  - the **provider** must have verified the address, or the caller has not
  *    shown they control it;
- *  - the **local account** must itself be trustworthy — either its address was
- *    verified, or it has no password at all (it was created by an OAuth
- *    sign-in or an invitation, so there is no credential an attacker could
- *    have planted in advance).
+ *  - the **local account**'s address must have been verified too. Whoever
+ *    made an unverified account never proved the address, and every way in
+ *    they left on it — a password, an identity from a provider that did not
+ *    vouch for the address — would go on opening the account the owner is
+ *    about to be signed into.
  *
- * A refusal is not a dead end: `POST /auth/link/<provider>` attaches the
- * identity once the caller proves ownership by holding a session.
+ * The second rule used to exempt an account with no password, on the theory
+ * that one made by an OAuth sign-in holds no credential an attacker could have
+ * planted. It holds exactly one: the identity it was made with, which is an
+ * attacker's whenever the provider did not vouch for the address.
+ *
+ * A refusal is not a dead end. `POST /auth/link/<provider>` attaches the
+ * identity once the caller proves ownership by holding a session, and proving
+ * the address (a magic link, an email code, a password reset) verifies the
+ * account — removing what nobody proved — after which this answers yes.
  */
 export function decideOAuthAutoLink(args: {
     providerEmailVerified: boolean | undefined;
@@ -48,9 +65,11 @@ export function decideOAuthAutoLink(args: {
     if (args.providerEmailVerified !== true) {
         return { allowed: false, reason: "provider-email-unverified" };
     }
-    const hasPassword = Boolean(args.existingUser.passwordHash);
-    if (hasPassword && !args.existingUser.emailVerified) {
-        return { allowed: false, reason: "local-account-unverified" };
+    if (!args.existingUser.emailVerified) {
+        return {
+            allowed: false,
+            reason: args.existingUser.passwordHash ? "local-account-unverified" : "local-account-unverified-passwordless"
+        };
     }
     return { allowed: true };
 }

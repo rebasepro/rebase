@@ -53,6 +53,7 @@ import { getEmailOtpTemplate, resolveEmailBranding } from "../email/templates";
 import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
+import { confirmAddressOwnership } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /** How long a code is good for. */
@@ -333,16 +334,17 @@ export function mountOtpRoutes(deps: {
 
         await authRepo.markMagicLinkTokenUsed(tokenHash);
 
-        const user = await authRepo.getUserById(storedToken.uid);
+        let user = await authRepo.getUserById(storedToken.uid);
         if (!user) {
             throw ApiError.badRequest("Invalid or expired code", "INVALID_CODE");
         }
 
         // Reading a code out of the inbox proves the address, exactly as
-        // following a link does.
+        // following a link does — with the same consequences for whatever
+        // somebody else left on an account nobody had proven.
         if (!user.emailVerified) {
-            await authRepo.setEmailVerified(user.id, true);
-            user.emailVerified = true;
+            await confirmAddressOwnership(authRepo, user, null);
+            user = { ...user, emailVerified: true, passwordHash: null };
         }
 
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
