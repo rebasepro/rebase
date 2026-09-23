@@ -3854,3 +3854,151 @@ Shift+Tab. With the hook call removed from `Dialog`, Tab lands on the dialog and
 the test fails. The hook takes its note in a `window` capture listener: a note
 taken on the container, while bubbling, is too late for a removal made by a
 listener on the field itself.
+
+## 67. State that outlives the identity it was computed for
+
+A value computed under one user's permissions is kept somewhere the next user
+reads from: a module-level cache, a subscription's last delivery, a connection
+authenticated once, a grant that copied the roles it saw. Signing out ends the
+session and leaves the value. Signing in as someone else, on the same tab, is
+the one path nothing tests — every suite signs in once.
+
+Five instances in one night, in five packages, none aware of the others:
+
+- `plugin-insights` keyed its result cache by widget and path, not user. The
+  next account on the tab saw the previous one's figures, computed under the
+  previous one's RLS, for the length of `cacheTTL`.
+- The admin table's scroll-restoration cache seeded the next user's first
+  render with the last user's rows, and kept them when the new user's read was
+  refused — `VirtualTable` shows an error only when it has no rows.
+- The client socket kept each subscription's `latestData` across a sign-out, and
+  a new `listen()` on the same query replayed it without subscribing.
+- The client re-authenticated the socket in place when a different account
+  signed in, and the server keeps each subscription's identity from when it was
+  made, so the old account's rows kept arriving.
+- An MCP OAuth refresh re-issued the roles recorded at consent, so a demoted or
+  deleted admin kept admin through `/mcp` as long as the client kept
+  refreshing.
+
+**Sweep:** list every module-level `Map`/cache, every long-lived connection and
+every token or grant that copies claims. For each, ask which identity its
+contents were computed under, and what clears it on sign-out *and* on a change
+of uid without a sign-out in between. "Keyed by user" is one fix; "cleared by
+one function both auth controllers call" is the other, and it is the one that
+stays true when the next cache is added.
+
+**Sweep (2026-09-23):**
+
+| checked | result |
+|---|---|
+| insights cache | **BUG**. Keyed by user now. |
+| table scroll cache, edit handoff, display cache, drafts | **BUG**. `clearSessionCaches()` on sign-out and on a different uid; drafts survive a sign-out and go when someone else signs in. |
+| client socket cached rows, account switch | **BUG** ×2. Cache dropped with the socket; a different account rebuilds the socket. |
+| socket token after a failed refresh | **BUG**. Fell back to the token read before the refresh — the signed-out one. |
+| MCP grant roles | **BUG**. Roles, account existence and the revocation watermark re-read on every refresh. |
+| `useFetch`, `useCollection`, `useRelationSelector` caches | clean. Keyed by query and cleared by the fetch-cache reset. |
+
+## 68. A value the store replaces whole, written as a diff
+
+The unit a write can express is not always the unit the store replaces. A
+JSONB column, a Firestore map, a Realtime Database node and a `Date` are each
+replaced whole by an update, so a diff finer than that is a destructive write:
+what the diff leaves out is deleted, not kept. The inverse is the same bug read
+backwards — a whole-value write where the store would have merged.
+
+- The CMS form's `getChanges` walked into objects. A `Date` has no own keys, so
+  a date-only edit produced an empty diff and was silently dropped; a map
+  sub-key edit sent `{ address: { city } }` and erased `street`; a geopoint
+  edit sent half a geopoint and got a 400.
+- The table's inline editor built `setIn({}, "address.street", v)` — the same
+  partial map — and the popup editor read the nested key flat and saved `{}`.
+- The drivers merged a `beforeSave` hook's result with `mergeDeep`, which merges
+  arrays index by index: a hook that filtered `lineItems` got the dropped
+  elements back. (`mergeDeep` itself is right for the thing that depends on it
+  — draft restore — so the fix is at the driver, not the util.)
+- The Realtime Database driver saved every update with `set()`, replacing the
+  node: editing one field deleted the rest.
+
+**Sweep:** for every write path, name the unit the *store* replaces and check
+the diff is never finer than it. The test that finds this edits one leaf of a
+nested value and reads the whole value back from the store — not from the form.
+
+## 69. An encoder and its decoder written apart
+
+A value is serialised in one place and parsed in another, and the two were
+written by different people against different edge cases. Each passes its own
+tests; the round trip is what nobody runs. The failures come from exactly the
+values the encoder treats as "nothing": `false`, `0`, `""`, `null`, a
+microsecond, a `%`, a quote.
+
+Found in one sweep:
+
+| encoder | decoder | what the round trip lost |
+|---|---|---|
+| table filter → URL (`encodedValue ? … : "null"`) | URL → live filter | `false`, `0` and `""` became IS NULL on the next row click |
+| same | same (`key.replace("_op","")`) | any field whose name contains `_op` |
+| search → URL | `decodeURIComponent` twice | a `%` crashed the view on reload |
+| GET's ETag over the REST row | write's ETag over the admin row (`{__type:"date"}` → `[object Object]`) | every conditional write got 412; the 412's tag was one constant |
+| keyset cursor from the served row (ms) | cursor compared with the column (µs) | rows skipped, or page 2 repeating page 1 forever |
+| REST filter `String(date)` | Postgres parsing a local-time string | the zone name, and every millisecond |
+| `cloud env pull` `JSON.stringify` | dotenv (unescapes `\n`, `\r` only) | quotes and backslashes |
+| CSV export's formula-escape `'` | CSV import | the apostrophe stayed |
+| CSV cell text | `JSON.parse` before the target type is known | `1.10`, twenty-digit ids, Excel's `TRUE` |
+| MCP gate's `.env` regex (first match) | the CLI's dotenv (last match, `export`) | the gate cleared localhost while the CLI connected to production |
+| CDC payload keyed by SQL column | address derived by property key | single-row subscriptions on a `columnName` key |
+
+**Sweep:** list every serialise/parse pair and write *one* test per pair that
+round-trips `false`, `0`, `""`, `null`, a value containing the format's own
+delimiter or escape, and the highest precision the store keeps. Where the pair
+can share one implementation, make it share one; the MCP gate now parses with
+the same dotenv the CLI does, and the ETag hashes one row shape on both sides.
+
+### Sweep — 2026-09-23, the whole OSS tree
+
+Fifteen read-only hunters, one per slice of `packages/*`, `app/`, `examples/`
+and `tooling/scripts` (everything but `saas/` and `website/`), each told to
+confirm a failure scenario before reporting and to list what came back clean.
+Then one fixer per slice: regression test first, seen red for the stated reason,
+fix, mutation-checked by reverting it, committed one finding per commit.
+
+About 270 findings reported and about 250 fixed, plus some forty siblings the
+fixers found in the code next to their own — the worst of them the collection
+editor's "Import from table", which read `pg_policy` instead of `pg_policies`
+and so turned every imported `SELECT` policy into a `FOR ALL` write grant. The
+per-slice reports, with every finding's failure scenario and the areas each
+hunter found clean, are summarised here; the commits carry the detail (`git log
+452c22d10..` from this date).
+
+| slice | found | fixed | notable | left open |
+|---|---|---|---|---|
+| server auth | 18 | 18 | pre-account-takeover through an unverified email + auto-link (class 42 at the policy's other direction); MFA challenge accepting a revoked token; cookie mode leaking the refresh token on 4 doors; auth limiters ignoring `REBASE_RATE_LIMIT_STORE` (class 21) | Mongo `unlinkUserIdentity` (Mongo is out of scope for now) |
+| server REST/MCP | 18 | 17 + 1 partial | nested routes resolving the parent by exact slug, so the kebab or table spelling switched every nested check off (class 2); ETag over two row shapes (class 69); MCP grants surviving revocation (class 67) | `$inc` crossing `validation.min/max` — needs a guard in the UPDATE, a design call |
+| server runtime | 13 | 12 | history revert writing fields the caller may not write (class 42); cron claim retention shorter than the catch-up window that depends on it (new shape: a retention horizon shorter than the lookback it serves); a hung job freezing the worker, the reaper and shutdown | cron enable/disable is per process (needs a persisted state design) |
+| storage/email | 10 | 9 | TUS door skipping the rendition prefix → stored XSS (class 42); writes naming any bucket on S3/GCS (class 42) | `mergeDeep` semantics (see class 68 — fixed at the driver instead) |
+| Postgres data path | 12 | 12 | driver reads serving `excludeFromApi` columns over the socket and MCP — password hashes (class 42, the worst finding of the night); socket filters as an oracle on hidden fields; composite keys matched on the first column | — |
+| Postgres schema | 16 | 16 | FK `REFERENCES` naming the property key, not the column; boot refusing to start over an unmanaged table named `2024_archive`; `db push` auto-approving lossy `ALTER … TYPE` | — |
+| MongoDB | 15 | 5 (+3 via auth) | create over an existing id as an upsert — row takeover (class 42) | 10 — Mongo out of scope for now |
+| Firebase | 8 | 7 | RTDB update via `set()` (class 68) | RTDB reference storage — needs a format decision |
+| client SDK | 15 | 15 | reconnect judged by a counter the recovery resets; stale tab wiping the shared session; offline create without an idempotency key → duplicate on replay | — |
+| CMS form | 18 | 18 | date edits dropped, map sub-key edits erasing siblings (class 68); stale field overwriting a concurrent change (class 63's client-side sibling) | — |
+| CMS views | 17 | 17 | URL filter round trip (class 69); bulk delete continuing after Escape (class 42) | cms-views-13 partly: a create that doesn't come back through the collection view |
+| collection editor + Studio | 17 | 17 | RLS import writing DB roles as app roles — restrictive policies fail open; EXPLAIN ANALYZE executing a DELETE; table rename orphaning every row | — |
+| app | 19 | 19 | reset-password and invitation links landing nowhere (class 21); MFA-enrolled accounts locked out of the admin; Back skipping every unsaved-changes blocker | — |
+| UI kit + plugins | 15 | 15 | disabled props dropped by `VirtualTableSwitch`, `MultiSelect` (class 12); insights cache (class 67) | — |
+| CLI | 19 | 19 | source upload shipping `backups/*.dump` and dev secrets outside git; telemetry sending project names | — |
+| MCP pkg, rls-check, tooling | 28 | 28 | MCP destructive gate approving a local URL while the CLI hits prod (class 69); `rls-check` fix SQL injectable through names (class 35); the kubectl hook blind to an env/path prefix (class 18) | three gate fixes landed only after the docs they flagged were corrected |
+
+**What the night says about the classes.** Class 42 (a second door) was the
+most common shape again, and the socket, MCP and in-process doors were where it
+lived: every one of the worst findings was a door that skipped a check REST
+applies. The rule that would have caught most of them is the one class 42
+already states — one implementation behind every door — and the fixes followed
+it: `assertQueryFieldsReadable` is now exported and called by the socket, MCP
+passes a viewer, nested routes share `createRow`/`updateRow`/`deleteRow` with
+the root ones.
+
+**UNCOVERED, found on the way:** `packages/firebase` has tests and no `test`
+script, so CI has never run them (class 3). ESLint could not load in this
+checkout (`zod-validation-error/v4` missing), so none of tonight's commits was
+linted until the wrap-up.
+
