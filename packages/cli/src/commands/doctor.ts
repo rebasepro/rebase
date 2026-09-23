@@ -87,15 +87,16 @@ export function findLibpqUrlProblems(projectRoot: string, envFile?: string | nul
 }
 
 /**
- * Report unparseable connection strings, if any.
+ * Report unparseable connection strings, if any. Returns true when there were,
+ * so the finding reaches the exit code like the environment errors do.
  *
  * Runs before the plugin's drift check and never blocks it. The plugin connects
  * through node-postgres, which parses these URLs happily — so it cannot see this
  * defect, and a project with it will otherwise get a clean bill of health while
  * `rebase db backup` fails.
  */
-function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): void {
-    if (findings.length === 0) return;
+function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): boolean {
+    if (findings.length === 0) return false;
 
     console.log("");
     console.log(chalk.red.bold("  ✗ Connection string that PostgreSQL's own tools cannot parse"));
@@ -116,6 +117,7 @@ function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): void {
     console.log(chalk.gray("    is why a project can look healthy and still have no working backups."));
     console.log(chalk.gray("    Projects scaffolded before 2026-08-18 all carry it."));
     console.log("");
+    return true;
 }
 
 /**
@@ -511,7 +513,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // Reported before the plugin runs: this one needs no database, and if the
     // URL is the problem then anything that tries to connect with it first will
     // fail with a worse message.
-    reportLibpqUrlProblems(findLibpqUrlProblems(projectRoot, envFile));
+    const connectionFailed = reportLibpqUrlProblems(findLibpqUrlProblems(projectRoot, envFile));
 
     // Same reasoning: no database needed, and one of these findings — a
     // `process.env` read at module scope — is a live failure whose only symptom
@@ -525,6 +527,9 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // any of it. Reported before the plugin runs, and non-blocking — a project
     // with one of these still deserves its drift report.
     const environmentFailed = reportEnvironmentFindings(collectEnvironmentFindings(projectRoot, envFile));
+    // Either is an error a CI gate must see: a connection string libpq cannot
+    // parse is a project whose backups have never run.
+    const failed = connectionFailed || environmentFailed;
 
     // Which database, resolved the way every other command resolves it.
     //
@@ -572,7 +577,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
             "  ○ Schema drift not checked: this project derives its API from the database — "
             + "run `rebase schema introspect` first."
         ));
-        if (environmentFailed) process.exit(1);
+        if (failed) process.exit(1);
         return;
     }
 
@@ -608,5 +613,5 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // the same as the project being able to run: an environment error is still
     // an error, and a doctor that exits 0 over one is a doctor nobody can gate
     // on.
-    if (environmentFailed) process.exit(1);
+    if (failed) process.exit(1);
 }
