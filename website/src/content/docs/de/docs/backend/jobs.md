@@ -90,7 +90,7 @@ jobs: {
 
 Konstruktionsbedingt sicher. Worker beanspruchen Jobs mit `SELECT … FOR UPDATE SKIP LOCKED`, sodass jeder Job an genau einen von ihnen geht und die anderen zur nächsten Zeile übergehen, anstatt sich dahinter anzustellen. Es muss kein Leader gewählt werden.
 
-Während eines Rolling Deployments erhält eine Instanz mit älterem Code möglicherweise Jobs, deren Task sie nicht implementiert. Diese werden an die Warteschlange zurückgegeben, anstatt als fehlgeschlagen markiert zu werden, sodass sie ausgeführt werden, sobald eine aktualisierte Instanz sie übernimmt.
+Eine Instanz beansprucht nur die Tasks, für die sie einen Handler hat. Während eines Rolling Deployments lässt eine Instanz mit älterem Code die Jobs liegen, deren Task nur der neuere Code implementiert: Sie bleiben `pending`, ohne dass ein Versuch verbraucht wird, bis eine aktualisierte Instanz sie beansprucht. Ein Task, den keine Instanz implementiert, bleibt ebenfalls `pending`, statt in die Dead-Letter-Ablage zu gehen.
 
 ## Zuverlässige Webhooks
 
@@ -109,9 +109,11 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Auf dem Job wird nur die **ID** des Webhooks gespeichert, niemals der Webhook selbst – das Signatur-Secret würde sonst für die Dauer der Aufbewahrungsfrist im Klartext in `rebase.jobs` liegen, und ein Webhook, der zwischen dem Einreihen und der Zustellung bearbeitet wurde, sollte im aktuellen Zustand gesendet werden.
 
+Eine Zustellung, die der Dispatcher verweigert (ein Loopback-, Link-Local-, privates oder Nicht-`http(s)`-Ziel), oder eine, auf die der Empfänger mit einer Weiterleitung antwortet, schlägt jedes Mal gleich fehl. Sie geht nach einem Versuch in die Dead-Letter-Ablage, mit dem Grund in `last_error`. Jeder andere Fehler wird wie bei jedem Job wiederholt.
+
 ## Herunterfahren
 
-`shutdown()` verhindert, dass der Worker neue Jobs beansprucht, und wartet auf die aktuell laufenden, damit ein Deployment den Rest eines Batches nicht doppelt ausführt. Alles, was beim Beenden des Prozesses noch läuft, behält seinen Anspruch und wird über das Visibility-Timeout wiederhergestellt.
+`shutdown()` verhindert, dass der Worker neue Jobs beansprucht, und wartet auf die aktuell laufenden, damit ein Deployment den Rest eines Batches nicht doppelt ausführt. Das Warten ist auf zwei Drittel des Shutdown-Timeouts begrenzt (10 Sekunden der standardmäßigen 15), damit ein Handler, der nie fertig wird, das Herunterfahren nicht aufhalten kann. Ein Job, der danach noch läuft, behält seinen Anspruch und wird über das Visibility-Timeout wiederhergestellt.
 
 ## Nächste Schritte
 

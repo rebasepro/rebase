@@ -90,7 +90,7 @@ jobs: {
 
 Seguro por diseño. Los workers reclaman con `SELECT … FOR UPDATE SKIP LOCKED`, por lo que cada trabajo va a exactamente uno de ellos y los demás pasan a la siguiente fila en lugar de hacer cola detrás de ella. No es necesario elegir ningún líder.
 
-Durante un despliegue progresivo (rolling deploy), a una instancia que ejecuta código más antiguo se le asignarán trabajos cuya tarea no implementa. Estos se devuelven a la cola en lugar de marcarse como fallidos, de modo que se ejecuten tan pronto como un par actualizado los recoja.
+Una instancia solo reclama las tareas para las que tiene un handler. Durante un despliegue progresivo (rolling deploy), una instancia que ejecuta código más antiguo deja de lado los trabajos cuya tarea solo implementa el código nuevo: permanecen en `pending`, sin gastar ningún intento, hasta que un par actualizado los reclama. Una tarea que ninguna instancia implementa también permanece en `pending`, en lugar de ir a la cola de mensajes fallidos (dead-letter).
 
 ## Webhooks duraderos
 
@@ -109,9 +109,11 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Solo el **id** del webhook se almacena en el trabajo, nunca el webhook en sí; de lo contrario, su secreto de firma permanecería en texto plano en `rebase.jobs` durante todo el tiempo que la retención conserve la fila, y un webhook editado entre el encolado y la entrega debe enviarse con su estado actual.
 
+Una entrega que el dispatcher se niega a enviar (un destino loopback, link-local, privado o que no sea `http(s)`), o una que el receptor responde con una redirección, falla de la misma manera cada vez. Pasa a dead-letter tras un solo intento, con el motivo en `last_error`. Cualquier otro fallo se reintenta como en cualquier trabajo.
+
 ## Apagado
 
-`shutdown()` detiene al worker para que no reclame nuevos trabajos y espera a los que están en curso, de modo que un despliegue no ejecute dos veces el final de un lote. Cualquier cosa que siga ejecutándose cuando el proceso finalice conserva su reclamo y se recupera mediante el tiempo de espera de visibilidad.
+`shutdown()` detiene al worker para que no reclame nuevos trabajos y espera a los que están en curso, de modo que un despliegue no ejecute dos veces el final de un lote. La espera está limitada a dos tercios del tiempo de espera de apagado (10 segundos de los 15 predeterminados), para que un handler que nunca termina no pueda retener el apagado. Un trabajo que siga ejecutándose después conserva su reclamo y se recupera mediante el tiempo de espera de visibilidad.
 
 ## Próximos pasos
 

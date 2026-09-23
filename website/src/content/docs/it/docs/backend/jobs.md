@@ -90,7 +90,7 @@ jobs: {
 
 Sicuro per progettazione. I worker acquisiscono i job con `SELECT … FOR UPDATE SKIP LOCKED`, quindi ogni job viene assegnato a uno solo di essi e gli altri passano alla riga successiva invece di mettersi in coda dietro di essa. Non è necessario eleggere alcun leader.
 
-Durante un rolling deploy, a un'istanza che esegue codice precedente verranno assegnati job di cui non implementa il task. Questi vengono rimessi in coda anziché contrassegnati come falliti, in modo da essere eseguiti non appena un'istanza aggiornata li prende in carico.
+Un'istanza acquisisce solo i task per cui ha un handler. Durante un rolling deploy, un'istanza che esegue codice precedente lascia stare i job il cui task è implementato solo dal codice più recente: restano `pending`, senza consumare tentativi, finché un'istanza aggiornata non li acquisisce. Anche un task che nessuna istanza implementa resta `pending`, invece di finire in dead-letter.
 
 ## Webhook persistenti
 
@@ -109,9 +109,11 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Sul job viene memorizzato solo l'**id** del webhook, mai il webhook stesso — altrimenti il suo segreto di firma rimarrebbe in chiaro in `rebase.jobs` per tutto il periodo di retention della riga, e un webhook modificato tra l'accodamento e l'invio deve essere inviato con la configurazione attuale.
 
+Un invio che il dispatcher si rifiuta di effettuare (una destinazione loopback, link-local, privata o non `http(s)`), o a cui il destinatario risponde con un redirect, fallisce ogni volta allo stesso modo. Finisce in dead-letter dopo un solo tentativo, con il motivo in `last_error`. Qualsiasi altro errore viene ritentato come per ogni job.
+
 ## Arresto
 
-`shutdown()` impedisce al worker di acquisire nuovi job e attende il completamento di quelli in corso (in flight), evitando che un deploy esegua due volte la coda di un batch. Qualsiasi operazione ancora in esecuzione quando il processo termina mantiene il proprio blocco e viene recuperata dal timeout di visibilità.
+`shutdown()` impedisce al worker di acquisire nuovi job e attende il completamento di quelli in corso (in flight), evitando che un deploy esegua due volte la coda di un batch. L'attesa è limitata a due terzi del timeout di arresto (10 secondi dei 15 predefiniti), così un handler che non termina mai non può bloccare l'arresto. Un job ancora in esecuzione dopo questo limite mantiene il proprio blocco e viene recuperato dal timeout di visibilità.
 
 ## Passaggi successivi
 

@@ -90,7 +90,7 @@ jobs: {
 
 Sûr par conception. Les workers effectuent leur réservation avec `SELECT … FOR UPDATE SKIP LOCKED`, de sorte que chaque job est attribué à exactement l'un d'entre eux et que les autres passent à la ligne suivante plutôt que d'attendre derrière lui. Nul besoin d'élire un leader.
 
-Lors d'un déploiement progressif (rolling deploy), une instance exécutant une ancienne version du code peut recevoir des jobs dont elle n'implémente pas la tâche. Ceux-ci sont replacés dans la file d'attente plutôt que marqués en échec, afin qu'ils s'exécutent dès qu'une instance mise à jour les prend en charge.
+Une instance ne réserve que les tâches pour lesquelles elle a un handler. Lors d'un déploiement progressif (rolling deploy), une instance exécutant une ancienne version du code laisse de côté les jobs dont seule la nouvelle version implémente la tâche : ils restent `pending`, sans qu'aucune tentative ne soit consommée, jusqu'à ce qu'une instance mise à jour les réserve. Une tâche qu'aucune instance n'implémente reste elle aussi `pending`, plutôt que d'être placée en dead-letter.
 
 ## Webhooks durables
 
@@ -109,9 +109,11 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Seul l'**identifiant** du webhook est stocké dans le job, jamais le webhook lui-même — son secret de signature se trouverait sinon en clair dans `rebase.jobs` pendant toute la durée de rétention de la ligne, et un webhook modifié entre la mise en file d'attente et l'envoi doit être transmis avec sa configuration actuelle.
 
+Un envoi que le dispatcher refuse d'effectuer (une destination loopback, link-local, privée ou non `http(s)`), ou auquel le destinataire répond par une redirection, échoue de la même manière à chaque fois. Il est placé en dead-letter après une seule tentative, avec la raison dans `last_error`. Tout autre échec est retenté comme pour n'importe quel job.
+
 ## Arrêt
 
-`shutdown()` empêche le worker de réserver de nouveaux jobs et attend la fin de ceux en cours de traitement, évitant ainsi qu'un déploiement n'exécute deux fois la fin d'un lot. Tout ce qui est encore en cours d'exécution au moment où le processus s'arrête conserve sa réservation et est récupéré par le timeout de visibilité.
+`shutdown()` empêche le worker de réserver de nouveaux jobs et attend la fin de ceux en cours de traitement, évitant ainsi qu'un déploiement n'exécute deux fois la fin d'un lot. L'attente est plafonnée aux deux tiers du timeout d'arrêt (10 secondes sur les 15 par défaut), afin qu'un handler qui ne se termine jamais ne puisse pas bloquer l'arrêt. Un job encore en cours d'exécution après ce délai conserve sa réservation et est récupéré par le timeout de visibilité.
 
 ## Prochaines étapes
 

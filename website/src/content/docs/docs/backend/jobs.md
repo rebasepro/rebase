@@ -126,9 +126,11 @@ Safe by construction. Workers claim with `SELECT … FOR UPDATE SKIP LOCKED`, so
 each job goes to exactly one of them and the others move on to the next row
 rather than queueing behind it. Nothing needs to be elected leader.
 
-During a rolling deploy an instance running older code will be handed jobs whose
-task it does not implement. Those are returned to the queue rather than failed,
-so they run as soon as an updated peer picks them up.
+An instance claims only the tasks it has a handler for. During a rolling deploy,
+an instance running older code leaves alone the jobs whose task only the newer
+code implements: they stay `pending`, their attempts untouched, until an updated
+peer claims them. A task that no instance implements stays `pending` too, rather
+than being dead-lettered.
 
 ## Durable webhooks
 
@@ -152,12 +154,18 @@ signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as
 retention keeps the row, and a webhook edited between the enqueue and the
 delivery should go out as it is now.
 
+A delivery the dispatcher refuses to send (a loopback, link-local, private or
+non-`http(s)` destination), or one the receiver answers with a redirect, fails
+the same way every time. It is dead-lettered after one attempt, with the reason
+in `last_error`. Any other failure is retried like any job.
+
 ## Shutdown
 
 `shutdown()` stops the worker claiming new jobs and waits for the ones in
-flight, so a deploy does not run the tail of a batch twice. Anything still
-running when the process goes keeps its claim and is recovered by the visibility
-timeout.
+flight, so a deploy does not run the tail of a batch twice. The wait is capped
+at two-thirds of the shutdown timeout (10 seconds of the default 15), so one
+handler that never settles cannot hold the shutdown. A job still running after
+that keeps its claim and is recovered by the visibility timeout.
 
 ## Next Steps
 

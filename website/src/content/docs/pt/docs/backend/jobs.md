@@ -90,7 +90,7 @@ jobs: {
 
 Seguro por construção. Os workers realizam a reivindicação com `SELECT … FOR UPDATE SKIP LOCKED`, de modo que cada job vai para exatamente um deles e os outros passam para a próxima linha em vez de ficarem esperando em fila atrás dele. Não é necessário eleger nenhum líder.
 
-Durante um rolling deploy, uma instância executando código antigo receberá jobs cuja tarefa ela não implementa. Esses jobs são devolvidos à fila em vez de falharem, para que sejam executados assim que um par atualizado os assumir.
+Uma instância só reivindica as tarefas para as quais tem um handler. Durante um rolling deploy, uma instância executando código antigo deixa de lado os jobs cuja tarefa só o código novo implementa: eles permanecem `pending`, sem gastar tentativas, até que um par atualizado os reivindique. Uma tarefa que nenhuma instância implementa também permanece `pending`, em vez de ir para a dead-letter.
 
 ## Webhooks duráveis
 
@@ -109,9 +109,11 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Apenas o **id** do webhook é armazenado no job, nunca o webhook em si — caso contrário, seu segredo de assinatura ficaria em texto não criptografado em `rebase.jobs` pelo tempo que a retenção mantiver a linha, e um webhook editado entre o enfileiramento e a entrega deve ser enviado com as configurações atuais.
 
+Uma entrega que o dispatcher se recusa a enviar (um destino loopback, link-local, privado ou que não seja `http(s)`), ou uma que o receptor responde com um redirecionamento, falha da mesma forma todas as vezes. Ela vai para a dead-letter após uma única tentativa, com o motivo em `last_error`. Qualquer outra falha é repetida como em qualquer job.
+
 ## Encerramento
 
-O `shutdown()` impede que o worker reivindique novos jobs e aguarda os que estão em andamento, para que um deploy não execute o final de um lote duas vezes. Qualquer coisa que ainda esteja em execução quando o processo for encerrado mantém sua reivindicação e é recuperada pelo timeout de visibilidade.
+O `shutdown()` impede que o worker reivindique novos jobs e aguarda os que estão em andamento, para que um deploy não execute o final de um lote duas vezes. A espera é limitada a dois terços do timeout de encerramento (10 segundos dos 15 padrão), para que um handler que nunca termina não possa segurar o encerramento. Um job ainda em execução depois disso mantém sua reivindicação e é recuperado pelo timeout de visibilidade.
 
 ## Próximos Passos
 
