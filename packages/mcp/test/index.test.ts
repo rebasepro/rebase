@@ -221,9 +221,53 @@ data: { title: "New Doc" } }
                 arguments: { email: "user@rebase.pro", password: "NewPass123!" }
             }
         });
-        expect(mockClient.admin.listUsersPaginated).toHaveBeenCalledWith({ search: "user@rebase.pro", limit: 1 });
+        expect(mockClient.admin.listUsersPaginated).toHaveBeenCalledWith(expect.objectContaining({ search: "user@rebase.pro" }));
         expect(mockClient.admin.resetPassword).toHaveBeenCalledWith("user-1", { password: "NewPass123!" });
         expect(result.content[0].text).toContain("Password reset");
+    });
+
+    // The server's search is a substring match on email or display name,
+    // ordered by role count, so the exact address is not necessarily first:
+    // with `limit: 1`, resetting ann@x.com while joann@x.com (an admin) exists
+    // answered "not found", as a success.
+    describe("finding the account to reset", () => {
+        const handler = () => (server as any)._requestHandlers.get("tools/call");
+        const reset = (email: string) => handler()({
+            method: "tools/call",
+            params: { name: "rebase_auth_reset_password", arguments: { email } }
+        });
+        const page = (users: { uid: string; email: string }[], total: number, offset: number) =>
+            ({ users, total, limit: users.length, offset });
+
+        it("pages past other accounts whose address contains it", async () => {
+            mockClient.admin.listUsersPaginated
+                .mockResolvedValueOnce(page(Array.from({ length: 100 }, (_, i) => ({ uid: `u${i}`, email: `jo${i}ann@x.com` })), 101, 0))
+                .mockResolvedValueOnce(page([{ uid: "ann-id", email: "ann@x.com" }], 101, 100));
+
+            const result = await reset("ann@x.com");
+
+            expect(result.isError).toBeFalsy();
+            expect(mockClient.admin.resetPassword).toHaveBeenCalledWith("ann-id", undefined);
+            expect(mockClient.admin.listUsersPaginated).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 100 }));
+        });
+
+        it("matches the address the way the server stores it, case-insensitively", async () => {
+            mockClient.admin.listUsersPaginated.mockResolvedValueOnce(page([{ uid: "ann-id", email: "ann@x.com" }], 1, 0));
+
+            await reset("Ann@X.com");
+
+            expect(mockClient.admin.resetPassword).toHaveBeenCalledWith("ann-id", undefined);
+        });
+
+        it("reports an address nobody has as an error, not as a result", async () => {
+            mockClient.admin.listUsersPaginated.mockResolvedValueOnce(page([{ uid: "jo", email: "joann@x.com" }], 1, 0));
+
+            const result = await reset("ann@x.com");
+
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("not found");
+            expect(mockClient.admin.resetPassword).not.toHaveBeenCalled();
+        });
     });
 
     it("routes list_roles to admin.listRoles", async () => {

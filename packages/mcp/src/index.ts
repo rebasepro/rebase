@@ -1009,6 +1009,29 @@ export function assertDestructiveTargetIsLocal(toolName: string): void {
     );
 }
 
+/**
+ * The account whose address is `email`, compared the way the server stores
+ * addresses (trimmed, lower-cased), or `undefined`.
+ *
+ * `GET /admin/users?search=` is a substring match on email *or* display name,
+ * ordered by role count, so the exact address is not necessarily on the first
+ * page, let alone first: with `limit: 1`, resetting ann@x.com while an admin
+ * joann@x.com existed answered "not found". Every page of matches is read.
+ */
+async function findUserByEmail(
+    client: RebaseClient,
+    email: string
+): Promise<{ uid?: string; id?: string; email: string } | undefined> {
+    const wanted = email.trim().toLowerCase();
+    const pageSize = 100;
+    for (let offset = 0; ; offset += pageSize) {
+        const page = await client.admin.listUsersPaginated({ search: email.trim(), limit: pageSize, offset });
+        const match = page.users.find((u) => u.email?.trim().toLowerCase() === wanted);
+        if (match) return match;
+        if (page.users.length < pageSize || offset + page.users.length >= page.total) return undefined;
+    }
+}
+
 async function ensureAdmin(): Promise<void> {
     const client = await getClient();
     try {
@@ -2136,14 +2159,13 @@ roles });
             const { email, password } = argsObj;
 
             // Step 1: Find user by email
-            const usersResult = await client.admin.listUsersPaginated({ search: email, limit: 1 });
-            const user = usersResult.users.find((u) => u.email === email);
+            const user = await findUserByEmail(client, email);
             if (!user) {
-                return textResult(`User with email "${email}" not found.`);
+                throw new Error(`User with email "${email}" not found.`);
             }
             const uid = user.uid || user.id;
             if (!uid) {
-                return textResult(`Could not determine user ID for "${email}".`);
+                throw new Error(`Could not determine user ID for "${email}".`);
             }
 
             // Step 2: Reset password via admin API
