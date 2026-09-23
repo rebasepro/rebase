@@ -1,5 +1,5 @@
 ---
-sourceHash: 99eda64e07fc731d
+sourceHash: 34a9f5de4738a3a6
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -222,6 +222,12 @@ Tout le reste — coupure de connexion, colonne manquante, problème de droits �
 | `FUNCTION_NOT_FOUND` | 404 | Aucune fonction portant ce nom n'est servie — ou elle l'est, mais ses propres routes ne couvrent pas le sous-chemin demandé. Un appelant connecté reçoit également la liste de ce qui *est* servi ; un appelant anonyme ne la reçoit pas, car cette liste constitue l'inventaire complet des endpoints personnalisés. Lorsqu'un fichier de ce nom n'a pas pu être chargé, le message le précise : c'est la différence entre une faute de frappe et un déploiement défectueux. | Vérifiez le nom via `GET /api/functions`, ou consultez les logs de démarrage pour repérer un fichier qui n'aurait pas pu se charger. |
 | `FUNCTION_TIMEOUT` | 504 | Le gestionnaire de fonction a dépassé son délai d'expiration. Il continue de s'exécuter ; il ne peut pas être interrompu d'ici. | Associez un `AbortSignal` aux appels sortants, ou augmentez `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Ce processus relaie les fonctions vers un autre processus qui n'a pas répondu. | Vérifiez que l'instance exécutant les fonctions est bien active. |
+
+## Tâches cron
+
+| Code | Statut | Signification | Action |
+| --- | --- | --- | --- |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> Un déclenchement manuel d'une tâche cron déjà en cours d'exécution — dans le processus qui a répondu, ou dans un autre qui détient le bail d'exécution de la tâche, comme le worker derrière un processus `api`. Rien n'a été exécuté. L'omission figure dans l'historique de la tâche, et `details.log` est cette entrée ; sa ligne nomme le processus qui exécute la tâche. | Réessayez quand cette exécution est terminée. Voir [Tâches cron](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
 ## Interfaces d'administration et modification du schéma
 

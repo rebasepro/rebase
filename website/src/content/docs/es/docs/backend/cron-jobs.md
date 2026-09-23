@@ -1,5 +1,5 @@
 ---
-sourceHash: 63794b5b1f8c0af6
+sourceHash: bd5ebbaf6bff7eb9
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -80,7 +80,7 @@ Eso es todo. Rebase hará lo siguiente:
 
 1. Escaneará el directorio en busca de archivos `.ts` / `.js`
 2. Registrará cada exportación por defecto como un cron job
-3. Creará automáticamente la tabla `rebase.cron_logs` en PostgreSQL (si el controlador soporta SQL)
+3. Creará automáticamente las tablas `rebase.cron_logs`, `rebase.cron_claims` y `rebase.cron_job_state` en PostgreSQL (si el controlador soporta SQL)
 4. Iniciará el programador y cargará los contadores a partir de los registros existentes en la base de datos
 5. Montará las rutas REST de administración en `/api/admin/cron`
 
@@ -133,7 +133,8 @@ interface CronJobDefinition {
     // Optional description shown in Studio
     description?: string;
 
-    // Whether the job starts enabled (default: true)
+    // Whether the job runs (default: true). A pause or a resume from Studio
+    // or the admin API overrides it, for every process, until reset.
     enabled?: boolean;
 
     // Max execution time in seconds (default: 300). Infinity means no
@@ -141,7 +142,7 @@ interface CronJobDefinition {
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
-    // instance was ticking (default: off). See "Recovering Missed Slots".
+    // instance was ticking (default: off). See "Cron across instances".
     catchUpWindowSeconds?: number;
 
     // The function to run on each tick
@@ -270,9 +271,9 @@ Todas las rutas de cron requieren **autenticación de administrador** (`requireA
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | Listar todos los cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtener el estado de una tarea individual |
-| `POST` | `/api/admin/cron/:id/trigger` | Activar manualmente una tarea |
+| `POST` | `/api/admin/cron/:id/trigger` | Activar manualmente una tarea — `409` mientras ya se está ejecutando |
 | `GET` | `/api/admin/cron/:id/logs` | Obtener el historial de ejecución (`?limit=N`) |
-| `PUT` | `/api/admin/cron/:id` | Habilitar/deshabilitar una tarea (`{ "enabled": true }`) |
+| `PUT` | `/api/admin/cron/:id` | Pausar o reanudar una tarea en todos los procesos (`{ "enabled": false }`); `null` vuelve a seguir el código |
 
 ### Ejemplo: Listar todas las tareas
 
@@ -332,6 +333,18 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
+Mientras la tarea se está ejecutando — aquí o en cualquier otro proceso —, la
+respuesta es `409` con el código `CRON_JOB_ALREADY_EXECUTING`; consulta
+[Protección de concurrencia](/docs/backend/cron-across-instances/#concurrency-guarding).
+
+### Pausar una tarea
+
+<span class="since-badge" data-since="0.23">Since 0.23</span> Una pausa desde Studio o con
+`PUT /api/admin/cron/:id` se aplica a todos los procesos y se mantiene tras
+reinicios y redespliegues; `{ "enabled": null }` devuelve la tarea al `enabled`
+que declara su archivo. Cómo la lee cada réplica, y qué ocurre cuando una no
+puede, está en [Cron entre instancias](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
+
 ## SDK de cliente
 
 El SDK cliente de Rebase expone un espacio de nombres `cron` para todas las operaciones:
@@ -366,9 +379,16 @@ Cuando los cron jobs están configurados, aparece una herramienta **Cron Jobs** 
 - **Panel de detalles** — Programación, próxima/última ejecución, duración e información de errores
 - **Historial de ejecución** — Entradas de registro desplegables con salida capturada y resultados
 - **Activación manual** — Ejecuta cualquier tarea bajo demanda con un solo clic
-- **Habilitar/deshabilitar** — Pausa y reanuda tareas sin reiniciar el servidor
+- **Habilitar/deshabilitar** — Pausa y reanuda tareas sin reiniciar el servidor, en todos los procesos a la vez; una pausa se mantiene tras reinicios y despliegues
 
 El panel se actualiza automáticamente cada 15 segundos.
+
+El panel muestra lo mismo sea cual sea el proceso que lo sirve. Una tarea que
+otro proceso está ejecutando aparece como en ejecución, y en un proceso cuyo
+programador no está iniciado — el rol `api` junto a un worker — el número de
+ejecuciones, el número de fallos y la última ejecución se leen de
+`rebase.cron_logs`, con una consulta limitada a las filas de cada tarea, en lugar
+de un proceso que no ejecuta nada.
 
 ## Validación de programación y análisis AST
 
@@ -389,59 +409,13 @@ Los programadores estándar basados en intervalos (como `setInterval`) se desví
 
 ---
 
-## Recuperación de intervalos perdidos (Missed Slots)
+## Más de un proceso
 
-Dado que el programador calcula el siguiente intervalo a partir de *ahora* en cada inicio, un intervalo solo se ejecuta si alguna instancia estaba activa y corriendo cuando llegó el momento. Cualquier cosa que reemplace el proceso durante un intervalo —un despliegue continuo (rolling deploy), una caída, una plataforma reciclando el contenedor— descarta esa ejecución, y el reemplazo programa el intervalo *posterior* a este. Nada produce un error; la ejecución simplemente nunca ocurre.
-
-Esto **no** es un problema exclusivo del escalado a cero (scale-to-zero). Un servicio fijado a una instancia activa (warm) sigue perdiendo ejecuciones, porque la plataforma tiene la libertad de retirar la instancia que contiene el temporizador e iniciar una nueva.
-
-Configura `catchUpWindowSeconds` con una ventana cómodamente más amplia que un reinicio, y el inicio ejecutará un intervalo que encuentre sin reclamar dentro de esa ventana:
-
-```typescript
-export default defineCron({
-    schedule: "0 6 * * *",       // daily at 06:00
-    name: "Scrape Listings",
-    catchUpWindowSeconds: 3600,  // tolerate an hour of downtime around 06:00
-    handler: async (ctx) => { /* … */ }
-});
-```
-
-Tres cosas a tener en cuenta:
-
-- **Desactivado por defecto.** Sin `catchUpWindowSeconds`, el comportamiento no cambia.
-- **Solo se ejecuta el intervalo perdido más reciente.** Arrancar tras una interrupción de seis horas pondrá al día una tarea horaria una sola vez, no seis. La recuperación (catch-up) evita que una ejecución se pierda; no reproduce el historial.
-- **Se requiere un almacenamiento compatible con reclamaciones (claims).** Catch-up reclama el intervalo a través de la misma clave `(job_id, slot)` que utiliza la ruta programada, que es lo único que distingue «este intervalo nunca se ejecutó» de «este intervalo ya se ejecutó en la instancia que está siendo reemplazada». Sin un almacenamiento vinculado, catch-up se omite y se registra una advertencia; de lo contrario, una instancia reciclada cada 30 minutos volvería a ejecutar la misma tarea horaria cada vez que se iniciara.
-
-En el caso habitual —un reinicio minutos después de que un intervalo se ejecutara normalmente—, el intervalo más reciente ya está reclamado, por lo que catch-up solo cuesta una comprobación de reclamación por tarea en cada inicio y no hace nada.
-
-Al arrancar se eliminan las reclamaciones de más de siete días, pero siempre se conserva la más reciente de cada tarea, sea cual sea su antigüedad. Esa reclamación es el registro de que el intervalo ya se ejecutó, así que un despliegue el día 10 no vuelve a ejecutar una tarea mensual con una ventana de catch-up de un mes.
-
-Una ejecución recuperada es una entrada normal en `cron_logs` (`manual` es `false`), con una primera línea de registro indicando el intervalo que recuperó y cuánto retraso tuvo:
-
-```
-⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
-```
-
----
-
-## Protección de concurrencia
-
-Para garantizar la estabilidad al ejecutar operaciones que consumen muchos recursos, Rebase implementa un estricto **bloqueo de ejecución de concurrencia única** por ID de tarea:
-- **Solapamientos programados**: Si el tick programado de una tarea se dispara mientras la ejecución anterior todavía se está ejecutando, el programador omite el tick y programa inmediatamente la siguiente ejecución candidata.
-- **Colisiones por activación manual**: Si un operador activa manualmente una tarea en ejecución a través de Rebase Studio o la API REST, la petición responde inmediatamente con una carga útil de omisión, protegiendo al worker activo.
-
-En cualquier caso, se escribe una fila en `rebase.cron_logs`, por lo que la omisión queda registrada en el historial de ejecución y no solo en el log del proceso:
-
-```json
-{
-  "jobId": "expire-users",
-  "success": true,
-  "result": { "skipped": true, "reason": "already_executing" },
-  "logs": ["Skipped: the previous run has not finished"]
-}
-```
-
-`success: true` porque nada falló: `result.skipped` es lo que lo marca. Varias de estas omisiones consecutivas son la señal característica de una tarea que ha sobrepasado su programación, y ese es un patrón que solo puedes ver si las omisiones quedan registradas.
+Cada proceso cuyo programador está activo arma los mismos temporizadores; la
+base de datos decide cuál de ellos ejecuta cada intervalo. Cómo un intervalo se
+ejecuta una sola vez, cómo se recupera un intervalo que un reinicio perdió, cómo
+una pausa llega a todas las réplicas y por qué una activación manual nunca se
+ejecuta junto a una programada se explica en [Cron entre instancias](/docs/backend/cron-across-instances).
 
 ---
 
@@ -477,7 +451,23 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+
+CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
+    job_id         TEXT PRIMARY KEY,
+    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by     TEXT,
+    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by     TEXT
+);
 ```
+
+Cada una se crea al arrancar si falta, así que una base de datos anterior a ella
+la obtiene en su siguiente despliegue. Ninguna es una colección, y el rol de
+usuario final `rebase_user` no tiene ningún privilegio sobre ellas: un
+`cron_job_state` escribible permitiría a un usuario autenticado pausar una tarea
+para todos, o retener su lease para que nada la ejecute.
 
 Al arrancar, el programador lee las estadísticas de esta tabla mediante consultas de agregación (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) para completar el historial de `totalRuns` y `totalFailures`. Las inserciones de registros se ejecutan en un barrido asíncrono no bloqueante; si falla el volcado a la base de datos, el programador registra el error y continúa la ejecución normal utilizando el búfer circular en memoria como alternativa de respaldo.
 
@@ -535,3 +525,4 @@ El handler se ejecuta en el despliegue, donde esas variables existen. Una import
 - **[Backend Overview](/docs/backend)** — Referencia completa de configuración del backend
 - **[Entity Callbacks](/docs/collections/callbacks)** — Ejecuta lógica ante cambios de datos
 - **[Webhook Integration](/docs/recipes/webhooks)** — Envía notificaciones en eventos
+- **[Cron entre instancias](/docs/backend/cron-across-instances)** — Una ejecución por intervalo, intervalos perdidos, pausar en todas partes y ejecuciones solapadas

@@ -1,5 +1,5 @@
 ---
-sourceHash: 99eda64e07fc731d
+sourceHash: 34a9f5de4738a3a6
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -255,6 +255,12 @@ codice SQLSTATE per tutti, e il messaggio indica il vincolo violato.
 | `FUNCTION_NOT_FOUND` | 404 | Nessuna funzione con questo nome è disponibile — o se lo è, le sue route non coprono il percorso successivo. A un chiamante autenticato viene anche indicato cosa *è* disponibile; a uno anonimo no, poiché tale elenco costituirebbe un inventario di tutti gli endpoint personalizzati. Se un file con quel nome non è stato caricato, il messaggio lo specifica: questa è la differenza tra un errore di digitazione e un deploy non riuscito. | Confronta il nome con `GET /api/functions`, o controlla il log di avvio per individuare il file non caricato. |
 | `FUNCTION_TIMEOUT` | 504 | L'handler ha superato il timeout previsto. L'esecuzione è ancora in corso; non può essere interrotta da qui. | Assegna un `AbortSignal` alle chiamate in uscita, oppure aumenta `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Questo processo fa da proxy per le funzioni verso un altro processo, che non ha risposto. | Verifica che l'unità delle funzioni sia in esecuzione. |
+
+## Cron job
+
+| Codice | Stato | Significato | Cosa fare |
+| --- | --- | --- | --- |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> Un avvio manuale di un cron job già in esecuzione — nel processo che ha risposto, o in un altro che detiene il lease di esecuzione del job, come il worker dietro un processo `api`. Non è stato eseguito nulla. Il salto è nella cronologia del job, e `details.log` è quella voce; la sua riga indica il processo che esegue il job. | Riprova quando quell'esecuzione è terminata. Vedi [Cron job](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
 ## Superfici di amministrazione e modifica dello schema
 

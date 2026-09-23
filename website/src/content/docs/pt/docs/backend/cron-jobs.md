@@ -1,5 +1,5 @@
 ---
-sourceHash: 63794b5b1f8c0af6
+sourceHash: bd5ebbaf6bff7eb9
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -80,7 +80,7 @@ Isso é tudo. O Rebase irá:
 
 1. Escanear o diretório em busca de arquivos `.ts` / `.js`
 2. Registrar cada exportação padrão como um cron job
-3. Criar automaticamente a tabela `rebase.cron_logs` no PostgreSQL (se o driver suportar SQL)
+3. Criar automaticamente as tabelas `rebase.cron_logs`, `rebase.cron_claims` e `rebase.cron_job_state` no PostgreSQL (se o driver suportar SQL)
 4. Iniciar o agendador e preencher os contadores a partir dos logs existentes no banco de dados
 5. Disponibilizar as rotas REST de administração em `/api/admin/cron`
 
@@ -133,7 +133,8 @@ interface CronJobDefinition {
     // Optional description shown in Studio
     description?: string;
 
-    // Whether the job starts enabled (default: true)
+    // Whether the job runs (default: true). A pause or a resume from Studio
+    // or the admin API overrides it, for every process, until reset.
     enabled?: boolean;
 
     // Max execution time in seconds (default: 300). Infinity means no
@@ -141,7 +142,7 @@ interface CronJobDefinition {
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
-    // instance was ticking (default: off). See "Recovering Missed Slots".
+    // instance was ticking (default: off). See "Cron across instances".
     catchUpWindowSeconds?: number;
 
     // The function to run on each tick
@@ -270,9 +271,9 @@ Todas as rotas de cron exigem **autenticação de administrador** (`requireAuth`
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | Lista todos os cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtém o status de um job individual |
-| `POST` | `/api/admin/cron/:id/trigger` | Dispara um job manualmente |
+| `POST` | `/api/admin/cron/:id/trigger` | Dispara um job manualmente — `409` enquanto ele já está em execução |
 | `GET` | `/api/admin/cron/:id/logs` | Obtém o histórico de execução (`?limit=N`) |
-| `PUT` | `/api/admin/cron/:id` | Habilita/desabilita um job (`{ "enabled": true }`) |
+| `PUT` | `/api/admin/cron/:id` | Pausa ou retoma um job em todos os processos (`{ "enabled": false }`); `null` volta a seguir o código |
 
 ### Exemplo: Listar Todos os Jobs
 
@@ -332,6 +333,19 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
+Enquanto o job está em execução — aqui ou em qualquer outro processo —, a
+resposta é `409` com o código `CRON_JOB_ALREADY_EXECUTING`; veja
+[Proteção de Concorrência](/docs/backend/cron-across-instances/#concurrency-guarding).
+
+### Pausando um job
+
+<span class="since-badge" data-since="0.23">Since 0.23</span> Uma pausa pelo Studio ou por
+`PUT /api/admin/cron/:id` vale para todos os processos e se mantém após
+reinicializações e novos deploys; `{ "enabled": null }` devolve o job ao
+`enabled` declarado no seu arquivo. Como cada réplica a lê, e o que acontece
+quando uma não consegue, está em
+[Cron entre instâncias](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
+
 ## SDK do Cliente
 
 O SDK do cliente Rebase disponibiliza o namespace `cron` para todas as operações:
@@ -366,9 +380,16 @@ Quando os cron jobs estão configurados, uma ferramenta **Cron Jobs** aparece no
 - **Painel de detalhes** — Agendamento, próxima/última execução, duração e detalhes de erro
 - **Histórico de execuções** — Entradas de log expansíveis com saídas e resultados capturados
 - **Disparo manual** — Execute qualquer job sob demanda com um único clique
-- **Habilitar/desabilitar** — Pause e retome jobs sem reiniciar o servidor
+- **Habilitar/desabilitar** — Pause e retome jobs sem reiniciar o servidor, em todos os processos de uma vez; uma pausa se mantém após reinicializações e deploys
 
 O painel é atualizado automaticamente a cada 15 segundos.
+
+O painel mostra a mesma coisa, seja qual for o processo que o serve. Um job que
+outro processo está executando aparece como em execução, e em um processo cujo
+agendador não foi iniciado — o papel `api` ao lado de um worker — o número de
+execuções, o número de falhas e a última execução são lidos de
+`rebase.cron_logs`, com uma consulta limitada às linhas de cada job, em vez de um
+processo que não executa nada.
 
 ## Validação de Agendamento e Análise AST
 
@@ -389,59 +410,13 @@ Agendadores padrão baseados em intervalos (como `setInterval`) sofrem desvio ao
 
 ---
 
-## Recuperando Slots Perdidos
+## Mais de um processo
 
-Como o agendador calcula o próximo slot a partir do momento atual (*now*) a cada inicialização, um slot só é executado se alguma instância estiver ativa e operando quando chegar a sua vez. Qualquer coisa que substitua o processo durante um slot — um deploy contínuo (rolling deploy), uma pane (crash), a reciclagem do container pela plataforma — descarta essa execução, e o substituto agendará o slot *seguinte*. Nenhum erro é emitido; a execução simplesmente nunca acontece.
-
-Isso **não** é um problema exclusivo do scale-to-zero. Um serviço fixado em uma instância ativa (warm instance) ainda assim perde execuções, pois a plataforma tem a liberdade de desligar a instância que mantém o timer e iniciar uma nova.
-
-Defina `catchUpWindowSeconds` com um intervalo confortavelmente maior do que o tempo de reinicialização, e a inicialização executará um slot que encontrar não reivindicado dentro desse intervalo:
-
-```typescript
-export default defineCron({
-    schedule: "0 6 * * *",       // daily at 06:00
-    name: "Scrape Listings",
-    catchUpWindowSeconds: 3600,  // tolerate an hour of downtime around 06:00
-    handler: async (ctx) => { /* … */ }
-});
-```
-
-Três pontos importantes:
-
-- **Desativado por padrão.** Sem `catchUpWindowSeconds`, o comportamento permanece inalterado.
-- **Apenas o slot perdido mais recente é executado.** Iniciar após uma interrupção de seis horas compensará um job de frequência horária uma única vez, e não seis vezes. O catch-up impede que uma execução seja perdida; ele não recria o histórico.
-- **É necessário um repositório capaz de registrar reivindicações (claims).** O catch-up reivindica o slot por meio da mesma chave `(job_id, slot)` que o fluxo agendado utiliza, que é o único elemento que distingue "este slot nunca foi executado" de "este slot já foi executado na instância que está sendo substituída". Sem um repositório conectado, o catch-up é ignorado e um aviso é registrado no log — caso contrário, uma instância reciclada a cada 30 minutos executaria novamente o mesmo job horário a cada inicialização.
-
-No caso comum — uma reinicialização minutos após um slot ter sido executado normalmente —, o slot mais recente já foi reivindicado, de modo que o catch-up custa apenas uma verificação por job a cada inicialização e não realiza ação adicional.
-
-Na inicialização, as reivindicações com mais de sete dias são apagadas, mas a mais recente de cada job é sempre mantida, qualquer que seja a sua idade. Essa reivindicação é o registro de que o slot já foi executado, então um job mensal com uma janela de catch-up de um mês não é executado de novo por um deploy no dia 10.
-
-Uma execução recuperada é uma entrada comum em `cron_logs` (`manual` é `false`), com uma primeira linha de log registrando o slot recuperado e o tempo de atraso:
-
-```
-⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
-```
-
----
-
-## Proteção de Concorrência
-
-Para garantir a estabilidade ao executar operações que demandam muitos recursos, o Rebase implementa um **bloqueio estrito de concorrência única** por ID de job:
-- **Sobreposições Agendadas**: Se o tick agendado de um job disparar enquanto a execução anterior ainda estiver em andamento, o agendador ignora o tick e agenda imediatamente a próxima execução candidata.
-- **Colisões por Disparo Manual**: Se um operador disparar manualmente um job em execução por meio do Rebase Studio ou da REST API, a requisição retorna imediatamente com uma carga indicando o descarte (skipped), protegendo o worker ativo.
-
-Em ambos os casos, uma linha é gravada em `rebase.cron_logs`, de modo que a supressão fica registrada no histórico de execuções em vez de constar apenas no log do processo:
-
-```json
-{
-  "jobId": "expire-users",
-  "success": true,
-  "result": { "skipped": true, "reason": "already_executing" },
-  "logs": ["Skipped: the previous run has not finished"]
-}
-```
-
-`success: true` porque nada falhou — `result.skipped` é o que indica a situação. Uma sequência consecutiva dessas ocorrências é o indício característico de um job que ultrapassou a capacidade do seu intervalo de agendamento, e esse é um padrão que você só pode identificar se os descartes forem devidamente registrados.
+Todo processo cujo agendador está ligado arma os mesmos timers; o banco de dados
+decide qual deles executa cada slot. Como um slot roda uma única vez, como um
+slot perdido em uma reinicialização é recuperado, como uma pausa chega a todas as
+réplicas e por que um disparo manual nunca roda ao lado de uma execução agendada
+está em [Cron entre instâncias](/docs/backend/cron-across-instances).
 
 ---
 
@@ -477,7 +452,23 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+
+CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
+    job_id         TEXT PRIMARY KEY,
+    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by     TEXT,
+    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by     TEXT
+);
 ```
+
+Cada uma é criada na inicialização se estiver faltando, então um banco de dados
+anterior a ela a recebe no próximo deploy. Nenhuma delas é uma coleção, e o papel
+de usuário final `rebase_user` não tem nenhum privilégio sobre elas: um
+`cron_job_state` gravável permitiria que um usuário autenticado pausasse um job
+para todos, ou segurasse seu lease para que nada o execute.
 
 Na inicialização, o agendador lê as estatísticas dessa tabela por meio de consultas agregadas (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) para preencher o histórico de `totalRuns` e `totalFailures`. As inserções de log são executadas em um fluxo assíncrono não bloqueante; se a gravação no banco de dados falhar, o agendador registra o erro e continua a operação normal usando o ring buffer em memória como contingência.
 
@@ -535,3 +526,4 @@ O handler é executado na instância de implantação, onde essas variáveis de 
 - **[Visão Geral do Backend](/docs/backend)** — Referência completa de configuração do backend
 - **[Callbacks de Entidades](/docs/collections/callbacks)** — Execute lógicas baseadas em alterações de dados
 - **[Integração com Webhooks](/docs/recipes/webhooks)** — Envie notificações a partir de eventos
+- **[Cron entre instâncias](/docs/backend/cron-across-instances)** — Uma execução por slot, slots perdidos, pausa em todo lugar e execuções sobrepostas

@@ -1,5 +1,5 @@
 ---
-sourceHash: 99eda64e07fc731d
+sourceHash: 34a9f5de4738a3a6
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -222,6 +222,12 @@ Alles andere – eine abgebrochene Verbindung, eine fehlende Spalte, ein Berecht
 | `FUNCTION_NOT_FOUND` | 404 | Es wird keine Funktion dieses Namens bereitgestellt – oder doch, aber ihre eigenen Routen decken den Pfad dahinter nicht ab. Einem angemeldeten Aufrufer wird auch mitgeteilt, was bereitgestellt *wird*; einem anonymen Aufrufer nicht, da diese Liste ein Verzeichnis aller benutzerdefinierten Endpunkte darstellt. Wenn eine Datei dieses Namens nicht geladen werden konnte, weist die Nachricht darauf hin: Das ist der Unterschied zwischen einem Tippfehler und einem fehlerhaften Deployment. | Überprüfen Sie den Namen anhand von `GET /api/functions` oder das Boot-Log auf eine Datei, die nicht geladen werden konnte. |
 | `FUNCTION_TIMEOUT` | 504 | Der Handler hat sein Timeout überschritten. Er läuft noch; er kann von hier aus nicht abgebrochen werden. | Übergeben Sie ausgehenden Aufrufen ein `AbortSignal` oder erhöhen Sie `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Dieser Prozess leitet Funktionen per Proxy an einen anderen weiter, der nicht geantwortet hat. | Überprüfen Sie, ob die Functions-Einheit läuft. |
+
+## Cron-Jobs
+
+| Code | Status | Bedeutung | Maßnahme |
+| --- | --- | --- | --- |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> Ein manueller Trigger eines Cron-Jobs, der bereits läuft — in dem Prozess, der geantwortet hat, oder in einem anderen, der die Run-Lease des Jobs hält, etwa dem Worker hinter einem `api`-Prozess. Es wurde nichts ausgeführt. Das Überspringen steht im Verlauf des Jobs, und `details.log` ist dieser Eintrag; seine Zeile nennt den Prozess, der den Job ausführt. | Versuchen Sie es erneut, wenn diese Ausführung beendet ist. Siehe [Cron-Jobs](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
 ## Admin-Oberflächen und Schema-Bearbeitung
 

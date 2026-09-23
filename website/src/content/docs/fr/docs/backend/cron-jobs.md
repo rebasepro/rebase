@@ -1,5 +1,5 @@
 ---
-sourceHash: 63794b5b1f8c0af6
+sourceHash: bd5ebbaf6bff7eb9
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -82,7 +82,7 @@ C'est tout. Rebase va :
 
 1. Scanner le répertoire à la recherche de fichiers `.ts` / `.js`
 2. Enregistrer chaque export par défaut en tant que tâche cron
-3. Créer automatiquement la table `rebase.cron_logs` dans PostgreSQL (si le pilote prend en charge le SQL)
+3. Créer automatiquement les tables `rebase.cron_logs`, `rebase.cron_claims` et `rebase.cron_job_state` dans PostgreSQL (si le pilote prend en charge le SQL)
 4. Démarrer le planificateur et initialiser les compteurs à partir des journaux existants en base de données
 5. Monter les routes REST d'administration sur `/api/admin/cron`
 
@@ -136,7 +136,8 @@ interface CronJobDefinition {
     // Optional description shown in Studio
     description?: string;
 
-    // Whether the job starts enabled (default: true)
+    // Whether the job runs (default: true). A pause or a resume from Studio
+    // or the admin API overrides it, for every process, until reset.
     enabled?: boolean;
 
     // Max execution time in seconds (default: 300). Infinity means no
@@ -144,7 +145,7 @@ interface CronJobDefinition {
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
-    // instance was ticking (default: off). See "Recovering Missed Slots".
+    // instance was ticking (default: off). See "Cron across instances".
     catchUpWindowSeconds?: number;
 
     // The function to run on each tick
@@ -290,9 +291,9 @@ Toutes les routes cron nécessitent une **authentification administrateur** (`re
 |---------|--------|-------------|
 | `GET` | `/api/admin/cron` | Lister toutes les tâches cron enregistrées |
 | `GET` | `/api/admin/cron/:id` | Obtenir le statut d'une tâche individuelle |
-| `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche |
+| `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche — `409` tant qu'elle est déjà en cours |
 | `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`) |
-| `PUT` | `/api/admin/cron/:id` | Activer/désactiver une tâche (`{ "enabled": true }`) |
+| `PUT` | `/api/admin/cron/:id` | Mettre en pause ou reprendre une tâche partout (`{ "enabled": false }`) ; `null` suit de nouveau le code |
 
 ### Exemple : Lister toutes les tâches
 
@@ -360,6 +361,19 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
+Tant que la tâche s'exécute — ici ou dans n'importe quel autre processus —, la
+réponse est `409` avec le code `CRON_JOB_ALREADY_EXECUTING` ; voir
+[Gestion de la concurrence](/docs/backend/cron-across-instances/#concurrency-guarding).
+
+### Mettre une tâche en pause
+
+<span class="since-badge" data-since="0.23">Since 0.23</span> Une pause depuis Studio ou via
+`PUT /api/admin/cron/:id` s'applique à tous les processus et reste en place après
+les redémarrages et les redéploiements ; `{ "enabled": null }` rend la tâche au
+`enabled` que déclare son fichier. Comment chaque réplique la lit, et ce qui se
+passe quand l'une d'elles ne le peut pas, est décrit dans
+[Cron entre plusieurs instances](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
+
 ## SDK Client
 
 Le SDK client Rebase expose un espace de noms `cron` pour toutes les opérations :
@@ -394,9 +408,16 @@ Lorsque des tâches cron sont configurées, un outil **Cron Jobs** apparaît dan
 - **Panneau de détails** — Planification, prochaine/dernière exécution, durée et informations sur les erreurs
 - **Historique d'exécution** — Entrées de journal extensibles avec les sorties capturées et les résultats
 - **Déclenchement manuel** — Exécutez n'importe quelle tâche à la demande en un clic
-- **Activer/Désactiver** — Mettez en pause et reprenez les tâches sans redémarrer le serveur
+- **Activer/Désactiver** — Mettez en pause et reprenez les tâches sans redémarrer le serveur, pour tous les processus à la fois ; une pause est conservée après les redémarrages et les déploiements
 
 Le tableau de bord s'actualise automatiquement toutes les 15 secondes.
+
+Le panneau affiche la même chose quel que soit le processus qui le sert. Une
+tâche qu'un autre processus exécute apparaît comme en cours, et sur un processus
+dont le planificateur n'est pas démarré — le rôle `api` à côté d'un worker —, le
+nombre d'exécutions, le nombre d'échecs et la dernière exécution sont lus dans
+`rebase.cron_logs`, par une requête limitée aux lignes de chaque tâche, plutôt
+que d'un processus qui n'exécute rien.
 
 ## Validation des planifications et parsing AST
 
@@ -417,62 +438,14 @@ Les planificateurs standards basés sur des intervalles (tels que `setInterval`)
 
 ---
 
-## Récupération des créneaux manqués
+## Plus d'un processus
 
-Comme le planificateur calcule le prochain créneau à partir de l'instant présent (*now*) à chaque démarrage, un créneau ne s'exécute que si une instance était active et opérationnelle lorsqu'il s'est présenté. Tout ce qui remplace le processus pendant un créneau — un déploiement progressif (rolling deploy), un crash, le recyclage du conteneur par la plateforme — ignore cette exécution, et le processus de remplacement planifie le créneau *suivant*. Aucune erreur n'est levée ; l'exécution n'a simplement jamais lieu.
-
-Ce n'est **pas** seulement un problème lié au scale-to-zero. Un service assigné à une instance active continue de perdre des exécutions, car une plateforme est libre de retirer l'instance hébergeant le timer et d'en démarrer une nouvelle.
-
-Définissez `catchUpWindowSeconds` sur une fenêtre largement supérieure à un redémarrage, et le démarrage exécutera un créneau qu'il trouvera non réclamé dans cette fenêtre :
-
-```typescript
-export default defineCron({
-    schedule: "0 6 * * *",       // daily at 06:00
-    name: "Scrape Listings",
-    catchUpWindowSeconds: 3600,  // tolerate an hour of downtime around 06:00
-    handler: async (ctx) => { /* … */ }
-});
-```
-
-Trois points à retenir :
-
-- **Désactivé par défaut.** Sans `catchUpWindowSeconds`, le comportement reste inchangé.
-- **Seul le créneau manqué le plus récent est exécuté.** Un démarrage après six heures d'interruption rattrape une tâche horaire une seule fois, pas six. Le rattrapage évite qu'une exécution disparaisse ; il ne rejoue pas l'historique.
-- **Un magasin supportant les réservations (claims) est requis.** Le rattrapage réserve le créneau via la même clé `(job_id, slot)` que le parcours planifié utilise, ce qui est la seule chose distinguant « ce créneau n'a jamais tourné » de « ce créneau a déjà tourné sur l'instance en cours de remplacement ». Sans magasin connecté, le rattrapage est ignoré et un avertissement est consigné — sinon, une instance recyclée toutes les 30 minutes réexécuterait la même tâche horaire à chaque démarrage.
-
-Dans le cas habituel — un redémarrage quelques minutes après qu'un créneau s'est exécuté normalement — le créneau le plus récent est déjà réclamé, donc le rattrapage ne coûte qu'une vérification de réservation par tâche par démarrage et ne fait rien de plus.
-
-Au démarrage, les réservations de plus de sept jours sont supprimées, mais la plus récente de chaque tâche est toujours conservée, quel que soit son âge. Cette réservation est la preuve que le créneau a déjà tourné : une tâche mensuelle avec une fenêtre de rattrapage d'un mois n'est donc pas réexécutée par un déploiement le 10.
-
-Une exécution récupérée constitue une entrée normale dans `cron_logs` (`manual` vaut `false`), avec une première ligne de journal indiquant le créneau récupéré et son retard :
-
-```
-⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
-```
-
----
-
-## Gestion de la concurrence
-
-Pour garantir la stabilité lors de l'exécution d'opérations gourmandes en ressources, Rebase implémente un **verrou d'exécution à concurrence unique** strict par identifiant de tâche :
-- **Chevauchements planifiés** : Si le déclenchement planifié d'une tâche survient alors que l'exécution précédente est toujours en cours, le planificateur ignore le déclenchement et planifie immédiatement la prochaine exécution candidate.
-- **Collisions avec déclenchement manuel** : Si un opérateur déclenche manuellement une tâche en cours d'exécution via Rebase Studio ou l'API REST, la requête répond immédiatement avec une charge utile indiquant qu'elle a été ignorée, protégeant ainsi le worker actif.
-
-Dans les deux cas, une ligne est écrite dans `rebase.cron_logs`, de sorte que l'omission apparaît dans l'historique
-d'exécution plutôt que seulement dans le journal du processus :
-
-```json
-{
-  "jobId": "expire-users",
-  "success": true,
-  "result": { "skipped": true, "reason": "already_executing" },
-  "logs": ["Skipped: the previous run has not finished"]
-}
-```
-
-`success: true` car rien n'a échoué — c'est `result.skipped` qui le signale. Une
-série de ces enregistrements d'affilée est la signature d'une tâche devenue trop longue pour sa fréquence,
-et c'est un schéma qu'il est impossible de repérer si ces omissions ne sont pas enregistrées.
+Chaque processus dont le planificateur est actif arme les mêmes minuteurs ; la
+base de données décide lequel d'entre eux exécute chaque créneau. Comment un
+créneau ne s'exécute qu'une fois, comment un créneau perdu lors d'un redémarrage
+est rattrapé, comment une pause atteint chaque réplique et pourquoi un
+déclenchement manuel ne s'exécute jamais à côté d'une exécution planifiée est
+décrit dans [Cron entre plusieurs instances](/docs/backend/cron-across-instances).
 
 ---
 
@@ -508,7 +481,24 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+
+CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
+    job_id         TEXT PRIMARY KEY,
+    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by     TEXT,
+    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by     TEXT
+);
 ```
+
+Chacune est créée au démarrage si elle manque, de sorte qu'une base de données
+antérieure l'obtient à son prochain déploiement. Aucune n'est une collection, et
+le rôle d'utilisateur final `rebase_user` n'a aucun privilège sur elles : un
+`cron_job_state` accessible en écriture permettrait à un utilisateur connecté de
+mettre une tâche en pause pour tout le monde, ou de retenir son bail pour que
+rien ne l'exécute.
 
 Au démarrage, le planificateur lit les statistiques de cette table via des requêtes d'agrégation (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) pour renseigner l'historique de `totalRuns` et `totalFailures`. Les insertions de journaux sont exécutées lors d'un passage asynchrone non bloquant ; si une écriture en base échoue, le planificateur enregistre l'erreur et poursuit son exécution normale en utilisant la mémoire tampon circulaire en mémoire comme solution de repli.
 
@@ -577,3 +567,4 @@ se contente d'enregistrer la tâche.
 - **[Vue d'ensemble du Backend](/docs/backend)** — Référence complète de la configuration du backend
 - **[Callbacks d'entités](/docs/collections/callbacks)** — Exécuter de la logique lors des modifications de données
 - **[Intégration de Webhooks](/docs/recipes/webhooks)** — Envoyer des notifications sur des événements
+- **[Cron entre plusieurs instances](/docs/backend/cron-across-instances)** — Une exécution par créneau, créneaux manqués, pause partout et exécutions qui se chevauchent

@@ -1,5 +1,5 @@
 ---
-sourceHash: 99eda64e07fc731d
+sourceHash: 34a9f5de4738a3a6
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -261,6 +261,12 @@ mensaje nombra la restricción.
 | `FUNCTION_NOT_FOUND` | 404 | No se sirve ninguna función con ese nombre, o sí se sirve, pero sus propias rutas no cubren la ruta posterior. A un cliente autenticado también se le indica qué *sí* se sirve; a uno anónimo no, porque esa lista es un inventario de cada endpoint personalizado. Si un archivo con ese nombre no pudo cargarse, el mensaje lo especifica: esa es la diferencia entre un error tipográfico y un despliegue roto. | Comprueba el nombre contra `GET /api/functions`, o el log de arranque para ver si un archivo no se cargó. |
 | `FUNCTION_TIMEOUT` | 504 | El handler excedió su tiempo de espera. Sigue ejecutándose; no se puede cancelar desde aquí. | Añade un `AbortSignal` a las llamadas salientes o aumenta `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Este proceso reenvía funciones por proxy a otro que no respondió. | Comprueba que la unidad de funciones esté en ejecución. |
+
+## Tareas cron
+
+| Código | Estado | Significado | Qué hacer |
+| --- | --- | --- | --- |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> Una activación manual de una tarea cron que ya se está ejecutando — en el proceso que respondió, o en otro que tiene el lease de ejecución de la tarea, como el worker detrás de un proceso `api`. No se ejecutó nada. La omisión queda en el historial de la tarea, y `details.log` es esa entrada; su línea nombra el proceso que ejecuta la tarea. | Vuelve a intentarlo cuando esa ejecución haya terminado. Consulta [Tareas cron](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
 ## Superficies de administración y edición de esquemas
 

@@ -82,6 +82,7 @@
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 - [Cron Jobs](https://rebase.pro/docs/backend/cron-jobs): Schedule recurring background tasks with Rebase's built-in cron job system. Define jobs as TypeScript files, monitor them in Studio, and manage them via the REST API.
+- [Cron across instances](https://rebase.pro/docs/backend/cron-across-instances): How cron jobs behave with more than one server process: one run per slot, a slot a restart dropped, a pause every replica honours, and runs that never overlap.
 - [Background Jobs](https://rebase.pro/docs/backend/jobs): A durable, Postgres-backed job queue — work that survives a restart, retried with backoff, with failures kept rather than dropped.
 - [Custom Functions](https://rebase.pro/docs/backend/custom-functions): Add custom Hono API endpoints alongside your Rebase CRUD routes. Auto-discovered from a directory, with full access to the backend instance.
 - [Global Backend Hooks](https://rebase.pro/docs/backend/hooks): Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.

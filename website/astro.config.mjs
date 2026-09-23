@@ -173,6 +173,7 @@ export default defineConfig({
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
+                        { label: "Cron across instances", slug: "docs/backend/cron-across-instances" },
                         { label: "Background Jobs", slug: "docs/backend/jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },

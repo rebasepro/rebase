@@ -1,5 +1,5 @@
 ---
-sourceHash: 63794b5b1f8c0af6
+sourceHash: bd5ebbaf6bff7eb9
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -80,7 +80,7 @@ Das ist alles. Rebase wird:
 
 1. Das Verzeichnis nach `.ts`- / `.js`-Dateien durchsuchen
 2. Jeden Standardexport als Cron-Job registrieren
-3. Die Tabelle `rebase.cron_logs` in PostgreSQL automatisch erstellen (sofern der Treiber SQL unterstützt)
+3. Die Tabellen `rebase.cron_logs`, `rebase.cron_claims` und `rebase.cron_job_state` in PostgreSQL automatisch erstellen (sofern der Treiber SQL unterstützt)
 4. Den Scheduler starten und Zähler aus vorhandenen DB-Logs initialisieren
 5. Admin-REST-Routen unter `/api/admin/cron` mounten
 
@@ -133,7 +133,8 @@ interface CronJobDefinition {
     // Optional description shown in Studio
     description?: string;
 
-    // Whether the job starts enabled (default: true)
+    // Whether the job runs (default: true). A pause or a resume from Studio
+    // or the admin API overrides it, for every process, until reset.
     enabled?: boolean;
 
     // Max execution time in seconds (default: 300). Infinity means no
@@ -141,7 +142,7 @@ interface CronJobDefinition {
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
-    // instance was ticking (default: off). See "Recovering Missed Slots".
+    // instance was ticking (default: off). See "Cron across instances".
     catchUpWindowSeconds?: number;
 
     // The function to run on each tick
@@ -271,9 +272,9 @@ Alle Cron-Routen erfordern **Admin-Authentifizierung** (`requireAuth` + `require
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | Alle registrierten Cron-Jobs auflisten |
 | `GET` | `/api/admin/cron/:id` | Status eines einzelnen Jobs abrufen |
-| `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen |
+| `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen — `409`, solange er bereits läuft |
 | `GET` | `/api/admin/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`) |
-| `PUT` | `/api/admin/cron/:id` | Job aktivieren/deaktivieren (`{ "enabled": true }`) |
+| `PUT` | `/api/admin/cron/:id` | Einen Job überall pausieren oder fortsetzen (`{ "enabled": false }`); `null` folgt wieder dem Code |
 
 ### Beispiel: Alle Jobs auflisten
 
@@ -333,6 +334,18 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
+Solange der Job läuft — hier oder in einem anderen Prozess —, lautet die Antwort
+`409` mit dem Code `CRON_JOB_ALREADY_EXECUTING`; siehe [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
+
+### Einen Job pausieren
+
+<span class="since-badge" data-since="0.23">Since 0.23</span> Eine Pause aus Studio oder per
+`PUT /api/admin/cron/:id` gilt für jeden Prozess und bleibt über Neustarts und
+Redeploys hinweg bestehen; `{ "enabled": null }` gibt den Job an das `enabled`
+zurück, das seine Datei deklariert. Wie jede Replik sie liest und was passiert,
+wenn eine das nicht kann, steht unter
+[Cron über mehrere Instanzen](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
+
 ## Client-SDK
 
 Das Rebase Client-SDK stellt einen `cron`-Namespace für alle Operationen bereit:
@@ -367,9 +380,17 @@ Wenn Cron-Jobs konfiguriert sind, erscheint in Rebase Studio unter **Compute** n
 - **Detail-Panel** — Zeitplan, nächste/letzte Ausführung, Dauer und Fehlerinformationen
 - **Ausführungsverlauf** — Erweiterbare Log-Einträge mit erfassten Ausgaben und Ergebnissen
 - **Manuelles Triggern** — Führen Sie jeden Job bei Bedarf mit einem Klick aus
-- **Aktivieren/Deaktivieren** — Jobs pausieren und fortsetzen, ohne den Server neu zu starten
+- **Aktivieren/Deaktivieren** — Jobs pausieren und fortsetzen, ohne den Server neu zu starten, für alle Prozesse gleichzeitig; eine Pause bleibt über Neustarts und Deploys hinweg bestehen
 
 Das Dashboard aktualisiert sich automatisch alle 15 Sekunden.
+
+Das Panel zeigt dasselbe, egal welcher Prozess es ausliefert. Ein Job, den ein
+anderer Prozess gerade ausführt, wird als laufend angezeigt, und auf einem
+Prozess, dessen Scheduler nicht gestartet ist — der `api`-Rolle neben einem
+Worker —, werden die Anzahl der Ausführungen, die Anzahl der Fehlschläge und die
+letzte Ausführung aus `rebase.cron_logs` gelesen, mit einer Abfrage, die auf die
+eigenen Zeilen jedes Jobs begrenzt ist, statt aus einem Prozess, der nichts
+ausführt.
 
 ## Zeitplan-Validierung & AST-Parsing
 
@@ -390,59 +411,13 @@ Standardmäßige intervallbasierte Scheduler (wie `setInterval`) driften mit der
 
 ---
 
-## Wiederherstellung verpasster Slots
+## Mehr als ein Prozess
 
-Da der Scheduler den nächsten Slot bei jedem Start ausgehend von *jetzt* berechnet, wird ein Slot nur ausgeführt, wenn eine Instanz aktiv war und lief, als er an der Reihe war. Alles, was den Prozess während eines Slots ersetzt – ein Rolling Deploy, ein Absturz, eine Plattform, die den Container recycelt – lässt diesen Durchlauf ausfallen, und der Ersatz plant den Slot *danach*. Es tritt kein Fehler auf; die Ausführung findet einfach nie statt.
-
-Dies ist **nicht** nur ein Scale-to-Zero-Problem. Ein Dienst, der an eine Warm-Instanz gebunden ist, verliert dennoch Ausführungen, da es einer Plattform freisteht, die Instanz mit dem Timer zu beenden und eine neue zu starten.
-
-Setzen Sie `catchUpWindowSeconds` auf ein Zeitfenster, das spürbar größer als ein Neustart ist, und der Startprozess führt einen Slot aus, den er innerhalb dieses Fensters als nicht beansprucht vorfindet:
-
-```typescript
-export default defineCron({
-    schedule: "0 6 * * *",       // daily at 06:00
-    name: "Scrape Listings",
-    catchUpWindowSeconds: 3600,  // tolerate an hour of downtime around 06:00
-    handler: async (ctx) => { /* … */ }
-});
-```
-
-Drei wichtige Dinge dazu:
-
-- **Standardmäßig deaktiviert.** Ohne `catchUpWindowSeconds` bleibt das Verhalten unverändert.
-- **Nur der jüngste verpasste Slot wird ausgeführt.** Ein Start nach einem sechsstündigen Ausfall holt einen stündlichen Job einmal nach, nicht sechsmal. Das Nachholen verhindert, dass eine Ausführung verloren geht; es spielt nicht die Historie erneut ab.
-- **Ein Store mit Claim-Unterstützung ist erforderlich.** Das Nachholen beansprucht den Slot über denselben `(job_id, slot)`-Schlüssel, den auch der reguläre Zeitplanpfad verwendet. Dies ist das Einzige, was unterscheidet zwischen „dieser Slot wurde nie ausgeführt“ und „dieser Slot wurde bereits auf der Instanz ausgeführt, die ersetzt wird“. Wenn kein Store angebunden ist, wird das Nachholen übersprungen und eine Warnung protokolliert – andernfalls würde eine Instanz, die alle 30 Minuten recycelt wird, denselben stündlichen Job bei jedem Start erneut ausführen.
-
-Im Normalfall – ein Neustart wenige Minuten nachdem ein Slot regulär ausgeführt wurde – ist der jüngste Slot bereits beansprucht, sodass das Nachholen lediglich eine Claim-Prüfung pro Job beim Start erfordert und nichts weiter unternimmt.
-
-Beim Start werden Claims gelöscht, die älter als sieben Tage sind, der jüngste Claim jedes Jobs bleibt jedoch immer erhalten, unabhängig von seinem Alter. Dieser Claim ist der Nachweis, dass der Slot bereits ausgeführt wurde, sodass ein monatlicher Job mit einem monatsweiten Nachholfenster nicht durch ein Deployment am 10. erneut ausgeführt wird.
-
-Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist `false`), wobei die erste Log-Zeile den nachgeholten Slot und die Verspätung festhält:
-
-```
-⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
-```
-
----
-
-## Concurrency Guarding
-
-Um Stabilität bei ressourcenintensiven Vorgängen zu gewährleisten, implementiert Rebase eine strikte **Single-Concurrency-Ausführungssperre** pro Job-ID:
-- **Geplante Überschneidungen**: Wenn der geplante Tick eines Jobs ausgelöst wird, während die vorherige Ausführung noch läuft, überspringt der Scheduler den Tick und plant sofort den nächsten Kandidatenlauf.
-- **Kollisionen bei manuellem Trigger**: Wenn ein Operator einen laufenden Job manuell über Rebase Studio oder die REST-API auslöst, antwortet die Anfrage sofort mit einer übersprungenen Payload, um den aktiven Worker zu schützen.
-
-In beiden Fällen wird eine Zeile in `rebase.cron_logs` geschrieben, sodass das Überspringen im Ausführungsverlauf und nicht nur im Prozesslog sichtbar ist:
-
-```json
-{
-  "jobId": "expire-users",
-  "success": true,
-  "result": { "skipped": true, "reason": "already_executing" },
-  "logs": ["Skipped: the previous run has not finished"]
-}
-```
-
-`success: true`, weil nichts fehlgeschlagen ist – `result.skipped` kennzeichnet den Vorgang. Mehrere dieser Einträge hintereinander weisen darauf hin, dass ein Job über seinen Zeitplan hinausgewachsen ist – ein Muster, das man nur erkennt, wenn die Übersprünge protokolliert werden.
+Jeder Prozess, dessen Scheduler eingeschaltet ist, stellt dieselben Timer; die
+Datenbank entscheidet, welcher von ihnen jeden Slot ausführt. Wie ein Slot genau
+einmal läuft, wie ein Slot, den ein Neustart verloren hat, nachgeholt wird, wie
+eine Pause jede Replik erreicht und warum ein manueller Trigger nie neben einer
+geplanten Ausführung läuft, steht unter [Cron über mehrere Instanzen](/docs/backend/cron-across-instances).
 
 ---
 
@@ -478,7 +453,24 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+
+CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
+    job_id         TEXT PRIMARY KEY,
+    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by     TEXT,
+    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by     TEXT
+);
 ```
+
+Jede davon wird beim Start erstellt, falls sie fehlt, sodass eine Datenbank,
+die älter ist, sie beim nächsten Deploy erhält. Keine davon ist eine Collection,
+und die Endbenutzerrolle `rebase_user` hat auf keiner davon Rechte: Ein
+beschreibbares `cron_job_state` würde es einem angemeldeten Benutzer erlauben,
+einen Job für alle zu pausieren oder seine Lease zu halten, sodass nichts ihn
+ausführt.
 
 Beim Start liest der Scheduler Statistiken aus dieser Tabelle über Aggregatabfragen (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`), um die Historie für `totalRuns` und `totalFailures` zu füllen. Log-Einträge werden in einem nicht blockierenden, asynchronen Durchlauf geschrieben; schlägt ein Schreibvorgang in die Datenbank fehl, protokolliert der Scheduler den Fehler und setzt die normale Ausführung fort, wobei der In-Memory-Ringpuffer als Fallback dient.
 
@@ -536,3 +528,4 @@ Der Handler läuft im Deployment, wo diese Variablen existieren. Ein Top-Level-I
 - **[Backend-Übersicht](/docs/backend)** — Vollständige Referenz zur Backend-Konfiguration
 - **[Entitäts-Callbacks](/docs/collections/callbacks)** — Logik bei Datenänderungen ausführen
 - **[Webhook-Integration](/docs/recipes/webhooks)** — Benachrichtigungen bei Ereignissen senden
+- **[Cron über mehrere Instanzen](/docs/backend/cron-across-instances)** — Eine Ausführung pro Slot, verpasste Slots, Pausieren überall und sich überschneidende Ausführungen

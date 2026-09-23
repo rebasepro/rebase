@@ -254,6 +254,12 @@ the message names the constraint.
 | `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. | Give outbound calls an `AbortSignal`, or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | This process proxies functions to another one, which did not answer. | Check that the functions unit is running. |
 
+## Cron jobs
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> A manual trigger of a cron job that is already running — on the process that answered, or on another one holding the job's run lease, such as the worker behind an `api` process. Nothing ran. The skip is in the job's history, and `details.log` is that entry; its line names the process running the job. | Try again when that run has finished. See [Cron Jobs](/docs/backend/cron-across-instances/#concurrency-guarding). |
+
 ## Admin surfaces and schema editing
 
 These say a feature is off or unconfigured rather than that the request was

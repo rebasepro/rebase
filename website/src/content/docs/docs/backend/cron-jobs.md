@@ -81,7 +81,7 @@ That's it. Rebase will:
 
 1. Scan the directory for `.ts` / `.js` files
 2. Register each default export as a cron job
-3. Auto-create the `rebase.cron_logs` table in PostgreSQL (if the driver supports SQL)
+3. Auto-create the `rebase.cron_logs`, `rebase.cron_claims` and `rebase.cron_job_state` tables in PostgreSQL (if the driver supports SQL)
 4. Start the scheduler and seed counters from existing DB logs
 5. Mount admin REST routes at `/api/admin/cron`
 
@@ -139,7 +139,8 @@ interface CronJobDefinition {
     // Optional description shown in Studio
     description?: string;
 
-    // Whether the job starts enabled (default: true)
+    // Whether the job runs (default: true). A pause or a resume from Studio
+    // or the admin API overrides it, for every process, until reset.
     enabled?: boolean;
 
     // Max execution time in seconds (default: 300). Infinity means no
@@ -147,7 +148,7 @@ interface CronJobDefinition {
     timeoutSeconds?: number;
 
     // How far back to look on startup for a slot that elapsed while no
-    // instance was ticking (default: off). See "Recovering Missed Slots".
+    // instance was ticking (default: off). See "Cron across instances".
     catchUpWindowSeconds?: number;
 
     // The function to run on each tick
@@ -293,9 +294,9 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | List all registered cron jobs |
 | `GET` | `/api/admin/cron/:id` | Get a single job's status |
-| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job |
+| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running |
 | `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`) |
-| `PUT` | `/api/admin/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
+| `PUT` | `/api/admin/cron/:id` | Pause or resume a job everywhere (`{ "enabled": false }`); `null` follows the code again |
 
 ### Example: List All Jobs
 
@@ -363,6 +364,17 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
+While the job is running — here or on any other process — the answer is `409`
+with the code `CRON_JOB_ALREADY_EXECUTING`; see [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
+
+### Pausing a job
+
+<span class="since-badge" data-since="0.23">Since 0.23</span> A pause from Studio or
+`PUT /api/admin/cron/:id` applies to every process and stays in place across
+restarts and redeploys; `{ "enabled": null }` hands the job back to the
+`enabled` its file declares. How every replica reads it, and what happens when
+one cannot, is on [Cron across instances](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
+
 ## Client SDK
 
 The Rebase client SDK exposes a `cron` namespace for all operations:
@@ -397,9 +409,15 @@ When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio und
 - **Detail panel** — Schedule, next/last run, duration, and error information
 - **Execution history** — Expandable log entries with captured output and results
 - **Manual trigger** — Run any job on demand with one click
-- **Enable/disable** — Pause and resume jobs without restarting the server
+- **Enable/disable** — Pause and resume jobs without restarting the server, for every process at once; a pause stays in place across restarts and deploys
 
 The dashboard auto-refreshes every 15 seconds.
+
+The panel shows the same thing whichever process serves it. A job another
+process is running shows as running, and on a process whose scheduler is not
+started — the `api` role beside a worker — the run count, the failure count and
+the last run are read from `rebase.cron_logs`, one query bounded to each job's
+own rows, rather than from a process that runs nothing.
 
 ## Schedule Validation & AST Parsing
 
@@ -420,62 +438,12 @@ Standard interval-based schedulers (such as `setInterval`) drift over time and c
 
 ---
 
-## Recovering Missed Slots
+## More than one process
 
-Because the scheduler computes the next slot from *now* on every boot, a slot only fires if some instance was alive and ticking when it came round. Anything that replaces the process during a slot — a rolling deploy, a crash, a platform recycling the container — drops that run, and the replacement schedules the slot *after* it. Nothing errors; the run simply never happens.
-
-This is **not** only a scale-to-zero problem. A service pinned to a warm instance still loses runs, because a platform is free to retire the instance holding the timer and start a fresh one.
-
-Set `catchUpWindowSeconds` to a window comfortably wider than a restart, and startup will run a slot it finds unclaimed inside that window:
-
-```typescript
-export default defineCron({
-    schedule: "0 6 * * *",       // daily at 06:00
-    name: "Scrape Listings",
-    catchUpWindowSeconds: 3600,  // tolerate an hour of downtime around 06:00
-    handler: async (ctx) => { /* … */ }
-});
-```
-
-Three things to know:
-
-- **Off by default.** Without `catchUpWindowSeconds`, behaviour is unchanged.
-- **Only the most recent missed slot runs.** Booting after a six-hour outage catches an hourly job up once, not six times. Catch-up stops a run going missing; it does not replay history.
-- **A claims-capable store is required.** Catch-up claims the slot through the same `(job_id, slot)` key the scheduled path uses, which is the only thing distinguishing "this slot never ran" from "this slot already ran on the instance being replaced". With no store attached, catch-up is skipped and a warning is logged — otherwise an instance recycled every 30 minutes would re-run the same hourly job every time it booted.
-
-In the ordinary case — a restart minutes after a slot ran normally — the most recent slot is already claimed, so catch-up costs one claim check per job per boot and does nothing.
-
-Boot deletes claims older than seven days, but always keeps each job's latest one, whatever its age. That claim is the record that the slot already ran, so a monthly job with a month-wide catch-up window is not re-run by a deploy on the 10th.
-
-A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a first log line recording the slot it recovered and how late it was:
-
-```
-⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
-```
-
----
-
-## Concurrency Guarding
-
-To ensure stability when executing resource-heavy operations, Rebase implements a strict **single-concurrency execution lock** per job ID:
-- **Scheduled Overlaps**: If a job's scheduled tick fires while the previous execution is still running, the scheduler skips the tick and immediately schedules the next candidate run.
-- **Manual Trigger Collisions**: If an operator manually triggers a running job via Rebase Studio or the REST API, the request returns immediately with a skipped payload, protecting the active worker.
-
-Either way a row is written to `rebase.cron_logs`, so the skip is in the run
-history rather than only in the process log:
-
-```json
-{
-  "jobId": "expire-users",
-  "success": true,
-  "result": { "skipped": true, "reason": "already_executing" },
-  "logs": ["Skipped: the previous run has not finished"]
-}
-```
-
-`success: true` because nothing failed — `result.skipped` is what marks it. A
-run of these in a row is the signature of a job that has outgrown its schedule,
-and that is a pattern you can only see if the skips are recorded.
+Every process whose scheduler is on arms the same timers; the database decides
+which of them runs each slot. How a slot runs once, how a slot a restart dropped
+is recovered, how a pause reaches every replica, and why a manual trigger never
+runs beside a scheduled run are on [Cron across instances](/docs/backend/cron-across-instances).
 
 ---
 
@@ -511,7 +479,23 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+
+CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
+    job_id         TEXT PRIMARY KEY,
+    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by     TEXT,
+    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by     TEXT
+);
 ```
+
+Each is created on boot if it is missing, so a database that predates one gains
+it on its next deploy. None of them is a collection, and the end-user role
+`rebase_user` has no privilege on any of them: a writable `cron_job_state` would
+let a signed-in user pause a job for everyone, or hold its lease so that nothing
+runs it.
 
 On startup, the scheduler reads stats from this table via aggregate queries (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) to populate `totalRuns` and `totalFailures` history. Log insertions are executed in a non-blocking asynchronous sweep; if a database flush fails, the scheduler logs the error and continues normal execution using the in-memory ring buffer as a fallback.
 
@@ -580,3 +564,4 @@ that merely registers the job.
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
 - **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
+- **[Cron across instances](/docs/backend/cron-across-instances)** — One run per slot, missed slots, pausing everywhere, and overlapping runs
