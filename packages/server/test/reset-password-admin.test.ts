@@ -37,7 +37,7 @@ accessExpiresIn: "1h" });
         };
     });
 
-    function createApp(authHooks?: any) {
+    function createApp(authHooks?: any, resetPasswordUrl = "https://reset.com") {
         const app = new Hono();
         app.onError(errorHandler);
         const adminRoutes = createResetPasswordRoute({
@@ -45,7 +45,7 @@ accessExpiresIn: "1h" });
             emailService: mockEmailService as any,
             emailConfig: {
                 from: "test@example.com",
-                resetPasswordUrl: "https://reset.com"
+                resetPasswordUrl
             },
             authHooks
         });
@@ -125,6 +125,33 @@ accessExpiresIn: "1h" });
         expect(body.user.uid).toBe("user-123");
         expect(mockAuthRepo.createPasswordResetToken).toHaveBeenCalled();
         expect(mockEmailService.send).toHaveBeenCalled();
+    });
+
+    /**
+     * The same link the forgot-password email builds from the same config. The
+     * raw `resetPasswordUrl || ""` kept a trailing slash, so
+     * `FRONTEND_URL="https://app.example.com/"` linked to `//reset-password`,
+     * which a router with a `/reset-password` route does not match.
+     */
+    it("does not double the slash of a frontend URL that ends in one", async () => {
+        mockAuthRepo.getUserById.mockResolvedValue({
+            id: "user-123",
+            email: "user@example.com",
+            displayName: "User One"
+        } as any);
+
+        const app = createApp(undefined, "https://app.example.com/");
+        const adminToken = await generateAccessToken("admin-user", ["admin"]);
+
+        const res = await app.request("/api/admin/users/user-123/reset-password", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${adminToken}` }
+        });
+
+        expect(res.status).toBe(200);
+        const { html } = mockEmailService.send.mock.calls[0][0] as { html: string };
+        expect(html).toContain("https://app.example.com/reset-password?token=");
+        expect(html).not.toContain("//reset-password");
     });
 
     it("calls onAdminResetPassword hook when provided", async () => {

@@ -20,6 +20,7 @@ import { resolveAuthHooks } from "./auth-hooks";
 import { generateSecurePassword, generateSecureToken, hashToken } from "./admin-user-ops";
 import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import { getPasswordResetTemplate, resolveEmailBranding } from "../email/templates";
+import { resolveEmailLinkBase } from "../email/link-base";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AuthCollectionConfig } from "@rebasepro/types";
@@ -121,7 +122,9 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
                 await authRepo.createPasswordResetToken(existing.id, tokenHash, expiresAt);
 
                 try {
-                    const baseUrl = emailConfig?.resetPasswordUrl || "";
+                    // The resolver the forgot-password email uses — see the
+                    // same line in `finalizeAdminUserCreation`.
+                    const baseUrl = resolveEmailLinkBase(emailConfig, "resetPassword");
                     const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
 
                     const { appName, logoUrl } = resolveEmailBranding(emailConfig);

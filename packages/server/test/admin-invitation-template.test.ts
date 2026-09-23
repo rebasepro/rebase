@@ -77,6 +77,24 @@ describe("finalizeAdminUserCreation — the invited user's email", () => {
         expect(sent[0].html).toContain("https://app.example.com/reset-password?token=");
     });
 
+    /**
+     * Built from the same resolver the self-service reset uses. The raw
+     * `resetPasswordUrl || ""` here kept a trailing slash, so
+     * `FRONTEND_URL="https://app.example.com/"` produced
+     * `https://app.example.com//reset-password?token=…`, which a router with a
+     * `/reset-password` route does not match — while the forgot-password email
+     * from the same config linked correctly.
+     */
+    it("does not double the slash of a frontend URL that ends in one", async () => {
+        const { ctx, sent } = makeContext();
+        ctx.emailConfig = { ...ctx.emailConfig, resetPasswordUrl: "https://app.example.com/" };
+
+        await finalizeAdminUserCreation(newUser, "temp-password", ctx);
+
+        expect(sent[0].html).toContain("https://app.example.com/reset-password?token=");
+        expect(sent[0].html).not.toContain("//reset-password");
+    });
+
     it("says the link lasts as long as the token it carries", async () => {
         // The template said "1 hour" while the token was minted for 24, so an
         // invitee who read the email the next morning believed the link was

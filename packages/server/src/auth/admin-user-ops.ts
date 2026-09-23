@@ -22,6 +22,7 @@ import type {
     UserCreationPrepareResult
 } from "@rebasepro/types";
 import { getUserInvitationTemplate, resolveEmailBranding, USER_INVITATION_LINK_TTL_MS } from "../email/templates";
+import { resolveEmailLinkBase } from "../email/link-base";
 import { logger } from "../utils/logger";
 
 // ─── Shared Crypto Utilities ────────────────────────────────────────────────
@@ -212,7 +213,10 @@ export async function finalizeAdminUserCreation(
 
             await ctx.authRepo.createPasswordResetToken(entity.id, tokenHash, expiresAt);
 
-            const baseUrl = ctx.emailConfig?.resetPasswordUrl || "";
+            // The resolver every other emailed link uses: it drops a trailing
+            // slash, which the raw config value kept — `…example.com/` linked
+            // to `//reset-password`, a path a router does not match.
+            const baseUrl = resolveEmailLinkBase(ctx.emailConfig, "resetPassword");
             const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
 
             // The invitation template, not the password-reset one.
