@@ -52,6 +52,10 @@ export function RebaseI18nProvider({
 }: PropsWithChildren<RebaseI18nProviderProps>) {
     const i18nRef = useRef<i18n | null>(null);
     const [ready, setReady] = React.useState(false);
+    // The language the `locale` prop is switching to, while it does. That
+    // change is the app's, not the user's, and must not be stored as their
+    // preference — once stored, the prop is ignored for good.
+    const propLanguageRef = useRef<string | null>(null);
 
     if (!i18nRef.current) {
         const instance = i18next.createInstance();
@@ -80,6 +84,10 @@ export function RebaseI18nProvider({
             });
 
         instance.on("languageChanged", (lng) => {
+            if (propLanguageRef.current === lng) {
+                propLanguageRef.current = null;
+                return;
+            }
             if (typeof window !== "undefined") {
                 writeStoredString(REBASE_LOCALE_STORAGE_KEY, lng);
             }
@@ -94,6 +102,7 @@ export function RebaseI18nProvider({
         if (i18nRef.current && i18nRef.current.language !== locale) {
             const hasUserPreference = Boolean(readStoredString(REBASE_LOCALE_STORAGE_KEY));
             if (!hasUserPreference) {
+                propLanguageRef.current = locale;
                 i18nRef.current.changeLanguage(locale);
             }
         }
