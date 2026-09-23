@@ -1,5 +1,5 @@
 ---
-sourceHash: 91344f4bf4cb8889
+sourceHash: eff51262efe91a3e
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -46,12 +46,23 @@ interface RebasePlugin {
     // Views added to the navigation automatically.
     views?: AppView[];
 
+    // onMount, onAuthStateChange, onUnmount — see below.
     lifecycle?: PluginLifecycle;
 }
 ```
 
 Jede dieser Eigenschaften ist optional, außer `key`. Die vollständige Liste der Slot-Namen finden Sie auf
 der Seite **[Slots](/docs/frontend/slots)**.
+
+### Lebenszyklus
+
+- `onMount(context)` wird einmal ausgeführt, sobald die Authentifizierung zum
+  ersten Mal bereit ist: Ein Benutzer ist angemeldet, oder die Anmeldung wurde
+  übersprungen.
+- `onAuthStateChange(user)` wird bei jedem späteren Benutzerwechsel ausgeführt:
+  mit dem neuen Benutzer bei einer Anmeldung, mit `null` bei einer Abmeldung.
+  Das Plugin bleibt dabei in beiden Fällen gemountet.
+- `onUnmount()` wird ausgeführt, wenn `<Rebase>` unmountet wird.
 
 ## Plugins verwenden
 

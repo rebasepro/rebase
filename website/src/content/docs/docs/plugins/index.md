@@ -45,12 +45,21 @@ interface RebasePlugin {
     // Views added to the navigation automatically.
     views?: AppView[];
 
+    // onMount, onAuthStateChange, onUnmount — see below.
     lifecycle?: PluginLifecycle;
 }
 ```
 
 Every one of these is optional except `key`. The full slot-name list lives on
 the **[Slots](/docs/frontend/slots)** page.
+
+### Lifecycle
+
+- `onMount(context)` runs once, when auth first becomes ready: a user is signed
+  in, or sign-in was skipped.
+- `onAuthStateChange(user)` runs on every later change of user: the new user on
+  a sign-in, `null` on sign-out. The plugin stays mounted across both.
+- `onUnmount()` runs when `<Rebase>` unmounts.
 
 ## Using Plugins
 

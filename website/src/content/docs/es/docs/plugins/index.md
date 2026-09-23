@@ -1,5 +1,5 @@
 ---
-sourceHash: 91344f4bf4cb8889
+sourceHash: eff51262efe91a3e
 title: Sistema de plugins
 sidebar_label: Plugins
 description: Extiende Rebase con plugins — inyecta componentes de UI, modifica colecciones, añade acciones a la barra de herramientas y crea constructores de campos personalizados.
@@ -47,12 +47,23 @@ interface RebasePlugin {
     // Views added to the navigation automatically.
     views?: AppView[];
 
+    // onMount, onAuthStateChange, onUnmount — see below.
     lifecycle?: PluginLifecycle;
 }
 ```
 
 Cada uno de estos es opcional excepto `key`. La lista completa de nombres de slots
 se encuentra en la página de **[Slots](/docs/frontend/slots)**.
+
+### Ciclo de vida
+
+- `onMount(context)` se ejecuta una vez, cuando la autenticación está lista por
+  primera vez: hay un usuario con sesión iniciada, o se omitió el inicio de
+  sesión.
+- `onAuthStateChange(user)` se ejecuta en cada cambio de usuario posterior: con
+  el nuevo usuario al iniciar sesión, con `null` al cerrarla. El plugin sigue
+  montado en ambos casos.
+- `onUnmount()` se ejecuta cuando `<Rebase>` se desmonta.
 
 ## Uso de plugins
 

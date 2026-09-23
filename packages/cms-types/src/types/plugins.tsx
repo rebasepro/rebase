@@ -243,20 +243,21 @@ export interface PluginHooks {
  */
 export interface PluginLifecycle {
     /**
-     * Called once when the plugin is mounted in the Rebase tree.
-     * Can return a Promise for async initialization.
+     * Called once, when auth first becomes ready: a user is signed in, or
+     * sign-in was skipped. Can return a Promise for async initialization.
      */
     onMount?: (context: RebaseContext) => void | Promise<void>;
 
     /**
-     * Called when the plugin is unmounted from the Rebase tree.
-     * Use this for cleanup (subscriptions, timers, etc.).
+     * Called when `<Rebase>` unmounts. Not on sign-out: the plugin stays
+     * mounted across a change of user. Use this for cleanup (subscriptions,
+     * timers, etc.).
      */
     onUnmount?: () => void;
 
     /**
-     * Called whenever the authentication state changes.
-     * Receives the new user (or null on sign-out).
+     * Called on every change of user after `onMount`: the new user on a
+     * sign-in, `null` on sign-out.
      */
     onAuthStateChange?: (user: User | null) => void;
 
