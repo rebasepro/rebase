@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
     Button,
@@ -10,7 +10,9 @@ import {
     Typography,
     MultiSelect,
     MultiSelectItem,
-    IconButton
+    IconButton,
+    TextField,
+    DebouncedTextField
 } from "../src";
 import "@testing-library/jest-dom";
 
@@ -114,6 +116,50 @@ describe("UI Components", () => {
             expect(header).toBeInTheDocument();
             expect(header).toHaveTextContent("Header Text");
         });
+    });
+
+    describe("TextField Component", () => {
+        // `TextField` accepts every input attribute, `onFocus` and `onBlur`
+        // included, and then set its own handlers after the spread. So a
+        // caller's blur handler never ran: `DebouncedTextField` never flushed
+        // the last keystrokes on blur, and a form's `Field` never marked a field
+        // touched.
+        it.each([false, true])("calls the caller's onFocus and onBlur (multiline: %s)", (multiline) => {
+            const onFocus = jest.fn();
+            const onBlur = jest.fn();
+            render(<TextField aria-label="name" multiline={multiline} value="" onChange={() => { /* noop */ }}
+                              onFocus={onFocus} onBlur={onBlur}/>);
+
+            const field = screen.getByLabelText("name");
+            fireEvent.focus(field);
+            fireEvent.blur(field);
+            expect(onFocus).toHaveBeenCalledTimes(1);
+            expect(onBlur).toHaveBeenCalledTimes(1);
+        });
+
+        it("DebouncedTextField hands over the last keystrokes on blur, not 150ms later", () => {
+            jest.useFakeTimers();
+            try {
+                const onChange = jest.fn();
+                const { unmount } = render(<DebouncedTextField aria-label="title" name="title" value="" onChange={onChange}/>);
+
+                const field = screen.getByLabelText("title");
+                fireEvent.change(field, { target: { value: "hello" } });
+                fireEvent.blur(field);
+                expect(onChange).toHaveBeenCalledTimes(1);
+                expect(onChange.mock.calls[0][0].target.value).toBe("hello");
+
+                // Closing the form straight after loses nothing, and sends nothing twice.
+                unmount();
+                act(() => {
+                    jest.advanceTimersByTime(500);
+                });
+                expect(onChange).toHaveBeenCalledTimes(1);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
     });
 
     /**

@@ -30,6 +30,8 @@ export type TextFieldProps<T extends string | number> = {
     type?: InputType;
     value?: T;
     onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    onFocus?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>;
+    onBlur?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>;
     label?: React.ReactNode;
     multiline?: boolean;
     disabled?: boolean;
@@ -53,13 +55,15 @@ export type TextFieldProps<T extends string | number> = {
      * @default 1
      */
     minRows?: number | string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "size" | "value">;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "size" | "value" | "onFocus" | "onBlur">;
 
 export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | number>>(
     <T extends string | number>(
         {
             value,
             onChange,
+            onFocus,
+            onBlur,
             label,
             type = "text",
             multiline = false,
@@ -90,6 +94,18 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
 
         const [focused, setFocused] = React.useState(false);
         const hasValue = value !== undefined && value !== null && value !== "";
+
+        // The field tracks focus for its label, and the caller still hears about
+        // it: `DebouncedTextField` flushes on blur, and a form marks a field
+        // touched on blur.
+        const handleFocus = (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            setFocused(true);
+            onFocus?.(event);
+        };
+        const handleBlur = (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            setFocused(false);
+            onBlur?.(event);
+        };
 
         useEffect(() => {
             const element = inputRef && "current" in inputRef ? inputRef.current : null;
@@ -130,8 +146,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 rows={typeof minRows === "string" ? parseInt(minRows) : (minRows ?? 3)}
                 value={value ?? ""}
                 onChange={onChange}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 style={inputStyle}
                 className={cls(
                     invisible ? focusedInvisibleMixin : "",
@@ -195,8 +211,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 )}
                 placeholder={focused || hasValue || !label ? placeholder : undefined}
                 autoFocus={autoFocus}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 type={type}
                 value={type === "number" && Number.isNaN(value) ? "" : value ?? ""}
                 onChange={onChange}
