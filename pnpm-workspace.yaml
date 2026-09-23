@@ -195,4 +195,9 @@ overrides:
   # A DoS on malformed input. Website build tooling only, via Astro; capped
   # below 6 because 6.x is the next major and nothing here asks for it.
   devalue: ">=5.9.2 <6"
+  # Fragment-aware query parsing and bounded parseBody() nesting (three moderate
+  # advisories, fixed in 4.13.5). Every package declares ^4.13.5 now; this also
+  # reaches the copy @modelcontextprotocol/sdk pulls in through
+  # @hono/node-server, which the lockfile had kept at 4.13.0.
+  hono: ">=4.13.5 <5"
 verifyDepsBeforeRun: false
