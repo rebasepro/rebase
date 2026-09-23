@@ -8,7 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv, parse as parseDotenv } from "dotenv";
-import { resolve, join, dirname, delimiter } from "node:path";
+import { resolve, join, dirname, delimiter, sep } from "node:path";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -2419,7 +2419,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
         const absoluteCollectionsDir = resolve(collectionsDir);
         const filePath = resolve(absoluteCollectionsDir, `${name}.ts`);
-        if (!filePath.startsWith(absoluteCollectionsDir)) {
+        // With the separator: `…/collections_private/x.ts` starts with
+        // `…/collections` too.
+        if (!filePath.startsWith(absoluteCollectionsDir + sep)) {
             throw new Error("Access denied: path traversal detected");
         }
         if (!existsSync(filePath)) throw new Error(`Collection "${name}" not found.`);

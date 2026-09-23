@@ -1017,6 +1017,51 @@ describe("the db gate checks the DSN the child would actually use", () => {
     });
 });
 
+describe("collection resources stay inside the collections directory", () => {
+    const tools = () => (server as any)._requestHandlers.get("tools/call");
+    const read = (uri: string) => (server as any)._requestHandlers.get("resources/read")({
+        method: "resources/read",
+        params: { uri }
+    });
+    let projectDir: string;
+
+    beforeEach(async () => {
+        projectDir = mkdtempSync(join(tmpdir(), "rebase-mcp-resources-"));
+        mkdirSync(join(projectDir, "config", "collections"), { recursive: true });
+        mkdirSync(join(projectDir, "config", "collections_private"), { recursive: true });
+        writeFileSync(join(projectDir, "config", "collections", "posts.ts"), "export const posts = 1;\n");
+        writeFileSync(join(projectDir, "config", "collections_private", "secrets.ts"), "export const key = 'sk_live';\n");
+        await tools()({
+            method: "tools/call",
+            params: {
+                name: "rebase_project_add",
+                arguments: { name: "resources", baseUrl: "http://localhost:3001", projectDir, token: "t" }
+            }
+        });
+        await tools()({ method: "tools/call", params: { name: "rebase_project_switch", arguments: { name: "resources" } } });
+    });
+
+    afterEach(async () => {
+        await tools()({ method: "tools/call", params: { name: "rebase_project_switch", arguments: { name: "default" } } });
+        rmSync(projectDir, { recursive: true, force: true });
+    });
+
+    it("reads a collection file", async () => {
+        const result = await read("rebase://collections/posts");
+        expect(result.contents[0].text).toContain("posts");
+    });
+
+    it("refuses a sibling directory whose name starts with the collections directory's", async () => {
+        // `startsWith(dir)` without a separator let `collections_private`
+        // through, because its path begins with `…/collections`.
+        await expect(read("rebase://collections/../collections_private/secrets")).rejects.toThrow(/path traversal/);
+    });
+
+    it("refuses a path that climbs out altogether", async () => {
+        await expect(read("rebase://collections/../../package")).rejects.toThrow(/path traversal/);
+    });
+});
+
 describe("a child is not handed the startup .env as if it were the shell", () => {
     /**
      * The server loads the startup project's `.env` into its own
