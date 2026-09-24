@@ -35,29 +35,59 @@ realtime, auth, storage, functions, cron, and backups — with access control
 enforced by Postgres itself. When a human needs to touch the data, the same
 collection definition renders a full admin panel.
 
+What leads is the consequence of that sentence, not the sentence itself: **the
+back office stops being a project**. "One definition, every surface" is the
+mechanism that proves it, not the headline (`website/SITE-STORY.md` §1).
+
 Success is a developer pointing Rebase at a database they own and getting a
 production-ready backend, without a second data model and without a vendor
 holding their credentials.
 
 ## Positioning
 
-Four claims, ranked. Anything below them is a feature, not a claim.
+Five claims, ranked, as in `website/SITE-STORY.md` §2, which holds the reasoning
+behind each. Anything below them is a feature, not a claim.
 
 1. **Security lives in the database.** Row-level security, fail-closed by
    default, generated from the collection definition — not middleware someone can
    forget to call. Tables without RLS are not served.
 2. **One definition, every surface.** A collection compiles to a Drizzle schema,
-   REST routes, an OpenAPI spec, typed SDK accessors, and RLS policies — and, if
-   wanted, an admin panel. There is no second data model.
-3. **The panel is a separate product.** It is a React app talking to the same
-   public API under the same policies. Add it, skip it, or delete it; the API
-   response does not move.
-4. **Agent-native.** MCP server, scoped API keys, installable agent skills.
+   REST routes, an OpenAPI spec, typed SDK accessors, and RLS policies — and the
+   admin panel that comes with them. There is no second data model.
+3. **The panel is a client, not a back door.** It is the same definition
+   rendered for people: a React app reading the data through the same public
+   API, in the same `rebase_user` role, under the same row-level security.
+   Whatever it can see, the customer's policies said so, and they can read them.
+   Delete it and no API response moves. A competitor's studio is privileged;
+   this panel has no more reach than the user holding it.
+
+   The claim covers the data plane only. An admin in the panel still reaches
+   `/api/admin/*` (backups, RLS audit, schema editor, cron, logs), and the
+   injected `default_admin_read` policy lets admins read more rows than other
+   users. What holds is that this is a policy in the customer's own database,
+   not a service role quietly bypassing it. "Separate product" survives as
+   internal vocabulary for the architecture and never appears in
+   customer-facing copy.
+4. **Agent-native.** MCP server, scoped API keys, installable agent skills. An
+   agent operates the backend through the same authorization the humans get.
+5. **It is yours.** MIT, end to end — the schema editor, the generated APIs, the
+   typed SDK, all of it. Self-hosted on the customer's own infrastructure,
+   holding their own credentials. It ranks last because it is worth nothing to
+   a reader who has not yet decided the product is good, and more than any other
+   claim to one who has: it belongs at the close, not the open.
 
 Three adoption modes are the shape of the offer (see
 [MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md)): **BaaS** (the API and typed
 SDK alone — the panel's packages are never installed), **CMS** (BaaS +
-schema-driven admin panel), and **Full** (CMS + Studio).
+schema-driven admin panel), and **Full** (CMS + Studio). Those are architecture
+names. In customer-facing copy they are three products, told in this order:
+**Rebase Backend**, **Rebase CMS** and **Rebase Studio**. The story has two
+layers, the backend and the admin panel on top of it; CMS and Studio are the
+panel's two sides, the team's and the developers'. The category noun is
+**backend** ("the open-source backend for Postgres"). "BaaS",
+"backend-as-a-service", "platform" and "framework" name competitors'
+categories, never Rebase's. The full naming sheet is in `website/SITE-STORY.md`
+§2.
 
 *Phrasing note, 2026-08-29:* this used to read "API only, no React in the
 dependency tree". That is accurate and it does not survive being quoted at a
@@ -119,14 +149,16 @@ is the useful part; keep it stated as a fact about what gets installed.
 
 **Terminology** — *collection* (the single TypeScript definition), *snapshot* (a
 record in the admin panel), *driver* (the data backend), *Studio* (the database
-workspace), *BaaS / CMS / Full* (the three adoption modes).
+workspace), *admin panel* (CMS and Studio together), *BaaS / CMS / Full* (the
+three adoption modes; internal names, see Positioning).
 
 ## Brand Commitments
 
 - Name **Rebase**; domain `rebase.pro`; npm scope `@rebasepro`; logo at
   `https://rebase.pro/img/logo_small.png`.
-- **Backend-first positioning is binding.** The backend leads; the admin panel is
-  the layer you opt into. Leading with the panel undersells the product and
+- **Backend-first positioning is binding.** The backend leads. The admin panel
+  comes second, and it comes with it: it is never framed as optional, an add-on,
+  or something you opt into. Leading with the panel undersells the product and
   mispositions it against Supabase-class competitors.
 - A binding design language already exists and is not renegotiated per surface.
   Its authority lives in `packages/ui/src/theme.css` (tokens) and
