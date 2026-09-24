@@ -154,7 +154,10 @@ export function setVersion(version, root = ROOT) {
         // Unconditionally, and before the early return below: "package.json is
         // already at the target" is not evidence about the file beside it, and
         // treating it as evidence is exactly how the two drift apart.
-        const manifest = setRegistryVersion(path.join(root, pkg.dir, "server.json"), pkg.name, version);
+        const manifest = [
+            setRegistryVersion(path.join(root, pkg.dir, "server.json"), pkg.name, version),
+            setPluginVersion(path.join(root, pkg.dir, ".claude-plugin", "plugin.json"), version)
+        ].filter(Boolean).join(", ") || null;
 
         if (json.version === version) {
             if (manifest) changed.push({ ...pkg, from: pkg.version, to: version, manifest });
@@ -200,6 +203,32 @@ function setRegistryVersion(file, packageName, version) {
     if (!touched) return null;
     fs.writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
     return path.basename(file);
+}
+
+/**
+ * Move the version in a Claude Code plugin manifest, when a package has one.
+ *
+ * `@rebasepro/agent-skills` is also a plugin in the Claude plugin directory,
+ * which reads its skills straight from this repo. Claude Code caches an
+ * installed plugin by its `version`: a manifest left behind keeps every install
+ * on the skills it first fetched, however far the package moves on.
+ *
+ * @returns the file's path within the package, or null when there was nothing to do.
+ */
+function setPluginVersion(file, version) {
+    if (!fs.existsSync(file)) return null;
+
+    let json;
+    try {
+        json = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (err) {
+        throw new Error(`${file} is not readable JSON: ${err.message}`);
+    }
+
+    if (json.version === version) return null;
+    json.version = version;
+    fs.writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+    return ".claude-plugin/plugin.json";
 }
 
 /* ── CLI ──────────────────────────────────────────────────────────── */

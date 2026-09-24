@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "rebase",
+  "displayName": "Rebase",
+  "version": "0.22.0",
+  "description": "Skills for building on Rebase, the open-source Postgres backend and admin panel: collections, auth and row-level security, the REST API and SDK, realtime, storage, email, webhooks, cron jobs, custom functions and deployment.",
+  "author": {
+    "name": "Rebase",
+    "url": "https://rebase.pro"
+  },
+  "homepage": "https://rebase.pro",
+  "repository": "https://github.com/rebasepro/rebase",
+  "license": "MIT",
+  "keywords": [
+    "rebase",
+    "postgres",
+    "backend",
+    "admin-panel",
+    "cms",
+    "drizzle"
+  ]
+}

@@ -22,7 +22,7 @@
  * found them all. This file asks that question, on every PR rather than at
  * release time — a release-time check is discovered during a release.
  *
- * Seven invariants:
+ * Eight invariants:
  *
  *  1. **Lockstep.** Every publishable package carries the same version. The one
  *     that would have caught this, on the first PR after the bump commit landed.
@@ -42,6 +42,9 @@
  *  7. **A `server.json` agrees with its package** — the MCP Registry validates
  *     a publish against npm, so a manifest that disagrees fails the release at
  *     its last step, once npm can no longer be rewritten.
+ *  8. **A Claude plugin manifest agrees with its package** — installs are
+ *     cached by the plugin's `version`, so one left behind stops every install
+ *     picking up the skills the package ships.
  *
  * Exit 1 on a finding, 2 if the check could not run.
  *
@@ -337,6 +340,26 @@ export function checkPublishableSet({ root = ROOT, sources } = {}) {
         if (hasRegistryFile) {
             for (const finding of checkRegistryManifest(registryFile, manifest, pkg)) {
                 fail(finding.message, finding.detail);
+            }
+        }
+
+        /* ── 8. A Claude plugin manifest agrees with its package ─────── */
+
+        const pluginFile = path.join(root, pkg.dir, ".claude-plugin", "plugin.json");
+        if (fs.existsSync(pluginFile)) {
+            let plugin;
+            try {
+                plugin = JSON.parse(fs.readFileSync(pluginFile, "utf8"));
+            } catch (err) {
+                fail(`${pkg.dir}/.claude-plugin/plugin.json is not readable JSON`, err.message);
+            }
+            if (plugin && plugin.version !== manifest.version) {
+                fail(
+                    `${pkg.dir}/.claude-plugin/plugin.json is at ${plugin.version}, the package at ${manifest.version}`,
+                    "Claude Code caches an installed plugin by this version, so every install"
+                    + "\n      keeps the skills it first fetched until the number moves."
+                    + "\n      Bump through `publishable-packages.mjs --set-version`, which writes both."
+                );
             }
         }
     }
