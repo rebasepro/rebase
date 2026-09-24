@@ -430,15 +430,24 @@ export const App: React.FC = () => {
 /* ── the prompter ────────────────────────────────────────────────────── */
 
 /**
- * A teleprompter: the whole script as one column that scrolls so the word
- * being said sits a third of the way down a fixed band. Said words are full
- * white, the next one is underlined, what is still to come is readable at
- * two thirds, and what has been said recedes. It sits at the top of the
- * page, under the camera, so a read looks at the lens — and a fixed band
- * means the film under it never moves, whatever the length of the line.
+ * A teleprompter for EYE CONTACT: the row being read is pinned to the top
+ * edge of the screen, right under the camera, and everything else keeps the
+ * eyes there.
+ *
+ *   - A narrow column, about thirty characters, centred under the lens: the
+ *     eyes sweep a few centimetres across a row, not the whole screen. The
+ *     first version ran rows up to 1400 px wide, a third of the way down a
+ *     band — reading it looked like reading, not like talking to the lens.
+ *   - Left-aligned, so every row starts in the same place and the eye never
+ *     hunts for the next one.
+ *   - It scrolls a ROW at a time, when the word being said wraps: the eyes
+ *     stay on the top row and the text comes up to them. What has been said
+ *     scrolls out of sight above; two rows of what is coming sit under it,
+ *     fading, to read ahead.
  */
+const PROMPTER_PAD = 10;
+
 const Prompter: React.FC<{ position: { line: number; word: number }; timing: Timing; phase: Phase }> = ({ position, timing, phase }) => {
-    const box = useRef<HTMLDivElement>(null);
     const words = useRef(new Map<string, HTMLSpanElement>());
     const [offset, setOffset] = useState(0);
     const idle = phase !== "recording";
@@ -448,45 +457,41 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
 
     useLayoutEffect(() => {
         const span = words.current.get(`${current}:${idle ? 0 : focus}`);
-        const height = box.current?.clientHeight ?? 0;
-        if (span) setOffset(Math.max(0, span.offsetTop - height * 0.3));
+        if (span) setOffset(Math.max(0, span.offsetTop - PROMPTER_PAD));
     }, [current, focus, idle]);
 
     return (
         <div
-            ref={box}
             style={{
                 position: "relative",
                 overflow: "hidden",
-                WebkitMaskImage: "linear-gradient(transparent 0%, #000 14%, #000 78%, transparent 100%)",
-                maskImage: "linear-gradient(transparent 0%, #000 14%, #000 78%, transparent 100%)",
+                /* Only the bottom fades: the top row is the one being read. */
+                WebkitMaskImage: "linear-gradient(#000 0%, #000 70%, transparent 100%)",
+                maskImage: "linear-gradient(#000 0%, #000 70%, transparent 100%)",
             }}
         >
             <div
                 style={{
                     position: "relative",
-                    maxWidth: 1400,
+                    width: "min(520px, 42vw)",
                     margin: "0 auto",
-                    /* The reading position is a third of the way down the
-                       band; this puts the first line there before anything
-                       has scrolled. 30% of a 30vh band. */
-                    padding: "9vh 48px 0",
+                    paddingTop: PROMPTER_PAD,
                     transform: `translateY(${-offset}px)`,
-                    transition: "transform 380ms cubic-bezier(0.16, 1, 0.3, 1)",
+                    transition: "transform 300ms cubic-bezier(0.16, 1, 0.3, 1)",
                     fontFamily: "Instrument Sans, Inter, sans-serif",
-                    fontSize: "clamp(26px, 3.6vh, 42px)",
-                    lineHeight: 1.32,
+                    fontSize: "clamp(24px, 3.4vh, 36px)",
+                    lineHeight: 1.28,
                     fontWeight: 500,
                     letterSpacing: "-0.01em",
-                    textAlign: "center",
+                    textAlign: "left",
                 }}
             >
                 {DESK_NARRATION.map((line, k) => (
-                    <p key={line.id} style={{ margin: "0 0 0.7em" }}>
+                    <p key={line.id} style={{ margin: "0 0 0.45em" }}>
                         {line.words.map((w, i) => {
-                            const past = !idle && (k < current || (k === current && i < spoken));
+                            const said = !idle && (k < current || (k === current && i < spoken));
                             const next = !idle && k === current && i === spoken;
-                            const color = past ? (k < current ? "rgba(255,255,255,0.22)" : "#FFFFFF") : "rgba(255,255,255,0.62)";
+                            const color = said ? "#FFFFFF" : k === current ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.5)";
                             return (
                                 <span
                                     key={i}
@@ -584,7 +589,8 @@ const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.fl
 
 /* One screen, never scrolled: the prompter's fixed band on top, the film
    in whatever height is left, the status and the keys under it. */
-const PROMPTER_HEIGHT = "30vh";
+/* The reading row plus two rows ahead: no taller, or the eye drifts down. */
+const PROMPTER_HEIGHT = "19vh";
 const page: React.CSSProperties = {
     height: "100vh",
     overflow: "hidden",

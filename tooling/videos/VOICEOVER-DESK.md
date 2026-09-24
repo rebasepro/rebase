@@ -102,8 +102,10 @@ pnpm live          # in tooling/videos → http://localhost:3500, open it in Chr
 2. **Frame yourself.** The film under the prompter shows you where the take
    will be: large in the centre, as it opens.
 3. **Press Space and read.** The recording starts and the film waits for
-   you. The prompter is at the top, under the camera, so you are looking at
-   the lens: the word you are on is underlined, the next line is under it.
+   you. The row you are reading is pinned to the top edge of the screen,
+   right under the camera, in a narrow column — your eyes stay a few
+   centimetres from the lens. The word you are on is underlined; the text
+   scrolls up to you a row at a time, with two rows to read ahead.
    The film plays live, following you — you see what the viewer will see
    as you say it.
 4. **If the prompter stops following** (a word it cannot make out), press →
