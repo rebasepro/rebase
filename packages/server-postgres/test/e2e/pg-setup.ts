@@ -26,6 +26,9 @@ let cleanupInstalled = false;
  * `spawnSync`, because an `exit` handler cannot await. `--rm` on `docker run`
  * covers only the case where postgres itself exits; a killed *test runner*
  * leaves the container up and healthy, which is the case that actually leaked.
+ * `-v` on every `docker rm`: `--rm` would drop the image's anonymous data
+ * volume, but a `docker rm` without `-v` keeps it — 577 of them (34 GB) had
+ * piled up on one machine.
  */
 function installCleanup(): void {
     if (cleanupInstalled) return;
@@ -33,7 +36,7 @@ function installCleanup(): void {
 
     const reap = () => {
         for (const name of running) {
-            spawnSync("docker", ["rm", "-f", name], { stdio: "ignore" });
+            spawnSync("docker", ["rm", "-f", "-v", name], { stdio: "ignore" });
         }
         running.clear();
     };
@@ -166,7 +169,7 @@ export async function stopPgContainer(containerName: string): Promise<void> {
     console.log(`[pg-setup] Removing container: ${containerName}`);
     running.delete(containerName);
     try {
-        await execa("docker", ["rm", "-f", containerName]);
+        await execa("docker", ["rm", "-f", "-v", containerName]);
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[pg-setup] Cleanup failed for ${containerName}: ${msg}`);
