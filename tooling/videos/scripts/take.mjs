@@ -227,6 +227,9 @@ export async function processTake(id, { log = console.log } = {}) {
     const frame = (t) => Math.round(t * FPS) - startFrom;
 
     const timing = {
+        /* The words this take was read from: the film refuses to time it
+           against any other script (timeline.ts). */
+        script: live.lines.map((l) => l.words),
         lines: lines.map((line, k) => {
             if (!line) return null;
             const words = placeWords(live.lines[k].words, line).map(frame);

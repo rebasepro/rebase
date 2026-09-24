@@ -61,6 +61,8 @@ const distinctive = (t: string) => t.length >= 4 && !COMMON.has(t);
  *  the presenter is still on it, which is worse than moving it late. */
 const TAIL_WORDS = 2;
 const TAIL_SILENCE = 24;
+/** The last line's silence: a second and a half, from 70% of it heard. */
+const LAST_LINE_SILENCE = 45;
 
 export class Follower {
     readonly fps: number;
@@ -169,10 +171,13 @@ export class Follower {
                 if (!n) continue;
                 /* Into the NEXT line on one word is how the film leaves a
                    line the presenter is still finishing: a misheard last
-                   word ("forms" as "table") matches the next line's. So a
-                   crossing needs the word after it confirmed too — or, if
-                   nothing has been heard after it yet, it waits. */
-                if (this.crosses(p, j)) {
+                   word ("forms" as "table") matches the next line's. And a
+                   jump of more than two words on one word is how it runs
+                   ahead inside a line: "it's" heard as "table" matched
+                   "tables" six words on. Both need the word after the match
+                   confirmed too — or, if nothing has been heard after it
+                   yet, they wait for it. */
+                if (this.crosses(p, j) || j > p + 2) {
                     const confirmed = this.confirms(heard, i + n, j);
                     if (confirmed === null) {
                         pending = true;
@@ -278,7 +283,14 @@ export class Follower {
         const { line, word } = this.position();
         const total = DESK_NARRATION[line].words.length;
         const left = total - word;
-        if (word === 0 || left > TAIL_WORDS || now - this.voiceSince < TAIL_SILENCE) return;
+        const quiet = now - this.voiceSince;
+        /* The LAST line may end on silence with more of it unheard: there is
+           no next line for the camera to leave for early, and without this a
+           misheard ending left the film running with nothing more to say. */
+        const last = line === DESK_NARRATION.length - 1;
+        const tail = left <= TAIL_WORDS && quiet >= TAIL_SILENCE;
+        const close = last && word >= total * 0.7 && quiet >= LAST_LINE_SILENCE;
+        if (word === 0 || !(tail || close)) return;
         this.log(now, "silence", `line ${line}: ${left} word(s) never heard`);
         this.finishLine(line, now, this.voiceSince);
     }

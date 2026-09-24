@@ -64,6 +64,11 @@ export interface Timing {
     lines: (SpokenLine | null)[];
     /** The timing is still being written — the recording page is listening. */
     live?: boolean;
+    /** A TAKE's: the words of each line as they were when it was read. A
+     *  take's frames belong to those words — word 11 of a line is whatever
+     *  word 11 was then — so a take read from an earlier script cannot be
+     *  timed against this one, and says so (buildDeskTimeline). */
+    script?: string[][];
 }
 
 /** The read the film was authored at: nine frames a word from each line's
@@ -241,11 +246,29 @@ function placeBeats(t: Timing): PlacedBeat[] {
 
 const timelines = new WeakMap<Timing, DeskTimeline>();
 
+/** A take read from other words than script.ts has now cannot be timed
+ *  against it: cues find their words by position, and positions moved.
+ *  Rendering it anyway would put the scan's tally, the refusal and the
+ *  two people's rows on the wrong words — silently. So it stops, here. */
+function assertSameScript(script: string[][]) {
+    DESK_NARRATION.forEach((line, i) => {
+        const read = script[i];
+        if (!read || read.join(" ") !== line.words.join(" ")) {
+            throw new Error(
+                `This take was read from a different script: line "${line.id}" was ` +
+                    `"${(read ?? []).join(" ")}", and is now "${line.words.join(" ")}". ` +
+                    "Its timing belongs to the words it was read from — record it again with the current script.",
+            );
+        }
+    });
+}
+
 /** The desk's timeline under a timing. Memoised on the timing object, so a
  *  component can call it every frame. */
 export function buildDeskTimeline(t: Timing): DeskTimeline {
     const cached = timelines.get(t);
     if (cached) return cached;
+    if (t.script) assertSameScript(t.script);
 
     const beats = placeBeats(t);
     const byId = new Map(beats.map((b) => [b.id, b]));

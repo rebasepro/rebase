@@ -135,7 +135,7 @@ export const BEATS: Beat[] = [
     /* Each start is four frames after its line begins: the words lead the
        picture. Two exceptions: push starts ten frames BEFORE "You push
        it", so the command is typed as the word is said, and users starts
-       inside the "run" line, on "answered", so the camera arrives at the
+       inside the "run" line, on "answers", so the camera arrives at the
        two people as their names are said. How long a beat lasts is no
        longer a number here at all — it lasts until the next line begins,
        however long the presenter takes to say this one. */
@@ -143,7 +143,7 @@ export const BEATS: Beat[] = [
     { id: "init", at: { line: "init", plus: 4 }, view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.8 },
     { id: "rule", at: { line: "rule", plus: 4 }, view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.65 },
     { id: "push", at: { line: "push", plus: -10 }, view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.8 },
-    { id: "users", at: { line: "run", word: "answered", plus: 4 }, view: cell(1, 1), roll: 0.22, x: 20, ground: "base", reveal: 0.8 },
+    { id: "users", at: { line: "run", word: "answers", plus: 4 }, view: cell(1, 1), roll: 0.22, x: 20, ground: "base", reveal: 0.8 },
     { id: "agent", at: { line: "agent", plus: 4 }, view: cell(2, 0), roll: 0.34, x: 20, ground: "deep", reveal: 0.65 },
     { id: "panel", at: { line: "panel", plus: 4 }, view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.8 },
     { id: "views", at: { line: "views", plus: 4 }, view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.8 },
