@@ -329,6 +329,19 @@ export const App: React.FC = () => {
 
     const inputProps = useMemo<DeskProps>(() => ({ timing, live: { stream } }), [timing, stream]);
 
+    /* ?simulate is a demonstration: it starts reading by itself. (Armed in
+       the timeout, not before it: StrictMode runs this effect twice in
+       development, and a latch set outside would cancel the only start.) */
+    const autoStarted = useRef(false);
+    useEffect(() => {
+        if (SIMULATE === null || phase !== "ready" || autoStarted.current) return;
+        const id = window.setTimeout(() => {
+            autoStarted.current = true;
+            void start();
+        }, 800);
+        return () => window.clearTimeout(id);
+    }, [phase, start]);
+
     /* Before a take, the film sits a few frames in — past the presenter's
        ten-frame fade — so the camera's framing can be judged. */
     useEffect(() => {
@@ -389,7 +402,11 @@ export const App: React.FC = () => {
                                 <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setMic(v); remember("live.mic", v); }} />
                             </>
                         )}
-                        <span style={{ color: "#36CCD6" }}>Press Space, then start reading whenever you are ready — the film waits for you.</span>
+                        <span style={{ color: "#36CCD6" }}>
+                            {SIMULATE
+                                ? "A simulated presenter reads the script by itself. Space reads it again."
+                                : "Press Space, then start reading whenever you are ready — the film waits for you."}
+                        </span>
                         {!SIMULATE && <span>Recognition hears the system microphone: make it this one.</span>}
                     </>
                 ) : recording ? (

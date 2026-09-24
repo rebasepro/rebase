@@ -50,6 +50,7 @@ const HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rebase — record the desk film</title>
+<link rel="icon" href="data:,">
 <style>html,body{margin:0;background:#0A0A0A;color:#fff}</style>
 ${existsSync(path.join(OUT, "main.css")) ? '<link rel="stylesheet" href="/live/main.css">' : ""}
 </head>
