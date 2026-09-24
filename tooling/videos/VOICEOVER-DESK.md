@@ -33,17 +33,17 @@ take. A take replaces all of it with its own (see *Recording a take*).
 | # | Beat | Starts | Words | Line | After |
 |---|------|--------|-------|------|-------|
 | 01 | You, to camera | 0.5s | 13 | Anyone can build a backend in an afternoon. But can you trust it? | 1.2s |
-| 02 | The evidence | 5.6s | 34 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of its database finds nine critical issues. Every table is open. | 1.8s — the tally sits |
-| 03 | What Rebase does | 17.5s | 28 | Rebase starts from that database, as it is. One command reads all nine tables and writes a typed collection file for each. Your schema becomes code, in seconds. | 0.6s |
-| 04 | The rule | 26.5s | 37 | Access rules live in that file, right next to the table they protect. Here, customers only see their own orders. Rebase compiles that into a Postgres policy, which the database checks on every query, from any client. | 2.0s |
+| 02 | The evidence | 5.6s | 34 | A coding agent wrote this backend. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of its database finds nine critical issues. Every table is open. | 1.8s — the tally sits |
+| 03 | What Rebase does | 17.5s | 25 | Rebase starts from that database. One command reads all nine tables and writes a typed collection file for each. Your schema becomes code, in seconds. | 1.5s |
+| 04 | The rule | 26.5s | 40 | Access rules live in that file, right next to the table they protect. In this example, customers only see their own orders. Rebase compiles the rule into a Postgres policy, which the database checks on every query, from any client. | 1.1s |
 | 05 | The same scan | 39.7s | 10 | You push it, and the same scan comes back clean. | 1.3s — the clean report sits |
 | 06 | Run it → two people | 44.0s | 31 | Then you run it, and the database itself answers each request. Robert sees his own orders. Dana, in support, sees them all. The query doesn't change. Postgres decides who sees what. | 0.9s |
 | 07 | The agent | 54.2s | 24 | You give an agent a key, and it gets exactly those permissions, and nothing more. The rules hold no matter what the prompt says. | 1.8s |
-| 08 | The panel | 63.2s | 21 | And your team has an admin panel on day one, generated from those files, security included. Nobody had to build it. | 2.8s — the montage plays |
+| 08 | The panel | 63.2s | 25 | And your team has an admin panel on day one, generated from those files, with access control already in place. Nobody had to build it. | 1.6s — the montage plays |
 | 09 | Every view | 72.3s | 14 | Each collection comes with the views that fit it: boards, tables, cards and forms. | 1.8s — the bento plays |
 | 10 | The schema | 78.3s | 14 | The schema view shows all the tables and relations, as your collections declare them. | 1.3s |
-| 11 | Studio | 83.8s | 17 | You can work on the database directly too, without leaving the app: SQL, schema, policies and logs. | 1.2s |
-| 12 | The wall | 90.1s | 33 | And that's the short version. There's also realtime sync, one isomorphic SDK for the server, the browser and agents, a visual collection editor that writes your TypeScript, storage, functions, jobs, search and cron. | 2.8s |
+| 11 | Studio | 83.8s | 17 | You can also work on the database directly, without leaving the app: SQL, schema, policies and logs. | 1.2s |
+| 12 | The wall | 90.1s | 33 | And that's the short version. There's more: realtime sync, one isomorphic SDK for the server, the browser and agents, a visual collection editor that writes your TypeScript, storage, functions, jobs, search and cron. | 2.8s |
 | 13 | Close | 102.8s | 41 | Rebase is open source, and runs on your laptop, your own servers or any cloud. You point it at the Postgres you already have, and you get the whole backend: a typed API, an admin panel, and rules the database enforces. | — |
 
 ## Timing, beat by beat

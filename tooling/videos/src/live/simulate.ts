@@ -74,9 +74,16 @@ export function simulateRead(options: Partial<SimOptions> = {}): SimRead {
     const heardAt: { atMs: number; text: string | null; final: boolean }[] = [];
 
     let t = o.startMs;
+    /* The voice detector (listen.ts) only calls silence after 400 ms of it,
+       so a pause shorter than that is no event at all — the voice stays on
+       across it. An earlier version sent "off" and "on" at every line
+       break, and for a 250 ms break the "off" arrived after the next "on":
+       the follower was told the presenter had gone quiet mid-line. */
+    let voiceOn = false;
     DESK_NARRATION.forEach((line) => {
         const said: number[] = [];
-        events.push({ atMs: t + 120, kind: "voice", speaking: true, voiceAtMs: t });
+        if (!voiceOn) events.push({ atMs: t + 120, kind: "voice", speaking: true, voiceAtMs: t });
+        voiceOn = true;
         line.words.forEach((word, i) => {
             said.push(t);
             const letters = word.replace(/[^A-Za-z0-9]/g, "").length;
@@ -102,8 +109,14 @@ export function simulateRead(options: Partial<SimOptions> = {}): SimRead {
         });
         words.push(said);
         ends.push(t);
-        events.push({ atMs: t + 400, kind: "voice", speaking: false, voiceAtMs: t });
-        t += o.pause[0] + (o.pause[1] - o.pause[0]) * rnd();
+        const pause = o.pause[0] + (o.pause[1] - o.pause[0]) * rnd();
+        /* After the last line the silence never ends, so it always registers. */
+        const last = line === DESK_NARRATION[DESK_NARRATION.length - 1];
+        if (pause > 420 || last) {
+            events.push({ atMs: t + 400, kind: "voice", speaking: false, voiceAtMs: t });
+            voiceOn = false;
+        }
+        t += pause;
     });
 
     /* Recognition events, in time order: each word extends the interim
