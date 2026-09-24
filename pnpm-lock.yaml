@@ -2109,6 +2109,9 @@ importers:
       '@remotion/cli':
         specifier: 4.0.500
         version: 4.0.500(postcss@8.5.24)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+      '@remotion/player':
+        specifier: 4.0.500
+        version: 4.0.500(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -2125,6 +2128,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
+      esbuild:
+        specifier: '>=0.28.1 <0.29'
+        version: 0.28.1
       puppeteer:
         specifier: 25.4.0
         version: 25.4.0(yauzl@3.4.0)

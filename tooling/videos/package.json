@@ -7,6 +7,7 @@
     "dependencies": {
         "@firecms/neat": "1.0.2",
         "@remotion/cli": "4.0.500",
+        "@remotion/player": "4.0.500",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
         "remotion": "4.0.500"
@@ -14,6 +15,7 @@
     "devDependencies": {
         "@types/react": "^19.2.17",
         "@types/react-dom": "^19.2.3",
+        "esbuild": "0.28.1",
         "puppeteer": "25.4.0",
         "typescript": "^6.0.3"
     },
@@ -31,7 +33,9 @@
         "reel": "remotion render src/index.ts Reel-Plausible out/reel-plausible.mp4 && remotion render src/index.ts Reel-Fanout out/reel-fanout.mp4 && remotion render src/index.ts Reel-TwoUsers out/reel-twousers.mp4 && remotion render src/index.ts Reel-Included out/reel-included.mp4 && remotion render src/index.ts Reel-Refused out/reel-refused.mp4 && remotion render src/index.ts Reel-Drift out/reel-drift.mp4 && remotion render src/index.ts Reel-Push out/reel-push.mp4 && remotion render src/index.ts Reel-Stream out/reel-stream.mp4 && remotion render src/index.ts Reel-Map out/reel-map.mp4 && remotion render src/index.ts Reel-Matrix out/reel-matrix.mp4 && remotion render src/index.ts Reel-Routes out/reel-routes.mp4",
         "intro:vo": "remotion render src/index.ts RebaseIntro-VO out/rebase-intro-vo.mp4",
         "desk": "remotion render src/index.ts RebaseDesk out/rebase-desk.mp4",
-        "desk:vo": "remotion render src/index.ts RebaseDesk-VO out/rebase-desk-vo.mp4"
+        "desk:vo": "remotion render src/index.ts RebaseDesk-VO out/rebase-desk-vo.mp4",
+        "live": "node scripts/live.mjs",
+        "take": "node scripts/take.mjs"
     },
     "sideEffects": [
         "*.css"
