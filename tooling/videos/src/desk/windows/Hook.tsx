@@ -132,11 +132,16 @@ export const ScanWindow: React.FC<{
     y: number;
     w: number;
     at: number;
-    rerunAt: number;
-}> = ({ x, y, w, at, rerunAt }) => (
+    /** Absolute frame the first report starts printing — pinned to the
+     *  narration so the tally lands on its words. Never before the command
+     *  has been typed; null while that word has not been said (live). */
+    reportAt: number | null;
+    /** Absolute frame the scan is typed again, or null until it is. */
+    rerunAt: number | null;
+}> = ({ x, y, w, at, reportAt, rerunAt }) => (
     <div style={{ position: "absolute", left: x, top: y, width: w }}>
         <Sequence from={at} layout="none">
-            <ScanBody rerunAt={rerunAt - at} />
+            <ScanBody reportAt={reportAt === null ? null : reportAt - at} rerunAt={rerunAt === null ? null : rerunAt - at} />
         </Sequence>
     </div>
 );
@@ -177,14 +182,16 @@ const Report: React.FC<{ lines: string[]; from: number }> = ({ lines, from }) =>
     );
 };
 
-const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
+const ScanBody: React.FC<{ reportAt: number | null; rerunAt: number | null }> = ({ reportAt, rerunAt }) => {
     const frame = useCurrentFrame();
     const rate = 0.5;
     const typed1 = Math.round(ramp(frame, 8, CMD.length * rate) * CMD.length);
-    const report1 = 8 + CMD.length * rate + 8;
-    const rerun = frame >= rerunAt;
-    const typed2 = Math.round(ramp(frame, rerunAt + 4, CMD.length * rate) * CMD.length);
-    const report2 = rerunAt + 4 + CMD.length * rate + 8;
+    /* A slower read leaves the prompt sitting on a typed command for a
+       moment before the report — which is what a scan looks like anyway. */
+    const report1 = reportAt === null ? null : Math.max(8 + CMD.length * rate + 8, reportAt);
+    const rerun = rerunAt !== null && frame >= rerunAt;
+    const typed2 = rerunAt === null ? 0 : Math.round(ramp(frame, rerunAt + 4, CMD.length * rate) * CMD.length);
+    const report2 = (rerunAt ?? 0) + 4 + CMD.length * rate + 8;
 
     return (
         <Frame title="rls-check · the same database" surface="well" delay={0} bodyStyle={{ padding: "22px 30px 26px" }}>
@@ -207,7 +214,7 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
                         <span style={{ color: INK.muted, marginRight: 12 }}>$</span>
                         {CMD.slice(0, typed1)}
                     </div>
-                    <Report lines={SCAN_BEFORE} from={report1} />
+                    {report1 !== null && <Report lines={SCAN_BEFORE} from={report1} />}
                     {rerun && (
                         <>
                             <div style={{ color: INK.high, marginTop: 6 }}>

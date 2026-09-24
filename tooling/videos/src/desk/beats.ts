@@ -1,5 +1,5 @@
-import { Easing, interpolate } from "remotion";
 import type { Ground } from "../theme";
+import type { LineId } from "./script";
 
 /**
  * THE DESK.
@@ -45,11 +45,30 @@ export interface View {
     zoom: number;
 }
 
+/**
+ * A moment in the narration: a line, or a word inside it, or the line's end,
+ * plus a number of frames. Nothing on the desk is placed at an absolute frame
+ * any more — every beat and every cue is one of these, and timeline.ts turns
+ * them into frames from whatever says when the words were spoken: the
+ * authored read at nine frames a word, a recorded take, or the presenter
+ * speaking live.
+ */
+export interface Cue {
+    line: LineId;
+    /** A word of the line by its text (first occurrence, case and
+     *  punctuation ignored), or by index. The line's first word if omitted. */
+    word?: string | number;
+    /** The moment the line ends, instead of a word. */
+    end?: true;
+    /** Frames after (or, negative, before) that moment. */
+    plus: number;
+}
+
 export interface Beat {
     id: string;
-    /** Absolute frame the beat starts. The camera begins moving 8 frames
-     *  before this and lands MOVE frames after. */
-    start: number;
+    /** When the beat starts. The camera begins moving MOVE_LEAD frames
+     *  before this and lands moveFrames() after. */
+    at: Cue;
     view: View;
     /** The ribbon's rotation for this beat — see film.ts on why roll is the
      *  one lever that changes the view without changing coverage. */
@@ -66,20 +85,15 @@ export interface Beat {
 const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CELL.h, zoom: 1 });
 
 /**
- * THE TEMPO. Every beat below was first timed at a 180-words-a-minute read
- * and the film came in at 78 seconds; it played a shade fast. Rather than
- * re-time eleven beats and eleven lines by hand, the sheet keeps its
- * original numbers and everything after the cold open is stretched by
- * this factor — beats, moves and the narration's frames alike, so no
- * relationship between them changes. 1.1 played a shade slow once the
- * lines had grown into full sentences; 1.05 is 91 seconds and a 171-word
- * read. What is NOT stretched is anything inside a window: typing speed,
- * a report streaming, a spring — those are how fast the product is, and
- * the product did not get slower.
+ * THE TEMPO of the AUTHORED read — the one the film falls back on when no
+ * take exists: nine frames a word times this, and every move's length. It
+ * was a stretch factor over a sheet of absolute frames (1.05 at one point);
+ * there is no such sheet any more — beats hang off the words, so a slower
+ * read is simply a later word — and it stays at 1. What it never touched is
+ * anything inside a window: typing speed, a report streaming, a spring —
+ * those are how fast the product is, not how fast anyone talks.
  */
 export const TEMPO = 1;
-/** A frame from the original sheet, on the stretched timeline. */
-export const tempo = (raw: number): number => Math.round(raw * TEMPO);
 
 /** The whole desk, framed on its content rather than its edges: the windows
  *  span roughly 200..5680 by 180..4200 now that the wall is a fourth row,
@@ -119,38 +133,35 @@ export const BEATS: Beat[] = [
        ribbon fades up behind them over the first frames. A logo pre-roll
        here left a person on camera for over a second with nothing to say. */
     /* Each start is four frames after its line begins: the words lead the
-       picture. The sheet is laid out from the script at nine frames a word,
-       with a breath between lines and a beat after every picture. The
-       three tour beats are five to six seconds each: a montage needs the
-       time to be seen, and "boards, tables, cards and forms" said over a
-       three-second cut was gone before the eye had found the boards. */
-    { id: "hook", start: tempo(12), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.8 },
-    { id: "init", start: tempo(530), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.8 },
-    { id: "rule", start: tempo(800), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.65 },
-    { id: "push", start: tempo(1180), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.8 },
-    { id: "users", start: tempo(1396), view: cell(1, 1), roll: 0.22, x: 20, ground: "base", reveal: 0.8 },
-    { id: "agent", start: tempo(1630), view: cell(2, 0), roll: 0.34, x: 20, ground: "deep", reveal: 0.65 },
-    { id: "panel", start: tempo(1900), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.8 },
-    { id: "views", start: tempo(2172), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.8 },
-    { id: "schema", start: tempo(2352), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.8 },
-    { id: "studio", start: tempo(2517), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.8 },
+       picture. Two exceptions: push starts ten frames BEFORE "You push
+       it", so the command is typed as the word is said, and users starts
+       inside the "run" line, on "answered", so the camera arrives at the
+       two people as their names are said. How long a beat lasts is no
+       longer a number here at all — it lasts until the next line begins,
+       however long the presenter takes to say this one. */
+    { id: "hook", at: { line: "question", plus: -3 }, view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.8 },
+    { id: "init", at: { line: "init", plus: 4 }, view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.8 },
+    { id: "rule", at: { line: "rule", plus: 4 }, view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.65 },
+    { id: "push", at: { line: "push", plus: -10 }, view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.8 },
+    { id: "users", at: { line: "run", word: "answered", plus: 4 }, view: cell(1, 1), roll: 0.22, x: 20, ground: "base", reveal: 0.8 },
+    { id: "agent", at: { line: "agent", plus: 4 }, view: cell(2, 0), roll: 0.34, x: 20, ground: "deep", reveal: 0.65 },
+    { id: "panel", at: { line: "panel", plus: 4 }, view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.8 },
+    { id: "views", at: { line: "views", plus: 4 }, view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.8 },
+    { id: "schema", at: { line: "schema", plus: 4 }, view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.8 },
+    { id: "studio", at: { line: "studio", plus: 4 }, view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.8 },
     /* The wall: 380 frames, enough for the line to name six of its
        twenty-four entries and for the cascade to finish under it. */
-    { id: "more", start: tempo(2707), view: cell(0, 3), roll: 0.3, ground: "base", reveal: 0.8 },
-    { id: "all", start: tempo(3087), view: ALL, roll: 0.16, ground: "base", reveal: 0.7 },
+    { id: "more", at: { line: "wall", plus: 4 }, view: cell(0, 3), roll: 0.3, ground: "base", reveal: 0.8 },
+    { id: "all", at: { line: "close", plus: 4 }, view: ALL, roll: 0.16, ground: "base", reveal: 0.7 },
 ];
 
 /** Where the camera starts: on the hook, which is where it stays until the
  *  first move. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(3510);
-
-export const beat = (id: string): Beat => {
-    const b = BEATS.find((x) => x.id === id);
-    if (!b) throw new Error(`no beat ${id}`);
-    return b;
-};
+/** Where the camera ends: see FINAL. Exported for the timeline, which
+ *  places the recession under the close. */
+export { FINAL };
 
 /** How early a move begins, relative to the beat it moves into. The
  *  narration for a beat starts a few frames before it, so the picture is
@@ -187,67 +198,5 @@ export function moveFrames(from: View, to: View): number {
  * The pull-back at the end is the one move that fades everything IN: the
  * desk reveals itself as the camera lifts off it.
  */
-const FADE_OUT_BY = 0.55;
-const FADE_IN_FROM = 0.45;
-
-/** Which beat the camera is in or moving into, and how far along the move. */
-export function deskPhase(frame: number): { beat: number; moving: boolean; t: number } {
-    for (let i = 0; i < BEATS.length; i++) {
-        const a = KEY_AT[2 * i + 1];
-        const z = KEY_AT[2 * i + 2];
-        if (frame < a) return { beat: i - 1, moving: false, t: 0 };
-        if (frame < z) return { beat: i, moving: true, t: (frame - a) / (z - a) };
-    }
-    return { beat: BEATS.length - 1, moving: false, t: 0 };
-}
-
-const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-
-/** Opacity of a window that is on camera during `shown` beats. */
-export function windowOpacity(frame: number, shown: readonly string[]): number {
-    const { beat, moving, t } = deskPhase(frame);
-    const has = (i: number) => i >= 0 && shown.includes(BEATS[i].id);
-    if (!moving) return has(beat) ? 1 : 0;
-    const from = has(beat - 1);
-    const to = has(beat);
-    if (from && to) return 1;
-    if (!from && !to) return 0;
-    if (from) return 1 - clamp01(t / FADE_OUT_BY);
-    return clamp01((t - FADE_IN_FROM) / (1 - FADE_IN_FROM));
-}
-
-/* Piecewise: hold at a view, ease to the next across its move window. Built
-   as keyframe arrays so the camera is a pure function of the absolute frame —
-   the same property the ribbon's own camera has, and for the same reason:
-   the renderer seeks. */
-const KEY_AT: number[] = [0];
-const KEY_VIEW: View[] = [OPENING];
-BEATS.forEach((b, i) => {
-    const from = i === 0 ? OPENING : BEATS[i - 1].view;
-    const a = b.start - MOVE_LEAD;
-    const z = a + moveFrames(from, b.view);
-    KEY_AT.push(a, z);
-    KEY_VIEW.push(from, b.view);
-});
-KEY_AT.push(DESK_DURATION);
-KEY_VIEW.push(FINAL);
-
-const EASE = Easing.inOut(Easing.cubic);
-const OPTS = { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: EASE } as const;
-
-export function cameraAt(frame: number): View {
-    return {
-        x: interpolate(frame, KEY_AT, KEY_VIEW.map((v) => v.x), OPTS),
-        y: interpolate(frame, KEY_AT, KEY_VIEW.map((v) => v.y), OPTS),
-        zoom: interpolate(frame, KEY_AT, KEY_VIEW.map((v) => v.zoom), OPTS),
-    };
-}
-
-/** True while the camera is at rest — used to drop the transform's
- *  fractional part so type rasterises on whole pixels. */
-export function cameraStill(frame: number): boolean {
-    for (let i = 1; i < KEY_AT.length; i += 2) {
-        if (frame > KEY_AT[i] && frame < KEY_AT[i + 1]) return false;
-    }
-    return true;
-}
+export const FADE_OUT_BY = 0.55;
+export const FADE_IN_FROM = 0.45;

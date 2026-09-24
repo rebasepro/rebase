@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
-import { beat, cameraAt, cameraStill, DESK, DESK_DURATION, windowOpacity } from "./beats";
-import { FLY_TO_CORNER } from "./Presenter";
+import { DESK } from "./beats";
+import { useDeskTimeline } from "./timeline";
 import { Title } from "./Title";
 import { AgentSession, ScanWindow } from "./windows/Hook";
 import { More } from "./windows/More";
@@ -36,29 +36,9 @@ import { TONE } from "../theme";
  * leave a hole in it.
  */
 
-const HOOK = beat("hook");
-const INIT = beat("init");
-const RULE = beat("rule");
-const PUSH = beat("push");
-const USERS = beat("users");
-const AGENT = beat("agent");
-const PANEL = beat("panel");
-const VIEWS = beat("views");
-const SCHEMA = beat("schema");
-const STUDIO = beat("studio");
-const MORE = beat("more");
-
-/* The shell's three commands, on the film's clock. `init` types as the
-   camera lands on the terminal; `db push` types on the return visit; the
-   scan re-runs the moment push has printed "RLS policies applied"; `dev`
-   types once the scan has come back clean. See Shell.tsx for the session
-   itself — these are its arithmetic (typing at 0.55 frames a character). */
-const SHELL_AT = INIT.start + 8;
-const PUSH_AT = PUSH.start + 14;
-/** The push output's last line lands at +22; the scan re-runs under it and
- *  its clean report settles by +45; dev is typed as "Then run it" begins. */
-const RERUN_AT = PUSH_AT + 32;
-const DEV_AT = RERUN_AT + 96;
+/* The shell's three commands, the scan's two runs, the agent's refusal —
+   every moment below is a cue in timeline.ts, hung off a beat or a word.
+   See Shell.tsx for the session itself; typing is 0.55 frames a character. */
 
 const Chroma: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <ToneOverride.Provider value={TONE.claim}>{children}</ToneOverride.Provider>
@@ -74,15 +54,27 @@ const Chroma: React.FC<{ children: React.ReactNode }> = ({ children }) => (
  *  ground between the two. */
 const On: React.FC<{ beats: string[]; children: React.ReactNode }> = ({ beats, children }) => {
     const frame = useCurrentFrame();
-    const o = windowOpacity(frame, beats);
+    const o = useDeskTimeline().windowOpacity(frame, beats);
     if (o <= 0) return null;
     return <div style={o < 1 ? { opacity: o } : undefined}>{children}</div>;
 };
 
 export const Desk: React.FC = () => {
     const frame = useCurrentFrame();
-    const cam = cameraAt(frame);
-    const still = cameraStill(frame);
+    const tl = useDeskTimeline();
+    const { cues } = tl;
+    const cam = tl.camera(frame);
+    const still = tl.cameraStill(frame);
+    /* A beat not yet placed — live, a line not yet said — has no windows:
+       they are left out of the tree, not faded, until its moment comes. */
+    const RULE = tl.beat("rule");
+    const USERS = tl.beat("users");
+    const AGENT = tl.beat("agent");
+    const PANEL = tl.beat("panel");
+    const VIEWS = tl.beat("views");
+    const SCHEMA = tl.beat("schema");
+    const STUDIO = tl.beat("studio");
+    const MORE = tl.beat("more");
     // Whole pixels at rest, so type rasterises the same on every held frame.
     const x = still ? Math.round(cam.x) : cam.x;
     const y = still ? Math.round(cam.y) : cam.y;
@@ -110,14 +102,16 @@ export const Desk: React.FC = () => {
                     headline first, the agent's summary during "built by an
                     agent. It works.", and the scan last, so its findings print
                     under "found three ways in". */}
-                <On beats={["hook", "all"]}>
-                    <Title
-                        x={200}
-                        y={230}
-                        at={FLY_TO_CORNER + 12}
-                        lines={["Anyone can build a backend", "in an afternoon.", "Nobody can tell you if it's safe."]}
-                    />
-                </On>
+                {cues.hookTitle !== null && (
+                    <On beats={["hook", "all"]}>
+                        <Title
+                            x={200}
+                            y={230}
+                            at={cues.hookTitle}
+                            lines={["Anyone can build a backend", "in an afternoon.", "Nobody can tell you if it's safe."]}
+                        />
+                    </On>
+                )}
                 <On beats={["hook", "init", "push", "all"]}>
                     {/* The scan sits on the LEFT: its report is 72 columns wide
                         and its summary line 77, and on the right that ran under
@@ -125,17 +119,21 @@ export const Desk: React.FC = () => {
                         are short, takes the right. 740 wide at 14px holds the
                         widest line the tool prints, the 77-character summary. Timed so the tally prints
                         under "nine critical". */}
-                    <ScanWindow x={200} y={540} w={740} at={FLY_TO_CORNER + 216} rerunAt={RERUN_AT} />
-                    <AgentSession x={960} y={540} w={620} at={FLY_TO_CORNER + 18} />
+                    {cues.scan !== null && (
+                        <ScanWindow x={200} y={540} w={740} at={cues.scan} reportAt={cues.scanReport} rerunAt={cues.rerun} />
+                    )}
+                    {cues.agentSession !== null && <AgentSession x={960} y={540} w={620} at={cues.agentSession} />}
                 </On>
 
                 {/* ── (0,½) THE TERMINAL — init, then push, then dev ─── */}
-                <On beats={["init", "push", "all"]}>
-                    <Shell x={200} y={1000} w={1380} at={SHELL_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
-                </On>
+                {cues.shell !== null && (
+                    <On beats={["init", "push", "all"]}>
+                        <Shell x={200} y={1000} w={1380} at={cues.shell} pushAt={cues.push} devAt={cues.dev} />
+                    </On>
+                )}
 
                 {/* ── (1,0) THE RULE — on the blue field ─────────────── */}
-                <On beats={["rule", "all"]}>
+                {RULE && <On beats={["rule", "all"]}>
                     <Chroma>
                         <Title
                             x={2120}
@@ -146,10 +144,10 @@ export const Desk: React.FC = () => {
                         />
                         <RuleWindows x={2120} y={480} at={RULE.start + 24} />
                     </Chroma>
-                </On>
+                </On>}
 
                 {/* ── (1,1) TWO PEOPLE ───────────────────────────────── */}
-                <On beats={["users", "all"]}>
+                {USERS && <On beats={["users", "all"]}>
                     <Title
                         x={2120}
                         y={1260}
@@ -157,11 +155,11 @@ export const Desk: React.FC = () => {
                         eyebrow="Row-level security, running"
                         lines={["The same query, twice."]}
                     />
-                    <UsersWindows x={2120} y={1440} at={USERS.start + 20} />
-                </On>
+                    {cues.users !== null && <UsersWindows x={2120} y={1440} at={cues.users} />}
+                </On>}
 
                 {/* ── (2,0) THE AGENT — on the deep field ────────────── */}
-                <On beats={["agent", "all"]}>
+                {AGENT && <On beats={["agent", "all"]}>
                     <ToneOverride.Provider value={TONE.deep}>
                         <Title
                             x={4040}
@@ -170,12 +168,14 @@ export const Desk: React.FC = () => {
                             eyebrow="Agent-native"
                             lines={["An agent gets your permissions.", "No way around them."]}
                         />
-                        <AgentConsole x={4040} y={500} w={1380} at={AGENT.start + 26} />
+                        {cues.agentConsole !== null && (
+                            <AgentConsole x={4040} y={500} w={1380} at={cues.agentConsole} refuseAt={cues.agentRefuse} />
+                        )}
                     </ToneOverride.Provider>
-                </On>
+                </On>}
 
                 {/* ── (2,1) THE PANEL ────────────────────────────────── */}
-                <On beats={["panel", "all"]}>
+                {PANEL && <On beats={["panel", "all"]}>
                     <Title
                         x={4040}
                         y={1300}
@@ -185,21 +185,21 @@ export const Desk: React.FC = () => {
                         size={DISPLAY.split}
                         width={520}
                     />
-                    <Panel x={4040} y={1250} at={PANEL.start + 6} tail={DESK_DURATION - PANEL.start} />
-                </On>
+                    <Panel x={4040} y={1250} at={PANEL.start + 6} tail={tl.until - PANEL.start} />
+                </On>}
 
                 {/* ── (2,2) EVERY VIEW ───────────────────────────────── */}
-                <On beats={["views", "all"]}>
-                    <Views x={3840} y={2160} at={VIEWS.start - 6} hold={DESK_DURATION - VIEWS.start} />
-                </On>
+                {VIEWS && <On beats={["views", "all"]}>
+                    <Views x={3840} y={2160} at={VIEWS.start - 6} hold={tl.until - VIEWS.start} />
+                </On>}
 
                 {/* ── (1,2) THE SCHEMA ───────────────────────────────── */}
-                <On beats={["schema", "all"]}>
+                {SCHEMA && <On beats={["schema", "all"]}>
                     <Schema x={1920} y={2160} at={SCHEMA.start - 4} />
-                </On>
+                </On>}
 
                 {/* ── (0,2) STUDIO ───────────────────────────────────── */}
-                <On beats={["studio", "all"]}>
+                {STUDIO && <On beats={["studio", "all"]}>
                     <Title
                         x={200}
                         y={2360}
@@ -210,12 +210,12 @@ export const Desk: React.FC = () => {
                         width={520}
                     />
                     <Studio x={200} y={2330} at={STUDIO.start + 6} />
-                </On>
+                </On>}
 
                 {/* ── (0,3) THE WALL — what a hundred seconds leaves out ─── */}
-                <On beats={["more", "all"]}>
+                {MORE && <On beats={["more", "all"]}>
                     <More x={0} y={3240} at={MORE.start + 4} />
-                </On>
+                </On>}
             </div>
         </AbsoluteFill>
     );

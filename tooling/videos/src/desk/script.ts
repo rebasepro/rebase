@@ -31,34 +31,54 @@ import { TEMPO } from "./beats";
 /** Nine frames a word — about 200 a minute — scaled with the tempo. */
 export const DESK_FRAMES_PER_WORD = 9 * TEMPO;
 
-export const DESK_NARRATION: { at: number; words: string[] }[] = [
+/** The lines by name, so the film can anchor a picture to a line — or to a
+ *  word inside one — without counting. See timeline.ts. */
+export type LineId =
+    | "question"
+    | "evidence"
+    | "init"
+    | "rule"
+    | "push"
+    | "run"
+    | "agent"
+    | "panel"
+    | "views"
+    | "schema"
+    | "studio"
+    | "wall"
+    | "close";
+
+/** `at` is the AUTHORED start: where the line falls when it is read at
+ *  exactly nine frames a word. A recorded take replaces all of these with
+ *  the frames the words were actually said (timeline.ts). */
+export const DESK_NARRATION: { id: LineId; at: number; words: string[] }[] = [
     // the question, to camera
-    { at: 15, words: ["Anyone", "can", "build", "a", "backend", "in", "an", "afternoon.", "But", "can", "you", "trust", "it?"] },
+    { id: "question", at: 15, words: ["Anyone", "can", "build", "a", "backend", "in", "an", "afternoon.", "But", "can", "you", "trust", "it?"] },
     // the evidence: the agent's summary, then the scan's tally
-    { at: 167, words: ["A", "coding", "agent", "built", "this", "one.", "It", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "the", "same", "database", "finds", "nine", "critical", "issues.", "Every", "table", "is", "open."] },
+    { id: "evidence", at: 167, words: ["A", "coding", "agent", "built", "this", "one.", "It", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "the", "same", "database", "finds", "nine", "critical", "issues.", "Every", "table", "is", "open."] },
     // what Rebase does with that database
-    { at: 526, words: ["Rebase", "starts", "from", "the", "database", "you", "already", "have.", "One", "command", "reads", "every", "table", "and", "writes", "a", "typed", "collection", "file", "for", "each", "one.", "Your", "schema", "becomes", "code,", "in", "seconds."] },
+    { id: "init", at: 526, words: ["Rebase", "starts", "from", "the", "database", "you", "already", "have.", "One", "command", "reads", "every", "table", "and", "writes", "a", "typed", "collection", "file", "for", "each", "one.", "Your", "schema", "becomes", "code,", "in", "seconds."] },
     // the rule
-    { at: 796, words: ["Access", "rules", "live", "in", "that", "file,", "right", "next", "to", "the", "table", "they", "protect.", "This", "one", "says", "customers", "only", "see", "their", "own", "orders.", "Rebase", "compiles", "it", "into", "a", "Postgres", "policy,", "so", "the", "database", "enforces", "it", "on", "every", "query,", "from", "every", "client."] },
+    { id: "rule", at: 796, words: ["Access", "rules", "live", "in", "that", "file,", "right", "next", "to", "the", "table", "they", "protect.", "This", "one", "says", "customers", "only", "see", "their", "own", "orders.", "Rebase", "compiles", "it", "into", "a", "Postgres", "policy,", "so", "the", "database", "enforces", "it", "on", "every", "query,", "from", "every", "client."] },
     // push + the same scan
-    { at: 1190, words: ["You", "push", "it,", "and", "the", "same", "scan", "comes", "back", "clean."] },
+    { id: "push", at: 1190, words: ["You", "push", "it,", "and", "the", "same", "scan", "comes", "back", "clean."] },
     // run it → the API answers two people
-    { at: 1320, words: ["Then", "you", "run", "it,", "and", "every", "request", "is", "answered", "by", "the", "database", "itself.", "Robert", "sees", "his", "own", "orders.", "Dana,", "in", "support,", "sees", "them", "all.", "It", "is", "the", "same", "query.", "Postgres", "decides", "who", "sees", "what."] },
+    { id: "run", at: 1320, words: ["Then", "you", "run", "it,", "and", "every", "request", "is", "answered", "by", "the", "database", "itself.", "Robert", "sees", "his", "own", "orders.", "Dana,", "in", "support,", "sees", "them", "all.", "It", "is", "the", "same", "query.", "Postgres", "decides", "who", "sees", "what."] },
     // the agent
-    { at: 1626, words: ["You", "give", "an", "agent", "a", "key,", "and", "it", "gets", "exactly", "those", "permissions,", "and", "nothing", "more.", "The", "rules", "hold", "no", "matter", "what", "the", "prompt", "says."] },
+    { id: "agent", at: 1626, words: ["You", "give", "an", "agent", "a", "key,", "and", "it", "gets", "exactly", "those", "permissions,", "and", "nothing", "more.", "The", "rules", "hold", "no", "matter", "what", "the", "prompt", "says."] },
     // the panel
-    { at: 1896, words: ["And", "your", "team", "gets", "an", "admin", "panel", "on", "day", "one,", "generated", "from", "the", "same", "files,", "with", "the", "same", "rules.", "Nobody", "had", "to", "build", "it."] },
+    { id: "panel", at: 1896, words: ["And", "your", "team", "gets", "an", "admin", "panel", "on", "day", "one,", "generated", "from", "the", "same", "files,", "with", "the", "same", "rules.", "Nobody", "had", "to", "build", "it."] },
     // views
-    { at: 2168, words: ["Every", "collection", "gets", "the", "views", "that", "fit", "it:", "boards,", "tables,", "cards", "and", "forms."] },
+    { id: "views", at: 2168, words: ["Every", "collection", "gets", "the", "views", "that", "fit", "it:", "boards,", "tables,", "cards", "and", "forms."] },
     // schema
     // The visualizer builds its graph from the collection registry
     // (useSchemaGraph(collections, liveRls)); only the RLS state is read from
     // pg_tables. "Read live from your database" was not true.
-    { at: 2348, words: ["The", "schema", "view", "shows", "every", "table", "and", "relation,", "as", "your", "collections", "declare", "them."] },
+    { id: "schema", at: 2348, words: ["The", "schema", "view", "shows", "every", "table", "and", "relation,", "as", "your", "collections", "declare", "them."] },
     // studio
-    { at: 2513, words: ["And", "you", "can", "work", "on", "the", "database", "itself", "in", "the", "same", "app:", "SQL,", "schema,", "policies", "and", "logs."] },
+    { id: "studio", at: 2513, words: ["And", "you", "can", "work", "on", "the", "database", "itself", "in", "the", "same", "app:", "SQL,", "schema,", "policies", "and", "logs."] },
     // the wall: what the film leaves out, six of twenty-four named
-    { at: 2703, words: ["And", "that's", "the", "short", "version.", "There's", "also", "realtime", "sync,", "one", "isomorphic", "SDK", "with", "the", "same", "shape", "on", "the", "server,", "in", "the", "browser", "and", "in", "an", "agent,", "a", "visual", "collection", "editor", "that", "writes", "your", "TypeScript,", "storage,", "functions,", "jobs,", "search", "and", "cron."] },
+    { id: "wall", at: 2703, words: ["And", "that's", "the", "short", "version.", "There's", "also", "realtime", "sync,", "one", "isomorphic", "SDK", "with", "the", "same", "shape", "on", "the", "server,", "in", "the", "browser", "and", "in", "an", "agent,", "a", "visual", "collection", "editor", "that", "writes", "your", "TypeScript,", "storage,", "functions,", "jobs,", "search", "and", "cron."] },
     // close — on the product, and what you get
-    { at: 3083, words: ["Rebase", "is", "open", "source,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "You", "point", "it", "at", "the", "Postgres", "you", "already", "have,", "and", "you", "get", "the", "whole", "backend:", "a", "typed", "API,", "an", "admin", "panel,", "and", "rules", "the", "database", "itself", "enforces."] },
+    { id: "close", at: 3083, words: ["Rebase", "is", "open", "source,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "You", "point", "it", "at", "the", "Postgres", "you", "already", "have,", "and", "you", "get", "the", "whole", "backend:", "a", "typed", "API,", "an", "admin", "panel,", "and", "rules", "the", "database", "itself", "enforces."] },
 ];

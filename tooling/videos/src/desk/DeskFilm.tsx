@@ -1,15 +1,42 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { DeskPlane } from "./DeskPlane";
 import { Desk } from "./Desk";
-import { beat, DESK_DURATION } from "./beats";
 import { Mark } from "../components/Mark";
 import { ramp, SHIFT } from "../components/motion";
 import { FONT, FRAME, INK } from "../theme";
 import { Narration } from "../Narration";
 import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
-import { Presenter } from "./Presenter";
-import { CLOSE, FLY_TO_CLOSE } from "./Presenter";
+import { CLOSE, Presenter, type LiveFeed, type Take } from "./Presenter";
+import { AUTHORED, buildDeskTimeline, DeskTimelineContext, useDeskTimeline, type Timing } from "./timeline";
+
+/**
+ * What the desk film is given. All optional: with none of them it is the
+ * authored film, a placeholder in the presenter's window.
+ *
+ *   timing  when each word was said (timeline.ts) — a take's, measured by
+ *           scripts/take.mjs, or the recording page's, live.
+ *   take    the recording that goes in the presenter's window.
+ *   live    the camera, live, on the recording page.
+ */
+export interface DeskProps {
+    timing?: Timing | null;
+    take?: Take | null;
+    live?: LiveFeed | null;
+    [key: string]: unknown;
+}
+
+/** The timeline for these props, for every component under it. */
+const WithTimeline: React.FC<{ timing?: Timing | null; children: React.ReactNode }> = ({ timing, children }) => {
+    const timeline = useMemo(() => buildDeskTimeline(timing ?? AUTHORED), [timing]);
+    return <DeskTimelineContext.Provider value={timeline}>{children}</DeskTimelineContext.Provider>;
+};
+
+/** How long the film runs for these props: to the close's last word and 49
+ *  frames past it. Read by the compositions' calculateMetadata. */
+export function deskDuration(props: DeskProps): number {
+    return buildDeskTimeline(props.timing ?? AUTHORED).duration ?? 1;
+}
 
 /**
  * The film: the ribbon, the desk on it, and two things in SCREEN space that
@@ -18,27 +45,41 @@ import { CLOSE, FLY_TO_CLOSE } from "./Presenter";
  * mark is at the close). Everything else is a place on the desk the camera
  * goes.
  */
-export const RebaseDesk: React.FC = () => (
+export const RebaseDesk: React.FC<DeskProps> = ({ timing, take, live }) => (
+    <WithTimeline timing={timing}>
+        <DeskFilm take={take} live={live} />
+    </WithTimeline>
+);
+
+const DeskFilm: React.FC<{ take?: Take | null; live?: LiveFeed | null }> = ({ take, live }) => (
     <AbsoluteFill style={{ background: "#000" }}>
         <DeskPlane />
         <Desk />
         <Close />
-        <Presenter />
+        <Presenter take={take} live={live} />
     </AbsoluteFill>
 );
 
 /** With the prompter, for timing the read. Not a deliverable. The prompter
  *  is pushed left of the presenter's corner so the two never overlap. */
-export const RebaseDeskVO: React.FC = () => (
-    <>
-        <RebaseDesk />
-        <Narration script={DESK_NARRATION} framesPerWord={DESK_FRAMES_PER_WORD} insetRight={340} />
-    </>
+export const RebaseDeskVO: React.FC<DeskProps> = ({ timing, take, live }) => (
+    <WithTimeline timing={timing}>
+        <DeskFilm take={take} live={live} />
+        <Prompter />
+    </WithTimeline>
 );
 
-const HOOK = beat("hook");
-
-const ALL = beat("all");
+/** The narration at the timeline's own word frames — the authored read, or
+ *  a take's, word for word. A line not (fully) said is left off. */
+const Prompter: React.FC = () => {
+    const { timing } = useDeskTimeline();
+    const script = DESK_NARRATION.flatMap((line, i) => {
+        const said = timing.lines[i];
+        if (!said || said.words.length < line.words.length || said.end === undefined) return [];
+        return [{ at: said.words[0], words: line.words, wordsAt: said.words, endsAt: said.end }];
+    });
+    return <Narration script={script} framesPerWord={DESK_FRAMES_PER_WORD} insetRight={340} />;
+};
 
 /** The address, over the whole desk pulled back: every window the film
  *  visited, small, for as long as the pull-back takes — then they go, and
@@ -53,7 +94,9 @@ const ALL = beat("all");
  *  any other shot in the film — the one shot that should have the least. */
 const Close: React.FC = () => {
     const frame = useCurrentFrame();
-    const at = FLY_TO_CLOSE + 20;
+    const { cues } = useDeskTimeline();
+    if (cues.flyToClose === null) return null;
+    const at = cues.flyToClose + 20;
     const mark = ramp(frame, at, 1);
     if (mark <= 0) return null;
     const scrim = ramp(frame, at + 6, 44);
@@ -62,7 +105,7 @@ const Close: React.FC = () => {
     const foot = ramp(frame, at + 66, 22);
     /* And to black entirely under the last line, so the final frame is the
        presenter, the mark, the address and the command on ground. */
-    const dark = ramp(frame, DESK_DURATION - 70, 56, SHIFT);
+    const dark = cues.fadeOut === null ? 0 : ramp(frame, cues.fadeOut, 56, SHIFT);
     const left = CLOSE.x + CLOSE.w + 60;
     return (
         <AbsoluteFill>

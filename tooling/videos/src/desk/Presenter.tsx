@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile, useCurrentFrame } from "remotion";
-import { beat } from "./beats";
-import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
+import { useDeskTimeline, type DeskTimeline } from "./timeline";
 import { FONT, FRAME, INK, SURFACE } from "../theme";
 
 /**
@@ -18,19 +17,29 @@ import { FONT, FRAME, INK, SURFACE } from "../theme";
  *
  * It is ONE video element for the whole film — the window moves and
  * resizes around it — so the take's audio is continuous and is the
- * narration. Until a take exists the window shows a placeholder.
+ * narration. What plays in it is one of three things:
  *
- * WHEN THERE IS A TAKE: set `TAKE`, then derive the beat starts from the
- * take's word timestamps rather than asking the read to hit the prompter's
- * frames. `beats.ts` already routes every start through `tempo()`; that
- * becomes a per-beat table. Nobody reads at exactly eleven frames a word,
- * and a read chasing a timer sounds like one.
+ *   a TAKE     a recording (scripts/take.mjs writes it and the props that
+ *              point at it). The film's timing is the take's own: every
+ *              beat hangs off the words as they were said (timeline.ts).
+ *   the CAMERA live, on the recording page (src/live): the presenter sees
+ *              themselves where the take will be, while the film follows
+ *              their voice.
+ *   nothing    a placeholder, so framing can be judged before either.
  */
 
-/** The recorded take, or null for the placeholder. Put the file in
- *  public/presenter/ and point at it here. `startFrom` trims the head of
- *  the clip so its first spoken word lands on the film's first line. */
-export const TAKE = null as { src: string; startFrom: number } | null;
+/** A recorded take, under public/. `startFrom` trims its head so the first
+ *  word lands where the timing says it does. */
+export interface Take {
+    src: string;
+    startFrom: number;
+}
+
+/** The camera on the recording page. Not serialisable — it only ever
+ *  exists in a browser, handed to the Player directly. */
+export interface LiveFeed {
+    stream: MediaStream | null;
+}
 
 export interface Box {
     x: number;
@@ -48,20 +57,15 @@ export const OPEN: Box = { x: 520, y: 210, w: 880, h: 660 };
 /** Left column of the close; the address takes the right. */
 export const CLOSE: Box = { x: 200, y: 240, w: 680, h: 600 };
 
-const ALL = beat("all");
-
-/** Frames of the presenter's own timeline, absolute. The presenter is on
- *  screen from the first frame and speaking from the fifteenth — a person
- *  who appears and then waits is a person with nothing to say. The open
- *  runs through the question — "You can build a backend in an afternoon
- *  now. But can you trust it?", fourteen words to camera — then the window
- *  flies to the corner while the evidence arrives on the desk behind it. */
+/** The presenter is on screen from the first frame and speaking from the
+ *  fifteenth — a person who appears and then waits is a person with nothing
+ *  to say. The open runs through the question — "Anyone can build a backend
+ *  in an afternoon. But can you trust it?", to camera — then the window flies
+ *  to the corner (cues.flyToCorner, five frames after the question ends)
+ *  while the evidence arrives on the desk behind it, and lifts off the corner
+ *  as the camera lifts off the desk (cues.flyToClose). */
 export const PRESENTER_IN = 0;
-const QUESTION = DESK_NARRATION[0];
-export const FLY_TO_CORNER = Math.round(QUESTION.at + QUESTION.words.length * DESK_FRAMES_PER_WORD) + 5;
 const FLY = 36;
-/** Lifts off the corner as the camera lifts off the desk. */
-export const FLY_TO_CLOSE = ALL.start + 4;
 const FLY_OUT = 60;
 
 const EASE = Easing.inOut(Easing.cubic);
@@ -80,17 +84,19 @@ function lerpBox(frame: number, a: number, z: number, from: Box, to: Box): Box {
 export type Stage = "open" | "corner" | "close";
 
 /** Where the window is at this frame, how visible, and which of the three
- *  places it is at or heading to. */
-export function presenterAt(frame: number): Box & { opacity: number; stage: Stage } {
+ *  places it is at or heading to. A move whose moment has not come — live,
+ *  a question not yet finished — has not started. */
+export function presenterAt(frame: number, tl: DeskTimeline): Box & { opacity: number; stage: Stage } {
+    const { flyToCorner, flyToClose } = tl.cues;
     const opacity = interpolate(frame, [PRESENTER_IN, PRESENTER_IN + 10], [0, 1], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });
-    if (frame < FLY_TO_CORNER) return { ...OPEN, opacity, stage: "open" };
-    if (frame < FLY_TO_CLOSE) {
-        return { ...lerpBox(frame, FLY_TO_CORNER, FLY_TO_CORNER + FLY, OPEN, CORNER), opacity, stage: "corner" };
+    if (flyToCorner === null || frame < flyToCorner) return { ...OPEN, opacity, stage: "open" };
+    if (flyToClose === null || frame < flyToClose) {
+        return { ...lerpBox(frame, flyToCorner, flyToCorner + FLY, OPEN, CORNER), opacity, stage: "corner" };
     }
-    return { ...lerpBox(frame, FLY_TO_CLOSE, FLY_TO_CLOSE + FLY_OUT, CORNER, CLOSE), opacity, stage: "close" };
+    return { ...lerpBox(frame, flyToClose, flyToClose + FLY_OUT, CORNER, CLOSE), opacity, stage: "close" };
 }
 
 
@@ -104,9 +110,9 @@ export function presenterAt(frame: number): Box & { opacity: number; stage: Stag
  * One element, moved and resized by CSS, so the take plays continuously
  * and its audio is the film's narration.
  */
-export const Presenter: React.FC = () => {
+export const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null }> = ({ take, live }) => {
     const frame = useCurrentFrame();
-    const p = presenterAt(frame);
+    const p = presenterAt(frame, useDeskTimeline());
     if (p.opacity <= 0) return null;
 
     return (
@@ -126,10 +132,12 @@ export const Presenter: React.FC = () => {
                     opacity: p.opacity,
                 }}
             >
-                {TAKE ? (
+                {live?.stream ? (
+                    <LiveCamera stream={live.stream} />
+                ) : take ? (
                     <OffthreadVideo
-                        src={staticFile(TAKE.src)}
-                        startFrom={TAKE.startFrom}
+                        src={staticFile(take.src)}
+                        startFrom={take.startFrom}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                 ) : (
@@ -137,6 +145,28 @@ export const Presenter: React.FC = () => {
                 )}
             </div>
         </AbsoluteFill>
+    );
+};
+
+/** The camera, live, on the recording page. Mirrored, as every self-view
+ *  is — the recording itself is not — and muted, so the room is not fed
+ *  back into the microphone. */
+const LiveCamera: React.FC<{ stream: MediaStream }> = ({ stream }) => {
+    const ref = useRef<HTMLVideoElement>(null);
+    useEffect(() => {
+        const video = ref.current;
+        if (!video || video.srcObject === stream) return;
+        video.srcObject = stream;
+        void video.play().catch(() => undefined);
+    }, [stream]);
+    return (
+        <video
+            ref={ref}
+            muted
+            playsInline
+            autoPlay
+            style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+        />
     );
 };
 

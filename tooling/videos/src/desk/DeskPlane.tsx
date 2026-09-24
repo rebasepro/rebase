@@ -1,9 +1,8 @@
 import React from "react";
 import { AbsoluteFill, Easing, getInputProps, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { NeatCanvas, NeatTravel } from "../gradient/NeatCanvas";
-import { BEATS, DESK_DURATION, MOVE_LEAD, moveFrames, OPENING } from "./beats";
 import { HERO_TONES } from "../data/neat-config";
-import { FLY_TO_CORNER } from "./Presenter";
+import { useDeskTimeline, type DeskTimeline } from "./timeline";
 import { GROUND } from "../theme";
 
 /**
@@ -30,65 +29,108 @@ const DEFAULT_STATION = { x: 0, y: -14, zoom: 2.05 };
  *  to the corner — one move, once. */
 const OPEN_Y = -12;
 /** Overridable through input props, so a measurement sweep can render the
- *  plane alone at candidate stations without editing this file. */
-const STATION = { ...DEFAULT_STATION, ...((getInputProps() as { station?: Partial<typeof DEFAULT_STATION> }).station ?? {}) };
+ *  plane alone at candidate stations without editing this file. Only a
+ *  render has input props: the Player — the recording page — throws on
+ *  asking, and a plain page has none. */
+function stationOverride(): Partial<typeof DEFAULT_STATION> {
+    try {
+        return (getInputProps() as { station?: Partial<typeof DEFAULT_STATION> }).station ?? {};
+    } catch {
+        return {};
+    }
+}
+const STATION = { ...DEFAULT_STATION, ...stationOverride() };
 
 /* Keyframes: [hold-end, move-end] per beat, so odd indices close a hold and
-   even ones close a move — the alternation the time warp is built on. */
-const AT: number[] = [0];
-const ROLL: number[] = [0.1];
-const SIDE: number[] = [0];
-const GROUND_KEY: string[] = [GROUND.base];
-const REVEAL: number[] = [0];
+   even ones close a move — the alternation the time warp is built on. They
+   are the camera's own move windows (timeline.ts), so the ribbon turns
+   exactly while the camera moves; live, only the beats placed so far. */
+interface RibbonKeys {
+    at: number[];
+    roll: number[];
+    side: number[];
+    r: number[];
+    g: number[];
+    b: number[];
+    reveal: number[];
+    warped: number[];
+}
 
-let prev = OPENING;
-BEATS.forEach((b) => {
-    const a = b.start - MOVE_LEAD;
-    const z = a + moveFrames(prev, b.view);
-    AT.push(a, z);
-    ROLL.push(ROLL[ROLL.length - 1], b.roll);
-    SIDE.push(SIDE[SIDE.length - 1], b.x ?? 0);
-    GROUND_KEY.push(GROUND_KEY[GROUND_KEY.length - 1], GROUND[b.ground]);
-    REVEAL.push(REVEAL[REVEAL.length - 1], b.reveal);
-    prev = b.view;
-});
-
-/* The last frame is ground and the wordmark, nothing else. */
-const OUTRO_FADE = 70;
-AT.push(DESK_DURATION - OUTRO_FADE, DESK_DURATION);
-ROLL.push(ROLL[ROLL.length - 1], ROLL[ROLL.length - 1]);
-SIDE.push(SIDE[SIDE.length - 1], SIDE[SIDE.length - 1]);
-GROUND_KEY.push(GROUND_KEY[GROUND_KEY.length - 1], GROUND_KEY[GROUND_KEY.length - 1]);
-REVEAL.push(REVEAL[REVEAL.length - 1], 0);
-
+/* The last frames are ground and the wordmark, nothing else. The fade is the
+   timeline's `fadeOut` cue: seventy frames before the end. */
 const rgb = (hex: string) => [
     parseInt(hex.slice(1, 3), 16),
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
 ];
-const R = GROUND_KEY.map((h) => rgb(h)[0]);
-const G = GROUND_KEY.map((h) => rgb(h)[1]);
-const B = GROUND_KEY.map((h) => rgb(h)[2]);
 
 const HOLD_RATE = 0.2;
 const MOVE_RATE = 2.0;
-const WARPED = AT.reduce<number[]>((acc, at, i) => {
-    if (i === 0) return [0];
-    const real = at - AT[i - 1];
-    acc.push(acc[i - 1] + real * (i % 2 === 1 ? HOLD_RATE : MOVE_RATE));
-    return acc;
-}, []);
+
+const keysByTimeline = new WeakMap<DeskTimeline, RibbonKeys>();
+
+function ribbonKeys(tl: DeskTimeline): RibbonKeys {
+    const cached = keysByTimeline.get(tl);
+    if (cached) return cached;
+    const at: number[] = [0];
+    const roll: number[] = [0.1];
+    const side: number[] = [0];
+    const ground: string[] = [GROUND.base];
+    const reveal: number[] = [0];
+    const last = <T,>(xs: T[]) => xs[xs.length - 1];
+    for (const b of tl.beats) {
+        at.push(b.moveAt, b.landAt);
+        roll.push(last(roll), b.roll);
+        side.push(last(side), b.x ?? 0);
+        ground.push(last(ground), GROUND[b.ground]);
+        reveal.push(last(reveal), b.reveal);
+    }
+    const { fadeOut } = tl.cues;
+    if (fadeOut !== null && tl.duration !== null && tl.beats.length) {
+        const from = Math.max(fadeOut, last(at) + 1);
+        at.push(from, Math.max(tl.duration, from + 1));
+        roll.push(last(roll), last(roll));
+        side.push(last(side), last(side));
+        ground.push(last(ground), last(ground));
+        reveal.push(last(reveal), 0);
+    }
+    const warped = at.reduce<number[]>((acc, t, i) => {
+        if (i === 0) return [0];
+        acc.push(acc[i - 1] + (t - at[i - 1]) * (i % 2 === 1 ? HOLD_RATE : MOVE_RATE));
+        return acc;
+    }, []);
+    const keys: RibbonKeys = {
+        at,
+        roll,
+        side,
+        r: ground.map((h) => rgb(h)[0]),
+        g: ground.map((h) => rgb(h)[1]),
+        b: ground.map((h) => rgb(h)[2]),
+        reveal,
+        warped,
+    };
+    keysByTimeline.set(tl, keys);
+    return keys;
+}
 
 const EASE = Easing.inOut(Easing.cubic);
 const OPTS = { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: EASE } as const;
 const LINEAR = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
-export function ribbonAt(frame: number): NeatTravel {
+/** Eased between keyframes and held past the last — live, the last is the
+ *  latest beat placed, and the ribbon holds its roll until the next. */
+function keyed(frame: number, at: number[], values: number[]): number {
+    return at.length < 2 ? values[0] : interpolate(frame, at, values, OPTS);
+}
+
+export function ribbonAt(frame: number, tl: DeskTimeline): NeatTravel {
+    const k = ribbonKeys(tl);
+    const fly = tl.cues.flyToCorner;
     return {
-        cameraX: STATION.x + interpolate(frame, AT, SIDE, OPTS),
-        cameraY: interpolate(frame, [FLY_TO_CORNER, FLY_TO_CORNER + 36], [OPEN_Y, STATION.y], OPTS),
+        cameraX: STATION.x + keyed(frame, k.at, k.side),
+        cameraY: fly === null ? OPEN_Y : interpolate(frame, [fly, fly + 36], [OPEN_Y, STATION.y], OPTS),
         cameraZoom: STATION.zoom,
-        cameraRotationZ: interpolate(frame, AT, ROLL, OPTS),
+        cameraRotationZ: keyed(frame, k.at, k.roll),
     };
 }
 
@@ -101,15 +143,24 @@ export function ribbonAt(frame: number): NeatTravel {
  * light animates across a move; a first version pumped the exposure and an
  * animated mask on every transition, and that was worse than the problem.
  */
-export function groundAt(frame: number) {
-    const r = Math.round(interpolate(frame, AT, R, OPTS));
-    const g = Math.round(interpolate(frame, AT, G, OPTS));
-    const b = Math.round(interpolate(frame, AT, B, OPTS));
-    return { color: `rgb(${r}, ${g}, ${b})`, reveal: interpolate(frame, AT, REVEAL, OPTS) };
+export function groundAt(frame: number, tl: DeskTimeline) {
+    const k = ribbonKeys(tl);
+    const r = Math.round(keyed(frame, k.at, k.r));
+    const g = Math.round(keyed(frame, k.at, k.g));
+    const b = Math.round(keyed(frame, k.at, k.b));
+    return { color: `rgb(${r}, ${g}, ${b})`, reveal: keyed(frame, k.at, k.reveal) };
 }
 
-export function timeAt(frame: number, fps: number) {
-    return interpolate(frame, AT, WARPED, LINEAR) / fps;
+/** The ribbon's own clock: slow under a hold, quick across a move. Past the
+ *  last keyframe it runs on at the rate of the segment that would follow —
+ *  live, a hold of unknown length, so the ribbon keeps breathing while the
+ *  presenter speaks rather than freezing until the next beat is placed. */
+export function timeAt(frame: number, fps: number, tl: DeskTimeline) {
+    const { at, warped } = ribbonKeys(tl);
+    const lastAt = at[at.length - 1];
+    if (frame <= lastAt && at.length > 1) return interpolate(frame, at, warped, LINEAR) / fps;
+    const rate = at.length % 2 === 1 ? HOLD_RATE : MOVE_RATE;
+    return (warped[warped.length - 1] + Math.max(0, frame - lastAt) * rate) / fps;
 }
 
 /**
@@ -126,7 +177,8 @@ const FADE = "linear-gradient(to bottom, #000 0%, #000 9%, rgba(0,0,0,0.55) 20%,
 export const DeskPlane: React.FC = () => {
     const { fps } = useVideoConfig();
     const frame = useCurrentFrame();
-    const ground = groundAt(frame);
+    const tl = useDeskTimeline();
+    const ground = groundAt(frame, tl);
     return (
         <>
             <AbsoluteFill style={{ background: ground.color }} />
@@ -134,8 +186,8 @@ export const DeskPlane: React.FC = () => {
                 framing="hero"
                 tone={HERO_TONES.loud}
                 opacity={ground.reveal}
-                camera={ribbonAt(frame)}
-                time={timeAt(frame, fps)}
+                camera={ribbonAt(frame, tl)}
+                time={timeAt(frame, fps, tl)}
                 style={{ mixBlendMode: "screen", WebkitMaskImage: FADE, maskImage: FADE }}
             />
         </>

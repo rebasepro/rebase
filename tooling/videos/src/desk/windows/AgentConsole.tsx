@@ -18,15 +18,19 @@ interface Line {
     kind: "call" | "key" | "ok" | "err" | "note";
     text: string;
     at: number;
+    /** Timed from the refusal — the delete call — rather than from the
+     *  window: the 403 lands on "and nothing more", however long the
+     *  presenter takes to get there. */
+    refusal?: true;
 }
 
 const LINES: Line[] = [
     { kind: "key", text: "api key   acme-support · customers: read, write", at: 6 },
     { kind: "call", text: "list_documents   customers · where status = active", at: 22 },
     { kind: "ok", text: "← 48 documents", at: 44 },
-    { kind: "call", text: "delete_document  customers · 3f9a2c7e-…", at: 74 },
-    { kind: "err", text: "← 403 API_KEY_FORBIDDEN", at: 96 },
-    { kind: "note", text: 'API key does not have "delete" permission for collection "customers"', at: 104 },
+    { kind: "call", text: "delete_document  customers · 3f9a2c7e-…", at: 0, refusal: true },
+    { kind: "err", text: "← 403 API_KEY_FORBIDDEN", at: 22, refusal: true },
+    { kind: "note", text: 'API key does not have "delete" permission for collection "customers"', at: 30, refusal: true },
 ];
 
 const COLOUR: Record<Line["kind"], string> = {
@@ -37,20 +41,29 @@ const COLOUR: Record<Line["kind"], string> = {
     note: INK.copy,
 };
 
-export const AgentConsole: React.FC<{ x: number; y: number; w: number; at: number }> = ({ x, y, w, at }) => (
+export const AgentConsole: React.FC<{
+    x: number;
+    y: number;
+    w: number;
+    at: number;
+    /** Absolute frame of the delete call, or null until it is due (live). */
+    refuseAt: number | null;
+}> = ({ x, y, w, at, refuseAt }) => (
     <div style={{ position: "absolute", left: x, top: y, width: w }}>
         <Sequence from={at} layout="none">
-            <ConsoleBody />
+            <ConsoleBody refuseAt={refuseAt === null ? null : refuseAt - at} />
         </Sequence>
     </div>
 );
 
-const ConsoleBody: React.FC = () => {
+const ConsoleBody: React.FC<{ refuseAt: number | null }> = ({ refuseAt }) => {
     const frame = useCurrentFrame();
     return (
         <Frame title="mcp · rebase-mcp-server" surface="well" delay={0} bodyStyle={{ padding: "26px 34px 30px" }}>
             <div style={{ fontFamily: FONT.mono, fontSize: 20, lineHeight: 1.75 }}>
-                {LINES.map((l) => (
+                {LINES.map((l) => {
+                    const at = l.refusal ? (refuseAt === null ? null : refuseAt + l.at) : l.at;
+                    return at === null ? null : (
                     <div
                         key={l.text}
                         style={{
@@ -58,14 +71,15 @@ const ConsoleBody: React.FC = () => {
                             paddingLeft: l.kind === "ok" || l.kind === "err" ? 30 : l.kind === "note" ? 58 : 0,
                             fontSize: l.kind === "note" ? 17 : 20,
                             marginTop: l.kind === "call" ? 10 : 0,
-                            opacity: ramp(frame, l.at, 10),
+                            opacity: ramp(frame, at, 10),
                             whiteSpace: "pre",
                         }}
                     >
                         {l.kind === "call" && <span style={{ color: INK.muted, marginRight: 14 }}>agent ›</span>}
                         {l.text}
                     </div>
-                ))}
+                    );
+                })}
             </div>
         </Frame>
     );

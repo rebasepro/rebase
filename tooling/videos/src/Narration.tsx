@@ -24,23 +24,34 @@ const READ_AHEAD = 36;
 const HOLD = 16;
 const FADE = 10;
 
+/** A line of narration. `wordsAt` and `endsAt`, when present, are the
+ *  frames its words were actually said (a take's timing), and replace the
+ *  even `framesPerWord` spacing. */
+interface NarrationLine {
+    at: number;
+    words: string[];
+    wordsAt?: number[];
+    endsAt?: number;
+}
+
 export const Narration: React.FC<{
-    script?: typeof NARRATION;
+    script?: NarrationLine[];
     framesPerWord?: number;
     /** Room kept clear on the right, for a presenter window in the corner. */
     insetRight?: number;
 }> = ({ script = NARRATION, framesPerWord = FRAMES_PER_WORD, insetRight = 0 }) => {
     const frame = useCurrentFrame();
 
-    let line: (typeof NARRATION)[number] | undefined;
+    let line: NarrationLine | undefined;
     for (const l of script) {
         if (frame >= l.at - READ_AHEAD) line = l;
         else break;
     }
     if (!line) return null;
 
-    const spoken = line.words.filter((_, i) => frame >= line!.at + i * framesPerWord).length;
-    const endsAt = line.at + line.words.length * framesPerWord;
+    const wordAt = (i: number) => line!.wordsAt?.[i] ?? line!.at + i * framesPerWord;
+    const spoken = line.words.filter((_, i) => frame >= wordAt(i)).length;
+    const endsAt = line.endsAt ?? line.at + line.words.length * framesPerWord;
     if (frame > endsAt + HOLD + FADE) return null;
 
     const alpha = Math.max(

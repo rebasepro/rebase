@@ -3,9 +3,8 @@ import React from "react";
 import { Composition, Series } from "remotion";
 import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
-import { RebaseDesk, RebaseDeskVO } from "./desk/DeskFilm";
+import { deskDuration, RebaseDesk, RebaseDeskVO, type DeskProps } from "./desk/DeskFilm";
 import { DeskPlane } from "./desk/DeskPlane";
-import { DESK_DURATION } from "./desk/beats";
 import { INTRO_DURATION, SCENES } from "./film";
 import { OVERLAP } from "./transitions";
 import { HeroIntro } from "./components/HeroIntro";
@@ -48,17 +47,24 @@ const ProductVideo: React.FC = () => (
     </Series>
 );
 
+const DESK_DEFAULTS: DeskProps = { timing: null, take: null };
+const deskMetadata = ({ props }: { props: DeskProps }) => ({ durationInFrames: deskDuration(props) });
+
 const FPS = 30;
 const WIDTH = 1920;
 const HEIGHT = 1080;
 
 export const RemotionRoot: React.FC = () => (
     <>
-        {/* THE DESK — one workspace, a camera, no cuts. See src/desk/beats.ts. */}
+        {/* THE DESK — one workspace, a camera, no cuts. See src/desk/beats.ts.
+            Its length is its narration's: the authored read by default, a
+            take's with --props=takes/<id>/props.json (scripts/take.mjs). */}
         <Composition
             id="RebaseDesk"
             component={RebaseDesk}
-            durationInFrames={DESK_DURATION}
+            defaultProps={DESK_DEFAULTS}
+            calculateMetadata={deskMetadata}
+            durationInFrames={deskDuration(DESK_DEFAULTS)}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
@@ -66,7 +72,9 @@ export const RemotionRoot: React.FC = () => (
         <Composition
             id="RebaseDesk-VO"
             component={RebaseDeskVO}
-            durationInFrames={DESK_DURATION}
+            defaultProps={DESK_DEFAULTS}
+            calculateMetadata={deskMetadata}
+            durationInFrames={deskDuration(DESK_DEFAULTS)}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
@@ -76,7 +84,7 @@ export const RemotionRoot: React.FC = () => (
         <Composition
             id="RebaseDesk-Plane"
             component={DeskPlane}
-            durationInFrames={DESK_DURATION}
+            durationInFrames={deskDuration(DESK_DEFAULTS)}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
