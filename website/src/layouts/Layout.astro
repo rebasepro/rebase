@@ -307,7 +307,13 @@ const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
 
 
     <title>{title}</title>
-    <link rel="shortcut icon" href="/favicon.svg" type="image/x-icon">
+    <!-- The SVG was the only icon, and declared as image/x-icon. The rest is
+         rendered from it by scripts/generate_icons.mjs. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="#0A0A0A">
     <link rel="preload" as="font" type="font/woff2" href={interLatinUrl} crossorigin>
     <link rel="preload" as="font" type="font/woff2" href={instrumentSansLatinUrl} crossorigin>
     <link rel="stylesheet" href="/styles/fonts-mono.css" media="print" onload="this.media='all'">

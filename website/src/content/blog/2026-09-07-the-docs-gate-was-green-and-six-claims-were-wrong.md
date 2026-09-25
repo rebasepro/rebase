@@ -1,6 +1,6 @@
 ---
 title: "The docs gate was green, and six of the claims were still wrong"
-description: "Checking that documentation names only symbols the code exports is mechanical, and we do it across 2952 code fences in six languages. Checking that its sentences are true is a different problem, and this is what we found when we went looking."
+description: "Checking that docs name only symbols the code exports is mechanical; we do it across 2952 code fences in six languages. Checking the claims are true is harder."
 pubDate: 2026-09-07
 authors: francesco
 ---

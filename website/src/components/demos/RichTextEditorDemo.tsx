@@ -55,19 +55,19 @@ export function RichTextEditorDemo() {
 
             {/* Editor body */}
             <div className="flex-1 p-8 lg:p-12 overflow-hidden flex flex-col gap-6 max-w-3xl mx-auto w-full relative">
-                <div className="text-4xl font-semibold text-white tracking-tight">Product Update: Q3 Features</div>
+                <div className="text-4xl font-semibold text-white tracking-tight">Oak-stopper wine decanter</div>
                 
                 <p className="text-lg text-surface-400 leading-relaxed">
-                    We've been working hard on the latest features for the Rebase editing experience. Here's a quick look at what's new.
+                    Mouth-blown glass with a solid oak stopper. A full bottle sits below the widest point, so the wine gets the whole surface to breathe.
                 </p>
 
                 <div className="flex gap-2 items-center">
                     <div className="w-1.5 h-1.5 rounded-full bg-surface-600"></div>
-                    <p className="text-lg text-surface-300">Notion-style rich text with blocks</p>
+                    <p className="text-lg text-surface-300">Holds 750 ml, one standard bottle</p>
                 </div>
                 <div className="flex gap-2 items-center">
                     <div className="w-1.5 h-1.5 rounded-full bg-surface-600"></div>
-                    <p className="text-lg text-surface-300">Drag and drop Kanban boards</p>
+                    <p className="text-lg text-surface-300">Rinse with warm water, no dishwasher</p>
                 </div>
 
                 {/* Animated slash command block */}
@@ -120,9 +120,12 @@ export function RichTextEditorDemo() {
 
                     {(step >= 3) && (
                         <div className="flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-300">
-                            <div className="w-full h-48 bg-surface-card rounded-xl border border-hairline-strong flex flex-col items-center justify-center relative overflow-hidden group">
-                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-80 mix-blend-luminosity transition-all duration-700"></div>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                            {/* The product's own photo, shipped with the site. This was a
+                                hotlinked Unsplash stock image of retro computers under
+                                "Product Update: Q3 Features" — filler, and a third-party
+                                request on the /cms page. */}
+                            <div className="w-full h-48 bg-white rounded-xl border border-hairline-strong flex flex-col items-center justify-center relative overflow-hidden group">
+                                <img src="/img/demo/products/wine-decanter.jpg" alt="The oak-stopper decanter on a white background" className="h-44 w-auto object-contain" loading="lazy" />
                                 
                                 {step === 3 && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-surface-sheet backdrop-blur-sm transition-opacity duration-500 opacity-100">
@@ -139,7 +142,7 @@ export function RichTextEditorDemo() {
                             
                             {step === 4 && (
                                 <div className="text-center text-sm text-surface-500 italic flex items-center justify-center gap-1">
-                                    New dark mode UI showcase
+                                    Shown with a full bottle
                                     <div className="w-[1.5px] h-4 bg-primary animate-pulse"></div>
                                 </div>
                             )}

@@ -1,6 +1,6 @@
 ---
 title: "Row-level security does not raise on a write it forbids"
-description: "A DELETE your RLS policy rejects and a DELETE that had nothing to match are the same statement with the same result: zero rows, no error. Every other authorization failure in the stack throws. This one arrives as a number nobody reads — and it turns a 403 into a 204."
+description: "A DELETE your RLS policy rejects and one that matched nothing look identical: zero rows, no error. That silence turns a 403 into a 204."
 pubDate: 2026-09-01
 authors: francesco
 ---

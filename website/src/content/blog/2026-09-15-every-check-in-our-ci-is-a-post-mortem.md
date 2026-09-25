@@ -1,6 +1,6 @@
 ---
 title: "Every check in our CI is a post-mortem, and that is the problem"
-description: "A gate added after an incident is scoped to that incident's exact shape, so the net grows one hole at a time. We keep a second document instead: a catalogue of named bug classes, the sweep that finds each one, and a dated log of what every sweep turned up — including what came back clean."
+description: "A gate added after an incident only covers that incident's shape. We keep a catalogue of named bug classes instead, with the sweep that finds each one."
 pubDate: 2026-09-15
 authors: francesco
 ---

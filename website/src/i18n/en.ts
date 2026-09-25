@@ -490,12 +490,12 @@ export const en = {
   "about.join.desc": "The code, the issues and the arguments are all in the open. Come and disagree with us.",
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
-  "index.meta.title": "Rebase — Open-Source Backend for Postgres: Access Rules Enforced by the Database",
-  "index.meta.description": "One TypeScript file per collection gives you the schema, REST API, typed SDK and panel. Access rules compile to Postgres row-level security, so every route, job and agent obeys them. Open-source; self-host or use Rebase Cloud.",
+  "index.meta.title": "Rebase — Open-Source Postgres Backend with an Admin Panel",
+  "index.meta.description": "The open-source backend for Postgres: REST, a typed SDK, realtime, auth and storage, and an admin panel you don't have to build. Access rules run in Postgres.",
   "cms.meta.title": "Rebase CMS — the admin panel of your Rebase backend",
-  "cms.meta.description": "The admin panel on every Rebase backend: spreadsheet editing, media, roles and history — extensible with your own React, on the same API and policies as your app.",
+  "cms.meta.description": "The admin panel on every Rebase backend: spreadsheet editing, media, roles and history, extensible with your own React, under your app's policies.",
   "backend.meta.title": "Rebase Backend — REST, typed SDK, realtime and RLS over your Postgres",
-  "backend.meta.description": "Point it at a Postgres database and REST routes, an OpenAPI spec, typed SDK accessors, realtime subscriptions, auth, storage, functions and cron all come from one collection definition — with access control enforced by the database.",
+  "backend.meta.description": "Point Rebase at Postgres and get REST, an OpenAPI spec, a typed SDK, realtime, auth, storage, functions and cron, with access rules enforced by the database.",
   "ai.meta.title": "AI & Agents Infrastructure — Rebase",
   "ai.meta.description": "Deploy an agent-ready backend on top of Postgres with a built-in MCP server, scoped API keys, and vector search.",
   // The page was serving "Rebase Studio — Visual Admin Panel for Postgres", which
@@ -503,7 +503,7 @@ export const en = {
   // /studio the database workspace registered as extra views inside it. This uses
   // the same wording as modes.full.desc so the two surfaces agree.
   "studio.meta.title": "Rebase Studio — the developer workspace: SQL, schema, RLS, logs",
-  "studio.meta.description": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer, running against your own Postgres. Studio is the developer workspace. It registers inside the same panel as CMS.",
+  "studio.meta.description": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer, against your own Postgres: the developers' side of the admin panel.",
   "sdk.meta.title": "Typed SDK — Rebase",
   "sdk.meta.description": "A fully typed client library for query composition, file storage, user auth, and real-time state synchronization.",
   "cli.meta.title": "CLI and dev tooling — Rebase",
@@ -512,24 +512,22 @@ export const en = {
   "security.meta.description": "Configure Row-Level Security (RLS) and granular role-based access controls right inside your schema.",
   "ui.meta.title": "React UI Components — Rebase",
   "ui.meta.description": "The React component library the panel itself is built from — the same widgets, tables and field editors your custom views should use.",
-  "startups.meta.title": "Rebase for startups — the backend first, the back office when you need it",
-  "startups.meta.description": "REST, a typed SDK, auth, storage and realtime over the Postgres you already run, with access control enforced by the database — and a generated admin panel for your team from day one.",
-  "agencies.meta.title": "Rebase for agencies — the client keeps the database, you keep the code",
-  "agencies.meta.description": "Deliver a backend and a back office on the client's own Postgres. MIT-licensed end to end, self-hosted or on Rebase Cloud, with no per-seat licence standing between you and the handover.",
+  "startups.meta.title": "For startups: backend first, back office later — Rebase",
+  "startups.meta.description": "REST, a typed SDK, auth, storage and realtime over your Postgres, with access rules enforced by the database, and an admin panel for your team from day one.",
+  "agencies.meta.title": "For agencies: the client keeps the database — Rebase",
+  "agencies.meta.description": "Deliver a backend and a back office on the client's own Postgres. MIT-licensed, self-hosted or on Rebase Cloud, with no per-seat licence in the handover.",
   "contact.meta.title": "Contact — Rebase",
   "contact.meta.description": "Get in touch for enterprise SLAs, dedicated hosting support, or custom integrations.",
   "developers.meta.title": "Build with Rebase — SDK, CLI, extending and deploying",
-  "developers.meta.description": "The day-to-day loop: one command to scaffold, a typed SDK generated from your schema, your own React where the generated views stop, and one process that splits into API, functions and worker when you outgrow it.",
+  "developers.meta.description": "The daily loop: scaffold in one command, a typed SDK from your schema, your own React where generated views stop, one process that splits as you grow.",
   // Refreshed 2026-08-10. /product and /studio were the only two pages hardcoding
   // their meta in English rather than routing through t(), so es/de/fr shipped
   // English titles and descriptions — and these keys sat unread. The values below
   // are the hardcoded English the pages were actually serving, not the stale
   // "Product Ecosystem" copy that was rotting here; switching the pages to t()
   // without this step would have downgraded the English to match the drift.
-  "product.meta.title":
-    "Rebase — a backend for your Postgres, and the admin panel that comes with it",
-  "product.meta.description":
-    "REST, a typed SDK, realtime, auth and storage over your Postgres — with access control enforced by the database. The admin panel renders from the same definition.",
+  "product.meta.title": "Product overview: a backend and its admin panel — Rebase",
+  "product.meta.description": "REST, a typed SDK, realtime, auth and storage over your Postgres, with access rules enforced by the database, and an admin panel from the same definition.",
   "rebase-vs-supabase.meta.title": "Rebase vs Supabase — RLS and Local DX Comparison",
   "rebase-vs-supabase.meta.description": "An admin dashboard generated from the same definition as the API, and row-level security written beside the collection rather than in a separate editor.",
   "rebase-vs-payload.meta.title": "Rebase vs Payload CMS — Headless Postgres Comparison",
@@ -550,7 +548,7 @@ export const en = {
   "mosaic.title": "One definition, every surface.",
   "mosaic.subtitle": "A spreadsheet, a kanban board, a gallery, a block editor, a custom React view — every screen below reads the same collection through the same API, under the same policies. Nothing here is a second data model.",
   "pricing.meta.title": "Pricing — Rebase",
-  "pricing.meta.description": "Rebase is free and open-source (MIT) — SSO, MFA and every feature ship in the open-source backend you run yourself. You pay only if you want us to host it, or for a support commitment.",
+  "pricing.meta.description": "Rebase is free and open source (MIT): SSO, MFA and every feature ship in the backend you run yourself. Pay only if we host it or for a support commitment.",
   "pricing.badge": "Pricing",
   "pricing.title": "Free and open-source. Pay only for what we run.",
   "pricing.subtitle":
@@ -601,7 +599,7 @@ export const en = {
 
   // Manifesto Page
   "manifesto.meta.title": "Our Manifesto — Why We're Building Rebase",
-  "manifesto.meta.description": "Why we build Rebase: authorization belongs in the database, your schema stays yours, and agents are first-class users of your backend. MIT-licensed, built in Europe.",
+  "manifesto.meta.description": "Why we build Rebase: authorization belongs in the database, your schema stays yours, and agents are first-class users of your backend. Built in Europe.",
   "manifesto.badge": "A letter from the team",
   "manifesto.hero.title": "Why we're building Rebase",
   "manifesto.hero.subtitle": "And why we think the industry put authorization in the wrong place — in application code, instead of in the database that actually holds the data.",
@@ -720,7 +718,7 @@ export const en = {
   "europe.link.security": "security page",
   "europe.legal2": "describes how the access rules themselves are enforced.",
   "europe.meta.title": "Sovereign backend for Europe — Rebase",
-  "europe.meta.description": "Everyone can host in Europe. The question is who the second party is: run Rebase yourself and there is none, or let a Spanish company operate it, with the sub-processor disclosed.",
+  "europe.meta.description": "Anyone can host in Europe. What matters is the second party: self-host Rebase and there is none, or let a Spanish company run it, sub-processors disclosed.",
 
   // ── ui ──────────────────────────────────────────────────────────
   "ui.00": "<a href=\"/cms\" class=\"hover:text-primary-light transition-colors\">Rebase CMS</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Component library</span>",
@@ -758,7 +756,7 @@ export const en = {
   "rlscheckpage.10": "No Rebase required",
   "rlscheckpage.11": "It reads the database, not your codebase. It needs no Rebase and asks about none.",
   "rlscheckpage.meta.title": "Free Postgres RLS audit — check your row-level security in one command",
-  "rlscheckpage.meta.description": "rls-check is a free, read-only Row-Level Security audit for any PostgreSQL database. Fifteen checks for the failures that make Postgres leak: RLS disabled on exposed tables, policies that are always true, views that read past their base table. Works on Supabase, Neon, RDS. No account, no install.",
+  "rlscheckpage.meta.description": "Free, read-only row-level security audit for any Postgres: 15 checks for RLS left off, always-true policies and views that bypass RLS. No account, no install.",
 
   // ── contact ─────────────────────────────────────────────────────
   "contact.00": "Talk to the people building it.",
@@ -1026,7 +1024,7 @@ export const en = {
   "comparepage.axis.leaving.q": "What happens if you stop using it",
   "comparepage.axis.leaving.rebase": "The database keeps working — policies, constraints and data exactly where they were. The panel was a dependency you can delete.",
   "comparepage.axis.leaving.others": "Depends how deep the tool went into your schema. If it created the tables, leaving means a migration.",
-  "comparepage.meta.title": "Rebase compared — Supabase, Directus, Strapi, Retool and the rest",
+  "comparepage.meta.title": "Compare Supabase, Directus, Strapi, Retool and more — Rebase",
   "comparepage.meta.description": "An honest side-by-side: where Rebase wins, where a competitor is the better call, and what the trade-offs actually are.",
 
   // ── devpage ─────────────────────────────────────────────────────

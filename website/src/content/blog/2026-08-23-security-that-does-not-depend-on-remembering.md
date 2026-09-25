@@ -1,6 +1,6 @@
 ---
 title: "Your backend's security should not depend on remembering to check"
-description: "Rebase generates Postgres row-level security from the same definition that generates the API — fail-closed, in the database, where a forgotten middleware call cannot reach it. Here's why that placement matters, and a tool that will tell you whether your own database leaks."
+description: "Rebase generates Postgres row-level security from the same definition as the API, fail-closed and in the database. Why that matters, and how to check yours."
 pubDate: 2026-08-23
 authors: francesco
 ---

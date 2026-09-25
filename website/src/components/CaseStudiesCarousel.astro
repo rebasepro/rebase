@@ -7,7 +7,14 @@
  * trackpad and momentum come for free); the script only wires the arrow pill,
  * pointer-drag on desktop, keyboard, and the counter.
  */
-const { t } = Astro.props;
+/**
+ * `header={false}` embeds the track alone, under the host page's own heading.
+ * /agencies used to render its "Products shipped on Rebase" heading and then
+ * this component's home-page chapter header under it — "05 · Built for real
+ * products" on a page with no 01–04, and two headings for one carousel.
+ */
+const { t, header = true } = Astro.props;
+const Tag = header ? "section" : "div";
 
 const cases = [
     {
@@ -100,9 +107,10 @@ const cases = [
 {/* Closes the sequence, so it carries the numeral like every other chapter —
     the eyebrow already said "08" while nothing else on the section did. Cyan
     returns here from beat 01: the page opens and closes on the same hue. */}
-<section id="s-case-study" class="chapter relative z-0 py-chapter">
+<Tag id={header ? "s-case-study" : undefined} class={header ? "chapter relative z-0 py-chapter" : "relative z-0"}>
 
     <!-- Header: heading left, supporting copy right -->
+    {header && (
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 animate-on-scroll fade-in-up">
             <div>
@@ -118,8 +126,9 @@ const cases = [
                set:html={t("showcase.subtitle")}></p>
         </div>
     </div>
+    )}
 
-    <div class="cs-carousel mt-block animate-on-scroll fade-in-up delay-100"
+    <div class:list={["cs-carousel animate-on-scroll fade-in-up delay-100", header && "mt-block"]}
          role="region"
          aria-roledescription="carousel"
          aria-label={t("showcase.title.part1") + " " + t("showcase.title.part2")}>
@@ -316,7 +325,7 @@ const cases = [
 
         <p class="sr-only" aria-live="polite" id="case-live"></p>
     </div>
-</section>
+</Tag>
 
 <style>
     .cs-carousel {

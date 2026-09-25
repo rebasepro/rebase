@@ -108,7 +108,7 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 | **REST API** | Auto-generated CRUD endpoints for every collection |
 | **Data Import/Export** | CSV, JSON, and Excel import with field mapping; CSV/JSON export |
 | **Collection Editor** | Visual schema editor that generates TypeScript via AST manipulation |
-| **Client SDK** | Type-safe JavaScript SDK for your frontend apps |
+| **Typed SDK** | Type-safe JavaScript SDK for your frontend apps |
 | **Plugin System** | Extend every part of the UI — toolbar, forms, fields, home page |
 | **AI Data Enhancement** | LLM-powered autocompletion for text fields |
 | **Cron Jobs** | Scheduled background tasks with monitoring, logging, and Studio dashboard |
@@ -581,7 +581,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL for the client SDK. **Set this in development only** — see below. | page origin |
+| `VITE_API_URL` | Backend API URL for the typed SDK. **Set this in development only** — see below. | page origin |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID. Enables "Sign in with Google". | — |
 
 > **Leave `VITE_API_URL` unset in production builds.**
@@ -1685,7 +1685,7 @@ mean the caller's. Typed code has been getting the error since the type changed;
 what breaks now is untyped code, and a scaffold's `ai-instructions.md` that
 still tells an assistant to reach for `rebase.data.<slug>` — `rebase init`
 rewrites that file, so regenerate it or edit the rule by hand. Browser code is
-untouched: `rebase.data` on the client SDK is the user-scoped plane and stays.
+untouched: `rebase.data` on the typed SDK is the user-scoped plane and stays.
 
 ### 27. `@rebasepro/cli` publishes three exports
 
@@ -10915,7 +10915,7 @@ const { data: posts } = await rebase.data.collection("posts").find({
 ```
 
 - [REST API](/docs/backend/api/) — the endpoint shapes, filters and errors
-- [Client SDK](/docs/sdk/) — querying, auth, realtime, storage
+- [Typed SDK](/docs/sdk/) — querying, auth, realtime, storage
 - `/api/docs` and `/api/swagger` — the OpenAPI document and its viewer, served
   by the running backend once it has a collection. A project with none serves
   neither: the document is generated from the collections, so there is nothing
@@ -11378,7 +11378,7 @@ called reads as a broken deploy.
 
 Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
 `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
-open. The client SDK turns all of them into a single `RebaseApiError` carrying
+open. The typed SDK turns all of them into a single `RebaseApiError` carrying
 `status`, `code` and `details` — see
 [Error handling](/docs/backend#error-handling).
 
@@ -11531,7 +11531,7 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 
 ### Next Steps
 
-- **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
+- **[Typed SDK](/docs/sdk)** — Type-safe client for the REST API
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
 
@@ -14336,7 +14336,7 @@ something you ask for:
 
 ### Fetching Relations in the SDK
 
-When querying data through the Rebase Client SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
+When querying data through the Rebase typed SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
 
 #### Include specific relations
 
@@ -14385,7 +14385,7 @@ for (const article of data) {
 
 > The relation names passed to `include()` must match the `relationName` defined in the collection's `relations` array.
 
-For the full query builder reference (filtering, sorting, pagination, real-time), see the [Client SDK documentation](/docs/sdk).
+For the full query builder reference (filtering, sorting, pagination, real-time), see the [typed SDK documentation](/docs/sdk).
 
 ### Relations in the admin panel
 
@@ -14844,7 +14844,7 @@ beforeSave: async ({ values }) => {
 Import it from `@rebasepro/types`, not from `@rebasepro/server`. A collection file
 is shared with the frontend — the admin panel's Vite build reads this same
 directory — so it may only import packages that run in a browser. `RebaseApiError`
-is the browser-safe one, and it is the same class the client SDK throws.
+is the browser-safe one, and it is the same class the typed SDK throws.
 :::
 
 #### `afterSave`
@@ -16163,7 +16163,7 @@ The WebSocket server attaches to the same HTTP server and provides real-time sub
 
 - Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
 - Subscribe to **entity changes** — get notified when a specific entity changes
-- Automatic **reconnection** handling in the client SDK
+- Automatic **reconnection** handling in the typed SDK
 
 The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deployments, provide a `connectionString` in your `PostgresBootstrapper` to enable cross-instance broadcasting.
 
@@ -16191,7 +16191,7 @@ Every failure — from any route, in any subsystem — comes back in one envelop
 The HTTP status is on the response, not in the body. Branch on `code`, not on
 `message` — messages are written for humans and are free to change.
 
-The client SDK turns every one of these into a `RebaseApiError` carrying
+The typed SDK turns every one of these into a `RebaseApiError` carrying
 `status`, `code` and `details` — including the failures that never reached a
 server at all. A refused connection, a DNS failure, CORS or an abort arrives as
 `status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,
@@ -16920,7 +16920,7 @@ called reads as a broken deploy.
 
 Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
 `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
-open. The client SDK turns all of them into a single `RebaseApiError` carrying
+open. The typed SDK turns all of them into a single `RebaseApiError` carrying
 `status`, `code` and `details` — see
 [Error handling](/docs/backend#error-handling).
 
@@ -17073,7 +17073,7 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 
 ### Next Steps
 
-- **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
+- **[Typed SDK](/docs/sdk)** — Type-safe client for the REST API
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
 
@@ -18931,7 +18931,7 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — bringing your own identity provider
 - **[Frontend Authentication](/docs/frontend/authentication/)** — login UI, auth controller, user management
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — row-level access control
-- **[Client SDK Authentication](/docs/sdk/authentication/)** — auth methods in the client SDK
+- **[Typed SDK Authentication](/docs/sdk/authentication/)** — auth methods in the typed SDK
 
 ## Auth endpoints and tokens
 
@@ -19027,11 +19027,11 @@ is omitted entirely when the account cannot be re-read, so treat it as optional
 there, and `providerId` is always `password` however the session was first
 created.
 
-:::caution[The client SDK flattens this envelope — raw HTTP does not]
+:::caution[The typed SDK flattens this envelope — raw HTTP does not]
 The JSON above is the wire format, and it is what `fetch("/api/auth/login")`
 returns: the token lives at **`body.tokens.accessToken`**.
 
-The [client SDK](/docs/sdk/authentication) unwraps `tokens` before it hands the
+The [typed SDK](/docs/sdk/authentication) unwraps `tokens` before it hands the
 session back, so `auth.signInWithEmail()` resolves to a flattened
 **`{ user, accessToken, refreshToken }`** instead.
 
@@ -19266,7 +19266,7 @@ To prevent timing attacks, Rebase validates both the user-configured service key
 - **[Authentication](/docs/backend/authentication/)** — the configuration these routes come from
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — replacing the provider behind them
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — what a policy does with `rebase.uid()`
-- **[Client SDK Authentication](/docs/sdk/authentication/)** — calling these routes from the SDK
+- **[Typed SDK Authentication](/docs/sdk/authentication/)** — calling these routes from the SDK
 
 ## Custom auth adapters
 
@@ -20548,7 +20548,7 @@ The realtime pipeline has three stages:
 
 1. **Database trigger** — A mutation hits the PostgreSQL database (via REST API, SDK, or Studio).
 2. **Server fan-out** — The Rebase server detects the change and fans it out to every active WebSocket subscription that matches the affected collection or entity.
-3. **Client callback** — The client SDK fires your `onUpdate` callback with the fresh data.
+3. **Client callback** — The typed SDK fires your `onUpdate` callback with the fresh data.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -20565,9 +20565,9 @@ Realtime is enabled out of the box. There is no flag to flip or service to start
 
 > By default, Rebase also emits realtime events for writes made **outside** the API (via `psql`, another service, or Studio's SQL editor) whenever the database connection supports it — see [database-level change capture](#database-level-change-capture-cdc).
 
-### Client SDK Subscriptions
+### Typed SDK Subscriptions
 
-The Rebase client SDK exposes two subscription methods on every collection accessor:
+The Rebase typed SDK exposes two subscription methods on every collection accessor:
 
 - **`listen()`** — Subscribe to an entire collection (with optional filters).
 - **`listenById()`** — Subscribe to a single entity by its ID.
@@ -20895,7 +20895,7 @@ Stale presences are automatically cleaned up after 30 seconds of inactivity.
 
 ### Auto-Reconnect
 
-The client SDK automatically reconnects when the WebSocket connection drops:
+The typed SDK automatically reconnects when the WebSocket connection drops:
 
 - **Exponential backoff** — Reconnect delays start at 1 second and double on each attempt, capping at 30 seconds.
 - **Maximum 5 attempts** — After 5 failed reconnection attempts, the client stops trying.
@@ -21016,7 +21016,7 @@ so a forbidden broadcast was indistinguishable from a delivered one.
 
 ### Next Steps
 
-- [Client SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
+- [Typed SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
 - [Authentication](/docs/backend/authentication) — Set up JWT auth and RLS policies.
 - [Backend Architecture](/docs/backend) — Overview of the Rebase server architecture.
 
@@ -21532,7 +21532,7 @@ matching; Firestore collections use the external text-search controller.
 
 - [REST API](/docs/backend/api/) — the query parameters a search reaches the server as
 - [Indexes](/docs/backend/indexes/) — what the search block creates, and what it costs
-- [Querying Data](/docs/sdk/querying/) — searching from the client SDK
+- [Querying Data](/docs/sdk/querying/) — searching from the typed SDK
 
 ## Indexes
 
@@ -22183,9 +22183,9 @@ restarts and redeploys; `{ "enabled": null }` hands the job back to the
 `enabled` its file declares. How every replica reads it, and what happens when
 one cannot, is on [Cron across instances](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
 
-### Client SDK
+### Typed SDK
 
-The Rebase client SDK exposes a `cron` namespace for all operations:
+The Rebase typed SDK exposes a `cron` namespace for all operations:
 
 ```typescript
 
@@ -25178,7 +25178,7 @@ effectiveRoleController.setEffectiveRole("editor");
 
 - **[Backend Authentication](/docs/backend/authentication)** — JWT, OAuth providers, SMTP configuration
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Row-level access control per collection
-- **[Client SDK Authentication](/docs/sdk/authentication)** — Programmatic auth methods
+- **[Typed SDK Authentication](/docs/sdk/authentication)** — Programmatic auth methods
 
 ## Storage & File Uploads
 
@@ -26444,7 +26444,7 @@ exportable: {
 
 - **[Collections](/docs/collections)** — Define your data model
 - **[Frontend Overview](/docs/frontend)** — Admin panel and UI components
-- **[Client SDK](/docs/sdk)** — Programmatic data access
+- **[Typed SDK](/docs/sdk)** — Programmatic data access
 
 ## Plugin System
 
@@ -27063,7 +27063,7 @@ function CategorySelector({ onSelect }) {
 
 ### `useRebaseClient`
 
-Retrieve the backing client SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
+Retrieve the backing typed SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
 
 ```typescript
 
@@ -27185,7 +27185,7 @@ function AnalyticsLogger() {
 ### Next Steps
 
 - **[Frontend Overview](/docs/frontend)** — React framework reference
-- **[Client SDK](/docs/sdk)** — Data operations SDK
+- **[Typed SDK](/docs/sdk)** — Data operations SDK
 
 ## Studio Tools
 
@@ -34588,7 +34588,7 @@ interface User {
 
 ### Overview
 
-The Rebase Client SDK provides real-time data subscriptions via WebSocket. When records change on the server, your subscribed callbacks fire immediately with the updated data.
+The Rebase typed SDK provides real-time data subscriptions via WebSocket. When records change on the server, your subscribed callbacks fire immediately with the updated data.
 
 The WebSocket connection is established automatically when a `websocketUrl` is available (derived from `baseUrl` by default). Reconnection and token refresh are handled transparently.
 
@@ -36753,7 +36753,7 @@ rebase cloud billing checkout    # a Stripe session for one project
 
 #### `rebase generate-sdk`
 
-Generate a typed client SDK from your collection definitions:
+Generate a typed SDK from your collection definitions:
 
 ```bash
 rebase generate-sdk
@@ -37084,7 +37084,7 @@ The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Wit
 
 #### `rebase generate-sdk`
 
-Generate a typed client SDK from your collection definitions:
+Generate a typed SDK from your collection definitions:
 
 ```bash
 rebase generate-sdk
@@ -37179,7 +37179,7 @@ rebase db migrate
 
 - **[Collections](/docs/collections)** — Define your data model
 - **[CLI Reference](/docs/cli)** — All CLI commands
-- **[Client SDK](/docs/sdk)** — Use the generated SDK
+- **[Typed SDK](/docs/sdk)** — Use the generated SDK
 
 ## rls-check
 
@@ -37765,7 +37765,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 |---------|------|---------|
 | `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
 | `@rebasepro/server` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
-| `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
+| `@rebasepro/client` | Typed SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/app` | Login views, auth controller hooks, user management | Frontend |
@@ -37780,7 +37780,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 
 #### Read Flow
 1. User opens a collection in Rebase CMS
-2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
+2. Typed SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
 3. Backend queries PostgreSQL via Drizzle ORM
 4. Data transformer deserializes database records into entity format
 5. Response sent to frontend, components render
@@ -37789,7 +37789,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 #### Write Flow
 1. User edits an entity in the form
 2. `beforeSave` callbacks run (validation, transformation)
-3. Client SDK sends `PATCH /api/data/:slug/:id`
+3. Typed SDK sends `PATCH /api/data/:slug/:id`
 4. Backend serializes values, runs Drizzle `UPDATE`
 5. `afterSave` callbacks run (side effects)
 6. `NOTIFY` broadcast triggers WebSocket update to all clients
@@ -37810,7 +37810,7 @@ In Rebase, your **TypeScript collection definitions are the single source of tru
 - **PostgreSQL tables** via Drizzle ORM schema generation
 - **CRUD UI** — forms, tables, validation, field types
 - **REST API** endpoints with filtering, sorting, and pagination
-- **Client SDK** — type-safe data operations
+- **Typed SDK** — type-safe data operations
 - **RLS policies** — Row Level Security in Postgres
 
 This means your schema is:
@@ -40867,7 +40867,7 @@ You now have a fully functional blog CMS with:
 
 ### Querying from the SDK
 
-Use the client SDK to fetch articles with their relations:
+Use the typed SDK to fetch articles with their relations:
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.

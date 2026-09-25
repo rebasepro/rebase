@@ -1,6 +1,6 @@
 ---
 title: "Supabase vs Appwrite vs Firebase vs PocketBase vs Convex: choosing a backend in 2026"
-description: "A deep, honest comparison of the major backend-as-a-service platforms — databases, authorization models, realtime, self-hosting, pricing — and where Rebase fits in."
+description: "An honest comparison of the major backend-as-a-service platforms: databases, authorization, realtime, self-hosting and pricing, and where Rebase fits."
 pubDate: 2026-07-18
 authors: francesco
 ---

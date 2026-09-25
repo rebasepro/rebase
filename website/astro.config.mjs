@@ -45,7 +45,13 @@ export default defineConfig({
             head: [
                 { tag: "meta", attrs: { property: "og:image", content: "https://rebase.pro/img/og/docs.png" } },
                 { tag: "meta", attrs: { name: "twitter:image", content: "https://rebase.pro/img/og/docs.png" } },
-                { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } }
+                { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+                // Starlight links favicon.svg itself; these are the rasters and the
+                // manifest the marketing layout also links.
+                { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "32x32" } },
+                { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
+                { tag: "link", attrs: { rel: "manifest", href: "/site.webmanifest" } },
+                { tag: "meta", attrs: { name: "theme-color", content: "#0A0A0A" } }
             ],
             locales: { root: { label: "English", lang: "en" }, es: { label: "Español", lang: "es" }, de: { label: "Deutsch", lang: "de" }, fr: { label: "Français", lang: "fr" }, it: { label: "Italiano", lang: "it" }, pt: { label: "Português", lang: "pt" } },
             customCss: [

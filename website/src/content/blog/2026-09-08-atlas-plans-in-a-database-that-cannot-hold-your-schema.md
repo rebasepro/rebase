@@ -1,6 +1,6 @@
 ---
 title: "Atlas plans your migration in a database that cannot hold your schema"
-description: "A pgvector column made `atlas schema apply` impossible — not flaky, impossible — because Atlas resolves your desired state inside a scratch database it empties on every run. Four workarounds, all measured dead, and the carve-out that worked, including the phantom DROP COLUMN it left behind."
+description: "A pgvector column made atlas schema apply impossible, because Atlas plans in a scratch database. Four workarounds that failed, and the carve-out that worked."
 pubDate: 2026-09-08
 authors: francesco
 ---

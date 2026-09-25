@@ -1,6 +1,6 @@
 ---
 title: "Nothing matched, and nothing said so"
-description: "Three consecutive releases shipped without one of their packages, and every job was green. The cause was a filter that selected nothing — a failure mode shared by pnpm filters, Atlas excludes, grep, and an empty test matrix. Here is why selection is silent by construction, and what we changed."
+description: "Three releases shipped without one of their packages while every job was green. The cause: a filter that selected nothing, silently. What we changed."
 pubDate: 2026-09-01
 authors: francesco
 draft: true

@@ -93,12 +93,19 @@ const footerNavs = [
 ];
 ---
 
-<footer class="p-4 sm:p-6 bg-surface-frame py-16 sm:py-24 border-t border-surface-800">
-    <div class="mx-auto max-w-6xl">
-        <div class="flex flex-col md:flex-row md:justify-between gap-8">
+<footer class="bg-surface-frame py-16 sm:py-24 border-t border-surface-800">
+    {/* On the page container (max-w-6xl px-6 lg:px-8), like every section above
+        it. The brand block and the waitlist share the top row and the six link
+        columns get the full width below: beside the brand block they had ~120px
+        each, and "Platform overview", "Terms of Service" and "Sovereignty in
+        Europe" all broke onto two lines. */}
+    <div class="mx-auto max-w-6xl px-6 lg:px-8">
+        <div class="flex flex-col gap-12 lg:gap-14">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div>
                 <div class="mb-6 md:mb-0">
                     <a href={translatePath("/")} class="flex items-center">
+                        <img src="/img/rebase_logo.svg" width="28" height="28" class="h-7 w-7 mr-3" alt="" loading="lazy" />
                         <span class="self-center text-lg font-semibold whitespace-nowrap text-white">Rebase</span>
                     </a>
                 </div>
@@ -113,9 +120,10 @@ const footerNavs = [
                     </svg>
                 </a>
 
+            </div>
                 <form
                     id="footer-waitlist"
-                    class="mt-8 max-w-xs"
+                    class="w-full max-w-sm"
                     novalidate
                     data-sending={t("footer.waitlistSending")}
                     data-success={t("footer.waitlistSuccess")}
