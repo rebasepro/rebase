@@ -1,7 +1,7 @@
 ---
 title: Offline & Local-First Sync
 sidebar_label: Offline
-description: Enable the Rebase Client SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.
+description: Enable the Rebase typed SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.
 ---
 
 ## Overview

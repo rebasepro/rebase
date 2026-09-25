@@ -1,7 +1,7 @@
 ---
 title: Storage & Files
 sidebar_label: Storage
-description: Upload, download, list, and delete files using the Rebase Client SDK's storage module.
+description: Upload, download, list, and delete files using the Rebase typed SDK's storage module.
 ---
 
 ## Overview

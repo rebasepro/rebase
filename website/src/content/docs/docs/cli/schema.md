@@ -217,7 +217,7 @@ The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Wit
 
 ### `rebase generate-sdk`
 
-Generate a typed client SDK from your collection definitions:
+Generate a typed SDK from your collection definitions:
 
 ```bash
 rebase generate-sdk
@@ -314,4 +314,4 @@ rebase db migrate
 
 - **[Collections](/docs/collections)** — Define your data model
 - **[CLI Reference](/docs/cli)** — All CLI commands
-- **[Client SDK](/docs/sdk)** — Use the generated SDK
+- **[Typed SDK](/docs/sdk)** — Use the generated SDK

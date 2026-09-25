@@ -234,7 +234,7 @@ You now have a fully functional blog CMS with:
 
 ## Querying from the SDK
 
-Use the client SDK to fetch articles with their relations:
+Use the typed SDK to fetch articles with their relations:
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.

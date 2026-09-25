@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b130367f73c18c5
+sourceHash: 42389d34a3b37766
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -97,11 +97,11 @@ Envie o access token de volta como `Authorization: Bearer <accessToken>`.
 aqui, e `providerId` é sempre `password`, independentemente de como a sessão foi criada
 inicialmente.
 
-:::caution[O SDK cliente simplifica este envelope — o HTTP puro não]
+:::caution[O SDK tipado simplifica este envelope — o HTTP puro não]
 O JSON acima é o formato de transmissão (wire format) e é o que `fetch("/api/auth/login")`
 retorna: o token reside em **`body.tokens.accessToken`**.
 
-O [SDK cliente](/docs/sdk/authentication) desempacota `tokens` antes de retornar a
+O [SDK tipado](/docs/sdk/authentication) desempacota `tokens` antes de retornar a
 sessão, então `auth.signInWithEmail()` resolve diretamente para
 **`{ user, accessToken, refreshToken }`**.
 
@@ -337,4 +337,4 @@ Para prevenir timing attacks, o Rebase valida tanto a chave de serviço configur
 - **[Autenticação](/docs/backend/authentication/)** — a configuração de onde essas rotas se originam
 - **[Adaptadores de autenticação personalizados](/docs/backend/auth-adapters/)** — substituindo o provedor por trás delas
 - **[Regras de segurança (RLS)](/docs/collections/security-rules/)** — o que uma política faz com `rebase.uid()`
-- **[Autenticação no SDK cliente](/docs/sdk/authentication/)** — chamando essas rotas a partir do SDK
+- **[Autenticação no SDK tipado](/docs/sdk/authentication/)** — chamando essas rotas a partir do SDK

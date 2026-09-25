@@ -1,13 +1,13 @@
 ---
-sourceHash: f49369700dcdc098
+sourceHash: 4b38a4ca87f38dc7
 title: Realtime-Abonnements
 sidebar_label: Realtime
-description: Abonnieren Sie Live-Datenänderungen mit dem Rebase Client SDK über WebSocket-basierte Realtime-Listener.
+description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
 ---
 
 ## Übersicht
 
-Das Rebase Client SDK bietet Echtzeit-Datenabonnements über WebSocket. Wenn sich Datensätze auf dem Server ändern, werden Ihre abonnierten Callbacks sofort mit den aktualisierten Daten ausgelöst.
+Das typisierte SDK von Rebase bietet Echtzeit-Datenabonnements über WebSocket. Wenn sich Datensätze auf dem Server ändern, werden Ihre abonnierten Callbacks sofort mit den aktualisierten Daten ausgelöst.
 
 Die WebSocket-Verbindung wird automatisch aufgebaut, sobald eine `websocketUrl` verfügbar ist (standardmäßig von `baseUrl` abgeleitet). Die Wiederverbindung und die Token-Aktualisierung werden transparent gehandhabt.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 862b9b1d6de22bdd
+sourceHash: 82e083381f34098d
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -432,7 +432,7 @@ auf einer Route, die das UI gerade aufgerufen hat, wirkt wie ein fehlerhaftes De
 
 Routen fügen darüber hinaus ihre eigenen spezifischeren Codes hinzu (`EMAIL_EXISTS`,
 `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), betrachten Sie die Liste der Codes daher
-als offen. Das Client-SDK wandelt alle in einen einzigen `RebaseApiError` um, der
+als offen. Das typisierte SDK wandelt alle in einen einzigen `RebaseApiError` um, der
 `status`, `code` und `details` enthält — siehe
 [Fehlerbehandlung](/docs/backend#error-handling).
 
@@ -585,6 +585,6 @@ wenn `enableSwagger` aktiviert ist.
 
 ## Nächste Schritte
 
-- **[Client SDK](/docs/sdk)** — Typsicherer Client für die REST-API
+- **[Typisiertes SDK](/docs/sdk)** — Typsicherer Client für die REST-API
 - **[Collections](/docs/collections)** — Definieren Sie Ihr Datenschema
 - **[Sicherheitsregeln (RLS)](/docs/collections/security-rules)** — Zugriff auf Zeilenebene steuern

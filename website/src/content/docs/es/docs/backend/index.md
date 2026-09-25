@@ -1,5 +1,5 @@
 ---
-sourceHash: 21b1ae6712a17e38
+sourceHash: 925edb3f8c355de4
 title: Descripción general del backend
 sidebar_label: Backend
 description: El backend de Rebase proporciona un servidor completo con API REST, autenticación, almacenamiento, WebSocket en tiempo real e historial de entidades, todo inicializado con una única llamada a una función.
@@ -268,7 +268,7 @@ El servidor WebSocket se adjunta al mismo servidor HTTP y proporciona suscripcio
 
 - Suscribirse a **cambios en colecciones**: reciba notificaciones cuando cualquier entidad de una colección se cree, actualice o elimine
 - Suscribirse a **cambios en entidades**: reciba notificaciones cuando una entidad específica cambie
-- Gestión automática de **reconexión** en el SDK del cliente
+- Gestión automática de **reconexión** en el SDK tipado
 
 El backend utiliza PostgreSQL `LISTEN/NOTIFY` internamente. Para despliegues con múltiples instancias, proporcione un `connectionString` en su `PostgresBootstrapper` para habilitar la difusión entre instancias.
 
@@ -295,7 +295,7 @@ Cada fallo —desde cualquier ruta, en cualquier subsistema— se devuelve en un
 
 El estado HTTP se encuentra en la respuesta, no en el cuerpo. Bifurque sobre `code`, no sobre `message`; los mensajes están escritos para humanos y pueden cambiar con libertad.
 
-El SDK del cliente convierte cada uno de estos en un `RebaseApiError` que incluye `status`, `code` y `details`, incluidos los fallos que ni siquiera llegaron a un servidor. Una conexión rechazada, un fallo de DNS, CORS o una cancelación (abort) llegan como `status: 0`, `code: "NETWORK_ERROR"`, con el propio error del runtime en `cause`, en lugar de lo que a `fetch` le haya parecido rechazar. Por lo tanto, el código de la aplicación captura una sola clase:
+El SDK tipado convierte cada uno de estos en un `RebaseApiError` que incluye `status`, `code` y `details`, incluidos los fallos que ni siquiera llegaron a un servidor. Una conexión rechazada, un fallo de DNS, CORS o una cancelación (abort) llegan como `status: 0`, `code: "NETWORK_ERROR"`, con el propio error del runtime en `cause`, en lugar de lo que a `fetch` le haya parecido rechazar. Por lo tanto, el código de la aplicación captura una sola clase:
 
 ```typescript
 async function setPrice(id: string, price: number) {

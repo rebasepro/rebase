@@ -1,5 +1,5 @@
 ---
-sourceHash: b2d69a15f60b73b7
+sourceHash: a900e8837709983d
 title: "Rezept: Blog-CMS"
 sidebar_label: Blog-CMS
 description: Erstellen Sie ein vollständiges Blog-CMS mit Artikeln, Autoren, Kategorien, Rich-Text-Bearbeitung und Bild-Uploads.
@@ -235,7 +235,7 @@ Sie verfügen nun über ein voll funktionsfähiges Blog-CMS mit:
 
 ## Abfragen über das SDK
 
-Verwenden Sie das Client-SDK, um Artikel mit ihren Relationen abzurufen:
+Verwenden Sie das typisierte SDK, um Artikel mit ihren Relationen abzurufen:
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.

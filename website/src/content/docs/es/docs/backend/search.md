@@ -1,5 +1,5 @@
 ---
-sourceHash: 7047b4fd73bde89d
+sourceHash: b40aeb5aa87322cc
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo habilitar en una colección de Postgres la búsqueda de texto completo con relevancia en los campos que indiques, incluyendo contenido JSONB y arrays.
@@ -223,4 +223,4 @@ El bloque `search` es exclusivo de Postgres y se rechaza en el arranque en otros
 
 - [API REST](/docs/backend/api/) — los parámetros de consulta con los que una búsqueda llega al servidor
 - [Índices](/docs/backend/indexes/) — qué crea el bloque de búsqueda y cuál es su coste
-- [Consultar datos](/docs/sdk/querying/) — buscar desde el SDK del cliente
+- [Consultar datos](/docs/sdk/querying/) — buscar desde el SDK tipado

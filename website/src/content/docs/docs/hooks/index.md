@@ -423,7 +423,7 @@ function CategorySelector({ onSelect }) {
 
 ## `useRebaseClient`
 
-Retrieve the backing client SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
+Retrieve the backing typed SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
 
 ```typescript
 import { useRebaseClient } from "@rebasepro/app";
@@ -554,4 +554,4 @@ function AnalyticsLogger() {
 ## Next Steps
 
 - **[Frontend Overview](/docs/frontend)** — React framework reference
-- **[Client SDK](/docs/sdk)** — Data operations SDK
+- **[Typed SDK](/docs/sdk)** — Data operations SDK

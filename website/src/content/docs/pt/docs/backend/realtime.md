@@ -1,5 +1,5 @@
 ---
-sourceHash: da709fdddc946e75
+sourceHash: dac64afe647bf1b0
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -14,7 +14,7 @@ O pipeline de tempo real possui três etapas:
 
 1. **Gatilho no banco de dados** — Uma mutação atinge o banco de dados PostgreSQL (via REST API, SDK ou Studio).
 2. **Fan-out no servidor** — O servidor Rebase detecta a alteração e a distribui (fan-out) para cada assinatura WebSocket ativa que corresponda à coleção ou entidade afetada.
-3. **Callback no cliente** — O SDK do cliente dispara seu callback `onUpdate` com os dados atualizados.
+3. **Callback no cliente** — O SDK tipado dispara seu callback `onUpdate` com os dados atualizados.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -31,9 +31,9 @@ O tempo real é habilitado por padrão. Não há nenhuma flag para ativar nem se
 
 > Por padrão, o Rebase também emite eventos em tempo real para gravações feitas **fora** da API (via `psql`, outro serviço ou pelo editor SQL do Studio) sempre que a conexão com o banco de dados suportar — veja [captura de alterações a nível de banco de dados (CDC)](#captura-de-alterações-a-nível-de-banco-de-dados-cdc).
 
-## Assinaturas do SDK do Cliente
+## Assinaturas do SDK tipado
 
-O SDK do cliente Rebase expõe dois métodos de assinatura em cada acessor de coleção:
+O SDK tipado do Rebase expõe dois métodos de assinatura em cada acessor de coleção:
 
 - **`listen()`** — Assina uma coleção inteira (com filtros opcionais).
 - **`listenById()`** — Assina uma única entidade pelo seu ID.
@@ -329,7 +329,7 @@ Presenças inativas são limpas automaticamente após 30 segundos de inatividade
 
 ## Reconexão Automática
 
-O SDK do cliente se reconecta automaticamente quando a conexão WebSocket cai:
+O SDK tipado se reconecta automaticamente quando a conexão WebSocket cai:
 
 - **Backoff exponencial** — Os atrasos de reconexão começam em 1 segundo e dobram a cada tentativa, com limite de 30 segundos.
 - **Máximo de 5 tentativas** — Após 5 tentativas de reconexão com falha, o cliente para de tentar.
@@ -443,6 +443,6 @@ Sem nenhum handler anexado, esses eventos são registrados no log como aviso. El
 
 ## Próximos Passos
 
-- [SDK do Cliente](/docs/sdk) — Referência completa do SDK, incluindo acessores tipados de coleção.
+- [SDK tipado](/docs/sdk) — Referência completa do SDK, incluindo acessores tipados de coleção.
 - [Autenticação](/docs/backend/authentication) — Configure a autenticação JWT e as políticas de RLS.
 - [Arquitetura do Backend](/docs/backend) — Visão geral da arquitetura do servidor Rebase.

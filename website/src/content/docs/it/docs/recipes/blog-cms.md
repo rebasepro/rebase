@@ -1,5 +1,5 @@
 ---
-sourceHash: b2d69a15f60b73b7
+sourceHash: a900e8837709983d
 title: "Ricetta: Blog CMS"
 sidebar_label: Blog CMS
 description: Crea un CMS completo per blog con articoli, autori, categorie, editing rich text e caricamento di immagini.
@@ -235,7 +235,7 @@ Ora disponi di un CMS per blog completamente funzionante con:
 
 ## Esecuzione di query dall'SDK
 
-Usa l'SDK client per recuperare gli articoli con le relative relazioni:
+Usa l'SDK tipizzato per recuperare gli articoli con le relative relazioni:
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.

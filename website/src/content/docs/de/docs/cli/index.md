@@ -1,5 +1,5 @@
 ---
-sourceHash: 0cdbaa95461e2a6e
+sourceHash: 5e9e7017aff81af7
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -412,7 +412,7 @@ rebase cloud billing checkout    # a Stripe session for one project
 
 ### `rebase generate-sdk`
 
-Generiert ein typisiertes Client-SDK aus Ihren Collection-Definitionen:
+Generiert ein typisiertes SDK aus Ihren Collection-Definitionen:
 
 ```bash
 rebase generate-sdk

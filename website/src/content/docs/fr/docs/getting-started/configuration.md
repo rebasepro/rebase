@@ -1,5 +1,5 @@
 ---
-sourceHash: 11b34d6efd4ef32e
+sourceHash: 90b6bdcbc917bfb7
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -43,7 +43,7 @@ Toute la configuration s'effectue via des variables d'environnement dans votre f
 
 | Variable | Description | Valeur par défaut |
 |----------|-------------|-------------------|
-| `VITE_API_URL` | URL de l'API backend pour le SDK client. **À définir en développement uniquement** — voir ci-dessous. | origine de la page |
+| `VITE_API_URL` | URL de l'API backend pour le SDK typé. **À définir en développement uniquement** — voir ci-dessous. | origine de la page |
 | `VITE_GOOGLE_CLIENT_ID` | ID client Google OAuth. Active « Se connecter avec Google ». | — |
 
 

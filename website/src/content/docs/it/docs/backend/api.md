@@ -1,5 +1,5 @@
 ---
-sourceHash: 862b9b1d6de22bdd
+sourceHash: 82e083381f34098d
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -348,7 +348,7 @@ Ogni errore, proveniente da qualsiasi route, viene restituito in una struttura (
 
 Una superficie/funzionalità assente perché non abilitata in questo deployment risponde con 501 accompagnato da un codice e da una motivazione, non con 404 — un 404 inspiegato su una route appena invocata dalla UI verrebbe interpretato come un deploy non funzionante.
 
-Le route aggiungono i propri codici più specifici oltre a questi (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), quindi considera l'elenco dei codici come aperto. L'SDK client converte tutti gli errori in un unico `RebaseApiError` contenente `status`, `code` e `details` — vedi [Error handling](/docs/backend#error-handling).
+Le route aggiungono i propri codici più specifici oltre a questi (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), quindi considera l'elenco dei codici come aperto. L'SDK tipizzato converte tutti gli errori in un unico `RebaseApiError` contenente `status`, `code` e `details` — vedi [Error handling](/docs/backend#error-handling).
 
 ## Ricerca testuale
 
@@ -481,6 +481,6 @@ Per verificare la struttura degli endpoint anziché lo schema sottostante, il do
 
 ## Passaggi successivi
 
-- **[Client SDK](/docs/sdk)** — Client con tipizzazione statica per l'API REST
+- **[SDK tipizzato](/docs/sdk)** — Client con tipizzazione statica per l'API REST
 - **[Collections](/docs/collections)** — Definisci lo schema dei tuoi dati
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Controlla l'accesso per singola riga

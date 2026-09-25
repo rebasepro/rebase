@@ -1,5 +1,5 @@
 ---
-sourceHash: 862b9b1d6de22bdd
+sourceHash: 82e083381f34098d
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -348,7 +348,7 @@ Cada fallo, de cualquier ruta, se devuelve en una misma estructura contenedora:
 
 Una funcionalidad que no esté disponible porque este despliegue no la habilitó responde 501 con un código y un motivo, no 404; un 404 inexplicable en una ruta a la que la interfaz de usuario acaba de llamar se interpreta como un despliegue defectuoso.
 
-Las rutas añaden sus propios códigos más específicos además de estos (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), por lo que debes considerar la lista de códigos como abierta. El SDK de cliente convierte todos ellos en un único `RebaseApiError` que contiene `status`, `code` y `details`; consulta [Manejo de errores](/docs/backend#error-handling).
+Las rutas añaden sus propios códigos más específicos además de estos (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), por lo que debes considerar la lista de códigos como abierta. El SDK tipado convierte todos ellos en un único `RebaseApiError` que contiene `status`, `code` y `details`; consulta [Manejo de errores](/docs/backend#error-handling).
 
 ## Búsqueda de texto
 
@@ -480,6 +480,6 @@ Para conocer la forma de los endpoints en lugar del esquema subyacente, el docum
 
 ## Próximos pasos
 
-- **[SDK de cliente](/docs/sdk)** — Cliente con seguridad de tipos para la API REST
+- **[SDK tipado](/docs/sdk)** — Cliente con seguridad de tipos para la API REST
 - **[Colecciones](/docs/collections)** — Define tu esquema de datos
 - **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — Controla el acceso por fila

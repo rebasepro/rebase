@@ -1,5 +1,5 @@
 ---
-sourceHash: 3c10e2e8a92e2f64
+sourceHash: 887e286667dfa3eb
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -616,4 +616,4 @@ eles recebem uma fachada `AuthCollectionContext` contendo:
 - **[Adaptadores de autenticação personalizados](/docs/backend/auth-adapters/)** — trazendo seu próprio provedor de identidade
 - **[Autenticação no Frontend](/docs/frontend/authentication/)** — interface de login, controlador de autenticação, gerenciamento de usuários
 - **[Regras de Segurança (RLS)](/docs/collections/security-rules/)** — controle de acesso a nível de linha
-- **[Autenticação no SDK do Cliente](/docs/sdk/authentication/)** — métodos de autenticação no SDK do cliente
+- **[Autenticação no SDK tipado](/docs/sdk/authentication/)** — métodos de autenticação no SDK tipado

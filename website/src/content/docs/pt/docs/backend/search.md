@@ -1,5 +1,5 @@
 ---
-sourceHash: 7047b4fd73bde89d
+sourceHash: b40aeb5aa87322cc
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como habilitar a busca de texto completo ranqueada em uma coleção Postgres nos campos especificados — incluindo conteúdo JSONB e array.
@@ -352,4 +352,4 @@ externo de busca de texto.
 
 - [REST API](/docs/backend/api/) — os parâmetros de consulta pelos quais uma busca chega ao servidor
 - [Indexes](/docs/backend/indexes/) — o que o bloco de busca cria e quanto custa
-- [Querying Data](/docs/sdk/querying/) — buscando a partir do SDK cliente
+- [Querying Data](/docs/sdk/querying/) — buscando a partir do SDK tipado

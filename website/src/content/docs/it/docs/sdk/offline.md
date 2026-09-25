@@ -1,8 +1,8 @@
 ---
-sourceHash: 529819bf2e68a515
+sourceHash: 9fd2ff2023cede85
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
-description: Attiva il motore di sincronizzazione local-first dell'SDK Client di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
+description: Attiva il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
 ---
 
 ## Panoramica

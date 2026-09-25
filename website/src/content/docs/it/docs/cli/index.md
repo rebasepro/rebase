@@ -1,5 +1,5 @@
 ---
-sourceHash: 0cdbaa95461e2a6e
+sourceHash: 5e9e7017aff81af7
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -441,7 +441,7 @@ rebase cloud billing checkout    # a Stripe session for one project
 
 ### `rebase generate-sdk`
 
-Genera un SDK client tipizzato a partire dalle definizioni delle tue collection:
+Genera un SDK tipizzato a partire dalle definizioni delle tue collection:
 
 ```bash
 rebase generate-sdk

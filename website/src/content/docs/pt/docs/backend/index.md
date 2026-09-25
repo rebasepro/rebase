@@ -1,5 +1,5 @@
 ---
-sourceHash: 21b1ae6712a17e38
+sourceHash: 925edb3f8c355de4
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -311,7 +311,7 @@ O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições e
 
 - Inscrever-se em **alterações na coleção** — receba notificações quando qualquer entidade em uma coleção for criada, atualizada ou excluída
 - Inscrever-se em **alterações na entidade** — receba notificações quando uma entidade específica for alterada
-- Tratamento automático de **reconexão** no SDK do cliente
+- Tratamento automático de **reconexão** no SDK tipado
 
 O backend utiliza PostgreSQL `LISTEN/NOTIFY` internamente. Para deploys com múltiplas instâncias, forneça uma `connectionString` no seu `PostgresBootstrapper` para habilitar a transmissão (broadcasting) entre instâncias.
 
@@ -339,7 +339,7 @@ Toda falha — de qualquer rota, em qualquer subsistema — retorna em um único
 O status HTTP está na resposta, não no corpo. Trate as condições com base no `code`, não na
 `message` — as mensagens são escritas para humanos e podem mudar.
 
-O SDK do cliente converte cada uma dessas falhas em um `RebaseApiError` contendo
+O SDK tipado converte cada uma dessas falhas em um `RebaseApiError` contendo
 `status`, `code` e `details` — incluindo as falhas que nem sequer chegaram a um
 servidor. Uma conexão recusada, uma falha de DNS, CORS ou um cancelamento (abort) chega como
 `status: 0`, `code: "NETWORK_ERROR"`, com o erro do próprio runtime em `cause`,

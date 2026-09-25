@@ -1,5 +1,5 @@
 ---
-sourceHash: 69d89e250dd512d5
+sourceHash: 19e4936be2af9792
 title: Esquema como Código
 sidebar_label: Esquema como Código
 description: Cómo Rebase utiliza colecciones de TypeScript como la única fuente de verdad para el esquema de su base de datos, UI y API.
@@ -12,7 +12,7 @@ En Rebase, sus **definiciones de colección de TypeScript son la única fuente d
 - **Tablas PostgreSQL** a través de la generación de esquemas Drizzle ORM
 - **UI CRUD** — formularios, tablas, validación, tipos de campo
 - **Endpoints de API REST** con filtrado, ordenación y paginación
-- **SDK de Cliente** — operaciones de datos con seguridad de tipos
+- **SDK tipado** — operaciones de datos con seguridad de tipos
 - **Políticas RLS** — Seguridad a Nivel de Fila en Postgres
 
 Esto significa que su esquema es:

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e2dfa451a30f422
+sourceHash: 1baf8e8f2454a5fe
 title: Importación y exportación de datos
 sidebar_label: Importación y exportación de datos
 description: Importa datos de archivos CSV, JSON y Excel a tus colecciones, y exporta datos de colecciones a CSV o JSON con campos calculados opcionales.
@@ -148,4 +148,4 @@ exportable: {
 
 - **[Collections](/docs/collections)** — Define tu modelo de datos
 - **[Frontend Overview](/docs/frontend)** — Panel de administración y componentes de interfaz de usuario
-- **[Client SDK](/docs/sdk)** — Acceso programático a datos
+- **[SDK tipado](/docs/sdk)** — Acceso programático a datos

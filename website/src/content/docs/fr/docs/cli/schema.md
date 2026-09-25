@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f87252e9cdbf780
+sourceHash: 827d73a898f837eb
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -164,7 +164,7 @@ Exécutez `doctor` chaque fois que quelque chose semble désynchronisé. Il indi
 
 ### `rebase generate-sdk`
 
-Générez un SDK client typé à partir de vos définitions de collections :
+Générez un SDK typé à partir de vos définitions de collections :
 
 ```bash
 rebase generate-sdk
@@ -252,4 +252,4 @@ rebase db migrate
 
 - **[Collections](/docs/collections)** — Définissez votre modèle de données
 - **[Référence CLI](/docs/cli)** — Toutes les commandes CLI
-- **[SDK client](/docs/sdk)** — Utilisez le SDK généré
+- **[SDK typé](/docs/sdk)** — Utilisez le SDK généré

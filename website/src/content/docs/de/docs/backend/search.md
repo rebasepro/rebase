@@ -1,5 +1,5 @@
 ---
-sourceHash: 7047b4fd73bde89d
+sourceHash: b40aeb5aa87322cc
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie Sie eine Postgres-Collection für die gerankte Volltextsuche über die von Ihnen benannten Felder aktivieren – einschließlich JSONB- und Array-Inhalten.
@@ -371,4 +371,4 @@ den externen Text-Search-Controller.
 
 - [REST API](/docs/backend/api/) — die Abfrageparameter, als die eine Suche den Server erreicht
 - [Indexes](/docs/backend/indexes/) — was der Search-Block erstellt und was er kostet
-- [Querying Data](/docs/sdk/querying/) — Suchen über das Client-SDK
+- [Querying Data](/docs/sdk/querying/) — Suchen über das typisierte SDK

@@ -1,5 +1,5 @@
 ---
-sourceHash: da709fdddc946e75
+sourceHash: dac64afe647bf1b0
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -14,7 +14,7 @@ Le pipeline temps réel comporte trois étapes :
 
 1. **Déclencheur de base de données** — Une mutation atteint la base de données PostgreSQL (via l'API REST, le SDK ou Studio).
 2. **Distribution par le serveur (fan-out)** — Le serveur Rebase détecte le changement et le distribue à chaque abonnement WebSocket actif correspondant à la collection ou à l'entité concernée.
-3. **Rappel côté client** — Le SDK client exécute votre fonction de rappel `onUpdate` avec les nouvelles données.
+3. **Rappel côté client** — Le SDK typé exécute votre fonction de rappel `onUpdate` avec les nouvelles données.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -31,9 +31,9 @@ Le temps réel est activé par défaut. Il n'y a aucun paramètre à modifier ni
 
 > Par défaut, Rebase émet également des événements en temps réel pour les écritures effectuées **en dehors** de l'API (via `psql`, un autre service ou l'éditeur SQL de Studio) dès que la connexion à la base de données le permet — voir [capture de données modifiées au niveau de la base de données](#capture-des-modifications-au-niveau-de-la-base-de-données-cdc).
 
-## Abonnements avec le SDK Client
+## Abonnements avec le SDK typé
 
-Le SDK client Rebase expose deux méthodes d'abonnement sur chaque accesseur de collection :
+Le SDK typé de Rebase expose deux méthodes d'abonnement sur chaque accesseur de collection :
 
 - **`listen()`** — S'abonner à une collection entière (avec des filtres optionnels).
 - **`listenById()`** — S'abonner à une entité spécifique par son identifiant.
@@ -329,7 +329,7 @@ Les présences inactives sont automatiquement nettoyées après 30 secondes d'in
 
 ## Reconnexion automatique
 
-Le SDK client se reconnecte automatiquement lorsque la connexion WebSocket est interrompue :
+Le SDK typé se reconnecte automatiquement lorsque la connexion WebSocket est interrompue :
 
 - **Temporisation exponentielle (Exponential backoff)** — Les délais de reconnexion débutent à 1 seconde et doublent à chaque tentative, avec un plafond à 30 secondes.
 - **5 tentatives au maximum** — Après 5 tentatives infructueuses de reconnexion, le client cesse d'essayer.
@@ -443,6 +443,6 @@ Si aucun gestionnaire n'est attaché, ces événements sont journalisés sous fo
 
 ## Prochaines étapes
 
-- [SDK Client](/docs/sdk) — Référence complète du SDK, y compris les accesseurs de collection typés.
+- [SDK typé](/docs/sdk) — Référence complète du SDK, y compris les accesseurs de collection typés.
 - [Authentification](/docs/backend/authentication) — Configurer l'authentification JWT et les politiques RLS.
 - [Architecture Backend](/docs/backend) — Vue d'ensemble de l'architecture du serveur Rebase.

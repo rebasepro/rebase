@@ -13,7 +13,7 @@ The realtime pipeline has three stages:
 
 1. **Database trigger** — A mutation hits the PostgreSQL database (via REST API, SDK, or Studio).
 2. **Server fan-out** — The Rebase server detects the change and fans it out to every active WebSocket subscription that matches the affected collection or entity.
-3. **Client callback** — The client SDK fires your `onUpdate` callback with the fresh data.
+3. **Client callback** — The typed SDK fires your `onUpdate` callback with the fresh data.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -30,9 +30,9 @@ Realtime is enabled out of the box. There is no flag to flip or service to start
 
 > By default, Rebase also emits realtime events for writes made **outside** the API (via `psql`, another service, or Studio's SQL editor) whenever the database connection supports it — see [database-level change capture](#database-level-change-capture-cdc).
 
-## Client SDK Subscriptions
+## Typed SDK Subscriptions
 
-The Rebase client SDK exposes two subscription methods on every collection accessor:
+The Rebase typed SDK exposes two subscription methods on every collection accessor:
 
 - **`listen()`** — Subscribe to an entire collection (with optional filters).
 - **`listenById()`** — Subscribe to a single entity by its ID.
@@ -362,7 +362,7 @@ Stale presences are automatically cleaned up after 30 seconds of inactivity.
 
 ## Auto-Reconnect
 
-The client SDK automatically reconnects when the WebSocket connection drops:
+The typed SDK automatically reconnects when the WebSocket connection drops:
 
 - **Exponential backoff** — Reconnect delays start at 1 second and double on each attempt, capping at 30 seconds.
 - **Maximum 5 attempts** — After 5 failed reconnection attempts, the client stops trying.
@@ -483,6 +483,6 @@ so a forbidden broadcast was indistinguishable from a delivered one.
 
 ## Next Steps
 
-- [Client SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
+- [Typed SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
 - [Authentication](/docs/backend/authentication) — Set up JWT auth and RLS policies.
 - [Backend Architecture](/docs/backend) — Overview of the Rebase server architecture.

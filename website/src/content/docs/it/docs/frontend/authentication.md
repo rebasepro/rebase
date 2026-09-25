@@ -1,5 +1,5 @@
 ---
-sourceHash: 90e2137462c112d2
+sourceHash: 8d1a98886641537e
 title: Autenticazione e Login
 sidebar_label: Autenticazione e Login
 description: Configura il controller di autenticazione, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -106,4 +106,4 @@ effectiveRoleController.setEffectiveRole("editor");
 
 - **[Autenticazione Backend](/docs/backend/authentication)** — JWT, provider OAuth, configurazione SMTP
 - **[Regole di sicurezza (RLS)](/docs/collections/security-rules)** — Controllo degli accessi a livello di riga per collection
-- **[Autenticazione Client SDK](/docs/sdk/authentication)** — Metodi di autenticazione programmatici
+- **[Autenticazione con l'SDK tipizzato](/docs/sdk/authentication)** — Metodi di autenticazione programmatici

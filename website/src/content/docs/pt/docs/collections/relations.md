@@ -1,5 +1,5 @@
 ---
-sourceHash: b0070dc1781e9f2d
+sourceHash: cbee90067ba8da67
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -350,7 +350,7 @@ Defina `"cascade"` quando a chave do destino for algo que uma pessoa pode editar
 
 ## Buscando Relações no SDK
 
-Ao consultar dados através do Rebase Client SDK, as relações **não** são incluídas por padrão. Use o método `include()` para solicitar entidades relacionadas juntamente com os dados primários.
+Ao consultar dados através do SDK tipado do Rebase, as relações **não** são incluídas por padrão. Use o método `include()` para solicitar entidades relacionadas juntamente com os dados primários.
 
 ### Incluir relações específicas
 
@@ -399,7 +399,7 @@ for (const article of data) {
 
 > Os nomes das relações passados para `include()` devem corresponder ao `relationName` definido no array `relations` da coleção.
 
-Para a referência completa do construtor de consultas (filtragem, classificação, paginação, tempo real), consulte a [documentação do Client SDK](/docs/sdk).
+Para a referência completa do construtor de consultas (filtragem, classificação, paginação, tempo real), consulte a [documentação do SDK tipado](/docs/sdk).
 
 ## Relações no painel de administração
 

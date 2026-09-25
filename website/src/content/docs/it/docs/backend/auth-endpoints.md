@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b130367f73c18c5
+sourceHash: 42389d34a3b37766
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -97,11 +97,11 @@ viene omesso completamente quando l'account non può essere riletto (quindi è d
 opzionale in questo caso) e `providerId` è sempre `password`, indipendentemente da come la sessione
 è stata originariamente creata.
 
-:::caution[L'SDK client appiattisce questo envelope — le richieste HTTP dirette no]
+:::caution[L'SDK tipizzato appiattisce questo envelope — le richieste HTTP dirette no]
 Il JSON sopra riportato rappresenta il formato di trasmissione (wire format) ed è ciò che
 restituisce `fetch("/api/auth/login")`: il token si trova in **`body.tokens.accessToken`**.
 
-L'[SDK client](/docs/sdk/authentication) estrae `tokens` prima di restituire la
+L'[SDK tipizzato](/docs/sdk/authentication) estrae `tokens` prima di restituire la
 sessione, per cui `auth.signInWithEmail()` si risolve invece in una struttura appiattita
 **`{ user, accessToken, refreshToken }`**.
 
@@ -336,4 +336,4 @@ Per prevenire timing attack (attacchi basati sui tempi di esecuzione), Rebase co
 - **[Autenticazione](/docs/backend/authentication/)** — la configurazione da cui derivano queste route
 - **[Adapter di autenticazione personalizzati](/docs/backend/auth-adapters/)** — come sostituire il provider sottostante
 - **[Regole di sicurezza (RLS)](/docs/collections/security-rules/)** — cosa fa una policy con `rebase.uid()`
-- **[Autenticazione con l'SDK client](/docs/sdk/authentication/)** — come chiamare queste route dall'SDK
+- **[Autenticazione con l'SDK tipizzato](/docs/sdk/authentication/)** — come chiamare queste route dall'SDK

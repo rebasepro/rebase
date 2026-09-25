@@ -1,5 +1,5 @@
 ---
-sourceHash: da709fdddc946e75
+sourceHash: dac64afe647bf1b0
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -14,7 +14,7 @@ El flujo de procesamiento en tiempo real consta de tres etapas:
 
 1. **Trigger de base de datos** — Una mutación impacta en la base de datos PostgreSQL (mediante la API REST, el SDK o Studio).
 2. **Distribución en el servidor (Server fan-out)** — El servidor de Rebase detecta el cambio y lo distribuye a cada suscripción WebSocket activa que coincida con la colección o entidad afectada.
-3. **Callback del cliente** — El SDK del cliente ejecuta tu callback `onUpdate` con los datos actualizados.
+3. **Callback del cliente** — El SDK tipado ejecuta tu callback `onUpdate` con los datos actualizados.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -31,9 +31,9 @@ El tiempo real está habilitado de forma predeterminada. No hay ningún indicado
 
 > Por defecto, Rebase también emite eventos en tiempo real para las escrituras realizadas **fuera** de la API (mediante `psql`, otro servicio o el editor SQL de Studio) siempre que la conexión a la base de datos lo admita; consulta [captura de cambios a nivel de base de datos](#captura-de-cambios-a-nivel-de-base-de-datos-cdc).
 
-## Suscripciones del SDK del cliente
+## Suscripciones del SDK tipado
 
-El SDK del cliente de Rebase expone dos métodos de suscripción en cada descriptor de acceso a colecciones:
+El SDK tipado de Rebase expone dos métodos de suscripción en cada descriptor de acceso a colecciones:
 
 - **`listen()`** — Suscribirse a una colección completa (con filtros opcionales).
 - **`listenById()`** — Suscribirse a una sola entidad por su ID.
@@ -329,7 +329,7 @@ Las presencias inactivas se eliminan automáticamente tras 30 segundos de inacti
 
 ## Reconexión automática
 
-El SDK del cliente se reconecta automáticamente cuando se pierde la conexión WebSocket:
+El SDK tipado se reconecta automáticamente cuando se pierde la conexión WebSocket:
 
 - **Retroceso exponencial (Exponential backoff)** — Los retrasos de reconexión comienzan en 1 segundo y se duplican en cada intento, con un límite máximo de 30 segundos.
 - **Máximo de 5 intentos** — Tras 5 intentos fallidos de reconexión, el cliente deja de intentarlo.
@@ -443,6 +443,6 @@ Si no se adjunta ningún controlador, estos se registran como una advertencia. A
 
 ## Próximos pasos
 
-- [Client SDK](/docs/sdk) — Referencia completa del SDK, incluidos los descriptores de acceso tipados a colecciones.
+- [SDK tipado](/docs/sdk) — Referencia completa del SDK, incluidos los descriptores de acceso tipados a colecciones.
 - [Autenticación](/docs/backend/authentication) — Configuración de autenticación JWT y políticas RLS.
 - [Arquitectura del backend](/docs/backend) — Descripción general de la arquitectura del servidor Rebase.

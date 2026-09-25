@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f143b9dd11e44cb
+sourceHash: e2d86104205efd30
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -374,9 +374,9 @@ les redémarrages et les redéploiements ; `{ "enabled": null }` rend la tâche 
 passe quand l'une d'elles ne le peut pas, est décrit dans
 [Cron entre plusieurs instances](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
 
-## SDK Client
+## SDK typé
 
-Le SDK client Rebase expose un espace de noms `cron` pour toutes les opérations :
+Le SDK typé de Rebase expose un espace de noms `cron` pour toutes les opérations :
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";

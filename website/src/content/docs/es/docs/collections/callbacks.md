@@ -1,5 +1,5 @@
 ---
-sourceHash: a45467350cfc4cad
+sourceHash: da1aaf2e9e970fb5
 title: Callbacks de entidades
 sidebar_label: Callbacks
 description: Usa callbacks de ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -191,7 +191,7 @@ beforeSave: async ({ values }) => {
 ```
 
 :::note
-Impórtalo desde `@rebasepro/types`, no desde `@rebasepro/server`. Un archivo de colección se comparte con el frontend — la compilación Vite del panel de administración lee este mismo directorio —, por lo que solo puede importar paquetes que se ejecuten en un navegador. `RebaseApiError` es el seguro para el navegador, y es la misma clase que lanza el SDK del cliente.
+Impórtalo desde `@rebasepro/types`, no desde `@rebasepro/server`. Un archivo de colección se comparte con el frontend — la compilación Vite del panel de administración lee este mismo directorio —, por lo que solo puede importar paquetes que se ejecuten en un navegador. `RebaseApiError` es el seguro para el navegador, y es la misma clase que lanza el SDK tipado.
 :::
 
 ### `afterSave`

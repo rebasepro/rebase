@@ -1,5 +1,5 @@
 ---
-sourceHash: 21b1ae6712a17e38
+sourceHash: 925edb3f8c355de4
 title: Backend-Übersicht
 sidebar_label: Backend
 description: Das Rebase-Backend bietet einen vollständigen Server mit REST-API, Authentifizierung, Storage, WebSocket-Echtzeit und Entitätshistorie – alles initialisiert mit einem einzigen Funktionsaufruf.
@@ -268,7 +268,7 @@ Der WebSocket-Server dockt an denselben HTTP-Server an und bietet Echtzeit-Abonn
 
 - **Collection-Änderungen** abonnieren — Benachrichtigungen erhalten, wenn eine beliebige Entität in einer Collection erstellt, aktualisiert oder gelöscht wird
 - **Entitätsänderungen** abonnieren — Benachrichtigungen erhalten, wenn sich eine bestimmte Entität ändert
-- Automatisches **Reconnection**-Handling im Client-SDK
+- Automatisches **Reconnection**-Handling im typisierten SDK
 
 Das Backend verwendet intern PostgreSQL `LISTEN/NOTIFY`. Geben Sie für Multi-Instanz-Deployments einen `connectionString` in Ihrem `PostgresBootstrapper` an, um instanzübergreifendes Broadcasting zu aktivieren.
 
@@ -295,7 +295,7 @@ Jeder Fehler – von jeder Route, in jedem Subsystem – wird in einem einheitli
 
 Der HTTP-Status befindet sich auf der Response, nicht im Body. Verzweigen Sie basierend auf `code`, nicht auf `message` – Meldungen sind für Menschen geschrieben und können sich ändern.
 
-Das Client-SDK wandelt jeden dieser Fehler in einen `RebaseApiError` um, der `status`, `code` und `details` enthält – einschließlich der Fehler, die den Server gar nicht erst erreicht haben. Eine abgewiesene Verbindung, ein DNS-Fehler, CORS oder ein Verbindungsabbruch kommen als `status: 0`, `code: "NETWORK_ERROR"` an, wobei der Fehler der Runtime selbst unter `cause` liegt, anstatt als beliebiger Fehler, mit dem `fetch` gerade abbrechen wollte. Daher fängt Anwendungscode eine einzige Klasse ab:
+Das typisierte SDK wandelt jeden dieser Fehler in einen `RebaseApiError` um, der `status`, `code` und `details` enthält – einschließlich der Fehler, die den Server gar nicht erst erreicht haben. Eine abgewiesene Verbindung, ein DNS-Fehler, CORS oder ein Verbindungsabbruch kommen als `status: 0`, `code: "NETWORK_ERROR"` an, wobei der Fehler der Runtime selbst unter `cause` liegt, anstatt als beliebiger Fehler, mit dem `fetch` gerade abbrechen wollte. Daher fängt Anwendungscode eine einzige Klasse ab:
 
 ```typescript
 async function setPrice(id: string, price: number) {

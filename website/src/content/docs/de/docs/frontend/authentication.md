@@ -1,5 +1,5 @@
 ---
-sourceHash: 90e2137462c112d2
+sourceHash: 8d1a98886641537e
 title: Authentifizierung & Anmeldung
 sidebar_label: Authentifizierung & Anmeldung
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
@@ -106,4 +106,4 @@ effectiveRoleController.setEffectiveRole("editor");
 
 - **[Backend-Authentifizierung](/docs/backend/authentication)** — JWT, OAuth-Anbieter, SMTP-Konfiguration
 - **[Sicherheitsregeln (RLS)](/docs/collections/security-rules)** — Zugriffskontrolle auf Zeilenebene (Row-Level Security) pro Collection
-- **[Client-SDK-Authentifizierung](/docs/sdk/authentication)** — Programmatische Authentifizierungsmethoden
+- **[Authentifizierung im typisierten SDK](/docs/sdk/authentication)** — Programmatische Authentifizierungsmethoden

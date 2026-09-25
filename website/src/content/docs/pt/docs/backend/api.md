@@ -1,5 +1,5 @@
 ---
-sourceHash: 862b9b1d6de22bdd
+sourceHash: 82e083381f34098d
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -416,7 +416,7 @@ pela interface pareceria uma falha no deploy.
 
 As rotas adicionam seus próprios códigos mais específicos sobre estes (`EMAIL_EXISTS`,
 `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), portanto considere a lista de códigos
-como aberta. O SDK do cliente converte todos eles em um único `RebaseApiError` contendo
+como aberta. O SDK tipado converte todos eles em um único `RebaseApiError` contendo
 `status`, `code` e `details` — veja
 [Tratamento de erros](/docs/backend#error-handling).
 
@@ -568,6 +568,6 @@ fica em `GET /api/docs`, com o Swagger UI em `/api/swagger` quando
 
 ## Próximos passos
 
-- **[SDK do Cliente](/docs/sdk)** — Cliente com tipagem estática (type-safe) para a API REST
+- **[SDK tipado](/docs/sdk)** — Cliente com tipagem estática (type-safe) para a API REST
 - **[Coleções](/docs/collections)** — Defina o schema dos seus dados
 - **[Regras de Segurança (RLS)](/docs/collections/security-rules)** — Controle o acesso por linha

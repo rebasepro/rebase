@@ -105,4 +105,4 @@ effectiveRoleController.setEffectiveRole("editor");
 
 - **[Backend Authentication](/docs/backend/authentication)** — JWT, OAuth providers, SMTP configuration
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Row-level access control per collection
-- **[Client SDK Authentication](/docs/sdk/authentication)** — Programmatic auth methods
+- **[Typed SDK Authentication](/docs/sdk/authentication)** — Programmatic auth methods

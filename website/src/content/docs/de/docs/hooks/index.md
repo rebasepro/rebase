@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ed2b6947b459eef
+sourceHash: 69847a513d72f4a9
 title: Hooks-Referenz
 sidebar_label: Hooks
 description: React-Hooks, die von Rebase bereitgestellt werden, um auf Authentifizierung, Daten, Navigation, Seitenfenster, Speicher und UI-Zustand zuzugreifen.
@@ -424,7 +424,7 @@ function CategorySelector({ onSelect }) {
 
 ## `useRebaseClient`
 
-Holt die zugrunde liegende Client-SDK-Instanz (`RebaseClient`) aus dem React-Kontext. Nützlich, um innerhalb Ihrer Komponenten rohe SDK-Operationen auszuführen — etwa eigene Endpunkte aufzurufen oder manuell hochzuladen.
+Holt die zugrunde liegende Instanz des typisierten SDK (`RebaseClient`) aus dem React-Kontext. Nützlich, um innerhalb Ihrer Komponenten rohe SDK-Operationen auszuführen — etwa eigene Endpunkte aufzurufen oder manuell hochzuladen.
 
 ```typescript
 import { useRebaseClient } from "@rebasepro/app";
@@ -555,4 +555,4 @@ function AnalyticsLogger() {
 ## Nächste Schritte
 
 - **[Frontend-Übersicht](/docs/frontend)** — React-Framework-Referenz
-- **[Client SDK](/docs/sdk)** — SDK für Datenoperationen
+- **[Typisiertes SDK](/docs/sdk)** — SDK für Datenoperationen

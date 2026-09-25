@@ -346,7 +346,7 @@ something you ask for:
 
 ## Fetching Relations in the SDK
 
-When querying data through the Rebase Client SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
+When querying data through the Rebase typed SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
 
 ### Include specific relations
 
@@ -395,7 +395,7 @@ for (const article of data) {
 
 > The relation names passed to `include()` must match the `relationName` defined in the collection's `relations` array.
 
-For the full query builder reference (filtering, sorting, pagination, real-time), see the [Client SDK documentation](/docs/sdk).
+For the full query builder reference (filtering, sorting, pagination, real-time), see the [typed SDK documentation](/docs/sdk).
 
 ## Relations in the admin panel
 

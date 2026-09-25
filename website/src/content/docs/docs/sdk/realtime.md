@@ -1,12 +1,12 @@
 ---
 title: Realtime Subscriptions
 sidebar_label: Realtime
-description: Subscribe to live data changes with the Rebase Client SDK using WebSocket-based realtime listeners.
+description: Subscribe to live data changes with the Rebase typed SDK using WebSocket-based realtime listeners.
 ---
 
 ## Overview
 
-The Rebase Client SDK provides real-time data subscriptions via WebSocket. When records change on the server, your subscribed callbacks fire immediately with the updated data.
+The Rebase typed SDK provides real-time data subscriptions via WebSocket. When records change on the server, your subscribed callbacks fire immediately with the updated data.
 
 The WebSocket connection is established automatically when a `websocketUrl` is available (derived from `baseUrl` by default). Reconnection and token refresh are handled transparently.
 

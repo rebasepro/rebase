@@ -134,7 +134,7 @@ const { data: posts } = await rebase.data.collection("posts").find({
 ```
 
 - [REST API](/docs/backend/api/) — the endpoint shapes, filters and errors
-- [Client SDK](/docs/sdk/) — querying, auth, realtime, storage
+- [Typed SDK](/docs/sdk/) — querying, auth, realtime, storage
 - `/api/docs` and `/api/swagger` — the OpenAPI document and its viewer, served
   by the running backend once it has a collection. A project with none serves
   neither: the document is generated from the collections, so there is nothing

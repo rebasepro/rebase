@@ -1,13 +1,13 @@
 ---
-sourceHash: f49369700dcdc098
+sourceHash: 4b38a4ca87f38dc7
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
-description: Inscreva-se em alterações de dados em tempo real com o Rebase Client SDK usando listeners em tempo real baseados em WebSocket.
+description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
 ---
 
 ## Visão Geral
 
-O Rebase Client SDK fornece subscrições de dados em tempo real via WebSocket. Quando registros são alterados no servidor, seus callbacks inscritos são disparados imediatamente com os dados atualizados.
+O SDK tipado do Rebase fornece subscrições de dados em tempo real via WebSocket. Quando registros são alterados no servidor, seus callbacks inscritos são disparados imediatamente com os dados atualizados.
 
 A conexão WebSocket é estabelecida automaticamente quando uma `websocketUrl` está disponível (derivada de `baseUrl` por padrão). A reconexão e a atualização de tokens são tratadas de forma transparente.
 

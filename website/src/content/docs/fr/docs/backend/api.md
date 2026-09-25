@@ -1,5 +1,5 @@
 ---
-sourceHash: 862b9b1d6de22bdd
+sourceHash: 82e083381f34098d
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.
@@ -348,7 +348,7 @@ Chaque échec, quelle que soit la route, est renvoyé dans une enveloppe unique 
 
 Une surface absente parce que ce déploiement ne l'a pas activée renvoie un code 501 avec un code et une raison, et non un 404 — un 404 inexpliqué sur une route que l'interface vient d'appeler évoquerait un déploiement défectueux.
 
-Les routes ajoutent leurs propres codes plus spécifiques en plus de ceux-ci (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), considérez donc la liste des codes comme évolutive. Le SDK client les convertit tous en une unique `RebaseApiError` contenant `status`, `code` et `details` — voir [Gestion des erreurs](/docs/backend#error-handling).
+Les routes ajoutent leurs propres codes plus spécifiques en plus de ceux-ci (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), considérez donc la liste des codes comme évolutive. Le SDK typé les convertit tous en une unique `RebaseApiError` contenant `status`, `code` et `details` — voir [Gestion des erreurs](/docs/backend#error-handling).
 
 ## Recherche textuelle
 
@@ -480,6 +480,6 @@ Pour connaître la forme des points de terminaison plutôt que le schéma sous-j
 
 ## Prochaines étapes
 
-- **[SDK Client](/docs/sdk)** — Client typé pour l'API REST
+- **[SDK typé](/docs/sdk)** — Client typé pour l'API REST
 - **[Collections](/docs/collections)** — Définissez votre schéma de données
 - **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — Contrôlez l'accès ligne par ligne

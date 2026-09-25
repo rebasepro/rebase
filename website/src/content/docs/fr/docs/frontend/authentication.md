@@ -1,5 +1,5 @@
 ---
-sourceHash: 90e2137462c112d2
+sourceHash: 8d1a98886641537e
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
@@ -106,4 +106,4 @@ effectiveRoleController.setEffectiveRole("editor");
 
 - **[Authentification backend](/docs/backend/authentication)** — JWT, fournisseurs OAuth, configuration SMTP
 - **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — Contrôle d'accès au niveau des lignes (row-level) par collection
-- **[Authentification du SDK Client](/docs/sdk/authentication)** — Méthodes d'authentification programmatiques
+- **[Authentification du SDK typé](/docs/sdk/authentication)** — Méthodes d'authentification programmatiques

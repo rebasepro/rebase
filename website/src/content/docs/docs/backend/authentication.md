@@ -562,4 +562,4 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — bringing your own identity provider
 - **[Frontend Authentication](/docs/frontend/authentication/)** — login UI, auth controller, user management
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — row-level access control
-- **[Client SDK Authentication](/docs/sdk/authentication/)** — auth methods in the client SDK
+- **[Typed SDK Authentication](/docs/sdk/authentication/)** — auth methods in the typed SDK

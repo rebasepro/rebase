@@ -96,11 +96,11 @@ is omitted entirely when the account cannot be re-read, so treat it as optional
 there, and `providerId` is always `password` however the session was first
 created.
 
-:::caution[The client SDK flattens this envelope — raw HTTP does not]
+:::caution[The typed SDK flattens this envelope — raw HTTP does not]
 The JSON above is the wire format, and it is what `fetch("/api/auth/login")`
 returns: the token lives at **`body.tokens.accessToken`**.
 
-The [client SDK](/docs/sdk/authentication) unwraps `tokens` before it hands the
+The [typed SDK](/docs/sdk/authentication) unwraps `tokens` before it hands the
 session back, so `auth.signInWithEmail()` resolves to a flattened
 **`{ user, accessToken, refreshToken }`** instead.
 
@@ -336,4 +336,4 @@ To prevent timing attacks, Rebase validates both the user-configured service key
 - **[Authentication](/docs/backend/authentication/)** — the configuration these routes come from
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — replacing the provider behind them
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — what a policy does with `rebase.uid()`
-- **[Client SDK Authentication](/docs/sdk/authentication/)** — calling these routes from the SDK
+- **[Typed SDK Authentication](/docs/sdk/authentication/)** — calling these routes from the SDK

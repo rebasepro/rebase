@@ -1,8 +1,8 @@
 ---
-sourceHash: fa7350988287074c
+sourceHash: 65b97b80de0b2704
 title: Architektur-Überblick
 sidebar_label: Architektur
-description: Erfahren Sie, wie Backend, Frontend, Client-SDK und Datenbank von Rebase ineinandergreifen, um ein vollständiges Backend-as-a-Service zu bilden.
+description: Erfahren Sie, wie Backend, Frontend, typisiertes SDK und Datenbank von Rebase ineinandergreifen, um ein vollständiges Backend-as-a-Service zu bilden.
 ---
 
 ## Systemarchitektur
@@ -76,7 +76,7 @@ Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie kön
 |-------|-------|---------------|
 | `@rebasepro/types` | TypeScript-Schnittstellen für Collections, Eigenschaften, Entitäten, Plugins | Alles |
 | `@rebasepro/server` | Backend-Server-Initialisierung, REST-API, Auth, Storage, WebSocket | Backend |
-| `@rebasepro/client` | Client-SDK – HTTP-Transport, WebSocket, Auth | Frontend |
+| `@rebasepro/client` | Typisiertes SDK – HTTP-Transport, WebSocket, Auth | Frontend |
 | `@rebasepro/app` | React-Framework – Scaffold, Controller, Formulare, Routen, Hooks | Frontend |
 | `@rebasepro/ui` | Eigenständige UI-Komponentenbibliothek (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/app` | Login-Ansichten, Auth-Controller-Hooks, Benutzerverwaltung | Frontend |
@@ -91,7 +91,7 @@ Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie kön
 
 ### Leseablauf
 1. Benutzer öffnet eine Collection im Rebase CMS
-2. Client-SDK sendet `GET /api/data/:slug` + öffnet ein WebSocket-Abonnement
+2. Typisiertes SDK sendet `GET /api/data/:slug` + öffnet ein WebSocket-Abonnement
 3. Backend fragt PostgreSQL über Drizzle ORM ab
 4. Daten-Transformer deserialisiert Datenbankdatensätze in das Entitätsformat
 5. Antwort wird an das Frontend gesendet, Komponenten rendern
@@ -100,7 +100,7 @@ Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie kön
 ### Schreibablauf
 1. Benutzer bearbeitet eine Entität im Formular
 2. `beforeSave`-Callbacks werden ausgeführt (Validierung, Transformation)
-3. Client-SDK sendet `PATCH /api/data/:slug/:id`
+3. Typisiertes SDK sendet `PATCH /api/data/:slug/:id`
 4. Backend serialisiert Werte, führt Drizzle-`UPDATE` aus
 5. `afterSave`-Callbacks werden ausgeführt (Nebeneffekte)
 6. `NOTIFY`-Broadcast löst ein WebSocket-Update an alle Clients aus

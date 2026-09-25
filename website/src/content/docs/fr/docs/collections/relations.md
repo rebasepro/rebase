@@ -1,5 +1,5 @@
 ---
-sourceHash: b0070dc1781e9f2d
+sourceHash: cbee90067ba8da67
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -355,7 +355,7 @@ personne — un slug, une référence produit — pour que les pointeurs la suiv
 
 ## Récupération des Relations dans le SDK
 
-Lors de l'interrogation de données via le SDK client Rebase, les relations ne sont **pas** incluses par défaut. Utilisez la méthode `include()` pour demander les entités liées en même temps que les données primaires.
+Lors de l'interrogation de données via le SDK typé de Rebase, les relations ne sont **pas** incluses par défaut. Utilisez la méthode `include()` pour demander les entités liées en même temps que les données primaires.
 
 ### Inclure des relations spécifiques
 
@@ -404,7 +404,7 @@ for (const article of data) {
 
 > Les noms de relation passés à `include()` doivent correspondre au `relationName` défini dans le tableau `relations` de la collection.
 
-Pour la référence complète du constructeur de requêtes (filtrage, tri, pagination, temps réel), consultez la [documentation du SDK client](/docs/sdk).
+Pour la référence complète du constructeur de requêtes (filtrage, tri, pagination, temps réel), consultez la [documentation du SDK typé](/docs/sdk).
 
 ## Les relations dans le panneau d'administration
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 90e2137462c112d2
+sourceHash: 8d1a98886641537e
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -106,4 +106,4 @@ effectiveRoleController.setEffectiveRole("editor");
 
 - **[Autenticación en el backend](/docs/backend/authentication)** — JWT, proveedores de OAuth, configuración de SMTP
 - **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — Control de acceso a nivel de fila por colección
-- **[Autenticación del SDK de cliente](/docs/sdk/authentication)** — Métodos de autenticación programática
+- **[Autenticación del SDK tipado](/docs/sdk/authentication)** — Métodos de autenticación programática

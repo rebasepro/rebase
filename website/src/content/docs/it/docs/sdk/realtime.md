@@ -1,13 +1,13 @@
 ---
-sourceHash: f49369700dcdc098
+sourceHash: 4b38a4ca87f38dc7
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
-description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK Rebase Client utilizzando listener realtime basati su WebSocket.
+description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
 ---
 
 ## Panoramica
 
-L'SDK Rebase Client fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback a cui ti sei iscritto vengono eseguiti immediatamente con i dati aggiornati.
+L'SDK tipizzato di Rebase fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback a cui ti sei iscritto vengono eseguiti immediatamente con i dati aggiornati.
 
 La connessione WebSocket viene stabilita automaticamente quando è disponibile un `websocketUrl` (derivato da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento del token vengono gestiti in modo trasparente.
 

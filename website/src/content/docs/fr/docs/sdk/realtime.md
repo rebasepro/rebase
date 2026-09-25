@@ -1,13 +1,13 @@
 ---
-sourceHash: f49369700dcdc098
+sourceHash: 4b38a4ca87f38dc7
 title: Abonnements en temps réel
 sidebar_label: Temps réel
-description: Abonnez-vous aux modifications de données en direct avec le SDK Rebase Client à l'aide d'écouteurs en temps réel basés sur WebSocket.
+description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
 ---
 
 ## Vue d'ensemble
 
-Le SDK Rebase Client fournit des abonnements aux données en temps réel via WebSocket. Lorsque des enregistrements changent sur le serveur, vos rappels (callbacks) abonnés se déclenchent immédiatement avec les données mises à jour.
+Le SDK typé de Rebase fournit des abonnements aux données en temps réel via WebSocket. Lorsque des enregistrements changent sur le serveur, vos rappels (callbacks) abonnés se déclenchent immédiatement avec les données mises à jour.
 
 La connexion WebSocket est établie automatiquement lorsqu'une `websocketUrl` est disponible (dérivée de `baseUrl` par défaut). La reconnexion et le rafraîchissement des jetons sont gérés de manière transparente.
 

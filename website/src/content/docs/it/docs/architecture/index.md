@@ -1,8 +1,8 @@
 ---
-sourceHash: fa7350988287074c
+sourceHash: 65b97b80de0b2704
 title: Panoramica dell'architettura
 sidebar_label: Architettura
-description: Scopri come il backend, il frontend, l'SDK client e il database di Rebase si integrano per formare un Backend-as-a-Service completo.
+description: Scopri come il backend, il frontend, l'SDK tipizzato e il database di Rebase si integrano per formare un Backend-as-a-Service completo.
 ---
 
 ## Architettura del sistema
@@ -76,7 +76,7 @@ Analogamente ai driver, i backend di storage sono registrati all'interno di un r
 |-----------|-------|---------------|
 | `@rebasepro/types` | Interfacce TypeScript per collezioni, proprietà, entità, plugin | Tutto |
 | `@rebasepro/server` | Inizializzazione del server backend, API REST, auth, storage, WebSocket | Backend |
-| `@rebasepro/client` | SDK Client — Trasporto HTTP, WebSocket, auth | Frontend |
+| `@rebasepro/client` | SDK tipizzato — Trasporto HTTP, WebSocket, auth | Frontend |
 | `@rebasepro/app` | Framework React — Scaffold, controller, form, route, hook | Frontend |
 | `@rebasepro/ui` | Libreria standalone di componenti UI (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/app` | Viste di login, hook per i controller di autenticazione, gestione utenti | Frontend |
@@ -91,7 +91,7 @@ Analogamente ai driver, i backend di storage sono registrati all'interno di un r
 
 ### Flusso di lettura
 1. L'utente apre una collezione in Rebase CMS
-2. L'SDK Client invia `GET /api/data/:slug` e apre una sottoscrizione WebSocket
+2. L'SDK tipizzato invia `GET /api/data/:slug` e apre una sottoscrizione WebSocket
 3. Il backend interroga PostgreSQL tramite Drizzle ORM
 4. Il trasformatore di dati deserializza i record del database nel formato entità
 5. La risposta viene inviata al frontend, i componenti eseguono il rendering
@@ -100,7 +100,7 @@ Analogamente ai driver, i backend di storage sono registrati all'interno di un r
 ### Flusso di scrittura
 1. L'utente modifica un'entità nel form
 2. Vengono eseguiti i callback `beforeSave` (validazione, trasformazione)
-3. L'SDK Client invia `PATCH /api/data/:slug/:id`
+3. L'SDK tipizzato invia `PATCH /api/data/:slug/:id`
 4. Il backend serializza i valori, esegue l'`UPDATE` di Drizzle
 5. Vengono eseguiti i callback `afterSave` (effetti collaterali)
 6. La trasmissione del `NOTIFY` attiva l'aggiornamento WebSocket su tutti i client

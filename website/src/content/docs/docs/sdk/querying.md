@@ -1,7 +1,7 @@
 ---
 title: Querying Data
 sidebar_label: Querying Data
-description: CRUD operations, fluent query builder, filter operators, sorting, column selection and aggregates with the Rebase Client SDK.
+description: CRUD operations, fluent query builder, filter operators, sorting, column selection and aggregates with the Rebase typed SDK.
 ---
 
 ## Accessing Collections

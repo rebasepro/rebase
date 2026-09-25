@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b130367f73c18c5
+sourceHash: 42389d34a3b37766
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -97,11 +97,11 @@ est totalement omis lorsque le compte ne peut pas être relu, considérez-le don
 ici, et `providerId` vaut toujours `password`, quelle que soit la façon dont la session
 a été créée initialement.
 
-:::caution[Le SDK client aplatit cette enveloppe — le protocole HTTP brut ne le fait pas]
+:::caution[Le SDK typé aplatit cette enveloppe — le protocole HTTP brut ne le fait pas]
 Le JSON ci-dessus est le format réseau, et c'est ce que renvoie `fetch("/api/auth/login")` :
 le jeton se trouve dans **`body.tokens.accessToken`**.
 
-Le [SDK client](/docs/sdk/authentication) déballe `tokens` avant de restituer la
+Le [SDK typé](/docs/sdk/authentication) déballe `tokens` avant de restituer la
 session, de sorte que `auth.signInWithEmail()` se résout plutôt en un objet aplati
 **`{ user, accessToken, refreshToken }`**.
 
@@ -337,4 +337,4 @@ Pour prévenir les attaques temporelles (timing attacks), Rebase valide la clé 
 - **[Authentication](/docs/backend/authentication/)** — la configuration dont sont issues ces routes
 - **[Adaptateurs d'authentification personnalisés](/docs/backend/auth-adapters/)** — remplacer le fournisseur sous-jacent
 - **[Règles de sécurité (RLS)](/docs/collections/security-rules/)** — ce qu'une politique fait avec `rebase.uid()`
-- **[Authentification avec le SDK client](/docs/sdk/authentication/)** — appeler ces routes depuis le SDK
+- **[Authentification avec le SDK typé](/docs/sdk/authentication/)** — appeler ces routes depuis le SDK

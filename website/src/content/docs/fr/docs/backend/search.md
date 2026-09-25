@@ -1,5 +1,5 @@
 ---
-sourceHash: 7047b4fd73bde89d
+sourceHash: b40aeb5aa87322cc
 title: Recherche
 sidebar_label: Recherche
 description: Comment .search() se comporte par défaut, et comment activer la recherche en texte intégral classée par pertinence sur les champs de votre choix pour une collection Postgres — y compris les contenus JSONB et tableaux.
@@ -223,4 +223,4 @@ Le bloc `search` est réservé à Postgres et est rejeté au démarrage sur les 
 
 - [REST API](/docs/backend/api/) — les paramètres de requête sous lesquels une recherche parvient au serveur
 - [Indexes](/docs/backend/indexes/) — ce que le bloc search crée, et ce qu'il coûte
-- [Querying Data](/docs/sdk/querying/) — effectuer des recherches depuis le SDK client
+- [Querying Data](/docs/sdk/querying/) — effectuer des recherches depuis le SDK typé

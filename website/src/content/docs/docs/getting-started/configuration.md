@@ -42,7 +42,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL for the client SDK. **Set this in development only** — see below. | page origin |
+| `VITE_API_URL` | Backend API URL for the typed SDK. **Set this in development only** — see below. | page origin |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID. Enables "Sign in with Google". | — |
 
 

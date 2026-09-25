@@ -1,8 +1,8 @@
 ---
-sourceHash: fa7350988287074c
+sourceHash: 65b97b80de0b2704
 title: Visão Geral da Arquitetura
 sidebar_label: Arquitetura
-description: Entenda como o backend, frontend, SDK do cliente e banco de dados do Rebase se integram para formar um Backend-as-a-Service completo.
+description: Entenda como o backend, frontend, SDK tipado e banco de dados do Rebase se integram para formar um Backend-as-a-Service completo.
 ---
 
 ## Arquitetura do Sistema
@@ -76,7 +76,7 @@ Assim como os drivers, os backends de armazenamento são registrados em um regis
 |---------|------|---------|
 | `@rebasepro/types` | Interfaces TypeScript para coleções, propriedades, entidades, plugins | Tudo |
 | `@rebasepro/server` | Inicialização do servidor backend, API REST, autenticação, armazenamento, WebSocket | Backend |
-| `@rebasepro/client` | SDK do cliente — transporte HTTP, WebSocket, autenticação | Frontend |
+| `@rebasepro/client` | SDK tipado — transporte HTTP, WebSocket, autenticação | Frontend |
 | `@rebasepro/app` | Framework React — Scaffold, controladores, formulários, rotas, hooks | Frontend |
 | `@rebasepro/ui` | Biblioteca de componentes de UI independente (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/app` | Telas de login, hooks de controlador de autenticação, gerenciamento de usuários | Frontend |
@@ -91,7 +91,7 @@ Assim como os drivers, os backends de armazenamento são registrados em um regis
 
 ### Fluxo de Leitura
 1. O usuário abre uma coleção no Rebase CMS
-2. O SDK do cliente envia `GET /api/data/:slug` + abre uma assinatura WebSocket
+2. O SDK tipado envia `GET /api/data/:slug` + abre uma assinatura WebSocket
 3. O backend consulta o PostgreSQL via Drizzle ORM
 4. O transformador de dados desserializa os registros do banco de dados no formato de entidade
 5. A resposta é enviada para o frontend, os componentes são renderizados
@@ -100,7 +100,7 @@ Assim como os drivers, os backends de armazenamento são registrados em um regis
 ### Fluxo de Escrita
 1. O usuário edita uma entidade no formulário
 2. Os callbacks `beforeSave` são executados (validação, transformação)
-3. O SDK do cliente envia `PATCH /api/data/:slug/:id`
+3. O SDK tipado envia `PATCH /api/data/:slug/:id`
 4. O backend serializa os valores, executa o `UPDATE` do Drizzle
 5. Os callbacks `afterSave` são executados (efeitos colaterais)
 6. A transmissão via `NOTIFY` aciona a atualização do WebSocket para todos os clientes

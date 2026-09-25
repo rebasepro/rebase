@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f87252e9cdbf780
+sourceHash: 827d73a898f837eb
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -164,7 +164,7 @@ Führen Sie `doctor` aus, wann immer sich etwas nicht synchron anfühlt. Es zeig
 
 ### `rebase generate-sdk`
 
-Generieren Sie ein typisiertes Client-SDK aus Ihren Collection-Definitionen:
+Generieren Sie ein typisiertes SDK aus Ihren Collection-Definitionen:
 
 ```bash
 rebase generate-sdk
@@ -252,4 +252,4 @@ rebase db migrate
 
 - **[Collections](/docs/collections)** — Definieren Sie Ihr Datenmodell
 - **[CLI-Referenz](/docs/cli)** — Alle CLI-Befehle
-- **[Client-SDK](/docs/sdk)** — Verwenden Sie das generierte SDK
+- **[Typisiertes SDK](/docs/sdk)** — Verwenden Sie das generierte SDK

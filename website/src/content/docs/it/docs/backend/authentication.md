@@ -1,5 +1,5 @@
 ---
-sourceHash: 3c10e2e8a92e2f64
+sourceHash: 887e286667dfa3eb
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -424,4 +424,4 @@ Quando vengono chiamati hook personalizzati (`onCreateUser`, `onResetPassword`),
 - **[Adapter di autenticazione personalizzati](/docs/backend/auth-adapters/)** — integrazione del proprio identity provider
 - **[Autenticazione frontend](/docs/frontend/authentication/)** — interfaccia utente di login, controller di autenticazione, gestione utenti
 - **[Regole di sicurezza (RLS)](/docs/collections/security-rules/)** — controllo degli accessi a livello di riga
-- **[Autenticazione client SDK](/docs/sdk/authentication/)** — metodi di autenticazione nell'SDK client
+- **[Autenticazione con l'SDK tipizzato](/docs/sdk/authentication/)** — metodi di autenticazione nell'SDK tipizzato

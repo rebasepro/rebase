@@ -1,8 +1,8 @@
 ---
-sourceHash: 9512a14f5c723020
+sourceHash: d5b5674d44477d40
 title: Interroger les données
 sidebar_label: Interroger les données
-description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK client Rebase.
+description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé de Rebase.
 ---
 
 ## Accéder aux collections

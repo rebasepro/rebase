@@ -1,5 +1,5 @@
 ---
-sourceHash: da709fdddc946e75
+sourceHash: dac64afe647bf1b0
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.
@@ -14,7 +14,7 @@ Die Realtime-Pipeline besteht aus drei Stufen:
 
 1. **Datenbank-Trigger** – Eine Mutation trifft auf die PostgreSQL-Datenbank (über REST-API, SDK oder Studio).
 2. **Server-Fan-out** – Der Rebase-Server erkennt die Änderung und verteilt sie (Fan-out) an jedes aktive WebSocket-Abonnement, das der betroffenen Collection oder Entität entspricht.
-3. **Client-Callback** – Das Client-SDK ruft Ihren `onUpdate`-Callback mit den aktuellen Daten auf.
+3. **Client-Callback** – Das typisierte SDK ruft Ihren `onUpdate`-Callback mit den aktuellen Daten auf.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -31,9 +31,9 @@ Realtime ist standardmäßig aktiviert. Es muss kein Flag gesetzt oder ein Diens
 
 > Standardmäßig gibt Rebase auch Realtime-Events für Schreibvorgänge aus, die **außerhalb** der API getätigt werden (über `psql`, einen anderen Dienst oder den SQL-Editor von Studio), sofern die Datenbankverbindung dies unterstützt – siehe [Change Capture auf Datenbankebene (CDC)](#change-capture-auf-datenbankebene-cdc).
 
-## Client-SDK-Abonnements
+## Abonnements im typisierten SDK
 
-Das Rebase-Client-SDK stellt für jeden Collection-Accessor zwei Abonnement-Methoden bereit:
+Das typisierte SDK von Rebase stellt für jeden Collection-Accessor zwei Abonnement-Methoden bereit:
 
 - **`listen()`** — Eine gesamte Collection abonnieren (mit optionalen Filtern).
 - **`listenById()`** — Eine einzelne Entität anhand ihrer ID abonnieren.
@@ -329,7 +329,7 @@ Veraltete Presences werden nach 30 Sekunden Inaktivität automatisch bereinigt.
 
 ## Automatische Wiederverbindung (Auto-Reconnect)
 
-Das Client-SDK verbindet sich automatisch wieder, wenn die WebSocket-Verbindung unterbrochen wird:
+Das typisierte SDK verbindet sich automatisch wieder, wenn die WebSocket-Verbindung unterbrochen wird:
 
 - **Exponentieller Backoff** – Wiederverbindungsverzögerungen beginnen bei 1 Sekunde und verdoppeln sich bei jedem Versuch bis zu einem Maximum von 30 Sekunden.
 - **Maximal 5 Versuche** – Nach 5 fehlgeschlagenen Wiederverbindungsversuchen stellt der Client die Versuche ein.
@@ -443,6 +443,6 @@ Wenn kein Handler zugewiesen ist, werden diese als Warnung protokolliert. Frühe
 
 ## Nächste Schritte
 
-- [Client-SDK](/docs/sdk) — Vollständige SDK-Referenz einschließlich typisierter Collection-Accessors.
+- [Typisiertes SDK](/docs/sdk) — Vollständige SDK-Referenz einschließlich typisierter Collection-Accessors.
 - [Authentifizierung](/docs/backend/authentication) — JWT-Authentifizierung und RLS-Richtlinien einrichten.
 - [Backend-Architektur](/docs/backend) — Überblick über die Rebase-Serverarchitektur.

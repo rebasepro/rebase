@@ -338,4 +338,4 @@ matching; Firestore collections use the external text-search controller.
 
 - [REST API](/docs/backend/api/) — the query parameters a search reaches the server as
 - [Indexes](/docs/backend/indexes/) — what the search block creates, and what it costs
-- [Querying Data](/docs/sdk/querying/) — searching from the client SDK
+- [Querying Data](/docs/sdk/querying/) — searching from the typed SDK

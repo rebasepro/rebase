@@ -1,5 +1,5 @@
 ---
-sourceHash: 69d89e250dd512d5
+sourceHash: 19e4936be2af9792
 title: Schéma comme Code
 sidebar_label: Schéma comme Code
 description: Comment Rebase utilise les collections TypeScript comme source unique de vérité pour votre schéma de base de données, votre interface utilisateur et votre API.
@@ -12,7 +12,7 @@ Dans Rebase, vos **définitions de collections TypeScript sont la source unique 
 - **Tables PostgreSQL** via la génération de schéma Drizzle ORM
 - **Interface utilisateur CRUD** — formulaires, tables, validation, types de champs
 - **Points de terminaison d'API REST** avec filtrage, tri et pagination
-- **SDK client** — opérations de données sécurisées par le type
+- **SDK typé** — opérations de données sécurisées par le type
 - **Politiques RLS** — Sécurité au niveau des lignes dans Postgres
 
 Cela signifie que votre schéma est :

@@ -1,5 +1,5 @@
 ---
-sourceHash: b0070dc1781e9f2d
+sourceHash: cbee90067ba8da67
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -352,7 +352,7 @@ pueda editar — un slug, un SKU — para que los punteros la sigan.
 
 ## Obtención de Relaciones en el SDK
 
-Al consultar datos a través del SDK del Cliente Rebase, las relaciones **no** se incluyen por defecto. Usa el método `include()` para solicitar entidades relacionadas junto con los datos primarios.
+Al consultar datos a través del SDK tipado de Rebase, las relaciones **no** se incluyen por defecto. Usa el método `include()` para solicitar entidades relacionadas junto con los datos primarios.
 
 ### Incluir relaciones específicas
 
@@ -401,7 +401,7 @@ for (const article of data) {
 
 > Los nombres de relación pasados a `include()` deben coincidir con el `relationName` definido en el array `relations` de la colección.
 
-Para la referencia completa del constructor de consultas (filtrado, ordenación, paginación, en tiempo real), consulta la [documentación del SDK del Cliente](/docs/sdk).
+Para la referencia completa del constructor de consultas (filtrado, ordenación, paginación, en tiempo real), consulta la [documentación del SDK tipado](/docs/sdk).
 
 ## Relaciones en el panel de administración
 

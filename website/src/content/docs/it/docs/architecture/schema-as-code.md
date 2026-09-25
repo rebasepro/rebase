@@ -1,5 +1,5 @@
 ---
-sourceHash: 69d89e250dd512d5
+sourceHash: 19e4936be2af9792
 title: Schema come Codice
 sidebar_label: Schema come Codice
 description: Come Rebase utilizza le collezioni TypeScript come unica fonte di verità per lo schema del tuo database, l'interfaccia utente e l'API.
@@ -12,7 +12,7 @@ In Rebase, le tue **definizioni di collezione TypeScript sono l'unica fonte di v
 - **Tabelle PostgreSQL** tramite la generazione dello schema Drizzle ORM
 - **Interfaccia Utente CRUD** — moduli, tabelle, validazione, tipi di campo
 - Endpoint **API REST** con filtraggio, ordinamento e impaginazione
-- **SDK Client** — operazioni sui dati type-safe
+- **SDK tipizzato** — operazioni sui dati type-safe
 - **Politiche RLS** — Sicurezza a Livello di Riga in Postgres
 
 Ciò significa che il tuo schema è:

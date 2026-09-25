@@ -1,5 +1,5 @@
 ---
-sourceHash: da709fdddc946e75
+sourceHash: dac64afe647bf1b0
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -14,7 +14,7 @@ La pipeline realtime si articola in tre fasi:
 
 1. **Trigger del database** — Una mutazione raggiunge il database PostgreSQL (tramite API REST, SDK o Studio).
 2. **Fan-out del server** — Il server Rebase rileva la modifica e la distribuisce (fan-out) a ogni sottoscrizione WebSocket attiva corrispondente alla collezione o entità interessata.
-3. **Callback del client** — L'SDK del client attiva il callback `onUpdate` con i nuovi dati.
+3. **Callback del client** — L'SDK tipizzato attiva il callback `onUpdate` con i nuovi dati.
 
 ```
 ┌──────────────┐      ┌────────────────────┐      ┌──────────────┐
@@ -31,9 +31,9 @@ Il realtime è abilitato per impostazione predefinita. Non ci sono flag da attiv
 
 > Per impostazione predefinita, Rebase emette anche eventi realtime per le scritture effettuate **all'esterno** dell'API (tramite `psql`, un altro servizio o l'editor SQL di Studio) ogni volta che la connessione al database lo supporta — consulta [acquisizione delle modifiche a livello di database (CDC)](#acquisizione-delle-modifiche-a-livello-di-database-cdc).
 
-## Sottoscrizioni dell'SDK client
+## Sottoscrizioni dell'SDK tipizzato
 
-L'SDK client di Rebase espone due metodi di sottoscrizione su ciascun accessor di collezione:
+L'SDK tipizzato di Rebase espone due metodi di sottoscrizione su ciascun accessor di collezione:
 
 - **`listen()`** — Sottoscrive un'intera collezione (con filtri opzionali).
 - **`listenById()`** — Sottoscrive una singola entità tramite il suo ID.
@@ -329,7 +329,7 @@ Le presenze inattive vengono eliminate automaticamente dopo 30 secondi di inatti
 
 ## Riconnessione automatica
 
-L'SDK client si riconnette automaticamente in caso di caduta della connessione WebSocket:
+L'SDK tipizzato si riconnette automaticamente in caso di caduta della connessione WebSocket:
 
 - **Backoff esponenziale** — I ritardi di riconnessione partono da 1 secondo e raddoppiano a ogni tentativo, fino a un massimo di 30 secondi.
 - **Massimo 5 tentativi** — Dopo 5 tentativi di riconnessione non riusciti, il client smette di riprovare.
@@ -443,6 +443,6 @@ Senza alcun gestore collegato, questi errori vengono registrati nei log come avv
 
 ## Passaggi successivi
 
-- [Client SDK](/docs/sdk) — Documentazione completa dell'SDK inclusi gli accessor tipizzati per le collezioni.
+- [SDK tipizzato](/docs/sdk) — Documentazione completa dell'SDK inclusi gli accessor tipizzati per le collezioni.
 - [Authentication](/docs/backend/authentication) — Configura l'autenticazione JWT e i criteri RLS.
 - [Backend Architecture](/docs/backend) — Panoramica dell'architettura del server Rebase.

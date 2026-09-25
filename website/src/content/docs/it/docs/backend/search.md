@@ -1,5 +1,5 @@
 ---
-sourceHash: 7047b4fd73bde89d
+sourceHash: b40aeb5aa87322cc
 title: Ricerca
 sidebar_label: Ricerca
 description: Come si comporta .search() per impostazione predefinita e come abilitare la ricerca full-text con ranking per una collection Postgres sui campi specificati — inclusi contenuti JSONB e array.
@@ -223,4 +223,4 @@ Il blocco `search` è disponibile esclusivamente per Postgres e viene rifiutato 
 
 - [REST API](/docs/backend/api/) — i parametri di query con cui una ricerca raggiunge il server
 - [Indici](/docs/backend/indexes/) — cosa crea il blocco di ricerca e quanto costa
-- [Interrogazione dei dati](/docs/sdk/querying/) — come eseguire ricerche dall'SDK client
+- [Interrogazione dei dati](/docs/sdk/querying/) — come eseguire ricerche dall'SDK tipizzato

@@ -309,7 +309,7 @@ The WebSocket server attaches to the same HTTP server and provides real-time sub
 
 - Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
 - Subscribe to **entity changes** — get notified when a specific entity changes
-- Automatic **reconnection** handling in the client SDK
+- Automatic **reconnection** handling in the typed SDK
 
 The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deployments, provide a `connectionString` in your `PostgresBootstrapper` to enable cross-instance broadcasting.
 
@@ -337,7 +337,7 @@ Every failure — from any route, in any subsystem — comes back in one envelop
 The HTTP status is on the response, not in the body. Branch on `code`, not on
 `message` — messages are written for humans and are free to change.
 
-The client SDK turns every one of these into a `RebaseApiError` carrying
+The typed SDK turns every one of these into a `RebaseApiError` carrying
 `status`, `code` and `details` — including the failures that never reached a
 server at all. A refused connection, a DNS failure, CORS or an abort arrives as
 `status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,

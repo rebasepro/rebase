@@ -1,8 +1,8 @@
 ---
-sourceHash: fa7350988287074c
+sourceHash: 65b97b80de0b2704
 title: Aperçu de l'architecture
 sidebar_label: Architecture
-description: Comprenez comment le backend, le frontend, le SDK client et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.
+description: Comprenez comment le backend, le frontend, le SDK typé et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.
 ---
 
 ## Architecture du système
@@ -76,7 +76,7 @@ Tout comme les pilotes, les backends de stockage sont enregistrés dans un regis
 |---------|------|---------|
 | `@rebasepro/types` | Interfaces TypeScript pour les collections, propriétés, entités, plugins | Tout |
 | `@rebasepro/server` | Initialisation du serveur backend, API REST, authentification, stockage, WebSocket | Backend |
-| `@rebasepro/client` | SDK client — Transport HTTP, WebSocket, authentification | Frontend |
+| `@rebasepro/client` | SDK typé — Transport HTTP, WebSocket, authentification | Frontend |
 | `@rebasepro/app` | Framework React — Scaffold, contrôleurs, formulaires, routes, hooks | Frontend |
 | `@rebasepro/ui` | Bibliothèque de composants d'interface utilisateur autonome (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/app` | Vues de connexion, hooks de contrôleur d'authentification, gestion des utilisateurs | Frontend |
@@ -91,7 +91,7 @@ Tout comme les pilotes, les backends de stockage sont enregistrés dans un regis
 
 ### Flux de lecture
 1. L'utilisateur ouvre une collection dans Rebase CMS
-2. Le SDK client envoie `GET /api/data/:slug` + ouvre une souscription WebSocket
+2. Le SDK typé envoie `GET /api/data/:slug` + ouvre une souscription WebSocket
 3. Le backend interroge PostgreSQL via Drizzle ORM
 4. Le transformateur de données désérialise les enregistrements de la base de données au format entité
 5. La réponse est envoyée au frontend, les composants effectuent le rendu
@@ -100,7 +100,7 @@ Tout comme les pilotes, les backends de stockage sont enregistrés dans un regis
 ### Flux d'écriture
 1. L'utilisateur modifie une entité dans le formulaire
 2. Les callbacks `beforeSave` s'exécutent (validation, transformation)
-3. Le SDK client envoie `PATCH /api/data/:slug/:id`
+3. Le SDK typé envoie `PATCH /api/data/:slug/:id`
 4. Le backend sérialise les valeurs, exécute l'`UPDATE` Drizzle
 5. Les callbacks `afterSave` s'exécutent (effets secondaires)
 6. La diffusion `NOTIFY` déclenche la mise à jour WebSocket vers tous les clients

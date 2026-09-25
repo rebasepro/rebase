@@ -419,7 +419,7 @@ called reads as a broken deploy.
 
 Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
 `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
-open. The client SDK turns all of them into a single `RebaseApiError` carrying
+open. The typed SDK turns all of them into a single `RebaseApiError` carrying
 `status`, `code` and `details` — see
 [Error handling](/docs/backend#error-handling).
 
@@ -572,6 +572,6 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 
 ## Next Steps
 
-- **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
+- **[Typed SDK](/docs/sdk)** — Type-safe client for the REST API
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row

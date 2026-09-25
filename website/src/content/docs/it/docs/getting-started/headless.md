@@ -1,5 +1,5 @@
 ---
-sourceHash: 213cc853c469bd0c
+sourceHash: c331939eb774410b
 title: Solo backend (headless)
 sidebar_label: Solo backend
 description: Esegui Rebase come Backend-as-a-Service headless sul tuo database PostgreSQL — un'API REST, autenticazione, storage e realtime, senza pannello di amministrazione né file di collezione.
@@ -133,7 +133,7 @@ const { data: posts } = await rebase.data.collection("posts").find({
 ```
 
 - [API REST](/docs/backend/api/) — struttura degli endpoint, filtri ed errori
-- [SDK Client](/docs/sdk/) — query, autenticazione, realtime, storage
+- [SDK tipizzato](/docs/sdk/) — query, autenticazione, realtime, storage
 - `/api/docs` e `/api/swagger` — il documento OpenAPI e il rispettivo visualizzatore,
   serviti dal backend in esecuzione una volta presente una collezione. Un progetto
   che non ne ha non fornisce nessuno dei due: il documento viene generato dalle collezioni,

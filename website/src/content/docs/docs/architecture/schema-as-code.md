@@ -11,7 +11,7 @@ In Rebase, your **TypeScript collection definitions are the single source of tru
 - **PostgreSQL tables** via Drizzle ORM schema generation
 - **CRUD UI** — forms, tables, validation, field types
 - **REST API** endpoints with filtering, sorting, and pagination
-- **Client SDK** — type-safe data operations
+- **Typed SDK** — type-safe data operations
 - **RLS policies** — Row Level Security in Postgres
 
 This means your schema is:

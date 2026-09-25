@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b130367f73c18c5
+sourceHash: 42389d34a3b37766
 title: Endpoints y tokens de autenticación
 sidebar_label: Endpoints de autenticación
 description: Las rutas de autenticación que monta el backend de Rebase, las estructuras de sus respuestas, autenticación multifactor, el contexto de base de datos que ve una directiva, JWKS y claves de servicio.
@@ -89,10 +89,10 @@ Envíe el token de acceso devuelto como `Authorization: Bearer <accessToken>`. `
 
 `POST /api/auth/refresh` responde con la misma estructura, con dos salvedades: `user` se omite por completo cuando la cuenta no se puede volver a leer, por lo que debe tratarse como opcional en ese caso, y `providerId` siempre es `password`, independientemente de cómo se haya creado la sesión originalmente.
 
-:::caution[El SDK de cliente aplana esta estructura contenedora — HTTP sin procesar no]
+:::caution[El SDK tipado aplana esta estructura contenedora — HTTP sin procesar no]
 El JSON anterior es el formato de transmisión (wire format), y es lo que devuelve `fetch("/api/auth/login")`: el token reside en **`body.tokens.accessToken`**.
 
-El [SDK de cliente](/docs/sdk/authentication) desempaqueta `tokens` antes de devolver la sesión, por lo que `auth.signInWithEmail()` se resuelve en su lugar en un objeto aplanado **`{ user, accessToken, refreshToken }`**.
+El [SDK tipado](/docs/sdk/authentication) desempaqueta `tokens` antes de devolver la sesión, por lo que `auth.signInWithEmail()` se resuelve en su lugar en un objeto aplanado **`{ user, accessToken, refreshToken }`**.
 
 Ambas estructuras son reales; pertenecen a dos capas distintas. Intentar leer la forma del SDK a partir de un `fetch` directo arroja `undefined`, lo que se manifiesta como "el inicio de sesión tuvo éxito pero no hay token de acceso" — el inicio de sesión fue correcto, pero el token estaba un nivel más abajo.
 :::
@@ -282,4 +282,4 @@ Para evitar ataques de temporización (timing attacks), Rebase valida tanto la c
 - **[Authentication](/docs/backend/authentication/)** — la configuración de la que proceden estas rutas
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — sustitución del proveedor subyacente
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — lo que hace una directiva con `rebase.uid()`
-- **[Client SDK Authentication](/docs/sdk/authentication/)** — llamada a estas rutas desde el SDK
+- **[Autenticación del SDK tipado](/docs/sdk/authentication/)** — llamada a estas rutas desde el SDK

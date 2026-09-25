@@ -482,7 +482,7 @@ rebase cloud billing checkout    # a Stripe session for one project
 
 ### `rebase generate-sdk`
 
-Generate a typed client SDK from your collection definitions:
+Generate a typed SDK from your collection definitions:
 
 ```bash
 rebase generate-sdk

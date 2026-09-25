@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b130367f73c18c5
+sourceHash: 42389d34a3b37766
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -95,11 +95,11 @@ wird vollständig weggelassen, wenn das Konto nicht erneut gelesen werden kann, 
 also als optional; und `providerId` ist immer `password`, unabhängig davon, wie die Sitzung
 ursprünglich erstellt wurde.
 
-:::caution[Das Client-SDK flacht diesen Envelope ab – reines HTTP nicht]
+:::caution[Das typisierte SDK flacht diesen Envelope ab – reines HTTP nicht]
 Das obige JSON ist das Übertragungsformat (Wire Format) und entspricht dem, was `fetch("/api/auth/login")`
 zurückgibt: Das Token befindet sich unter **`body.tokens.accessToken`**.
 
-Das [Client-SDK](/docs/sdk/authentication) entpackt `tokens`, bevor es die
+Das [typisierte SDK](/docs/sdk/authentication) entpackt `tokens`, bevor es die
 Sitzung zurückgibt, sodass `auth.signInWithEmail()` stattdessen zu einem abgeflachten
 **`{ user, accessToken, refreshToken }`** aufgelöst wird.
 
@@ -335,4 +335,4 @@ Um Timing-Angriffe zu verhindern, validiert Rebase sowohl den vom Benutzer konfi
 - **[Authentifizierung](/docs/backend/authentication/)** — die Konfiguration, aus der diese Routen stammen
 - **[Benutzerdefinierte Auth-Adapter](/docs/backend/auth-adapters/)** — Ersetzen des zugrunde liegenden Anbieters
 - **[Sicherheitsregeln (RLS)](/docs/collections/security-rules/)** — was eine Policy mit `rebase.uid()` macht
-- **[Client-SDK-Authentifizierung](/docs/sdk/authentication/)** — Aufrufen dieser Routen über das SDK
+- **[Authentifizierung im typisierten SDK](/docs/sdk/authentication/)** — Aufrufen dieser Routen über das SDK

@@ -150,4 +150,4 @@ exportable: {
 
 - **[Collections](/docs/collections)** — Define your data model
 - **[Frontend Overview](/docs/frontend)** — Admin panel and UI components
-- **[Client SDK](/docs/sdk)** — Programmatic data access
+- **[Typed SDK](/docs/sdk)** — Programmatic data access

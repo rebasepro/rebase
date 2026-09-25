@@ -1,5 +1,5 @@
 ---
-sourceHash: b0070dc1781e9f2d
+sourceHash: cbee90067ba8da67
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -361,7 +361,7 @@ bearbeiten kann — ein Slug, eine SKU — damit die Zeiger ihm folgen.
 
 ## Beziehungen im SDK abrufen
 
-Beim Abfragen von Daten über das Rebase Client SDK sind Beziehungen standardmäßig **nicht** enthalten. Verwenden Sie die Methode `include()`, um verwandte Entitäten zusammen mit den primären Daten anzufordern.
+Beim Abfragen von Daten über das typisierte SDK von Rebase sind Beziehungen standardmäßig **nicht** enthalten. Verwenden Sie die Methode `include()`, um verwandte Entitäten zusammen mit den primären Daten anzufordern.
 
 ### Spezifische Beziehungen einschließen
 
@@ -410,7 +410,7 @@ for (const article of data) {
 
 > Die an `include()` übergebenen Beziehungsnamen müssen mit dem `relationName` übereinstimmen, der im `relations`-Array der Sammlung definiert ist.
 
-Für die vollständige Referenz zum Query Builder (Filtern, Sortieren, Paginierung, Echtzeit) siehe die [Client SDK-Dokumentation](/docs/sdk).
+Für die vollständige Referenz zum Query Builder (Filtern, Sortieren, Paginierung, Echtzeit) siehe die [Dokumentation des typisierten SDK](/docs/sdk).
 
 ## Beziehungen im Admin-Panel
 

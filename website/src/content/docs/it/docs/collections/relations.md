@@ -1,5 +1,5 @@
 ---
-sourceHash: b0070dc1781e9f2d
+sourceHash: cbee90067ba8da67
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -357,7 +357,7 @@ puntatori la seguano.
 
 ## Recupero delle Relazioni nell'SDK
 
-Quando si interrogano i dati tramite l'SDK Rebase Client, le relazioni **non** sono incluse di default. Usa il metodo `include()` per richiedere le entità correlate insieme ai dati primari.
+Quando si interrogano i dati tramite l'SDK tipizzato di Rebase, le relazioni **non** sono incluse di default. Usa il metodo `include()` per richiedere le entità correlate insieme ai dati primari.
 
 ### Includere relazioni specifiche
 
@@ -406,7 +406,7 @@ for (const article of data) {
 
 > I nomi delle relazioni passati a `include()` devono corrispondere al `relationName` definito nell'array `relations` della collezione.
 
-Per la documentazione completa del query builder (filtro, ordinamento, paginazione, real-time), consulta la [documentazione dell'SDK Client](/docs/sdk).
+Per la documentazione completa del query builder (filtro, ordinamento, paginazione, real-time), consulta la [documentazione dell'SDK tipizzato](/docs/sdk).
 
 ## Relazioni nel pannello di amministrazione
 

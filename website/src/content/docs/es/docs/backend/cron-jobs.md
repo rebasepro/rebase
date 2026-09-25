@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f143b9dd11e44cb
+sourceHash: e2d86104205efd30
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -345,9 +345,9 @@ reinicios y redespliegues; `{ "enabled": null }` devuelve la tarea al `enabled`
 que declara su archivo. Cómo la lee cada réplica, y qué ocurre cuando una no
 puede, está en [Cron entre instancias](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
 
-## SDK de cliente
+## SDK tipado
 
-El SDK cliente de Rebase expone un espacio de nombres `cron` para todas las operaciones:
+El SDK tipado de Rebase expone un espacio de nombres `cron` para todas las operaciones:
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";

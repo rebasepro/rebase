@@ -1,8 +1,8 @@
 ---
-sourceHash: 529819bf2e68a515
+sourceHash: 9fd2ff2023cede85
 title: Offline & Local-First-Sync
 sidebar_label: Offline
-description: Aktivieren Sie die Local-First-Sync-Engine des Rebase Client SDK — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
+description: Aktivieren Sie die Local-First-Sync-Engine des typisierten SDK von Rebase — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
 ---
 
 ## Überblick

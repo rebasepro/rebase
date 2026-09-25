@@ -1,5 +1,5 @@
 ---
-sourceHash: a45467350cfc4cad
+sourceHash: da1aaf2e9e970fb5
 title: Callbacks d'entité
 sidebar_label: Callbacks
 description: Utilisez les callbacks de cycle de vie pour exécuter une logique personnalisée lors de la création, mise à jour, lecture ou suppression d'entités. Inclut l'API context.data pour les opérations inter-collections.
@@ -191,7 +191,7 @@ beforeSave: async ({ values }) => {
 ```
 
 :::note
-Importez-le depuis `@rebasepro/types`, et non depuis `@rebasepro/server`. Un fichier de collection est partagé avec le frontend — le build Vite du panneau d'administration lit ce même répertoire — il ne peut donc importer que des packages qui s'exécutent dans un navigateur. `RebaseApiError` est la version compatible navigateur, et c'est la même classe que celle levée par le SDK client.
+Importez-le depuis `@rebasepro/types`, et non depuis `@rebasepro/server`. Un fichier de collection est partagé avec le frontend — le build Vite du panneau d'administration lit ce même répertoire — il ne peut donc importer que des packages qui s'exécutent dans un navigateur. `RebaseApiError` est la version compatible navigateur, et c'est la même classe que celle levée par le SDK typé.
 :::
 
 ### `afterSave`

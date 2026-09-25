@@ -375,9 +375,9 @@ restarts and redeploys; `{ "enabled": null }` hands the job back to the
 `enabled` its file declares. How every replica reads it, and what happens when
 one cannot, is on [Cron across instances](/docs/backend/cron-across-instances/#pausing-a-job-across-every-process).
 
-## Client SDK
+## Typed SDK
 
-The Rebase client SDK exposes a `cron` namespace for all operations:
+The Rebase typed SDK exposes a `cron` namespace for all operations:
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";

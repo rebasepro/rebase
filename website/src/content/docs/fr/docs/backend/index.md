@@ -1,5 +1,5 @@
 ---
-sourceHash: 21b1ae6712a17e38
+sourceHash: 925edb3f8c355de4
 title: Vue d'ensemble du backend
 sidebar_label: Backend
 description: Le backend Rebase fournit un serveur complet avec API REST, authentification, stockage, temps réel via WebSocket et historique des entités — le tout initialisé avec un seul appel de fonction.
@@ -268,7 +268,7 @@ Le serveur WebSocket se greffe sur le même serveur HTTP et fournit des abonneme
 
 - Abonnement aux **changements de collection** — soyez notifié dès qu'une entité d'une collection est créée, mise à jour ou supprimée
 - Abonnement aux **changements d'entités** — soyez notifié lorsqu'une entité spécifique est modifiée
-- Gestion automatique de la **reconnexion** dans le SDK client
+- Gestion automatique de la **reconnexion** dans le SDK typé
 
 Le backend s'appuie en interne sur le mécanisme `LISTEN/NOTIFY` de PostgreSQL. Pour les déploiements multi-instances, fournissez une chaîne `connectionString` dans votre `PostgresBootstrapper` pour activer la diffusion inter-instances.
 
@@ -295,7 +295,7 @@ Chaque défaillance — quelle que soit la route ou le sous-système concerné �
 
 Le statut HTTP figure sur la réponse elle-même, pas dans le corps. Basez vos conditions sur `code` et non sur `message` — les messages sont rédigés pour des humains et sont susceptibles d'évoluer.
 
-Le SDK client convertit chacune de ces réponses en une `RebaseApiError` contenant `status`, `code` et `details` — y compris les échecs qui n'ont jamais pu atteindre le serveur. Une connexion refusée, une défaillance DNS, une erreur CORS ou une annulation arrive sous la forme `status: 0`, `code: "NETWORK_ERROR"`, avec l'erreur originelle du runtime dans `cause`, plutôt que sous la forme aléatoire avec laquelle `fetch` aurait pu rejeter. Le code applicatif n'a ainsi qu'une seule classe à capturer :
+Le SDK typé convertit chacune de ces réponses en une `RebaseApiError` contenant `status`, `code` et `details` — y compris les échecs qui n'ont jamais pu atteindre le serveur. Une connexion refusée, une défaillance DNS, une erreur CORS ou une annulation arrive sous la forme `status: 0`, `code: "NETWORK_ERROR"`, avec l'erreur originelle du runtime dans `cause`, plutôt que sous la forme aléatoire avec laquelle `fetch` aurait pu rejeter. Le code applicatif n'a ainsi qu'une seule classe à capturer :
 
 ```typescript
 async function setPrice(id: string, price: number) {

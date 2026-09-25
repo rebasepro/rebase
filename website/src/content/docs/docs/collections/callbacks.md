@@ -237,7 +237,7 @@ beforeSave: async ({ values }) => {
 Import it from `@rebasepro/types`, not from `@rebasepro/server`. A collection file
 is shared with the frontend — the admin panel's Vite build reads this same
 directory — so it may only import packages that run in a browser. `RebaseApiError`
-is the browser-safe one, and it is the same class the client SDK throws.
+is the browser-safe one, and it is the same class the typed SDK throws.
 :::
 
 ### `afterSave`

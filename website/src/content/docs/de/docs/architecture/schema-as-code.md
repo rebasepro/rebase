@@ -1,5 +1,5 @@
 ---
-sourceHash: 69d89e250dd512d5
+sourceHash: 19e4936be2af9792
 title: Schema als Code
 sidebar_label: Schema als Code
 description: Wie Rebase TypeScript-Sammlungen als einzige Quelle der Wahrheit für Ihr Datenbankschema, Ihre Benutzeroberfläche und Ihre API verwendet.
@@ -12,7 +12,7 @@ In Rebase sind Ihre **TypeScript-Sammlungsdefinitionen die einzige Quelle der Wa
 - **PostgreSQL-Tabellen** über die Drizzle ORM-Schemaerzeugung
 - **CRUD-Benutzeroberfläche** — Formulare, Tabellen, Validierung, Feldtypen
 - **REST-API**-Endpunkte mit Filterung, Sortierung und Paginierung
-- **Client-SDK** — typsichere Datenoperationen
+- **Typisiertes SDK** — typsichere Datenoperationen
 - **RLS-Richtlinien** — Zeilenebenen-Sicherheit in Postgres
 
 Das bedeutet, Ihr Schema ist:

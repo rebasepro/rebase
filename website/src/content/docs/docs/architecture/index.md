@@ -1,7 +1,7 @@
 ---
 title: Architecture Overview
 sidebar_label: Architecture
-description: Understand how Rebase's backend, frontend, client SDK, and database integrate to form a complete Backend-as-a-Service.
+description: Understand how Rebase's backend, frontend, typed SDK, and database integrate to form a complete Backend-as-a-Service.
 ---
 
 ## System Architecture
@@ -75,7 +75,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 |---------|------|---------|
 | `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
 | `@rebasepro/server` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
-| `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
+| `@rebasepro/client` | Typed SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/app` | Login views, auth controller hooks, user management | Frontend |
@@ -90,7 +90,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 
 ### Read Flow
 1. User opens a collection in Rebase CMS
-2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
+2. Typed SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
 3. Backend queries PostgreSQL via Drizzle ORM
 4. Data transformer deserializes database records into entity format
 5. Response sent to frontend, components render
@@ -99,7 +99,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 ### Write Flow
 1. User edits an entity in the form
 2. `beforeSave` callbacks run (validation, transformation)
-3. Client SDK sends `PATCH /api/data/:slug/:id`
+3. Typed SDK sends `PATCH /api/data/:slug/:id`
 4. Backend serializes values, runs Drizzle `UPDATE`
 5. `afterSave` callbacks run (side effects)
 6. `NOTIFY` broadcast triggers WebSocket update to all clients

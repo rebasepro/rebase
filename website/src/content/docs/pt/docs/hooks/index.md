@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ed2b6947b459eef
+sourceHash: 69847a513d72f4a9
 title: Referência de Hooks
 sidebar_label: Hooks
 description: Hooks React fornecidos pelo Rebase para acessar autenticação, dados, navegação, painéis laterais, armazenamento e estado da UI.
@@ -424,7 +424,7 @@ function CategorySelector({ onSelect }) {
 
 ## `useRebaseClient`
 
-Recupera do contexto do React a instância do SDK cliente subjacente (`RebaseClient`). Útil para invocar operações diretas do SDK (como chamar endpoints próprios ou fazer uploads manuais) dentro dos seus componentes.
+Recupera do contexto do React a instância do SDK tipado subjacente (`RebaseClient`). Útil para invocar operações diretas do SDK (como chamar endpoints próprios ou fazer uploads manuais) dentro dos seus componentes.
 
 ```typescript
 import { useRebaseClient } from "@rebasepro/app";
@@ -555,4 +555,4 @@ function AnalyticsLogger() {
 ## Próximos Passos
 
 - **[Visão Geral do Frontend](/docs/frontend)** — Referência do framework React
-- **[SDK do cliente](/docs/sdk)** — SDK de operações de dados
+- **[SDK tipado](/docs/sdk)** — SDK de operações de dados
