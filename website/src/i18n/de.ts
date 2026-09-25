@@ -408,7 +408,7 @@ export const de = {
   "agencies.features.f6.title": "React und TypeScript, durchgehend",
   "agencies.features.f6.desc": "Keine Template-Sprache, kein proprietärer Builder. Die Leute, die du schon beschäftigst, können es lesen.",
   "about.meta.title": "Über uns — Rebase",
-  "about.meta.description": "Warum wir Rebase bauen: Autorisierung gehört in die Datenbank, nicht in Middleware, die man aufzurufen vergessen kann. Vom Team hinter FireCMS, MIT-lizenziert, in Europa.",
+  "about.meta.description": "Warum wir Rebase bauen: Autorisierung gehört in die Datenbank, nicht in Middleware. Vom Team hinter FireCMS, MIT-lizenziert, aus Europa.",
   "about.hero.title": "Autorisierung gehört in die Datenbank.",
   "about.hero.subtitle": "Das ist die Wette, auf der das ganze Produkt steht, und der Grund, warum es diese Firma gibt. Zugriffsregeln im Anwendungscode schützen die Tür, nicht den Raum — ein vergessener Endpoint, ein Hintergrund-Job, ein Migrationsskript oder eine psql-Sitzung laufen daran vorbei. Also haben wir sie dorthin gelegt, wo die Daten sind.",
   "about.story.title": "Warum wir es bauen",
@@ -431,17 +431,18 @@ export const de = {
   "about.join.desc": "Der Code, die Issues und die Diskussionen sind alle offen. Komm und widersprich uns.",
   "about.join.github": "Auf GitHub beitragen",
   "about.join.discord": "Unserem Discord beitreten",
-  "index.meta.title": "Rebase — Open-Source-Backend für Postgres: Zugriffsregeln, von der Datenbank durchgesetzt",
-  "index.meta.description": "Eine TypeScript-Datei pro Collection liefert Schema, REST-API, typisiertes SDK und Panel. Zugriffsregeln werden zu Postgres Row-Level Security kompiliert, sodass jede Route, jeder Job und jeder Agent sich daran hält. Open-Source: selbst hosten oder Rebase Cloud nutzen.",
+  "index.meta.title": "Rebase — Open-Source-Postgres-Backend mit Admin-Panel",
+  "index.meta.description": "Open-Source-Backend für Postgres: REST, typisiertes SDK, Realtime, Auth, Storage & Admin-Panel. Zugriffsregeln laufen direkt in Postgres.",
   "cms.meta.title": "Rebase CMS — das Admin-Panel deines Rebase-Backends",
   "cms.meta.description":
-    "Das Admin-Panel auf jedem Rebase-Backend: Tabellenbearbeitung, Medien, Rollen und Historie — erweiterbar mit eigenem React, auf derselben API und denselben Policies wie deine App.",
+    "Das Admin-Panel auf jedem Rebase-Backend: Tabellenbearbeitung, Medien, Rollen und Historie, erweiterbar mit eigenem React, unter den Policies deiner App.",
   "backend.meta.title": "Rebase Backend — REST, typisiertes SDK, Realtime und RLS über deinem Postgres",
-  "backend.meta.description": "Zeig es auf eine Postgres-Datenbank: REST-Routen, OpenAPI-Spec, typisierte SDK-Accessoren, Realtime-Subscriptions, Auth, Storage, Functions und Cron entstehen aus einer einzigen Collection-Definition — mit Zugriffskontrolle, die die Datenbank durchsetzt.",
+  "backend.meta.description": "Rebase auf Postgres liefert REST, OpenAPI, ein typisiertes SDK, Realtime, Auth, Storage & Functions – mit Zugriffsregeln in der Datenbank.",
   "ai.meta.title": "KI & Agenten-Infrastruktur — Rebase",
   "ai.meta.description": "Deploye ein agentenbereites Backend auf Postgres mit integriertem MCP-Server, Scoped API Keys und Vektorsuche.",
   "studio.meta.title": "Rebase Studio — der Entwickler-Workspace: SQL, Schema, RLS, Logs",
-  "studio.meta.description": "SQL-Editor, Schema-Visualisierung, RLS-Policy-Editor, Logs und API-Explorer, auf deinem eigenen Postgres. Studio ist der Entwickler-Workspace. Es registriert sich im selben Panel wie CMS.",
+  "studio.meta.description":
+    "SQL-Editor, Schema-Visualizer, RLS-Policy-Editor, Logs und API-Explorer auf deinem eigenen Postgres: die Entwicklerseite des Admin-Panels.",
   "sdk.meta.title": "Typisiertes SDK — Rebase",
   "sdk.meta.description": "Eine vollständig typisierte Client-Bibliothek für Query-Komposition, Dateispeicher, Benutzer-Auth und Echtzeit-Statussynchronisierung.",
   "cli.meta.title": "CLI und Dev-Tools — Rebase",
@@ -450,19 +451,20 @@ export const de = {
   "security.meta.description": "Konfiguriere Row-Level Security (RLS) und feingranulare rollenbasierte Zugriffskontrollen direkt in deinem Schema.",
   "ui.meta.title": "React UI-Komponenten — Rebase",
   "ui.meta.description": "Die React-Komponentenbibliothek, aus der das Panel selbst gebaut ist — dieselben Widgets, Tabellen und Feld-Editoren, die deine eigenen Views verwenden sollten.",
-  "startups.meta.title": "Rebase für Startups — erst das Backend, das Back-Office wenn du es brauchst",
-  "startups.meta.description":
-    "REST, ein typisiertes SDK, Auth, Storage und Realtime über dem Postgres, den du schon betreibst, mit Zugriffskontrolle durch die Datenbank — und ein generiertes Admin-Panel für dein Team vom ersten Tag an.",
-  "agencies.meta.title": "Rebase für Agenturen — der Kunde behält die Datenbank, du behältst den Code",
-  "agencies.meta.description": "Liefere ein Backend und ein Back-Office auf dem Postgres des Kunden. Durchgehend MIT-lizenziert, self-hosted oder auf Rebase Cloud, ohne Per-Seat-Lizenz zwischen dir und der Übergabe.",
+  "startups.meta.title":
+    "Für Startups: Erst das Backend, später das Back-Office — Rebase",
+  "startups.meta.description": "REST, typisiertes SDK, Auth, Storage & Realtime für Postgres: DB-gestützte Zugriffsregeln und ein fertiges Admin-Panel für dein Team ab Tag 1.",
+  "agencies.meta.title":
+    "Für Agenturen: Der Kunde behält die Datenbank — Rebase",
+  "agencies.meta.description":
+    "Liefere ein Backend und ein Back-Office auf dem Postgres des Kunden. MIT-lizenziert, self-hosted oder auf Rebase Cloud, ohne Per-Seat-Lizenz bei der Übergabe.",
   "contact.meta.title": "Kontakt — Rebase",
   "contact.meta.description": "Nimm Kontakt auf für Enterprise-SLAs, dedizierten Hosting-Support oder individuelle Integrationen.",
   "developers.meta.title": "Mit Rebase bauen — SDK, CLI, erweitern und deployen",
-  "developers.meta.description": "Die tägliche Schleife: ein Befehl zum Scaffolding, ein aus deinem Schema generiertes typisiertes SDK, dein eigenes React dort, wo die generierten Views aufhören, und ein Prozess, der sich in API, Functions und Worker teilt, wenn du herauswächst.",
+  "developers.meta.description": "Scaffolding per Befehl, typisiertes SDK aus dem Schema, eigenes React für Views und ein Prozess, der flexibel mit deinen Anforderungen wächst.",
   "product.meta.title":
-    "Rebase — ein Backend für dein Postgres, samt dem Admin-Panel, das dazugehört",
-  "product.meta.description":
-    "REST, ein typisiertes SDK, Realtime, Auth und Storage über deinem Postgres — mit Zugriffskontrolle, die die Datenbank durchsetzt. Das Admin-Panel entsteht aus derselben Definition.",
+    "Produktübersicht: ein Backend und sein Admin-Panel — Rebase",
+  "product.meta.description": "REST, typisiertes SDK, Realtime, Auth & Storage über Postgres – mit DB-basierten Zugriffsregeln und Admin-Panel aus derselben Definition.",
   "rebase-vs-supabase.meta.title": "Rebase vs Supabase — RLS und lokale DX im Vergleich",
   "rebase-vs-supabase.meta.description": "Ein Admin-Dashboard, das aus derselben Definition wie die API entsteht, und Row-Level Security, die neben der Collection steht statt in einem separaten Editor.",
   "rebase-vs-payload.meta.title": "Rebase vs Payload CMS — Headless Postgres im Vergleich",
@@ -483,8 +485,7 @@ export const de = {
   "mosaic.title": "Eine Definition, jede Oberfläche.",
   "mosaic.subtitle": "Eine Tabelle, ein Kanban-Board, eine Galerie, ein Block-Editor, eine eigene React-View — jeder Screen unten liest dieselbe Collection über dieselbe API, unter denselben Policies. Nichts davon ist ein zweites Datenmodell.",
   "pricing.meta.title": "Preise — Rebase",
-  "pricing.meta.description":
-    "Rebase ist kostenlos und Open Source (MIT) — SSO, MFA und jede Funktion stecken im Open-Source-Backend, das du selbst betreibst. Du zahlst nur, wenn wir es hosten sollen, oder für eine Support-Zusage.",
+  "pricing.meta.description": "Rebase ist Open Source (MIT): Alle Features inklusive für Self-Hosting. Zahle nur für Managed Hosting oder garantierten Support.",
   "pricing.badge": "Preise",
   "pricing.title":
     "Kostenlos und Open Source. Zahle nur für das, was wir betreiben.",
@@ -533,7 +534,7 @@ export const de = {
   "footer.pricing": "Preise",
   "footer.manifesto": "Unser Manifest",
   "manifesto.meta.title": "Unser Manifest — Warum wir Rebase bauen",
-  "manifesto.meta.description": "Warum wir Rebase bauen: Autorisierung gehört in die Datenbank, dein Schema bleibt deins, und Agenten sind vollwertige Nutzer deines Backends. MIT-lizenziert, aus Europa.",
+  "manifesto.meta.description": "Warum Rebase: Autorisierung gehört in die DB, dein Schema bleibt deins und Agenten sind First-Class-Nutzer des Backends. Aus Europa.",
   "manifesto.badge": "Ein Brief vom Team",
   "manifesto.hero.title": "Warum wir Rebase bauen",
   "manifesto.hero.subtitle": "Und warum wir glauben, dass die Branche die Autorisierung an der falschen Stelle untergebracht hat — im Anwendungscode statt in der Datenbank, die die Daten tatsächlich hält.",
@@ -634,7 +635,7 @@ export const de = {
   "europe.link.security": "Security-Seite",
   "europe.legal2": "beschreibt, wie die Zugriffsregeln selbst durchgesetzt werden.",
   "europe.meta.title": "Souveränes Backend für Europa — Rebase",
-  "europe.meta.description": "Jeder kann in Europa hosten. Die Frage ist, wer die zweite Partei ist: Betreib Rebase selbst und es gibt keine, oder lass ein spanisches Unternehmen es betreiben, mit offengelegtem Unterauftragsverarbeiter.",
+  "europe.meta.description": "Hoste Rebase selbst ohne Drittanbieter oder nutze unser spanisches Unternehmen mit transparenten Unterauftragsverarbeitern in Europa.",
 
   // ── ui ──────────────────────────────────────────────────────────
   "ui.00": "<a href=\"/cms\" class=\"hover:text-primary-light transition-colors\">Rebase CMS</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Komponentenbibliothek</span>",
@@ -672,7 +673,7 @@ export const de = {
   "rlscheckpage.10": "Rebase wird nicht gebraucht",
   "rlscheckpage.11": "Es liest die Datenbank, nicht deinen Code. Es braucht kein Rebase und fragt auch nicht danach.",
   "rlscheckpage.meta.title": "Kostenloses Postgres-RLS-Audit — prüf deine Row-Level Security mit einem Befehl",
-  "rlscheckpage.meta.description": "rls-check ist ein kostenloses, nur lesendes Row-Level-Security-Audit für jede PostgreSQL-Datenbank. Fünfzehn Checks für die Fehler, an denen Postgres leckt: abgeschaltete RLS auf ausgelieferten Tabellen, immer wahre Policies, Views, die an ihrer Basistabelle vorbeilesen. Läuft gegen Supabase, Neon, RDS. Kein Account, keine Installation.",
+  "rlscheckpage.meta.description": "Kostenloses Postgres-Audit: 15 Checks für deaktiviertes RLS, fehlerhafte Policies & Views, die RLS umgehen. Ohne Account & Installation.",
 
   // ── contact ─────────────────────────────────────────────────────
   "contact.00": "Sprich mit den Leuten, die es bauen.",
@@ -897,8 +898,18 @@ export const de = {
   "comparepage.10": "Der Großteil der Kategorie",
   "comparepage.11": "Zeile eins, in der Praxis",
   "comparepage.12": "Policies sind eine Datei, keine Einstellung",
-  "comparepage.13": "Die erste Zeile dieser Tabelle ist die wichtigste, deshalb steht sie hier als Bildschirm statt als Behauptung. Zugriffsregeln liegen neben der Collection, zu der sie gehören, kompilieren zu echten Postgres-Policies, und der Editor sagt dir, wenn Datenbank und Code auseinandergelaufen sind.",
-  "comparepage.14": "Ein Werkzeug, das Berechtigungen in der eigenen Middleware durchsetzt, kann dir diesen Bildschirm nicht zeigen, weil die Regeln nicht in der Datenbank stehen, um gezeigt zu werden.",
+  "comparepage.13":
+    "Die erste Zeile dieser Tabelle ist die wichtigste, deshalb hier als Query statt als Behauptung: dasselbe Statement aus psql, verbunden als eigene Datenbankrolle der App, ohne Anwendung im Pfad.",
+  "comparepage.14":
+    "Liegen die Regeln in der Middleware, sieht diese Session jede Zeile. Liegen sie in Postgres, sieht sie nur, was die Policies erlauben — und ohne angemeldeten Benutzer ist das nichts.",
+  "comparepage.fig.mw.label": "Regeln in der App-Middleware",
+  "comparepage.fig.mw.note":
+    "Jede Zeile. Die Prüfung lag in der Route, und die Route lag nicht im Pfad.",
+  "comparepage.fig.pg.label": "Regeln in Postgres (Rebase)",
+  "comparepage.fig.pg.note":
+    "Kein User in der Session, daher greift keine Policy. Standardmäßig geschlossen.",
+  "comparepage.fig.caption":
+    "Dieselbe Abfrage auf denselben Daten, aus einer Session, die die Anwendung umgeht.",
   "comparepage.15": "Der ehrliche Teil",
   "comparepage.16": "Vier Fälle, in denen du Rebase nicht nehmen solltest",
   "comparepage.17": "<span class=\"mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600\"></span> <span><span class=\"text-white\">Du bist nicht auf Postgres und willst es nicht werden.</span> Das ganze Sicherheitsmodell ist Postgres-Row-Level-Security. Auf MySQL oder Mongo trifft nichts von dem Interessanten zu.</span>",
@@ -944,7 +955,8 @@ export const de = {
   "comparepage.axis.leaving.q": "Was passiert, wenn du aufhörst",
   "comparepage.axis.leaving.rebase": "Die Datenbank läuft weiter — Policies, Constraints und Daten genau dort, wo sie waren. Das Panel war eine Abhängigkeit, die du löschen kannst.",
   "comparepage.axis.leaving.others": "Kommt darauf an, wie tief das Werkzeug in dein Schema gegangen ist. Hat es die Tabellen angelegt, heißt Weggehen: migrieren.",
-  "comparepage.meta.title": "Rebase im Vergleich — Supabase, Directus, Strapi, Retool und der Rest",
+  "comparepage.meta.title":
+    "Supabase, Directus, Strapi, Retool und mehr im Vergleich — Rebase",
   "comparepage.meta.description": "Ein ehrlicher Direktvergleich: wo Rebase gewinnt, wo ein Wettbewerber die bessere Wahl ist und wie die Abwägungen wirklich aussehen.",
 
   // ── devpage ─────────────────────────────────────────────────────
