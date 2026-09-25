@@ -39,12 +39,25 @@
     --sl-font-mono: var(--font-mono), ui-monospace, monospace;
     /* Starlight has no heading-font token, so headings are overridden below. */
 
-    /* Make default backgrounds match our dark site */
-    --sl-color-bg: #000;
-    --sl-color-bg-nav: color-mix(in srgb, #000 80%, var(--color-primary) 0%);
-    --sl-color-bg-sidebar: #000000;
-    --sl-color-bg-inline-code: #1a1a1a;
-    --sl-color-hairline: #0f1115;
+    /* The site's own ground and neutral ramp. The docs were pure #000 with
+       Starlight's cool blue-greys (body text rgb 193 195 200, a #0f1115
+       hairline) against the site's #0a0a0a and neutral surface ramp — two
+       palettes one click apart (2026-09-23 audit). */
+    --sl-color-bg: var(--color-surface-900);
+    --sl-color-bg-nav: var(--color-surface-900);
+    --sl-color-bg-sidebar: var(--color-surface-900);
+    --sl-color-bg-inline-code: var(--color-surface-800);
+    --sl-color-hairline: var(--color-surface-800);
+    --sl-color-white: #ffffff;
+    --sl-color-gray-1: var(--color-surface-200);
+    --sl-color-gray-2: var(--color-surface-300);
+    --sl-color-gray-3: var(--color-surface-400);
+    --sl-color-gray-4: var(--color-surface-500);
+    --sl-color-gray-5: var(--color-surface-600);
+    --sl-color-gray-6: var(--color-surface-700);
+    --sl-color-black: var(--color-surface-900);
+    /* Links read in the site's text blue (4.36:1 as text for --color-primary). */
+    --sl-color-text-accent: var(--color-primary-light);
 
     /* a bit taller header to match site scale */
     --sl-nav-height: 4rem;
@@ -89,8 +102,8 @@ h1, h2, h3 {
 
 /* Fixed header background and translucency */
 .header {
-    background: color-mix(in srgb, #000 75%, transparent);
-    backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--color-surface-900) 78%, transparent);
+    backdrop-filter: blur(14px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -98,8 +111,10 @@ h1, h2, h3 {
     @apply rounded-xl border border-surface-700 p-4 mb-6 text-white;
 }
 
+/* Was #454959, a slate blue from no palette on the site. */
 .starlight-aside.starlight-aside--tip {
-    background-color: #454959;
+    background-color: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-900));
+    border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-surface-700));
 }
 
 .starlight-aside__content a {

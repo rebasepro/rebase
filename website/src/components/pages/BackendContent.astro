@@ -5,8 +5,6 @@ import { useTranslatedPath } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 import HeroConnectionWidget from '../demos/HeroConnectionWidget';
 import { SplitLayerDemo } from '../demos/SplitLayerDemo';
-import { ApiMiniDemo } from '../demos/ApiMiniDemo';
-import { RealtimeMiniDemo } from '../demos/RealtimeMiniDemo';
 
 const translatePath = useTranslatedPath(lang);
 
@@ -164,15 +162,9 @@ import ClosingCta from "../ClosingCta.astro";
                         a join you hand-wrote.
                     </p>
                 </div>
+                {/* The home page shows the REST explorer widget; this page's figure is
+                    the one only it has — the generated URL surface. */}
                 <div class="lg:col-span-7 space-y-5">
-                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
-                            <div class="ml-2 text-3xs font-mono text-surface-400">api.yourapp.com</div>
-                        </div>
-                        <div class="h-[260px] w-full overflow-hidden" inert aria-hidden="true">
-                            <ApiMiniDemo client:visible/>
-                        </div>
-                    </div>
                     <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                             <span class="font-mono text-xs text-surface-400">{t("backendpage.label.generated")}</span>
@@ -232,11 +224,37 @@ import ClosingCta from "../ClosingCta.astro";
                     <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.06")}></p>
                     <p class="text-base text-surface-400 leading-relaxed" set:html={t("backendpage.07")}></p>
                 </div>
+                {/* Its own figure. The home page shows two live tables mirroring each
+                    other; this section's claim is different — a write from anywhere
+                    produces the same event — so the figure is the sources converging. */}
                 <div class="lg:col-span-7">
-                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
-                         inert aria-hidden="true">
-                        <RealtimeMiniDemo client:visible/>
-                    </div>
+                    <figure class="frame overflow-hidden">
+                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
+                            <span class="font-mono text-xs text-surface-400">orders · four writers, one stream</span>
+                            <span class="font-mono text-xs text-surface-500">LISTEN/NOTIFY</span>
+                        </div>
+                        <ul class="divide-y divide-surface-800/70 font-mono text-xs">
+                            {[
+                                ["REST", "PATCH /api/data/orders/42", "your app"],
+                                ["psql", "UPDATE orders SET status = 'shipped' WHERE id = 42;", "a person at a terminal"],
+                                ["cron", "UPDATE orders SET status = 'closed' WHERE …", "a scheduled job"],
+                                ["Studio", "UPDATE orders … — run from the SQL editor", "the admin panel"],
+                            ].map(([source, statement, who]) => (
+                                <li class="grid grid-cols-[4.5rem_1fr] gap-x-4 px-5 py-3">
+                                    <span class="text-primary-light">{source}</span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-surface-200">{statement}</span>
+                                        <span class="block text-surface-500">{who}</span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                        <div class="border-t border-surface-800/80 bg-surface-900/40 px-5 py-4 font-mono text-xs">
+                            <p class="text-surface-300"><span class="text-surface-500">→</span> one change event: <span class="text-white">orders · UPDATE · id 42</span></p>
+                            <p class="mt-2 text-surface-400"><span class="text-surface-500">→</span> each subscriber re-reads the row under its own access rules</p>
+                        </div>
+                        <figcaption class="sr-only">Four ways to write to the orders table — the REST API, psql, a cron job and Studio's SQL editor — all produce the same change event, which each subscriber receives filtered by its own access rules.</figcaption>
+                    </figure>
                 </div>
             </div>
         </div>

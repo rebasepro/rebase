@@ -14,7 +14,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 
 
 import ClosingCta from "../ClosingCta.astro";
-import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
+import { CASE_STUDIES } from "../../data/case-studies";
 ---
 
 
@@ -426,7 +426,29 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
                     <p class="mt-lead text-lg text-surface-400">{t("agenciespage.02")}</p>
                 </div>
             </div>
-            <CaseStudiesCarousel t={t} header={false} />
+            {/* Its own composition: a project index. The home page shows these as a
+                screenshot carousel; this page mounted that carousel and showed its
+                home-page chapter header ("05 · Built for real products") under its
+                own heading. Same data (src/data/case-studies.ts), different figure. */}
+            <div class="max-w-6xl mx-auto px-6 lg:px-8">
+                <ul class="divide-y divide-surface-800 border-y border-surface-800">
+                    {CASE_STUDIES.map((c) => (
+                        <li class="grid gap-x-10 gap-y-2 py-6 md:grid-cols-[13rem_1fr_auto] md:items-baseline">
+                            <div>
+                                <p class="font-mono text-2xs uppercase tracking-[0.2em] text-surface-500">{t(`showcase.${c.key}.badge`)}</p>
+                                <p class="mt-1 text-lg font-semibold text-white">{t(`showcase.${c.key}.title`)}</p>
+                            </div>
+                            <p class="text-sm leading-relaxed text-surface-400 max-w-2xl">{t(`showcase.${c.key}.desc`)}</p>
+                            {c.href ? (
+                                <a href={c.href} target="_blank" rel="noopener noreferrer"
+                                   class="text-sm text-primary-light hover:text-white transition-colors whitespace-nowrap">{c.host} ↗</a>
+                            ) : (
+                                <span class="font-mono text-xs text-surface-500 whitespace-nowrap">{c.host}</span>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </section>
 
     <ClosingCta title={t("close.agencies.title")} blurb={t("close.agencies.blurb")} trackId="agencies" />

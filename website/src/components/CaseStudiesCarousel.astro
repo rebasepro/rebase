@@ -7,110 +7,17 @@
  * trackpad and momentum come for free); the script only wires the arrow pill,
  * pointer-drag on desktop, keyboard, and the counter.
  */
-/**
- * `header={false}` embeds the track alone, under the host page's own heading.
- * /agencies used to render its "Products shipped on Rebase" heading and then
- * this component's home-page chapter header under it — "05 · Built for real
- * products" on a page with no 01–04, and two headings for one carousel.
- */
-const { t, header = true } = Astro.props;
-const Tag = header ? "section" : "div";
+const { t } = Astro.props;
 
-const cases = [
-    {
-        id: "medicalmotion",
-        image: "/img/showcase/medicalmotion.webp",
-        key: "case2",
-        href: "https://medicalmotion.com",
-        host: "medicalmotion.com",
-        logo: "/img/logos/medicalmotion_white.svg",
-        // Artwork is tightly cropped in its viewBox.
-        logoClass: "h-7 sm:h-8",
-        glow: "from-rose-500/25 via-primary/15 to-transparent"
-    },
-    {
-        id: "unfeigned",
-        image: "/img/showcase/unfeigned.webp",
-        key: "case5",
-        href: "https://unfeignedgear.com",
-        host: "unfeignedgear.com",
-        logo: null as string | null,
-        logoClass: "",
-        glow: "from-cyan-500/25 via-primary/15 to-transparent"
-    },
-    {
-        id: "sustentalent",
-        image: "/img/showcase/sustentalent.webp",
-        key: "case",
-        href: "https://sustentalent.com",
-        host: "sustentalent.com",
-        logo: "/img/logos/sustentalent_white.svg",
-        // Artwork occupies only the middle 50% of its viewBox, so it needs
-        // roughly double the box height to read at the same optical size.
-        logoClass: "h-14 sm:h-16 -my-3",
-        glow: "from-emerald-500/25 via-primary/15 to-transparent"
-    },
-    {
-        id: "dadaki",
-        image: "/img/showcase/dadaki.webp",
-        key: "case0",
-        href: "https://dadaki.com",
-        host: "dadaki.com",
-        // The app mark from dadaki.com/logo.svg — a square tile rather than a
-        // wordmark, so it is sized to sit level with the wordmarks beside it.
-        logo: "/img/logos/dadaki.svg" as string | null,
-        logoClass: "h-9 sm:h-10",
-        logoIsMark: true,
-        glow: "from-violet-500/25 via-primary/15 to-transparent"
-    },
-    {
-        id: "presupuestos",
-        image: "/img/showcase/presupuestos.webp",
-        key: "case3",
-        href: "https://presupuestos.rebase.website",
-        host: "presupuestos.rebase.website",
-        // The app's own favicon: a square mark, so it is sized to sit level
-        // with the wordmarks the way dadaki's does.
-        logo: "/img/logos/presupuestos.svg" as string | null,
-        logoClass: "h-9 sm:h-10",
-        logoIsMark: true,
-        glow: "from-amber-500/25 via-primary/15 to-transparent"
-    },
-    {
-        id: "prospector",
-        image: "/img/showcase/prospector.webp",
-        key: "case4",
-        href: "https://prospector.rebase.website",
-        host: "prospector.rebase.website",
-        logo: null as string | null,
-        logoClass: "",
-        glow: "from-primary/25 via-violet-500/15 to-transparent"
-    },
-    {
-        id: "edith",
-        // No public address, so nothing to photograph: this one keeps a
-        // drawn figure. See the note on `href` below.
-        image: null as string | null,
-        key: "case6",
-        // A client's internal tool: there is no public address to send a reader
-        // to, so this card carries no link and `host` labels the chrome instead
-        // of naming a domain that does not answer.
-        href: null as string | null,
-        host: "internal · edith",
-        logo: null as string | null,
-        logoClass: "",
-        glow: "from-indigo-500/25 via-primary/15 to-transparent"
-    }
-];
+import { CASE_STUDIES as cases } from "../data/case-studies";
 ---
 
 {/* Closes the sequence, so it carries the numeral like every other chapter —
     the eyebrow already said "08" while nothing else on the section did. Cyan
     returns here from beat 01: the page opens and closes on the same hue. */}
-<Tag id={header ? "s-case-study" : undefined} class={header ? "chapter relative z-0 py-chapter" : "relative z-0"}>
+<section id="s-case-study" class="chapter relative z-0 py-chapter">
 
     <!-- Header: heading left, supporting copy right -->
-    {header && (
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 animate-on-scroll fade-in-up">
             <div>
@@ -126,9 +33,8 @@ const cases = [
                set:html={t("showcase.subtitle")}></p>
         </div>
     </div>
-    )}
 
-    <div class:list={["cs-carousel animate-on-scroll fade-in-up delay-100", header && "mt-block"]}
+    <div class="cs-carousel mt-block animate-on-scroll fade-in-up delay-100"
          role="region"
          aria-roledescription="carousel"
          aria-label={t("showcase.title.part1") + " " + t("showcase.title.part2")}>
@@ -255,11 +161,11 @@ const cases = [
 
                         <h3 class="mt-3 flex items-center gap-3 min-h-9">
                             {c.logo && (
-                                <img src={c.logo} alt={(c as any).logoIsMark ? "" : t(`showcase.${c.key}.title`)}
-                                     aria-hidden={(c as any).logoIsMark ? "true" : undefined}
+                                <img src={c.logo} alt={c.logoIsMark ? "" : t(`showcase.${c.key}.title`)}
+                                     aria-hidden={c.logoIsMark ? "true" : undefined}
                                      class={`${c.logoClass} w-auto`} loading="lazy"/>
                             )}
-                            {(!c.logo || (c as any).logoIsMark) && (
+                            {(!c.logo || c.logoIsMark) && (
                                 <span class="text-2xl font-semibold text-white tracking-tight">
                                     {t(`showcase.${c.key}.title`)}
                                 </span>
@@ -325,7 +231,7 @@ const cases = [
 
         <p class="sr-only" aria-live="polite" id="case-live"></p>
     </div>
-</Tag>
+</section>
 
 <style>
     .cs-carousel {

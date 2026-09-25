@@ -134,21 +134,21 @@ export function RealtimeMiniDemo() {
                     <div className="w-1.5 h-1.5 rounded-full bg-rose-500/70"></div>
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400/70"></div>
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/70"></div>
-                    <span className="ml-1 text-[8px] text-surface-400 truncate">{label}</span>
+                    <span className="ml-1 text-[10px] text-surface-400 truncate">{label}</span>
                     {justApplied && (
-                        <span className="ml-auto text-[7px] text-primary uppercase tracking-wider rt-fade shrink-0">synced</span>
+                        <span className="ml-auto text-[9px] text-primary uppercase tracking-wider rt-fade shrink-0">synced</span>
                     )}
                     {isOrigin && (phase === "click" || phase === "travel") && (
-                        <span className="ml-auto text-[7px] text-amber-400 uppercase tracking-wider rt-fade shrink-0">writing</span>
+                        <span className="ml-auto text-[9px] text-amber-400 uppercase tracking-wider rt-fade shrink-0">writing</span>
                     )}
                 </div>
 
                 {/* Table */}
                 <div className="relative flex-1 overflow-hidden">
                     <div className="flex px-2 items-center border-b border-hairline bg-surface-field" style={{ height: HEADER_H }}>
-                        <div className="flex-1 text-[7px] font-semibold text-surface-500 uppercase tracking-wider">name</div>
-                        <div className="w-12 text-[7px] font-semibold text-surface-500 uppercase tracking-wider">status</div>
-                        <div className="w-10 text-[7px] font-semibold text-surface-500 uppercase tracking-wider text-right">upd</div>
+                        <div className="flex-1 text-[9px] font-semibold text-surface-500 uppercase tracking-wider">name</div>
+                        <div className="w-12 text-[9px] font-semibold text-surface-500 uppercase tracking-wider">status</div>
+                        <div className="w-12 shrink-0 text-[9px] font-semibold text-surface-500 uppercase tracking-wider text-right">upd</div>
                     </div>
 
                     {data.map(row => {
@@ -160,11 +160,11 @@ export function RealtimeMiniDemo() {
                                 className={`flex px-2 items-center border-b border-hairline transition-colors duration-300 ${lit ? "bg-primary/10 ring-1 ring-inset ring-primary/25" : ""}`}
                                 style={{ height: ROW_H }}
                             >
-                                <div className="flex-1 text-[9px] text-white truncate">{row.name}</div>
+                                <div className="flex-1 text-[11px] text-white truncate">{row.name}</div>
                                 <div className="w-12">
-                                    <span className={`chip text-[8px] px-1 py-0.5 rounded-md transition-colors duration-300 ${statusColor(row.status)}`}>{row.status}</span>
+                                    <span className={`chip text-[10px] px-1 py-0.5 rounded-md transition-colors duration-300 ${statusColor(row.status)}`}>{row.status}</span>
                                 </div>
-                                <div className={`w-10 text-[8px] text-right truncate ${lit ? "text-primary" : "text-surface-500"}`}>{row.updated}</div>
+                                <div className={`w-12 shrink-0 text-[10px] text-right whitespace-nowrap ${lit ? "text-primary" : "text-surface-500"}`}>{row.updated}</div>
                             </div>
                         );
                     })}
@@ -197,7 +197,7 @@ export function RealtimeMiniDemo() {
 
                 {/* The socket between the two windows */}
                 <div className="w-12 shrink-0 flex flex-col items-center justify-center gap-1 relative">
-                    <span className="text-[7px] text-surface-500 uppercase tracking-wider">ws</span>
+                    <span className="text-[9px] text-surface-500 uppercase tracking-wider">ws</span>
                     <div className="relative w-full h-px bg-hairline">
                         {(phase === "travel" || phase === "click") && (
                             <span
@@ -205,7 +205,7 @@ export function RealtimeMiniDemo() {
                             ></span>
                         )}
                     </div>
-                    <span className={`text-[7px] uppercase tracking-wider transition-colors duration-300 ${phase === "travel" ? "text-primary" : "text-surface-500"}`}>
+                    <span className={`text-[9px] uppercase tracking-wider transition-colors duration-300 ${phase === "travel" ? "text-primary" : "text-surface-500"}`}>
                         {phase === "travel" ? (event.origin === "a" ? "a→b" : "b→a") : "live"}
                     </span>
                 </div>
@@ -216,13 +216,13 @@ export function RealtimeMiniDemo() {
             {/* Event log, on the card itself — it belongs to neither window */}
             <div className="flex items-center gap-1.5 shrink-0 overflow-hidden">
                 {phase === "idle" ? (
-                    <span className="text-[8px] text-surface-500 italic truncate">Both clients subscribed to users…</span>
+                    <span className="text-[10px] text-surface-500 italic truncate">Both clients subscribed to users…</span>
                 ) : (
-                    <span className="text-[8px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm truncate rt-fade">
+                    <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm truncate rt-fade">
                         {`UPDATE users SET status='${event.status}' WHERE id=${event.rowId}`}
                     </span>
                 )}
-                <span className="ml-auto text-[8px] text-surface-500 shrink-0">ws://localhost:3000/realtime</span>
+                <span className="ml-auto text-[10px] text-surface-500 shrink-0">ws://localhost:3000/realtime</span>
             </div>
 
             <style dangerouslySetInnerHTML={{ __html: `

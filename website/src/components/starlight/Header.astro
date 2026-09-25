@@ -5,6 +5,22 @@ import Search from "virtual:starlight/components/Search";
 import SiteTitle from "virtual:starlight/components/SiteTitle";
 import SocialIcons from "virtual:starlight/components/SocialIcons";
 import ThemeSelect from "virtual:starlight/components/ThemeSelect";
+import { languages, useTranslations } from "../../i18n/ui";
+
+// The marketing nav, so the docs are not a second site: every other page's
+// header has Product / Developers / Pricing, and the docs had none. Marketing
+// pages exist in four locales; `it` and `pt` docs readers get the English ones
+// (the same rule SiteTitle follows for the logo link).
+const docsLocale = Astro.locals.starlightRoute.locale ?? "";
+const siteLang = (docsLocale in languages ? docsLocale : "en") as keyof typeof languages;
+const t = useTranslations(siteLang);
+const prefix = siteLang === "en" ? "" : `/${siteLang}`;
+const siteNav = [
+    { label: t("nav.product"), href: `${prefix}/product` },
+    { label: t("nav.developers"), href: `${prefix}/developers` },
+    { label: t("nav.pricing"), href: `${prefix}/pricing` },
+    { label: t("footer.blog"), href: "/blog" },
+];
 
 // Render Search if Pagefind is enabled or the default component has been overridden
 const shouldRenderSearch =
@@ -16,9 +32,15 @@ const shouldRenderSearch =
         <SiteTitle/>
     </div>
 
-    <div class="flex min-w-0 flex-1 print:hidden">
-
-    </div>
+    <nav class="hidden min-w-0 flex-1 items-center gap-1 lg:flex print:hidden" aria-label="Rebase">
+        {siteNav.map((item) => (
+            <a href={item.href}
+               class="rounded-lg px-3 py-2 text-sm font-semibold text-surface-300 hover:text-white hover:bg-white/5 transition-colors">
+                {item.label}
+            </a>
+        ))}
+    </nav>
+    <div class="flex min-w-0 flex-1 lg:hidden print:hidden"></div>
 
     <div class="hidden items-center gap-4 md:flex print:hidden">
         <div class="lg:min-w-48">

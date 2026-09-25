@@ -3,7 +3,6 @@ const { lang, t } = Astro.props;
 
 import { NeatBackground } from '../../components/NeatBackground';
 import { useTranslatedPath } from '../../i18n/ui';
-import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo';
 
 const translatePath = useTranslatedPath(lang);
 
@@ -227,10 +226,40 @@ import { DEMO_URL } from "../../utils/links";
                         </svg>
                     </a>
                 </div>
+                {/* Its own figure. This used to be Studio's RLS editor — the same screen
+                    /security shows, one click away via the link beside it. Row one of
+                    the table is "where authorization is enforced", so the proof is the
+                    path that skips the app: the same query from psql. */}
                 <div class="lg:col-span-8">
-                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
-                        <RLSEditorDemo client:visible/>
-                    </div>
+                    <figure class="grid gap-4 md:grid-cols-2">
+                        {[
+                            {
+                                label: t("comparepage.fig.mw.label"),
+                                result: "12408",
+                                note: t("comparepage.fig.mw.note"),
+                                tone: "text-rose-300",
+                            },
+                            {
+                                label: t("comparepage.fig.pg.label"),
+                                result: "0",
+                                note: t("comparepage.fig.pg.note"),
+                                tone: "text-emerald-300",
+                            },
+                        ].map((side) => (
+                            <div class="frame overflow-hidden">
+                                <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
+                                    <span class="font-mono text-xs text-surface-400">{side.label}</span>
+                                </div>
+                                <div class="p-5 font-mono text-xs leading-relaxed">
+                                    <p class="text-surface-500">$ psql "$APP_ROLE_URL"</p>
+                                    <p class="text-surface-200">=&gt; select count(*) from orders;</p>
+                                    <p class={`mt-3 text-2xl font-semibold ${side.tone}`}>{side.result}</p>
+                                    <p class="mt-3 font-sans text-sm text-surface-400">{side.note}</p>
+                                </div>
+                            </div>
+                        ))}
+                        <figcaption class="md:col-span-2 text-sm text-surface-500">{t("comparepage.fig.caption")}</figcaption>
+                    </figure>
                 </div>
             </div>
         </div>

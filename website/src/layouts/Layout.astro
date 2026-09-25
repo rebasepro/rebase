@@ -15,6 +15,8 @@ import TypeDevPanel from "../components/TypeDevPanel.astro";
 import ManifestoBanner from "../components/ManifestoBanner.astro";
 
 import { getLangFromUrl, useTranslations, languages, defaultLang } from "../i18n/ui";
+import fs from "node:fs";
+import nodePath from "node:path";
 
 export interface BreadcrumbItem {
     name: string;
@@ -41,13 +43,25 @@ export interface Props {
 // the Organization schema below. One source, `index.meta.*`.
 const defaultT = useTranslations(getLangFromUrl(Astro.url));
 
+// A route's share card is public/img/og/<route>.png when one has been rendered
+// (scripts/generate_og_images.mjs), in every locale; otherwise the home card.
+// Derived rather than passed: 24 pages that never passed `ogImage` all shared
+// one card, and a new card should not need a second edit to be used.
+// check_site.mjs asserts the result, so a wrong working directory cannot make
+// this fall back to the home card silently.
+const routeSlug = Astro.url.pathname.replace(/^\/(?:es|de|fr)(?=\/|$)/, "").replace(/^\/+|\/+$/g, "") || "home";
+const routeCard = `/img/og/${routeSlug}.png`;
+const routeOgImage = fs.existsSync(nodePath.join(process.cwd(), "public", routeCard))
+    ? `https://rebase.pro${routeCard}`
+    : "https://rebase.pro/img/og/home.png";
+
 const {
     title = defaultT("index.meta.title"),
     description = defaultT("index.meta.description"),
     breadcrumbs,
     lang = getLangFromUrl(Astro.url),
     showBanner = false,
-    ogImage = "https://rebase.pro/img/og/home.png",
+    ogImage = routeOgImage,
     ogType = "website",
     noindex = false
 } = Astro.props;

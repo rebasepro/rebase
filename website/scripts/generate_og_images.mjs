@@ -108,6 +108,151 @@ const CARDS = [
         eyebrow: "Blog",
         title: "Notes from building Rebase",
         sub: "What we shipped, what broke, and what it taught us."
+    },
+    {
+        slug: "product",
+        eyebrow: "Product",
+        title: "One definition. Everything it produces.",
+        sub: "REST, a typed SDK, realtime, auth, storage and an admin panel, from one TypeScript file."
+    },
+    {
+        slug: "security",
+        eyebrow: "Security",
+        title: "Secured by the database. Not by middleware.",
+        sub: "Access rules compile to Postgres row-level security. A table with no policy is refused."
+    },
+    {
+        slug: "ai",
+        eyebrow: "AI & agents",
+        title: "A key permission is not a policy.",
+        sub: "An MCP server with scoped keys, and row-level security underneath it."
+    },
+    {
+        slug: "cms",
+        eyebrow: "Rebase CMS",
+        title: "The same definition, rendered for people.",
+        sub: "Spreadsheet editing, media, relations and roles, generated from your collections."
+    },
+    {
+        slug: "studio",
+        eyebrow: "Rebase Studio",
+        title: "Run your database from the same panel.",
+        sub: "SQL editor, schema builder, RLS policies, branches and logs."
+    },
+    {
+        slug: "ui",
+        eyebrow: "Component library",
+        title: "The components the panel is built from.",
+        sub: "The React components behind the admin panel, yours to build with."
+    },
+    {
+        slug: "developers",
+        eyebrow: "Developers",
+        title: "Schema as code. Everything else follows.",
+        sub: "Scaffold, generate the typed SDK, extend in React, deploy."
+    },
+    {
+        slug: "sdk",
+        eyebrow: "Typed SDK",
+        title: "One client. Typed from your schema.",
+        sub: "Queries, auth, storage and realtime, checked at compile time."
+    },
+    {
+        slug: "cli",
+        eyebrow: "CLI",
+        title: "One CLI for the whole lifecycle.",
+        sub: "Scaffold, generate, migrate and deploy from one command line."
+    },
+    {
+        slug: "europe",
+        eyebrow: "Sovereignty",
+        title: "Sovereignty is not a region setting.",
+        sub: "Run it yourself and there is no second party. Or let a Spanish company run it."
+    },
+    {
+        slug: "about",
+        eyebrow: "About",
+        title: "Authorization belongs in the database.",
+        sub: "Why Rebase exists, and what is next on the roadmap."
+    },
+    {
+        slug: "manifesto",
+        eyebrow: "Manifesto",
+        title: "Why we're building Rebase",
+        sub: "Your schema stays yours, and the database enforces the rules."
+    },
+    {
+        slug: "agencies",
+        eyebrow: "For agencies",
+        title: "The client keeps the database. You keep the code.",
+        sub: "A backend and a back office on the client's own Postgres."
+    },
+    {
+        slug: "startups",
+        eyebrow: "For startups",
+        title: "The backend first. The back office when you need it.",
+        sub: "REST, a typed SDK and auth today; the admin panel when a human needs it."
+    },
+    {
+        slug: "contact",
+        eyebrow: "Contact",
+        title: "Talk to the people building it.",
+        sub: "Book a call, or find us on Discord and GitHub."
+    },
+    {
+        slug: "kit-digital",
+        eyebrow: "Kit Digital",
+        title: "Kit Digital programme",
+        sub: "Rebase is a registered digitalising agent in Spain."
+    },
+    {
+        slug: "rebase-vs-supabase",
+        eyebrow: "Compare",
+        title: "Rebase vs Supabase",
+        sub: "Both run on Postgres. Where the access rules live, and the local developer loop."
+    },
+    {
+        slug: "rebase-vs-firebase",
+        eyebrow: "Compare",
+        title: "Rebase vs Firebase",
+        sub: "Relational data you own, instead of documents in someone else's store."
+    },
+    {
+        slug: "rebase-vs-payload",
+        eyebrow: "Compare",
+        title: "Rebase vs Payload",
+        sub: "A backend with an admin panel, or a headless CMS, both on Postgres."
+    },
+    {
+        slug: "rebase-vs-directus",
+        eyebrow: "Compare",
+        title: "Rebase vs Directus",
+        sub: "A schema written as code, or one the admin app owns."
+    },
+    {
+        slug: "rebase-vs-strapi",
+        eyebrow: "Compare",
+        title: "Rebase vs Strapi",
+        sub: "Your Postgres introspected, or a schema the CMS owns."
+    },
+    {
+        slug: "rebase-vs-retool",
+        seedKey: "og/rebase-vs-retool#2",
+        eyebrow: "Compare",
+        title: "Rebase vs Retool",
+        sub: "An open-source admin panel generated from your schema, or screens drawn by hand."
+    },
+    {
+        slug: "rebase-vs-hasura",
+        eyebrow: "Compare",
+        title: "Rebase vs Hasura",
+        sub: "REST, a typed SDK and an admin panel, or a GraphQL API."
+    },
+    {
+        slug: "rebase-vs-django",
+        eyebrow: "Compare",
+        title: "Rebase vs Django",
+        sub: "A React admin panel over your Postgres, or the Django admin."
     }
 ];
 
@@ -292,7 +437,9 @@ for (const card of CARDS) {
         // `poseFor` keys the texture seed on the slug alone, so a seed whose
         // texture is all void blanks every seat of the orbit — which is what
         // `og/home` did. Later seats redraw the texture too.
-        const key = `og/${card.slug}`;
+        // `seedKey` re-rolls a slug whose whole orbit comes out flat
+        // (og/rebase-vs-retool did: eight blank seats) without renaming the file.
+        const key = card.seedKey ?? `og/${card.slug}`;
         const pose = {
             ...poseFor(key, seat * GOLDEN),
             ...(seat ? { textureSeed: Math.floor(1 + 997 * hash01(`${key}#texture#${seat}`)) } : {}),

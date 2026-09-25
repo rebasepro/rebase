@@ -159,6 +159,17 @@ for (const [route, file] of [...pages].sort()) {
     }
 }
 
+// 5a. A route with a rendered share card uses it. Layout derives og:image from
+//     the route and falls back to the home card, so a build run from the wrong
+//     working directory would quietly give every page the home card again —
+//     the state 24 pages were in before 2026-09-25.
+for (const [route, file] of pages) {
+    const slug = route.replace(/^\/(?:es|de|fr)(?=\/|$)/, "").replace(/^\/+|\/+$/g, "") || "home";
+    if (!files.has(`img/og/${slug}.png`)) continue;
+    const og = readFileSync(file, "utf8").match(/<meta\s+property="og:image"\s+content="([^"]*)"/)?.[1];
+    if (!og?.endsWith(`/img/og/${slug}.png`)) fail(route, "og-image-not-the-route-card", og ?? "missing");
+}
+
 // 5b. The same sheet over the English `.md` mirrors (`/product.md`, …).
 for (const f of files) {
     if (!/^[a-z0-9-]+\.md$/.test(f)) continue;
