@@ -481,6 +481,72 @@ connectionString: "postgres://u:s3cr3t@h/app" };
     });
 });
 
+/**
+ * The control plane's `backup` function describes a backup as `{ id, name,
+ * type, size, date, status }`, with `size` already formatted ("12.34 MB", or
+ * "unknown" when it could not be read). The CLI read `filename` and divided
+ * `size` by a megabyte, so every row printed `undefined … NaN MB` and `create`
+ * printed "(unknown)" — the one name `restore` and `download` need.
+ */
+describe("db backup, in the shape the control plane sends", () => {
+    const backup = {
+        id: "3f1a",
+        name: "manual-backup-1758900000000.sql",
+        type: "manual",
+        size: "12.34 MB",
+        date: "2025-09-26 15:20:00 UTC",
+        status: "completed"
+    };
+
+    function captureAll(): { text: () => string; restore: () => void } {
+        const chunks: string[] = [];
+        // eslint-disable-next-line no-control-regex
+        const ANSI = /\u001b\[[0-9;]*m/g;
+        const push = (...args: unknown[]) => { chunks.push(args.map(String).join(" ")); };
+        const log = vi.spyOn(console, "log").mockImplementation(push);
+        const err = vi.spyOn(console, "error").mockImplementation(push);
+        return {
+            text: () => chunks.join("\n").replace(ANSI, ""),
+            restore: () => { log.mockRestore(); err.mockRestore(); }
+        };
+    }
+
+    it("lists each backup by the filename restore and download take, with its size and date", async () => {
+        setJsonModeForTest(false);
+        const unsized = { ...backup, id: "9c2b", name: "automated-backup-1758800000000.sql", type: "automated", size: "unknown" };
+        useClient(fakeClient({
+            invoke: async (_n, _b, opts) => {
+                expect(opts?.path).toBe("list/proj_1");
+                return { backups: [backup, unsized] };
+            }
+        }));
+        const cap = captureAll();
+        await dbCommand("backup", ["node", "rebase", "cloud", "db", "backup", "list"]);
+        cap.restore();
+        setJsonModeForTest(true);
+
+        const text = cap.text();
+        expect(text).toContain("manual-backup-1758900000000.sql");
+        expect(text).toContain("12.34 MB");
+        expect(text).toContain("2025-09-26 15:20:00 UTC");
+        expect(text).toContain("automated-backup-1758800000000.sql");
+        expect(text).not.toContain("undefined");
+        expect(text).not.toContain("NaN");
+    });
+
+    it("names the backup it created", async () => {
+        setJsonModeForTest(false);
+        useClient(fakeClient({ invoke: async () => ({ success: true, backup }) }));
+        const cap = captureAll();
+        await dbCommand("backup", ["node", "rebase", "cloud", "db", "backup", "create"]);
+        cap.restore();
+        setJsonModeForTest(true);
+
+        expect(cap.text()).toContain("Backup created: manual-backup-1758900000000.sql");
+        expect(cap.text()).not.toContain("(unknown)");
+    });
+});
+
 /* ── deployment history shaping ─────────────────────────────────── */
 
 describe("deployments list --json", () => {

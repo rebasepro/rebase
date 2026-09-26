@@ -43,11 +43,34 @@ interface DatabaseRow {
     pitrEnabled?: boolean;
 }
 
+/**
+ * One backup, as the control plane's `backup` function describes it.
+ *
+ * `name` is the filename `restore` and `download` take. `size` arrives already
+ * formatted — "12.34 MB", or "unknown" when the platform could not read it —
+ * and is printed as given. `filename` and a numeric `size` are read too, so a
+ * row from any control plane renders.
+ */
 interface BackupRow {
-    filename: string;
-    size?: number;
-    createdAt?: string;
+    id?: string;
+    name?: string;
+    filename?: string;
+    size?: string | number;
     type?: string;
+    date?: string;
+    status?: string;
+}
+
+/** The filename a backup is restored and downloaded by. */
+function backupName(row: BackupRow | undefined): string | undefined {
+    return row?.name ?? row?.filename;
+}
+
+/** A backup's size for a person: the control plane's own string, or bytes as MB. */
+function backupSize(row: BackupRow): string | undefined {
+    if (typeof row.size === "string") return row.size;
+    if (typeof row.size === "number" && Number.isFinite(row.size)) return `${(row.size / 1024 / 1024).toFixed(1)} MB`;
+    return undefined;
 }
 
 export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -582,7 +605,7 @@ type: "manual" },
             );
             if (!res.success) fail(res.error || "Backup failed.");
             emit(
-                () => success(`Backup created: ${res.backup?.filename ?? "(unknown)"}`),
+                () => success(`Backup created: ${backupName(res.backup) ?? "(unnamed)"}`),
                 { success: true,
 backup: res.backup ?? null }
             );
@@ -683,8 +706,8 @@ path: `list/${projectId}` }
                     return;
                 }
                 for (const b of res.backups) {
-                    const size = b.size !== undefined ? `${(b.size / 1024 / 1024).toFixed(1)} MB` : "";
-                    console.log(`  ${chalk.bold(b.filename)}  ${chalk.gray(`${b.type ?? ""} ${size}`.trim())}`);
+                    const detail = [b.type, backupSize(b), b.date].filter(Boolean).join("  ");
+                    console.log(`  ${chalk.bold(backupName(b) ?? "(unnamed)")}  ${chalk.gray(detail)}`);
                 }
                 console.log("");
             },
