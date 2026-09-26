@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { cls } from "../../../util";
 import { focusedDisabled } from "../../../styles";
 import { DateTimeField } from "../../DateTimeField";
@@ -30,15 +30,65 @@ export function VirtualTableDateField(props: {
     // column with gaps in it read as a column of placeholders, one per row.
     // The mask is only useful once someone is typing into it.
     const [focused, setFocused] = useState(false);
-    const empty = !internalValue;
+    const focusedRef = useRef(false);
+
+    // A typed date is written once it is complete, not once per keystroke:
+    // the input reports each one, and retyping a year passes through 0002,
+    // 0020 and 0202 on its way to 2026. While the field has the focus a change
+    // waits for the typing to pause — and a year of fewer than four digits for
+    // more typing — and leaving the field writes what it holds. A date picked
+    // with the field unfocused is written at once.
+    const [draft, setDraft] = useState<{ value: Date | null } | null>(null);
+    const draftRef = useRef<{ value: Date | null } | null>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const updateValueRef = useRef(updateValue);
+    useEffect(() => {
+        updateValueRef.current = updateValue;
+    }, [updateValue]);
+
+    const commit = useCallback(() => {
+        clearTimeout(timerRef.current);
+        const pending = draftRef.current;
+        if (!pending) return;
+        draftRef.current = null;
+        setDraft(null);
+        updateValueRef.current(pending.value);
+    }, []);
+
+    const onDateChange = (dateValue: Date | null) => {
+        const pending = { value: dateValue ?? null };
+        draftRef.current = pending;
+        setDraft(pending);
+        clearTimeout(timerRef.current);
+        if (!focusedRef.current) {
+            commit();
+        } else if (!pending.value || pending.value.getFullYear() >= 1000) {
+            timerRef.current = setTimeout(commit, 400);
+        }
+    };
+
+    useEffect(() => () => {
+        clearTimeout(timerRef.current);
+        if (draftRef.current) updateValueRef.current(draftRef.current.value);
+    }, []);
+
+    const shownValue = draft ? draft.value : internalValue;
+    const empty = !shownValue;
 
     return (
         <div className={"w-full h-full flex items-center"}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}>
+            onFocus={() => {
+                focusedRef.current = true;
+                setFocused(true);
+            }}
+            onBlur={() => {
+                focusedRef.current = false;
+                setFocused(false);
+                commit();
+            }}>
             <DateTimeField
-                value={internalValue ?? undefined}
-                onChange={(dateValue) => updateValue(dateValue ?? null)}
+                value={shownValue ?? undefined}
+                onChange={onDateChange}
                 // Same omission as `VirtualTableInput`: destructured and forwarded
                 // nowhere, so a disabled date cell was still editable. `error` went
                 // the same way — it drives `DateTimeField`'s invalid styling, and a

@@ -209,17 +209,25 @@ hour12: false,
                 [hours, minutes] = timePart.split(":").map(Number);
             }
 
+            // Built field by field: `new Date(year, …)` and `Date.UTC(year, …)`
+            // read a year of 0–99 as 1900–1999, so a year typed digit by digit
+            // (0002, 0020) came out as 1902 and 1920.
             let resultDate: Date;
 
             if (!timezone) {
                 // No timezone specified: interpret input as local time (backward compatible)
-                resultDate = new Date(year, month - 1, day, hours, minutes);
+                resultDate = new Date(0);
+                resultDate.setFullYear(year, month - 1, day);
+                resultDate.setHours(hours, minutes, 0, 0);
             } else {
                 // Timezone specified: interpret input as that timezone and convert to UTC.
                 // If the user entered 00:00 in Mexico (UTC-6, offset=-360), the
                 // wall-clock time read as UTC is 00:00Z, and subtracting -360
                 // minutes gives 06:00 UTC.
-                const wallClockAsUtc = Date.UTC(year, month - 1, day, hours, minutes);
+                const wallClock = new Date(0);
+                wallClock.setUTCFullYear(year, month - 1, day);
+                wallClock.setUTCHours(hours, minutes, 0, 0);
+                const wallClockAsUtc = wallClock.getTime();
 
                 // The offset belongs to the instant being entered, not to the
                 // wall-clock time read as UTC: within hours of a DST switch those
