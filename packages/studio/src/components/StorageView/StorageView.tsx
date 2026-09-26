@@ -596,6 +596,14 @@ export const StorageView = () => {
         fetchContents(currentPath);
     }, [currentPath, fetchContents, selectedSourceKey]);
 
+    // What was previewed and selected belongs to the listing it was picked in.
+    const clearSelection = useCallback(() => {
+        setSelectedFile(null);
+        setSelectedDownloadUrl(null);
+        setSelectedPaths(new Set());
+        lastClickedRef.current = null;
+    }, []);
+
     // Navigate to path
     //
     // Updates only this view's own parameter and leaves the rest of the query
@@ -612,11 +620,16 @@ export const StorageView = () => {
             else next.delete(STORAGE_PATH_PARAM);
             return next;
         }, { replace: true });
-        setSelectedFile(null);
-        setSelectedDownloadUrl(null);
-        setSelectedPaths(new Set());
-        lastClickedRef.current = null;
-    }, [setSearchParams]);
+        clearSelection();
+    }, [setSearchParams, clearSelection]);
+
+    // Switching source keeps the folder path, not the files picked in it: the
+    // preview's and the selection's actions run through the selected source,
+    // so a file opened in one would be deleted, by its path, from the other.
+    const handleSourceChange = useCallback((key: string) => {
+        setSelectedSourceKey(key);
+        clearSelection();
+    }, [clearSelection]);
 
     // Navigate up one level
     const handleNavigateUp = useCallback(() => {
@@ -1347,7 +1360,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             position="item-aligned"
                                             value={selectedSourceKey}
                                             onValueChange={(value) => {
-                                                if (value) setSelectedSourceKey(value);
+                                                if (value && value !== selectedSourceKey) handleSourceChange(value);
                                             }}
                                             renderValue={(key) => {
                                                 const label = storageSources.registry[key]?.label;
