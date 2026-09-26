@@ -380,8 +380,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud domains add",
         usage: "cloud domains add <domain>",
         summary:
-            "Register a custom domain on this project and print the DNS records to publish. "
-            + "Registering is not verifying — run `domains verify` once the records are live.",
+            "Register a custom domain on this project, beside any it already has, and print the DNS records to publish. "
+            + "Registering is not verifying — run `domains verify <domain>` once the records are live.",
         flags: [],
         examples: ["rebase cloud domains add app.example.com"],
         notes: [
@@ -394,8 +394,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud domains remove",
         usage: "cloud domains remove <domain>",
         summary:
-            "Unregister a custom domain. The project keeps serving on its <slug>.rebase.website host. "
-            + "Aliases: `rm`, `delete`.",
+            "Stop serving one custom domain. The project keeps its other domains and its <slug>.rebase.website host. "
+            + "The domain may be left out when the project has only one. Aliases: `rm`, `delete`.",
         flags: [],
         examples: ["rebase cloud domains remove app.example.com"]
     },

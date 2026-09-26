@@ -404,7 +404,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "debug", section: "Deploy & observe", description: "Diagnose a misbehaving deployment. Read-only" },
 
     { action: "env", section: "Config", description: "Environment variables" },
-    { action: "domains", section: "Config", description: "Custom domain, its DNS records, and verification" },
+    { action: "domains", section: "Config", description: "Custom domains, their DNS records, and verification" },
     { action: "extensions", section: "Config", description: "The Postgres extension allowlist" },
     { action: "settings", section: "Config", description: "Name, subdomain, repository, branch" },
 
