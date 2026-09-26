@@ -46,7 +46,7 @@ import { resolveSoftDelete } from "./services/soft-delete";
 import { runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
-import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
+import { isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
@@ -885,7 +885,11 @@ export class PostgresBackendDriver implements DataDriver {
             // fail the write here — the policy is about to refuse it anyway,
             // and refusing with the wrong message would be worse than letting
             // the database answer. `complete: false` is what says "no evidence
-            // of absence"; see `resolveTenantWrite`.
+            // of absence"; see `resolveTenantWrite`. A statement the database
+            // refused is the exception: it has aborted the write's
+            // transaction, so the database can no longer answer anything but
+            // 25P02, and its own refusal is the better message.
+            if (reachedDatabase(err)) throw err;
             logger.debug(`[save] Could not read '${slug}' to resolve the caller's tenants`, {
                 detail: err instanceof Error ? err.message : String(err)
             });
@@ -968,6 +972,10 @@ export class PostgresBackendDriver implements DataDriver {
             } catch (err) {
                 // The refusal above is the answer, not a failed enrichment.
                 if (err instanceof ApiError) throw err;
+                // So is a statement the database refused: on a request it
+                // has aborted the write's transaction, and carrying on only
+                // turns the next statement into an unrelated 25P02.
+                if (reachedDatabase(err)) throw err;
                 // Best-effort enrichment: callbacks and history run without
                 // previous values rather than the save failing on a read the
                 // write itself does not need (e.g. a collection whose key the
@@ -2367,6 +2375,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 // Last, inside the transaction: whatever the callbacks started
                 // on it finishes before the commit rather than after it.
                 await writeScope?.settle();
+                // A failure a callback caught has still aborted the
+                // transaction, and its COMMIT would be a ROLLBACK that
+                // reports success. Refused here, so the caller is told.
+                await writeScope?.assertCommittable();
                 return out;
             }, options)).finally(() => writeScope?.close())
         );

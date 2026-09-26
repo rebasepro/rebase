@@ -27,6 +27,7 @@ import {
     type VisibleTargets
 } from "./junction-writes";
 import { serializePropertyToServer } from "../data-transformer";
+import { reachedDatabase } from "../utils/pg-error-utils";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -562,8 +563,11 @@ export class RelationWriteService {
                 // save as done while the database had rejected the write, which
                 // is the whole defect this path was just fixed for. `name` as
                 // well as `instanceof`, because a skewed install can hold two
-                // copies of the server package.
-                if (e instanceof ApiError || (e as Error)?.name === "ApiError") throw e;
+                // copies of the server package. Nor is a statement the
+                // database refused: it has aborted the transaction, so the
+                // other relations cannot be written anyway, and swallowing it
+                // left the next statement to fail with an unrelated 25P02.
+                if (e instanceof ApiError || (e as Error)?.name === "ApiError" || reachedDatabase(e)) throw e;
                 logger.warn(`Failed to update inverse relation '${relation.relationName}'`, { error: e });
             }
         }

@@ -1,6 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { logger, type AmbientTransaction } from "@rebasepro/server";
+import { sql } from "drizzle-orm";
+import { ApiError, logger, type AmbientTransaction } from "@rebasepro/server";
 import type { DrizzleClient } from "../interfaces";
+import { extractPgError } from "../utils/pg-error-utils";
 
 type RunSql = (sqlText: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
 
@@ -27,6 +29,8 @@ export class WriteTransactionScope implements AmbientTransaction {
     private open = true;
     private readonly inflight = new Set<Promise<unknown>>();
     private readonly commitHooks: Array<() => void> = [];
+    /** The first tracked statement that failed, whether or not its caller caught it. */
+    private failure?: unknown;
 
     /** The transaction handle, for statements in this package that are already written against drizzle. */
     tx?: DrizzleClient;
@@ -62,7 +66,10 @@ export class WriteTransactionScope implements AmbientTransaction {
         const settled = Promise.resolve(statement);
         this.inflight.add(settled);
         const done = () => { this.inflight.delete(settled); };
-        settled.then(done, done);
+        settled.then(done, (error: unknown) => {
+            this.failure ??= error;
+            done();
+        });
         return settled;
     }
 
@@ -81,6 +88,45 @@ export class WriteTransactionScope implements AmbientTransaction {
             await Promise.allSettled([...this.inflight]);
         }
         this.open = false;
+    }
+
+    /**
+     * Refuse to commit a transaction a failed statement has aborted.
+     *
+     * Once any statement fails, Postgres aborts the whole transaction, and
+     * catching the error in JavaScript does not undo that. The COMMIT that
+     * follows is answered with the tag `ROLLBACK` and no error, so the driver
+     * resolves it: the write reported success — 200, webhooks, realtime,
+     * the idempotency record — while nothing was stored. A callback that
+     * wrapped a lookup or a job enqueue in `try/catch` was enough.
+     *
+     * So one statement is asked of the transaction before its commit. On an
+     * aborted one it fails with `25P02`, and the write is refused and rolled
+     * back instead. A failed `context.data` write is not caught by this: it
+     * runs in a savepoint, is undone on its own, and leaves the transaction
+     * usable — which is what makes catching one safe.
+     */
+    async assertCommittable(): Promise<void> {
+        if (!this.tx) return;
+        try {
+            await this.tx.execute(sql`SELECT 1`);
+        } catch (error) {
+            if (extractPgError(error)?.code !== "25P02") throw error;
+            logger.error(
+                "[transaction] A statement on this write's transaction failed and its error was caught; the write was rolled back",
+                { error: this.failure ?? error }
+            );
+            const refusal = new ApiError(
+                500,
+                "TRANSACTION_ABORTED",
+                "A statement on this write's transaction failed and its error was caught. That aborts the " +
+                "transaction in Postgres, so the write was rolled back and nothing was stored. A failed " +
+                "`context.data` write is undone on its own and may be caught; any other failed statement " +
+                "(a read, a job enqueue) has to be let through."
+            );
+            refusal.cause = this.failure ?? error;
+            throw refusal;
+        }
     }
 
     /**
