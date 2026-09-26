@@ -11,13 +11,18 @@
  * The popup editor for the same cell read the value as `values["address.street"]`,
  * a key that does not exist on nested form values, so it saved `undefined` and
  * reported success.
+ *
+ * The whole map is built from the row the cell was rendered with. The cell's
+ * memo compared only its own value, so a row read back with a sibling key
+ * changed (`address.city`, edited in the next column) never reached the
+ * `address.street` cell, and its next edit sent the old city back.
  */
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
-import type { OnCellValueChangeParams } from "@rebasepro/app";
+import type { Entity, StringProperty } from "@rebasepro/types";
+import type { AdminCollection, RebaseContext, SelectedCellProps } from "@rebasepro/cms-types";
+import type { DataCollectionTableController, OnCellValueChangeParams } from "@rebasepro/app";
 
 // jsdom has no ResizeObserver; the popup observes its own size to stay on screen.
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -29,19 +34,20 @@ if (typeof globalThis.ResizeObserver === "undefined") {
     Object.defineProperty(globalThis, "ResizeObserver", { value: NoopResizeObserver, configurable: true });
 }
 
-type SaveCall = { values: Record<string, unknown> };
+type SaveCall = { values: Record<string, unknown>; previousValues?: Record<string, unknown> };
 const saves: SaveCall[] = [];
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
         saveEntityWithCallbacks: async (props: SaveCall & { afterSave?: () => void }) => {
-            saves.push({ values: props.values });
+            saves.push({ values: props.values, previousValues: props.previousValues });
             props.afterSave?.();
         },
         useRebaseContext: () => ({}),
         useAuthController: () => ({ user: null }),
-        useCustomizationController: () => ({ plugins: [] }),
-        useData: () => ({ collection: () => ({}) })
+        useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, locale: undefined }),
+        useData: () => ({ collection: () => ({}) }),
+        useTranslation: () => ({ t: (key: string) => key })
     };
     return new Proxy({}, {
         get: (_t, key: string | symbol) =>
@@ -57,6 +63,8 @@ jest.mock("../../src/form", () => ({
 
 import { useCollectionInlineEditor } from "../../src/components/CollectionViewBinding/hooks/useCollectionInlineEditor";
 import { PopupFormFieldInternal } from "../../src/components/CollectionTableBinding/internal/popup_field/PopupFormField";
+import { PropertyTableCell } from "../../src/components/CollectionTableBinding/PropertyTableCell";
+import { SelectableTableContext } from "../../src/components/SelectableTable/SelectableTableContext";
 
 type Customer = { address: { street: string; city: string }; tags?: string[] };
 
@@ -140,5 +148,73 @@ describe("inline editing a key inside a map", () => {
         expect(onCellValueChange).toHaveBeenCalledTimes(1);
         expect(onCellValueChange.mock.calls[0][0].value).toBe("Old St");
         expect(onCellValueChange.mock.calls[0][0].propertyKey).toBe("address.street");
+    });
+
+    it("a spread child cell builds the map from the row as it is now, not as it last saw it", async () => {
+        let selected: SelectedCellProps | undefined;
+        const listeners = new Set<() => void>();
+        const store = {
+            getEntity: () => selected,
+            subscribe: (listener: () => void) => {
+                listeners.add(listener);
+                return () => { listeners.delete(listener); };
+            },
+            select: (cell?: SelectedCellProps) => {
+                selected = cell;
+                listeners.forEach((listener) => listener());
+            }
+        };
+        const streetProperty: StringProperty = { type: "string", name: "Street" };
+
+        function StreetCell({ row }: { row: Entity<Customer> }) {
+            const { onValueChange } = useCollectionInlineEditor<Customer>({
+                path: "customers",
+                collection,
+                dataClient: {} as never,
+                context: {} as RebaseContext
+            });
+            const controller: DataCollectionTableController<Record<string, unknown>> = {
+                selectionStore: store,
+                select: store.select,
+                onValueChange,
+                size: "m"
+            };
+            return <SelectableTableContext.Provider value={controller}>
+                <PropertyTableCell propertyKey={"address.street"}
+                    columnIndex={1}
+                    align={"left"}
+                    value={row.values.address.street}
+                    readonly={false}
+                    property={streetProperty}
+                    height={40}
+                    width={200}
+                    entity={row}
+                    path={"customers"}
+                    disabled={false}/>
+            </SelectableTableContext.Provider>;
+        }
+
+        const view = render(<StreetCell row={{ id: "1", path: "customers", values: { address: { street: "Old St", city: "Berlin" } } }}/>);
+        // The city cell was edited and saved; the row is read back with the
+        // new city and the street untouched.
+        view.rerender(<StreetCell row={{ id: "1", path: "customers", values: { address: { street: "Old St", city: "Munich" } } }}/>);
+
+        act(() => store.select({
+            propertyKey: "address.street",
+            entityPath: "customers",
+            entityId: "1",
+            cellRect: new DOMRect(0, 0, 200, 40),
+            width: 200,
+            height: 40
+        }));
+        const editor = screen.getByRole("textbox");
+        fireEvent.change(editor, { target: { value: "New St" } });
+        await act(async () => {
+            fireEvent.blur(editor);
+        });
+
+        expect(saves).toHaveLength(1);
+        expect(saves[0].values).toEqual({ address: { street: "New St", city: "Munich" } });
+        expect(saves[0].previousValues).toEqual({ address: { street: "Old St", city: "Munich" } });
     });
 });

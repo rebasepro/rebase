@@ -417,6 +417,10 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
     },
     areEqual) as React.FunctionComponent<PropertyTableCellProps<any>>;
 
+// The row is compared as well as the cell's own value: a save is built from
+// `entity.values` — a key inside a map is written as the whole map — and hands
+// them to `beforeSave` as the previous values, so a cell must not hold on to a
+// row that has since changed in another column or in a sibling key.
 function areEqual(prevProps: PropertyTableCellProps<any>, nextProps: PropertyTableCellProps<any>) {
     return prevProps.height === nextProps.height &&
         prevProps.propertyKey === nextProps.propertyKey &&
@@ -426,6 +430,7 @@ function areEqual(prevProps: PropertyTableCellProps<any>, nextProps: PropertyTab
         equal(prevProps.value, nextProps.value) &&
         prevProps.entity.id === nextProps.entity.id &&
         prevProps.entity.path === nextProps.entity.path &&
+        (prevProps.entity === nextProps.entity || equal(prevProps.entity.values, nextProps.entity.values)) &&
         prevProps.isDragging === nextProps.isDragging &&
         prevProps.isDraggable === nextProps.isDraggable &&
         prevProps.frozen === nextProps.frozen
