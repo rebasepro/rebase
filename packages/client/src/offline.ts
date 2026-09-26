@@ -839,6 +839,13 @@ data: u.data as AnyRow })),
                 options?: WriteOptions
             ) => {
                 await this.ensureCollection(slug);
+                // As in `create`: the key the edit is sent under is the key
+                // its replay is sent under, so a replay of an edit that already
+                // committed is answered from the server's record of it rather
+                // than applied again over whatever was written since.
+                const idempotencyKey = options?.idempotencyKey ?? createMutationId();
+                let sent = false;
+                let sendFailure: unknown;
                 // Never overtake a write already queued for this row. The
                 // reads already respect the queue; the writes did not, so an
                 // edit made while the row's own create was still pending went
@@ -847,7 +854,7 @@ data: u.data as AnyRow })),
                 // Queuing keeps the order the app issued the writes in.
                 if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
                     try {
-                        const row = await inner.update(id, data, options);
+                        const row = await inner.update(id, data, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
                         await this.ingest(slug, [row]);
                         this.notifyCollection(slug);
@@ -855,6 +862,8 @@ data: u.data as AnyRow })),
                     } catch (error) {
                         if (!isNetworkError(error)) throw error;
                         this.connectivity.markFailure();
+                        sent = true;
+                        sendFailure = error;
                     }
                 }
                 // A field operation is an expression over the *stored* value,
@@ -864,6 +873,18 @@ data: u.data as AnyRow })),
                 // spread the marker object into the column, so a UI showing
                 // `views` would render `{ $inc: 1 }` until the queue drained.
                 if (hasFieldOperation(data as Record<string, unknown>)) {
+                    // Sent, and no answer: it may well have been applied. "It
+                    // cannot be applied, retry" would apply it twice — so the
+                    // caller hears that the outcome is unknown, and gets the key
+                    // under which a retry is applied at most once.
+                    if (sent) {
+                        throw new RebaseApiError(
+                            `The connection failed after a field operation on "${slug}" was sent, so it may ` +
+                            "or may not have been applied. Retry it with the idempotencyKey in `details` " +
+                            "to apply it at most once.",
+                            { status: 0, code: "NETWORK_ERROR", details: { idempotencyKey }, cause: sendFailure }
+                        );
+                    }
                     throw new RebaseClientError(
                         `Cannot apply a field operation to "${slug}" while offline: it is evaluated ` +
                         "against the stored value, which this device does not have a current copy of. " +
@@ -877,6 +898,7 @@ data: u.data as AnyRow })),
                     type: "update",
                     id,
                     data: data as AnyRow,
+                    ...(sent ? { sent: { idempotencyKey } } : {}),
                     rollback: { rows: { [String(id)]: base ?? null } }
                 });
                 const optimistic = optimisticRow<M>({ ...(base ?? {}), ...(data as AnyRow) }, id);
@@ -887,12 +909,18 @@ data: u.data as AnyRow })),
 
             delete: async (id: string | number, options?: WriteOptions) => {
                 await this.ensureCollection(slug);
+                // Keyed from the first attempt, because a delete is the write
+                // a lost answer hurts most: its replay finds the row gone and
+                // answers 404, which the queue takes for a refusal — rolling
+                // back, and reporting as failed, a delete that succeeded.
+                const idempotencyKey = options?.idempotencyKey ?? createMutationId();
+                let sent = false;
                 // As in `update`: a delete must not overtake this row's own
                 // queued create, or it 404s and the create then lands behind
                 // it, leaving the row the caller just deleted.
                 if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
                     try {
-                        await inner.delete(id, options);
+                        await inner.delete(id, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
                         this.removeLocalRow(slug, id, true);
                         this.notifyCollection(slug);
@@ -901,12 +929,14 @@ data: u.data as AnyRow })),
                     } catch (error) {
                         if (!isNetworkError(error)) throw error;
                         this.connectivity.markFailure();
+                        sent = true;
                     }
                 }
                 await this.enqueue({
                     collection: slug,
                     type: "delete",
                     id,
+                    ...(sent ? { sent: { idempotencyKey } } : {}),
                     rollback: { rows: { [String(id)]: this.rawLocalRow(slug, id) ?? null } }
                 });
                 this.removeLocalRow(slug, id);
@@ -1992,14 +2022,27 @@ data: u.data as AnyRow })),
                 await this.ingestReplaced(op, queued[i].id, rows[i]);
             }
         } else if (op.type === "update") {
-            const row = await inner.update(op.id!, op.data as AnyRow);
+            // Keyed only when the edit was already sent once: then its body is
+            // frozen (tail coalescing skips an op with `sent`), so the replay
+            // is the same request under the same key. An edit only ever queued
+            // can absorb later edits after a replay attempt, and a key held for
+            // the smaller body would refuse the merged one — while re-sending
+            // plain values without a key writes the same values again.
+            const row = await inner.update(
+                op.id!,
+                op.data as AnyRow,
+                op.sent ? { idempotencyKey: op.sent.idempotencyKey } : undefined
+            );
             await this.ingestReplaced(op, op.id!, row);
         } else if (op.type === "deleteMany") {
             const ids = op.ids ?? [];
             await inner.deleteMany(ids, { idempotencyKey: op.mutationId });
             for (const id of ids) this.removeLocalRow(op.collection, id, true);
         } else if (op.type === "delete") {
-            await inner.delete(op.id!);
+            // A delete's request is its id, which nothing rewrites once it has
+            // been sent, so it is always keyed: a replay of one that committed
+            // is answered from the key instead of a 404 for the missing row.
+            await inner.delete(op.id!, { idempotencyKey: op.sent?.idempotencyKey ?? op.mutationId });
             this.removeLocalRow(op.collection, op.id!, true);
         }
     }

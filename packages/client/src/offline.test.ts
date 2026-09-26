@@ -492,10 +492,13 @@ describe("OfflineManager", () => {
 
         it("merges consecutive updates to the same row", async () => {
             const server = createFakeServer();
-            const { manager, wrap } = createManager(server);
+            // Queued without being tried, as above: an update that was tried
+            // may have committed under its key, and is never merged into.
+            const { manager, wrap } = createManager(server, { syncIntervalMs: 60_000 });
             const posts = wrap("posts");
             await server.client("posts").create({ title: "a", views: 0 }, "p1");
             server.state.online = false;
+            await posts.find().catch(() => undefined);
 
             await posts.update("p1", { title: "b" });
             await posts.update("p1", { views: 1 });

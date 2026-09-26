@@ -913,17 +913,29 @@ function createKeyedServer() {
             };
             return keyed("createMany", body, options?.idempotencyKey, () => data.map(insert));
         },
-        async update(id: string | number, data: Row) {
-            if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
-            const existing = rows.get(String(id));
-            if (!existing) throw new RebaseApiError("Not found", { status: 404 });
-            const row = { ...existing, ...data, id };
-            rows.set(String(id), row);
-            return row;
+        // The existence read is inside the claim, as on the real routes: a
+        // replay under a held key is answered from the key, and never reads a
+        // row that the first attempt already deleted.
+        async update(id: string | number, data: Row, options?: WriteOptions) {
+            return keyed(`update ${String(id)}`, data, options?.idempotencyKey, () => {
+                const existing = rows.get(String(id));
+                if (!existing) throw new RebaseApiError("Not found", { status: 404 });
+                const row: Row = { ...existing, id };
+                for (const [field, value] of Object.entries(data)) {
+                    const increment = typeof value === "object" && value !== null && "$inc" in value
+                        ? Number((value as { $inc: unknown }).$inc)
+                        : undefined;
+                    row[field] = increment === undefined ? value : Number(existing[field] ?? 0) + increment;
+                }
+                rows.set(String(id), row);
+                return row;
+            });
         },
-        async delete(id: string | number) {
-            if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
-            rows.delete(String(id));
+        async delete(id: string | number, options?: WriteOptions) {
+            return keyed(`delete ${String(id)}`, { id }, options?.idempotencyKey, () => {
+                if (!rows.has(String(id))) throw new RebaseApiError("Not found", { status: 404 });
+                rows.delete(String(id));
+            });
         },
         async findById(id: string | number) {
             return rows.get(String(id));
@@ -1044,6 +1056,88 @@ describe("a write whose answer was lost before it was queued", () => {
 
         expect(errors).toEqual([]);
         expect([...server.rows.values()]).toEqual([{ id: "srv-1", title: "Hello, edited" }]);
+    });
+
+    it("replays a delete under the key it was first sent with, so a committed delete is not reported as failed", async () => {
+        const server = createKeyedServer();
+        server.rows.set("p1", { id: "p1", title: "Hello" });
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        // The delete commits; its answer is lost, so it is queued.
+        server.state.loseNextAnswer = true;
+        await posts.delete("p1");
+        await offline.sync();
+
+        const deletes = server.sent.filter((s) => s.op === "delete p1");
+        expect(deletes).toHaveLength(2);
+        expect(deletes[0].key).toBeDefined();
+        expect(deletes[1].key).toBe(deletes[0].key);
+        expect(errors).toEqual([]);
+        expect(server.rows.has("p1")).toBe(false);
+        expect(await posts.findById("p1")).toBeUndefined();
+        expect(offline.api.status().pending).toBe(0);
+    });
+
+    it("replays an update under the key it was first sent with, not over a newer write", async () => {
+        const server = createKeyedServer();
+        server.rows.set("p1", { id: "p1", title: "a" });
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        server.state.loseNextAnswer = true;
+        await posts.update("p1", { title: "b" });
+        // Somebody else edits the row before this client drains its queue.
+        server.rows.set("p1", { id: "p1", title: "c" });
+        await offline.sync();
+
+        const updates = server.sent.filter((s) => s.op === "update p1");
+        expect(updates).toHaveLength(2);
+        expect(updates[0].key).toBeDefined();
+        expect(updates[1]).toEqual(updates[0]);
+        expect(server.rows.get("p1")).toEqual({ id: "p1", title: "c" });
+        expect(errors).toEqual([]);
+    });
+
+    it("keeps an edit made after a sent update as a write of its own", async () => {
+        const server = createKeyedServer();
+        server.rows.set("p1", { id: "p1", title: "a", views: 0 });
+        const errors: Error[] = [];
+        const { offline, posts } = server.manager((error) => errors.push(error));
+
+        server.state.loseNextAnswer = true;
+        await posts.update("p1", { title: "b" });
+        // Queued behind the first, which is still pending. Merged into it, the
+        // replay would present the first request's key with a different body.
+        await posts.update("p1", { views: 1 });
+        expect(offline.api.status().pending).toBe(2);
+        await offline.sync();
+
+        expect(errors).toEqual([]);
+        expect(server.rows.get("p1")).toEqual({ id: "p1", title: "b", views: 1 });
+    });
+
+    it("reports a field operation whose answer was lost as unknown, with the key to retry it under", async () => {
+        const server = createKeyedServer();
+        server.rows.set("p1", { id: "p1", views: 5 });
+        const { posts } = server.manager();
+
+        server.state.loseNextAnswer = true;
+        const failure = await posts.update("p1", { views: { $inc: 1 } } as Row).then(
+            () => undefined,
+            (error: unknown) => error
+        );
+
+        // Applied once on the server. Telling the caller it "cannot be
+        // applied" and to retry would apply it twice.
+        expect(server.rows.get("p1")?.views).toBe(6);
+        expect(failure).toBeInstanceOf(RebaseApiError);
+        expect(failure).toMatchObject({ status: 0, code: "NETWORK_ERROR" });
+        const key = (failure as RebaseApiError).details as { idempotencyKey?: string } | undefined;
+        expect(key?.idempotencyKey).toBe(server.sent[0].key);
+
+        await posts.update("p1", { views: { $inc: 1 } } as Row, { idempotencyKey: key?.idempotencyKey });
+        expect(server.rows.get("p1")?.views).toBe(6);
     });
 
     it("replays a natural-key upsert batch only as the request it was sent as", async () => {
