@@ -163,6 +163,30 @@ export class RebaseRealtimeChannel {
     private catchUpInFlight = false;
 
     /**
+     * Whether {@link lastSeq} is a position this client reached, rather than
+     * the zero of a handle that has not caught up yet.
+     *
+     * A client joining for the first time asks for whatever is retained, so
+     * history pruned before it ever joined is not something it missed. Only a
+     * client with a position can have a hole in what it saw.
+     */
+    private positioned = false;
+
+    /** The page size the catch-up in flight asked for, reused for its later pages. */
+    private catchUpLimit: number | undefined;
+
+    /**
+     * `latestSeq` of an empty page that left this client behind, while a
+     * second request confirms it.
+     *
+     * The server reads the retained messages and then the cursor, so a message
+     * committed between the two shows up in `latestSeq` and not in the page.
+     * The second request returns it if it exists; only a second empty page
+     * means the messages up to this seq are gone.
+     */
+    private emptyTailSeq: number | null = null;
+
+    /**
      * Deadline for a catch-up response.
      *
      * Buffering live messages is only safe because the wait is bounded. A
@@ -277,6 +301,7 @@ export class RebaseRealtimeChannel {
      */
     private async requestHistory(limit?: number): Promise<void> {
         this.catchUpInFlight = true;
+        this.catchUpLimit = limit;
 
         if (this.catchUpTimeout) clearTimeout(this.catchUpTimeout);
         this.catchUpTimeout = setTimeout(() => this.abandonCatchUp(), CATCH_UP_TIMEOUT_MS);
@@ -308,6 +333,7 @@ export class RebaseRealtimeChannel {
         }
         if (!this.catchUpInFlight) return;
         this.catchUpInFlight = false;
+        this.emptyTailSeq = null;
         for (const resolve of this.historyWaiters.splice(0)) {
             resolve({ messages: [], retained: false });
         }
@@ -381,6 +407,12 @@ export class RebaseRealtimeChannel {
      * retention cannot be served; `CHANNEL_BUS_PAYLOAD_TOO_LARGE` when a
      * broadcast on an ephemeral channel is too big to cross the bus.
      *
+     * `CHANNEL_HISTORY_GAP` is raised by the client: a catch-up found that the
+     * server no longer retains messages this client never received, so its
+     * state has a hole a replay cannot fill. `details` is `{ from, to }`, the
+     * inclusive range of sequence numbers missed. Resync the channel's state
+     * from its source of truth.
+     *
      * These used to be dropped on the floor — there is no promise to reject on
      * a fire-and-forget frame, so a forbidden broadcast looked exactly like a
      * delivered one. With no handler attached they are logged as a warning,
@@ -432,7 +464,10 @@ export class RebaseRealtimeChannel {
      */
     async history(options: { sinceSeq?: number; limit?: number } = {}): Promise<ChannelHistoryResult> {
         await this.join();
-        if (options.sinceSeq !== undefined) this.lastSeq = options.sinceSeq;
+        if (options.sinceSeq !== undefined) {
+            this.lastSeq = options.sinceSeq;
+            this.positioned = options.sinceSeq > 0;
+        }
 
         const result = new Promise<ChannelHistoryResult>((resolve) => {
             this.historyWaiters.push(resolve);
@@ -451,6 +486,8 @@ export class RebaseRealtimeChannel {
         // A rejoin is a fresh start: replaying from a watermark left over from
         // the previous membership would silently skip everything before it.
         this.lastSeq = 0;
+        this.positioned = false;
+        this.emptyTailSeq = null;
         this.pendingLive = [];
         this.catchUpInFlight = false;
         if (this.catchUpTimeout) {
@@ -515,11 +552,11 @@ export class RebaseRealtimeChannel {
                 }
                 if (seq <= this.lastSeq) break; // already delivered
                 this.lastSeq = seq;
+                this.positioned = true;
                 this.deliver(event);
                 break;
             }
             case "channel_history": {
-                this.catchUpInFlight = false;
                 if (this.catchUpTimeout) {
                     clearTimeout(this.catchUpTimeout);
                     this.catchUpTimeout = null;
@@ -529,6 +566,16 @@ export class RebaseRealtimeChannel {
 
                 for (const resolve of this.historyWaiters.splice(0)) {
                     resolve({ messages: entries, retained, latestSeq });
+                }
+
+                // The log numbers every retained message densely, so a first
+                // new entry past `lastSeq + 1` means retention pruned what lies
+                // between. Said before the entries are delivered, so a handler
+                // sees the hole where it is.
+                const wasPositioned = this.positioned;
+                const firstNew = entries.find((entry) => entry.seq > this.lastSeq);
+                if (firstNew && wasPositioned && firstNew.seq > this.lastSeq + 1) {
+                    this.reportHistoryGap(this.lastSeq + 1, firstNew.seq - 1);
                 }
 
                 // Server-ordered ascending; the watermark check makes the
@@ -544,7 +591,40 @@ export class RebaseRealtimeChannel {
                         replayed: true
                     });
                 }
+                if (retained) this.positioned = true;
 
+                // One answer is one page. Until the watermark reaches the
+                // server's cursor, live messages stay held back: flushing them
+                // now would advance the watermark over the rest of the replay,
+                // and nothing would ask for it again.
+                const behind = retained && latestSeq !== undefined && latestSeq > this.lastSeq;
+                if (behind && firstNew) {
+                    this.emptyTailSeq = null;
+                    void this.requestHistory(this.catchUpLimit);
+                    break;
+                }
+                if (behind && wasPositioned) {
+                    if (this.emptyTailSeq === null) {
+                        this.emptyTailSeq = latestSeq;
+                        void this.requestHistory(this.catchUpLimit);
+                        break;
+                    }
+                    // Confirmed: nothing after `lastSeq` is retained up to the
+                    // first page's cursor. A live message already held back is
+                    // real, so the hole ends before it.
+                    const firstLive = this.pendingLive.reduce<number | undefined>(
+                        (min, event) => event.seq !== undefined && (min === undefined || event.seq < min) ? event.seq : min,
+                        undefined
+                    );
+                    const end = firstLive !== undefined ? Math.min(this.emptyTailSeq, firstLive - 1) : this.emptyTailSeq;
+                    if (end > this.lastSeq) {
+                        this.reportHistoryGap(this.lastSeq + 1, end);
+                        this.lastSeq = end;
+                    }
+                }
+
+                this.emptyTailSeq = null;
+                this.catchUpInFlight = false;
                 this.flushPendingLive();
                 break;
             }
@@ -559,26 +639,37 @@ export class RebaseRealtimeChannel {
                     ?? (typeof raw === "string" ? raw : undefined)
                     ?? message.error
                     ?? "The server refused a channel operation.";
-                const error = new RebaseApiError(text, {
+                this.emitError(new RebaseApiError(text, {
                     ...(asObject?.code ? { code: asObject.code } : {})
-                });
-                if (this.errorHandlers.size === 0) {
-                    // Not silence: an unobserved refusal is exactly the failure
-                    // this branch exists for.
-                    console.warn(
-                        `[Rebase] Channel "${this.name}" error${asObject?.code ? ` (${asObject.code})` : ""}: ${text}. ` +
-                        "Attach `channel.onError(...)` to handle it."
-                    );
-                    break;
-                }
-                for (const handler of [...this.errorHandlers]) {
-                    try {
-                        handler(error);
-                    } catch (e) {
-                        console.error("Error in channel error handler:", e);
-                    }
-                }
+                }));
                 break;
+            }
+        }
+    }
+
+    /** Tell the app that retention dropped messages it never received. */
+    private reportHistoryGap(from: number, to: number): void {
+        this.emitError(new RebaseApiError(
+            `Channel "${this.name}" missed messages ${from}–${to}: the server no longer retains them. Resync this channel's state.`,
+            { code: "CHANNEL_HISTORY_GAP", details: { from, to } }
+        ));
+    }
+
+    private emitError(error: RebaseApiError): void {
+        if (this.errorHandlers.size === 0) {
+            // Not silence: an unobserved refusal is exactly the failure
+            // this exists for.
+            console.warn(
+                `[Rebase] Channel "${this.name}" error${error.code ? ` (${error.code})` : ""}: ${error.message}. ` +
+                "Attach `channel.onError(...)` to handle it."
+            );
+            return;
+        }
+        for (const handler of [...this.errorHandlers]) {
+            try {
+                handler(error);
+            } catch (e) {
+                console.error("Error in channel error handler:", e);
             }
         }
     }
@@ -593,6 +684,7 @@ export class RebaseRealtimeChannel {
             if (seq !== undefined) {
                 if (seq <= this.lastSeq) continue;
                 this.lastSeq = seq;
+                this.positioned = true;
             }
             this.deliver(event);
         }

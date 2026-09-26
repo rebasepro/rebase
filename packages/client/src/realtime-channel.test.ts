@@ -298,6 +298,118 @@ describe("RebaseRealtimeChannel", () => {
             expect(fake.types()).toContain("channel_history");
         });
 
+        /** A page of retained entries `from..to`, in the server's ascending order. */
+        function page(from: number, to: number) {
+            return Array.from({ length: to - from + 1 }, (_, i) => ({
+                seq: from + i, event: "op", payload: { n: from + i }, at: "2026-01-01T00:00:00Z"
+            }));
+        }
+
+        function historyRequests() {
+            return fake.sent
+                .filter((m) => m.type === "channel_history")
+                .map((m) => (m.payload as { sinceSeq?: number }).sinceSeq);
+        }
+
+        it("pages through a catch-up longer than one server page before releasing live messages", async () => {
+            // The server answers one page (200 by default) and says how far the
+            // channel has got in `latestSeq`. Flushing the live message after
+            // the first page would advance the watermark over 201..500, and
+            // nothing would ever ask for them again.
+            const { channel: retained, received } = await retainedChannel();
+            fake.sent.length = 0;
+
+            fake.reconnect();
+            await jest.advanceTimersByTimeAsync(0);
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 501 }, seq: 501 });
+
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 500, messages: page(1, 200) });
+            await jest.advanceTimersByTimeAsync(0);
+            expect(historyRequests()).toEqual([0, 200]);
+            expect(received.map((e) => e.seq).at(-1)).toBe(200);
+
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 501, messages: page(201, 400) });
+            await jest.advanceTimersByTimeAsync(0);
+            expect(historyRequests()).toEqual([0, 200, 400]);
+
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 501, messages: page(401, 501) });
+            await jest.advanceTimersByTimeAsync(0);
+
+            expect(historyRequests()).toEqual([0, 200, 400]);
+            expect(received.map((e) => e.seq)).toEqual(page(1, 501).map((e) => e.seq));
+            expect(retained.sequence).toBe(501);
+        });
+
+        it("reports messages the server no longer retains instead of stepping over them", async () => {
+            const { channel: retained, received } = await retainedChannel();
+            const seen: Array<{ seq?: number; code?: string; details?: unknown }> = [];
+            retained.onBroadcast((e) => seen.push({ seq: e.seq }));
+            retained.onError((e) => seen.push({ code: e.code, details: e.details }));
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: {}, seq: 100 });
+
+            fake.reconnect();
+            await jest.advanceTimersByTimeAsync(0);
+            // Retention pruned 101..300 while this client was away.
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 302, messages: page(301, 302) });
+
+            expect(seen).toEqual([
+                { seq: 100 },
+                { code: "CHANNEL_HISTORY_GAP", details: { from: 101, to: 300 } },
+                { seq: 301 },
+                { seq: 302 }
+            ]);
+            expect(received.map((e) => e.seq)).toEqual([100, 301, 302]);
+        });
+
+        it("reports a gap when the whole tail was pruned, after confirming it was not a race", async () => {
+            const { channel: retained } = await retainedChannel();
+            const codes: Array<{ code?: string; details?: unknown }> = [];
+            retained.onError((e) => codes.push({ code: e.code, details: e.details }));
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: {}, seq: 100 });
+            fake.sent.length = 0;
+
+            fake.reconnect();
+            await jest.advanceTimersByTimeAsync(0);
+            // Nothing retained after 100, but the cursor is at 500. One more
+            // request tells pruning apart from a message committed mid-replay.
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 500, messages: [] });
+            await jest.advanceTimersByTimeAsync(0);
+            expect(historyRequests()).toEqual([100, 100]);
+            expect(codes).toEqual([]);
+
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 500, messages: [] });
+
+            expect(codes).toEqual([{ code: "CHANNEL_HISTORY_GAP", details: { from: 101, to: 500 } }]);
+            expect(retained.sequence).toBe(500);
+        });
+
+        it("does not call a message committed during the replay a gap", async () => {
+            const { channel: retained, received } = await retainedChannel();
+            const codes: string[] = [];
+            retained.onError((e) => codes.push(String(e.code)));
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: {}, seq: 100 });
+
+            fake.reconnect();
+            await jest.advanceTimersByTimeAsync(0);
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 101, messages: [] });
+            await jest.advanceTimersByTimeAsync(0);
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 101, messages: page(101, 101) });
+
+            expect(codes).toEqual([]);
+            expect(received.map((e) => e.seq)).toEqual([100, 101]);
+        });
+
+        it("does not report pruned history to a client joining for the first time", async () => {
+            const { channel: retained, received } = await retainedChannel({ settle: false });
+            const codes: string[] = [];
+            retained.onError((e) => codes.push(String(e.code)));
+
+            fake.push({ type: "channel_history", channel: "doc:42", retained: true, latestSeq: 302, messages: page(301, 302) });
+
+            expect(codes).toEqual([]);
+            expect(received.map((e) => e.seq)).toEqual([301, 302]);
+        });
+
         it("forgets its position on leave, so a rejoin does not skip the past", async () => {
             const { channel: retained } = await retainedChannel();
             fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: {}, seq: 9 });
