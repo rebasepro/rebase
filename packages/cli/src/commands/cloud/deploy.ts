@@ -68,7 +68,10 @@ interface BlockingDeployment {
     createdAt?: string | null;
     status?: string | null;
     triggerSource?: string;
-    /** Whether the blocking deployment was triggered by THIS user. */
+    /**
+     * Whether the same user triggered the blocking deployment. Never that it
+     * is this trigger's own: a replay of that is answered 200 `deduplicated`.
+     */
     mine?: boolean;
 }
 
@@ -1252,7 +1255,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
         triggered = { deploymentId: String(res.deployment.id),
 deduplicated: res.deduplicated === true };
     } catch (e) {
-        triggered = resolveTriggerFailure(e);
+        resolveTriggerFailure(e);
     }
     const { deploymentId, deduplicated } = triggered;
 
@@ -1320,21 +1323,20 @@ command: "cloud deploy" });
 }
 
 /**
- * Turn a failed trigger into either a deployment to follow, or an exit.
+ * Turn a failed trigger into an exit that says why.
  *
- * The 409 is the interesting one. A deploy trigger can reach the control plane
- * twice without anybody asking twice — the SDK transport replays a request once
- * after refreshing an expired token, and any lost response has the same effect
- * — so "a deployment is already in progress" was routinely describing the
- * deployment this very command had just created. With no id in the message the
- * only available reading was "someone else is deploying, back off", and the
- * build stream was lost either way.
+ * A 409 is a refusal, whoever holds the lock. The control plane answers a
+ * replay of this very trigger — the same user sending the same uploaded
+ * archive — with a 200 carrying `deduplicated: true`, which the success path
+ * follows. So the deployment a 409 names is always a different one, and
+ * `mine` means only that the same user started it: an earlier deploy, building
+ * earlier code. Following it reported that deploy's verdict as this one's, and
+ * the code just uploaded was never built.
  *
- * So: if the control plane says the blocking deployment is ours, we attach to
- * it. If it is not ours, we still name it, because "which one, since when, from
- * where" is the difference between an actionable refusal and a dead end.
+ * The refusal names the blocker, because "which one, since when, from where"
+ * is the difference between an actionable refusal and a dead end.
  */
-function resolveTriggerFailure(e: unknown): { deploymentId: string; deduplicated: boolean } {
+function resolveTriggerFailure(e: unknown): never {
     const err = e as {
         status?: number;
         message?: string;
@@ -1344,21 +1346,20 @@ function resolveTriggerFailure(e: unknown): { deploymentId: string; deduplicated
 
     if (err?.status === 409) {
         const blocking = err.details?.deployment;
-        if (blocking?.id && blocking.mine) {
-            return { deploymentId: String(blocking.id),
-deduplicated: true };
-        }
+        const where = blocking?.triggerSource && blocking.triggerSource !== "unknown"
+            ? ` from the ${blocking.triggerSource}`
+            : "";
+        const who = blocking?.mine ? ", triggered by you" : where ? ", triggered" : "";
         // Older control planes send a bare 409 with no `details`; the message
         // then stays the honest general one rather than a fabricated id.
         fail(
             blocking?.id
-                ? `Deployment ${blocking.id} is already in progress for this project` +
-                      `${blocking.triggerSource && blocking.triggerSource !== "unknown" ? `, triggered from the ${blocking.triggerSource}` : ""}` +
+                ? `Deployment ${blocking.id} is already in progress for this project${who}${where}` +
                       `${blocking.createdAt ? ` at ${fmtDate(blocking.createdAt)}` : ""}.`
                 : "A deployment is already in progress for this project.",
             blocking?.id
-                ? `Follow it with \`rebase cloud logs -f\`, or stop it with \`rebase cloud cancel ${blocking.id}\`.`
-                : "Follow it with `rebase cloud logs -f`.",
+                ? `Nothing was deployed. Wait for it (\`rebase cloud logs -f\`) or stop it with \`rebase cloud cancel ${blocking.id}\`, then deploy again.`
+                : "Nothing was deployed. Wait for it (`rebase cloud logs -f`), then deploy again.",
             "deploy_in_progress"
         );
     }

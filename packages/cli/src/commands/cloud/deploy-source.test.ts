@@ -554,6 +554,81 @@ describe("a static app deploy in JSON mode", () => {
     });
 });
 
+/**
+ * A 409 names the deployment holding the lock, and `mine` says only that the
+ * same user started it. The control plane answers a genuine replay of this
+ * trigger (same user, same uploaded archive) with 200 `deduplicated`, so a 409
+ * is always an EARLIER deploy — and following it reported "✓ Deployment
+ * succeeded" for code that was never built.
+ */
+describe("a trigger refused because another deploy is running", () => {
+    function refusedBy(mine: boolean): ReturnType<typeof vi.fn> {
+        const findById = vi.fn(async () => ({ id: "d-earlier", status: "success", logs: "built OLD source\n" }));
+        invoke.mockRejectedValueOnce(Object.assign(
+            new Error("A deployment is already in progress for this project (deployment d-earlier, triggered by you)."),
+            {
+                status: 409,
+                code: "deploy_in_progress",
+                details: {
+                    deployment: {
+                        id: "d-earlier",
+                        createdAt: "2026-09-27T01:00:00.000Z",
+                        status: "deploying",
+                        triggeredByUserId: "u1",
+                        triggerSource: "cli",
+                        mine
+                    }
+                }
+            }
+        ));
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok" }) },
+                data: { collection: () => ({ findById, find: async () => ({ data: [] }) }) },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+        return findById;
+    }
+
+    it("refuses when the running deploy is the caller's own earlier one, and never follows it", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+        controlPlane();
+        const findById = refusedBy(true);
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--source", "."], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        const text = said.join("\n");
+        expect(text).toContain("Deployment d-earlier is already in progress for this project, triggered by you");
+        expect(text).toContain("rebase cloud cancel d-earlier");
+        expect(text).not.toContain("following it");
+        expect(findById.mock.calls.map(([id]) => id)).not.toContain("d-earlier");
+    });
+
+    it("answers with the deploy_in_progress code in JSON mode", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+        controlPlane();
+        refusedBy(true);
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--source", "."], "shop"))
+                .rejects.toMatchObject({ code: 1 });
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        expect(JSON.parse(stdout.join(""))).toMatchObject({ error: { code: "deploy_in_progress" } });
+    });
+});
+
 describe("contradictory flags", () => {
     it("refuses --source with --no-source before anything is uploaded", async () => {
         controlPlane();
