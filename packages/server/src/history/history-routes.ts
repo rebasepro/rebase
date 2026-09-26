@@ -11,16 +11,25 @@ import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
 
 /**
+ * The row snapshots a history entry stores. An update entry carries the row on
+ * both sides of the write, each read under the *writer's* viewer, so each is a
+ * copy of every column the writer could see.
+ */
+const HISTORY_SNAPSHOT_KEYS = ["values", "previous_values"] as const;
+
+/**
  * A history entry, with the fields this caller cannot read taken out of its
- * stored snapshot.
+ * stored snapshots.
  *
  * History stores the **whole row** — that is what makes it a revert target — and
  * it is served to anyone who can read the row, not only to admins: the route's
  * gate is "can you fetch this entity", nothing more. So a field the data API
  * withholds was in every history entry of every row the caller could open, which
- * is the read rule with an audit log around it.
+ * is the read rule with an audit log around it. Both snapshots are rewritten
+ * ({@link HISTORY_SNAPSHOT_KEYS}): stripping one leaves the same value one key
+ * over.
  *
- * The snapshot is rewritten rather than the entry dropped: the caller is
+ * The snapshots are rewritten rather than the entry dropped: the caller is
  * entitled to know that a version exists, who made it and when. Only the
  * withheld columns leave. The revert route reads the stored entry through the
  * history service, not through this projection; what it may write back is
@@ -35,13 +44,17 @@ function stripHistoryValues(
     if (refused.size === 0) return entries;
 
     return entries.map(entry => {
-        const values = entry.values;
-        if (typeof values !== "object" || values === null || Array.isArray(values)) return entry;
-        const kept: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
-            if (!refused.has(key)) kept[key] = value;
+        const stripped: Record<string, unknown> = { ...entry };
+        for (const key of HISTORY_SNAPSHOT_KEYS) {
+            const snapshot = entry[key];
+            if (!isPlainValues(snapshot)) continue;
+            const kept: Record<string, unknown> = {};
+            for (const [field, value] of Object.entries(snapshot)) {
+                if (!refused.has(field)) kept[field] = value;
+            }
+            stripped[key] = kept;
         }
-        return { ...entry, values: kept };
+        return stripped;
     });
 }
 /**

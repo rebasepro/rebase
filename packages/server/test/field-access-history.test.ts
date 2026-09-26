@@ -34,7 +34,10 @@ const snapshot = {
     entity_id: "s-1",
     table_name: "staff",
     changed_by: "someone",
-    values: { id: "s-1", name: "Ada", salary: 90_000, password_hash: "salt:hash" }
+    values: { id: "s-1", name: "Ada", salary: 90_000, password_hash: "salt:hash" },
+    // An update entry stores the row before the write too, read under the
+    // writer's viewer — so it carries the same withheld columns.
+    previous_values: { id: "s-1", name: "Ada", salary: 80_000, password_hash: "salt:old" }
 };
 
 function mount(roles: string[] | undefined) {
@@ -78,6 +81,16 @@ describe("GET /:slug/:id/history", () => {
         expect(values).not.toHaveProperty("salary");
     });
 
+    it("takes it out of the previous snapshot as well", async () => {
+        // Every update entry carries the row on both sides of the write.
+        // Stripping one side served the old salary off the other.
+        const entry = await list(["staff"]);
+        const previous = entry.previous_values as Record<string, unknown>;
+        expect(previous.name).toBe("Ada");
+        expect(previous).not.toHaveProperty("salary");
+        expect(previous).not.toHaveProperty("password_hash");
+    });
+
     it("keeps the entry itself, with its metadata", async () => {
         const entry = await list(["staff"]);
         expect(entry.id).toBe("h1");
@@ -85,7 +98,9 @@ describe("GET /:slug/:id/history", () => {
     });
 
     it("serves the field to a caller holding the role", async () => {
-        expect((await list(["hr"])).values).toMatchObject({ salary: 90_000 });
+        const entry = await list(["hr"]);
+        expect(entry.values).toMatchObject({ salary: 90_000 });
+        expect(entry.previous_values).toMatchObject({ salary: 80_000 });
     });
 
     it("serves it to `admin`", async () => {
@@ -94,7 +109,9 @@ describe("GET /:slug/:id/history", () => {
 
     it("never serves an `excludeFromApi` column, under its stored spelling", async () => {
         for (const roles of [["staff"], ["hr"], ["admin"]]) {
-            expect((await list(roles)).values).not.toHaveProperty("password_hash");
+            const entry = await list(roles);
+            expect(entry.values).not.toHaveProperty("password_hash");
+            expect(entry.previous_values).not.toHaveProperty("password_hash");
         }
     });
 
@@ -102,6 +119,8 @@ describe("GET /:slug/:id/history", () => {
         // The auth middleware sets a driver but no `user` for an unauthenticated
         // request. Reading that as "no viewer" would hand every column to
         // whoever did not sign in.
-        expect((await list(undefined)).values).not.toHaveProperty("salary");
+        const entry = await list(undefined);
+        expect(entry.values).not.toHaveProperty("salary");
+        expect(entry.previous_values).not.toHaveProperty("salary");
     });
 });
