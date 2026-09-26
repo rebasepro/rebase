@@ -112,6 +112,35 @@ describe("installShutdownHandlers", () => {
         expect(exit).toHaveBeenCalledWith(1);
     });
 
+    it("still runs cleanup and exits 0 when the backend's drain has to be forced", async () => {
+        // The backend was handed the same budget as this handler's own force
+        // timer, which is armed first and so always fired first: a drain that
+        // needed its forced resolve never reached `onCleanup` (the pool close).
+        const hung: RealtimeProvider = {
+            subscribeToCollection: () => undefined,
+            subscribeToOne: () => undefined,
+            unsubscribe: () => undefined,
+            notifyUpdate: async () => undefined,
+            destroy: () => new Promise<void>(() => { /* never settles */ })
+        };
+        const backend = { shutdown: createShutdown({ server: createServer(), realtimeServices: { default: hung } }) };
+        let cleaned = false;
+        const exit = jest.fn();
+
+        uninstall = installShutdownHandlers(backend, {
+            signals: [TEST_SIGNAL],
+            timeoutMs: 300,
+            onCleanup: () => { cleaned = true; },
+            exit: exit as unknown as (code: number) => void
+        });
+
+        process.emit(TEST_SIGNAL, TEST_SIGNAL);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        expect(cleaned).toBe(true);
+        expect(exit.mock.calls).toEqual([[0]]);
+    });
+
     it("uninstall removes the signal listeners", async () => {
         const shutdown = jest.fn(async () => {});
         const exit = jest.fn();

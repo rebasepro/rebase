@@ -34,6 +34,8 @@ class MockWebSocket {
     public readyState = WebSocket.OPEN;
     public send = jest.fn();
     public on = jest.fn();
+    public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
+    public terminate = jest.fn();
 }
 
 /**

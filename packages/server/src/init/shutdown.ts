@@ -35,7 +35,9 @@ export interface ShutdownHandlerOptions {
     /**
      * Hard force-exit timeout in milliseconds. If the shutdown sequence
      * (drain + cleanup) has not completed by then, the process exits with
-     * code 1. Also passed to `backend.shutdown()` as its drain timeout.
+     * code 1. `backend.shutdown()` is given this budget less a reserve for
+     * `onCleanup` (the smaller of 2s and a fifth of it), so a drain the
+     * backend has to force still ends in the pool close.
      *
      * @default 15000
      */
@@ -101,7 +103,10 @@ export function installShutdownHandlers(
         forceTimer.unref();
 
         try {
-            await backend.shutdown(timeoutMs);
+            // Less than this timer's own budget: the backend's force-resolve
+            // at the same deadline would lose the race to it, and exit 1
+            // without the cleanup ever running.
+            await backend.shutdown(timeoutMs - cleanupReserveMs(timeoutMs));
             if (onCleanup) {
                 await onCleanup();
             }
@@ -125,6 +130,11 @@ export function installShutdownHandlers(
             process.removeListener(signal, listener);
         }
     };
+}
+
+/** The part of a shutdown budget kept back from the drain for `onCleanup`. */
+function cleanupReserveMs(timeoutMs: number): number {
+    return Math.min(2_000, Math.floor(timeoutMs / 5));
 }
 
 /**

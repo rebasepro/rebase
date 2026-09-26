@@ -241,6 +241,26 @@ type Subscription = {
 type DeliveryCheck = (() => boolean) & { mayReportFailure: () => boolean };
 
 /**
+ * How long a client gets to answer the close frame at shutdown before its
+ * socket is dropped. `ws` would otherwise wait its own 30s close timeout, which
+ * is longer than the whole shutdown budget.
+ */
+const WEBSOCKET_CLOSE_GRACE_MS = 1_000;
+
+/**
+ * Close each socket with 1001, and terminate the ones still open after
+ * `graceMs`. Nothing here waits: the HTTP server's close() is what waits for
+ * the sockets to end.
+ */
+function closeWebSockets(sockets: WebSocket[], graceMs: number): void {
+    for (const ws of sockets) {
+        if (ws.readyState === WebSocket.OPEN) ws.close(1001, "server shutting down");
+        // A no-op on a socket that has closed by the time it fires.
+        if (ws.readyState !== WebSocket.CLOSED) unref(setTimeout(() => ws.terminate(), graceMs));
+    }
+}
+
+/**
  * PostgreSQL-specific realtime service.
  * Handles WebSocket connections and subscriptions for real-time row updates.
  *
@@ -2548,8 +2568,8 @@ lastSeen: Date.now() });
      *  1. All debounced refetch timers are cancelled (prevents queries after pool closes).
      *  2. All subscription state and callbacks are cleared.
      *  3. The dedicated LISTEN client (outside the pool) is disconnected.
-     *  4. All WebSocket clients are removed (but not forcefully closed — the
-     *     HTTP server close will handle that).
+     *  4. All WebSocket clients are closed with 1001 ("going away"); one that
+     *     does not answer the close frame is dropped after a short grace.
      */
     async destroy(): Promise<void> {
         // 1. Cancel every pending debounced refetch timer
@@ -2599,8 +2619,13 @@ lastSeen: Date.now() });
             logger.warn("⚠️ [ChannelBus] Error while stopping the channel bus", { error }));
         this.bus = new MemoryChannelBus();
 
-        // 5. Drop client references (don't close — server.close drains them)
+        // 5. Close the client sockets. The HTTP server's close() waits on an
+        // upgraded connection for as long as the browser keeps it open, and
+        // closeAllConnections() does not reach one either, so a socket left
+        // open here holds the whole shutdown until its force timer.
+        const sockets = [...this.clients.values()];
         this.clients.clear();
+        closeWebSockets(sockets, WEBSOCKET_CLOSE_GRACE_MS);
 
         this.debugLog("🧹 [RealtimeService] destroy() complete — all resources released.");
     }
