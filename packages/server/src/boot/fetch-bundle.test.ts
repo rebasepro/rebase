@@ -590,6 +590,89 @@ describe("a failed install leaves nothing a later boot would trust", () => {
     });
 });
 
+describe("an install that never finished is not taken for one that did", () => {
+    /**
+     * A failed install deletes what it wrote, but a SIGKILL — an OOMKill, a
+     * startup probe restarting the container — runs no cleanup at all. The
+     * partial `node_modules` it leaves survives on the pod's volume, and the
+     * directory check at the top of `installBundleDependencies` (and the
+     * entrypoint's) takes it for a finished install on every restart after.
+     */
+    it("redoes an install that was killed partway, rather than skipping it", async () => {
+        fs.writeFileSync(path.join(scratch, "package.json"), JSON.stringify({ dependencies: { a: "1", b: "1" } }));
+        // Writes one of two packages, then is killed: the promise never settles
+        // and nothing after it runs.
+        void installBundleDependencies(scratch, () => {
+            fs.mkdirSync(path.join(scratch, "node_modules", "a"), { recursive: true });
+            return new Promise(() => { /* killed */ });
+        });
+        expect(fs.existsSync(path.join(scratch, "node_modules", "a"))).toBe(true);
+
+        // The restart.
+        const second: string[] = [];
+        let partialLeftInPlace = true;
+        await installBundleDependencies(scratch, async (_c, args) => {
+            if (second.length === 0) partialLeftInPlace = fs.existsSync(path.join(scratch, "node_modules", "a"));
+            second.push(args[0]);
+        });
+
+        expect(second[0]).toBe("install");
+        // Installed from scratch, not over the half a tree.
+        expect(partialLeftInPlace).toBe(false);
+        expect(usableBundleFallback(scratch)).toBeUndefined();
+    });
+
+    it("vouches for the tree again once an install completes", async () => {
+        fs.writeFileSync(path.join(scratch, MANIFEST_FILENAME), "{}");
+        fs.writeFileSync(path.join(scratch, "package.json"), "{}");
+        await installBundleDependencies(scratch, async () => {
+            fs.mkdirSync(path.join(scratch, "node_modules", "a"), { recursive: true });
+        });
+
+        const again: string[] = [];
+        await installBundleDependencies(scratch, async (c) => { again.push(c); });
+        expect(again).toEqual([]);
+        expect(usableBundleFallback(scratch)).toBe(scratch);
+    });
+
+    it("does not offer a half-prepared new bundle as the fallback for a failed fetch", async () => {
+        // The destination is also the fallback the entrypoint hands boot. Once
+        // the old tree has been cleared and the new one unpacked, an install
+        // failure leaves the NEW bundle there with no dependencies — which boot
+        // then served, under a log line saying it might be older.
+        const destination = path.join(scratch, "dest");
+        fs.mkdirSync(destination);
+        await fetchBundle({
+            url: "https://example.test/bundle/OLD",
+            destination,
+            fetchImpl: okFetch(new Uint8Array([1])),
+            extract: async (_t, d) => {
+                fs.writeFileSync(path.join(d, MANIFEST_FILENAME), JSON.stringify({ app: "old" }));
+                fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ dependencies: { x: "1" } }));
+            },
+            installImpl: (root) => installBundleDependencies(root, async () => {
+                fs.mkdirSync(path.join(root, "node_modules", "x"), { recursive: true });
+            })
+        });
+        expect(usableBundleFallback(destination)).toBe(destination);
+
+        await expect(fetchBundle({
+            url: URL_,
+            destination,
+            fetchImpl: okFetch(new Uint8Array([1])),
+            extract: async (_t, d) => {
+                fs.writeFileSync(path.join(d, MANIFEST_FILENAME), JSON.stringify({ app: "new" }));
+                fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ dependencies: { x: "1" } }));
+            },
+            installImpl: (root) => installBundleDependencies(root, async () => {
+                throw new Error("npm ERR! 503 Service Unavailable");
+            })
+        })).rejects.toThrow(/503/);
+
+        expect(usableBundleFallback(destination)).toBeUndefined();
+    });
+});
+
 describe("dedupeRuntimePackages", () => {
     /**
      * The absent case is the common one.

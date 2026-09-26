@@ -45,9 +45,19 @@ function unpackedSource() {
     }
 }
 
+/**
+ * Present in a bundle while a dependency install there has not finished —
+ * `INSTALL_PENDING_FILENAME` in packages/server/src/boot/fetch-bundle.ts, which
+ * this must match. What it outlives is an install that was killed partway (an
+ * OOMKill, a probe restart), whose partial `node_modules` a directory check
+ * cannot tell from a finished one.
+ */
+const INSTALL_PENDING_FILE = ".rebase-install-pending";
+
 const WANTED_URL = process.env.REBASE_BUNDLE_URL;
 const ON_DISK = fs.existsSync(path.join(BUNDLE, "manifest.json"));
 const UNPACKED_FROM = unpackedSource();
+const INSTALL_PENDING = fs.existsSync(path.join(BUNDLE, INSTALL_PENDING_FILE));
 
 /**
  * A bundle already on disk is only worth keeping if it is the one we were told
@@ -80,8 +90,12 @@ const UNPACKED_FROM = unpackedSource();
  * itself is right — this is still a re-fetch — but the on-disk tree is now
  * handed to the runtime as a fallback, so a failed download degrades to
  * possibly-stale code with a loud error instead of no code at all.
+ *
+ * A tree from the right URL whose dependency install never finished is not
+ * ready either: re-fetching sends it back through the runtime's install, which
+ * starts over, and the runtime will not take it as a fallback.
  */
-const STALE_ON_DISK = ON_DISK && Boolean(WANTED_URL) && UNPACKED_FROM !== WANTED_URL;
+const STALE_ON_DISK = ON_DISK && Boolean(WANTED_URL) && (UNPACKED_FROM !== WANTED_URL || INSTALL_PENDING);
 const FETCH_MODE = Boolean(WANTED_URL) && (!ON_DISK || STALE_ON_DISK);
 
 if (FETCH_MODE) {
@@ -90,7 +104,9 @@ if (FETCH_MODE) {
     // absent or not what we were asked for, so an inherited value would only
     // stop the fetch that is the whole point of this container.
     delete process.env.REBASE_BUNDLE;
-    if (STALE_ON_DISK) {
+    if (STALE_ON_DISK && UNPACKED_FROM === WANTED_URL) {
+        log(`the dependency install for the bundle on disk never finished; re-fetching`);
+    } else if (STALE_ON_DISK) {
         log(
             `the bundle on disk came from ${UNPACKED_FROM ?? "an unrecorded source"}, ` +
                 `not REBASE_BUNDLE_URL; re-fetching`
@@ -201,10 +217,15 @@ if (!FETCH_MODE) {
 // what keeps one image able to run every project.
 const bundlePackageJson = path.join(bundleDir, "package.json");
 const bundleModules = path.join(bundleDir, "node_modules");
+const bundleInstallPending = path.join(bundleDir, INSTALL_PENDING_FILE);
 
 // Skipped entirely in fetch mode: there is nothing here yet, and the runtime
 // runs the same install — same flags, same dedupe — once it has unpacked.
-if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
+//
+// A `node_modules` left by an install that never finished is not a reason to
+// skip: it is started over.
+const installUnfinished = fs.existsSync(bundleInstallPending);
+if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && (!fs.existsSync(bundleModules) || installUnfinished)) {
     let declared = {};
     try {
         declared = JSON.parse(fs.readFileSync(bundlePackageJson, "utf8")).dependencies ?? {};
@@ -224,6 +245,11 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModu
         // arch, and they are exactly where a malicious transitive dep would run.
         // Skipping them makes the boot hermetic, and is safe precisely because the
         // no-native-deps rule guarantees nothing needs them.
+        if (installUnfinished) {
+            log("the last dependency install in this bundle did not finish; reinstalling");
+            fs.rmSync(bundleModules, { recursive: true, force: true });
+        }
+        fs.writeFileSync(bundleInstallPending, "");
         const result = spawnSync(
             "npm",
             ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
@@ -235,6 +261,7 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModu
                 "Pre-install them into the bundle at build time, or bake them into a derived image."
             );
         }
+        fs.rmSync(bundleInstallPending, { force: true });
     }
 }
 

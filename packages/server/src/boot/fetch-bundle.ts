@@ -98,6 +98,20 @@ export const BUNDLE_FETCH_DIR_ENV = "REBASE_BUNDLE_FETCH_DIR";
  */
 export const BUNDLE_SOURCE_FILENAME = ".rebase-bundle-source";
 
+/**
+ * Present in a bundle root while a dependency install there has not finished.
+ *
+ * Written before npm starts and removed once it returns, so it outlives exactly
+ * one thing: an install that was killed partway. A failed install deletes what
+ * it wrote, but a SIGKILL — an OOMKill, a startup probe restarting the
+ * container — runs no cleanup, and the partial `node_modules` it leaves on the
+ * pod's volume cannot be told from a finished one by looking at the directory.
+ *
+ * `infra/docker/entrypoint.mjs` reads this file by the same name — keep the two
+ * in step.
+ */
+export const INSTALL_PENDING_FILENAME = ".rebase-install-pending";
+
 /** What the tree in `destination` was fetched from, or null if unknown. */
 export function unpackedBundleSource(destination: string): string | null {
     try {
@@ -120,7 +134,11 @@ export function unpackedBundleSource(destination: string): string | null {
  */
 export function usableBundleFallback(dir: string | undefined): string | undefined {
     if (!dir) return undefined;
-    return fs.existsSync(path.join(dir, "manifest.json")) ? dir : undefined;
+    if (!fs.existsSync(path.join(dir, "manifest.json"))) return undefined;
+    // A tree whose install never finished is not the copy that was working: it
+    // is the new bundle the failed fetch got as far as unpacking, or one that
+    // was killed mid-install, and either way it has no complete dependencies.
+    return fs.existsSync(path.join(dir, INSTALL_PENDING_FILENAME)) ? undefined : dir;
 }
 
 export interface FetchBundleOptions {
@@ -268,14 +286,21 @@ export async function installBundleDependencies(
     exec: (cmd: string, args: string[], opts: object) => Promise<unknown> = run
 ): Promise<void> {
     if (!fs.existsSync(path.join(bundleRoot, "package.json"))) return;
-    if (fs.existsSync(path.join(bundleRoot, "node_modules"))) {
+    const pending = path.join(bundleRoot, INSTALL_PENDING_FILENAME);
+    if (fs.existsSync(pending)) {
+        // An earlier install here never returned. Whatever it wrote is a
+        // partial tree, so it is started over rather than trusted.
+        logger.warn("A previous dependency install in this bundle did not finish; reinstalling");
+        fs.rmSync(path.join(bundleRoot, "node_modules"), { recursive: true, force: true });
+    } else if (fs.existsSync(path.join(bundleRoot, "node_modules"))) {
         // Vendored at build time, or already installed by an earlier start of
         // this same pod. Either way installing over it is slower and no safer.
         //
         // This is only sound because a failed install deletes what it wrote
-        // (below). Measured 2026-08-22: an install OOMKilled partway leaves a
-        // node_modules holding 124 of 156 packages — indistinguishable from a
-        // complete one to a directory check. Without the cleanup, the restart
+        // (below), and a killed one leaves INSTALL_PENDING_FILENAME behind (the
+        // branch above). Measured 2026-08-22: an install OOMKilled partway
+        // leaves a node_modules holding 124 of 156 packages — indistinguishable
+        // from a complete one to a directory check. Without either, the restart
         // that follows skips the install, the runtime boots on a tree missing a
         // third of its dependencies, and the failure surfaces as an import
         // error deep inside a request.
@@ -290,6 +315,7 @@ export async function installBundleDependencies(
 
     logger.info("Installing bundle dependencies", { command: `npm ${args[0]}`, cwd: bundleRoot });
     const started = Date.now();
+    fs.writeFileSync(pending, "");
     try {
         await exec("npm", args, { cwd: bundleRoot, maxBuffer: 32 * 1024 * 1024 });
     } catch (error: unknown) {
@@ -315,6 +341,7 @@ export async function installBundleDependencies(
                 : "")
         );
     }
+    fs.rmSync(pending, { force: true });
     logger.info("Bundle dependencies installed", { ms: Date.now() - started });
 
     // The dedupe that used to live here now runs in `bootFromBundle`, against
