@@ -47,7 +47,7 @@ import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeSto
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { parseFirst } from "pgsql-ast-parser";
-import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, quoteTableName, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
+import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, needsDestructiveConfirmation, quoteTableName, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -866,12 +866,7 @@ role: selectedRole });
         const sqlTarget = selectedText || activeTab.sql;
         if (!sqlTarget.trim()) return;
 
-        // Destructive operation check
-        const destructiveKeywords = ["DELETE", "DROP", "TRUNCATE", "UPDATE"];
-        const hasDestructive = destructiveKeywords.some(kw => sqlTarget.toUpperCase().includes(kw));
-        const hasWhere = sqlTarget.toUpperCase().includes("WHERE");
-
-        if (hasDestructive && (!hasWhere || sqlTarget.toUpperCase().includes("DROP") || sqlTarget.toUpperCase().includes("TRUNCATE"))) {
+        if (needsDestructiveConfirmation(sqlTarget)) {
             setPendingAction(() => () => executeRun(selectedText));
             setIsConfirmDialogOpen(true);
             return;

@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, extractTablesFromQuery, quoteTableName, resolveQueryCollections } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, extractTablesFromQuery, needsDestructiveConfirmation, quoteTableName, resolveQueryCollections } from "./sql_utils";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -404,5 +404,33 @@ describe("acceptsAutoLimit", () => {
     it("refuses a script, and text it cannot parse", () => {
         expect(acceptsAutoLimit("SELECT 1; DELETE FROM users WHERE id = 1")).toBe(false);
         expect(acceptsAutoLimit("CREATE TABLE copy AS SELECT * FROM users")).toBe(false);
+    });
+});
+
+describe("needsDestructiveConfirmation", () => {
+    it("asks for a DELETE or UPDATE without WHERE, whatever else the text holds", () => {
+        expect(needsDestructiveConfirmation("DELETE FROM posts")).toBe(true);
+        expect(needsDestructiveConfirmation("DELETE FROM posts; SELECT * FROM posts WHERE id = 1")).toBe(true);
+        expect(needsDestructiveConfirmation("-- clean up where needed\nDELETE FROM posts")).toBe(true);
+        expect(needsDestructiveConfirmation("UPDATE users SET role = 'admin'; SELECT * FROM users WHERE id = 1")).toBe(true);
+        expect(needsDestructiveConfirmation("WITH gone AS (DELETE FROM posts RETURNING id) SELECT count(*) FROM gone")).toBe(true);
+    });
+
+    it("asks for a drop or a truncate, with or without WHERE elsewhere", () => {
+        expect(needsDestructiveConfirmation("DROP TABLE posts")).toBe(true);
+        expect(needsDestructiveConfirmation("TRUNCATE posts; SELECT * FROM users WHERE id = 1")).toBe(true);
+        expect(needsDestructiveConfirmation("ALTER TABLE posts DROP COLUMN title")).toBe(true);
+    });
+
+    it("asks for text it cannot read that names a destructive command", () => {
+        expect(needsDestructiveConfirmation("DROP SCHEMA archive CASCADE")).toBe(true);
+        expect(needsDestructiveConfirmation("DELETE FROM posts USING users WHERE posts.author_id = users.id")).toBe(true);
+    });
+
+    it("does not ask for a filtered DELETE or UPDATE, or a read", () => {
+        expect(needsDestructiveConfirmation("DELETE FROM posts WHERE id = 1")).toBe(false);
+        expect(needsDestructiveConfirmation("UPDATE posts SET title = 'x' WHERE id = 1; SELECT 1")).toBe(false);
+        expect(needsDestructiveConfirmation("SELECT updated_at FROM posts")).toBe(false);
+        expect(needsDestructiveConfirmation("-- delete these later\nSELECT * FROM posts")).toBe(false);
     });
 });

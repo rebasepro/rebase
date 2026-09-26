@@ -46,6 +46,52 @@ export function acceptsAutoLimit(sqlText: string): boolean {
     return statement.type === "select" && !statement.limit;
 }
 
+/** A destructive command named anywhere in a text, comments included. */
+const DESTRUCTIVE_COMMAND = /\b(DELETE|UPDATE|DROP|TRUNCATE)\b/i;
+
+function isDestructiveStatement(statement: Statement): boolean {
+    switch (statement.type) {
+        case "delete":
+        case "update":
+            return !statement.where;
+        case "truncate table":
+        case "drop table":
+        case "drop sequence":
+        case "drop index":
+        case "drop type":
+        case "drop trigger":
+        case "drop function":
+            return true;
+        case "alter table":
+            return statement.changes.some(change => change.type === "drop column" || change.type === "drop constraint");
+        case "with":
+            return statement.bind.some(binding => isDestructiveStatement(binding.statement)) ||
+                isDestructiveStatement(statement.in);
+        case "with recursive":
+            return isDestructiveStatement(statement.in);
+        case "do":
+            return DESTRUCTIVE_COMMAND.test(statement.code);
+        default:
+            return false;
+    }
+}
+
+/**
+ * Whether "Run" asks before running `sqlText`: a statement in it deletes or
+ * updates without a WHERE of its own, drops or truncates.
+ *
+ * Decided per parsed statement, not on the text. A search of the text for the
+ * word WHERE found it in another statement or in a comment, so `DELETE FROM
+ * posts; SELECT * FROM posts WHERE id = 1` deleted every post without asking.
+ * Text the parser cannot read is confirmed whenever it names a destructive
+ * command.
+ */
+export function needsDestructiveConfirmation(sqlText: string): boolean {
+    const statements = parseStatements(sqlText);
+    if (!statements) return DESTRUCTIVE_COMMAND.test(sqlText);
+    return statements.some(isDestructiveStatement);
+}
+
 /**
  * A table extracted from a SQL query's FROM/JOIN clauses.
  */

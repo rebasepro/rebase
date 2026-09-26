@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
 
 /**
@@ -43,7 +43,19 @@ jest.mock("@rebasepro/app", () => ({
     useApiConfig: () => ({ getAuthToken: async () => "token" }),
     IconForView: () => null,
     ErrorView: ({ error }: { error: unknown }) => <div role="alert">{String(error)}</div>,
-    ConfirmationDialog: () => null
+    // The confirmation the console asks for, reduced to its title and its two
+    // answers: a test can see it was asked, and answer it.
+    ConfirmationDialog: ({ open, title, onAccept, onCancel }: {
+        open: boolean;
+        title: string;
+        onAccept: () => void;
+        onCancel: () => void;
+    }) => open
+        ? <div role="dialog" aria-label={title}>
+            <button onClick={onAccept}>accept</button>
+            <button onClick={onCancel}>cancel</button>
+        </div>
+        : null
 }));
 
 /** What the stand-in editor reports as selected; nothing unless a test says. */
@@ -187,5 +199,41 @@ describe("running a selection", () => {
 
         await waitFor(() => expect(sent()).toHaveLength(1));
         expect(sent()[0]).toBe("SELECT * FROM posts LIMIT 1000;");
+    });
+});
+
+/**
+ * "Run" asks before a DELETE or UPDATE without WHERE. It decided that on the
+ * text, so the word WHERE anywhere — another statement, a comment — turned the
+ * question off: `DELETE FROM posts; SELECT * FROM posts WHERE id = 1` deleted
+ * every post at once.
+ */
+describe("the destructive-statement confirmation", () => {
+    async function run(text: string): Promise<void> {
+        render(<SQLEditor/>);
+        await typeSql(text);
+        fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
+    }
+
+    for (const text of [
+        "DELETE FROM posts",
+        "DELETE FROM posts; SELECT * FROM posts WHERE id = 1",
+        "-- clean up where needed\nDELETE FROM posts",
+        "UPDATE users SET role = 'admin'; SELECT * FROM users WHERE id = 1"
+    ]) {
+        it(`asks before running ${JSON.stringify(text)}, and runs it once accepted`, async () => {
+            await run(text);
+            const dialog = await screen.findByRole("dialog", { name: label("studio_sql_dangerous_operation") });
+            expect(sent()).toEqual([]);
+
+            fireEvent.click(within(dialog).getByRole("button", { name: "accept" }));
+            await waitFor(() => expect(sent()).toEqual([text]));
+        });
+    }
+
+    it("runs a DELETE with its own WHERE without asking", async () => {
+        await run("DELETE FROM posts WHERE id = 1");
+        await waitFor(() => expect(sent()).toEqual(["DELETE FROM posts WHERE id = 1"]));
+        expect(screen.queryByRole("dialog")).toBeNull();
     });
 });
