@@ -16,7 +16,6 @@ import { EntityTableCell } from "./internal/EntityTableCell";
 import { EntityTableCellActions } from "./internal/EntityTableCellActions";
 
 import { useSelectableTableController } from "../SelectableTable/SelectableTableContext";
-import { useClearRestoreValue } from "../../form/useClearRestoreValue";
 import { getRowHeight, useTranslation } from "@rebasepro/app";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { EntityTableCellOpener } from "./internal/EntityTableCell";
@@ -176,6 +175,9 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 });
         }, [internalValue, validation, propertyKey, property, entity]);
 
+        // Saves the row at once, so only an edit may call it. The table shows
+        // what is stored: a disabled property's `clearOnDisabled` belongs to
+        // the form, whose values are written only when the user saves.
         const updateValue = (newValue: unknown | null) => {
 
             let updatedValue: unknown;
@@ -187,12 +189,6 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             setInternalValue(updatedValue);
             saveValues(updatedValue);
         };
-
-        useClearRestoreValue<unknown>({
-            property,
-            value: internalValue,
-            setValue: updateValue
-        });
 
         const onSelect = useCallback((cellRect: DOMRect | undefined) => {
             if (!cellRect) {
