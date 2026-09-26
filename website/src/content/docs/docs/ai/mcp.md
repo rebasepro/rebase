@@ -24,6 +24,11 @@ see [The remote endpoint](#the-remote-endpoint).
 The server is published to npm and needs no install step; `npx` fetches it.
 Every block below is the whole integration.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` writes the block for each agent you pick when it
+[sets up your AI coding agents](/docs/ai/skills#set-up-by-rebase-init), keeping
+any other servers already in the file. `rebase init --agent cursor,codex` does
+the same without asking.
+
 **Claude Code** — `.mcp.json` at your project root. `rebase init` writes this
 file for you:
 
@@ -41,7 +46,8 @@ file for you:
 }
 ```
 
-**Cursor** — the same shape, in `.cursor/mcp.json`:
+**Cursor** — the same shape, in `.cursor/mcp.json`. Cursor expands
+`${workspaceFolder}` to the project root:
 
 ```json title=".cursor/mcp.json"
 {
@@ -50,7 +56,7 @@ file for you:
       "command": "npx",
       "args": ["-y", "@rebasepro/mcp"],
       "env": {
-        "REBASE_PROJECT_DIR": "."
+        "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
     }
   }
@@ -73,14 +79,16 @@ file for you:
 }
 ```
 
-**Codex CLI** — TOML rather than JSON, in `~/.codex/config.toml`. It is
-user-level, not per-project, so name the project directory here:
+**Codex CLI** — TOML rather than JSON, in the project's `.codex/config.toml`.
+Codex reads a project config only once you have trusted the project:
 
-```toml title="~/.codex/config.toml"
+```toml title=".codex/config.toml"
 [mcp_servers.rebase]
 command = "npx"
 args = ["-y", "@rebasepro/mcp"]
-env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
+
+[mcp_servers.rebase.env]
+REBASE_PROJECT_DIR = "."
 ```
 
 **Kiro** — `.kiro/settings/mcp.json`:
@@ -98,6 +106,28 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   }
 }
 ```
+
+**GitHub Copilot in VS Code** — `.vscode/mcp.json`, under `servers` and with
+an explicit transport:
+
+```json title=".vscode/mcp.json"
+{
+  "servers": {
+    "rebase": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+**Windsurf** reads MCP servers only from its user-level config, so there is no
+project file to write. Add the server in Windsurf's MCP settings, with an
+absolute `REBASE_PROJECT_DIR`.
 
 Any MCP client that can spawn a stdio server works; the shape is the same.
 
@@ -117,10 +147,10 @@ precedence, and it is the same in every client:
 Auto-discovery from `.rebase/state.json` fills gaps in all three cases and never
 overrules a value one of them supplied.
 
-The project-level blocks set `REBASE_PROJECT_DIR` to `"."` — the client's
-working directory is the project — because rule 3 reads a file shared by every
-project on the machine. The Codex block is user-level rather than per-project,
-so it names an absolute path instead.
+The project-level blocks name the project — `"."`, the client's working
+directory, or the editor's `${workspaceFolder}` — because rule 3 reads a file
+shared by every project on the machine. A user-level config, such as Windsurf's,
+names an absolute path instead.
 
 ## What the server can reach
 

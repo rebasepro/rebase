@@ -37,7 +37,7 @@ const LAYOUTS = {
     gemini: { dir: ".agents/skills", index: null },
     cursor: { dir: ".cursor/rules", index: "rebase.mdc" },
     windsurf: { dir: ".windsurf/rules", index: "rebase.md" },
-    codex: { dir: ".codex/skills", index: null },
+    codex: { dir: ".agents/skills", index: null },
     kiro: { dir: ".kiro/steering", index: "rebase.md" },
     copilot: { dir: ".github/instructions", index: "rebase.instructions.md" }
 } as const;

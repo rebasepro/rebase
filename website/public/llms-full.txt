@@ -3028,6 +3028,23 @@ yet, listed so that nobody reads a promise into them:
   could hold two copies that disagreed. `SchemaCommitPaths` and
   `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
 
+#### Added
+
+##### CLI
+
+- **`rebase init` sets up your AI coding agents.** It asks whether to install
+  the Rebase skills and register the Rebase MCP server, lists the agents it
+  finds on the machine (`~/.claude`, `~/.cursor`, `~/.gemini`, `~/.codex`,
+  `~/.kiro`, Windsurf's `~/.codeium/windsurf`), and pre-ticks those. The skills
+  and each agent's project-level MCP config land before the first commit:
+  `.mcp.json`, `.cursor/mcp.json`, `.gemini/settings.json`,
+  `.codex/config.toml`, `.kiro/settings/mcp.json` or `.vscode/mcp.json`.
+  Existing servers and settings in those files are kept, and a file with
+  comments is left alone. Windsurf reads MCP servers only from a user-level
+  file, so it gets the skills alone. Under `--yes` nothing is set up unless you
+  pass `--agent` (`-a`), e.g. `rebase init my-app --yes --agent claude,cursor`.
+  Before, `rebase init` only printed `rebase skills install`.
+
 #### Fixed
 
 ##### Server & REST
@@ -3048,6 +3065,18 @@ yet, listed so that nobody reads a promise into them:
   Going back landed at the top with only the first page loaded. It now returns
   to the same rows. The card view also stops jumping back slightly the first
   time more rows load after a fresh visit.
+
+##### CLI
+
+- **`rebase skills install --agent codex` writes where Codex reads.** It wrote
+  `.codex/skills`, which Codex never opens: Codex reads repository skills from
+  `.agents/skills`. It now writes there, the directory Gemini CLI and
+  Antigravity read too, and installs it once when both are named.
+
+- **The scaffold's `.gitignore` keeps `.vscode/mcp.json`.** It ignored
+  `.vscode/` whole, so the MCP server registered for GitHub Copilot never
+  reached the first commit. Other editor settings in `.vscode/` are still
+  ignored.
 
 ### [0.23.0] - 2026-09-27
 
@@ -36105,6 +36134,11 @@ see [The remote endpoint](#the-remote-endpoint).
 The server is published to npm and needs no install step; `npx` fetches it.
 Every block below is the whole integration.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` writes the block for each agent you pick when it
+[sets up your AI coding agents](/docs/ai/skills#set-up-by-rebase-init), keeping
+any other servers already in the file. `rebase init --agent cursor,codex` does
+the same without asking.
+
 **Claude Code** — `.mcp.json` at your project root. `rebase init` writes this
 file for you:
 
@@ -36122,7 +36156,8 @@ file for you:
 }
 ```
 
-**Cursor** — the same shape, in `.cursor/mcp.json`:
+**Cursor** — the same shape, in `.cursor/mcp.json`. Cursor expands
+`${workspaceFolder}` to the project root:
 
 ```json title=".cursor/mcp.json"
 {
@@ -36131,7 +36166,7 @@ file for you:
       "command": "npx",
       "args": ["-y", "@rebasepro/mcp"],
       "env": {
-        "REBASE_PROJECT_DIR": "."
+        "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
     }
   }
@@ -36154,14 +36189,16 @@ file for you:
 }
 ```
 
-**Codex CLI** — TOML rather than JSON, in `~/.codex/config.toml`. It is
-user-level, not per-project, so name the project directory here:
+**Codex CLI** — TOML rather than JSON, in the project's `.codex/config.toml`.
+Codex reads a project config only once you have trusted the project:
 
-```toml title="~/.codex/config.toml"
+```toml title=".codex/config.toml"
 [mcp_servers.rebase]
 command = "npx"
 args = ["-y", "@rebasepro/mcp"]
-env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
+
+[mcp_servers.rebase.env]
+REBASE_PROJECT_DIR = "."
 ```
 
 **Kiro** — `.kiro/settings/mcp.json`:
@@ -36179,6 +36216,28 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   }
 }
 ```
+
+**GitHub Copilot in VS Code** — `.vscode/mcp.json`, under `servers` and with
+an explicit transport:
+
+```json title=".vscode/mcp.json"
+{
+  "servers": {
+    "rebase": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+**Windsurf** reads MCP servers only from its user-level config, so there is no
+project file to write. Add the server in Windsurf's MCP settings, with an
+absolute `REBASE_PROJECT_DIR`.
 
 Any MCP client that can spawn a stdio server works; the shape is the same.
 
@@ -36198,10 +36257,10 @@ precedence, and it is the same in every client:
 Auto-discovery from `.rebase/state.json` fills gaps in all three cases and never
 overrules a value one of them supplied.
 
-The project-level blocks set `REBASE_PROJECT_DIR` to `"."` — the client's
-working directory is the project — because rule 3 reads a file shared by every
-project on the machine. The Codex block is user-level rather than per-project,
-so it names an absolute path instead.
+The project-level blocks name the project — `"."`, the client's working
+directory, or the editor's `${workspaceFolder}` — because rule 3 reads a file
+shared by every project on the machine. A user-level config, such as Windsurf's,
+names an absolute path instead.
 
 ### What the server can reach
 
@@ -36646,6 +36705,33 @@ collections are defined, why migrations are two steps, and which mistakes the
 framework will not catch for it. For tools that act on your data, see the
 [MCP server](/docs/ai/mcp).
 
+### Set up by `rebase init`
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A new project does not need the command. `rebase init` asks
+whether to set up your AI coding agents, then lists the ones it finds on the
+machine:
+
+```text
+? Set up Rebase skills and the Rebase MCP server for your AI coding agent(s)? Yes
+
+Detecting installed AI coding agents...
+  ✓ Claude Code — ~/.claude
+  ✓ Gemini CLI / Antigravity — ~/.gemini
+  ✗ Cursor — ~/.cursor (not found)
+  ✗ Windsurf — ~/.codeium/windsurf (not found)
+  ✗ Codex CLI — ~/.codex (not found)
+  ✗ Kiro — ~/.kiro (not found)
+  · GitHub Copilot — can't be detected; tick it below if you use it
+```
+
+The agents it found are pre-ticked. For each one you keep, it writes the skills
+and registers the [MCP server](/docs/ai/mcp) in that agent's project config, all
+before the project's first commit. In CI, or with `--yes`, name them:
+
+```bash
+rebase init my-app --yes --agent claude,cursor
+```
+
 ### Which assistant
 
 The command takes `--agent` (or `-a`), repeatable and comma-separated:
@@ -36664,7 +36750,7 @@ Seven targets are supported — one for every pointer file `rebase init` writes:
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
 | `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
-| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.agents/skills/<skill>/SKILL.md` |
 | `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
 | `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
 
@@ -36680,11 +36766,13 @@ bodies sit in per-skill subdirectories and are opened on demand.
 :::
 
 `gemini` covers **both** Gemini CLI and Antigravity — they read the same
-`.agents/` directory, so there is no separate `antigravity` value.
+`.agents/` directory, so there is no separate `antigravity` value. Codex reads
+it too; naming both `gemini` and `codex` writes the directory once.
 
 With no `--agent`, the command detects which assistants a project already uses by
 looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` and
-`.kiro/`. If it finds none it prompts you to choose.
+`.kiro/`. If it finds none it prompts you to choose, with the assistants installed
+on the machine already ticked.
 
 **GitHub Copilot is never detected.** Its directory would be `.github/`, and
 `.github/` is not evidence anyone uses Copilot: `rebase init` writes
@@ -36938,6 +37026,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 | `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
 | `--setup-key <key>` | The one-time key authenticating that link |
+| `-a, --agent <name>` | <span class="since-badge" data-since="0.24">Since 0.24</span> Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
 
 #### `rebase dev`
 
@@ -37456,8 +37545,7 @@ identity it acts as both apply, so a key can never read more than that identity 
 
 #### `rebase skills install`
 
-Install the Rebase reference skills for your AI coding assistant. Supports
-Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity:
+Install the Rebase reference skills for your AI coding assistants — every `--agent` above:
 
 ```bash
 rebase skills install

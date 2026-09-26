@@ -47,6 +47,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 | `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
 | `--setup-key <key>` | The one-time key authenticating that link |
+| `-a, --agent <name>` | <span class="since-badge" data-since="0.24">Since 0.24</span> Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
 
 ### `rebase dev`
 
@@ -565,8 +566,7 @@ identity it acts as both apply, so a key can never read more than that identity 
 
 ### `rebase skills install`
 
-Install the Rebase reference skills for your AI coding assistant. Supports
-Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity:
+Install the Rebase reference skills for your AI coding assistants — every `--agent` above:
 
 ```bash
 rebase skills install

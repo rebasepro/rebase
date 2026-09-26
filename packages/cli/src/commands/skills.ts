@@ -3,8 +3,9 @@ import fs from "fs";
 import path from "path";
 import inquirer from "inquirer";
 import { createRequire } from "module";
+import os from "os";
 import { findProjectRoot } from "../utils/project";
-import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
 const require = createRequire(import.meta.url);
@@ -29,14 +30,32 @@ const require = createRequire(import.meta.url);
  * A subdirectory layout has no such problem: the rule file already sits beside
  * its own assets, so `references/x.md` resolves as written and nothing is
  * loaded until it is opened.
+ *
+ * `homeMarkers` are the directories under `~` that say the assistant is
+ * installed on this machine. They answer a different question from
+ * `detectDir`: a fresh scaffold has no `.claude/` of its own, so `rebase init`
+ * asks the machine which assistants the developer has and pre-selects those.
+ *
+ * `mcp` is where the assistant reads a *project-level* MCP server list, and in
+ * which shape — see `agent-setup.ts`. `projectDir` is what `REBASE_PROJECT_DIR`
+ * is set to: `"."` where the server is spawned in the project, the editor's own
+ * workspace variable where it may not be. `null` means there is no project
+ * file to write: Windsurf reads only a user-level config, and one entry there
+ * cannot name every project on the machine.
  */
-const AGENTS = {
+export const AGENTS = {
     cursor: {
         label: "Cursor",
         detectDir: ".cursor",
+        homeMarkers: [".cursor"],
         targetDir: ".cursor/rules",
         flatLayout: true,
         indexFile: "rebase.mdc",
+        mcp: {
+            file: ".cursor/mcp.json",
+            format: "mcpServers",
+            projectDir: "${workspaceFolder}"
+        },
         /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -46,8 +65,15 @@ const AGENTS = {
     claude: {
         label: "Claude Code",
         detectDir: ".claude",
+        homeMarkers: [".claude"],
         targetDir: ".claude/skills",
         flatLayout: false,
+        // The scaffold already ships this file; writing it is then a no-op.
+        mcp: {
+            file: ".mcp.json",
+            format: "mcpServers",
+            projectDir: "."
+        },
         /** Claude Code uses the standard SKILL.md format in subdirectories. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -57,9 +83,11 @@ const AGENTS = {
     windsurf: {
         label: "Windsurf",
         detectDir: ".windsurf",
+        homeMarkers: [".codeium/windsurf", ".windsurf"],
         targetDir: ".windsurf/rules",
         flatLayout: true,
         indexFile: "rebase.md",
+        mcp: null,
         /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -69,8 +97,14 @@ const AGENTS = {
     gemini: {
         label: "Gemini CLI / Antigravity",
         detectDir: ".agents",
+        homeMarkers: [".gemini"],
         targetDir: ".agents/skills",
         flatLayout: false,
+        mcp: {
+            file: ".gemini/settings.json",
+            format: "mcpServers",
+            projectDir: "."
+        },
         /** Gemini uses the standard SKILL.md format in subdirectories. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -80,9 +114,22 @@ const AGENTS = {
     codex: {
         label: "Codex CLI",
         detectDir: ".codex",
-        targetDir: ".codex/skills",
+        homeMarkers: [".codex"],
+        // Codex reads repository skills from `.agents/skills` — every directory
+        // from the working directory up to the repository root — and nothing
+        // under `.codex/`. This entry used to write `.codex/skills`, so `--agent
+        // codex` reported 21 skills installed into a directory Codex never
+        // opens. It shares the directory with Gemini; the installer writes it
+        // once.
+        targetDir: ".agents/skills",
         flatLayout: false,
-        /** Codex reads AGENTS.md; the skills sit beside its own config. */
+        // Project-scoped, and read only once the developer trusts the project.
+        mcp: {
+            file: ".codex/config.toml",
+            format: "codexToml",
+            projectDir: "."
+        },
+        /** Codex uses the standard SKILL.md format in subdirectories. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
             content
@@ -91,9 +138,15 @@ const AGENTS = {
     kiro: {
         label: "Kiro",
         detectDir: ".kiro",
+        homeMarkers: [".kiro"],
         targetDir: ".kiro/steering",
         flatLayout: true,
         indexFile: "rebase.md",
+        mcp: {
+            file: ".kiro/settings/mcp.json",
+            format: "mcpServers",
+            projectDir: "."
+        },
         /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -111,9 +164,17 @@ const AGENTS = {
         // command `rebase init` printed got a success message and nothing in
         // `.claude/skills`. Copilot is `--agent copilot`.
         detectDir: null,
+        // Same reasoning on the machine: Copilot lives inside VS Code or a
+        // JetBrains IDE, and neither's directory says the extension is there.
+        homeMarkers: [],
         targetDir: ".github/instructions",
         flatLayout: true,
         indexFile: "rebase.instructions.md",
+        mcp: {
+            file: ".vscode/mcp.json",
+            format: "vscode",
+            projectDir: "${workspaceFolder}"
+        },
         /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -122,7 +183,15 @@ const AGENTS = {
     }
 } as const;
 
-type AgentKey = keyof typeof AGENTS;
+export type AgentKey = keyof typeof AGENTS;
+
+/** Narrows a string to an agent name, by the table's own keys. */
+export function isAgentKey(value: string): value is AgentKey {
+    return Object.hasOwn(AGENTS, value);
+}
+
+/** Every agent, in table order. */
+export const AGENT_KEYS: AgentKey[] = Object.keys(AGENTS).filter(isAgentKey);
 
 /**
  * Resolve the path to the skills directory from @rebasepro/agent-skills.
@@ -199,6 +268,19 @@ export function loadSkills(skillsDir: string): LoadedSkill[] {
         });
     }
 
+    return skills;
+}
+
+/**
+ * The skills this CLI ships, from its own `@rebasepro/agent-skills`.
+ *
+ * Throws rather than exiting, so `rebase init` can report a missing bundle as a
+ * warning and still finish the scaffold.
+ */
+export function loadBundledSkills(): LoadedSkill[] {
+    const skillsDir = getSkillsSourceDir();
+    const skills = loadSkills(skillsDir);
+    if (skills.length === 0) throw new Error(`No skills found in ${skillsDir}`);
     return skills;
 }
 
@@ -298,14 +380,42 @@ function describe(skill: LoadedSkill): string {
  * guessing, because the wrong guess installs 21 files and reports success.
  */
 export function detectAgents(projectDir: string): AgentKey[] {
-    const detected: AgentKey[] = [];
-    for (const [key, agent] of Object.entries(AGENTS)) {
-        if (!agent.detectDir) continue;
-        if (fs.existsSync(path.join(projectDir, agent.detectDir))) {
-            detected.push(key as AgentKey);
-        }
-    }
-    return detected;
+    return AGENT_KEYS.filter((key) => {
+        const { detectDir } = AGENTS[key];
+        return detectDir !== null && fs.existsSync(path.join(projectDir, detectDir));
+    });
+}
+
+/** What `detectInstalledAgents` found for one assistant. */
+export interface InstalledAgent {
+    key: AgentKey;
+    label: string;
+    /** The home directory checked, as `~/…` — the one found, else the first. */
+    marker: string | null;
+    found: boolean;
+}
+
+/**
+ * Which assistants are installed on this machine, from their home directories.
+ *
+ * The question `rebase init` needs answered, and one `detectAgents` cannot: a
+ * project that does not exist yet has no `.claude/` in it. What the machine has
+ * is only a default — the developer confirms it — so a false positive costs an
+ * unticked box, not 21 files nobody asked for.
+ */
+export function detectInstalledAgents(home: string = os.homedir()): InstalledAgent[] {
+    return AGENT_KEYS.map((key) => {
+        const agent = AGENTS[key];
+        const markers: readonly string[] = agent.homeMarkers;
+        const hit = markers.find((m) => fs.existsSync(path.join(home, m)));
+        const shown = hit ?? markers[0];
+        return {
+            key,
+            label: agent.label,
+            marker: shown === undefined ? null : `~/${shown}`,
+            found: hit !== undefined
+        };
+    });
 }
 
 /** Install skills for a specific agent into the project directory. */
@@ -354,6 +464,36 @@ export function installForAgent(
     return { skills: count, assets: assetCount };
 }
 
+/** What `installSkills` did for one agent. */
+export interface SkillsInstallResult {
+    agent: AgentKey;
+    skills: number;
+    assets: number;
+    /** An earlier agent in the same run that already wrote this directory. */
+    sharedWith?: AgentKey;
+}
+
+/**
+ * Install for several agents, writing each target directory once.
+ *
+ * Gemini and Codex both read `.agents/skills`; installing twice would write the
+ * same 21 files twice and report two installs of one directory.
+ */
+export function installSkills(
+    agents: readonly AgentKey[],
+    skills: LoadedSkill[],
+    projectDir: string
+): SkillsInstallResult[] {
+    const written = new Map<string, SkillsInstallResult>();
+    return agents.map((agent) => {
+        const earlier = written.get(AGENTS[agent].targetDir);
+        if (earlier) return { ...earlier, agent, sharedWith: earlier.agent };
+        const result = { agent, ...installForAgent(agent, skills, projectDir) };
+        written.set(AGENTS[agent].targetDir, result);
+        return result;
+    });
+}
+
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const SKILLS_SUBCOMMANDS = ["install"] as const;
 
@@ -400,7 +540,17 @@ export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
         maxPositionals: 0
     });
 
-    const requested = (flags["--agent"] ?? [])
+    return resolveAgentNames(flags["--agent"] ?? []);
+}
+
+/**
+ * The agents a list of `--agent` values names, or null when it names none.
+ *
+ * Shared by `rebase skills install` and `rebase init`, so both accept the same
+ * spellings. Throws a UsageError on a name that is not an agent.
+ */
+export function resolveAgentNames(values: readonly string[]): AgentKey[] | null {
+    const requested = values
         .flatMap(value => value.split(",").map(v => v.trim()))
         .filter(Boolean);
     if (requested.length === 0) return null;
@@ -412,15 +562,14 @@ export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
     // developer actually uses. Guessing from them would install several agents'
     // skills unasked; refusing leaves a scripted setup with no way through.
     // Naming `all` is the developer saying it out loud.
-    if (requested.includes("all")) return Object.keys(AGENTS) as AgentKey[];
+    if (requested.includes("all")) return [...AGENT_KEYS];
 
-    const valid = Object.keys(AGENTS);
-    const unknown = requested.filter(a => !valid.includes(a));
+    const unknown = requested.filter(a => !isAgentKey(a));
     if (unknown.length > 0) {
-        console.error(chalk.red(`Unknown agent(s): ${unknown.join(", ")}. Available: ${valid.join(", ")}`));
-        process.exit(1);
+        throw new UsageError(`Unknown agent(s): ${unknown.join(", ")}. Available: ${AGENT_KEYS.join(", ")}, all`);
     }
-    return requested as AgentKey[];
+    // Deduplicated, in the order given: `--agent claude,claude` is one install.
+    return [...new Set(requested.filter(isAgentKey))];
 }
 
 async function skillsInstall(rawArgs: string[] = []) {
@@ -439,17 +588,11 @@ async function skillsInstall(rawArgs: string[] = []) {
     const projectDir = findProjectRoot() ?? process.cwd();
 
     // 1. Load skills from @rebasepro/agent-skills
-    let skillsDir: string;
+    let skills: LoadedSkill[];
     try {
-        skillsDir = getSkillsSourceDir();
+        skills = loadBundledSkills();
     } catch (err) {
         console.error(`${chalk.red.bold("ERROR")} ${err instanceof Error ? err.message : String(err)}`);
-        process.exit(1);
-    }
-
-    const skills = loadSkills(skillsDir);
-    if (skills.length === 0) {
-        console.error(`${chalk.red.bold("ERROR")} No skills found in ${skillsDir}`);
         process.exit(1);
     }
 
@@ -472,24 +615,27 @@ async function skillsInstall(rawArgs: string[] = []) {
             process.exit(1);
         }
 
-        const choices = Object.entries(AGENTS).map(([key, agent]) => ({
-            name: agent.label,
+        // The project says nothing, but the machine may: pre-tick the agents
+        // whose home directory exists, as `rebase init` does.
+        const installed = detectInstalledAgents();
+        const choices = installed.map(({ key, label, found }) => ({
+            name: label,
             value: key,
-            checked: false
+            checked: found
         }));
 
         const { selectedAgents } = await inquirer.prompt([{
             type: "checkbox",
             name: "selectedAgents",
-            message: "No AI agent configuration detected. Which agents do you use?",
+            message: "No AI agent configuration in this project. Which agents do you use?",
             choices,
-            validate: (input: string[]) => {
+            validate: (input: readonly unknown[]) => {
                 if (input.length === 0) return "Please select at least one agent.";
                 return true;
             }
         }]);
 
-        agents = selectedAgents as AgentKey[];
+        agents = AGENT_KEYS.filter(key => selectedAgents.includes(key));
     }
 
     // 4. Install skills for each agent
@@ -497,15 +643,18 @@ async function skillsInstall(rawArgs: string[] = []) {
     console.log(chalk.gray(`  Found ${chalk.white(skills.length)} Rebase skills`));
     console.log("");
 
-    for (const agentKey of agents) {
-        const agent = AGENTS[agentKey];
-        const { skills: count, assets } = installForAgent(agentKey, skills, projectDir);
+    for (const result of installSkills(agents, skills, projectDir)) {
+        const agent = AGENTS[result.agent];
         // Relative to where the command was typed, now that the destination is
         // the project root rather than the cwd — otherwise `.claude/skills`
         // names a directory that is not the one it wrote to.
         const shown = path.relative(process.cwd(), path.join(projectDir, agent.targetDir)) || agent.targetDir;
-        const withAssets = assets > 0 ? ` (+ ${assets} reference file${assets === 1 ? "" : "s"})` : "";
-        console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${count} skills installed${withAssets} to ${chalk.gray(shown)}`);
+        if (result.sharedWith) {
+            console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — reads the same ${chalk.gray(shown)} as ${AGENTS[result.sharedWith].label}`);
+            continue;
+        }
+        const withAssets = result.assets > 0 ? ` (+ ${result.assets} reference file${result.assets === 1 ? "" : "s"})` : "";
+        console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${result.skills} skills installed${withAssets} to ${chalk.gray(shown)}`);
     }
 
     console.log("");

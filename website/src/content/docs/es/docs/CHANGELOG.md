@@ -44,6 +44,23 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   could hold two copies that disagreed. `SchemaCommitPaths` and
   `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
 
+### Added
+
+#### CLI
+
+- **`rebase init` sets up your AI coding agents.** It asks whether to install
+  the Rebase skills and register the Rebase MCP server, lists the agents it
+  finds on the machine (`~/.claude`, `~/.cursor`, `~/.gemini`, `~/.codex`,
+  `~/.kiro`, Windsurf's `~/.codeium/windsurf`), and pre-ticks those. The skills
+  and each agent's project-level MCP config land before the first commit:
+  `.mcp.json`, `.cursor/mcp.json`, `.gemini/settings.json`,
+  `.codex/config.toml`, `.kiro/settings/mcp.json` or `.vscode/mcp.json`.
+  Existing servers and settings in those files are kept, and a file with
+  comments is left alone. Windsurf reads MCP servers only from a user-level
+  file, so it gets the skills alone. Under `--yes` nothing is set up unless you
+  pass `--agent` (`-a`), e.g. `rebase init my-app --yes --agent claude,cursor`.
+  Before, `rebase init` only printed `rebase skills install`.
+
 ### Fixed
 
 #### Server & REST
@@ -64,6 +81,18 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   Going back landed at the top with only the first page loaded. It now returns
   to the same rows. The card view also stops jumping back slightly the first
   time more rows load after a fresh visit.
+
+#### CLI
+
+- **`rebase skills install --agent codex` writes where Codex reads.** It wrote
+  `.codex/skills`, which Codex never opens: Codex reads repository skills from
+  `.agents/skills`. It now writes there, the directory Gemini CLI and
+  Antigravity read too, and installs it once when both are named.
+
+- **The scaffold's `.gitignore` keeps `.vscode/mcp.json`.** It ignored
+  `.vscode/` whole, so the MCP server registered for GitHub Copilot never
+  reached the first commit. Other editor settings in `.vscode/` are still
+  ignored.
 
 ## [0.23.0] - 2026-09-27
 

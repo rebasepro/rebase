@@ -35,6 +35,7 @@ output so Node ESM can load it; `--check` reports instead of rewriting.
 | `--database-url` | — | PostgreSQL connection string (skip prompt) |
 | `--introspect` | — | Auto-introspect the database after init |
 | `--yes` | `-y` | Non-interactive mode (use all defaults) |
+| `--agent` | `-a` | Install the skills and register the MCP server for these AI agents (`claude,cursor`, or `all`). Without it the prompt asks, pre-ticking the agents installed on the machine; under `--yes`, none |
 
 #### What gets scaffolded
 

@@ -21,7 +21,7 @@ rebase skills install
 Name the agents explicitly when there is nothing to detect, or when running
 without a TTY. Supported: `claude` (`.claude/skills`), `cursor`
 (`.cursor/rules`), `windsurf` (`.windsurf/rules`), `gemini` (`.agents/skills`),
-`codex` (`.codex/skills`), `kiro` (`.kiro/steering`) and `copilot`
+`codex` (`.agents/skills`), `kiro` (`.kiro/steering`) and `copilot`
 (`.github/instructions`) — one for every pointer file `rebase init` writes.
 
 ```bash
@@ -53,7 +53,7 @@ Common destinations:
 |---|---|---|
 | Claude Code | `.claude/skills/<name>/SKILL.md` | one directory per skill |
 | Gemini CLI / Antigravity | `.agents/skills/<name>/SKILL.md` | one directory per skill |
-| Codex CLI | `.codex/skills/<name>/SKILL.md` | one directory per skill |
+| Codex CLI | `.agents/skills/<name>/SKILL.md` | one directory per skill |
 | Cursor | `.cursor/rules/rebase.mdc` + `<name>/SKILL.md` | index rule + bodies |
 | Windsurf | `.windsurf/rules/rebase.md` + `<name>/SKILL.md` | index rule + bodies |
 | Kiro | `.kiro/steering/rebase.md` + `<name>/SKILL.md` | index rule + bodies |

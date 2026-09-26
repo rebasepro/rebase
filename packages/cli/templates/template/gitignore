@@ -11,8 +11,13 @@ build/
 !.env.example
 
 # IDE
+#
+# `.vscode/*` rather than `.vscode/`: git cannot re-include a file inside an
+# ignored directory, and `.vscode/mcp.json` is the Rebase MCP server
+# `rebase init --agent copilot` registers for the whole team.
 .idea/
-.vscode/
+.vscode/*
+!.vscode/mcp.json
 *.swp
 *.swo
 

@@ -10,12 +10,15 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
+import type arg from "arg";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
 import { promptForConsent } from "../telemetry/consent";
 import { durationBucket, recordEvent } from "../telemetry";
 import { parseEnvBoolean } from "@rebasepro/types";
+import { AGENT_KEYS, AGENTS, type AgentKey, resolveAgentNames } from "./skills";
+import { configureAgents, printAgentSetup, promptForAgents } from "./agent-setup";
 
 const access = promisify(fs.access);
 
@@ -130,6 +133,8 @@ export interface InitOptions {
     setupKey?: string;
     /** Control-plane URL the setup key is redeemed against. */
     cloudUrl?: string;
+    /** AI coding agents to install skills and the MCP server for. */
+    agents: AgentKey[];
 }
 
 export interface BuildQuestionsParams {
@@ -275,6 +280,10 @@ ${chalk.bold("Options")}
   ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
   ${chalk.blue("--project")} ${chalk.gray("<slug>")}          Link the scaffold to a Rebase Cloud project
   ${chalk.blue("--setup-key")} ${chalk.gray("<key>")}         One-time key authenticating the cloud link ${chalk.gray("(use with --project)")}
+  ${chalk.blue("-a, --agent")} ${chalk.gray("<name>")}        Set up an AI coding agent: Rebase skills + the MCP server.
+                            ${chalk.gray(`Repeatable or comma-separated: ${AGENT_KEYS.join(" | ")} | all`)}
+                            ${chalk.gray("Asks when omitted, pre-ticking the agents installed on this")}
+                            ${chalk.gray("machine; under --yes, none unless named.")}
 
 ${chalk.bold("What gets scaffolded")}
   ${chalk.gray("default")}     Backend + an admin UI, driven by collections you define ${chalk.gray("(like Payload/Directus)")}
@@ -285,6 +294,7 @@ ${chalk.bold("Examples")}
   ${chalk.gray("$")} rebase init my-shop --template ecommerce --install
   ${chalk.gray("$")} rebase init my-api --headless --yes
   ${chalk.gray("$")} rebase init . --yes --git
+  ${chalk.gray("$")} rebase init my-app --yes --agent claude,cursor
 `);
 }
 
@@ -319,12 +329,14 @@ export const INIT_FLAGS = {
     "--headless": Boolean,
     "--project": String,
     "--setup-key": String,
+    "--agent": [String],
     "--yes": Boolean,
+    "-a": "--agent",
     "-g": "--git",
     "-i": "--install",
     "-t": "--template",
     "-y": "--yes"
-} as const;
+} satisfies arg.Spec;
 
 async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<InitOptions> {
     const { flags: args, positionals } = parseCommandArgs({
@@ -363,6 +375,9 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
     const headlessArg = args["--headless"] === true ? true : undefined;
 
+    // Resolved before any question, so a misspelt agent costs nothing.
+    const namedAgents = resolveAgentNames(args["--agent"] ?? []);
+
     // `--no-install` is an explicit "no", not merely the absence of a "yes": it
     // suppresses the interactive question too, so `rebase init app --no-install`
     // asks one fewer thing rather than asking and ignoring the answer.
@@ -392,7 +407,10 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             pmCommands,
             cloudProject: args["--project"] || undefined,
             setupKey: args["--setup-key"] || undefined,
-            cloudUrl: resolveCloudUrl(rawArgs)
+            cloudUrl: resolveCloudUrl(rawArgs),
+            // Nothing is guessed without a person to confirm it: the machine's
+            // agents are only ever a pre-ticked default in the prompt.
+            agents: namedAgents ?? []
         };
     }
 
@@ -403,7 +421,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
         console.error(chalk.yellow("  Re-run with --yes to accept defaults, passing any choices as flags, e.g.:"));
         console.error(chalk.yellow(`    rebase init ${nameArg || "my-app"} --yes --template blog`));
-        console.error(chalk.gray("  Options: --template <blog|ecommerce|blank>  --headless  --database-url <url>  --install  --git"));
+        console.error(chalk.gray("  Options: --template <blog|ecommerce|blank>  --headless  --database-url <url>  --install  --git  --agent <name>"));
         process.exit(1);
     }
 
@@ -418,6 +436,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
 
     const answers = await inquirer.prompt(questions);
+    const agents = namedAgents ?? await promptForAgents();
 
     const targetDirectory = path.resolve(process.cwd(), nameArg || answers.projectName);
     const projectName = path.basename(targetDirectory);
@@ -441,7 +460,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         pmCommands,
         cloudProject: args["--project"] || undefined,
         setupKey: args["--setup-key"] || undefined,
-        cloudUrl: resolveCloudUrl(rawArgs)
+        cloudUrl: resolveCloudUrl(rawArgs),
+        agents
     };
 }
 
@@ -620,6 +640,12 @@ async function createProject(options: InitOptions) {
     // frontend` in a pnpm project is a second package manager reading a
     // lockfile it did not write.
     await writeProjectPackageManagerIntoManifest(options.targetDirectory, options.pmCommands);
+
+    // Before git, so the skills and MCP configs are in the initial commit.
+    if (options.agents.length > 0) {
+        console.log(chalk.gray("  Setting up AI coding agents..."));
+        printAgentSetup(configureAgents(options.agents, options.targetDirectory));
+    }
 
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.
@@ -813,7 +839,12 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(chalk.bold("🤖 AI Agent Skills"));
     console.log("");
-    console.log(chalk.gray("  Install Rebase agent skills for your AI coding assistant:"));
+    if (options.agents.length > 0) {
+        console.log(chalk.gray(`  Set up for ${options.agents.map(a => AGENTS[a].label).join(", ")}. Commit the files to share them;`));
+        console.log(chalk.gray("  after a Rebase upgrade, refresh the skills with:"));
+    } else {
+        console.log(chalk.gray("  Install Rebase agent skills for your AI coding assistant:"));
+    }
     console.log("");
     console.log(`  ${chalk.cyan("rebase skills install")}  ${chalk.gray("or")}  ${chalk.cyan(pmCommands.run("skills:install").join(" "))}`);
     console.log("");

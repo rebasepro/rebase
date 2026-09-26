@@ -23,15 +23,23 @@ const TEMPLATE_GITIGNORE = path.resolve(here, "..", "..", "templates", "template
 
 let repo: string;
 
-/** `git check-ignore` answers 0 when the path is ignored, 1 when it is not. */
+/**
+ * Whether git would ignore the path, read from the pattern that decides it.
+ *
+ * Not from the exit code alone: `git check-ignore` exits 0 when the last
+ * matching pattern is a *negation* too, so `!.vscode/mcp.json` read as
+ * "ignored" while `git add` tracked the file. It exits 1 when nothing matches.
+ */
 function isIgnored(relativePath: string): boolean {
+    let verdict: string;
     try {
-        execFileSync("git", ["check-ignore", "-q", "--no-index", relativePath], { cwd: repo });
-
-        return true;
+        verdict = execFileSync("git", ["check-ignore", "-v", "--no-index", relativePath], { cwd: repo, encoding: "utf-8" });
     } catch {
         return false;
     }
+    // `<source>:<line>:<pattern>\t<path>`
+    const pattern = verdict.split("\t")[0].split(":").slice(2).join(":");
+    return !pattern.startsWith("!");
 }
 
 beforeAll(() => {
@@ -74,6 +82,24 @@ describe("the scaffold's .gitignore", () => {
         // ignores itself, for projects scaffolded before this rule existed.
         expect(isIgnored("backend/.rebase/sql/schema.sql")).toBe(true);
         expect(isIgnored("backend/.rebase/sql/policies.sql")).toBe(true);
+    });
+
+    it("tracks every agent config `rebase init --agent` writes, and no other editor settings", () => {
+        // `.vscode/` was ignored whole, so the MCP server registered for
+        // Copilot never reached the initial commit or anyone else's checkout.
+        for (const file of [
+            ".mcp.json",
+            ".vscode/mcp.json",
+            ".cursor/mcp.json",
+            ".gemini/settings.json",
+            ".codex/config.toml",
+            ".kiro/settings/mcp.json",
+            ".claude/skills/rebase-basics/SKILL.md",
+            ".agents/skills/rebase-basics/SKILL.md"
+        ]) {
+            expect(isIgnored(file), `${file} must stay tracked`).toBe(false);
+        }
+        expect(isIgnored(".vscode/settings.json")).toBe(true);
     });
 
     it("keeps ignoring the uploads directory it already ignored", () => {

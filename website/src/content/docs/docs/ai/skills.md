@@ -18,6 +18,33 @@ collections are defined, why migrations are two steps, and which mistakes the
 framework will not catch for it. For tools that act on your data, see the
 [MCP server](/docs/ai/mcp).
 
+## Set up by `rebase init`
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A new project does not need the command. `rebase init` asks
+whether to set up your AI coding agents, then lists the ones it finds on the
+machine:
+
+```text
+? Set up Rebase skills and the Rebase MCP server for your AI coding agent(s)? Yes
+
+Detecting installed AI coding agents...
+  ✓ Claude Code — ~/.claude
+  ✓ Gemini CLI / Antigravity — ~/.gemini
+  ✗ Cursor — ~/.cursor (not found)
+  ✗ Windsurf — ~/.codeium/windsurf (not found)
+  ✗ Codex CLI — ~/.codex (not found)
+  ✗ Kiro — ~/.kiro (not found)
+  · GitHub Copilot — can't be detected; tick it below if you use it
+```
+
+The agents it found are pre-ticked. For each one you keep, it writes the skills
+and registers the [MCP server](/docs/ai/mcp) in that agent's project config, all
+before the project's first commit. In CI, or with `--yes`, name them:
+
+```bash
+rebase init my-app --yes --agent claude,cursor
+```
+
 ## Which assistant
 
 The command takes `--agent` (or `-a`), repeatable and comma-separated:
@@ -36,7 +63,7 @@ Seven targets are supported — one for every pointer file `rebase init` writes:
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
 | `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
-| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.agents/skills/<skill>/SKILL.md` |
 | `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
 | `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
 
@@ -52,11 +79,13 @@ bodies sit in per-skill subdirectories and are opened on demand.
 :::
 
 `gemini` covers **both** Gemini CLI and Antigravity — they read the same
-`.agents/` directory, so there is no separate `antigravity` value.
+`.agents/` directory, so there is no separate `antigravity` value. Codex reads
+it too; naming both `gemini` and `codex` writes the directory once.
 
 With no `--agent`, the command detects which assistants a project already uses by
 looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` and
-`.kiro/`. If it finds none it prompts you to choose.
+`.kiro/`. If it finds none it prompts you to choose, with the assistants installed
+on the machine already ticked.
 
 **GitHub Copilot is never detected.** Its directory would be `.github/`, and
 `.github/` is not evidence anyone uses Copilot: `rebase init` writes
