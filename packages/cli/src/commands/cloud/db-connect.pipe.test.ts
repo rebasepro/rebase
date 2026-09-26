@@ -22,7 +22,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import net from "node:net";
 import { WebSocketServer } from "ws";
-import { pipeThroughTunnel } from "./db-connect";
+import { pipeThroughTunnel, tunnelListener } from "./db-connect";
 
 /** A stand-in for the control plane's tunnel endpoint. */
 interface FakeTunnel {
@@ -181,6 +181,83 @@ describe("pipeThroughTunnel", () => {
         expect(errors.join("\n")).toContain("requires the owner or admin role");
 
         await local.close();
+        await tunnel.close();
+    });
+});
+
+/**
+ * The listener outlives the access token it started with.
+ *
+ * `db connect` is left running — its own page says so — and every connection
+ * it accepts signs in to the tunnel separately. It used to present the token it
+ * held at startup, which the control plane stops accepting within the hour:
+ * from then on every new `psql` or pool connection was refused while the
+ * tunnel went on "running", and nothing ever refreshed.
+ */
+describe("tunnelListener", () => {
+    /** A session holder that can be told its token has lapsed. */
+    function sessionHolder(refresh: () => Promise<{ accessToken: string }>) {
+        let session = { accessToken: "token-at-start", expiresAt: Date.now() + 30 * 60_000 };
+        const refreshSession = vi.fn(async () => {
+            const next = await refresh();
+            session = { accessToken: next.accessToken, expiresAt: Date.now() + 60 * 60_000 };
+            return session;
+        });
+        return {
+            client: { auth: { getSession: () => session, refreshSession } },
+            refreshSession,
+            expire: () => { session = { ...session, expiresAt: Date.now() - 1000 }; }
+        };
+    }
+
+    async function open(listener: net.Server): Promise<number> {
+        await new Promise<void>((resolve) => listener.listen(0, "127.0.0.1", () => resolve()));
+        return (listener.address() as { port: number }).port;
+    }
+
+    it("signs a connection made after the token lapsed in with a refreshed one", async () => {
+        const tunnel = await fakeTunnel();
+        const holder = sessionHolder(async () => ({ accessToken: "token-refreshed" }));
+        const listener = tunnelListener(holder.client, tunnel.endpoint);
+        const port = await open(listener);
+
+        const first = net.connect({ port, host: "127.0.0.1" });
+        await until(() => tunnel.handshake.length === 1, "the first handshake");
+        holder.expire();
+        const second = net.connect({ port, host: "127.0.0.1" });
+        await until(() => tunnel.handshake.length === 2, "the second handshake");
+
+        expect(tunnel.handshake).toEqual([
+            { type: "authenticate", token: "token-at-start" },
+            { type: "authenticate", token: "token-refreshed" }
+        ]);
+        expect(holder.refreshSession).toHaveBeenCalledTimes(1);
+
+        first.destroy();
+        second.destroy();
+        await new Promise<void>((resolve) => listener.close(() => resolve()));
+        await tunnel.close();
+    });
+
+    it("closes the connection, and says why, when the session cannot be refreshed", async () => {
+        // The control plane refuses a lapsed token, as its endpoint does.
+        const tunnel = await fakeTunnel({ refuse: { code: "unauthenticated", message: "invalid or expired session" } });
+        const holder = sessionHolder(async () => { throw new Error("refresh token revoked"); });
+        holder.expire();
+        const errors: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+        const listener = tunnelListener(holder.client, tunnel.endpoint);
+        const port = await open(listener);
+
+        const local = net.connect({ port, host: "127.0.0.1" });
+        await new Promise<void>((resolve) => local.once("close", () => resolve()));
+
+        expect(tunnel.handshake).toEqual([]);
+        expect(errors.join("\n")).toContain("rebase cloud login");
+
+        await new Promise<void>((resolve) => listener.close(() => resolve()));
         await tunnel.close();
     });
 });

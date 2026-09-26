@@ -40,9 +40,12 @@ import {
     parseCloudArgs,
     emit,
     fail,
+    freshAccessToken,
     note,
     noteBlank,
-    reportError
+    reportError,
+    warn,
+    type SessionHolder
 } from "./context";
 
 /** Documented in `action-help.ts`, and paired with it by `action-help.test.ts`. */
@@ -173,10 +176,7 @@ export async function dbConnect(rawArgs: string[]): Promise<void> {
         fail(`--port must be a port number, not ${requested}.`, undefined, "bad_port");
     }
 
-    const endpoint = tunnelUrl(url, projectId);
-    const server = net.createServer((socket) => {
-        pipeThroughTunnel(socket, endpoint, client.auth.getSession()?.accessToken ?? "");
-    });
+    const server = tunnelListener(client, tunnelUrl(url, projectId));
 
     server.on("error", (err: NodeJS.ErrnoException) => {
         if (err.code === "EADDRINUSE") {
@@ -243,6 +243,37 @@ export async function dbConnect(rawArgs: string[]): Promise<void> {
 }
 
 /**
+ * The local listener: each connection it accepts gets its own tunnel, signed in
+ * with a token that is current when the connection arrives.
+ *
+ * The command is left running for as long as the developer works, and the
+ * access token it started with lapses within the hour. Every connection is
+ * authenticated on its own, so each one reads the token then, refreshing it
+ * first when it is close to expiry — rather than the one read at startup, which
+ * the control plane refuses for every connection opened after it expires.
+ *
+ * The socket is paused while the token is read, so a client's first bytes wait
+ * for the tunnel exactly as they do once it is being established.
+ */
+export function tunnelListener(client: SessionHolder, endpoint: string): net.Server {
+    return net.createServer((socket) => {
+        socket.pause();
+        freshAccessToken(client).then(
+            (token) => {
+                if (!socket.destroyed) pipeThroughTunnel(socket, endpoint, token);
+            },
+            () => {
+                warn(
+                    "A connection was closed: the session this tunnel signs in with has expired and could not be refreshed.",
+                    "Run `rebase cloud login`, then connect again."
+                );
+                socket.destroy();
+            }
+        );
+    });
+}
+
+/**
  * One accepted connection, carried over one WebSocket.
  *
  * The local socket is paused until the tunnel says `ready`, so a client that
@@ -267,8 +298,10 @@ export function pipeThroughTunnel(socket: net.Socket, endpoint: string, token: s
     const closeBoth = (reason?: string) => {
         if (reason && !ready) {
             // Only worth saying while the tunnel is being established: after
-            // that, a close is a client disconnecting and is not news.
-            note(chalk.red(`✗ ${reason}`));
+            // that, a close is a client disconnecting and is not news. A
+            // warning, so it reaches stderr in JSON mode too: the connection
+            // that was dropped belongs to a client nobody else is watching.
+            warn(`A connection was refused: ${reason}`);
         }
         try {
             if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();

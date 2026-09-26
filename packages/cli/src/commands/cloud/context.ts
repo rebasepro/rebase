@@ -297,6 +297,31 @@ export function createCloudClient(url: string): CloudClient {
 /** Two minutes of head-room before a token is treated as expired. */
 const EXPIRY_BUFFER_MS = 120_000;
 
+/** The half of a client that holds its session — all {@link freshAccessToken} reads. */
+export interface SessionHolder {
+    auth: {
+        getSession(): { accessToken: string; expiresAt: number } | null;
+        refreshSession(): Promise<{ accessToken: string }>;
+    };
+}
+
+/**
+ * An access token with time left on it, refreshed first if it is close to
+ * expiry. Rejects when there is no session, or it cannot be refreshed.
+ *
+ * For the requests the SDK does not make itself. Its own calls refresh and
+ * retry on a 401; a raw `fetch` or a tunnel handshake presents whatever token
+ * it was handed, and `createCloudClient` never refreshes in the background. A
+ * token read once at the start of a command that runs for longer than it
+ * lives — a deploy's build, a `db connect` left open — is refused by the time
+ * it is used, so it is read here at the moment it is sent.
+ */
+export async function freshAccessToken(client: SessionHolder): Promise<string> {
+    const session = client.auth.getSession();
+    if (session?.accessToken && session.expiresAt > Date.now() + EXPIRY_BUFFER_MS) return session.accessToken;
+    return (await client.auth.refreshSession()).accessToken;
+}
+
 /**
  * Return an authenticated client for the resolved host, refreshing the access
  * token if it is close to expiry. Exits with a helpful message when there is no
