@@ -26,6 +26,7 @@ import {
     isJsonMode,
     printJson,
     fail,
+    freshAccessToken,
     warn,
     reportError,
     resolveTimeoutMs,
@@ -150,6 +151,27 @@ function resolveFrameworkVersion(sourceDir: string): string | undefined {
  */
 function progress(line: string): void {
     if (!isJsonMode()) console.log(line);
+}
+
+/**
+ * The token for one of the raw uploads below, read as it is sent.
+ *
+ * They are plain `fetch` calls, which never refresh a session the way the
+ * SDK's own requests do, and each is sent after work that can outlive a token:
+ * a type check and a build, or packing a large directory. Read once at the
+ * start, the token had lapsed by then, the upload was refused with a 401, and
+ * the build was thrown away.
+ */
+async function uploadToken(client: CloudClient, url: string): Promise<string> {
+    try {
+        return await freshAccessToken(client);
+    } catch {
+        fail(
+            `Your session for ${url} has expired.`,
+            "Run `rebase cloud login` to sign in again, then deploy again.",
+            "session_expired"
+        );
+    }
 }
 
 /** Upload a build-context tarball; returns the opaque `source` ref for deploy. */
@@ -414,8 +436,6 @@ async function uploadAndTrigger(opts: {
 
     // Pack + upload.
     const tarPath = path.join(os.tmpdir(), `rebase-bundle-${Date.now()}.tar.gz`);
-    const token = client.auth.getSession()?.accessToken;
-    if (!token) fail("Not authenticated.", "Run `rebase cloud login`.");
 
     let bundleId: string;
     try {
@@ -428,7 +448,7 @@ async function uploadAndTrigger(opts: {
         }
         const sizeMb = (packed.bytes / 1024 / 1024).toFixed(1);
         progress(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
-        bundleId = await uploadBundle(url, token!, projectId, tarPath);
+        bundleId = await uploadBundle(url, await uploadToken(client, url), projectId, tarPath);
     } catch (e) {
         fail(e instanceof Error ? e.message : String(e));
         return;
@@ -473,7 +493,9 @@ async function uploadAndTrigger(opts: {
         rebuildSource = await prepareRebuildSource({
             projectRoot,
             url,
-            token: token!,
+            // Read after packing, just before the upload — see `uploadToken`. A
+            // session that cannot be refreshed costs the source, as a warning.
+            token: () => freshAccessToken(client),
             projectId,
             manifest: projectManifest,
             progress: (line) => progress(chalk.gray(line)),
@@ -1218,9 +1240,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     if (args["--source"]) {
         const tarPath = await createSourceTarball(args["--source"]);
         try {
-            const token = client.auth.getSession()?.accessToken;
-            if (!token) fail("Not authenticated.", "Run `rebase cloud login`.");
-            source = await uploadSource(url, token, projectId, tarPath);
+            source = await uploadSource(url, await uploadToken(client, url), projectId, tarPath);
         } finally {
             fs.rmSync(tarPath, { force: true });
         }

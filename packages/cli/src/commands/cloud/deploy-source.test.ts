@@ -132,7 +132,7 @@ beforeEach(() => {
     invoke = vi.fn(async () => ({ success: true, deployment: { id: "d1" }, managed: true }));
     (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         client: {
-            auth: { getSession: () => ({ accessToken: "tok" }) },
+            auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
             data: { collection: () => ({ findById: async () => undefined }) },
             functions: { invoke }
         },
@@ -207,7 +207,7 @@ describe("a backend bundle deploy", () => {
         controlPlane();
         (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
             client: {
-                auth: { getSession: () => ({ accessToken: "tok" }) },
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
                 data: { collection: () => ({ findById: async () => ({ id: "proj_1", platformRebuilds: false }) }) },
                 functions: { invoke }
             },
@@ -404,7 +404,7 @@ describe("the cli.deploy event", () => {
     function deploymentEnds(status: string): void {
         (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
             client: {
-                auth: { getSession: () => ({ accessToken: "tok" }) },
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
                 data: {
                     collection: (name: string) => ({
                         findById: async () => (name === "deployments" ? { id: "d1", status, logs: "built\n" } : undefined)
@@ -555,6 +555,66 @@ describe("a static app deploy in JSON mode", () => {
 });
 
 /**
+ * The uploads are raw `fetch` calls, which never refresh a token, and the token
+ * was read once — after a build that can outlive it. A deploy started with a
+ * few minutes left on the session sent its bundle with an expired token, got a
+ * 401, and threw the build away; the source beside it was lost the same way,
+ * as a warning.
+ */
+describe("a deploy whose session lapses before its uploads", () => {
+    let sentWith: Map<string, string | null>;
+    let refreshSession: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+        sentWith = new Map();
+        let session = { accessToken: "token-at-start", expiresAt: Date.now() + 60_000 };
+        refreshSession = vi.fn(async () => {
+            session = { accessToken: "token-refreshed", expiresAt: Date.now() + 60 * 60_000 };
+            return session;
+        });
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => session, refreshSession },
+                data: { collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) }) },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+            const auth = new Headers(init?.headers).get("Authorization");
+            sentWith.set(new URL(url).pathname, auth);
+            if (auth !== "Bearer token-refreshed") {
+                return new Response(JSON.stringify({ error: { message: "Invalid or expired token" } }), { status: 401 });
+            }
+            if (url.includes("/deploy/bundle/upload")) return new Response(JSON.stringify({ bundleId: "b1" }));
+            if (url.includes("/deploy/source/upload")) return new Response(JSON.stringify({ sourceId: SOURCE_ID }));
+            if (url.includes("/deploy/upload")) return new Response(JSON.stringify({ source: "gs://contexts/c.tar.gz" }));
+            return new Response("not found", { status: 404 });
+        }));
+    });
+
+    it("sends the bundle and its source with a refreshed token", async () => {
+        bundle("backend");
+
+        await deploy();
+
+        expect(sentWith.get("/api/functions/deploy/bundle/upload")).toBe("Bearer token-refreshed");
+        expect(sentWith.get("/api/functions/deploy/source/upload")).toBe("Bearer token-refreshed");
+        expect(triggered()).toMatchObject({ bundleId: "b1", rebuildSource: { sourceId: SOURCE_ID } });
+        expect(refreshSession).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends a --source build context with a refreshed token", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "--source", ".", "--no-follow"], "shop");
+
+        expect(sentWith.get("/api/functions/deploy/upload")).toBe("Bearer token-refreshed");
+        expect(triggered().source).toBe("gs://contexts/c.tar.gz");
+    });
+});
+
+/**
  * A 409 names the deployment holding the lock, and `mine` says only that the
  * same user started it. The control plane answers a genuine replay of this
  * trigger (same user, same uploaded archive) with 200 `deduplicated`, so a 409
@@ -583,7 +643,7 @@ describe("a trigger refused because another deploy is running", () => {
         ));
         (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
             client: {
-                auth: { getSession: () => ({ accessToken: "tok" }) },
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
                 data: { collection: () => ({ findById, find: async () => ({ data: [] }) }) },
                 functions: { invoke }
             },

@@ -504,7 +504,7 @@ describe("prepareRebuildSource never fails the deploy", () => {
         const result = prepareRebuildSource({
             projectRoot: scratch,
             url: "https://cp.example",
-            token: "t",
+            token: async () => "t",
             projectId: "p",
             manifest: undefined,
             progress: () => undefined,

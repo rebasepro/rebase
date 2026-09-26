@@ -528,7 +528,8 @@ const DEFAULT_STEPS: RebuildSourceSteps = {
 export async function prepareRebuildSource(opts: {
     projectRoot: string;
     url: string;
-    token: string;
+    /** The access token, read when the upload is sent rather than before the packing. */
+    token: () => Promise<string>;
     projectId: string;
     manifest?: RebaseProjectManifest;
     progress: (line: string) => void;
@@ -557,7 +558,7 @@ export async function prepareRebuildSource(opts: {
             return null;
         }
         opts.progress(`  Uploading source (${listing.files.length} files, ${mb(size)} MB)...`);
-        const sourceId = await steps.upload(opts.url, opts.token, opts.projectId, tarPath);
+        const sourceId = await steps.upload(opts.url, await opts.token(), opts.projectId, tarPath);
         return {
             sourceId,
             projectPath: listing.projectPath,
