@@ -23,6 +23,7 @@ import fc from "fast-check";
 import {
     ALL_WHERE_FILTER_OPS,
     CANONICAL_TO_REST,
+    LIST_OPS,
     NULL_OPS,
     REST_TO_CANONICAL,
     WhereFilterOp,
@@ -170,6 +171,29 @@ describe("filter wire codec", () => {
                 expect(result.map(t => t[0])).toEqual(expected);
             }
         ), { numRuns: RUNS });
+    });
+});
+
+describe("scalar operands in a query parameter", () => {
+
+    /**
+     * Exact, not idempotent: the operand of a scalar operator is a string the
+     * caller wrote, and it comes back as that string. A parenthesised one read
+     * as a list is a different query — `["==", "(none)"]` matching nothing,
+     * `["!=", "(none)"]` matching the rows it excludes.
+     */
+    it("round-trips every string exactly", () => {
+        const scalarOp = fc.constantFrom(
+            ...ALL_WHERE_FILTER_OPS.filter(op => !NULL_OPS.has(op) && !LIST_OPS.has(op))
+        );
+        const value = fc.oneof(
+            fc.string({ maxLength: 12 }),
+            fc.stringMatching(/^[()\\,a]{0,8}$/)
+        );
+        fc.assert(fc.property(fieldName, scalarOp, value, (field, op, v) => {
+            const back = deserializeFilter(serializeFilter({ [field]: [op, v] } as never));
+            expect(back[field]).toEqual([op, v]);
+        }), { numRuns: RUNS });
     });
 });
 

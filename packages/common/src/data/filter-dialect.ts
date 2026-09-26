@@ -118,6 +118,43 @@ function unescapeWireValue(value: string): string {
 }
 
 /**
+ * Whether a scalar, sent raw as a query parameter's operand, would be read
+ * back as something other than itself.
+ *
+ * A query parameter owns its whole value, so its scalar goes out unescaped —
+ * `eq.a,b`, `eq.C:\x` — and the decoder returns it verbatim. Two shapes break
+ * that. A parenthesised operand is a list for every operator (so that
+ * `["==", ["a","b"]]` on an array column stays a list), so raw, the scalar
+ * `"(deleted)"` would arrive as `["deleted"]`: an `==` matching nothing, a
+ * `!=` returning the very rows it excludes. Such a scalar is sent escaped,
+ * `eq.\(deleted\)`. And that spelling has to be told apart from a raw value
+ * that looks the same, so a scalar of *that* shape is escaped in turn.
+ *
+ * Everything else stays raw, so a value an older client sends decodes as it
+ * always has — unless it is exactly the escaped spelling of such a scalar,
+ * which decodes to the scalar it spells.
+ */
+function scalarNeedsEscape(value: string): boolean {
+    if (value.startsWith("(") && value.endsWith(")")) return true;
+    return decodeEscapedScalar(value) !== undefined;
+}
+
+/**
+ * The scalar an operand is the escaped spelling of, when it is one.
+ *
+ * Exact on purpose: only an operand that {@link escapeWireValue} produces from
+ * a scalar that {@link scalarNeedsEscape} is decoded. Any other operand —
+ * including a raw backslash an older client sent, like `\\server\share` — is
+ * left verbatim. Terminates because an operand that matches contains an
+ * escape pair, so the value is strictly shorter than it.
+ */
+function decodeEscapedScalar(operand: string): string | undefined {
+    if (!operand.startsWith("\\")) return undefined;
+    const value = unescapeWireValue(operand);
+    return escapeWireValue(value) === operand && scalarNeedsEscape(value) ? value : undefined;
+}
+
+/**
  * Split a parenthesized list string on unescaped commas.
  * Input is the content between `(` and `)`.
  *
@@ -467,7 +504,10 @@ function serializeOperatorAndValue(
     }
 
     const scalar = stringifyValue(value);
-    return `${restOp}.${escapeScalar ? escapeWireValue(scalar) : scalar}`;
+    // A list operator's operand is a list, so a scalar there has no spelling
+    // to protect; see `scalarNeedsEscape` for the others.
+    const escape = escapeScalar || (!LIST_OPS.has(op) && scalarNeedsEscape(scalar));
+    return `${restOp}.${escape ? escapeWireValue(scalar) : scalar}`;
 }
 
 /**
@@ -586,7 +626,10 @@ const NULL_OPERANDS: ReadonlySet<string> = new Set(["null", "true", "false", ""]
  *   operand: only {@link NULL_OPERANDS}. `notnull.reason` is the value
  *   `"notnull.reason"`, not "reason is not null".
  * - **Everything else** takes one scalar, and any remainder is one — including
- *   the empty string, so `eq.` really is "equals the empty string".
+ *   the empty string, so `eq.` really is "equals the empty string". A
+ *   parenthesised remainder is a list for these too (`eq.(a,b)` is array
+ *   equality); a scalar that is itself parenthesised arrives escaped,
+ *   `eq.\(none\)`, and is decoded here — see {@link scalarNeedsEscape}.
  *
  * ### The one ambiguity that remains, and how to write past it
  *
@@ -648,7 +691,9 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
     // to compile to was never written by anyone.
     if (LIST_OPS.has(canonicalOp)) return ["==", raw];
 
-    return [canonicalOp, rest];
+    // A scalar the serializer had to escape, because raw it would have read
+    // as a list; see `scalarNeedsEscape`.
+    return [canonicalOp, decodeEscapedScalar(rest) ?? rest];
 }
 
 /**

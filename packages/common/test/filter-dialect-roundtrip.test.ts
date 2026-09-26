@@ -70,3 +70,45 @@ describe("filter dialect round trip", () => {
         expect(deserializeFilter({ s: "eq.active" })).toEqual({ s: ["==", "active"] });
     });
 });
+
+/**
+ * A query parameter's scalar operand is sent raw, and the decoder read any
+ * parenthesised operand as a list — for every operator. So
+ * `["==", "(deleted)"]` reached the server as `["==", ["deleted"]]`, which
+ * matches nothing, and `["!=", "(deleted)"]` returned the very rows it was
+ * written to exclude. Placeholders like `(none)` and `(untitled)` are ordinary
+ * values, and the same filter inside an `or(...)` group, or over the socket,
+ * was right.
+ */
+describe("a parenthesised scalar in a query parameter", () => {
+    const roundTrip = (filter: unknown) =>
+        deserializeFilter(serializeFilter(filter as never) as never);
+
+    const scalarOps = ["==", "!=", ">", ">=", "<", "<=", "array-contains", "like", "ilike", "not-like", "not-ilike"];
+    const values = ["(deleted)", "(a,b)", "()", "(\\)", "(a\\,b)", "\\(a\\)", "\\\\\\(a\\\\\\)", "((x))"];
+
+    it.each(scalarOps)("comes back as the same string for %p", (op) => {
+        for (const value of values) {
+            expect(roundTrip({ status: [op, value] })).toEqual({ status: [op, value] });
+        }
+    });
+
+    it("still sends the scalars that were never ambiguous raw", () => {
+        expect(serializeFilter({ status: ["==", "active"] })).toEqual({ status: "eq.active" });
+        expect(serializeFilter({ path: ["==", "\\\\server\\share"] })).toEqual({ path: "eq.\\\\server\\share" });
+        expect(serializeFilter({ name: ["like", "(draft%"] })).toEqual({ name: "like.(draft%" });
+    });
+
+    it("keeps reading the old wire forms as it did", () => {
+        // Clients in the field send these, and each has one meaning.
+        expect(deserializeFilter({ tags: "eq.(a,b)" })).toEqual({ tags: ["==", ["a", "b"]] });
+        expect(deserializeFilter({ path: "eq.\\\\server\\share" })).toEqual({ path: ["==", "\\\\server\\share"] });
+        expect(deserializeFilter({ note: "eq.a\\,b" })).toEqual({ note: ["==", "a\\,b"] });
+        expect(deserializeFilter({ role: "in.(admin,editor)" })).toEqual({ role: ["in", ["admin", "editor"]] });
+    });
+
+    it("keeps an array value a list, so array equality still works", () => {
+        expect(roundTrip({ tags: ["==", ["a", "b"]] })).toEqual({ tags: ["==", ["a", "b"]] });
+        expect(roundTrip({ tags: ["array-contains", ["a"]] })).toEqual({ tags: ["array-contains", ["a"]] });
+    });
+});
