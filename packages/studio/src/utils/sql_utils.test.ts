@@ -125,17 +125,12 @@ resultColumn: "id" }]);
 resultColumn: "id" }]);
     });
 
-    it("resolves simple unambiguous JOIN", () => {
-        const sql = "SELECT * FROM users u JOIN roles r ON u.role_id = r.id";
+    it("resolves a JOIN whose tables' keys come back under their own names", () => {
+        const sql = "SELECT u.id AS user_id, u.email, r.role_name FROM users u JOIN roles r ON u.role_id = r.id";
         const result = determineTableAndPK(sql, "email", mockSchemas);
         expect(result.tableName).toBe("users");
         expect(result.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "id" }]);
-
-        const result2 = determineTableAndPK(sql, "role_name", mockSchemas);
-        expect(result2.tableName).toBe("roles");
-        expect(result2.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "id" }]);
+resultColumn: "user_id" }]);
     });
 
     it("resolves aliased PK columns in JOINs", () => {
@@ -243,6 +238,61 @@ describe("inline editing in a named schema", () => {
         const result = determineTableAndPK(sql, "status", twoOrders);
         expect(result.schemaName).toBe("archive");
         expect(result.primaryKeys).toEqual([{ dbColumn: "order_no", resultColumn: "order_no" }]);
+    });
+});
+
+/**
+ * Inline editing a JOIN whose result has two columns of one name.
+ *
+ * A result row is an object keyed by column name, so of two `id` columns only
+ * the last survives. `SELECT * FROM blog_posts p JOIN users u …` shows the
+ * user's id in the row, and editing the post's title ran
+ * `UPDATE "blog_posts" … WHERE "id" = <the user's id>` — another post changed,
+ * the one on screen did not, and the console said "Row updated".
+ */
+describe("inline editing a result with duplicate column names", () => {
+    const join = "FROM blog_posts p JOIN users u ON u.id = p.author_id";
+
+    it("refuses when the edited table's key shares its name with another column", () => {
+        const star = determineTableAndPK(`SELECT * ${join}`, "title", mockSchemas);
+        expect(star.error).toContain("\"id\"");
+        expect(star.primaryKeys).toBeUndefined();
+
+        const explicit = determineTableAndPK(`SELECT p.id, p.title, u.id, u.email ${join}`, "title", mockSchemas);
+        expect(explicit.error).toContain("\"id\"");
+        expect(explicit.primaryKeys).toBeUndefined();
+
+        const tableStar = determineTableAndPK(`SELECT p.*, u.id ${join}`, "title", mockSchemas);
+        expect(tableStar.error).toContain("\"id\"");
+    });
+
+    it("refuses when the edited column shares its name with another column", () => {
+        const sql = "SELECT u.id AS user_id, r.id AS role_id, u.created_at, r.created_at FROM users u JOIN roles r ON u.role_id = r.id";
+        const result = determineTableAndPK(sql, "created_at", mockSchemas);
+        expect(result.error).toContain("\"created_at\"");
+        expect(result.tableName).toBeUndefined();
+    });
+
+    it("resolves the same join once each key has a name of its own", () => {
+        const result = determineTableAndPK(`SELECT p.id AS post_id, p.title, u.id AS user_id, u.email ${join}`, "title", mockSchemas);
+        expect(result.error).toBeUndefined();
+        expect(result.tableName).toBe("blog_posts");
+        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "post_id" }]);
+    });
+
+    it("still resolves a single table's SELECT *", () => {
+        const result = determineTableAndPK("SELECT * FROM blog_posts", "title", mockSchemas);
+        expect(result.error).toBeUndefined();
+        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "id" }]);
+    });
+
+    it("does not offer to open a record by a key column another table also fills", () => {
+        const resultColumns = ["id", "title", "author_id", "email", "created_at"];
+        const matched = resolveQueryCollections(`SELECT * ${join}`, mockSchemas, mockCollections, resultColumns);
+        expect(matched.map(m => [m.tableName, m.pkColumn])).toEqual([["blog_posts", undefined], ["users", undefined]]);
+
+        const aliased = resolveQueryCollections(`SELECT p.id AS post_id, p.title, u.id AS user_id ${join}`, mockSchemas, mockCollections, ["post_id", "title", "user_id"]);
+        expect(aliased.map(m => [m.tableName, m.pkColumn])).toEqual([["blog_posts", "post_id"], ["users", "user_id"]]);
     });
 });
 

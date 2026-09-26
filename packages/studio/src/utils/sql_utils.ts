@@ -1,4 +1,4 @@
-import { parse, parseFirst, type Statement } from "pgsql-ast-parser";
+import { parse, parseFirst, type Expr, type SelectFromStatement, type SelectedColumn, type Statement } from "pgsql-ast-parser";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 
 /** The statements in `sqlText`, or `null` when the parser cannot read it. */
@@ -83,6 +83,91 @@ function findTableInfo(schemas: Record<string, TableInfo[]>, table: ExtractedTab
 }
 
 /**
+ * The name Postgres gives the result column of an unaliased select item, as
+ * far as it can be told from the expression: a column keeps its name, a cast
+ * the name of what it casts, a function call the function's, and anything
+ * else a name no table column has.
+ */
+function expressionColumnName(expr: Expr): string {
+    switch (expr.type) {
+        case "ref":
+            return expr.name;
+        case "cast": {
+            const operandName = expressionColumnName(expr.operand);
+            if (operandName !== "?column?") return operandName;
+            return expr.to.kind === "array" ? operandName : expr.to.name;
+        }
+        case "call":
+            return expr.function.name;
+        case "keyword":
+            return expr.keyword;
+        case "case":
+            return "case";
+        case "array select":
+            return "array";
+        case "select": {
+            const [first] = expr.columns ?? [];
+            return first ? selectedColumnName(first) : "?column?";
+        }
+        default:
+            return "?column?";
+    }
+}
+
+function selectedColumnName(column: SelectedColumn): string {
+    return column.alias?.name ?? expressionColumnName(column.expr);
+}
+
+/**
+ * How many columns of the query's result may carry `name` — an upper bound:
+ * a `*` over a source whose columns are not known counts once for every name.
+ *
+ * A result row is an object keyed by column name, so where two columns share
+ * a name the row holds only the last of them. A key or a value read from such
+ * a row cannot be told apart from its namesake: for `SELECT * FROM posts p
+ * JOIN authors a …` the row's `id` is the author's.
+ */
+function resultColumnCounter(ast: SelectFromStatement, schemas: Record<string, TableInfo[]>): (name: string) => number {
+    const sources = (ast.from ?? []).map(item => {
+        if (item.type === "table") {
+            const renamed = item.name.columnNames ?? [];
+            const columns = findTableInfo(schemas, { name: item.name.name, schema: item.name.schema })
+                ?.columns.map((c, i) => renamed[i]?.name ?? c.name);
+            return { refName: item.name.alias ?? item.name.name, columns };
+        }
+        if (item.type === "statement") {
+            const { statement } = item;
+            const named = statement.type === "select" &&
+                (statement.columns ?? []).every(c => !(c.expr.type === "ref" && c.expr.name === "*"));
+            const renamed = item.columnNames ?? [];
+            const columns = named && statement.type === "select"
+                ? (statement.columns ?? []).map((c, i) => renamed[i]?.name ?? selectedColumnName(c))
+                : undefined;
+            return { refName: item.alias, columns };
+        }
+        return { refName: item.alias?.name, columns: undefined };
+    });
+    return (name: string) => {
+        let count = 0;
+        for (const column of ast.columns ?? []) {
+            const expr = column.expr;
+            if (expr.type === "ref" && expr.name === "*") {
+                const covered = expr.table
+                    ? sources.filter(source => source.refName === expr.table?.name)
+                    : sources;
+                if (covered.length === 0) count += 1;
+                for (const source of covered) {
+                    count += source.columns ? source.columns.filter(c => c === name).length : 1;
+                }
+            } else if (selectedColumnName(column) === name) {
+                count += 1;
+            }
+        }
+        return count;
+    };
+}
+
+/**
  * A collection matched to a table in a SQL query.
  */
 export interface ResolvedQueryCollection {
@@ -159,10 +244,12 @@ export function resolveQueryCollections(
 
     // Parse the AST to resolve SELECT column aliases
     const selectColumns: { table?: string; column: string; alias?: string }[] = [];
+    let countResultColumns: ((name: string) => number) | undefined;
     try {
         const ast = parseFirst(sqlString);
-        if (ast.type === "select" && ast.columns) {
-            for (const col of ast.columns) {
+        if (ast.type === "select") {
+            countResultColumns = resultColumnCounter(ast, schemas);
+            for (const col of ast.columns ?? []) {
                 if (col.expr?.type === "ref") {
                     selectColumns.push({
                         table: col.expr.table?.name,
@@ -216,6 +303,12 @@ export function resolveQueryCollections(
         // If still not found, fall back to checking tableColumns
         if (!pkColumn && tableColumns.includes("id")) {
             pkColumn = "id";
+        }
+
+        // A key column another column of the result shares its name with is
+        // not this table's: the row holds only the last of them.
+        if (pkColumn && (!countResultColumns || countResultColumns(pkColumn) > 1)) {
+            pkColumn = undefined;
         }
 
         results.push({
@@ -346,6 +439,18 @@ export function determineTableAndPK(sqlString: string, columnKey: string, schema
                 resultColumn: selectCol?.alias || selectCol?.column || dbCol
             };
         });
+
+        // The row holds only the last of several columns of one name, so an
+        // edited value or a key read from a shared name may be another
+        // table's: the UPDATE would find some other row by it.
+        const countResultColumns = resultColumnCounter(ast, schemas);
+        if (countResultColumns(columnKey) > 1) {
+            return { error: `Ambiguous column "${columnKey}": the result has more than one column of that name. Give each one its own alias to edit it.` };
+        }
+        const sharedKey = primaryKeys.find(pk => countResultColumns(pk.resultColumn) > 1);
+        if (sharedKey) {
+            return { error: `Cannot tell which "${sharedKey.resultColumn}" column is the key of "${resolvedTableName}": the result has more than one column of that name. Give it its own alias (${tableAlias || resolvedTableName}.${sharedKey.dbColumn} AS ${resolvedTableName}_${sharedKey.dbColumn}) to edit this table.` };
+        }
 
         return { tableName: resolvedTableName,
 schemaName: resolvedTable.schema,
