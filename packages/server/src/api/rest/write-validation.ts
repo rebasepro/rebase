@@ -160,6 +160,52 @@ export function assertNoClosedFields(
 }
 
 /**
+ * Refuse a field operation on a field this caller may not read.
+ *
+ * An operation reads the stored value — `$inc` adds to it, `$push` appends to
+ * it — and its result is held to the property's declared bounds by the same
+ * statement. So the answer to one is a measurement of the value: a refused
+ * `{ score: { $inc: -40 } }` against `min: 0` says the hidden score is below
+ * 40, an accepted one is undone with `$inc: 40`, and a binary search recovers
+ * the value exactly. `max` on an array does the same for its length, and a
+ * column's own type range does it with no declared bound at all. A plain value
+ * reads nothing, so it stays the write rule's alone.
+ *
+ * The same refusal, with the same code, a filter on the field gets from the
+ * read side (`assertQueryFieldsReadable`): a column no response can carry is a
+ * column no request may interrogate, whichever verb the request uses.
+ */
+function assertFieldOpsReadable(
+    values: Record<string, unknown>,
+    collection: CollectionConfig,
+    where: string,
+    viewer: FieldViewer | undefined
+): void {
+    const operated = Object.keys(values).filter(key => isFieldOperation(values[key]));
+    if (operated.length === 0) return;
+    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    const named = operated.filter(key => refused.has(key));
+    if (named.length === 0) return;
+
+    const violations: WriteViolation[] = named.map(field => ({
+        field,
+        code: "access",
+        message: `'${field}' on '${collection.slug}' is not readable with your roles, so it cannot be changed ` +
+            "by a field operation, which reads the stored value. Send the value itself."
+    }));
+    throw ApiError.badRequest(
+        `${where}${violations.map(v => v.message).join(" ")}`,
+        "FIELD_NOT_READABLE",
+        {
+            collection: collection.slug,
+            fields: named,
+            violations,
+            messages: violations.map(v => v.message)
+        }
+    );
+}
+
+/**
  * Reject a write naming a field the collection does not have.
  *
  * An unknown key does *not* reach the INSERT and come back as `column "titel"
@@ -210,6 +256,7 @@ export function assertKnownWriteFields(
     // convenience flag must not be able to turn off a security rule; the two
     // facts are unrelated.
     assertNoClosedFields(values, collection, where, options?.viewer);
+    assertFieldOpsReadable(values, collection, where, options?.viewer);
 
     // The opt-out lets a key through that this config does not describe; the
     // driver still requires a real column behind it.

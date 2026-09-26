@@ -144,6 +144,63 @@ describe("every write door", () => {
     });
 });
 
+describe("a field operation on a field the caller cannot read", () => {
+    /**
+     * An operation reads the stored value: `$inc` adds to it, and the result
+     * is held to the property's bounds by the same statement. So a refusal of
+     * `{ score: { $inc: -n } }` against `min: 0` says whether the hidden score
+     * is below `n`, and an accepted one can be undone with `$inc: n` — a binary
+     * search recovers the value exactly, in about forty requests. The read
+     * rule is `access.read`, and the column is open for writing, so the write
+     * rule never objected. The read side refuses a filter on the same field;
+     * this is the write door's half of that rule.
+     */
+    const posts = {
+        slug: "posts",
+        name: "Posts",
+        table: "posts",
+        properties: {
+            id: { type: "string", isId: "manual" },
+            name: { type: "string" },
+            // Only admins may read it; anyone who may update the row may set it.
+            score: { type: "number", access: { read: ["admin"] }, validation: { min: 0 } },
+            tags: { type: "array", of: { type: "string" }, access: { read: ["admin"] }, validation: { max: 3 } }
+        }
+    } as unknown as CollectionConfig;
+    const editor = { roles: ["editor"] };
+
+    it("refuses $inc before anything reads the row, naming the field", () => {
+        const error = thrown(() => assertKnownWriteFields({ score: { $inc: -37 } }, posts, { viewer: editor }));
+        expect(error.code).toBe("FIELD_NOT_READABLE");
+        expect(error.statusCode).toBe(400);
+        expect(error.message).toContain("'score'");
+        expect((error.details as { fields: string[] }).fields).toEqual(["score"]);
+    });
+
+    it("refuses an array operation too, whose bound is the array's hidden length", () => {
+        const error = thrown(() => assertKnownWriteFields({ tags: { $push: ["x"] } }, posts, { viewer: editor }));
+        expect(error.code).toBe("FIELD_NOT_READABLE");
+        expect(error.message).toContain("'tags'");
+    });
+
+    it("refuses it through the socket's and MCP's door", () => {
+        const error = thrown(() => assertWriteRequestValid({ score: { $inc: 1 } }, posts, { viewer: editor }));
+        expect(error.code).toBe("FIELD_NOT_READABLE");
+    });
+
+    it("still accepts a plain value for the same field, which reads nothing", () => {
+        expect(() => assertKnownWriteFields({ score: 5 }, posts, { viewer: editor })).not.toThrow();
+    });
+
+    it("accepts the operation from a caller who may read the field", () => {
+        expect(() => assertKnownWriteFields({ score: { $inc: -37 } }, posts, { viewer: admin })).not.toThrow();
+    });
+
+    it("leaves the trusted server plane alone", () => {
+        expect(() => assertKnownWriteFields({ score: { $inc: -37 } }, posts)).not.toThrow();
+    });
+});
+
 describe("the known-fields list", () => {
     /**
      * The list in an "unknown field" error is an offer. Offering a field the
