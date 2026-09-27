@@ -418,7 +418,19 @@ describe("Cron slot claiming across instances (E2E)", () => {
                     tryClaimRun: async (jobId, slot) =>
                         jobId === uncoordinated
                             ? true
-                            : instance.store.tryClaimRun!(jobId, slot)
+                            : instance.store.tryClaimRun!(jobId, slot),
+                    // The run lease (`rebase.cron_job_state`) is the second
+                    // cross-process guard: a scheduled run takes it too, so a
+                    // control that neutralised only the slot claim still ran
+                    // once per lease window — 1 to 5 times, by timing.
+                    tryAcquireRunLease: async (jobId, holder, ttlSeconds) =>
+                        jobId === uncoordinated
+                            ? { acquired: true }
+                            : instance.store.tryAcquireRunLease!(jobId, holder, ttlSeconds),
+                    releaseRunLease: async (jobId, holder) =>
+                        jobId === uncoordinated
+                            ? undefined
+                            : instance.store.releaseRunLease!(jobId, holder)
                 });
                 scheduler.registerJobs([
                     {
