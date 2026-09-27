@@ -55,7 +55,7 @@ A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a f
 
 ## Pausing a job across every process
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> A pause is stored
+A pause is stored
 in `rebase.cron_job_state`, not in the memory of the process that served it, so
 it reaches every replica — and, on a [split deployment](/docs/deployment/split-processes/),
 the worker, when the request was served by an `api` process that runs no timers.
@@ -117,7 +117,7 @@ history rather than only in the process log:
 run of these in a row is the signature of a job that has outgrown its schedule,
 and that is a pattern you can only see if the skips are recorded.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> The lock holds
+The lock holds
 across processes, not only inside one. Every run — scheduled, manual or a
 catch-up — takes a **run lease** in `rebase.cron_job_state` before its handler
 starts, and releases it when the run ends. So a manual trigger from the `api`

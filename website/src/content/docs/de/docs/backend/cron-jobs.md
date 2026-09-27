@@ -1,5 +1,5 @@
 ---
-sourceHash: e2d86104205efd30
+sourceHash: 7c92103faece259e
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -334,12 +334,12 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
-<span class="since-badge" data-since="0.23">Seit 0.23</span> Solange der Job läuft — hier oder in einem anderen Prozess —, lautet die Antwort
+Solange der Job läuft — hier oder in einem anderen Prozess —, lautet die Antwort
 `409` mit dem Code `CRON_JOB_ALREADY_EXECUTING`; siehe [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
 
 ### Einen Job pausieren
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Eine Pause aus Studio oder per
+Eine Pause aus Studio oder per
 `PUT /api/admin/cron/:id` gilt für jeden Prozess und bleibt über Neustarts und
 Redeploys hinweg bestehen; `{ "enabled": null }` gibt den Job an das `enabled`
 zurück, das seine Datei deklariert. Wie jede Replik sie liest und was passiert,

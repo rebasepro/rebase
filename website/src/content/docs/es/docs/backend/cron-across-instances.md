@@ -1,5 +1,5 @@
 ---
-sourceHash: cae06a81ae018c4f
+sourceHash: e38cb2eddd8b623a
 title: Cron entre instancias
 sidebar_label: Cron entre instancias
 description: "Cómo se comportan las tareas cron con más de un proceso de servidor: una ejecución por intervalo, un intervalo que un reinicio perdió, una pausa que respetan todas las réplicas y ejecuciones que nunca se solapan."
@@ -57,7 +57,7 @@ Una ejecución recuperada es una entrada normal en `cron_logs` (`manual` es `fal
 
 ## Pausar una tarea en todos los procesos
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Una pausa se guarda en
+Una pausa se guarda en
 `rebase.cron_job_state`, no en la memoria del proceso que atendió la petición,
 así que llega a todas las réplicas — y, en un
 [despliegue dividido](/docs/deployment/split-processes/), al worker, cuando la
@@ -117,7 +117,7 @@ En cualquier caso, se escribe una fila en `rebase.cron_logs`, por lo que la omis
 
 `success: true` porque nada falló: `result.skipped` es lo que lo marca. Varias de estas omisiones consecutivas son la señal característica de una tarea que ha sobrepasado su programación, y ese es un patrón que solo puedes ver si las omisiones quedan registradas.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> El bloqueo se mantiene entre procesos,
+El bloqueo se mantiene entre procesos,
 no solo dentro de uno. Cada ejecución — programada, manual o de recuperación —
 toma un **lease de ejecución** en `rebase.cron_job_state` antes de que arranque
 su handler, y lo libera cuando termina. Así, una activación manual desde el

@@ -1,5 +1,5 @@
 ---
-sourceHash: a427caf371209bb1
+sourceHash: e54b55e42d1c4f1d
 title: Rebase auf Railway bereitstellen
 description: Stellen Sie Rebase auf Railway mit dem veröffentlichten Runtime-Image und Ihrem Projekt-Bundle bereit. Behalten Sie den EU-Fokus bei.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Committen Sie ein dreizeiliges `Dockerfile` im Root-Verzeichnis des Repositorys, sodass der Build-Schritt von Railway lediglich ein Kopiervorgang und keine Kompilierung ist:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 

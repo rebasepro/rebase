@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-27
+
 ### Breaking
 
 #### Server & REST

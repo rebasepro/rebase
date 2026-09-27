@@ -364,12 +364,12 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> While the job is running — here or on any other process — the answer is `409`
+While the job is running — here or on any other process — the answer is `409`
 with the code `CRON_JOB_ALREADY_EXECUTING`; see [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
 
 ### Pausing a job
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> A pause from Studio or
+A pause from Studio or
 `PUT /api/admin/cron/:id` applies to every process and stays in place across
 restarts and redeploys; `{ "enabled": null }` hands the job back to the
 `enabled` its file declares. How every replica reads it, and what happens when

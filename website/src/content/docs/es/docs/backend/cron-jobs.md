@@ -1,5 +1,5 @@
 ---
-sourceHash: e2d86104205efd30
+sourceHash: 7c92103faece259e
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -333,13 +333,13 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
-<span class="since-badge" data-since="0.23">Desde 0.23</span> Mientras la tarea se está ejecutando — aquí o en cualquier otro proceso —, la
+Mientras la tarea se está ejecutando — aquí o en cualquier otro proceso —, la
 respuesta es `409` con el código `CRON_JOB_ALREADY_EXECUTING`; consulta
 [Protección de concurrencia](/docs/backend/cron-across-instances/#concurrency-guarding).
 
 ### Pausar una tarea
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Una pausa desde Studio o con
+Una pausa desde Studio o con
 `PUT /api/admin/cron/:id` se aplica a todos los procesos y se mantiene tras
 reinicios y redespliegues; `{ "enabled": null }` devuelve la tarea al `enabled`
 que declara su archivo. Cómo la lee cada réplica, y qué ocurre cuando una no

@@ -1,5 +1,5 @@
 ---
-sourceHash: bf432ea275d5b977
+sourceHash: 8dcaffcacef692bc
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -123,7 +123,7 @@ que enviaste es el ID que obtuviste. Lee la cabecera de respuesta.
 | `ROLE_LOOKUP_FAILED` | 503 | No se pudieron leer los roles del llamante — en una ruta de administración, o en una solicitud de datos en un backend con `config.auth`. Falla de forma cerrada en lugar de confiar en los roles del token. | Reintenta; revisa la base de datos. |
 | `SELF_DELETE` | 400 | Un administrador intentó eliminar su propia cuenta. | Haz que lo haga otro administrador. |
 | `SESSION_REVOKED` | 401 | Se cerró la sesión en otro lugar, o se revocaron todas las sesiones. | Inicia sesión de nuevo. |
-| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Desde 0.23</span> Un enlace mágico, código por correo o restablecimiento de contraseña demostró la dirección de una cuenta no verificada, y la cuenta tiene una identidad de inicio de sesión cuyo proveedor nunca verificó esa dirección. El repositorio de autenticación no puede eliminarla (no tiene `unlinkUserIdentity`), así que la prueba se rechaza en lugar de dejar esa vía de acceso en una cuenta verificada. | Implementa `unlinkUserIdentity` en el repositorio de autenticación propio, o pide a un administrador que revise la cuenta. |
+| `UNVERIFIED_IDENTITIES` | 409 | Un enlace mágico, código por correo o restablecimiento de contraseña demostró la dirección de una cuenta no verificada, y la cuenta tiene una identidad de inicio de sesión cuyo proveedor nunca verificó esa dirección. El repositorio de autenticación no puede eliminarla (no tiene `unlinkUserIdentity`), así que la prueba se rechaza en lugar de dejar esa vía de acceso en una cuenta verificada. | Implementa `unlinkUserIdentity` en el repositorio de autenticación propio, o pide a un administrador que revise la cuenta. |
 | `SETUP_REQUIRED` | 403 | El proyecto aún no tiene administrador, por lo que esta ruta no está disponible. | Completa la configuración del primer administrador. |
 | `TOKEN_ALREADY_USED` | 401 | Se reutilizó un token de un solo uso. | Solicita uno nuevo. |
 | `TOKEN_EXPIRED` | 401 | El token ha superado su tiempo de vida. | Solicita uno nuevo. |
@@ -243,7 +243,7 @@ mensaje nombra la restricción.
 
 | Código | Estado | Significado | Qué hacer |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Desde 0.23</span> El `maxResults` de un listado de almacenamiento no es un número entero de al menos 1, o su `pageToken` no lo emitió el origen. Un tamaño de página menor que uno devolvía antes una página vacía con el mismo token, así que un bucle `while (pageToken)` nunca terminaba. | Envía un `maxResults` positivo y devuelve `nextPageToken` sin cambios. |
+| `INVALID_LIST_OPTIONS` | 400 | El `maxResults` de un listado de almacenamiento no es un número entero de al menos 1, o su `pageToken` no lo emitió el origen. Un tamaño de página menor que uno devolvía antes una página vacía con el mismo token, así que un bucle `while (pageToken)` nunca terminaba. | Envía un `maxResults` positivo y devuelve `nextPageToken` sin cambios. |
 | `INVALID_STORAGE_BUCKET` | 400 | El nombre del bucket está malformado. | Revisa el nombre. |
 | `INVALID_STORAGE_KEY` | 400 | La clave del objeto está malformada o escapa de su prefijo. | Revisa la clave. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | Los parámetros de transformación de imagen están fuera de rango o son contradictorios. | Consulta [Storage](/docs/backend/storage/). |
@@ -267,7 +267,7 @@ mensaje nombra la restricción.
 
 | Código | Estado | Significado | Qué hacer |
 | --- | --- | --- | --- |
-| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> Una activación manual de una tarea cron que ya se está ejecutando — en el proceso que respondió, o en otro que tiene el lease de ejecución de la tarea, como el worker detrás de un proceso `api`. No se ejecutó nada. La omisión queda en el historial de la tarea, y `details.log` es esa entrada; su línea nombra el proceso que ejecuta la tarea. | Vuelve a intentarlo cuando esa ejecución haya terminado. Consulta [Tareas cron](/docs/backend/cron-across-instances/#concurrency-guarding). |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | Una activación manual de una tarea cron que ya se está ejecutando — en el proceso que respondió, o en otro que tiene el lease de ejecución de la tarea, como el worker detrás de un proceso `api`. No se ejecutó nada. La omisión queda en el historial de la tarea, y `details.log` es esa entrada; su línea nombra el proceso que ejecuta la tarea. | Vuelve a intentarlo cuando esa ejecución haya terminado. Consulta [Tareas cron](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
 ## Superficies de administración y edición de esquemas
 

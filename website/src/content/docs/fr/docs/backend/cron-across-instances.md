@@ -1,5 +1,5 @@
 ---
-sourceHash: cae06a81ae018c4f
+sourceHash: e38cb2eddd8b623a
 title: Cron entre plusieurs instances
 sidebar_label: Cron entre plusieurs instances
 description: "Comment les tâches cron se comportent avec plus d'un processus serveur : une exécution par créneau, un créneau perdu lors d'un redémarrage, une pause que toutes les répliques respectent, et des exécutions qui ne se chevauchent jamais."
@@ -58,7 +58,7 @@ Une exécution récupérée constitue une entrée normale dans `cron_logs` (`man
 
 ## Mettre une tâche en pause dans tous les processus
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Une pause est enregistrée dans
+Une pause est enregistrée dans
 `rebase.cron_job_state`, et non dans la mémoire du processus qui a répondu, de
 sorte qu'elle atteint chaque réplique — et, dans un
 [déploiement scindé](/docs/deployment/split-processes/), le worker, quand la
@@ -124,7 +124,7 @@ d'exécution plutôt que seulement dans le journal du processus :
 série de ces enregistrements d'affilée est la signature d'une tâche devenue trop longue pour sa fréquence,
 et c'est un schéma qu'il est impossible de repérer si ces omissions ne sont pas enregistrées.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Le verrou vaut entre processus, pas
+Le verrou vaut entre processus, pas
 seulement au sein d'un seul. Chaque exécution — planifiée, manuelle ou de
 rattrapage — prend un **bail d'exécution** dans `rebase.cron_job_state` avant que
 son handler ne démarre, et le libère à la fin de l'exécution. Ainsi, un

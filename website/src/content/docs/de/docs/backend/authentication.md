@@ -1,5 +1,5 @@
 ---
-sourceHash: 887e286667dfa3eb
+sourceHash: 78b489b0acdcc296
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -450,7 +450,7 @@ Identität, deren Provider diese Adresse nicht verifiziert hat, und beendet jede
 Sitzung, bevor er das Konto als verifiziert markiert. Danach gilt Schritt 2. Konten,
 die ein Admin mit `POST /api/admin/users` anlegt, werden als verifiziert
 gespeichert, sodass eingeladene Personen „Mit Google anmelden“ sofort nutzen können.
-<span class="since-badge" data-since="0.23">Seit 0.23</span> Ein eigenes Auth-Repository ohne `unlinkUserIdentity` lehnt einen solchen Nachweis
+Ein eigenes Auth-Repository ohne `unlinkUserIdentity` lehnt einen solchen Nachweis
 mit `409 UNVERIFIED_IDENTITIES` ab, wenn eine Identität zu entfernen ist.
 
 Dieses Verhalten ist nicht konfigurierbar — es gibt bewusst keine Option, Verknüpfungen

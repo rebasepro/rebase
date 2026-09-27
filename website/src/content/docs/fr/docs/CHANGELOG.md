@@ -11,6 +11,8 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-27
+
 ### Breaking
 
 #### Server & REST

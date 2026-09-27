@@ -1,5 +1,5 @@
 ---
-sourceHash: cae06a81ae018c4f
+sourceHash: e38cb2eddd8b623a
 title: Cron entre instâncias
 sidebar_label: Cron entre instâncias
 description: "Como os cron jobs se comportam com mais de um processo de servidor: uma execução por slot, um slot perdido em uma reinicialização, uma pausa que toda réplica respeita e execuções que nunca se sobrepõem."
@@ -57,7 +57,7 @@ Uma execução recuperada é uma entrada comum em `cron_logs` (`manual` é `fals
 
 ## Pausando um job em todos os processos
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Uma pausa é guardada em
+Uma pausa é guardada em
 `rebase.cron_job_state`, e não na memória do processo que atendeu a requisição,
 então ela chega a todas as réplicas — e, em um
 [deploy dividido](/docs/deployment/split-processes/), ao worker, quando a
@@ -118,7 +118,7 @@ Em ambos os casos, uma linha é gravada em `rebase.cron_logs`, de modo que a sup
 
 `success: true` porque nada falhou — `result.skipped` é o que indica a situação. Uma sequência consecutiva dessas ocorrências é o indício característico de um job que ultrapassou a capacidade do seu intervalo de agendamento, e esse é um padrão que você só pode identificar se os descartes forem devidamente registrados.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> O bloqueio vale entre processos, não
+O bloqueio vale entre processos, não
 só dentro de um. Cada execução — agendada, manual ou de recuperação — obtém um
 **lease de execução** em `rebase.cron_job_state` antes de seu handler começar, e
 o libera quando a execução termina. Assim, um disparo manual a partir do processo

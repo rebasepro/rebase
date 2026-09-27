@@ -2915,6 +2915,8 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+### [0.23.0] - 2026-09-27
+
 #### Breaking
 
 ##### Server & REST
@@ -18073,7 +18075,7 @@ the ID you got. Read the response header.
 | `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. | Retry; check the database. |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
 | `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked. | Sign in again. |
-| `UNVERIFIED_IDENTITIES` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
+| `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed. | Request a fresh one. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
@@ -18191,7 +18193,7 @@ the message names the constraint.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | <span class="since-badge" data-since="0.23">Since 0.23</span> A storage listing's `maxResults` is not a whole number of at least 1, or its `pageToken` is not one the source issued. A page size below one used to answer an empty page carrying the same token, so a `while (pageToken)` loop never ended. | Send a positive `maxResults`, and pass back `nextPageToken` unchanged. |
+| `INVALID_LIST_OPTIONS` | 400 | A storage listing's `maxResults` is not a whole number of at least 1, or its `pageToken` is not one the source issued. A page size below one used to answer an empty page carrying the same token, so a `while (pageToken)` loop never ended. | Send a positive `maxResults`, and pass back `nextPageToken` unchanged. |
 | `INVALID_STORAGE_BUCKET` | 400 | The bucket name is malformed. | Check the name. |
 | `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |
@@ -18215,7 +18217,7 @@ the message names the constraint.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
-| `CRON_JOB_ALREADY_EXECUTING` | 409 | <span class="since-badge" data-since="0.23">Since 0.23</span> A manual trigger of a cron job that is already running — on the process that answered, or on another one holding the job's run lease, such as the worker behind an `api` process. Nothing ran. The skip is in the job's history, and `details.log` is that entry; its line names the process running the job. | Try again when that run has finished. See [Cron Jobs](/docs/backend/cron-across-instances/#concurrency-guarding). |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | A manual trigger of a cron job that is already running — on the process that answered, or on another one holding the job's run lease, such as the worker behind an `api` process. Nothing ran. The skip is in the job's history, and `details.log` is that entry; its line names the process running the job. | Try again when that run has finished. See [Cron Jobs](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
 ### Admin surfaces and schema editing
 
@@ -19268,7 +19270,7 @@ proof removes the password (a reset sets the new one) and every linked identity
 whose provider did not verify that address, and ends every session, before it
 marks the account verified. After that, step 2 applies. Accounts created by an
 admin with `POST /api/admin/users` are stored verified, so an invitee can use
-"Sign in with Google" straight away. <span class="since-badge" data-since="0.23">Since 0.23</span> A custom auth repository without
+"Sign in with Google" straight away. A custom auth repository without
 `unlinkUserIdentity` refuses such a proof with `409 UNVERIFIED_IDENTITIES` when
 there is an identity to remove.
 
@@ -22625,12 +22627,12 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> While the job is running — here or on any other process — the answer is `409`
+While the job is running — here or on any other process — the answer is `409`
 with the code `CRON_JOB_ALREADY_EXECUTING`; see [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
 
 #### Pausing a job
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> A pause from Studio or
+A pause from Studio or
 `PUT /api/admin/cron/:id` applies to every process and stays in place across
 restarts and redeploys; `{ "enabled": null }` hands the job back to the
 `enabled` its file declares. How every replica reads it, and what happens when
@@ -22877,7 +22879,7 @@ A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a f
 
 ### Pausing a job across every process
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> A pause is stored
+A pause is stored
 in `rebase.cron_job_state`, not in the memory of the process that served it, so
 it reaches every replica — and, on a [split deployment](/docs/deployment/split-processes/),
 the worker, when the request was served by an `api` process that runs no timers.
@@ -22939,7 +22941,7 @@ history rather than only in the process log:
 run of these in a row is the signature of a job that has outgrown its schedule,
 and that is a pattern you can only see if the skips are recorded.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> The lock holds
+The lock holds
 across processes, not only inside one. Every run — scheduled, manual or a
 catch-up — takes a **run lease** in `rebase.cron_job_state` before its handler
 starts, and releases it when the run ends. So a manual trigger from the `api`
@@ -38497,7 +38499,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.22.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.23.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -38548,7 +38550,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.22.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.23.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -39609,7 +39611,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 
@@ -39711,7 +39713,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.22.0"
+  image = "rebasepro/server:0.23.0"
 
 [http_service]
   internal_port = 8080
@@ -39860,7 +39862,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.22.0
+image: rebasepro/server:0.23.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -40085,7 +40087,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.22.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.23.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -40356,7 +40358,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 
@@ -40457,7 +40459,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 
@@ -40562,7 +40564,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 
@@ -40690,7 +40692,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.22.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.23.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -40834,7 +40836,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 
@@ -40946,7 +40948,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 
@@ -41040,7 +41042,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.22.0
+FROM rebasepro/server:0.23.0
 COPY dist-bundle /bundle
 ```
 

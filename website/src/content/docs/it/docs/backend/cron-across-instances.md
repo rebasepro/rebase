@@ -1,5 +1,5 @@
 ---
-sourceHash: cae06a81ae018c4f
+sourceHash: e38cb2eddd8b623a
 title: Cron su più istanze
 sidebar_label: Cron su più istanze
 description: "Come si comportano i cron job con più di un processo server: un'esecuzione per slot, uno slot perso per un riavvio, una pausa rispettata da ogni replica ed esecuzioni che non si sovrappongono mai."
@@ -57,7 +57,7 @@ Un'esecuzione recuperata è una voce normale in `cron_logs` (`manual` è `false`
 
 ## Mettere in pausa un job in tutti i processi
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Una pausa viene salvata in
+Una pausa viene salvata in
 `rebase.cron_job_state`, non nella memoria del processo che ha servito la
 richiesta, quindi raggiunge ogni replica — e, in un
 [deployment suddiviso](/docs/deployment/split-processes/), il worker, quando la
@@ -117,7 +117,7 @@ In entrambi i casi viene scritta una riga in `rebase.cron_logs`, così che l'omi
 
 `success: true` perché nulla è fallito — è `result.skipped` a contrassegnarlo. Una sequenza consecutiva di questi eventi indica chiaramente che un job richiede più tempo rispetto all'intervallo pianificato, un pattern che può essere individuato solo se le omissioni vengono registrate.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Il blocco vale tra processi, non solo
+Il blocco vale tra processi, non solo
 all'interno di uno. Ogni esecuzione — pianificata, manuale o di recupero — prende
 un **lease di esecuzione** in `rebase.cron_job_state` prima che il suo handler
 parta, e lo rilascia quando l'esecuzione termina. Così un avvio manuale dal

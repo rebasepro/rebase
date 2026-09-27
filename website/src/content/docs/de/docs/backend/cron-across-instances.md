@@ -1,5 +1,5 @@
 ---
-sourceHash: cae06a81ae018c4f
+sourceHash: e38cb2eddd8b623a
 title: Cron über mehrere Instanzen
 sidebar_label: Cron über mehrere Instanzen
 description: "Wie sich Cron-Jobs mit mehr als einem Server-Prozess verhalten: eine Ausführung pro Slot, ein Slot, den ein Neustart verloren hat, eine Pause, die jede Replik einhält, und Ausführungen, die sich nie überschneiden."
@@ -57,7 +57,7 @@ Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist
 
 ## Einen Job in allen Prozessen pausieren
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Eine Pause wird in
+Eine Pause wird in
 `rebase.cron_job_state` gespeichert, nicht im Speicher des Prozesses, der die
 Anfrage beantwortet hat. Sie erreicht daher jede Replik — und bei einem
 [aufgeteilten Deployment](/docs/deployment/split-processes/) auch den Worker, wenn
@@ -121,7 +121,7 @@ In beiden Fällen wird eine Zeile in `rebase.cron_logs` geschrieben, sodass das 
 
 `success: true`, weil nichts fehlgeschlagen ist – `result.skipped` kennzeichnet den Vorgang. Mehrere dieser Einträge hintereinander weisen darauf hin, dass ein Job über seinen Zeitplan hinausgewachsen ist – ein Muster, das man nur erkennt, wenn die Übersprünge protokolliert werden.
 
-<span class="since-badge" data-since="0.23">Since 0.23</span> Die Sperre gilt prozessübergreifend,
+Die Sperre gilt prozessübergreifend,
 nicht nur innerhalb eines Prozesses. Jede Ausführung — geplant, manuell oder
 nachgeholt — nimmt vor dem Start ihres Handlers eine **Run-Lease** in
 `rebase.cron_job_state` und gibt sie am Ende der Ausführung wieder frei. Ein
