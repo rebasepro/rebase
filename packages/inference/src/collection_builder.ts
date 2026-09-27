@@ -13,6 +13,19 @@ import { DataType, EnumValues, Properties, Property, StringProperty, Vector } fr
 
 export type InferenceTypeBuilder = (value: unknown) => DataType;
 
+/**
+ * The entry a count record holds for a column, if it holds one.
+ *
+ * The records are keyed by column names out of the data, and a plain object
+ * answers `record["constructor"]` or `record["toString"]` with what it
+ * inherits: the count was written onto the global `Object`, and the values
+ * list was `Object.values`, so importing a file with a `constructor` column
+ * threw. Only an own entry is one this record counted.
+ */
+function ownEntry<T>(record: Record<string, T>, key: string): T | undefined {
+    return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
 export async function buildEntityPropertiesFromData(
     data: object[],
     getType: InferenceTypeBuilder
@@ -164,7 +177,7 @@ function increaseMapTypeCount(
 ) {
     if (key.startsWith("_")) return; // Ignore properties starting with _
 
-    let typesCount: TypesCount = typesCountRecord[key];
+    let typesCount: TypesCount | undefined = ownEntry(typesCountRecord, key);
     if (!typesCount) {
         typesCount = {};
         typesCountRecord[key] = typesCount;
@@ -187,19 +200,15 @@ function increaseValuesCount(
 
     const type = getType(fieldValue);
 
-    let valuesRecord: {
+    const valuesRecord: {
         values: unknown[];
         valuesCount: Map<unknown, number>;
         map?: ValuesCountRecord;
-    } = typeValuesRecord[key];
-
-    if (!valuesRecord) {
-        valuesRecord = {
-            values: [],
-            valuesCount: new Map()
-        };
-        typeValuesRecord[key] = valuesRecord;
-    }
+    } = ownEntry(typeValuesRecord, key) ?? {
+        values: [],
+        valuesCount: new Map()
+    };
+    typeValuesRecord[key] = valuesRecord;
 
     if (type === "map") {
         let mapValuesRecord: ValuesCountRecord | undefined = valuesRecord.map;
@@ -364,7 +373,7 @@ function buildPropertiesFromCount(
             totalDocsCount,
             mostProbableType,
             typesCount,
-            valuesCountRecord ? valuesCountRecord[key] : undefined
+            valuesCountRecord ? ownEntry(valuesCountRecord, key) : undefined
         );
     });
     return res;

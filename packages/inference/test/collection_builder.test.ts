@@ -218,3 +218,35 @@ _internal: true }
         expect(properties.name).toBeDefined();
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Column names that Object.prototype also has
+// ─────────────────────────────────────────────────────────────
+describe("buildEntityPropertiesFromData with prototype-named columns", () => {
+    /**
+     * The counts are records keyed by column name, and a plain object answers
+     * `record["constructor"]` with the inherited `Object` function. The count
+     * was then written onto the global `Object`, and the values list was
+     * `Object.values`, so the import threw. An F1 dataset has a `constructor`
+     * column; `toString` and `valueOf` are just as ordinary.
+     */
+    it("infers them as ordinary columns and leaves Object alone", async () => {
+        const properties = await buildEntityPropertiesFromData([
+            { constructor: "mclaren", toString: "x", valueOf: 3, hasOwnProperty: true },
+            { constructor: "ferrari", toString: "y", valueOf: 4, hasOwnProperty: false },
+            { nested: { constructor: "a", toString: "b" } }
+        ], inferType);
+
+        expect(properties.constructor).toMatchObject({ type: "string", name: "Constructor" });
+        expect(properties.toString).toMatchObject({ type: "string" });
+        expect(properties.valueOf).toMatchObject({ type: "number" });
+        expect(properties.hasOwnProperty).toMatchObject({ type: "boolean" });
+        expect(properties.nested).toMatchObject({
+            type: "map",
+            properties: { constructor: { type: "string" }, toString: { type: "string" } }
+        });
+        expect(Object.hasOwn(Object, "string")).toBe(false);
+        expect(Object.hasOwn(Object, "number")).toBe(false);
+        expect(Object.hasOwn(Object.prototype.toString, "string")).toBe(false);
+    });
+});
