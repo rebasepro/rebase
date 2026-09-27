@@ -1,8 +1,8 @@
 import {
     DEFAULT_DATA_SOURCE_KEY,
     DEFAULT_STORAGE_SOURCE_KEY,
-    findStorageSuffixCollision,
     parseEnvBoolean,
+    resourceEnvSuffix,
     storageEnvSuffix,
     type DataSourceDefinition,
     type StorageSourceDefinition
@@ -71,7 +71,26 @@ export function envSuffixForKey(key: string, defaultKey: string): string {
 }
 
 /**
- * Read `<base>` for the default source, `<base>__<KEY>` for a named one.
+ * Every spelling of a key's suffix the runtime reads, the preferred first.
+ *
+ * Two encoders of `<BASE>__<KEY>` exist: `resourceEnvSuffix`, which the CLI and
+ * the control plane write a database's variables with, and `storageEnvSuffix`,
+ * which this reader was built on and the control plane writes storage variables
+ * with. They agree on every key whose uppercase is letter-for-letter, and differ
+ * on the rest — `straße` is `__STRASSE` to the first and `__STRA_E` to the
+ * second. Both are shipped names, so both are read: the written one first, then
+ * the one this reader always used. Neither is renamed.
+ */
+function envSuffixFormsForKey(key: string, defaultKey: string): string[] {
+    const own = envSuffixForKey(key, defaultKey);
+    if (!own) return [own];
+    const written = resourceEnvSuffix(key);
+    return written && written !== "__" && written !== own ? [written, own] : [own];
+}
+
+/**
+ * Read `<base>` for the default source, `<base>__<KEY>` for a named one — under
+ * each spelling in `suffixes`, the first set one winning.
  *
  * Blank — empty or whitespace only — is unset. An emptied variable is how a
  * console "removes" one, and a value of three spaces is not a bucket name;
@@ -79,9 +98,12 @@ export function envSuffixForKey(key: string, defaultKey: string): string {
  * none. Values with content are returned as they are: a secret's trailing
  * space is the secret's business.
  */
-function readVar(env: EnvBag, base: string, suffix: string): string | undefined {
-    const value = env[`${base}${suffix}`];
-    return value === undefined || value.trim() === "" ? undefined : value;
+function readVar(env: EnvBag, base: string, suffixes: readonly string[]): string | undefined {
+    for (const suffix of suffixes) {
+        const value = env[`${base}${suffix}`];
+        if (value !== undefined && value.trim() !== "") return value;
+    }
+    return undefined;
 }
 
 /**
@@ -99,12 +121,12 @@ function readVar(env: EnvBag, base: string, suffix: string): string | undefined 
 function readAccountVar(
     env: EnvBag,
     base: string,
-    suffix: string,
-    accountSuffix: string | undefined
+    suffixes: readonly string[],
+    accountSuffixes: readonly string[] | undefined
 ): string | undefined {
-    const own = readVar(env, base, suffix);
-    if (own !== undefined || accountSuffix === undefined) return own;
-    return readVar(env, base, accountSuffix);
+    const own = readVar(env, base, suffixes);
+    if (own !== undefined || accountSuffixes === undefined) return own;
+    return readVar(env, base, accountSuffixes);
 }
 
 /**
@@ -118,10 +140,26 @@ function readAccountVar(
 function readAccountBool(
     env: EnvBag,
     base: string,
-    suffix: string,
-    accountSuffix: string | undefined
+    suffixes: readonly string[],
+    accountSuffixes: readonly string[] | undefined
 ): boolean | undefined {
-    return parseEnvBoolean(readAccountVar(env, base, suffix, accountSuffix));
+    return parseEnvBoolean(readAccountVar(env, base, suffixes, accountSuffixes));
+}
+
+/** Two distinct keys sharing any spelling of their suffix, or `null`. */
+function findSuffixCollision(
+    keys: string[],
+    defaultKey: string
+): { a: string; b: string; suffix: string } | null {
+    const seen = new Map<string, string>();
+    for (const key of keys) {
+        for (const suffix of envSuffixFormsForKey(key, defaultKey)) {
+            const existing = seen.get(suffix);
+            if (existing !== undefined && existing !== key) return { a: existing, b: key, suffix };
+            seen.set(suffix, key);
+        }
+    }
+    return null;
 }
 
 /**
@@ -129,13 +167,14 @@ function readAccountBool(
  *
  * `media-cdn` and `media_cdn` are different source keys but the same suffix, and
  * without this check one of them would silently read the other's configuration.
+ * Every spelling a key is read under counts (see `envSuffixFormsForKey`).
  */
 export function assertDistinctSuffixes(
     definitions: { key: string }[],
     defaultKey: string,
     what: string
 ): void {
-    const collision = findStorageSuffixCollision(definitions.map(d => d.key), defaultKey);
+    const collision = findSuffixCollision(definitions.map(d => d.key), defaultKey);
     if (collision) {
         throw new BundleError(
             `${what} keys "${collision.a}" and "${collision.b}" both map to the same environment ` +
@@ -200,8 +239,10 @@ engine: "postgres" }, ...serverSide];
     const resolved: ResolvedDataSourceConfig[] = [];
 
     for (const definition of effective) {
-        const suffix = envSuffixForKey(definition.key, DEFAULT_DATA_SOURCE_KEY);
-        const connectionString = readVar(env, "DATABASE_URL", suffix);
+        const suffixes = envSuffixFormsForKey(definition.key, DEFAULT_DATA_SOURCE_KEY);
+        // Named in errors: the spelling the CLI and the control plane write.
+        const suffix = suffixes[0];
+        const connectionString = readVar(env, "DATABASE_URL", suffixes);
 
         if (!connectionString) {
             throw new BundleError(
@@ -214,7 +255,7 @@ engine: "postgres" }, ...serverSide];
 
         const engine = definition.engine || "postgres";
         const driverPackage =
-            readVar(env, "REBASE_DRIVER", suffix) ||
+            readVar(env, "REBASE_DRIVER", suffixes) ||
             ENGINE_DRIVERS[engine.toLowerCase()];
 
         if (!driverPackage) {
@@ -224,15 +265,15 @@ engine: "postgres" }, ...serverSide];
             );
         }
 
-        const poolConfig = resolvePoolConfig(env, suffix);
+        const poolConfig = resolvePoolConfig(env, suffixes);
 
         resolved.push({
             key: definition.key,
             engine,
             driverPackage,
             connectionString,
-            adminConnectionString: readVar(env, "ADMIN_CONNECTION_STRING", suffix),
-            readConnectionString: readVar(env, "DATABASE_READ_URL", suffix),
+            adminConnectionString: readVar(env, "ADMIN_CONNECTION_STRING", suffixes),
+            readConnectionString: readVar(env, "DATABASE_READ_URL", suffixes),
             isDefault: definition.key === DEFAULT_DATA_SOURCE_KEY,
             poolConfig
         });
@@ -262,11 +303,11 @@ engine: "postgres" }, ...serverSide];
     return resolved;
 }
 
-function resolvePoolConfig(env: EnvBag, suffix: string): Record<string, number> | undefined {
+function resolvePoolConfig(env: EnvBag, suffixes: readonly string[]): Record<string, number> | undefined {
     const entries: Record<string, number> = {};
-    const max = readVar(env, "DB_POOL_MAX", suffix);
-    const idle = readVar(env, "DB_POOL_IDLE_TIMEOUT", suffix);
-    const connect = readVar(env, "DB_POOL_CONNECT_TIMEOUT", suffix);
+    const max = readVar(env, "DB_POOL_MAX", suffixes);
+    const idle = readVar(env, "DB_POOL_IDLE_TIMEOUT", suffixes);
+    const connect = readVar(env, "DB_POOL_CONNECT_TIMEOUT", suffixes);
 
     if (max !== undefined) entries.max = Number(max);
     if (idle !== undefined) entries.idleTimeoutMillis = Number(idle);
@@ -274,7 +315,7 @@ function resolvePoolConfig(env: EnvBag, suffix: string): Record<string, number> 
 
     for (const [name, value] of Object.entries(entries)) {
         if (!Number.isFinite(value)) {
-            throw new BundleError(`Pool setting "${name}" for suffix "${suffix || "(default)"}" is not a number.`);
+            throw new BundleError(`Pool setting "${name}" for suffix "${suffixes[0] || "(default)"}" is not a number.`);
         }
     }
 
@@ -331,6 +372,9 @@ export function resolveStorageBackend(
     accountHint?: string,
     options: ResolveStorageOptions = {}
 ): BackendStorageConfig | undefined {
+    const suffixes = envSuffixFormsForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
+    // This reader's own spelling. It names the local directory below, which
+    // holds files already written, so it is never re-derived another way.
     const suffix = envSuffixForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
     // Every local source gets a directory of its own. Two sources sharing
     // `defaultBasePath` shared one namespace — a file uploaded to `media` was
@@ -338,7 +382,7 @@ export function resolveStorageBackend(
     // worked. The default keeps the plain path, so nothing an existing
     // deployment wrote moves; a named source appends its key the way its
     // variables do: `uploads__media`.
-    const localBasePath = readVar(env, "STORAGE_PATH", suffix)
+    const localBasePath = readVar(env, "STORAGE_PATH", suffixes)
         || (suffix ? `${defaultBasePath}${suffix.toLowerCase()}` : defaultBasePath);
     // An object store the project declared and the environment did not bind.
     // In production that is "not configured" and stays so — the console's
@@ -357,7 +401,10 @@ export function resolveStorageBackend(
     const accountSuffix = accountHint
         ? envSuffixForKey(accountHint, DEFAULT_STORAGE_SOURCE_KEY)
         : undefined;
-    const declaredType = readVar(env, "STORAGE_TYPE", suffix);
+    const accountSuffixes = accountHint
+        ? envSuffixFormsForKey(accountHint, DEFAULT_STORAGE_SOURCE_KEY)
+        : undefined;
+    const declaredType = readVar(env, "STORAGE_TYPE", suffixes);
     const type = (declaredType || engineHint || "").trim().toLowerCase();
     // Whether the *environment* named this backend, as opposed to inheriting it
     // from a declaration. It decides what a missing bucket means:
@@ -377,7 +424,7 @@ export function resolveStorageBackend(
     const explicit = Boolean(declaredType);
 
     if (type === "s3") {
-        const bucket = readVar(env, "S3_BUCKET", suffix);
+        const bucket = readVar(env, "S3_BUCKET", suffixes);
         if (!bucket) {
             if (!explicit) return standIn("s3");
             throw new BundleError(
@@ -388,8 +435,8 @@ export function resolveStorageBackend(
         // Account-scoped: the credentials describe the PROVIDER, not the bucket.
         // Fifteen buckets on one MinIO install shared one access key and copied
         // it fifteen times before this existed.
-        const accessKeyId = readAccountVar(env, "S3_ACCESS_KEY_ID", suffix, accountSuffix);
-        const secretAccessKey = readAccountVar(env, "S3_SECRET_ACCESS_KEY", suffix, accountSuffix);
+        const accessKeyId = readAccountVar(env, "S3_ACCESS_KEY_ID", suffixes, accountSuffixes);
+        const secretAccessKey = readAccountVar(env, "S3_SECRET_ACCESS_KEY", suffixes, accountSuffixes);
         // A bucket with no credentials cannot work, and failing here is far
         // clearer than what it does otherwise: `S3StorageController` passes an
         // explicit `credentials: { accessKeyId: "", secretAccessKey: "" }` to the
@@ -422,16 +469,16 @@ export function resolveStorageBackend(
         return {
             type: "s3",
             bucket,
-            region: readAccountVar(env, "S3_REGION", suffix, accountSuffix) || "auto",
+            region: readAccountVar(env, "S3_REGION", suffixes, accountSuffixes) || "auto",
             accessKeyId,
             secretAccessKey,
-            endpoint: readAccountVar(env, "S3_ENDPOINT", suffix, accountSuffix),
-            forcePathStyle: readAccountBool(env, "S3_FORCE_PATH_STYLE", suffix, accountSuffix)
+            endpoint: readAccountVar(env, "S3_ENDPOINT", suffixes, accountSuffixes),
+            forcePathStyle: readAccountBool(env, "S3_FORCE_PATH_STYLE", suffixes, accountSuffixes)
         };
     }
 
     if (type === "gcs") {
-        const bucket = readVar(env, "GCS_BUCKET", suffix);
+        const bucket = readVar(env, "GCS_BUCKET", suffixes);
         if (!bucket) {
             if (!explicit) return standIn("gcs");
             throw new BundleError(
@@ -446,8 +493,8 @@ export function resolveStorageBackend(
             // GCP project and the service-account key file describe who is
             // calling, not which bucket. Both stay optional — on GKE the
             // ambient workload identity supplies them and neither is set.
-            projectId: readAccountVar(env, "GCS_PROJECT_ID", suffix, accountSuffix),
-            keyFilename: readAccountVar(env, "GCS_KEY_FILENAME", suffix, accountSuffix)
+            projectId: readAccountVar(env, "GCS_PROJECT_ID", suffixes, accountSuffixes),
+            keyFilename: readAccountVar(env, "GCS_KEY_FILENAME", suffixes, accountSuffixes)
         };
     }
 

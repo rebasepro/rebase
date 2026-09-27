@@ -262,3 +262,68 @@ describe("resolveStorageSources", () => {
         expect(sources!["media"]).toMatchObject({ type: "s3", bucket: "media-bucket" });
     });
 });
+
+describe("a key whose uppercase is not letter-for-letter", () => {
+    /**
+     * The CLI (`rebase dev`) and the control plane name a database's variable
+     * with `resourceEnvSuffix` — uppercase, then drop what is not A–Z or 0–9 —
+     * so `straße` is written as `DATABASE_URL__STRASSE`. The runtime read it
+     * with `storageEnvSuffix`, which drops first and uppercases after, and asked
+     * for `DATABASE_URL__STRA_E`: a boot that refused the variable it had been
+     * given. The written name is read first; the one the runtime always read
+     * still works, so nothing already deployed changes name.
+     */
+    const definitions: DataSourceDefinition[] = [
+        { key: "(default)", engine: "postgres" },
+        { key: "straße", engine: "postgres" }
+    ];
+
+    it("reads the database variable the CLI and the control plane write", () => {
+        const resolved = resolveDataSources(
+            { DATABASE_URL: "postgres://localhost/app", DATABASE_URL__STRASSE: "postgres://h/strasse" },
+            definitions
+        );
+
+        expect(resolved.find(r => r.key === "straße")?.connectionString).toBe("postgres://h/strasse");
+    });
+
+    it("still reads the spelling it always read", () => {
+        const resolved = resolveDataSources(
+            { DATABASE_URL: "postgres://localhost/app", DATABASE_URL__STRA_E: "postgres://h/old" },
+            definitions
+        );
+
+        expect(resolved.find(r => r.key === "straße")?.connectionString).toBe("postgres://h/old");
+    });
+
+    it("names the written spelling when neither is set", () => {
+        expect(() => resolveDataSources({ DATABASE_URL: "postgres://localhost/app" }, definitions))
+            .toThrow(/set DATABASE_URL__STRASSE/);
+    });
+
+    it("reads a bucket under either spelling, and keeps the local directory where it was", () => {
+        const s3 = resolveStorageBackend(
+            {
+                STORAGE_TYPE__STRASSE: "s3",
+                S3_BUCKET__STRASSE: "b",
+                S3_ACCESS_KEY_ID__STRASSE: "k",
+                S3_SECRET_ACCESS_KEY__STRASSE: "s"
+            },
+            "straße",
+            undefined,
+            "/var/uploads"
+        );
+        expect(s3).toMatchObject({ type: "s3", bucket: "b" });
+
+        // The directory names files already on disk: derived once, not re-derived.
+        expect(resolveStorageBackend({}, "straße", undefined, "/var/uploads"))
+            .toEqual({ type: "local", basePath: "/var/uploads__stra_e" });
+    });
+
+    it("refuses two keys that share a spelling in either form", () => {
+        expect(() => resolveDataSources(
+            { DATABASE_URL: "postgres://localhost/app" },
+            [...definitions, { key: "strasse", engine: "postgres" }]
+        )).toThrow(/"straße" and "strasse" both map/);
+    });
+});
