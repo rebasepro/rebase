@@ -883,15 +883,13 @@ export function warningPayload(warnings: DeployWarning[]): Record<string, unknow
 /**
  * Read what the preflight needs: the project row and its newest deployments.
  *
- * Best effort by construction: a preflight that cannot read is a preflight that
- * says nothing, never a deploy that fails. The managed refusal rides on the same
- * read, so an unreadable project falls through to the old behaviour rather than
- * blocking a deploy on a lookup.
+ * `readable: false` when either read failed. The plan lines are best effort and
+ * say nothing then; the managed refusal is not — see the caller.
  */
 async function readDeployContext(
     client: CloudClient,
     projectId: string
-): Promise<{ project?: DeployProjectRow; recent: DeploySourceRow[] }> {
+): Promise<{ project?: DeployProjectRow; recent: DeploySourceRow[]; readable: boolean }> {
     try {
         const [project, recent] = await Promise.all([
             client.data.collection("projects").findById(projectId),
@@ -905,10 +903,12 @@ async function readDeployContext(
         ]);
         return {
             project: project as DeployProjectRow | undefined,
-            recent: recent.data as DeploySourceRow[]
+            recent: recent.data as DeploySourceRow[],
+            readable: true
         };
     } catch {
-        return { recent: [] };
+        return { recent: [],
+readable: false };
     }
 }
 
@@ -1255,8 +1255,21 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     // Everything below builds a container image from source. Say what that
     // source is before anything is uploaded or triggered, and refuse the one
     // case where the command would quietly undo the project's runtime.
-    const { project, recent } = await readDeployContext(client, projectId);
+    const { project, recent, readable } = await readDeployContext(client, projectId);
     const plan = planBareDeploy(project, recent, new Date());
+
+    // The refusal below is the only thing between a managed project and a
+    // container build: the control plane does not refuse one, and a
+    // successful build moves the project to `custom`. So a read that failed
+    // is not "not managed" — it is not knowing, and only `--eject` says the
+    // answer does not matter.
+    if (!readable && args["--eject"] !== true) {
+        fail(
+            `Could not read ${projectRef}, so this deploy cannot tell whether it would eject the project from the managed runtime.`,
+            "Try again in a moment. If leaving the managed runtime is intended, pass `--eject`.",
+            "preflight_unreadable"
+        );
+    }
 
     const eject: EjectContext = {
         managed: plan.managed,

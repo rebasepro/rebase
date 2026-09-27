@@ -133,7 +133,7 @@ beforeEach(() => {
     (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         client: {
             auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-            data: { collection: () => ({ findById: async () => undefined }) },
+            data: { collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) }) },
             functions: { invoke }
         },
         url: "https://cp.example"
@@ -407,7 +407,8 @@ describe("the cli.deploy event", () => {
                 auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
                 data: {
                     collection: (name: string) => ({
-                        findById: async () => (name === "deployments" ? { id: "d1", status, logs: "built\n" } : undefined)
+                        findById: async () => (name === "deployments" ? { id: "d1", status, logs: "built\n" } : undefined),
+                        find: async () => ({ data: [] })
                     })
                 },
                 functions: { invoke }
@@ -686,6 +687,56 @@ describe("a trigger refused because another deploy is running", () => {
         }
 
         expect(JSON.parse(stdout.join(""))).toMatchObject({ error: { code: "deploy_in_progress" } });
+    });
+});
+
+/**
+ * The refusal to eject a managed project rides on reading the project, and a
+ * read that failed used to be read as "not managed": a transient error on the
+ * one request that could tell sent a live managed project's `--source` deploy
+ * through as a container build, and the control plane does not refuse one.
+ */
+describe("a source deploy whose preflight cannot read the project", () => {
+    function projectUnreadable(): void {
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
+                data: {
+                    collection: (name: string) => ({
+                        findById: async () => {
+                            if (name === "projects") throw Object.assign(new Error("Bad gateway"), { status: 502 });
+                            return undefined;
+                        },
+                        find: async () => ({ data: [] })
+                    })
+                },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+    }
+
+    it("refuses before anything is uploaded, rather than risk ejecting a managed project", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+        controlPlane();
+        projectUnreadable();
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--source", ".", "--no-follow"], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        expect(said.join("\n")).toContain("--eject");
+        expect(requests).toEqual([]);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("goes ahead with --eject, which says leaving the managed runtime is meant", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+        controlPlane();
+        projectUnreadable();
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "--source", ".", "--eject", "--no-follow"], "shop");
+
+        expect(triggered().source).toBe("gs://contexts/build-contexts/proj_1/c.tar.gz");
     });
 });
 
