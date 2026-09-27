@@ -46,7 +46,9 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(HERE, "..", "..", "..");
 const PAGE = "website/src/content/docs/docs/backend/endpoints.md";
-const QUERY_PARSER = "packages/server/src/api/rest/query-parser.ts";
+// The parser reads its reserved names from the one set `@rebasepro/common`
+// shares with the SDK, which sends a filter on a column so named inside `?where=`.
+const QUERY_PARSER = "packages/common/src/data/filter-dialect.ts";
 
 /**
  * Every page that could declare a data-API query parameter, all six locales.
@@ -490,13 +492,13 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
 
     // ── every declared query parameter is one the parser reserves ─────────
     const parser = readFileSync(path.join(root, QUERY_PARSER), "utf8");
-    const reservedLine = parser.match(/const reservedQueryKeys = \[([^\]]*)\]/);
+    const reservedLine = parser.match(/const RESERVED_QUERY_KEYS: ReadonlySet<string> = new Set\(\[([^\]]*)\]/);
     if (!reservedLine) {
-        throw new Error(`Could not read reservedQueryKeys out of ${QUERY_PARSER} — the guard is checking nothing.`);
+        throw new Error(`Could not read RESERVED_QUERY_KEYS out of ${QUERY_PARSER} — the guard is checking nothing.`);
     }
     const reserved = new Set([...reservedLine[1].matchAll(/"([^"]+)"/g)].map(m => m[1]));
     if (reserved.size === 0) {
-        throw new Error(`reservedQueryKeys parsed empty in ${QUERY_PARSER} — the guard is checking nothing.`);
+        throw new Error(`RESERVED_QUERY_KEYS parsed empty in ${QUERY_PARSER} — the guard is checking nothing.`);
     }
 
     let paramRows = 0;
@@ -515,7 +517,7 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
                 kind: "param",
                 message:
                     `${file}:${i + 1} declares a query parameter \`${name}\`, which ` +
-                    `reservedQueryKeys does not contain. The parser reads an unreserved key as a ` +
+                    `RESERVED_QUERY_KEYS does not contain. The parser reads an unreserved key as a ` +
                     `filter on the column of that name, so \`?${name}=\` returns 200 and matches ` +
                     "nothing. Reserved: " + [...reserved].join(", ") + "."
             });
