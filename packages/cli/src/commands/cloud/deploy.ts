@@ -248,7 +248,14 @@ async function deployBundle(opts: {
 
     // Build the bundle unless the caller pointed at a prebuilt one.
     if (!opts.bundleDir) {
-        const loaded = loadManifest(projectRoot);
+        // Every refusal before the build goes through `fail`: a throw reached
+        // stdout in JSON mode as nothing at all.
+        let loaded: ReturnType<typeof loadManifest>;
+        try {
+            loaded = loadManifest(projectRoot);
+        } catch (err) {
+            fail(err instanceof Error ? err.message : String(err), undefined, "invalid_manifest");
+        }
 
         // Which app, decided once and by the manifest. A repository declares
         // apps and a project owns them, so a repository holding only an admin
@@ -318,9 +325,11 @@ app: target.app as RebaseBackendAppConfig };
             deriveOptionsFor(projectRoot, backend.app)
         );
         if (resourceIssues.length > 0) {
-            throw new Error(
+            fail(
                 `${resourceIssues.length} problem(s) in the declared resources:\n` +
-                resourceIssues.map(i => `  ${i.path}  ${i.message}`).join("\n")
+                    resourceIssues.map(i => `  ${i.path}  ${i.message}`).join("\n"),
+                undefined,
+                "build_failed"
             );
         }
         // A build that fails is the deploy's answer, in either output mode: in
@@ -412,7 +421,12 @@ async function uploadAndTrigger(opts: {
     startedAt: number;
 }): Promise<void> {
     const { client, url, projectId, projectRef, projectRoot, bundleDir } = opts;
-    const manifest = readBundleManifest(bundleDir);
+    let manifest: ReturnType<typeof readBundleManifest>;
+    try {
+        manifest = readBundleManifest(bundleDir);
+    } catch (err) {
+        fail(err instanceof Error ? err.message : String(err), undefined, "invalid_bundle");
+    }
     // `cli.deploy`, recorded for a bundle deploy as for a source build: this is
     // the default deploy of every scaffold, and it recorded nothing.
     const record = (followed: boolean, status: string): Promise<void> => recordDeploy({

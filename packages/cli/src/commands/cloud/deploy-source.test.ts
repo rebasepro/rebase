@@ -36,9 +36,16 @@ vi.mock("../../bundle", async (importOriginal) => {
     return { ...actual, buildBundle: vi.fn(actual.buildBundle) };
 });
 
+// The real derivation unless a test says otherwise, so one can hand the deploy a problem.
+vi.mock("../../resources/derive", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../../resources/derive")>();
+    return { ...actual, deriveResourceGraph: vi.fn(actual.deriveResourceGraph) };
+});
+
 import * as context from "./context";
 import { deployCommand } from "./deploy";
 import { buildBundle } from "../../bundle";
+import { deriveResourceGraph } from "../../resources/derive";
 import { recordEvent } from "../../telemetry";
 
 class Exited extends Error {
@@ -737,6 +744,58 @@ describe("a source deploy whose preflight cannot read the project", () => {
         await deployCommand(["node", "rebase", "cloud", "deploy", "--source", ".", "--eject", "--no-follow"], "shop");
 
         expect(triggered().source).toBe("gs://contexts/build-contexts/proj_1/c.tar.gz");
+    });
+});
+
+/**
+ * In JSON mode stdout carries one value, and three of the managed deploy's own
+ * refusals were thrown past `fail`: a `rebase.json` that does not parse, a
+ * problem in the declared resources, and a `--bundle-dir` with no manifest.
+ * Each exited 1 with a line on stderr and nothing on stdout for a caller to read.
+ */
+describe("a managed deploy refused before anything is built, in JSON mode", () => {
+    let stdout: string[];
+
+    beforeEach(() => {
+        controlPlane();
+        context.setJsonModeForTest(true);
+        stdout = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+    });
+
+    afterEach(() => context.setJsonModeForTest(false));
+
+    async function refusal(...args: string[]): Promise<{ message: string; code: string }> {
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--no-follow", ...args], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+        expect(requests).toEqual([]);
+        return JSON.parse(stdout[0]).error;
+    }
+
+    it("answers a --bundle-dir with no manifest", async () => {
+        const error = await refusal("--bundle", "--bundle-dir", bundleDir);
+        expect(error).toMatchObject({ code: "invalid_bundle", message: expect.stringContaining("No manifest.json") });
+    });
+
+    it("answers a rebase.json that does not parse", async () => {
+        write(project, "rebase.json", "{ not json");
+        const error = await refusal("--bundle");
+        expect(error.code).toBe("invalid_manifest");
+    });
+
+    it("answers a problem in the declared resources", async () => {
+        vi.mocked(deriveResourceGraph).mockImplementationOnce(async (options) => {
+            const actual = await vi.importActual<typeof import("../../resources/derive")>("../../resources/derive");
+            return {
+                ...(await actual.deriveResourceGraph(options)),
+                issues: [{ path: "storage.ts", message: "bucket name is not valid" }]
+            };
+        });
+        const error = await refusal("--bundle");
+        expect(error).toMatchObject({ code: "build_failed", message: expect.stringContaining("bucket name is not valid") });
     });
 });
 
