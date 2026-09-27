@@ -430,7 +430,7 @@ find: async () => ({ data: rows }) }));
      * "not found" for a deployment the control plane would have rolled back to.
      */
     describe("an id older than the history page", () => {
-        function clientWith(older: Record<string, unknown> | undefined, invoke: ReturnType<typeof vi.fn>) {
+        function clientWith(older: Record<string, unknown> | undefined, invoke: NonNullable<FakeClientSpec["invoke"]>) {
             const client = fakeClient({ invoke, find: async () => ({ data: rows }) });
             return {
                 ...client,

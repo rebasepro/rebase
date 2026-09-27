@@ -15,7 +15,7 @@ import type { StorageListResult } from "@rebasepro/types";
  */
 
 const defaultSource = {
-    listObjects: jest.fn(async (): Promise<StorageListResult> => ({
+    listObjects: jest.fn(async (_path?: string): Promise<StorageListResult> => ({
         prefixes: [],
         items: [{ name: "logo.png", fullPath: "default/logo.png" }] as StorageListResult["items"]
     })),
