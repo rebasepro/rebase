@@ -251,8 +251,17 @@ async function setEnv(rawArgs: string[]): Promise<void> {
         fail(
             `${parsed!.key} is read by your bundler at BUILD time, and project variables are applied at ` +
                 "rollout — after the image is built. Setting it here would not reach the bundle.",
-            `Put ${buildTimePrefix}* variables in the source you deploy (a committed .env, or your build ` +
-                "config), then `rebase cloud deploy`. Pass --force if your build genuinely reads this at run time.",
+            // Per deploy path, because the two read it in different places. A
+            // managed deploy builds the frontend on this machine; a `--source`
+            // build runs on the platform from an upload that never carries an
+            // `.env` file (see `neverUploaded`).
+            // `VITE_API_URL` is the exception: the local build reads it from the
+            // shell alone (`staticBuildEnv`), never from a file.
+            "A managed deploy builds the frontend on this machine: set it in your shell when you run " +
+                `\`rebase cloud deploy\`${parsed!.key === "VITE_API_URL" ? "" : ", or in the app's .env.production"}. ` +
+                "A --source build runs on the platform and " +
+                "never receives .env files: set it in the build itself — an ENV line in your Dockerfile, or " +
+                "`define` in your bundler config. Pass --force if your build genuinely reads this at run time.",
             "build_time_variable"
         );
     }

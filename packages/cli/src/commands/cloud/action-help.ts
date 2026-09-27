@@ -408,7 +408,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "a running instance does not pick it up.",
         flags: [
             ["--secret", "Store it encrypted and never return it in a listing"],
-            ["--force", "Overwrite a variable that is already set"]
+            ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"]
         ],
         examples: [
             "rebase cloud env set STRIPE_KEY=sk_live_… --secret",

@@ -17,6 +17,7 @@ import { isRollbackable, deploymentDurationMs, deploymentView, triggerInfo, type
 import { parseEnvAssignment } from "./env";
 import { resolveExtensionAlias } from "./extensions";
 import { buildSettingsPatch, parseOnOff } from "./settings";
+import { ACTION_HELP } from "./action-help";
 
 /* ── stdout capture ─────────────────────────────────────────────── */
 
@@ -324,6 +325,42 @@ limits: {} };
         expect(revealCalls).toHaveLength(0);
         const parsed = JSON.parse(cap.output().trim());
         expect(parsed.error.code).toBe("secret_write_only");
+    });
+});
+
+/**
+ * `env set VITE_…` is refused, and the refusal says where the value goes
+ * instead. It said "a committed .env" — which a `--source` deploy never
+ * uploads, whatever git says — so following it left the container build
+ * baking in `undefined`, the failure the refusal exists to prevent.
+ */
+describe("env set of a build-time variable", () => {
+    it("points at where each deploy reads it, never at a committed .env", async () => {
+        const invoke = vi.fn(async () => ({}));
+        useClient(fakeClient({ invoke }));
+
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        await expect(
+            envCommand("set", ["node", "rebase", "cloud", "env", "set", "VITE_API_URL=https://api.example.com", "--json"])
+        ).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+
+        expect(invoke).not.toHaveBeenCalled();
+        const { error } = JSON.parse(cap.output().trim());
+        expect(error.code).toBe("build_time_variable");
+        expect(error.hint).not.toMatch(/committed \.env/);
+        expect(error.hint).toContain("--source");
+        expect(error.hint).toContain("Dockerfile");
+    });
+
+    it("documents --force as the way past that refusal, which is all it does", () => {
+        const force = ACTION_HELP["env set"].flags.find(([flag]) => flag === "--force");
+        expect(force?.[1]).toMatch(/build-time/i);
+        expect(force?.[1]).not.toMatch(/overwrite/i);
     });
 });
 
