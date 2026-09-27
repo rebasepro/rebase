@@ -1358,7 +1358,11 @@ export class PostgresBackendDriver implements DataDriver {
             // unbounded gaps. See `HistoryService.recordHistory` for the trade.
             if (this.historyService && resolvedCollection?.history) {
                 await this.historyService.recordHistory({
-                    tableName: path,
+                    // The collection's slug, which is what the history route
+                    // reads — not the path the write came in on. Keyed by
+                    // `owners/1/docs`, a write made through a parent never
+                    // appeared in the row's own history.
+                    tableName: resolvedCollection.slug,
                     id: savedId,
                     action: status === "new" ? "create" : "update",
                     values: savedValues as Record<string, unknown>,
@@ -1934,7 +1938,8 @@ export class PostgresBackendDriver implements DataDriver {
         // describes is gone.
         if (this.historyService && resolvedCollection?.history) {
             await this.historyService.recordHistory({
-                tableName: targetPath,
+                // Keyed like the save's entry: the slug, whatever the path.
+                tableName: resolvedCollection.slug,
                 id: row.id.toString(),
                 action: "delete",
                 values: stored,
