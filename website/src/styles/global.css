@@ -46,7 +46,7 @@
     /* The height of the sticky site header. A token rather than a measurement
        because two places need to agree on it: the header pins its nav to this
        height, and a hero that wants its art to run *behind* the bar pulls itself
-       up by exactly the same amount (see IndexV2Content). Deriving one from the
+       up by exactly the same amount (see HomeContent). Deriving one from the
        other at runtime would mean a layout read on every paint; declaring it
        once means the nav can never quietly outgrow what the hero compensates
        for. Change it here and both sides follow. */
@@ -104,7 +104,7 @@
          chapter   a numbered chapter's padding-block      96 → 160
          band      a short band between two chapters       64 → 112
          strip     a caption-and-logos strip               40 →  72
-         block     a head block → the content it opens     48 →  80
+         content   a head block → the content it opens     48 →  80
          lead      a heading → its lead paragraph          24 →  32
          label     an eyebrow → the heading it labels      20 →  24
 
@@ -124,7 +124,7 @@
     --spacing-chapter: clamp(6rem, 1.9rem + 9vw, 10rem);
     --spacing-band: clamp(4rem, 1.6rem + 6vw, 7rem);
     --spacing-strip: clamp(2.5rem, 0.9rem + 4vw, 4.5rem);
-    --spacing-block: clamp(3rem, 1.4rem + 4vw, 5rem);
+    --spacing-content: clamp(3rem, 1.4rem + 4vw, 5rem);
     --spacing-lead: clamp(1.5rem, 1.1rem + 1vw, 2rem);
     --spacing-label: clamp(1.25rem, 1.1rem + 0.4vw, 1.5rem);
 }

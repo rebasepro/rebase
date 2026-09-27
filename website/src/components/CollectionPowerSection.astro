@@ -44,7 +44,7 @@ const t = useTranslations(lang);
         nothing above or below it. §6 asks for one shell width precisely so the
         edges line up, and a grid this deliberate is what lets the numerals and
         chroma fields read as structure rather than as decoration. */}
-    <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-block animate-on-scroll fade-in-up">
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-content animate-on-scroll fade-in-up">
         <p class="mb-label eyebrow">{index && (<><span class="font-mono">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{t('power.badge')}</p>
         <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={t('power.title')}></h2>
         <p class="mt-lead max-w-[38rem] text-lg text-surface-400">
