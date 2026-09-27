@@ -1,7 +1,72 @@
-// Reset timers for the copy buttons, keyed by button: a second click has to
-// restart the confirmation window rather than let the first timeout clear a
-// button that just re-copied.
+// Copy buttons: `.copy-btn[data-command]` writes the command to the clipboard.
+//
+// One listener on the document, bound once, rather than one per button bound at
+// page load. The per-button version silently skipped every button that did not
+// exist at that moment — a hot-reloaded hero, an island that renders its own
+// button — and a copy button that does nothing is worse than none.
+//
+// A button says it worked on itself: `data-copied` is set for 1.8s (global.css
+// colours it; a component can style `group-data-copied:` children), the icons
+// marked `data-copy-idle` / `data-copy-done` swap, and the text in
+// `data-copy-label` reads the button's `data-copy-done-label`.
+const COPY_CONFIRM_MS = 1800;
 const copyResetTimers = new WeakMap<Element, number>();
+const copyIdleLabels = new WeakMap<Element, string>();
+
+function confirmCopy(button: HTMLElement) {
+  const idle = button.querySelector("[data-copy-idle]");
+  const done = button.querySelector("[data-copy-done]");
+  const label = button.querySelector<HTMLElement>("[data-copy-label]");
+  // Read the idle label once per button, never mid-confirmation — a second
+  // click inside the window used to save "Copied" as the idle text for good.
+  if (label && !copyIdleLabels.has(button)) copyIdleLabels.set(button, label.textContent ?? "");
+
+  // The icons are <svg>, and `hidden` is an HTMLElement property: assigning it
+  // on an SVGElement sets a plain JS field and changes nothing on screen. The
+  // attribute is what the stylesheet reads.
+  button.dataset.copied = "";
+  if (idle && done) { idle.toggleAttribute("hidden", true); done.toggleAttribute("hidden", false); }
+  if (label) label.textContent = button.dataset.copyDoneLabel || "Copied";
+
+  const pending = copyResetTimers.get(button);
+  if (pending) clearTimeout(pending);
+  copyResetTimers.set(button, window.setTimeout(() => {
+    delete button.dataset.copied;
+    if (idle && done) { idle.toggleAttribute("hidden", false); done.toggleAttribute("hidden", true); }
+    if (label) label.textContent = copyIdleLabels.get(button) ?? "";
+    copyResetTimers.delete(button);
+  }, COPY_CONFIRM_MS));
+}
+
+document.addEventListener("click", (event) => {
+  const button = (event.target as Element | null)?.closest<HTMLElement>(".copy-btn[data-command]");
+  if (!button) return;
+  const command = button.dataset.command!;
+
+  // `navigator.clipboard` is undefined on a non-secure origin, and rejects
+  // when the document is not focused — both leave the reader with a button
+  // that did nothing at all. Fall back to a selection copy.
+  const fallback = () => {
+    const scratch = document.createElement("textarea");
+    scratch.value = command;
+    scratch.setAttribute("readonly", "");
+    scratch.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(scratch);
+    scratch.select();
+    try {
+      if (document.execCommand("copy")) confirmCopy(button);
+    } catch {
+      /* nothing sensible left to try */
+    }
+    scratch.remove();
+  };
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(command).then(() => confirmCopy(button), fallback);
+  } else {
+    fallback();
+  }
+});
 
 // Mouse spotlight effect for cards
 function initPageEffects() {
@@ -81,80 +146,6 @@ function initPageEffects() {
 
     lazyVideos.forEach(video => videoObserver.observe(video));
   }
-
-  // Global copy-btn logic.
-  //
-  // The confirmation used to be a `title` swap and a colour change, which means
-  // the only unambiguous "it worked" signal lived in a tooltip the reader has to
-  // hover to see. A button that can swap its own icon and label says so on the
-  // button: mark the two icons `data-copy-idle` / `data-copy-done` and the text
-  // node `data-copy-label`, and this handler drives them. Buttons without those
-  // hooks keep the old colour-only behaviour.
-  document.querySelectorAll(".copy-btn").forEach(button => {
-    button.addEventListener("click", () => {
-      const command = button.getAttribute("data-command");
-      if (!command) return;
-
-      const idle = button.querySelector<HTMLElement>("[data-copy-idle]");
-      const done = button.querySelector<HTMLElement>("[data-copy-done]");
-      const label = button.querySelector<HTMLElement>("[data-copy-label]");
-      const idleLabel = label?.textContent ?? "";
-      const originalTitle = button.getAttribute("title") || "Copy to clipboard";
-      // One timer per button: clicking again mid-confirmation must restart the
-      // window, not let the first timeout reset a button that just re-copied.
-      const timers = copyResetTimers;
-
-      const confirm = () => {
-        button.setAttribute("title", "Copied!");
-        button.classList.add("text-emerald-400");
-        button.classList.remove("text-surface-500");
-        if (idle && done) {
-          idle.hidden = true;
-          done.hidden = false;
-        }
-        if (label) label.textContent = button.getAttribute("data-copy-done-label") || "Copied";
-
-        const pending = timers.get(button);
-        if (pending) clearTimeout(pending);
-        timers.set(button, window.setTimeout(() => {
-          button.setAttribute("title", originalTitle);
-          button.classList.remove("text-emerald-400");
-          button.classList.add("text-surface-500");
-          if (idle && done) {
-            idle.hidden = false;
-            done.hidden = true;
-          }
-          if (label) label.textContent = idleLabel;
-          timers.delete(button);
-        }, 1800));
-      };
-
-      // `navigator.clipboard` is undefined on a non-secure origin, and rejects
-      // when the document is not focused — both leave the reader with a button
-      // that did nothing at all. Fall back to a selection copy.
-      const fallback = () => {
-        const scratch = document.createElement("textarea");
-        scratch.value = command;
-        scratch.setAttribute("readonly", "");
-        scratch.style.cssText = "position:fixed;top:0;left:0;opacity:0";
-        document.body.appendChild(scratch);
-        scratch.select();
-        try {
-          document.execCommand("copy");
-          confirm();
-        } catch {
-          /* nothing sensible left to try */
-        }
-        scratch.remove();
-      };
-
-      if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(command).then(confirm, fallback);
-      } else {
-        fallback();
-      }
-    });
-  });
 }
 
 // `astro:page-load` only fires once ClientRouter's own chunk has been fetched and
@@ -167,7 +158,7 @@ function initPageEffects() {
 // `astro:page-load` also fires on the initial load, so the flag keeps that from
 // re-running over a DOM we just set up — a second pass strips `in-view` off
 // elements that have already animated in, flashing them back to `opacity: 0`,
-// and stacks a duplicate set of listeners on every card and copy button.
+// and stacks a duplicate set of listeners on every card.
 // `astro:before-swap` marks the point where the DOM is genuinely replaced.
 let initialized = false;
 

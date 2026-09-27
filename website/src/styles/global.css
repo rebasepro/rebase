@@ -1327,6 +1327,17 @@ h6 {
     inset: -6px;
 }
 
+/* The copied state, set for 1.8s by page-effects.ts. Unlayered so it beats the
+   button's own `text-*` utilities; on the coral close the ink stays dark, since
+   emerald on coral is unreadable. */
+.copy-btn[data-copied] {
+    color: var(--color-emerald-400);
+}
+
+.ground-close .copy-btn[data-copied] {
+    color: #0a0a0a;
+}
+
 .subtle-shimmer {
     /* Set to inline-block for better compatibility with
       background-clip and transforms.
