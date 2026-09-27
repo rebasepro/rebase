@@ -398,9 +398,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         return internals?.db ?? (pgConfig.connection as PostgresDriverInternals["db"] | undefined);
     };
 
-    const provisioningQueryable = (driverResult?: InitializedDriver) => {
-        const internals = driverResult?.internals as PostgresDriverInternals | undefined;
-        const db = internals?.db ?? (pgConfig.connection as PostgresDriverInternals["db"] | undefined);
+    const requireProvisioningDb = (driverResult?: InitializedDriver) => {
+        const db = provisioningDb(driverResult);
         if (!db) {
             throw new Error(
                 "Cannot provision the collection schema: this Postgres adapter was created without a " +
@@ -408,6 +407,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 "to `createPostgresAdapter` (see `createPostgresDatabaseConnection`)."
             );
         }
+        return db;
+    };
+
+    const provisioningQueryable = (driverResult?: InitializedDriver) => {
+        const db = requireProvisioningDb(driverResult);
         return {
             async query<T>(text: string): Promise<{ rows: T[] }> {
                 return { rows: sqlRows<T>(await db.execute(sql.raw(text))) };
@@ -423,22 +427,30 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      * Idempotent and cheap to repeat: `CREATE SCHEMA IF NOT EXISTS` plus a
      * handful of `CREATE OR REPLACE FUNCTION`.
      */
-    const provisionRlsRuntime = async (
-        queryable: { query<T>(text: string): Promise<{ rows: T[] }> }
-    ): Promise<void> => {
+    const provisionRlsRuntime = async (driverResult?: InitializedDriver): Promise<void> => {
+        const db = requireProvisioningDb(driverResult);
         const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
         // One statement per call — this handle speaks the extended query
         // protocol, which rejects multi-command strings. Advisory-locked
-        // for the same reason the auth path is: two instances booting
-        // against one fresh database must not race on CREATE OR REPLACE.
-        await queryable.query("SELECT pg_advisory_lock(hashtext('rebase_auth_functions_init'))");
-        try {
+        // for the same reason the auth path is, and on the same key: two
+        // instances booting against one fresh database must not race on
+        // CREATE OR REPLACE.
+        //
+        // A transaction lock, inside the transaction the statements run in,
+        // exactly as `auth/ensure-tables.ts` takes it. The handle is a pool,
+        // and a session lock taken by one statement and released by another
+        // could be released on a connection that never held it — behind a
+        // transaction-mode pooler, a different server connection every time.
+        // The unlock then answered `false`, the lock stayed on an idle pooled
+        // connection, and the next boot waited on it until
+        // `statement_timeout`. This one is released by the commit or the
+        // rollback, on the connection that holds it.
+        await db.transaction(async (tx) => {
+            await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
             for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
-                await queryable.query(statement);
+                await tx.execute(sql.raw(statement));
             }
-        } finally {
-            await queryable.query("SELECT pg_advisory_unlock(hashtext('rebase_auth_functions_init'))");
-        }
+        });
     };
 
     return {
@@ -1309,7 +1321,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          * as the auth path and the migration preamble, from the same constant.
          */
         async ensureRlsRuntime(driverResult?: InitializedDriver): Promise<void> {
-            await provisionRlsRuntime(provisioningQueryable(driverResult));
+            await provisionRlsRuntime(driverResult);
         },
 
         async ensureCollectionPolicies(
@@ -1331,7 +1343,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const { rows } = await queryable.query<{ present: boolean }>(
                 "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
             );
-            if (!rows[0]?.present) await provisionRlsRuntime(queryable);
+            if (!rows[0]?.present) await provisionRlsRuntime(driverResult);
             const outcome = await ensureCollectionPolicies(
                 queryable,
                 collections as CollectionConfig[],
