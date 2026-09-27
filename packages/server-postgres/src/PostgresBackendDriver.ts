@@ -166,6 +166,34 @@ function insertOnlyKeysOf(
         && beforeHooks[key] === afterHooks[key]);
 }
 
+/**
+ * Refuse an update that stamps a `softDelete` collection's field.
+ *
+ * Stamping it IS the delete — every read hides the row from then on — so it is
+ * `delete`'s to do, where the permission is `delete`, `beforeDelete` can veto,
+ * `afterDelete` runs and history says "delete". Written by an update, a caller
+ * holding only write access trashed rows, past all of that. Clearing it stays
+ * an update: that is how a row is restored, and what a form sends back for a
+ * live row.
+ */
+function assertUpdateDoesNotSoftDelete(
+    collection: CollectionConfig | undefined,
+    values: Record<string, unknown> | undefined,
+    path: string
+): void {
+    const softDelete = resolveSoftDelete(collection);
+    if (!softDelete) return;
+    const value = values?.[softDelete.field];
+    if (value === undefined || value === null) return;
+    const slug = collection?.slug ?? path;
+    const message = `'${softDelete.field}' on '${slug}' records a delete, so an update may only clear it ` +
+        "(null restores the row). Delete the row to set it.";
+    throw ApiError.badRequest(message, "FIELD_NOT_WRITABLE", {
+        collection: slug,
+        violations: [{ field: softDelete.field, code: "soft_delete", message }]
+    });
+}
+
 /** A key that names a row: not absent, and not the empty string a form sends. */
 function isPresentKey(id: string | number | undefined | null): id is string | number {
     return id !== undefined && id !== null && id !== "";
@@ -1027,6 +1055,10 @@ export class PostgresBackendDriver implements DataDriver {
         // hides updated and then answered 500. The read runs in the write's
         // transaction; a row it cannot see is still met safely by the
         // statement's own conflict branch below.
+        if (status === "existing") {
+            assertUpdateDoesNotSoftDelete(resolvedCollection as CollectionConfig | undefined, values, path);
+        }
+
         const upserting = upsert === true && status !== "existing";
         if (upserting && resolvedCollection) {
             const stored = await this.findUpsertTarget<M>(
@@ -1242,6 +1274,14 @@ export class PostgresBackendDriver implements DataDriver {
         const insertOnlyKeys = upserting
             ? insertOnlyKeysOf(updatedValues, values, beforeHooks, afterHooks, resolvedCollection?.properties)
             : undefined;
+        // A stamped soft-delete field may create a row already trashed, and
+        // may not trash a stored one: that is a delete (see
+        // `assertUpdateDoesNotSoftDelete`).
+        const softDeleteField = resolveSoftDelete(resolvedCollection as CollectionConfig | undefined)?.field;
+        if (insertOnlyKeys && softDeleteField
+            && updatedValues[softDeleteField] !== undefined && updatedValues[softDeleteField] !== null) {
+            insertOnlyKeys.push(softDeleteField);
+        }
 
         try {
             let savedRow = await this.dataService.save<M>(
