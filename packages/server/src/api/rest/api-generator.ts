@@ -339,7 +339,13 @@ export class RestApiGenerator {
                 const collection = bySlug.get(operation.collection)!;
                 if (!operation.values) return;
                 assertKnownWriteFields(operation.values, collection, { viewer: batchViewer });
-                assertWriteValuesValid(operation.values, collection);
+                // A create or an upsert may insert, so `required` holds for it,
+                // as it does on `POST` and `POST /bulk` — here, before the
+                // transaction opens, rather than as the INSERT's NOT NULL error
+                // after the operations before it have written.
+                assertWriteValuesValid(operation.values, collection, {
+                    status: operation.op === "update" ? undefined : "new"
+                });
                 if (operation.op === "update") {
                     assertFieldOpsValid(operation.values, collection, { operationIndex: index });
                 } else {

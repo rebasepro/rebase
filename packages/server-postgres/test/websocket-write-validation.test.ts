@@ -80,6 +80,18 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         }
     };
 
+    /** A collection with a required field, for the create-time check. */
+    const profilesCollection = {
+        slug: "profiles",
+        name: "Profiles",
+        table: "profiles",
+        properties: {
+            id: { name: "ID", type: "string", isId: true },
+            handle: { name: "Handle", type: "string", validation: { required: true } },
+            bio: { name: "Bio", type: "string" }
+        }
+    };
+
     const connect = () => {
         const handlers: Record<string, (...args: any[]) => any> = {};
         const ws = {
@@ -105,7 +117,7 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
             key: "postgres",
             initialised: true,
             registry: {
-                getCollectionByPath: (path: string) => (path === "users" ? usersCollection : undefined)
+                getCollectionByPath: (path: string) => (path === "users" ? usersCollection : path === "profiles" ? profilesCollection : undefined)
             },
             save: async (props: unknown) => { saved.push(props); return {}; },
             withAuth: undefined
@@ -203,6 +215,22 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
 
         expect(saved).toHaveLength(1);
         expect(saved[0]).toMatchObject({ values: { age: { $inc: 1 } } });
+    });
+
+    it("refuses a create missing a required field, naming it, before the driver runs", async () => {
+        // The REST create answers VALIDATION_CONSTRAINT. Validated without the
+        // status, the socket left `required` to the INSERT's NOT NULL error.
+        const { ws, send } = connect();
+
+        await send({ type: "SAVE", requestId: "r-7", payload: { path: "profiles", status: "new", values: { bio: "x" } } });
+
+        expect(saved).toEqual([]);
+        expect(lastFrame(ws)).toMatchObject({ type: "ERROR", payload: { error: { code: "VALIDATION_CONSTRAINT" } } });
+        expect(lastFrame(ws).payload.error.message).toMatch(/handle/);
+
+        // An update names only what it changes.
+        await send({ type: "SAVE", requestId: "r-8", payload: { path: "profiles", id: "p-1", status: "existing", values: { bio: "y" } } });
+        expect(saved).toHaveLength(1);
     });
 
     it("hands the driver the address, the values and the status — nothing else the frame says", async () => {

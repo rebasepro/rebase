@@ -527,7 +527,7 @@ roles: verifiedUser.roles }
                  * driver decides what a path means, and refusing here would
                  * turn "unknown collection" into a validation error.
                  */
-                const assertWriteRequest = (path: string | undefined, values: unknown): void => {
+                const assertWriteRequest = (path: string | undefined, values: unknown, status?: SaveProps["status"]): void => {
                     if (!path || !values || typeof values !== "object") return;
                     const collection = driver.registry?.getCollectionByPath(path);
                     if (!collection) return;
@@ -538,7 +538,9 @@ roles: verifiedUser.roles }
                     // satisfies every role list, and a socket is not it.
                     const session = clientSessions.get(clientId);
                     assertWriteRequestValid(values as Record<string, unknown>, collection, {
-                        viewer: { roles: session?.user?.roles ?? ["anon"] }
+                        viewer: { roles: session?.user?.roles ?? ["anon"] },
+                        // `required` holds on a create, as on `POST`.
+                        status
                     });
                     // Field operations (`{ views: { $inc: 1 } }`) reach the
                     // driver through this door exactly as they reach it through
@@ -716,7 +718,7 @@ colors: true }));
                         // from `request.collection`: that field is client-
                         // supplied, and reading the rules out of it would let
                         // the caller choose which rules to be checked against.
-                        assertWriteRequest(request.path, request.values as Record<string, unknown>);
+                        assertWriteRequest(request.path, request.values as Record<string, unknown>, request.status);
                         // A create is one when the driver takes it for one:
                         // no id, or a status that asks for a new row.
                         assertNestedWrite(request.path, request.id === undefined || request.status !== "existing" ? "create" : "update");

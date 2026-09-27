@@ -46,6 +46,19 @@ const items = {
     }
 } as unknown as CollectionConfig;
 
+/** A collection with a required field, for the create-time checks. */
+const customers = {
+    slug: "customers",
+    name: "Customers",
+    singularName: "Customer",
+    table: "customers",
+    properties: {
+        id: { name: "ID", type: "number", isId: "serial" },
+        name: { name: "Name", type: "string", validation: { required: true } },
+        email: { name: "Email", type: "string", validation: { unique: true } }
+    }
+} as unknown as CollectionConfig;
+
 interface Harness {
     app: Hono;
     calls: Record<string, unknown>[][];
@@ -92,7 +105,7 @@ function createHarness(options?: {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([orders, items], driver).generateRoutes());
+    app.route("/", new RestApiGenerator([orders, items, customers], driver).generateRoutes());
     return { app, calls };
 }
 
@@ -200,6 +213,40 @@ describe("POST /_batch", () => {
         expect((await res.json() as { error: { code: string } }).error.code)
             .toBe("VALIDATION_UNKNOWN_FIELDS");
         expect(calls).toHaveLength(0);
+    });
+
+    it("refuses a create or an upsert missing a required field before the transaction opens", async () => {
+        // `POST /customers` answers this with VALIDATION_CONSTRAINT naming the
+        // field. The batch validated without saying the row is new, so the
+        // rule went unasked and the answer was the INSERT's NOT NULL failure —
+        // after the operations before it had written.
+        for (const operation of [
+            { op: "create", collection: "customers", values: { email: "a@b.c" } },
+            { op: "upsert", collection: "customers", values: { email: "a@b.c" }, onConflict: ["email"] }
+        ]) {
+            const { app, calls } = createHarness();
+
+            const res = await batch(app, {
+                operations: [{ op: "create", collection: "orders", values: { total: 1 } }, operation]
+            });
+
+            expect(res.status).toBe(400);
+            const body = await res.json() as { error: { code: string; message: string } };
+            expect(body.error.code).toBe("VALIDATION_CONSTRAINT");
+            expect(body.error.message).toContain("name");
+            expect(calls).toHaveLength(0);
+        }
+    });
+
+    it("does not ask an update for the fields it leaves alone", async () => {
+        const { app, calls } = createHarness();
+
+        const res = await batch(app, {
+            operations: [{ op: "update", collection: "customers", id: 1, values: { email: "a@b.c" } }]
+        });
+
+        expect(res.status).toBe(200);
+        expect(calls).toHaveLength(1);
     });
 
     it("refuses a field operation on a create", async () => {
