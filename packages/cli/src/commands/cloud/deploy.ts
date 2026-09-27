@@ -78,6 +78,8 @@ interface BlockingDeployment {
 
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 15 * 60 * 1000; // 15 min hard stop
+/** How long a follow keeps retrying a status it cannot read before it says so. */
+const UNREADABLE_STATUS_MS = 60 * 1000;
 
 function sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
@@ -1592,13 +1594,44 @@ async function streamBuildLogs(
     const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
     let printed = "";
     const started = Date.now();
+    /** When the current run of failed status reads began. */
+    let unreadableSince: number | undefined;
+    const stopIfTimedOut = async (): Promise<void> => {
+        if (Date.now() - started <= timeoutMs) return;
+        await opts.onTerminal?.("timeout");
+        if (!quiet) console.log("");
+        fail(
+            `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the build to finish.`,
+            "The deployment may still be running — check `rebase cloud logs`.",
+            "timeout"
+        );
+    };
 
     for (;;) {
         let dep: Deployment | undefined;
         try {
             dep = (await client.data.collection("deployments").findById(deploymentId)) as Deployment | undefined;
+            unreadableSince = undefined;
         } catch (e) {
-            reportError(e, "Failed to read deployment status");
+            // A read that failed says nothing about the build. A control plane
+            // mid-rollout answers a request or two with a 502, and a connection
+            // drops; ending the follow there reported a deploy that went on to
+            // succeed as a failure, through the exit code that is its verdict.
+            // So those are read again, for a while. A refusal is not transient.
+            if (!transientReadFailure(e)) reportError(e, "Failed to read deployment status");
+            unreadableSince ??= Date.now();
+            if (Date.now() - unreadableSince > UNREADABLE_STATUS_MS) {
+                await opts.onTerminal?.("status_unreadable");
+                fail(
+                    `Could not read deployment ${deploymentId}'s status for over a minute: ` +
+                        `${e instanceof Error ? e.message : String(e)}`,
+                    "The deployment may still be running — check `rebase cloud logs`.",
+                    "status_unreadable"
+                );
+            }
+            await stopIfTimedOut();
+            await sleep(POLL_INTERVAL_MS);
+            continue;
         }
         if (!dep) fail(`Deployment ${deploymentId} disappeared.`, undefined, "not_found");
 
@@ -1646,18 +1679,21 @@ async function streamBuildLogs(
             return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };
         }
 
-        if (Date.now() - started > timeoutMs) {
-            await opts.onTerminal?.("timeout");
-            if (!quiet) console.log("");
-            fail(
-                `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the build to finish.`,
-                "The deployment may still be running — check `rebase cloud logs`.",
-                "timeout"
-            );
-        }
-
+        await stopIfTimedOut();
         await sleep(POLL_INTERVAL_MS);
     }
+}
+
+/**
+ * Whether a failed status read is worth reading again: no answer at all (the
+ * connection failed), or one saying the control plane could not answer now.
+ * Anything else — a 401, a 403, a 404 — will say the same next time.
+ */
+function transientReadFailure(e: unknown): boolean {
+    const status = typeof e === "object" && e !== null && "status" in e && typeof e.status === "number"
+        ? e.status
+        : undefined;
+    return status === undefined || status === 408 || status === 429 || status >= 500;
 }
 
 /** What `rebase cloud logs` parses. Its page pairs against this. */

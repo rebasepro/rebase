@@ -254,3 +254,91 @@ describe("rebase cloud logs in JSON mode", () => {
         expect(result()).toEqual({ runtime: true, logs: "GET /api/health 200\n" });
     });
 });
+
+/**
+ * A follow polls every 1.5 seconds for up to fifteen minutes, and a control
+ * plane rolling out answers a request or two with a 502 on the way. One failed
+ * read ended the follow with exit 1 while the deployment carried on and
+ * succeeded — and a deploy's exit code is documented as the deploy's verdict.
+ */
+describe("a follow that cannot read the status for a moment", () => {
+    let stdout: string[];
+
+    /** A client whose status reads answer, in turn, with these — an Error is thrown. */
+    function reads(answers: Array<Record<string, unknown> | Error>): ReturnType<typeof vi.fn> {
+        let read = 0;
+        const findById = vi.fn(async () => {
+            const answer = answers[Math.min(read++, answers.length - 1)];
+            if (answer instanceof Error) throw answer;
+            return answer;
+        });
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                data: { collection: () => ({ find: async () => ({ data: [{ id: "d1", status: "deploying", logs: L1 }] }), findById }) }
+            },
+            url: "https://cp.example"
+        });
+        return findById;
+    }
+
+    const status = (code: number | undefined) => Object.assign(new Error(`HTTP ${code}`), code === undefined ? {} : { status: code });
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        stdout = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Exited(code ?? 0);
+        }) as never);
+        context.setJsonModeForTest(true);
+    });
+
+    afterEach(() => {
+        context.setJsonModeForTest(false);
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it("keeps following through a 502 and a dropped connection, and reports the build's own verdict", async () => {
+        reads([
+            status(502),
+            status(undefined),
+            { id: "d1", status: "success", logs: L1 + L2 }
+        ]);
+
+        const done = logsCommand(["node", "rebase", "cloud", "logs", "--json", "--follow"], "shop");
+        await vi.advanceTimersByTimeAsync(10_000);
+        await done;
+
+        expect(JSON.parse(stdout.join(""))).toEqual({ deploymentId: "d1", status: "success", logs: L1 + L2 });
+    });
+
+    it("stops on a refusal that another read will not change", async () => {
+        const findById = reads([status(403), { id: "d1", status: "success", logs: L1 }]);
+
+        const done = logsCommand(["node", "rebase", "cloud", "logs", "--json", "--follow"], "shop").catch((e: unknown) => e);
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(await done).toMatchObject({ code: 1 });
+        expect(findById).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives up when the status stays unreadable, saying the build may still be running", async () => {
+        reads([status(503)]);
+
+        const done = logsCommand(["node", "rebase", "cloud", "logs", "--json", "--follow"], "shop").catch((e: unknown) => e);
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+        expect(await done).toMatchObject({ code: 1 });
+        // The first value: with `process.exit` stood in, the command's own
+        // catch reports the stand-in's throw as well.
+        expect(JSON.parse(stdout[0])).toMatchObject({
+            error: { code: "status_unreadable", hint: expect.stringContaining("may still be running") }
+        });
+    });
+});
