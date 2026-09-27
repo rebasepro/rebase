@@ -27,6 +27,13 @@ export interface PgNotifyListenerOptions {
     logLabel: string;
     /** Delay before a reconnect attempt. */
     reconnectDelayMs?: number;
+    /**
+     * Called once the connection is listening again after a drop — never after
+     * the first connect. Postgres keeps no NOTIFY for a session that is not
+     * listening, so whatever was published while the connection was down is
+     * gone for good; a caller that mirrors state from the channel resyncs here.
+     */
+    onReconnect?: () => void;
 }
 
 const DEFAULT_RECONNECT_DELAY_MS = 3000;
@@ -132,6 +139,17 @@ export class PgNotifyListener {
             if (initial) throw err;
             logger.error(`❌ ${logLabel} Failed to connect LISTEN client`, { error: err });
             this.scheduleReconnect();
+            return;
+        }
+        // Outside the `try`: a throwing handler is not a failed connection,
+        // and must not tear down the one that just came back.
+        if (!initial && this.options.onReconnect) {
+            logger.warn(`⚠️ ${logLabel} LISTEN client reconnected; anything published while it was down was missed.`);
+            try {
+                this.options.onReconnect();
+            } catch (err) {
+                logger.error(`❌ ${logLabel} Error resyncing after a reconnect`, { error: err });
+            }
         }
     }
 

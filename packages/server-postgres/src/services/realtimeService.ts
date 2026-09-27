@@ -2666,7 +2666,11 @@ lastSeen: Date.now() });
         }
         this.cdcTableMap = this.buildCdcTableMap();
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
-        this.cdcListener = new CdcListener(connectionString, (event) => this.handleCdcEvent(event));
+        this.cdcListener = new CdcListener(
+            connectionString,
+            (event) => this.handleCdcEvent(event),
+            () => this.resyncSubscriptions()
+        );
         try {
             // start() validates the initial connection; if it can't be established
             // it rejects here, and we leave CDC inactive so the caller can fall
@@ -2686,6 +2690,41 @@ lastSeen: Date.now() });
             `📡 [RealtimeService] Database-level change capture ACTIVE — writes from ANY source now emit realtime events ` +
             `(${this.cdcTableMap.size} mapped table key(s)).`
         );
+    }
+
+    /**
+     * Refetch every live subscription, as a change to its path would.
+     *
+     * Called when a LISTEN connection (CDC, or the cross-instance broadcast)
+     * is listening again after a drop. Postgres does not queue NOTIFY for a
+     * session that is not listening, so every change committed while it was
+     * down — by another instance, psql, a cron — reached nobody here, and a
+     * subscriber held its pre-gap rows until some later change to the same
+     * collection happened to arrive. Each refetch runs under the
+     * subscription's own scope, so this decides only who looks again.
+     */
+    private resyncSubscriptions(): void {
+        for (const [subscriptionId, subscription] of this._subscriptions.entries()) {
+            try {
+                if (subscription.clientId === "driver") {
+                    const callback = this.subscriptionCallbacks.get(subscriptionId);
+                    if (!callback) continue;
+                    if (subscription.type === "single" && subscription.id !== undefined) {
+                        this.debouncedSingleDriverRefetch(subscriptionId, subscription.path, String(subscription.id), subscription, callback);
+                    } else if (subscription.type === "collection" && subscription.collectionRequest) {
+                        this.debouncedDriverRefetch(subscriptionId, subscription.path, subscription, callback);
+                    }
+                } else if (this.clients.has(subscription.clientId)) {
+                    if (subscription.type === "single" && subscription.id !== undefined) {
+                        this.debouncedSingleRefetch(subscriptionId, subscription.path, String(subscription.id), subscription);
+                    } else if (subscription.type === "collection" && subscription.collectionRequest) {
+                        this.debouncedCollectionRefetch(subscriptionId, subscription.path, subscription);
+                    }
+                }
+            } catch (error) {
+                logger.error(`❌ [RealtimeService] Could not resync subscription ${subscriptionId}`, { error });
+            }
+        }
     }
 
     /** Stop the CDC listener and clear its state. */
@@ -2924,8 +2963,12 @@ lastSeen: Date.now() });
 
     /**
      * Create and connect the dedicated LISTEN client with auto-reconnect.
+     *
+     * @param reconnect Set when the client is coming back from a drop: every
+     *        notification published in the gap is gone, so the subscriptions
+     *        are refetched once it is listening again.
      */
-    private async connectListenClient(): Promise<void> {
+    private async connectListenClient({ reconnect = false }: { reconnect?: boolean } = {}): Promise<void> {
         if (!this.listenConnectionString) return;
 
         let pending: PgClient | undefined;
@@ -3008,6 +3051,10 @@ lastSeen: Date.now() });
             pending = undefined;
 
             this.debugLog(`📡 [RealtimeService] LISTEN client connected on channel "${PG_NOTIFY_CHANNEL}"`);
+            if (reconnect) {
+                logger.warn("⚠️ [RealtimeService] LISTEN client reconnected; refetching every subscription for what it missed.");
+                this.resyncSubscriptions();
+            }
         } catch (err) {
             if (pending) {
                 try { await pending.end(); } catch { /* already dead */ }
@@ -3036,7 +3083,7 @@ lastSeen: Date.now() });
                 this.listenClient = undefined;
             }
 
-            await this.connectListenClient();
+            await this.connectListenClient({ reconnect: true });
         }, delay);
     }
 }

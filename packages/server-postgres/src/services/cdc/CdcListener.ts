@@ -63,11 +63,21 @@ export function parseCdcPayload(payload: string): CdcChangeEvent | null {
 export class CdcListener {
     private readonly listener: PgNotifyListener;
 
-    constructor(connectionString: string, onEvent: (event: CdcChangeEvent) => void | Promise<void>) {
+    /**
+     * @param onReconnect Called when the connection is listening again after a
+     *        drop. Every change committed in the gap was notified to nobody, so
+     *        this is where subscribers are told to look again.
+     */
+    constructor(
+        connectionString: string,
+        onEvent: (event: CdcChangeEvent) => void | Promise<void>,
+        onReconnect?: () => void
+    ) {
         this.listener = new PgNotifyListener({
             connectionString,
             channel: CDC_CHANNEL,
             logLabel: "[CDC]",
+            onReconnect,
             onPayload: (payload) => {
                 const event = parseCdcPayload(payload);
                 if (!event) {
