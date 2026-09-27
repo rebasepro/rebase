@@ -1,5 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
@@ -18,10 +18,14 @@ import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-gua
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import {
     assertUserCreationBodyValid,
+    completeUserCreations,
     createUserThroughAuthCollection,
+    createsUsers,
     deletingAuthCollectionUsers,
     isAuthCollection,
-    prepareAuthCollectionUpdates
+    prepareAuthCollectionUpdates,
+    prepareUserCreations,
+    type UserCreatingAdapter
 } from "./auth-collection-writes";
 import { findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
@@ -336,6 +340,9 @@ export class RestApiGenerator {
             // One viewer for the whole body: a batch is one request from one
             // caller, whatever collections it names.
             const batchViewer = requestViewer(c);
+            // The creates on the auth collection: user creations, whose rows
+            // the adapter prepares and whose credentials it delivers.
+            const userCreations: { index: number; adapter: UserCreatingAdapter; collection: CollectionConfig }[] = [];
             operations.forEach((operation, index) => {
                 this.enforceApiKeyPermission(
                     { get: (key: string) => c.get(key as never), req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
@@ -344,6 +351,14 @@ export class RestApiGenerator {
                 );
                 const collection = bySlug.get(operation.collection)!;
                 if (!operation.values) return;
+                if (operation.op === "create" && createsUsers(this.authAdapter, collection)) {
+                    // A user creation, as on `POST /users`: what it consumes,
+                    // `password` included, is the adapter's to say.
+                    assertUserCreationBodyValid(this.authAdapter, collection, operation.values, batchViewer);
+                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`);
+                    userCreations.push({ index, adapter: this.authAdapter, collection });
+                    return;
+                }
                 assertKnownWriteFields(operation.values, collection, { viewer: batchViewer });
                 // A create or an upsert may insert, so `required` holds for it,
                 // as it does on `POST` and `POST /bulk` — here, before the
@@ -368,7 +383,7 @@ export class RestApiGenerator {
                 }
             });
 
-            return this.runIdempotent(c, body, async () => {
+            const execute = async () => {
                 // The auth collection's updates and deletes are user
                 // administration, as on its own routes: checked together,
                 // before the transaction opens.
@@ -389,23 +404,48 @@ export class RestApiGenerator {
                     })));
                     userUpdates.forEach((operation, index) => { operation.values = prepared[index]; });
                 }
-                const written = await this.deletingUsers(usersCollection, userDeletes, () => driver.batchWrite!({
-                    operations: operations.map((operation: ParsedBatchOperation) => ({
-                        op: operation.op,
-                        path: getCollectionDataPath(bySlug.get(operation.collection)!),
-                        id: operation.id,
-                        values: operation.values,
-                        collection: bySlug.get(operation.collection),
-                        onConflict: operation.onConflict,
-                        ref: operation.ref
-                    }))
-                }));
+                const creations: UserCreationPrepareResult[] = [];
+                const written = await this.deletingUsers(usersCollection, userDeletes, async () => {
+                    // The user creations' own step (a create hook among it)
+                    // last, once every check that can refuse the batch has.
+                    for (const creation of userCreations) {
+                        const operation = operations[creation.index];
+                        const [prepared] = await prepareUserCreations(creation.adapter, creation.collection, [operation.values!]);
+                        operation.values = prepared.values;
+                        creations.push(prepared);
+                    }
+                    return driver.batchWrite!({
+                        operations: operations.map((operation: ParsedBatchOperation) => ({
+                            op: operation.op,
+                            path: getCollectionDataPath(bySlug.get(operation.collection)!),
+                            id: operation.id,
+                            values: operation.values,
+                            collection: bySlug.get(operation.collection),
+                            onConflict: operation.onConflict,
+                            ref: operation.ref
+                        }))
+                    });
+                });
+                // After the commit, so a batch that rolled back invites nobody.
+                const deliveries = new Map<number, UserCreationFinalizeResult>();
+                for (const [position, creation] of userCreations.entries()) {
+                    const [delivery] = await completeUserCreations(
+                        creation.adapter, [creations[position]], [written[creation.index] ?? {}]
+                    );
+                    deliveries.set(creation.index, delivery);
+                }
                 return {
-                    data: written.map((row) => (row ? this.formatResponse(row) : null)),
+                    data: written.map((row, index) => (row
+                        ? { ...(this.formatResponse(row) as Record<string, unknown>), ...deliveries.get(index) }
+                        : null)),
                     meta: { operations: written.length }
                 };
-            }, (result) => {
-                if (!prefersMinimal(c)) return c.json(result as never);
+            };
+            const respond = (result: unknown) => {
+                // A batch that creates users answers in full and is never
+                // replayed, as `POST /users` is: its temporary passwords are
+                // shown once. See `createUsers`.
+                if (!prefersMinimal(c) || userCreations.length > 0) return c.json(result as never);
                 const rows = ((result as { data?: unknown })?.data ?? []) as (Record<string, unknown> | null)[];
                 c.header("Preference-Applied", "return=minimal");
                 return c.json({
@@ -413,7 +453,10 @@ export class RestApiGenerator {
                         row ? rowIdentity(row, bySlug.get(operations[index].collection)!) : null),
                     meta: (result as { meta?: unknown })?.meta
                 } as never);
-            });
+            };
+            return userCreations.length > 0
+                ? respond(await execute())
+                : this.runIdempotent(c, body, execute, respond);
         });
     }
 
@@ -758,6 +801,38 @@ export class RestApiGenerator {
         remove: () => Promise<T>
     ): Promise<T> {
         return deletingAuthCollectionUsers(this.authAdapter, collection, uids, remove);
+    }
+
+    /**
+     * `POST /users/bulk`: every row a user creation, the rows written as one
+     * transaction, the invitations sent once it has committed.
+     *
+     * Answered in full whatever `Prefer` says, and never replayed from the
+     * idempotency store, as `POST /users` is: the answer can carry temporary
+     * passwords, which are shown once. Dropped from a minimal answer they are
+     * gone, and handed out again on a replayed key they are disclosed.
+     */
+    private async createUsers(
+        driver: DataDriver,
+        adapter: UserCreatingAdapter,
+        path: string,
+        collection: CollectionConfig,
+        rows: Record<string, unknown>[]
+    ): Promise<{ data: Record<string, unknown>[]; meta: { written: number } }> {
+        const prepared = await prepareUserCreations(adapter, collection, rows);
+        const written = await driver.saveMany!({
+            path,
+            rows: prepared.map(creation => creation.values),
+            collection
+        });
+        const deliveries = await completeUserCreations(adapter, prepared, written);
+        return {
+            data: written.map((row, index) => ({
+                ...(this.formatResponse(row) as Record<string, unknown>),
+                ...deliveries[index]
+            })),
+            meta: { written: written.length }
+        };
     }
 
     /**
@@ -1409,17 +1484,33 @@ export class RestApiGenerator {
                 );
             }
 
+            // On the auth collection, each row is a user creation, as on
+            // `POST /users`: the adapter's step, not a plain insert. (An
+            // upsert is not one: it may update a user instead.)
+            const userAdapter = body.upsert !== true && createsUsers(this.authAdapter, resolvedCollection)
+                ? this.authAdapter
+                : undefined;
+
             // Checked before the transaction opens, and named by row index: a
             // batch is all-or-nothing, so one bad field in ten thousand rows
             // should not be found by rolling the other 9,999 back.
             rows.forEach((row, rowIndex) => {
-                assertKnownWriteFields(row, resolvedCollection, { rowIndex, viewer: requestViewer(c) });
-                assertWriteValuesValid(row, resolvedCollection, { rowIndex, status: "new" });
+                if (userAdapter) {
+                    // What a user creation consumes, `password` included.
+                    assertUserCreationBodyValid(userAdapter, resolvedCollection, row, requestViewer(c), rowIndex);
+                } else {
+                    assertKnownWriteFields(row, resolvedCollection, { rowIndex, viewer: requestViewer(c) });
+                    assertWriteValuesValid(row, resolvedCollection, { rowIndex, status: "new" });
+                }
                 // This route inserts (or upserts), and an operation over a
                 // value that is not there yet has nothing to mean. Refused here
                 // rather than in the driver so the message names the row.
                 assertNoFieldOpsOnCreate(row, `Row ${rowIndex} of a bulk create`);
             });
+
+            if (userAdapter) {
+                return c.json(await this.createUsers(driver, userAdapter, path, resolvedCollection, rows));
+            }
 
             // A client that never sees the response cannot know whether the
             // batch committed, so it retries — and without a key the server

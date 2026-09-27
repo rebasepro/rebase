@@ -20,6 +20,7 @@ import { errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
+import type { EmailService } from "../src/email";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
 
@@ -49,8 +50,18 @@ const posts = {
 type Call = [method: string, props: Record<string, unknown>];
 
 /** `admins` hold the admin role; every other known user is an editor. */
-function harness(options: { admins: string[]; emails?: Record<string, string>; hooks?: AuthHooks; caller?: string }) {
+function harness(options: {
+    admins: string[];
+    emails?: Record<string, string>;
+    hooks?: AuthHooks;
+    caller?: string;
+    collections?: CollectionConfig[];
+    /** An email service that can send, so a created user is invited. */
+    email?: boolean;
+    failWrites?: boolean;
+}) {
     const calls: Call[] = [];
+    const sent: { to: string; subject: string }[] = [];
     const deleteAllRefreshTokensForUser = jest.fn(async (_uid: string) => undefined);
     const repo = {
         getUserRoleIds: async (uid: string) => (options.admins.includes(uid) ? ["admin"] : ["editor"]),
@@ -59,9 +70,23 @@ function harness(options: { admins: string[]; emails?: Record<string, string>; h
             const holder = Object.entries(options.emails ?? {}).find(([, held]) => held === email)?.[0];
             return holder ? ({ id: holder, email } as UserData) : null;
         },
+        createPasswordResetToken: async () => undefined,
         deleteAllRefreshTokensForUser
     } as unknown as AuthRepository;
-    const adapter = createBuiltinAuthAdapter({ authRepository: repo, authHooks: options.hooks });
+    const adapter = createBuiltinAuthAdapter({
+        authRepository: repo,
+        authHooks: options.hooks,
+        ...(options.email ? {
+            emailService: {
+                isConfigured: () => true,
+                send: async (message: { to: string; subject: string }) => {
+                    sent.push({ to: message.to, subject: message.subject });
+                    return { messageId: "m" };
+                }
+            } as unknown as EmailService,
+            emailConfig: { resetPasswordUrl: "https://app.example.com" }
+        } : {})
+    });
 
     const record = (method: string, result: (props: Record<string, unknown>) => unknown) =>
         async (props: Record<string, unknown>) => {
@@ -78,7 +103,15 @@ function harness(options: { admins: string[]; emails?: Record<string, string>; h
         delete: record("delete", () => undefined),
         updateMany: record("updateMany", (props) => (props.updates as { id: string }[]).map(u => ({ id: u.id }))),
         deleteMany: record("deleteMany", () => undefined),
-        batchWrite: record("batchWrite", (props) => (props.operations as unknown[]).map(() => null))
+        saveMany: record("saveMany", (props) => {
+            if (options.failWrites) throw new Error("the transaction rolled back");
+            return (props.rows as Record<string, unknown>[]).map((row, index) => ({ id: `new-${index}`, ...row }));
+        }),
+        batchWrite: record("batchWrite", (props) => {
+            if (options.failWrites) throw new Error("the transaction rolled back");
+            return (props.operations as { op: string; id?: string; values?: Record<string, unknown> }[])
+                .map((operation, index) => operation.op === "delete" ? null : { id: operation.id ?? `new-${index}`, ...operation.values });
+        })
     } as unknown as DataDriver;
 
     const app = new Hono();
@@ -88,10 +121,10 @@ function harness(options: { admins: string[]; emails?: Record<string, string>; h
         c.set("user" as never, { uid: options.caller ?? "admin-1", roles: ["admin"] } as never);
         await next();
     });
-    app.route("/", new RestApiGenerator([users, posts], driver, adapter).generateRoutes());
+    app.route("/", new RestApiGenerator(options.collections ?? [users, posts], driver, adapter).generateRoutes());
 
-    const writes = () => calls.filter(([method]) => ["save", "delete", "updateMany", "deleteMany", "batchWrite"].includes(method));
-    return { app, calls, writes, deleteAllRefreshTokensForUser };
+    const writes = () => calls.filter(([method]) => ["save", "delete", "updateMany", "deleteMany", "saveMany", "batchWrite"].includes(method));
+    return { app, calls, writes, sent, deleteAllRefreshTokensForUser };
 }
 
 const send = (app: Hono, method: string, path: string, body?: unknown) =>
@@ -243,5 +276,151 @@ describe("updating a user through the data API", () => {
 
         expect(res.status).toBe(200);
         expect((writes()[0][1].values as Record<string, unknown>).title).toBe("Mixed Case");
+    });
+});
+
+/**
+ * A create on the auth collection is a user creation, whichever route it takes.
+ * `POST /users` ran the adapter's user creation; `POST /users/bulk` and a
+ * `_batch` create wrote the row as any table's. A password could not be set
+ * at all (`password` is not a column, so it was refused), so the user had
+ * none and was never invited; the email was stored as typed, so sign-in,
+ * password reset and magic links, which look it up normalized, never found
+ * it; and the collection's `onCreateUser` never ran.
+ */
+describe("creating users through the data API's bulk doors", () => {
+    type Row = Record<string, unknown>;
+    const dataOf = async (res: Response) => (await res.json() as { data: (Row | null)[] }).data;
+
+    it("POST /bulk creates each user through the adapter: email normalized, password hashed, verified", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/users/bulk", {
+            rows: [
+                { email: "New.One@Example.COM", displayName: "One", password: "Correct-Horse-9" },
+                { email: " two@example.com ", displayName: "Two" }
+            ]
+        });
+
+        expect(res.status).toBe(200);
+        const [[method, props]] = writes();
+        expect(method).toBe("saveMany");
+        const rows = props.rows as Row[];
+        expect(rows.map(row => row.email)).toEqual(["new.one@example.com", "two@example.com"]);
+        expect(rows[0].password).toBeUndefined();
+        expect(rows.every(row => typeof row.passwordHash === "string" && row.emailVerified === true)).toBe(true);
+        expect(rows[0].passwordHash).not.toBe("Correct-Horse-9");
+
+        // No email service: the generated password is the only way in, so it
+        // is handed back for the row that did not bring its own.
+        const data = await dataOf(res);
+        expect(data[0]).toMatchObject({ invitationSent: false });
+        expect(data[0]?.temporaryPassword).toBeUndefined();
+        expect(typeof data[1]?.temporaryPassword).toBe("string");
+    });
+
+    it("POST /bulk answers in full even when asked for a minimal answer, as POST /users does", async () => {
+        // A minimal bulk answer is the ids alone, and the generated passwords
+        // are shown once: dropped from the answer, they are gone.
+        const { app } = harness({ admins: ["admin-1"] });
+
+        const res = await app.request("/users/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify({ rows: [{ email: "two@example.com", displayName: "Two" }] })
+        });
+
+        expect(res.headers.get("Preference-Applied")).toBeNull();
+        const [row] = await dataOf(res);
+        expect(row).toMatchObject({ id: "new-0", email: "two@example.com", invitationSent: false });
+        expect(typeof row?.temporaryPassword).toBe("string");
+    });
+
+    it("POST /bulk invites each new user after the write, and nobody when it fails", async () => {
+        const ok = harness({ admins: ["admin-1"], email: true });
+        await send(ok.app, "POST", "/users/bulk", { rows: [{ email: "A@B.C", displayName: "A" }, { email: "d@e.f", displayName: "D" }] });
+        expect(ok.sent.map(message => message.to)).toEqual(["a@b.c", "d@e.f"]);
+
+        const failed = harness({ admins: ["admin-1"], email: true, failWrites: true });
+        const res = await send(failed.app, "POST", "/users/bulk", { rows: [{ email: "a@b.c", displayName: "A" }] });
+        expect(res.status).toBe(500);
+        expect(failed.sent).toEqual([]);
+    });
+
+    it("POST /bulk runs the collection's onCreateUser for each row", async () => {
+        const onCreateUser = jest.fn(async (body: Record<string, unknown>) => ({
+            values: { email: String(body.email).toLowerCase(), displayName: "From the hook" },
+            invitationSent: true
+        }));
+        const hooked = { ...users, auth: { enabled: true, onCreateUser } } as unknown as CollectionConfig;
+        const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts] });
+
+        const res = await send(app, "POST", "/users/bulk", { rows: [{ email: "X@Y.Z", inviteCode: "a" }, { email: "P@Q.R", inviteCode: "b" }] });
+
+        expect(res.status).toBe(200);
+        expect(onCreateUser).toHaveBeenCalledTimes(2);
+        expect(writes()[0][1].rows).toEqual([
+            { email: "x@y.z", displayName: "From the hook" },
+            { email: "p@q.r", displayName: "From the hook" }
+        ]);
+        expect((await dataOf(res)).every(row => row?.invitationSent === true)).toBe(true);
+    });
+
+    it("POST /bulk still refuses a field the users collection does not have, naming the row", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/users/bulk", { rows: [{ email: "a@b.c" }, { email: "d@e.f", nmae: "x" }] });
+
+        expect(res.status).toBe(400);
+        expect((await errorOf(res)).message).toContain("nmae");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("a _batch create is a user creation too, and leaves the other operations alone", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/_batch", {
+            operations: [
+                { op: "create", collection: "posts", values: { title: "Mixed Case" } },
+                { op: "create", collection: "users", values: { email: "New@Example.COM", displayName: "N" } }
+            ]
+        });
+
+        expect(res.status).toBe(200);
+        const operations = writes()[0][1].operations as { values: Row }[];
+        expect(operations[0].values).toEqual({ title: "Mixed Case" });
+        expect(operations[1].values.email).toBe("new@example.com");
+        expect(typeof operations[1].values.passwordHash).toBe("string");
+        const data = await dataOf(res);
+        expect(data[0]?.temporaryPassword).toBeUndefined();
+        expect(typeof data[1]?.temporaryPassword).toBe("string");
+    });
+
+    it("a _batch refused by a user-administration check runs no create hook", async () => {
+        const onCreateUser = jest.fn(async (body: Record<string, unknown>) => ({ values: body }));
+        const hooked = { ...users, auth: { enabled: true, onCreateUser } } as unknown as CollectionConfig;
+        const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts] });
+
+        const res = await send(app, "POST", "/_batch", {
+            operations: [
+                { op: "create", collection: "users", values: { email: "n@e.w" } },
+                { op: "delete", collection: "users", id: "admin-1" }
+            ]
+        });
+
+        expect(res.status).toBe(403);
+        expect(onCreateUser).not.toHaveBeenCalled();
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("a _batch sends no invitation when its transaction fails", async () => {
+        const { app, sent } = harness({ admins: ["admin-1"], email: true, failWrites: true });
+
+        const res = await send(app, "POST", "/_batch", {
+            operations: [{ op: "create", collection: "users", values: { email: "a@b.c", displayName: "A" } }]
+        });
+
+        expect(res.status).toBe(500);
+        expect(sent).toEqual([]);
     });
 });

@@ -31,8 +31,8 @@ import { assertQueryFieldsReadable } from "../api/rest/field-access-query.js";
 import {
     assertUserCreationBodyValid,
     createUserThroughAuthCollection,
+    createsUsers,
     deletingAuthCollectionUsers,
-    isAuthCollection,
     prepareAuthCollectionUpdates
 } from "../api/rest/auth-collection-writes.js";
 import { logger } from "../utils/logger.js";
@@ -186,7 +186,7 @@ async function createUser(
     ctx: McpToolContext
 ): Promise<Record<string, unknown> | undefined> {
     const adapter = ctx.authAdapter;
-    if (!adapter?.prepareUserCreation || !isAuthCollection(collection)) return undefined;
+    if (!createsUsers(adapter, collection)) return undefined;
 
     const body = valuesObject(args.values);
     asToolError(() => {
