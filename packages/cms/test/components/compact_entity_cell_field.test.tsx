@@ -64,6 +64,27 @@ describe("CompactEntityCellField", () => {
         expect(screen.getByLabelText(CLEAR).className).not.toContain("opacity-0");
     });
 
+    test("the hidden cross cannot be hit: only a hovered or selected cell's cross takes the click", () => {
+        // It clears the value and the cell saves at once. Hidden by opacity
+        // alone it was still under the pointer at rest, next to the opener,
+        // and a tap on a touch screen — where nothing is hovered — emptied
+        // the relation unseen.
+        const { rerender } = render(
+            <CompactEntityCellField empty={false} disabled={false} onClear={() => undefined}>
+                <span>Barbara Miller</span>
+            </CompactEntityCellField>
+        );
+        const atRest = screen.getByLabelText(CLEAR).className.split(/\s+/);
+        expect(atRest).toContain("pointer-events-none");
+        expect(atRest).toContain("group-hover/cell:pointer-events-auto");
+        rerender(
+            <CompactEntityCellField empty={false} disabled={false} selected onClear={() => undefined}>
+                <span>Barbara Miller</span>
+            </CompactEntityCellField>
+        );
+        expect(screen.getByLabelText(CLEAR).className.split(/\s+/)).not.toContain("pointer-events-none");
+    });
+
     test("disabled: the line is shown and no tool is offered", () => {
         render(
             <CompactEntityCellField empty={false} disabled onClear={() => undefined}>

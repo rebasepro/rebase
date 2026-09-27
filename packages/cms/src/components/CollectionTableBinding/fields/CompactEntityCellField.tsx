@@ -11,7 +11,8 @@ import { EmptyValue } from "../../../preview";
  * each title opens its record in the side panel. The cell's opener — the
  * chevron it reveals on hover — opens the dialog, and a cross beside it clears
  * the value. The cross follows the opener: hidden at rest, shown on hover and
- * while the cell is selected.
+ * while the cell is selected. Unlike the opener it saves at once, so hidden it
+ * cannot be hit either: a tap where nothing is hovered selects the cell.
  */
 export function CompactEntityCellField({
     children,
@@ -40,7 +41,9 @@ export function CompactEntityCellField({
                     shape={"square"}
                     aria-label={t("clear")}
                     className={cls("w-6 !h-6 min-w-6 min-h-6 p-0 hover:scale-100 transition-opacity duration-100",
-                        selected ? "opacity-100" : "opacity-0 group-hover/cell:opacity-100 focus-visible:opacity-100")}
+                        selected
+                            ? "opacity-100"
+                            : "opacity-0 pointer-events-none group-hover/cell:opacity-100 group-hover/cell:pointer-events-auto focus-visible:opacity-100")}
                     onMouseDown={(e: React.MouseEvent) => e.preventDefault()}
                     onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
