@@ -5,6 +5,9 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     resolveCloudUrl,
+    resolveCloudTarget,
+    isKnownControlPlane,
+    isJsonMode,
     refuseDirectLink,
     parseCloudArgs,
     createCloudClient,
@@ -79,7 +82,8 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     // `requireClient`'s guard — and it is the one command where getting this
     // wrong sends a password somewhere it should never go.
     refuseDirectLink(rawArgs);
-    const url = resolveCloudUrl(rawArgs);
+    const { url, source } = resolveCloudTarget(rawArgs);
+    if (source === "link" && !isKnownControlPlane(url)) await confirmLinkedControlPlane(url);
 
     noteBlank();
     note(`Signing in to ${chalk.cyan(url)}`);
@@ -176,6 +180,35 @@ mask: "•" });
             fail("Invalid email or password.", undefined, "invalid_credentials");
         }
         reportError(e, "Login failed");
+    }
+}
+
+/**
+ * Ask before sending a password to a control plane a repository named.
+ *
+ * `.rebase/cloud.json` is committed with the code, so a cloned repository can
+ * point its cloud commands at any host — and "Not logged in to <host>" invites
+ * the login that would hand that host the user's email and password. A host
+ * the user has signed in to before, or the platform's own, is theirs; any other
+ * one is named and confirmed at a terminal, and refused without one: `--url`
+ * is how a script says it means that host.
+ */
+async function confirmLinkedControlPlane(url: string): Promise<void> {
+    const message = `This directory's .rebase/cloud.json names the control plane ${url}, which you have not signed in to before.`;
+    if (isJsonMode() || process.stdin.isTTY !== true) {
+        fail(
+            message,
+            `Your email and password would be sent there. To sign in to it on purpose, pass --url ${url}.`,
+            "unknown_control_plane"
+        );
+    }
+    warn(message, "Your Rebase Cloud email and password will be sent to it.");
+    const { confirmed } = await inquirer.prompt([
+        { type: "confirm", name: "confirmed", default: false, message: `Sign in to ${url}?` }
+    ]);
+    if (!confirmed) {
+        console.error(chalk.gray("  Aborted."));
+        process.exit(0);
     }
 }
 

@@ -659,7 +659,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         notes: [
             "--password warns, once, before the request: by the time a login succeeds the password is already in the history file.",
             "There is no machine token yet, so CI genuinely needs a human's credentials. REBASE_CLOUD_EMAIL and "
-                + "REBASE_CLOUD_PASSWORD are how a secret store hands them over without them appearing on a command line."
+                + "REBASE_CLOUD_PASSWORD are how a secret store hands them over without them appearing on a command line.",
+            "In a directory whose .rebase/cloud.json names a control plane you have not signed in to before, login "
+                + "names it and asks first, and refuses without a terminal: a cloned repository does not choose where "
+                + "your password goes. Pass --url <that host> to sign in there on purpose."
         ]
     },
 

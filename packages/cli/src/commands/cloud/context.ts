@@ -182,11 +182,24 @@ export function setCurrentContext(url: string): void {
    A **direct** link is deliberately absent from that list; see below.
 */
 
+/**
+ * Where the control-plane URL came from. `link` is the one a repository chose
+ * rather than the user — see {@link isKnownControlPlane}.
+ */
+export type CloudUrlSource = "flag" | "env" | "link" | "context" | "default";
+
 export function resolveCloudUrl(rawArgs: string[]): string {
+    return resolveCloudTarget(rawArgs).url;
+}
+
+/** The control-plane URL, and which rung of the ladder above supplied it. */
+export function resolveCloudTarget(rawArgs: string[]): { url: string; source: CloudUrlSource } {
     const parsed = arg({ "--url": String }, { argv: rawArgs.slice(2),
 permissive: true });
-    const explicit = parsed["--url"] || process.env.REBASE_CLOUD_URL;
-    if (explicit) return normalizeUrl(explicit);
+    if (parsed["--url"]) return { url: normalizeUrl(parsed["--url"]),
+source: "flag" };
+    if (process.env.REBASE_CLOUD_URL) return { url: normalizeUrl(process.env.REBASE_CLOUD_URL),
+source: "env" };
 
     const link = readLink();
     /*
@@ -203,12 +216,27 @@ permissive: true });
      * `refuseDirectLink`, which every one of them reaches through
      * `requireClient` (and `login`, which builds its client directly).
      */
-    if (link?.url && link.mode !== "direct") return normalizeUrl(link.url);
+    if (link?.url && link.mode !== "direct") return { url: normalizeUrl(link.url),
+source: "link" };
 
     const current = currentContextUrl();
-    if (current) return normalizeUrl(current);
+    if (current) return { url: normalizeUrl(current),
+source: "context" };
 
-    return DEFAULT_CLOUD_URL;
+    return { url: DEFAULT_CLOUD_URL,
+source: "default" };
+}
+
+/**
+ * Whether a control-plane host is one the user chose: the platform's own, or a
+ * host already in their credentials file because they signed in to it.
+ *
+ * A link file is part of the repository, and a cloned repository is not the
+ * user's to trust with their password. `login` asks before sending one to a
+ * linked host that is neither.
+ */
+export function isKnownControlPlane(url: string): boolean {
+    return url === DEFAULT_CLOUD_URL || Object.hasOwn(readCredentials().contexts, url);
 }
 
 /**
