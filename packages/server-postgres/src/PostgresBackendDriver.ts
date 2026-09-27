@@ -12,6 +12,7 @@ import {
     CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
+    FilterValues,
     ListenCollectionProps,
     ListenOneProps,
     RebaseCallContext,
@@ -39,6 +40,8 @@ import {
     parseEnvBoolean
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
@@ -86,6 +89,14 @@ export function effectiveSqlRole(requestedRole?: string): string {
 export const CONNECTION_OWNER = "<connection owner>";
 
 /**
+ * What puts a session back after caller SQL: the session user and role, then
+ * every setting. Two statements, because the extended protocol refuses a
+ * multi-command string. Pinned settings (`search_path` from the connection's
+ * startup options) come back as they were pinned.
+ */
+const RESET_SESSION_STATEMENTS = ["SET SESSION AUTHORIZATION DEFAULT", "RESET ALL"] as const;
+
+/**
  * A statement named a database role the connection cannot assume.
  *
  * Its own type because the tempting recovery — run it anyway, as the owner — is
@@ -127,6 +138,30 @@ export class RoleSwitchUnavailableError extends Error {
  */
 function applyBeforeSaveResult<T extends object, R extends object>(values: T, result: R): T & R {
     return { ...values, ...result };
+}
+
+/**
+ * The keys of a create's final values that its INSERT alone may write: those
+ * the caller did not send, no `beforeSave` hook wrote, and that are not an
+ * `on_update` stamp — a declared default, a tenant stamp, a create-time stamp.
+ * See `PersistSaveOptions.insertOnlyKeys`.
+ */
+function insertOnlyKeysOf(
+    finalValues: object,
+    callerValues: object | undefined,
+    beforeHooks: Record<string, unknown>,
+    afterHooks: Record<string, unknown>,
+    properties: Properties | undefined
+): string[] {
+    const sent = new Set(Object.keys(callerValues ?? {}));
+    const updateStamps = new Set(Object.entries(properties ?? {})
+        .filter(([, property]) => (property?.type === "date" && property.autoValue === "on_update")
+            || (property?.type === "string" && property.autoValue === "user_on_update"))
+        .map(([key]) => key));
+    return Object.keys(finalValues).filter(key =>
+        !sent.has(key)
+        && !updateStamps.has(key)
+        && beforeHooks[key] === afterHooks[key]);
 }
 
 /** A key that names a row: not absent, and not the empty string a form sends. */
@@ -902,6 +937,66 @@ export class PostgresBackendDriver implements DataDriver {
         }
     }
 
+    /**
+     * The stored row an upsert's key names, if this caller can address it —
+     * with its address and the values to update it with.
+     *
+     * Read as the caller reads: their policies and `beforeQuery` scope, and
+     * soft-deleted rows hidden, so a row found here is one an update may
+     * target. On the trusted plane for its fields only, like
+     * {@link resolveCallerTenants}: the key columns are the server's to see.
+     *
+     * `undefined` when the key is incomplete (the write is a plain insert,
+     * which is the persistence layer's rule too), when a key value is not a
+     * plain value, or when no such row is visible. None of those can write a
+     * stored row wrongly: the statement's own conflict branch sets only what
+     * the caller sent, and only on a row in their scope.
+     *
+     * The values drop the key and the conflict target, which the stored row
+     * already has: a natural-key upsert carrying a key the caller invented
+     * must not move the row onto it.
+     */
+    private async findUpsertTarget<M extends Record<string, unknown>>(
+        path: string,
+        collection: CollectionConfig,
+        values: Partial<EntityValues<M>>,
+        id: string | number | undefined,
+        onConflict: readonly string[] | undefined
+    ): Promise<{ id: string; values: Partial<EntityValues<M>> } | undefined> {
+        const primaryKeys = getPrimaryKeys(collection, this.registry);
+        const key: Record<string, unknown> = { ...values };
+        if (isPresentKey(id)) Object.assign(key, parseIdValues(id, primaryKeys));
+        const targetFields = onConflict && onConflict.length > 0
+            ? [...onConflict]
+            : primaryKeys.map(info => info.fieldName);
+        if (targetFields.length === 0) return undefined;
+
+        const filter: FilterValues<string> = {};
+        for (const field of targetFields) {
+            const value = key[field];
+            if (value === undefined || value === null || value === "") return undefined;
+            if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return undefined;
+            filter[field] = ["==", value];
+        }
+
+        const [row] = await withFieldViewer(undefined, () => this.dataService.fetchCollectionForRest(path, {
+            filter,
+            limit: 1,
+            databaseId: collection.databaseId
+        }));
+        // The row must be the one the key names. A filter key the table does
+        // not have is dropped rather than refused under the process-wide
+        // "warn" mode, and an unfiltered `limit: 1` is somebody else's row.
+        if (!row || targetFields.some(field => String(row[field]) !== String(key[field]))) return undefined;
+
+        const rest: Record<string, unknown> = { ...values };
+        for (const field of [...primaryKeys.map(info => info.fieldName), ...targetFields]) delete rest[field];
+        return {
+            id: deriveRowAddress(row, collection, this.registry),
+            values: rest as Partial<EntityValues<M>>
+        };
+    }
+
     async save<M extends Record<string, unknown>>({
                                                             path,
                                                             id,
@@ -918,6 +1013,27 @@ export class PostgresBackendDriver implements DataDriver {
             globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
+
+        // An upsert that finds its row is an update of that row, and runs as
+        // one: the update gate, `beforeSave` told "existing" with the stored
+        // values, `on_update` stamps only, history "update". Every upsert door
+        // (`?on_conflict=`, bulk and `_batch` upserts, the SDK, the socket)
+        // reached the create pipeline instead, and the INSERT's conflict branch
+        // wrote it over the stored row: omitted fields reset to their
+        // `defaultValue`, `user_on_create` handed to whoever ran the import,
+        // hooks told the row was new, and a row the caller's `beforeQuery`
+        // hides updated and then answered 500. The read runs in the write's
+        // transaction; a row it cannot see is still met safely by the
+        // statement's own conflict branch below.
+        const upserting = upsert === true && status !== "existing";
+        if (upserting && resolvedCollection) {
+            const stored = await this.findUpsertTarget<M>(
+                path, resolvedCollection as CollectionConfig, values, id, onConflict
+            );
+            if (stored) {
+                return this.save<M>({ path, id: stored.id, values: stored.values, collection, status: "existing" });
+            }
+        }
 
         let updatedValues = values;
         const contextForCallback = this.buildCallContext();
@@ -989,6 +1105,9 @@ export class PostgresBackendDriver implements DataDriver {
             }
         }
 
+        /** The row as the hooks receive it, to tell what they wrote. */
+        const beforeHooks: Partial<EntityValues<M>> = updatedValues;
+
         // A `before*` callback is the application speaking, not the server
         // failing: a bare `throw` is the documented way to block a write, so it
         // answers 400 with the author's message rather than a masked 500.
@@ -1041,6 +1160,7 @@ export class PostgresBackendDriver implements DataDriver {
         } catch (callbackError) {
             throw toCallbackError(callbackError, "beforeSave", path);
         }
+        const afterHooks: Partial<EntityValues<M>> = updatedValues;
 
         // Apply autoValue timestamps (on_create / on_update) at the application layer.
         // This handles updated_at fields for all writes that flow through the Rebase backend.
@@ -1102,13 +1222,23 @@ export class PostgresBackendDriver implements DataDriver {
             writeId = undefined;
         }
 
+        // For an upsert whose INSERT meets a stored row anyway — one the read
+        // above could not see, or one inserted concurrently — what the
+        // conflict-update may set: what the caller sent, what a hook wrote, and
+        // the `on_update` stamps. Everything else here the create alone decided
+        // (declared defaults, a tenant stamp; the create-time stamps are left
+        // out by the persistence layer), and a stored row keeps its own.
+        const insertOnlyKeys = upserting
+            ? insertOnlyKeysOf(updatedValues, values, beforeHooks, afterHooks, resolvedCollection?.properties)
+            : undefined;
+
         try {
             let savedRow = await this.dataService.save<M>(
                 path,
                 updatedValues,
                 writeId,
                 resolvedCollection?.databaseId,
-                { upsert, onConflict }
+                { upsert: upserting, onConflict, insertOnlyKeys }
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
@@ -1914,14 +2044,69 @@ export class PostgresBackendDriver implements DataDriver {
     async executeSql(sqlText: string, options?: {
         database?: string,
         role?: string,
-        params?: unknown[]
+        params?: unknown[],
+        isolateSession?: boolean
     }): Promise<Record<string, unknown>[]> {
+        if (options?.isolateSession) {
+            return this.onIsolatedSession(
+                this.getTargetDb(options.database),
+                (db) => this.executeSqlOn(db, sqlText, options)
+            );
+        }
         if (!options?.database && !options?.role) {
             return this.dataService.executeSql(sqlText, options?.params);
         }
+        return this.executeSqlOn(this.getTargetDb(options?.database), sqlText, options);
+    }
 
-        const targetDb = this.getTargetDb(options?.database);
+    /**
+     * Run `fn` on a session of its own, and put that session back the way it
+     * was handed out before anything else can use it.
+     *
+     * For SQL a person wrote — the Studio editor. It may `SET ROLE`,
+     * `SET SESSION AUTHORIZATION` or `set_config(…, false)`, which outlive the
+     * statement (and a transaction's commit) and stay on the connection. On a
+     * pooled one they were inherited by whatever checked it out next: an auth
+     * lookup, the job store or history running as `rebase_user`, on one
+     * connection in N, until a restart. `SET SESSION AUTHORIZATION DEFAULT`
+     * clears the role as well, which `RESET ALL` does not.
+     *
+     * A connection that cannot be reset — the statement left a transaction
+     * open or aborted — is destroyed rather than returned. A handle that is
+     * already one session (PGlite in process, a single client) is reset in
+     * place.
+     */
+    private async onIsolatedSession<T>(targetDb: DrizzleClient, fn: (db: DrizzleClient) => Promise<T>): Promise<T> {
+        const pool = "$client" in targetDb ? targetDb.$client : undefined;
+        if (!(pool instanceof Pool)) {
+            try {
+                return await fn(targetDb);
+            } finally {
+                for (const statement of RESET_SESSION_STATEMENTS) {
+                    await targetDb.execute(drizzleSql.raw(statement)).catch((error: unknown) =>
+                        logger.error("[PostgresBackendDriver] Could not reset the session after caller SQL", { error }));
+                }
+            }
+        }
+        const connection = await pool.connect();
+        let reusable = true;
+        try {
+            return await fn(drizzle(connection));
+        } finally {
+            try {
+                for (const statement of RESET_SESSION_STATEMENTS) await connection.query(statement);
+            } catch {
+                reusable = false;
+            }
+            connection.release(reusable ? undefined : true);
+        }
+    }
 
+    private async executeSqlOn(targetDb: DrizzleClient, sqlText: string, options?: {
+        database?: string,
+        role?: string,
+        params?: unknown[]
+    }): Promise<Record<string, unknown>[]> {
         try {
             // Does this actually need a role switch?
             //

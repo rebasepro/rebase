@@ -1,7 +1,7 @@
 import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -14,7 +14,7 @@ import {
 } from "./collection-helpers";
 import { sanitizeAndConvertDates, serializeDataToServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
-import type { ReadCallContextProvider } from "./read-scope";
+import { beforeQueryCondition, type ReadCallContextProvider } from "./read-scope";
 import { RelationWriteService } from "./RelationWriteService";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
@@ -30,6 +30,44 @@ import { ApiError, logger, splitFieldOps } from "@rebasepro/server";
 import { brokenFieldOpBounds, compileFieldOpBounds, compileFieldOps, fieldOpBoundsError } from "./field-op-sql";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
+
+/**
+ * The top-level properties whose value is stamped once, when the row is
+ * created: `on_create` dates and `user_on_create` identities.
+ *
+ * What they hold is a fact about the row's creation, so a write to a row that
+ * already exists has nothing to say about them — an update, and the
+ * conflict-update of an upsert that met a stored row. Top level only: a stamp
+ * nested inside a `map` is part of that map's value, not a column a write can
+ * leave out.
+ */
+export function createStampKeys(properties: Properties | undefined): string[] {
+    const keys: string[] = [];
+    for (const [key, property] of Object.entries(properties ?? {})) {
+        if ((property?.type === "date" && property.autoValue === "on_create")
+            || (property?.type === "string" && property.autoValue === "user_on_create")) {
+            keys.push(key);
+        }
+    }
+    return keys;
+}
+
+/** How {@link PersistService.save} writes a row that may already be stored. */
+export interface PersistSaveOptions {
+    /** INSERT ... ON CONFLICT DO UPDATE. See `SaveProps.upsert`. */
+    upsert?: boolean;
+    /** The conflict target, instead of the primary key. See `SaveProps.onConflict`. */
+    onConflict?: readonly string[];
+    /**
+     * Keys of `values` that belong to the INSERT alone: what the create
+     * pipeline filled in rather than what the caller wrote — a declared
+     * `defaultValue`, a tenant stamp. When an upsert's INSERT meets a stored
+     * row, those columns keep the value they have. The create-time stamps
+     * (`on_create`, `user_on_create`) are left out of the conflict-update
+     * without being named here.
+     */
+    insertOnlyKeys?: readonly string[];
+}
 
 /**
  * Service for handling all row write operations.
@@ -238,6 +276,10 @@ export class PersistService {
      * the row already exists — which is what a re-runnable import needs. The
      * conflict is matched on the primary key unless `options.onConflict` names
      * other columns; see {@link SaveProps.onConflict} for why that matters.
+     * When the INSERT meets a stored row, the conflict-update sets what the
+     * caller wrote and nothing the create alone decides — see
+     * {@link PersistSaveOptions.insertOnlyKeys} — and only on a row the caller's
+     * `beforeQuery` scope reaches.
      *
      * `values` may carry field operations (`{ views: { $inc: 1 } }`). They are
      * split out here rather than at the REST boundary because every request
@@ -250,7 +292,7 @@ export class PersistService {
         values: Partial<M>,
         id?: string | number,
         databaseId?: string,
-        options?: { upsert?: boolean; onConflict?: readonly string[] }
+        options?: PersistSaveOptions
     ): Promise<Record<string, unknown>> {
         // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
@@ -521,25 +563,58 @@ export class PersistService {
                         for (const field of targetFields) delete set[field];
 
                         // A conflict means the row was already there, so its
-                        // `on_create` stamp is a fact about the past and not
-                        // this write's to redecide. Bulk rows are saved with
-                        // `status: "new"` on purpose (an import's rows carry a
-                        // natural key for rows that may not exist), which
-                        // computes the creation timestamp for every row — and
-                        // the conflict-update then wrote it over the original.
-                        // A nightly re-import reset `createdAt` on everything
-                        // it touched, and every "new this week" query with it.
-                        // The INSERT branch keeps the value: it is right there.
-                        for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
-                            if ((prop as Property).type === "date"
-                                && (prop as { autoValue?: string }).autoValue === "on_create") {
-                                delete set[propName];
-                            }
+                        // create-time stamps (`on_create`, `user_on_create`)
+                        // are facts about the past and not this write's to
+                        // redecide. Bulk rows are saved with `status: "new"` on
+                        // purpose (an import's rows carry a natural key for
+                        // rows that may not exist), which computes the stamps
+                        // for every row — and the conflict-update then wrote
+                        // them over the originals. A nightly re-import reset
+                        // `createdAt` on everything it touched, and handed
+                        // `createdBy` to whoever ran it. The INSERT branch keeps
+                        // the values: they are right there.
+                        for (const key of createStampKeys(collection.properties as Properties | undefined)) {
+                            delete set[key];
                         }
+                        // The same for everything else the create alone filled
+                        // in. A `defaultValue` describes a row the caller did
+                        // not finish describing, not one that exists: written
+                        // here it reset every omitted field of every stored row
+                        // an import touched — `status` back to "draft".
+                        for (const key of options.insertOnlyKeys ?? []) delete set[key];
 
-                        result = Object.keys(set).length > 0
-                            ? await insertQuery.onConflictDoUpdate({ target, set }).returning(returningKeys)
+                        // Only a row the caller's `beforeQuery` scope reaches is
+                        // theirs to update. Their UPDATE is refused before it
+                        // runs when the row is out of scope; here the stored row
+                        // is only known once the INSERT meets it, so the scope
+                        // rides along as the conflict-update's own WHERE.
+                        const scope = await this.writeScope(collection, effectiveCollectionPath, table);
+                        const updating = Object.keys(set).length > 0;
+                        result = updating
+                            ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: scope }).returning(returningKeys)
                             : await insertQuery.onConflictDoNothing({ target }).returning(returningKeys);
+
+                        if (result.length === 0) {
+                            // The key is taken and the statement changed nothing:
+                            // the stored row is outside the caller's scope, or
+                            // there was nothing to change on it. Asked of the
+                            // row itself, through the same scope, rather than
+                            // falling back to an id the caller may not address —
+                            // which then failed the read-back below as a 500.
+                            const keyConditions: SQL[] = target.map((column, i) => eq(column, dataForInsert[targetFields[i]]));
+                            if (scope) keyConditions.push(scope);
+                            const keyLabel = targetFields.map((field) => String(dataForInsert[field])).join(", ");
+                            const missing = `No row "${keyLabel}" in "${effectiveCollectionPath}" to update.`;
+                            if (updating) {
+                                throw await explainZeroRowWrite(
+                                    tx, table, keyConditions,
+                                    `Not allowed to update "${keyLabel}" in "${effectiveCollectionPath}": a row-level security policy rejected the write.`,
+                                    missing
+                                );
+                            }
+                            result = await tx.select(returningKeys).from(table).where(and(...keyConditions)).limit(1);
+                            if (result.length === 0) throw ApiError.notFound(missing);
+                        }
                     } else {
                         result = await insertQuery.returning(returningKeys);
                     }
@@ -618,6 +693,26 @@ export class PersistService {
         );
         if (!finalEntity) throw new Error("Could not fetch row after save.");
         return finalEntity;
+    }
+
+    /**
+     * The caller's `beforeQuery` scope over this table, as one condition: what
+     * a stored row must satisfy for a write that meets it to change it. The
+     * same scope the update gate and the single get apply; `undefined` when the
+     * collection declares no hook.
+     */
+    private writeScope(collection: CollectionConfig, collectionPath: string, table: PgTable): Promise<SQL | undefined> {
+        const [key] = getPrimaryKeys(collection, this.registry);
+        return beforeQueryCondition(
+            { registry: this.registry, callContext: this.callContext },
+            collection, collectionPath, table as PgTable<never>,
+            { operation: "get", query: {} },
+            {
+                collection,
+                registry: this.registry,
+                sourceIdColumn: key ? table[key.fieldName as keyof typeof table] as AnyPgColumn | undefined : undefined
+            }
+        );
     }
 
     /**

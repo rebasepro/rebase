@@ -4,7 +4,7 @@ import type { VectorSearchParams } from "@rebasepro/types";
 import { FetchService } from "./FetchService";
 import type { ReadCallContextProvider } from "./read-scope";
 import type { WithDeleted } from "./soft-delete";
-import { PersistService } from "./PersistService";
+import { PersistService, type PersistSaveOptions } from "./PersistService";
 import { RelationService } from "./RelationService";
 import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -214,7 +214,7 @@ export class DataService implements DataRepository {
         values: Partial<M>,
         id?: string | number,
         databaseId?: string,
-        options?: { upsert?: boolean; onConflict?: readonly string[] }
+        options?: PersistSaveOptions
     ): Promise<Record<string, unknown>> {
         return this.persistService.save<M>(collectionPath, values, id, databaseId, options);
     }
