@@ -4002,3 +4002,29 @@ script, so CI has never run them (class 3). ESLint could not load in this
 checkout (`zod-validation-error/v4` missing), so none of tonight's commits was
 linted until the wrap-up.
 
+
+### Sweep — 2026-09-27, a second pass over the OSS tree
+
+Four days after the first, seven read-only hunters took angles the first sweep
+did not: the CLI's cloud half against the handlers it talks to, the runtime's
+contract with the pods that run it, concurrency and transaction state in the
+Postgres driver, and a door × operation matrix of every check each door runs
+(class 42 read as a table rather than door by door). Same method: a confirmed
+failure scenario per finding, a test seen red, the fix mutation-checked, one
+commit per finding (`git log df41b1af5..` from this date).
+
+| slice | found | fixed | notable | left open |
+|---|---|---|---|---|
+| CLI ↔ control plane | 12 | 12 | `deploy` answered a 409 by following an earlier deploy and exited 0 with the new code never shipped; `db backup list` read `filename`/`size` the server never sent (class 69); a repo's `.rebase/cloud.json` chose where `login` sent the password | — |
+| runtime contract | 9 | 7 (+2 in the control plane) | SIGTERM never finishing while a WebSocket was open; an install killed partway vouched for by a marker written before it; `JobStore.complete`/`fail` not fenced by the claim, so a stale attempt overwrote a live one | — |
+| Postgres concurrency | 10 | 9 | a callback that caught a failed statement turned the write's COMMIT into a silent ROLLBACK while the request answered 200 and webhooks fired; the new `$inc` bound check as an oracle on unreadable fields; a Studio `SET ROLE` surviving on a pooled connection | `dataAsAdmin` inside `afterSave` runs outside the request's transaction — a design call |
+| door matrix | 14 | 14 (+4 siblings) | an upsert ran the CREATE pipeline over a stored row (defaults and `created_by` rewritten); `save({ id, status: "new" })` was an UPDATE; history served withheld fields in `previous_values`; the users collection as a second door into user admin on REST, `_batch`, the socket and MCP | an upsert on the users collection takes neither rule set (refusal parked on `sweep/refuse-user-upsert`, blocked on the docs' own upsert example); the soft-delete condition vs. the documented restore |
+| CMS + Studio | 9 | 9 | a spread map's cell saving the whole map from a stale row (class 67, regressing part of d43d5766e); the SQL console editing the wrong row of a JOIN whose tables share an `id` | hover-only destructive buttons in the Studio editors |
+| client + plugins | 10 | 7 | channel catch-up stopping at the first page of 200; a parenthesised filter value decoded as a list (class 69); the MCP data fence closable by a row's text | codegen keeping `write: []` fields on `Insert`; `$`-keys in maps; the shared `rebase_auth` storage key |
+
+**What the pass says.** The first sweep's doors were fixed one by one; the matrix
+found that the users collection and upsert were doors in their own right, each
+reaching the same rows through a path none of the per-door fixes touched. The
+transaction finding is class 57's sibling at the database: the error was caught,
+so nothing looked wrong, and the database quietly refused to keep what the
+request reported saved.
