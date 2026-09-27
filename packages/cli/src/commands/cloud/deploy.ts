@@ -682,14 +682,45 @@ export function isManagedProject(
         && pick(latest as Record<string, unknown> | undefined, "bundleId", "bundle_id") !== undefined;
 }
 
-/** What a `deploy` with nothing attached will build, in the words to print. */
+/** A row's own `createdAt`, in ms; 0 when it has none that parses. */
+function createdAtMs(row: DeploySourceRow): number {
+    const raw = row.createdAt ?? row.created_at;
+    const at = raw instanceof Date ? raw.getTime() : typeof raw === "string" ? new Date(raw).getTime() : NaN;
+    return Number.isNaN(at) ? 0 : at;
+}
+
+/**
+ * The deployment whose uploaded archive a bare deploy rebuilds, if any.
+ *
+ * The control plane's own rule (`reusableSourceRef`, over the newest 25 rows):
+ * the newest row, by its own `createdAt`, carrying a build-context ref. Not the
+ * newest row — a rollback or a bundle deploy carries none, and the upload
+ * rebuilt then is the one before it.
+ */
+export function snapshotDeployment(recent: readonly DeploySourceRow[]): DeploySourceRow | undefined {
+    let best: { row: DeploySourceRow; at: number } | undefined;
+    for (const row of recent) {
+        const ref = pick(row as Record<string, unknown>, "sourceRef", "source_ref");
+        if (!ref || ref.includes("..") || !ref.endsWith(".tar.gz")) continue;
+        const at = createdAtMs(row);
+        if (!best || at > best.at) best = { row, at };
+    }
+    return best?.row;
+}
+
+/**
+ * What a `deploy` with nothing attached will build, in the words to print.
+ *
+ * `recent` is the project's newest deployments, newest first — the same page
+ * the control plane reads to choose an archive.
+ */
 export function planBareDeploy(
     project: DeployProjectRow | undefined,
-    latest: DeploySourceRow | undefined,
+    recent: readonly DeploySourceRow[],
     now: Date
 ): BareDeployPlan {
     const projectRow = project as Record<string, unknown> | undefined;
-    const deploymentRow = latest as Record<string, unknown> | undefined;
+    const latest = recent[0];
     const managed = isManagedProject(project, latest);
 
     const repo = pick(projectRow, "gitRepoUrl", "git_repo_url");
@@ -700,17 +731,20 @@ source: "git",
 lines: [`Building from git: ${repo}${branch ? ` (${branch})` : ""}.`] };
     }
 
-    if (pick(deploymentRow, "sourceRef", "source_ref")) {
-        const age = timeAgo((latest?.createdAt ?? latest?.created_at) as string | Date | undefined, now);
-        return {
-            managed,
-            source: "snapshot",
-            lines: [
-                `Rebuilding the stored source archive${latest?.id !== undefined ? ` from deployment ${latest.id}` : ""}` +
-                    `${age ? `, uploaded ${age}` : ""}.`,
-                "This directory is NOT uploaded — pass `--source .` to build what is on disk."
-            ]
-        };
+    const snapshot = snapshotDeployment(recent);
+    if (snapshot) {
+        const age = timeAgo(snapshot.createdAt ?? snapshot.created_at, now);
+        const lines = [
+            `Rebuilding the stored source archive${snapshot.id !== undefined ? ` from deployment ${snapshot.id}` : ""}` +
+                `${age ? `, uploaded ${age}` : ""}.`
+        ];
+        if (latest && snapshot !== latest && latest.id !== undefined) {
+            lines.push(`Deployment ${latest.id}, the newest, carried no archive of its own, so this is not what it deployed.`);
+        }
+        lines.push("This directory is NOT uploaded — pass `--source .` to build what is on disk.");
+        return { managed,
+source: "snapshot",
+lines };
     }
 
     return {
@@ -845,7 +879,7 @@ export function warningPayload(warnings: DeployWarning[]): Record<string, unknow
 }
 
 /**
- * Read the two rows the preflight needs.
+ * Read what the preflight needs: the project row and its newest deployments.
  *
  * Best effort by construction: a preflight that cannot read is a preflight that
  * says nothing, never a deploy that fails. The managed refusal rides on the same
@@ -855,18 +889,24 @@ export function warningPayload(warnings: DeployWarning[]): Record<string, unknow
 async function readDeployContext(
     client: CloudClient,
     projectId: string
-): Promise<{ project?: DeployProjectRow; latest?: DeploySourceRow }> {
+): Promise<{ project?: DeployProjectRow; recent: DeploySourceRow[] }> {
     try {
-        const [project, latest] = await Promise.all([
+        const [project, recent] = await Promise.all([
             client.data.collection("projects").findById(projectId),
-            latestDeployment(client, projectId)
+            // The page the control plane chooses an archive from — see
+            // `snapshotDeployment`.
+            client.data.collection("deployments").find({
+                where: { project: ["==", projectId] },
+                orderBy: ["createdAt", "desc"],
+                limit: 25
+            })
         ]);
         return {
             project: project as DeployProjectRow | undefined,
-            latest: latest as DeploySourceRow | undefined
+            recent: recent.data as DeploySourceRow[]
         };
     } catch {
-        return {};
+        return { recent: [] };
     }
 }
 
@@ -1213,8 +1253,8 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     // Everything below builds a container image from source. Say what that
     // source is before anything is uploaded or triggered, and refuse the one
     // case where the command would quietly undo the project's runtime.
-    const { project, latest } = await readDeployContext(client, projectId);
-    const plan = planBareDeploy(project, latest, new Date());
+    const { project, recent } = await readDeployContext(client, projectId);
+    const plan = planBareDeploy(project, recent, new Date());
 
     const eject: EjectContext = {
         managed: plan.managed,

@@ -59,8 +59,8 @@ bundleId: "b1" })).toBe(false);
 
 describe("planning a bare deploy", () => {
     it("flags a managed project, whose source build would eject it", () => {
-        expect(planBareDeploy({ runtimeMode: "managed" }, undefined, NOW).managed).toBe(true);
-        expect(planBareDeploy({ runtimeMode: "custom" }, undefined, NOW).managed).toBe(false);
+        expect(planBareDeploy({ runtimeMode: "managed" }, [], NOW).managed).toBe(true);
+        expect(planBareDeploy({ runtimeMode: "custom" }, [], NOW).managed).toBe(false);
     });
 
     it("still says what a forced build would use, managed or not", () => {
@@ -68,7 +68,7 @@ describe("planning a bare deploy", () => {
         const plan = planBareDeploy(
             { runtimeMode: "managed",
 gitRepoUrl: "https://github.com/acme/api.git" },
-            undefined,
+            [],
             NOW
         );
         expect(plan.managed).toBe(true);
@@ -79,7 +79,7 @@ gitRepoUrl: "https://github.com/acme/api.git" },
         const plan = planBareDeploy(
             { gitRepoUrl: "https://github.com/acme/api.git",
 gitBranch: "main" },
-            undefined,
+            [],
             NOW
         );
         expect(plan.source).toBe("git");
@@ -90,9 +90,9 @@ gitBranch: "main" },
     it("dates the stored archive, and says the working directory is not it", () => {
         const plan = planBareDeploy(
             {},
-            { id: 42,
+            [{ id: 42,
 sourceRef: "gs://ctx/p/1.tar.gz",
-createdAt: "2026-07-20T12:00:00.000Z" },
+createdAt: "2026-07-20T12:00:00.000Z" }],
             NOW
         );
         expect(plan.source).toBe("snapshot");
@@ -102,9 +102,44 @@ createdAt: "2026-07-20T12:00:00.000Z" },
     });
 
     it("reports having nothing to rebuild", () => {
-        expect(planBareDeploy({}, { id: 1,
-status: "failed" }, NOW).source).toBe("none");
-        expect(planBareDeploy(undefined, undefined, NOW).source).toBe("none");
+        expect(planBareDeploy({}, [{ id: 1,
+status: "failed" }], NOW).source).toBe("none");
+        expect(planBareDeploy(undefined, [], NOW).source).toBe("none");
+    });
+
+    /**
+     * The control plane rebuilds the newest row that carries an archive
+     * (`reusableSourceRef`, over the newest 25), not the newest row. After a
+     * rollback — whose row has no archive — the plan said there was nothing to
+     * rebuild while the build that followed re-shipped the upload just rolled
+     * back from.
+     */
+    it("names the upload the control plane will rebuild when the newest deploy carried none", () => {
+        const plan = planBareDeploy(
+            {},
+            [
+                { id: "R3", status: "success", createdAt: "2026-07-26T11:00:00.000Z" },
+                { id: "D2", status: "success", sourceRef: "gs://ctx/build-contexts/p/bbbb.tar.gz", createdAt: "2026-07-26T09:00:00.000Z" },
+                { id: "D1", status: "success", sourceRef: "gs://ctx/build-contexts/p/aaaa.tar.gz", createdAt: "2026-07-25T12:00:00.000Z" }
+            ],
+            NOW
+        );
+        expect(plan.source).toBe("snapshot");
+        expect(plan.lines[0]).toContain("deployment D2");
+        expect(plan.lines[0]).toContain("3h ago");
+        expect(plan.lines.join(" ")).toContain("R3");
+    });
+
+    it("picks the newest upload by its own date, whatever order the rows arrived in", () => {
+        const plan = planBareDeploy(
+            {},
+            [
+                { id: "D1", sourceRef: "gs://ctx/build-contexts/p/aaaa.tar.gz", createdAt: "2026-07-25T12:00:00.000Z" },
+                { id: "D2", sourceRef: "gs://ctx/build-contexts/p/bbbb.tar.gz", createdAt: "2026-07-26T09:00:00.000Z" }
+            ],
+            NOW
+        );
+        expect(plan.lines[0]).toContain("deployment D2");
     });
 
     it("prefers git over an older uploaded archive", () => {
@@ -112,8 +147,8 @@ status: "failed" }, NOW).source).toBe("none");
         // repository set. Git is what the control plane will actually build.
         const plan = planBareDeploy(
             { gitRepoUrl: "https://github.com/acme/api.git" },
-            { id: 7,
-sourceRef: "gs://ctx/p/1.tar.gz" },
+            [{ id: 7,
+sourceRef: "gs://ctx/p/1.tar.gz" }],
             NOW
         );
         expect(plan.source).toBe("git");
