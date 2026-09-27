@@ -41,7 +41,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
-import { deriveRowAddress } from "./services/collection-helpers";
+import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
 import { runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
@@ -127,6 +127,11 @@ export class RoleSwitchUnavailableError extends Error {
  */
 function applyBeforeSaveResult<T extends object, R extends object>(values: T, result: R): T & R {
     return { ...values, ...result };
+}
+
+/** A key that names a row: not absent, and not the empty string a form sends. */
+function isPresentKey(id: string | number | undefined | null): id is string | number {
+    return id !== undefined && id !== null && id !== "";
 }
 
 /**
@@ -1079,11 +1084,29 @@ export class PostgresBackendDriver implements DataDriver {
             previousValuesForHistory as Record<string, unknown> | undefined
         ) as Partial<EntityValues<M>>;
 
+        // A create that names its key is still a create. The persistence layer
+        // reads an `id` as "update this row", so a new row's key travels inside
+        // the values, where the INSERT takes it — which is what the REST create
+        // does with a key in the body. Handed down as `id`, in-process
+        // `create(values, id)`, MCP `create_document { id }` and a socket
+        // `SAVE { id, status: "new" }` were all UPDATEs: a new id answered 404,
+        // and an existing one was overwritten with create-time values instead
+        // of refused. Only `status: "existing"` addresses a stored row; a
+        // duplicate key here is the driver's 409, as it is for any create.
+        let writeId = id;
+        if ((status === "new" || status === "copy") && !upsert && isPresentKey(id) && resolvedCollection) {
+            updatedValues = {
+                ...updatedValues,
+                ...parseIdValues(id, getPrimaryKeys(resolvedCollection as CollectionConfig, this.registry))
+            } as Partial<EntityValues<M>>;
+            writeId = undefined;
+        }
+
         try {
             let savedRow = await this.dataService.save<M>(
                 path,
                 updatedValues,
-                id,
+                writeId,
                 resolvedCollection?.databaseId,
                 { upsert, onConflict }
             );
