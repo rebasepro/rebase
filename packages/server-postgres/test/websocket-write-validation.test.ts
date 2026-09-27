@@ -31,6 +31,8 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     assertFieldOpsValid: require("../../server/src/api/rest/field-ops").assertFieldOpsValid,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    assertNoFieldOpsOnCreate: require("../../server/src/api/rest/field-ops").assertNoFieldOpsOnCreate,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     splitFieldOps: require("../../server/src/api/rest/field-ops").splitFieldOps,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer,
@@ -39,7 +41,11 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     resolveConflictTarget: require("../../server/src/api/rest/conflict-target").resolveConflictTarget,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    assertNestedWriteAllowed: require("../../server/src/api/rest/nested-write-access").assertNestedWriteAllowed
+    assertNestedWriteAllowed: require("../../server/src/api/rest/nested-write-access").assertNestedWriteAllowed,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    assertUserCreationBodyValid: require("../../server/src/api/rest/auth-collection-writes").assertUserCreationBodyValid,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    createUserThroughAuthCollection: require("../../server/src/api/rest/auth-collection-writes").createUserThroughAuthCollection
 }));
 
 import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
@@ -441,7 +447,15 @@ describe("a socket write to the auth collection", () => {
     };
 
     let writes: unknown[];
-    let userAdmin: { prepareUserUpdates: jest.Mock; prepareUserDeletions: jest.Mock; finalizeUserDeletions: jest.Mock };
+    let failWrites: boolean;
+    let userAdmin: {
+        prepareUserUpdates: jest.Mock;
+        prepareUserDeletions: jest.Mock;
+        finalizeUserDeletions: jest.Mock;
+        prepareUserCreation: jest.Mock;
+        describeUserCreationContract: jest.Mock;
+        finalizeUserCreation: jest.Mock;
+    };
 
     const connect = async () => {
         const handlers: Record<string, (...args: any[]) => any> = {};
@@ -462,7 +476,22 @@ describe("a socket write to the auth collection", () => {
         jest.clearAllMocks();
         mockWssInstance = null;
         writes = [];
+        failWrites = false;
         userAdmin = {
+            // The built-in adapter's shape: `password` is consumed, hashed,
+            // and a generated one is delivered when none was given.
+            prepareUserCreation: jest.fn(async (body: Record<string, unknown>) => {
+                const { password, ...rest } = body;
+                return {
+                    values: { ...rest, email: String(body.email).trim().toLowerCase(), passwordHash: `hashed:${password ?? "generated"}` },
+                    clearPassword: password ? undefined : "generated",
+                    hookHandledEmail: false,
+                    invitationSent: false
+                };
+            }),
+            describeUserCreationContract: jest.fn(() => ({ validate: true, extraFields: ["password"] })),
+            finalizeUserCreation: jest.fn(async (_row: unknown, clearPassword?: string) =>
+                clearPassword ? { temporaryPassword: clearPassword, invitationSent: false } : { invitationSent: false }),
             prepareUserUpdates: jest.fn(async (updates: { values: Record<string, unknown> }[]) =>
                 updates.map(({ values }) => typeof values.email === "string" ? { ...values, email: values.email.toLowerCase() } : values)),
             prepareUserDeletions: jest.fn(async (uids: string[]) => {
@@ -482,7 +511,11 @@ describe("a socket write to the auth collection", () => {
             key: "postgres",
             initialised: true,
             registry: { getCollectionByPath: (path: string) => (path === "users" ? users : undefined) },
-            save: async (props: unknown) => { writes.push(props); return {}; },
+            save: async (props: { values: Record<string, unknown> }) => {
+                if (failWrites) throw new Error("the write failed");
+                writes.push(props);
+                return { id: "u-new", ...props.values };
+            },
             delete: async (props: unknown) => { writes.push(props); },
             withAuth: undefined
         } as unknown as PostgresBackendDriver;
@@ -516,5 +549,51 @@ describe("a socket write to the auth collection", () => {
         expect(userAdmin.prepareUserDeletions).toHaveBeenCalledWith(["u-2"]);
         expect(writes).toHaveLength(1);
         expect(userAdmin.finalizeUserDeletions).toHaveBeenCalledWith(["u-2"]);
+    });
+
+    /**
+     * A create on the auth collection is a user creation, as on `POST /users`.
+     * The socket wrote it as any table's row: `password` was refused as an
+     * unknown field, so the user had none and was never invited, the email
+     * was stored as typed (sign-in looks it up normalized), and the
+     * collection's `onCreateUser` never ran.
+     */
+    it("creates a user through the auth adapter, and hands back what POST /users does", async () => {
+        const { send, last } = await connect();
+
+        await send({ type: "SAVE", requestId: "c", payload: { path: "users", status: "new", values: { email: " Ann@Example.COM " } } });
+
+        expect(userAdmin.prepareUserCreation).toHaveBeenCalledWith({ email: " Ann@Example.COM " }, { enabled: true });
+        expect(writes).toEqual([expect.objectContaining({
+            path: "users", status: "new", values: { email: "ann@example.com", passwordHash: "hashed:generated" }
+        })]);
+        expect(userAdmin.finalizeUserCreation).toHaveBeenCalledWith(
+            { id: "u-new", values: expect.objectContaining({ email: "ann@example.com" }) }, "generated"
+        );
+        expect(last()).toMatchObject({
+            type: "SAVE_SUCCESS",
+            payload: { row: { id: "u-new", email: "ann@example.com", temporaryPassword: "generated", invitationSent: false } }
+        });
+    });
+
+    it("accepts the password a user creation consumes, and still refuses a field the collection does not have", async () => {
+        const { send, last } = await connect();
+
+        await send({ type: "SAVE", requestId: "c", payload: { path: "users", status: "new", values: { email: "a@b.c", password: "pw-123456" } } });
+        expect(writes).toEqual([expect.objectContaining({ values: { email: "a@b.c", passwordHash: "hashed:pw-123456" } })]);
+
+        await send({ type: "SAVE", requestId: "d", payload: { path: "users", status: "new", values: { email: "d@e.f", nmae: "x" } } });
+        expect(last()).toMatchObject({ type: "ERROR" });
+        expect(writes).toHaveLength(1);
+    });
+
+    it("delivers no credentials when the write fails", async () => {
+        const { send, last } = await connect();
+        failWrites = true;
+
+        await send({ type: "SAVE", requestId: "c", payload: { path: "users", status: "new", values: { email: "a@b.c" } } });
+
+        expect(last()).toMatchObject({ type: "ERROR" });
+        expect(userAdmin.finalizeUserCreation).not.toHaveBeenCalled();
     });
 });

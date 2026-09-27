@@ -3,14 +3,14 @@ import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
-import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, type NestedWriteKind } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -611,14 +611,9 @@ roles: verifiedUser.roles }
                     assertNestedWriteAllowed(hop, kind, path, { roles: session?.user?.roles ?? ["anon"] });
                 };
 
-                /**
-                 * The auth collection's rows are the users, so a write to one
-                 * is user administration — the auth adapter's to check, as it
-                 * is on the REST routes and `/admin/users`. `undefined` for any
-                 * other collection, or an adapter with nothing to say.
-                 */
-                const userAdminFor = (path: unknown): AuthAdapter | undefined => {
-                    if (typeof path !== "string" || !authAdapter) return undefined;
+                /** The auth collection at `path`, or `undefined` for any other. */
+                const authCollectionAt = (path: unknown): CollectionConfig | undefined => {
+                    if (typeof path !== "string") return undefined;
                     let collection;
                     try {
                         collection = driver.registry?.getCollectionByPath(path);
@@ -627,8 +622,16 @@ roles: verifiedUser.roles }
                     }
                     const auth = collection?.auth;
                     const isAuthCollection = auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
-                    return isAuthCollection ? authAdapter : undefined;
+                    return isAuthCollection ? collection : undefined;
                 };
+                /**
+                 * The auth collection's rows are the users, so a write to one
+                 * is user administration — the auth adapter's to check, as it
+                 * is on the REST routes and `/admin/users`. `undefined` for any
+                 * other collection, or an adapter with nothing to say.
+                 */
+                const userAdminFor = (path: unknown): AuthAdapter | undefined =>
+                    authAdapter && authCollectionAt(path) ? authAdapter : undefined;
 
                 /**
                  * An upsert's options, under the rules `POST /api/data`
@@ -742,7 +745,24 @@ colors: true }));
                         // from `request.collection`: that field is client-
                         // supplied, and reading the rules out of it would let
                         // the caller choose which rules to be checked against.
-                        assertWriteRequest(request.path, request.values as Record<string, unknown>, request.status);
+                        //
+                        // A create on the auth collection is a user creation,
+                        // as on `POST /users`: the adapter's step, not a plain
+                        // insert, and the body checked against what that step
+                        // consumes (`password` is not a column). An upsert is
+                        // not one: it may update a user instead.
+                        const usersCollection = request.status !== "existing" && request.upsert !== true && authAdapter?.prepareUserCreation
+                            ? authCollectionAt(request.path)
+                            : undefined;
+                        if (usersCollection) {
+                            const body = (request.values ?? {}) as Record<string, unknown>;
+                            assertUserCreationBodyValid(authAdapter, usersCollection, body, {
+                                roles: clientSessions.get(clientId)?.user?.roles ?? ["anon"]
+                            });
+                            assertNoFieldOpsOnCreate(body, "A create");
+                        } else {
+                            assertWriteRequest(request.path, request.values as Record<string, unknown>, request.status);
+                        }
                         // A create is one when the driver takes it for one:
                         // no id, or a status that asks for a new row.
                         assertNestedWrite(request.path, request.id === undefined || request.status !== "existing" ? "create" : "update");
@@ -759,13 +779,20 @@ colors: true }));
                         const [values] = userAdmin?.prepareUserUpdates
                             ? await userAdmin.prepareUserUpdates([{ uid: String(request.id), values: request.values as Record<string, unknown> }])
                             : [request.values];
-                        const row = await delegate.save({
+                        const write = (toWrite: SaveProps["values"]) => delegate.save({
                             path: request.path,
                             ...(request.id !== undefined && { id: request.id }),
-                            values,
+                            values: toWrite,
                             status: request.status,
                             ...upsertOptions(request)
                         });
+                        // The user creation answers with what `POST /users`
+                        // does: the row, and whether an invitation went out or
+                        // the temporary password that did not.
+                        const created = usersCollection
+                            ? await createUserThroughAuthCollection(authAdapter, usersCollection, (values ?? {}) as Record<string, unknown>, write)
+                            : undefined;
+                        const row = created ? { ...created.row, ...created.delivery } : await write(values);
                         wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(row, { depth: null,
 colors: true }));
                         const response = {

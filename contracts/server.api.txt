@@ -73,6 +73,7 @@ function assertNestedWriteAllowed
 function assertNoFieldOpsOnCreate
 function assertQueryFieldsReadable
 function assertUploadWithinPropertyLimits
+function assertUserCreationBodyValid
 function assertWriteRequestValid
 function blockedAddressReason
 function bootFromBundle
@@ -115,6 +116,7 @@ function createStorageRoutes
 function createTwitterProvider
 function createUnconfiguredEmailService
 function createUploadConstraintResolver
+function createUserThroughAuthCollection
 function declaredErrorAnswer
 function declaredUniqueTargets
 function defaultBackoff
