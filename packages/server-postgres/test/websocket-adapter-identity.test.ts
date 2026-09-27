@@ -52,7 +52,7 @@ describe("WebSocket Server identity from an auth adapter", () => {
                 return driver;
             })
         } as unknown as PostgresBackendDriver;
-        const realtime = { addClient: jest.fn(), startDataDriverSubscription: jest.fn() } as unknown as RealtimeService;
+        const realtime = { addClient: jest.fn(), startDataDriverSubscription: jest.fn(), rescopeClient: jest.fn() } as unknown as RealtimeService;
         const adapter = { verifyToken: async () => adapterUser, verifyRequest: async () => null } as unknown as AuthAdapter;
         createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter);
     }

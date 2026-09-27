@@ -469,6 +469,11 @@ channelWindowStart: Date.now() });
                         if (session) {
                             session.user = verifiedUser;
                             session.authenticated = true;
+                            // What this socket already holds open — a session
+                            // refresh, a demotion, another account — is read
+                            // as the identity it has now, before it is told
+                            // the sign-in took.
+                            await realtimeService.rescopeClient(clientId, sessionAuthContext(session));
                         }
                         wsDebug(`[WS] replying AUTH_SUCCESS for requestId ${requestId}`);
                         ws.send(JSON.stringify({

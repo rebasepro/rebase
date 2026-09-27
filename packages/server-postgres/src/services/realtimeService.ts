@@ -946,6 +946,80 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
     }
 
+    /**
+     * Re-judge everything a socket holds open as the identity it has now.
+     *
+     * A socket re-authenticates on every session refresh, and when a role is
+     * taken away, a tenant claim removed or a different account signs in, the
+     * next token says so. Requests read as the new identity at once; the
+     * subscriptions kept refetching as the one they were opened with, so a
+     * demoted user went on receiving editor-only or another tenant's rows for
+     * as long as the view stayed mounted.
+     *
+     * Each of this client's subscriptions is replaced by one carrying the new
+     * identity — a replacement, so a refetch already running as the old one
+     * cannot deliver — and refetched, so the view narrows now rather than at
+     * the next write. A subscription whose filter, sort or projection names a
+     * field the new roles may not read is ended with the refusal a new
+     * subscription would get. Channel memberships are put to the authorizer
+     * again, when one is installed, and left when it refuses.
+     */
+    async rescopeClient(clientId: string, authContext: SubscriptionAuthContext): Promise<void> {
+        for (const [subscriptionId, subscription] of [...this._subscriptions.entries()]) {
+            if (subscription.clientId !== clientId) continue;
+
+            if (subscription.type === "collection" && subscription.collectionRequest) {
+                const collection = this.registry.getCollectionByPath(subscription.path);
+                const request = subscription.collectionRequest;
+                try {
+                    if (collection) {
+                        assertReadRequestReadable(
+                            {
+                                // Stored from the subscription's own request, which carried it as one.
+                                filter: request.filter as FilterValues<string>,
+                                logical: request.logical,
+                                orderBy: request.orderBy,
+                                fields: request.fields
+                            },
+                            collection,
+                            { roles: authContext.roles ?? ["anon"] }
+                        );
+                    }
+                } catch (e) {
+                    if (!(e instanceof ApiError)) throw e;
+                    await this.handleUnsubscribe(clientId, subscriptionId);
+                    this.sendError(clientId, e.message, subscriptionId, e.code);
+                    continue;
+                }
+            }
+
+            const rescoped: Subscription = { ...subscription, authContext, started: 0, delivered: 0 };
+            this._subscriptions.set(subscriptionId, rescoped);
+            if (rescoped.type === "single" && rescoped.id !== undefined) {
+                this.debouncedSingleRefetch(subscriptionId, rescoped.path, String(rescoped.id), rescoped);
+            } else if (rescoped.type === "collection" && rescoped.collectionRequest) {
+                this.debouncedCollectionRefetch(subscriptionId, rescoped.path, rescoped);
+            }
+        }
+
+        const authorizer = this.channelAuthorizer;
+        if (!authorizer) return;
+        for (const [channel, members] of [...this.channels.entries()]) {
+            if (!members.has(clientId)) continue;
+            let allowed: boolean;
+            try {
+                allowed = await authorizer({ channel, action: "join", clientId, user: authContext });
+            } catch (error) {
+                logger.error(`❌ [Channels] Authorizer threw re-checking "${channel}" after a sign-in — leaving it`, { error });
+                allowed = false;
+            }
+            if (!allowed) {
+                this.leaveChannel(clientId, channel);
+                this.denyChannelAction(clientId, channel, "join", "refused by the channel authorizer for the identity this socket signed in as");
+            }
+        }
+    }
+
     private async handleUnsubscribe(_clientId: string, subscriptionId: string) {
         this._subscriptions.delete(subscriptionId);
         this.subscriptionCallbacks.delete(subscriptionId);

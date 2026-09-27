@@ -48,7 +48,11 @@ async function start(options: {
         },
         withAuth: async () => driver
     } as unknown as PostgresBackendDriver;
-    const realtime = { addClient: () => undefined, handleClientMessage: async () => undefined } as unknown as RealtimeService;
+    const realtime = {
+        addClient: () => undefined,
+        handleClientMessage: async () => undefined,
+        rescopeClient: async () => undefined
+    } as unknown as RealtimeService;
 
     const server = http.createServer();
     servers.push(server);

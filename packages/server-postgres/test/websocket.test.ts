@@ -102,6 +102,7 @@ describe("WebSocket Server authorization", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
+            rescopeClient: jest.fn(),
             startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
 
@@ -288,6 +289,22 @@ describe("WebSocket Server authorization", () => {
                 "SELECT * FROM users", { role: "postgres", isolateSession: true });
         });
 
+        it("re-reads what the socket holds open as the identity it signs in as again", async () => {
+            // A session refresh re-authenticates the same socket; a role taken
+            // away in between has to reach the subscriptions, not only the
+            // next request.
+            mockExtractUserFromToken.mockReturnValue({ uid: "u1", roles: ["editor"] });
+            const { messageCallback } = connect();
+            await send(messageCallback, { type: "AUTHENTICATE", requestId: "a1", payload: { token: "first" } });
+
+            mockExtractUserFromToken.mockReturnValue({ uid: "u1", roles: ["viewer"] });
+            await send(messageCallback, { type: "AUTHENTICATE", requestId: "a2", payload: { token: "refreshed" } });
+
+            const rescope = mockRealtimeService.rescopeClient as jest.Mock;
+            expect(rescope).toHaveBeenCalledTimes(2);
+            expect(rescope.mock.calls[1][1]).toMatchObject({ uid: "u1", roles: ["viewer"] });
+        });
+
         it("keeps the editor's session isolated even when the frame asks otherwise", async () => {
             mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
             (mockDriver.admin.executeSql as jest.Mock).mockResolvedValue({ rows: [] } as never);
@@ -322,6 +339,7 @@ describe("WebSocket Server SQL error handling", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
+            rescopeClient: jest.fn(),
             startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
 
@@ -481,6 +499,7 @@ describe("WebSocket Server requireAuth resolution", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
+            rescopeClient: jest.fn(),
             startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
         mockDriver = {
@@ -620,6 +639,7 @@ payload: { n } }
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
+            rescopeClient: jest.fn(),
             startDataDriverSubscription: jest.fn(),
             handleClientMessage: jest.fn(async () => {})
         } as unknown as RealtimeService;
@@ -709,6 +729,7 @@ describe("WebSocket Server SQL audit line", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
+            rescopeClient: jest.fn(),
             startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
         mockDriver = {
@@ -822,6 +843,7 @@ describe("WebSocket Server list limits", () => {
         mockServer = {} as Server;
         mockRealtimeService = {
             addClient: jest.fn(),
+            rescopeClient: jest.fn(),
             startDataDriverSubscription: jest.fn()
         } as unknown as RealtimeService;
         mockDriver = {
