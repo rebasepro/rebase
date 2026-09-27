@@ -880,14 +880,22 @@ message: e instanceof Error ? e.message : String(e) });
         }
     }, [allItems, selectedPaths, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
 
-    // Confirm delete for a single folder
-    const handleConfirmDeleteFolder = useCallback(async () => {
+    // Confirm delete for a single file or folder
+    const handleConfirmDeleteItem = useCallback(async () => {
         if (!deleteDialogTarget || deleteDialogTarget === "selection") return;
         setDeleting(true);
         try {
-            await deleteFolderRecursive(deleteDialogTarget.fullPath);
+            if (deleteDialogTarget.isFolder) {
+                await deleteFolderRecursive(deleteDialogTarget.fullPath);
+            } else {
+                await storageSourceRef.current.deleteObject(deleteDialogTarget.fullPath);
+            }
             snackbarController.open({ type: "success",
-message: `Folder "${deleteDialogTarget.name}" deleted` });
+message: deleteDialogTarget.isFolder ? `Folder "${deleteDialogTarget.name}" deleted` : `"${deleteDialogTarget.name}" deleted` });
+            if (!deleteDialogTarget.isFolder && selectedFile?.fullPath === deleteDialogTarget.fullPath) {
+                setSelectedFile(null);
+                setSelectedDownloadUrl(null);
+            }
             setSelectedPaths(prev => {
                 const next = new Set(prev);
                 next.delete(deleteDialogTarget.fullPath);
@@ -902,7 +910,7 @@ message: e instanceof Error ? e.message : String(e) });
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
         }
-    }, [deleteDialogTarget, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+    }, [deleteDialogTarget, selectedFile, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
 
     // Select all / deselect
     const handleSelectAll = useCallback(() => {
@@ -1153,7 +1161,10 @@ message: e instanceof Error ? e.message : String(e) });
                                             <IconButton
                                                 size="smallest"
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => handleDeleteFile(file)}
+                                                onClick={() => {
+                                                    setDeleteDialogTarget(file);
+                                                    setDeleteDialogOpen(true);
+                                                }}
                                             >
                                                 <Trash2Icon size={14}/>
                                             </IconButton>
@@ -1515,14 +1526,18 @@ message: e instanceof Error ? e.message : String(e) });
                     <Typography variant="subtitle1" className="font-semibold mb-2">
                         {deleteDialogTarget === "selection"
                             ? `Delete ${selectedPaths.size} item${selectedPaths.size !== 1 ? "s" : ""}?`
-                            : deleteDialogTarget
+                            : deleteDialogTarget?.isFolder
                                 ? `Delete folder "${deleteDialogTarget.name}"?`
-                                : "Delete?"}
+                                : deleteDialogTarget
+                                    ? "Delete File?"
+                                    : "Delete?"}
                     </Typography>
                     <Typography variant="body2" color="secondary">
                         {deleteDialogTarget === "selection"
                             ? "This will permanently delete all selected files and folders, including their contents. This action cannot be undone."
-                            : "This will permanently delete the folder and all of its contents. This action cannot be undone."}
+                            : deleteDialogTarget && !deleteDialogTarget.isFolder
+                                ? <>Are you sure you want to delete &quot;{deleteDialogTarget.name}&quot;? This action cannot be undone.</>
+                                : "This will permanently delete the folder and all of its contents. This action cannot be undone."}
                     </Typography>
                 </DialogContent>
                 <DialogActions>
@@ -1539,7 +1554,7 @@ message: e instanceof Error ? e.message : String(e) });
                     <LoadingButton
                         color="error"
                         loading={deleting}
-                        onClick={deleteDialogTarget === "selection" ? handleBulkDelete : handleConfirmDeleteFolder}
+                        onClick={deleteDialogTarget === "selection" ? handleBulkDelete : handleConfirmDeleteItem}
                     >
                         <Trash2Icon size={14} className="mr-1"/>
                         Delete
