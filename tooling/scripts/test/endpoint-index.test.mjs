@@ -36,7 +36,8 @@ function endpointFixture(rows) {
         "packages/server/src/api/rest/api-generator.ts":
             "this.router = new Hono();\n" +
             "this.router.get(`${basePath}/count`, handler);\n",
-        "packages/server/src/api/rest/query-parser.ts": "const reservedQueryKeys = [\"limit\"];\n",
+        "packages/common/src/data/filter-dialect.ts":
+            "export const RESERVED_QUERY_KEYS: ReadonlySet<string> = new Set([\"limit\"]);\n",
         [ENDPOINT_PAGE]:
             "| Method | Path | Gate |\n|---|---|---|\n" +
             rows.map(([method, route]) => `| \`${method}\` | \`${route}\` | none |`).join("\n") + "\n"
