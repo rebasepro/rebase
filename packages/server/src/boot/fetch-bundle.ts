@@ -150,7 +150,11 @@ export interface FetchBundleOptions {
     fetchImpl?: typeof fetch;
     /** Injected for tests. */
     extract?: (tarball: string, destination: string) => Promise<void>;
-    /** How long a single download attempt may take before it is abandoned. */
+    /**
+     * How long a download attempt may go without progress — waiting for the
+     * response, or between two chunks of its body — before it is abandoned and
+     * retried.
+     */
     timeoutMs?: number;
     /**
      * How many times to try the download.
@@ -530,18 +534,36 @@ async function downloadTo(
     options: FetchBundleOptions,
     fetchImpl: typeof fetch
 ): Promise<void> {
+    // A deadline on progress rather than on the whole transfer, so a large
+    // bundle on a slow link still arrives, while one that stalls — before its
+    // headers or partway through its body — is abandoned and retried instead
+    // of waiting until the startup probe kills the pod.
+    const idleMs = options.timeoutMs ?? 60_000;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000);
-
-    let response: Response;
+    let timer = setTimeout(() => controller.abort(), idleMs);
+    const progressed = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => controller.abort(), idleMs);
+    };
     try {
-        response = await fetchImpl(options.url, {
-            headers: options.token ? { authorization: `Bearer ${options.token}` } : {},
-            signal: controller.signal
-        });
+        await downloadWithin(tarball, options, fetchImpl, controller.signal, progressed);
     } finally {
         clearTimeout(timer);
     }
+}
+
+async function downloadWithin(
+    tarball: string,
+    options: FetchBundleOptions,
+    fetchImpl: typeof fetch,
+    signal: AbortSignal,
+    progressed: () => void
+): Promise<void> {
+    const response = await fetchImpl(options.url, {
+        headers: options.token ? { authorization: `Bearer ${options.token}` } : {},
+        signal
+    });
+    progressed();
 
     if (!response.ok) {
         // The status is the diagnosis: 401/403 is a bad or missing token, 404 is
@@ -562,7 +584,17 @@ async function downloadTo(
     // limit is sized for serving requests, not for holding its own artifact —
     // `await response.arrayBuffer()` put the whole archive in RSS at the moment
     // of boot, which is the worst moment to need it.
-    await pipeline(Readable.fromWeb(response.body as never), createWriteStream(tarball));
+    await pipeline(
+        Readable.fromWeb(response.body as never),
+        async function* (source: AsyncIterable<Buffer>) {
+            for await (const chunk of source) {
+                progressed();
+                yield chunk;
+            }
+        },
+        createWriteStream(tarball),
+        { signal }
+    );
 
     const { size } = fs.statSync(tarball);
     if (size === 0) throw new Error("the bundle is empty");

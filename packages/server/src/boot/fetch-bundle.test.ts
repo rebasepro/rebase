@@ -253,6 +253,61 @@ describe("fetchBundle", () => {
     });
 });
 
+describe("a download whose body stalls", () => {
+    it("is abandoned at the attempt's timeout and retried, rather than hanging the boot", async () => {
+        // Headers arrive, then nothing. The timeout used to be cleared as soon
+        // as the headers did, so the body could stall until the startup probe
+        // killed the pod, and the retries were never reached.
+        let attempts = 0;
+        const stalling = (async () => {
+            attempts++;
+            const body = new ReadableStream<Uint8Array>({
+                start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); }
+            });
+            return new Response(body, { status: 200, statusText: "OK" });
+        }) as unknown as typeof fetch;
+
+        const started = Date.now();
+        const outcome = await Promise.race([
+            fetchBundle({
+                url: URL_, destination: scratch, fetchImpl: stalling,
+                timeoutMs: 50, attempts: 2, retryDelayMs: 10, ...noInstall
+            }).then(() => "resolved", (error: Error) => error.message),
+            new Promise(resolve => setTimeout(() => resolve("still waiting"), 2_000))
+        ]);
+
+        expect(outcome).toMatch(/Could not download the bundle/);
+        expect(attempts).toBe(2);
+        expect(Date.now() - started).toBeLessThan(1_000);
+    });
+
+    it("lets a slow download that keeps making progress finish", async () => {
+        // The deadline is on progress, not on the whole transfer: a large
+        // bundle on a slow link is not a stall.
+        let attempts = 0;
+        const slow = (async () => {
+            attempts++;
+            let sent = 0;
+            const body = new ReadableStream<Uint8Array>({
+                async pull(controller) {
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                    if (sent++ < 6) controller.enqueue(new Uint8Array([sent]));
+                    else controller.close();
+                }
+            });
+            return new Response(body, { status: 200, statusText: "OK" });
+        }) as unknown as typeof fetch;
+
+        const root = await fetchBundle({
+            url: URL_, destination: scratch, fetchImpl: slow, extract: extractManifest(),
+            timeoutMs: 100, attempts: 1, ...noInstall
+        });
+
+        expect(root).toBe(scratch);
+        expect(attempts).toBe(1);
+    });
+});
+
 describe("bundleRootIn", () => {
     it("finds a manifest at the top level", () => {
         fs.writeFileSync(path.join(scratch, MANIFEST_FILENAME), "{}");
