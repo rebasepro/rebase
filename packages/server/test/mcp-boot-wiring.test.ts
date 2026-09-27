@@ -14,6 +14,7 @@
 import { Hono } from "hono";
 import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
 import { initializeRebaseBackend } from "../src/init";
+import { generateMcpAccessToken } from "../src/auth/jwt";
 import { logger } from "../src/utils/logger";
 
 const JWT_SECRET = "mcp-boot-wiring-test-secret-0123456789";
@@ -52,14 +53,14 @@ function unscopableDriver(): DataDriver {
     } as unknown as DataDriver;
 }
 
-function bootstrapperFor(driver: DataDriver): BackendBootstrapper {
+function bootstrapperFor(driver: DataDriver, authRepository: object = {}): BackendBootstrapper {
     return {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
             return { driver, collections: [], internals: {} } as unknown as InitializedDriver;
         },
-        async initializeAuth() { return { userService: {}, authRepository: {} }; }
+        async initializeAuth() { return { userService: {}, authRepository }; }
     } as unknown as BackendBootstrapper;
 }
 
@@ -73,6 +74,8 @@ async function boot(options: {
     mcp?: boolean;
     publicUrl?: string | undefined;
     driver?: DataDriver;
+    collections?: object[];
+    authRepository?: object;
 } = {}): Promise<Hono> {
     const app = new Hono();
     const previous = process.env.REBASE_PUBLIC_URL;
@@ -83,8 +86,8 @@ async function boot(options: {
         await initializeRebaseBackend({
             app: app as never,
             server: {} as never,
-            collections: [COLLECTION],
-            bootstrappers: [bootstrapperFor(options.driver ?? capableDriver())],
+            collections: options.collections ?? [COLLECTION],
+            bootstrappers: [bootstrapperFor(options.driver ?? capableDriver(), options.authRepository)],
             auth: { jwtSecret: JWT_SECRET },
             cronPersistence: false,
             surfaces: options.mcp === undefined ? undefined : { mcp: options.mcp }
@@ -233,6 +236,49 @@ describe("when it does mount", () => {
             if (previous === undefined) delete process.env.REBASE_MCP_OPEN_REGISTRATION;
             else process.env.REBASE_MCP_OPEN_REGISTRATION = previous;
         }
+    });
+
+    it("hands a write to the users collection to the auth adapter", async () => {
+        // The write tools answer to the adapter's user administration only if
+        // the boot hands them the adapter. Without it, deleting the last
+        // administrator through `delete_document` succeeded.
+        const deleted: unknown[] = [];
+        const driver = capableDriver() as DataDriver & Record<string, unknown>;
+        driver.withAuth = async () => driver;
+        driver.delete = async (props: unknown) => { deleted.push(props); };
+        const users = {
+            slug: "users",
+            name: "Users",
+            auth: { enabled: true },
+            properties: { email: { type: "string", name: "Email" } }
+        };
+        const app = await boot({
+            mcp: true,
+            publicUrl: PUBLIC_URL,
+            driver,
+            collections: [COLLECTION, users],
+            authRepository: {
+                getUserRoleIds: async () => ["admin"],
+                listUsersPaginated: async () => ({ users: [], total: 1, limit: 1, offset: 0 })
+            }
+        });
+        const token = await generateMcpAccessToken({
+            uid: "admin-1", roles: ["admin"], scope: "mcp:read mcp:write", clientId: "mcp_test",
+            aud: `${PUBLIC_URL}/mcp`, iss: PUBLIC_URL
+        }, 3600);
+
+        const res = await app.request("/mcp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+                jsonrpc: "2.0", id: 1, method: "tools/call",
+                params: { name: "delete_document", arguments: { collection: "users", id: "admin-1" } }
+            })
+        });
+        const body = await res.json() as { result: { isError?: boolean; content: { text: string }[] } };
+        expect(body.result.isError).toBe(true);
+        expect(body.result.content[0].text).toBe("Cannot delete the last administrator");
+        expect(deleted).toHaveLength(0);
     });
 
     it("changes nothing about any other path", async () => {

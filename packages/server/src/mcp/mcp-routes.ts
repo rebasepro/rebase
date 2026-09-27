@@ -24,7 +24,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types.js";
 import { declaredErrorAnswer } from "../api/errors.js";
 import { logger } from "../utils/logger.js";
@@ -81,6 +81,12 @@ export interface McpRoutesConfig {
     /** Resolved per request, because a driver may be swapped at runtime. */
     getDriver(): DataDriver | undefined;
     getCollections(): CollectionConfig[];
+    /**
+     * The deployment's auth adapter. A write to the auth collection is user
+     * administration, and the adapter holds it to the rules `/admin/users`
+     * does. Without one, those rows are written as any table's.
+     */
+    getAuthAdapter?(): AuthAdapter | undefined;
     /** The server's own name and version, for `initialize`. */
     serverInfo: { name: string; version: string };
     /**
@@ -376,6 +382,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             const result = await tool.run(args, {
                 driver,
                 collections: config.getCollections(),
+                authAdapter: config.getAuthAdapter?.(),
                 caller
             });
             return rpcResult(id, {

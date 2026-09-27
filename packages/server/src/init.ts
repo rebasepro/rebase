@@ -1969,6 +1969,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         // `config.collections`, and the MCP client would be told
                         // this project has no data at all.
                         getCollections: () => activeCollections,
+                        // The write tools' door into the users table answers
+                        // to the adapter, as the REST routes and the socket do.
+                        getAuthAdapter: () => authAdapter,
                         serverInfo: {
                             name: "rebase",
                             version: readRuntimeVersion([process.cwd()]) ?? "unknown"

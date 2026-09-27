@@ -16,7 +16,13 @@ import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from 
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
-import { completeUserCreation } from "../../auth/admin-user-ops";
+import {
+    assertUserCreationBodyValid,
+    createUserThroughAuthCollection,
+    deletingAuthCollectionUsers,
+    isAuthCollection,
+    prepareAuthCollectionUpdates
+} from "./auth-collection-writes";
 import { findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
     createIdempotencyStore,
@@ -180,12 +186,6 @@ function junctionCollectionFor(relation: ResolvedRelation): CollectionConfig | u
     if (!isManyToMany(relation)) return undefined;
     if (Object.keys(relation.through.properties).length === 0) return undefined;
     return getJunctionConfigForRelation(relation.through);
-}
-
-/** Whether `collection` is the auth collection — its rows are the users. */
-function isAuthCollection(collection: CollectionConfig): boolean {
-    const auth = collection.auth;
-    return auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
 }
 
 /**
@@ -744,10 +744,7 @@ export class RestApiGenerator {
         collection: CollectionConfig,
         updates: { uid: string; values: Record<string, unknown> }[]
     ): Promise<Record<string, unknown>[]> {
-        if (updates.length === 0 || !isAuthCollection(collection) || !this.authAdapter?.prepareUserUpdates) {
-            return updates.map(update => update.values);
-        }
-        return this.authAdapter.prepareUserUpdates(updates);
+        return prepareAuthCollectionUpdates(this.authAdapter, collection, updates);
     }
 
     /**
@@ -760,11 +757,7 @@ export class RestApiGenerator {
         uids: string[],
         remove: () => Promise<T>
     ): Promise<T> {
-        const adapter = collection && isAuthCollection(collection) && uids.length > 0 ? this.authAdapter : undefined;
-        await adapter?.prepareUserDeletions?.(uids);
-        const result = await remove();
-        await adapter?.finalizeUserDeletions?.(uids);
-        return result;
+        return deletingAuthCollectionUsers(this.authAdapter, collection, uids, remove);
     }
 
     /**
@@ -984,11 +977,6 @@ export class RestApiGenerator {
             { where: "`on_conflict`" }
         );
 
-        const isAuth = collection.auth;
-        const authCollection = isAuthCollection(collection);
-
-        const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
-
         // Auth signups carry credential fields (`password`, provider
         // bits) that the users collection does not declare as columns —
         // `prepareUserCreation` turns them into what the table has. The
@@ -996,53 +984,25 @@ export class RestApiGenerator {
         // for everything else. Skipping the check outright (as this used
         // to) meant a typo on the users table was silently dropped and
         // answered 201, while the same typo on `posts` was a 400.
-        if (!authCollection) {
+        if (!isAuthCollection(collection)) {
             assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
             assertWriteValuesValid(body, collection, { status: "new" });
             assertNoFieldOpsOnCreate(body, "A create");
         } else {
-            const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
-            if (contract?.validate) {
-                assertKnownWriteFields(body, collection, {
-                    extraKnownFields: contract.extraFields,
-                    viewer: requestViewer(c)
-                });
-                // Same condition as the key check above: with a custom
-                // `onCreateUser` the adapter owns the body's shape, so the
-                // collection's constraints do not describe what arrived.
-                assertWriteValuesValid(body, collection);
-            }
+            assertUserCreationBodyValid(this.authAdapter, collection, body, requestViewer(c));
         }
 
-        if (authCollection && this.authAdapter?.prepareUserCreation) {
-            const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
-
-            const entity = await driver.save({
-                path,
-                values: prepared.values,
-                collection: address.driverCollection,
-                status: "new"
-            });
-
-            // `POST /admin/users` goes through the same step, so the two
-            // doors agree on whether a create hook already delivered the
-            // credentials.
-            const finalize = this.authAdapter.finalizeUserCreation?.bind(this.authAdapter);
-            const delivery = await completeUserCreation(prepared, finalize && (clearPassword => finalize(
-                // `driver.save` returns the flat row — the row IS the
-                // values. Reading `entity.values` here (an Entity-era
-                // leftover) handed the adapter `undefined`, whose
-                // `.email` threw inside the invite-email try block —
-                // reported as "email delivery failed", so no
-                // invitation was ever sent.
-                { id: entity.id as string,
-values: entity as Record<string, unknown> },
-                clearPassword
-            )));
-
-            const response = this.formatResponse(entity) as Record<string, unknown>;
-
-            return c.json({ ...response, ...delivery }, 201);
+        // A create on the auth collection is a user creation, through the
+        // same steps as `POST /admin/users` and MCP's `create_document`.
+        const created = await createUserThroughAuthCollection(this.authAdapter, collection, body, values => driver.save({
+            path,
+            values,
+            collection: address.driverCollection,
+            status: "new"
+        }));
+        if (created) {
+            const response = this.formatResponse(created.row) as Record<string, unknown>;
+            return c.json({ ...response, ...created.delivery }, 201);
         }
 
         // Deliberately not applied to the auth-signup branch above: that

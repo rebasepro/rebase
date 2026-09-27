@@ -15,7 +15,7 @@
  * against a shape production does not have.
  */
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { generateAccessToken } from "../../src/auth/jwt";
 import { createOAuthRoutes } from "../../src/mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../../src/mcp/mcp-routes";
@@ -198,6 +198,8 @@ export interface HarnessOptions {
     identity?: McpGrantIdentity;
     maxBodySize?: number;
     rateLimit?: DataRateLimitConfig;
+    /** The deployment's auth adapter — what a write to the auth collection answers to. */
+    authAdapter?: AuthAdapter;
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -210,6 +212,7 @@ export function buildApp(options: HarnessOptions = {}) {
         oauthBasePath: "/api/oauth",
         getDriver: () => driver,
         getCollections: () => options.collections ?? COLLECTIONS,
+        getAuthAdapter: () => options.authAdapter,
         serverInfo: { name: "rebase", version: "test" },
         maxBodySize: options.maxBodySize,
         rateLimit: options.rateLimit

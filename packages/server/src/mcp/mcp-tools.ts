@@ -20,7 +20,7 @@
  * second lock, not the main one — a `mcp:write` token still cannot write a row
  * the user could not write themselves.
  */
-import type { CollectionConfig, DataDriver, FilterValues } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, DataDriver, FilterValues } from "@rebasepro/types";
 import { getCollectionDataPath } from "@rebasepro/types";
 import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
@@ -28,6 +28,13 @@ import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field-ops.js";
 import { assertQueryFieldsReadable } from "../api/rest/field-access-query.js";
+import {
+    assertUserCreationBodyValid,
+    createUserThroughAuthCollection,
+    deletingAuthCollectionUsers,
+    isAuthCollection,
+    prepareAuthCollectionUpdates
+} from "../api/rest/auth-collection-writes.js";
 import { logger } from "../utils/logger.js";
 import { scopeAllows } from "./oauth-metadata.js";
 
@@ -43,6 +50,12 @@ export interface McpToolContext {
     driver: DataDriver;
     collections: CollectionConfig[];
     caller: McpCaller;
+    /**
+     * The deployment's auth adapter. The auth collection's rows are the users,
+     * so the write tools hand a write to one to it, as REST and `/admin/users`
+     * do. See `api/rest/auth-collection-writes.ts`.
+     */
+    authAdapter?: AuthAdapter;
 }
 
 export interface McpToolDefinition {
@@ -138,16 +151,60 @@ function writableValues(
     ctx: McpToolContext,
     status: "new" | "existing"
 ): Record<string, unknown> {
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-        throw new McpToolError("`values` must be an object of field names to values.");
-    }
-    const values = raw as Record<string, unknown>;
+    const values = valuesObject(raw);
     asToolError(() => {
         assertWriteRequestValid(values, collection, { status, viewer: viewerOf(ctx) });
         if (status === "new") assertNoFieldOpsOnCreate(values, "A create");
         else assertFieldOpsValid(values, collection);
     });
     return values;
+}
+
+function valuesObject(raw: unknown): Record<string, unknown> {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        throw new McpToolError("`values` must be an object of field names to values.");
+    }
+    return raw as Record<string, unknown>;
+}
+
+/**
+ * A create on the auth collection, which is a user creation: the adapter's
+ * steps, as REST's `POST` and `POST /admin/users` take them — the password
+ * hashed, the email normalized, the collection's `onCreateUser`, the
+ * invitation or the generated password. Written straight to the driver, it
+ * was a user with no password, never invited, whose email sign-in could not
+ * find.
+ *
+ * The body is checked against what the adapter says a create consumes
+ * (`password` is not a column), not against the collection alone.
+ *
+ * `undefined` for any other collection, or an adapter with no such step.
+ */
+async function createUser(
+    args: Record<string, unknown>,
+    collection: CollectionConfig,
+    ctx: McpToolContext
+): Promise<Record<string, unknown> | undefined> {
+    const adapter = ctx.authAdapter;
+    if (!adapter?.prepareUserCreation || !isAuthCollection(collection)) return undefined;
+
+    const body = valuesObject(args.values);
+    asToolError(() => {
+        assertUserCreationBodyValid(adapter, collection, body, viewerOf(ctx));
+        assertNoFieldOpsOnCreate(body, "A create");
+    });
+    const driver = await scopedDriver(ctx);
+    const created = await createUserThroughAuthCollection(adapter, collection, body, values => driver.save({
+        path: collectionPath(collection),
+        collection,
+        values,
+        id: args.id ? String(args.id) : undefined,
+        status: "new"
+    }));
+    // The delivery fields are the create response's, as on REST: with no
+    // email service to send the invitation, the generated password is the
+    // only way the new user gets in, and the caller is the one to hand it on.
+    return created && { ...created.row, ...created.delivery };
 }
 
 function collectionPath(collection: CollectionConfig): string {
@@ -377,6 +434,13 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
+            const user = await createUser(args, collection, ctx);
+            if (user) {
+                logger.info("[mcp] User created", {
+                    collection: collectionPath(collection), uid: ctx.caller.uid, clientId: ctx.caller.clientId
+                });
+                return user;
+            }
             const values = writableValues(args.values, collection, ctx, "new");
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
@@ -409,13 +473,19 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
-            const values = writableValues(args.values, collection, ctx, "existing");
+            const id = String(args.id);
+            // On the auth collection, the adapter's check and stored form: no
+            // demoting the last administrator, the email as sign-in looks it up.
+            const [values] = await prepareAuthCollectionUpdates(ctx.authAdapter, collection, [{
+                uid: id,
+                values: writableValues(args.values, collection, ctx, "existing")
+            }]);
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
                 path: collectionPath(collection),
                 collection,
                 values,
-                id: String(args.id),
+                id,
                 status: "existing"
             });
             logger.info("[mcp] Row updated", {
@@ -442,10 +512,13 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
             const driver = await scopedDriver(ctx);
-            await driver.delete({
+            // On the auth collection: the last administrator stays, and
+            // `beforeUserDelete` may veto; after, the sessions end and
+            // `afterUserDelete` runs.
+            await deletingAuthCollectionUsers(ctx.authAdapter, collection, [String(args.id)], () => driver.delete({
                 row: { id: String(args.id), path: collectionPath(collection) },
                 collection
-            });
+            }));
             logger.info("[mcp] Row deleted", {
                 collection: collectionPath(collection), id: String(args.id),
                 uid: ctx.caller.uid, clientId: ctx.caller.clientId
