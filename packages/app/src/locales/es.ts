@@ -845,6 +845,7 @@ export const es: RebaseTranslations = {
     studio_sql_cannot_edit_missing_query: "No se pueden editar las filas: falta la consulta subyacente.",
     studio_sql_cannot_resolve_table: "No se pudo determinar la tabla ni la clave primaria",
     studio_sql_missing_pk: "A la fila le faltan columnas de clave primaria: {{columns}}. No se puede actualizar con seguridad.",
+    studio_sql_cannot_edit_other_connection: "Estas filas se leyeron de otra base de datos o con otro rol. Vuelve a ejecutar la consulta para editarlas.",
     studio_sql_update_failed: "Error al actualizar: {{message}}",
     studio_sql_execution_not_supported: "La fuente de datos actual no admite la ejecución de SQL.",
     studio_sql_error_executing: "Se produjo un error al ejecutar la consulta.",

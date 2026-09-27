@@ -837,6 +837,7 @@ export const it: RebaseTranslations = {
     studio_sql_cannot_edit_missing_query: "Impossibile modificare le righe: manca la query sottostante.",
     studio_sql_cannot_resolve_table: "Impossibile determinare la tabella o la chiave primaria",
     studio_sql_missing_pk: "Alla riga mancano le colonne della chiave primaria: {{columns}}. Impossibile aggiornarla in sicurezza.",
+    studio_sql_cannot_edit_other_connection: "Queste righe sono state lette da un altro database o con un altro ruolo. Esegui di nuovo la query per modificarle.",
     studio_sql_update_failed: "Aggiornamento non riuscito: {{message}}",
     studio_sql_execution_not_supported: "L'origine dati attuale non supporta l'esecuzione di SQL.",
     studio_sql_error_executing: "Si è verificato un errore durante l'esecuzione della query.",

@@ -837,6 +837,7 @@ export const de: RebaseTranslations = {
     studio_sql_cannot_edit_missing_query: "Zeilen können nicht bearbeitet werden: Die zugrunde liegende Abfrage fehlt.",
     studio_sql_cannot_resolve_table: "Tabelle bzw. Primärschlüssel konnte nicht ermittelt werden",
     studio_sql_missing_pk: "In der Zeile fehlen die Primärschlüsselspalten: {{columns}}. Eine sichere Aktualisierung ist nicht möglich.",
+    studio_sql_cannot_edit_other_connection: "Diese Zeilen wurden aus einer anderen Datenbank oder mit einer anderen Rolle gelesen. Führen Sie die Abfrage erneut aus, um sie zu bearbeiten.",
     studio_sql_update_failed: "Aktualisierung fehlgeschlagen: {{message}}",
     studio_sql_execution_not_supported: "Die aktuelle Datenquelle unterstützt keine SQL-Ausführung.",
     studio_sql_error_executing: "Beim Ausführen der Abfrage ist ein Fehler aufgetreten.",

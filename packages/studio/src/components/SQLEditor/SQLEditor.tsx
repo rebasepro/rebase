@@ -204,6 +204,9 @@ const getStoragePrefix = (baseUrl?: string) => {
     return baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_");
 };
 
+/** Where a statement runs: the database, and the role it runs as. */
+type SQLConnection = { database?: string; role?: string };
+
 /** The part of a tab that is persisted; the rest is per-session. */
 type StoredTab = {
     id: string;
@@ -268,7 +271,12 @@ export const SQLEditor = () => {
         loading: boolean,
         error: string | null,
         execTime: number | null,
-        lastExecutedSql: string | null
+        lastExecutedSql: string | null,
+        /**
+         * The database and role `lastExecutedSql` ran on: the rows on screen
+         * were read there, and an edit of one is written there or not at all.
+         */
+        lastExecutedConnection: SQLConnection | null
     }>>(() => {
         const projectPrefixSync = getStoragePrefix(client?.baseUrl);
         // This runs during the first render, so anything it throws takes the
@@ -287,7 +295,8 @@ export const SQLEditor = () => {
             loading: false,
             error: null,
             execTime: null,
-            lastExecutedSql: null
+            lastExecutedSql: null,
+            lastExecutedConnection: null
         }));
         if (restored.length > 0) return restored;
         return [{
@@ -300,7 +309,8 @@ export const SQLEditor = () => {
             loading: false,
             error: null,
             execTime: null,
-            lastExecutedSql: null
+            lastExecutedSql: null,
+            lastExecutedConnection: null
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -549,11 +559,25 @@ isPrimaryKey });
     // Inline editing state
     const [editingCell, setEditingCell] = useState<{ rowIndex: number, columnKey: string, initialValue: unknown } | null>(null);
 
+    const isCurrentConnection = useCallback((connection: SQLConnection | null): connection is SQLConnection =>
+        connection !== null && connection.database === selectedDatabase && connection.role === selectedRole,
+    [selectedDatabase, selectedRole]);
+
     const handleDoubleClick = useCallback((rowIndex: number, columnKey: string, initialValue: unknown, rowData: Record<string, unknown>) => {
         if (!activeTab.lastExecutedSql) {
             snackbarController.open({
                 type: "error",
                 message: t("studio_sql_cannot_edit_missing_query")
+            });
+            return;
+        }
+
+        // The rows were read on one database as one role; the schema the key
+        // is resolved against, and the UPDATE, are the selected ones.
+        if (!isCurrentConnection(activeTab.lastExecutedConnection)) {
+            snackbarController.open({
+                type: "error",
+                message: t("studio_sql_cannot_edit_other_connection")
             });
             return;
         }
@@ -583,7 +607,7 @@ isPrimaryKey });
         setEditingCell({ rowIndex,
 columnKey,
 initialValue });
-    }, [activeTab.lastExecutedSql, schemas, snackbarController]);
+    }, [activeTab.lastExecutedSql, activeTab.lastExecutedConnection, isCurrentConnection, schemas, snackbarController, t]);
 
     const handleCellSave = useCallback(async (newValue: string | null, rowData: Record<string, unknown>, columnKey: string, rowIndex: number) => {
         if (!editingCell || !activeTab.lastExecutedSql) return;
@@ -591,6 +615,13 @@ initialValue });
         setEditingCell(null); // Optimistically close
 
         if (newValue === editingCell.initialValue) return;
+
+        const connection = activeTab.lastExecutedConnection;
+        if (!isCurrentConnection(connection)) {
+            snackbarController.open({ type: "error",
+message: t("studio_sql_cannot_edit_other_connection") });
+            return;
+        }
 
         const resolution = determineTableAndPK(activeTab.lastExecutedSql, columnKey, schemas);
         if (resolution.error || !resolution.tableName || !resolution.primaryKeys || resolution.primaryKeys.length === 0) {
@@ -642,8 +673,8 @@ message: resolution.error || "Resolution failed." });
 
         try {
             if (databaseAdmin?.executeSql) {
-                await databaseAdmin.executeSql(updateSql, { database: selectedDatabase,
-role: selectedRole });
+                await databaseAdmin.executeSql(updateSql, { database: connection.database,
+role: connection.role });
 
                 const newResults = [...(activeTab.results || [])];
                 if (newResults[rowIndex]) {
@@ -663,7 +694,7 @@ role: selectedRole });
                 message: t("studio_sql_update_failed", { message: e instanceof Error ? e.message : String(e) })
             });
         }
-    }, [editingCell, schemas, activeTab.lastExecutedSql, activeTab.results, databaseAdmin, updateActiveTab, snackbarController, selectedDatabase, selectedRole]);
+    }, [editingCell, schemas, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.results, isCurrentConnection, databaseAdmin, updateActiveTab, snackbarController, t]);
 
     const [columnWidths, setColumnWidths] = useState<Record<string, Record<string, number>>>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
@@ -745,7 +776,8 @@ role: selectedRole });
             loading: false,
             error: null,
             execTime: null,
-            lastExecutedSql: null
+            lastExecutedSql: null,
+            lastExecutedConnection: null
         }]);
         setActiveTabId(newId);
     };
@@ -803,9 +835,13 @@ role: selectedRole });
 error: t("studio_sql_explain_single_statement") });
             return;
         }
+        // The plan replaces the rows on screen, so nothing left there is a row
+        // an edit could write back.
         updateActiveTab({ loading: true,
 error: null,
-results: null });
+results: null,
+lastExecutedSql: null,
+lastExecutedConnection: null });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
@@ -845,7 +881,8 @@ role: selectedRole });
                 updateActiveTab({
                     results: result,
                     execTime: Math.round(performance.now() - start),
-                    lastExecutedSql: sqlToRun
+                    lastExecutedSql: sqlToRun,
+                    lastExecutedConnection: { database: selectedDatabase, role: selectedRole }
                 });
 
                 if (history[history.length - 1] !== activeTab.sql) {

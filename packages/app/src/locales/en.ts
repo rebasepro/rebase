@@ -845,6 +845,7 @@ export const en: RebaseTranslations = {
     studio_sql_cannot_edit_missing_query: "Cannot edit rows: The underlying query is missing.",
     studio_sql_cannot_resolve_table: "Could not resolve table/primary key",
     studio_sql_missing_pk: "Row is missing primary key column(s): {{columns}}. Cannot safely update.",
+    studio_sql_cannot_edit_other_connection: "These rows were read from another database or as another role. Run the query again to edit them.",
     studio_sql_update_failed: "Failed to update: {{message}}",
     studio_sql_execution_not_supported: "SQL execution is not supported by the current data source.",
     studio_sql_error_executing: "An error occurred while executing the query.",

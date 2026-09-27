@@ -920,6 +920,7 @@ export interface RebaseTranslations {
     studio_sql_cannot_edit_missing_query?: string;
     studio_sql_cannot_resolve_table?: string;
     studio_sql_missing_pk?: string;
+    studio_sql_cannot_edit_other_connection?: string;
     studio_sql_update_failed?: string;
     studio_sql_execution_not_supported?: string;
     studio_sql_error_executing?: string;
