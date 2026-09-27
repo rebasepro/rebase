@@ -46,6 +46,7 @@ import { Pool } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
+import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
 import { resolveSoftDelete } from "./services/soft-delete";
 import { runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
@@ -1876,7 +1877,17 @@ export class PostgresBackendDriver implements DataDriver {
         // changes is only how the table records it: a timestamp in the declared
         // field instead of a `DELETE`. `hard` opts back into the real thing and
         // needs no extra permission, because it is the same verb.
-        const softDelete = hard ? undefined : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);
+        //
+        // Through a many-to-many path the target row is not what is deleted:
+        // it is shared, and the delete removes this parent's link to it (the
+        // persistence layer's rule for a junction). Its collection's soft
+        // delete says how *its* rows are removed, which this is not — stamped
+        // here, it trashed the tag for every post and re-asserted the link.
+        const hop = isNestedPath(targetPath) ? resolveNestedPath(targetPath, this.registry) : undefined;
+        const unlinking = hop !== undefined && isJunctionBackedRelation(hop.relation);
+        const softDelete = hard || unlinking
+            ? undefined
+            : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);
         if (softDelete) {
             await this.dataService.save(
                 targetPath,
@@ -1936,7 +1947,9 @@ export class PostgresBackendDriver implements DataDriver {
         // Awaited, for the same reason the save's entry is: a delete is the one
         // change whose history nothing else can reconstruct, because the row it
         // describes is gone.
-        if (this.historyService && resolvedCollection?.history) {
+        // An unlink changed a parent's set, not the target row, so it is not
+        // an entry in that row's history.
+        if (this.historyService && resolvedCollection?.history && !unlinking) {
             await this.historyService.recordHistory({
                 // Keyed like the save's entry: the slug, whatever the path.
                 tableName: resolvedCollection.slug,
