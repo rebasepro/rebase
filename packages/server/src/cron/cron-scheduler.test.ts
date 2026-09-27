@@ -1389,6 +1389,44 @@ catchUpWindowSeconds: 3600,
             expect(entry.logs.some(l => l.includes("hello from annotated"))).toBe(true);
         });
 
+        it("reads the clock per job, so a later job does not catch up a slot newer ones have passed", async () => {
+            // Boot at 06:30. The first job's catch-up runs until 08:40; the
+            // hourly job meanwhile fires 07:00 and 08:00 from its own timer.
+            // Its catch-up, when the loop reaches it, used to look for the most
+            // recent slot as of 06:30 — found 06:00 unclaimed, and ran it after
+            // 08:00 had already run.
+            jest.setSystemTime(new Date(2026, 6, 29, 6, 30));
+            const claimed = new Set<string>();
+            const store = makeClaimStore(true);
+            store.tryClaimRun.mockImplementation(async (id: string, slot: string) => {
+                const key = `${id}@${slot}`;
+                if (claimed.has(key)) return false;
+                claimed.add(key);
+                return true;
+            });
+            const hourlyRuns: string[] = [];
+            scheduler.setStore(store);
+            scheduler.registerJobs([
+                makeCatchUpJob("long-daily", {
+                    timeoutSeconds: 3 * 60 * 60,
+                    handler: async () => { await new Promise(resolve => setTimeout(resolve, 130 * 60 * 1000)); }
+                }),
+                makeCatchUpJob("hourly", {
+                    schedule: "0 * * * *",
+                    catchUpWindowSeconds: 3 * 60 * 60,
+                    handler: async (ctx) => { hourlyRuns.push(new Date(ctx.scheduledAt).toISOString()); }
+                })
+            ]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(135 * 60 * 1000);
+
+            expect(hourlyRuns).toEqual([
+                new Date(2026, 6, 29, 7, 0).toISOString(),
+                new Date(2026, 6, 29, 8, 0).toISOString()
+            ]);
+            expect(claimed.has(`hourly@${new Date(2026, 6, 29, 6, 0).toISOString()}`)).toBe(false);
+        });
+
         it("does not replay a slot the catch-up already took", async () => {
             // One claim per (job, slot): catch-up takes today's 06:00, and
             // tomorrow's 06:00 is a different key — one further run, not a replay.

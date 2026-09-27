@@ -1184,8 +1184,6 @@ export class CronScheduler {
             return;
         }
 
-        const now = new Date();
-
         for (const job of candidates) {
             try {
                 if (!this.started || job.executing) continue;
@@ -1193,6 +1191,11 @@ export class CronScheduler {
                 if (!(await this.isEnabledNow(job))) continue;
                 if (!this.started || job.executing) continue;
 
+                // Read per job, not once for the pass: the jobs ahead of this
+                // one ran their catch-ups first, and this job's own timer may
+                // have fired newer slots meanwhile. Its most recent slot is the
+                // one as of now, or a stale one runs after newer ones already did.
+                const now = new Date();
                 const windowSeconds = job.definition.catchUpWindowSeconds!;
                 const from = new Date(now.getTime() - windowSeconds * 1000);
                 const slot = findMostRecentSlot(job.definition.schedule, from, now, job.definition.timezone);
