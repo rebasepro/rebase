@@ -291,7 +291,7 @@ that made five claims in sequence and read as a thesis.
 
 | Beat | Section | Carries |
 |------|---------|---------|
-| — | `s-hero` | Headline, the claim-1 sub, the install terminal (API and realtime named before the panel) |
+| — | `s-hero` | Headline, the claim-1 sub, two buttons: the demo and the install command (API and realtime named before the panel) |
 | — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" and naming FireCMS's 10,000+ projects |
 | 01 | `s-collection-power` | Claim 2 — one collection, everything generated |
 | 02 | `s-backend-engine` | The running backend: SDK, REST, realtime — live, press the buttons |
@@ -329,12 +329,14 @@ Three rules are encoded in that table and should not be quietly undone:
   backend-first rule exists to prevent. It cannot be first, because "RLS written
   in the same file as the collection" needs the collection beat to have run. The
   build is: the definition (01) → what it generates (02) → what enforces it (03).
-- **The hero carries a product artifact.** It used to be a WebGL gradient with
-  type on it, and the install command appeared twice — once in a small hero box
-  and again two screens later as beat 01, with the logo wall between the two
-  tellings. Those are now one thing, in the hero. Every competitor hero audited
-  carried a product artifact and ours carried decoration, which broke
-  proof-over-assertion in the one place it matters most.
+- **The hero carries the install command, not a window around it.** It used to
+  be a WebGL gradient with type on it, then a terminal frame beside the copy —
+  traffic lights, a `zsh · ~/work` title, a Copy button and two lines of output,
+  a whole window drawn around one command. Francesco, 2026-09-27: the hero
+  already has a lot in it and the window chrome is noise. The command is now the
+  second button beside "Try the demo", coloured by role (runner, package, verb),
+  and the whole button copies. Do not put the window back; the demos below the
+  fold are the product artifacts.
 - **GitHub is not a hero action.** Payload and Strapi put star counts up front
   because theirs are proof; ours is not one yet, and a primary hero button that
   spends the highest-intent click on our weakest signal is a self-inflicted
@@ -491,9 +493,8 @@ there once. Do not re-implement any of them inline on a page.
   `.frame-head`.
 - **Every embedded demo gets a reserved, clipped `.well`.** They animate; an
   auto-height container makes the page resize on every frame.
-- **Window chrome only on real terminals.** Three survive site-wide
-  (`rebase dev`, `after rebase init`, `zsh`). File, browser and panel frames do
-  not get traffic lights.
+- **Window chrome only on real terminals.** File, browser and panel frames do
+  not get traffic lights, and the home hero has no window at all (see above).
 - **Heroes are left-aligned.**
 - **Neat is composition, not wallpaper.** Dividers use the masked, bled pattern
   (`height: 600px` with `-my-72`, `z-index: -1`, `.neat-divider`) so the canvas

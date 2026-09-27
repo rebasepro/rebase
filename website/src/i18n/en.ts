@@ -14,11 +14,6 @@ export const en = {
   "rlscheck.cta": "See all 15 checks",
   "copy.command": "Copy",
   "copy.command.done": "Copied",
-  "demo.init": "✔ Initialized Rebase in current directory.",
-  "demo.pull": "✔ Schema pushed to database. Tables created.",
-  "demo.rls": "✔ Access rules compiled into Postgres policies.",
-  "demo.dev": "✔ API, realtime and panel running.",
-  "demo.ports": "API and panel URLs printed on start <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> picks free ports per project",
   "social.title": "From the makers of FireCMS, the open-source CMS in 10,000+ projects.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.

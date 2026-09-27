@@ -11,11 +11,6 @@ export const es = {
   "rlscheck.cta": "Ver las 15 comprobaciones",
   "copy.command": "Copiar",
   "copy.command.done": "Copiado",
-  "demo.init": "✔ Rebase inicializado en el directorio actual.",
-  "demo.pull": "✔ Esquema aplicado a la base de datos. Tablas creadas.",
-  "demo.rls": "✔ Reglas de acceso compiladas en políticas de Postgres.",
-  "demo.dev": "✔ API, realtime y panel en marcha.",
-  "demo.ports": "Las URLs de la API y del panel se imprimen al arrancar <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> elige puertos libres por proyecto",
   "social.title": "De los creadores de FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.

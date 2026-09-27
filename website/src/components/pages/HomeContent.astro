@@ -29,6 +29,9 @@ const RLS_CHECK_COMMAND = "npx @rebasepro/rls-check";
 // One source for the command the hero shows and the copy button writes, so
 // the two can never drift apart.
 const INSTALL_COMMAND = "pnpm dlx @rebasepro/cli init";
+// The hero colours the command by role: the runner, the package, the verb.
+const [INSTALL_RUNNER, INSTALL_PACKAGE, INSTALL_VERB] =
+    INSTALL_COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(1);
 const SELFHOST_COMMAND = "docker compose up -d";
 
 ---
@@ -125,10 +128,15 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         </h1>
                     </div>
 
-                    {/* Row two: the argument on the left, the artifact on the
-                        right. The sub keeps its 34rem measure from §6 — the
-                        headline got wider, the reading line did not. */}
-                    <div class="lg:col-span-5">
+                    {/* Row two: the argument and the two ways in. There used to be
+                        a terminal frame on the right (traffic lights, a `zsh ·
+                        ~/work` title, a Copy button, two lines of output) — a
+                        whole window drawn around one command. Francesco,
+                        2026-09-27: "the hero has a lot of stuff already", the
+                        mac buttons are noise. The command is what a reader
+                        takes away, so it is now the second button: the whole
+                        thing copies. The sub keeps its 34rem measure (§6). */}
+                    <div class="lg:col-span-12">
                         <div class="max-w-[34rem] text-base sm:text-lg leading-relaxed text-[#b4b8bd]">
                             <p>{t("hero.subtitle")}</p>
                         </div>
@@ -142,62 +150,26 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             >
                                 {t("hero.cta.demo")}
                             </a>
-                        </div>
-                    </div>
-
-                    <!-- The hero carries a product artifact. SITE-STORY §5 records that
-                         the WebGL-plus-type hero was replaced for exactly this reason;
-                         dropping it again left the right half of the frame empty. The
-                         install command lives here now, once, with its real output. -->
-                    <div class="lg:col-span-7">
-                        <div class="frame group/term">
-                            <div class="frame-head">
-                                <span class="h-2 w-2 rounded-full bg-rose-500/70"></span>
-                                <span class="h-2 w-2 rounded-full bg-amber-400/70"></span>
-                                <span class="h-2 w-2 rounded-full bg-emerald-400/70"></span>
-                                <span class="ml-2 truncate">zsh · ~/work</span>
-                                {/* The command is the one thing in this frame a reader
-                                    actually needs to take away, so it gets a real
-                                    button — labelled, always visible, with a state —
-                                    rather than an icon that appears on hover. */}
-                                <button
-                                    type="button"
-                                    data-track-copy="hero-terminal"
-                                    data-command={INSTALL_COMMAND}
-                                    data-copy-done-label={t("copy.command.done")}
-                                    class="copy-btn ml-auto inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.055] px-2 py-1 font-sans text-2xs font-medium text-surface-400 transition-colors hover:border-white/20 hover:bg-white/[0.09] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                    aria-label={`Copy "${INSTALL_COMMAND}" to the clipboard`}
-                                    title="Copy to clipboard"
-                                >
-                                    <svg data-copy-idle class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                    </svg>
-                                    <svg data-copy-done hidden class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M20 6 9 17l-5-5"/>
-                                    </svg>
-                                    <span data-copy-label>{t("copy.command")}</span>
-                                </button>
-                            </div>
-                            {/* A terminal does not reflow a command across two lines. At 390px these
-                                lines are wider than the frame, so they scroll sideways instead of
-                                wrapping — `$ pnpm dlx @rebasepro/cli init` stays one line, which is
-                                the whole point of showing it in a terminal. */}
-                            <div class="px-5 py-5 font-mono text-xs sm:text-sm leading-[2] text-surface-300 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                {/* Cut to the command and two outcomes, 2026-09-12
-                                    (Francesco: "there is already too much stuff in
-                                    the main fold, simplify"). What went: "Initialized
-                                    Rebase in current directory", which only restates
-                                    `init`; the ports caption, a detail nobody needs in
-                                    the first screen; and the blinking caret, which was
-                                    affectation rather than information. `demo.rls`
-                                    stays — the policies being compiled rather than
-                                    remembered is the page's strongest claim, and this
-                                    is the only place it appears above the fold. */}
-                                <p><span class="select-none text-surface-500">$</span> <span class="select-all text-white">{INSTALL_COMMAND}</span></p>
-                                <p class="text-emerald-400">{t("demo.rls")}</p>
-                                <p class="text-emerald-400">{t("demo.dev")}</p>
-                            </div>
+                            <button
+                                type="button"
+                                data-track-copy="hero-command"
+                                data-command={INSTALL_COMMAND}
+                                data-copy-done-label={t("copy.command.done")}
+                                class="copy-btn group inline-flex items-center gap-3 rounded-lg border border-white/12 bg-white/[0.03] px-5 min-h-(--control-large) font-mono text-sm text-surface-200 transition-colors hover:border-white/25 hover:bg-white/[0.06] data-copied:border-emerald-400/60 data-copied:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                aria-label={`Copy "${INSTALL_COMMAND}" to the clipboard`}
+                                title="Copy to clipboard"
+                            >
+                                <span class="select-none text-surface-500">$</span>
+                                <span><span class="text-emerald-400">{INSTALL_RUNNER}</span> <span class="text-primary-light">{INSTALL_PACKAGE}</span> <span class="text-white">{INSTALL_VERB}</span></span>
+                                <svg data-copy-idle class="h-4 w-4 text-surface-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                </svg>
+                                <svg data-copy-done hidden class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M20 6 9 17l-5-5"/>
+                                </svg>
+                                <span data-copy-label class="hidden font-sans font-medium group-data-copied:inline">{t("copy.command")}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
