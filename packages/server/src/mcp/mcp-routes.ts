@@ -26,6 +26,7 @@ import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types.js";
+import { declaredErrorAnswer } from "../api/errors.js";
 import { logger } from "../utils/logger.js";
 import { verifyMcpAccessToken } from "../auth/jwt.js";
 import { createDataRateLimiter, type DataRateLimitConfig } from "../auth/rate-limiter.js";
@@ -387,13 +388,32 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             // error means the client sent something malformed, while this is the
             // model's call not working, and the model is the one that can fix it
             // by trying something else — so the message has to reach it.
-            const message = error instanceof McpToolError
+            //
+            // A refusal the server declared for its caller (`ApiError`, or the
+            // `RebaseApiError` a collection callback's veto is) reaches the
+            // model too, through the predicate every other door uses — REST
+            // hands the same message to the same person. A declared fault
+            // (5xx) does not: it is not the model's to fix, and its text is
+            // the server's business. Anything else is masked, because a
+            // driver's own error can name tables and constraints.
+            const declared = declaredErrorAnswer(error);
+            const refusal = error instanceof McpToolError
                 ? error.message
-                : "The call failed. This is usually a permission rule refusing the operation for your account.";
-            if (!(error instanceof McpToolError)) {
+                : declared && declared.status < 500 ? declared.message : undefined;
+            const message = refusal
+                ?? "The call failed. This is usually a permission rule refusing the operation for your account.";
+            if (refusal === undefined) {
                 logger.error("[mcp] Tool call failed", {
                     tool: name, uid: caller.uid, clientId: caller.clientId, error
                 });
+            } else if (declared && !(error instanceof McpToolError)) {
+                // What REST's error handler logs for the same refusal.
+                const fields = {
+                    tool: name, uid: caller.uid, clientId: caller.clientId,
+                    status: declared.status, code: declared.code, message: declared.message
+                };
+                if (declared.expected) logger.debug("[mcp] Tool call refused", fields);
+                else logger.warn("[mcp] Tool call refused", fields);
             }
             return rpcResult(id, {
                 content: [{ type: "text", text: message }],

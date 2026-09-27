@@ -11,7 +11,8 @@
  * there is nothing asserting that a correct request succeeds — that is the
  * other file's job — and everything asserting that something does not happen.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import { RebaseApiError, type CollectionConfig } from "@rebasepro/types";
+import { ApiError } from "../src/api/errors";
 import { configureJwt, generateAccessToken, generateMcpAccessToken, signPurposeToken } from "../src/auth/jwt";
 import {
     buildApp, stubDriver, authorize, redeem, connectedClient, registerClient,
@@ -454,6 +455,50 @@ describe("tool inputs", () => {
         });
         const body = await res.json() as { result: { content: { text: string }[] } };
         expect(body.result.content[0].text).not.toContain("oauth_clients");
+        expect(body.result.content[0].text).toMatch(/permission rule/i);
+    });
+
+    it.each([
+        // A collection callback's veto: the browser-safe class a collection file throws.
+        ["a callback's RebaseApiError", new RebaseApiError("A candidate in the offer stage cannot be renamed", {
+            status: 400, code: "CALLBACK_REJECTED"
+        })],
+        ["the server's ApiError", ApiError.conflict("A candidate with this email already exists", "UNIQUE_VIOLATION")]
+    ])("hands the model the message of a refusal the server declared — %s — as REST hands it to the caller", async (_, refusal) => {
+        // `declaredErrorAnswer` is how every other door decides that an error
+        // chose its own answer. This one reduced a callback's veto to "usually
+        // a permission rule", which sends the model looking for the wrong fix.
+        const { driver } = stubDriver();
+        (driver as unknown as { save: () => Promise<never> }).save = async () => { throw refusal; };
+        const { app } = buildApp({ driver });
+        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", values: { name: "Y" } } }
+        });
+        const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
+        expect(body.result.isError).toBe(true);
+        expect(body.result.content[0].text).toBe(refusal.message);
+    });
+
+    it("keeps a declared server fault's message from the model", async () => {
+        // REST answers a declared 5xx verbatim; this door is stricter, as the
+        // realtime subscriptions are. A fault is not the model's to fix.
+        const { driver } = stubDriver();
+        (driver as unknown as { save: () => Promise<never> }).save = async () => {
+            throw ApiError.serviceUnavailable("pool exhausted on replica db-3");
+        };
+        const { app } = buildApp({ driver });
+        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", values: { name: "Y" } } }
+        });
+        const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
+        expect(body.result.isError).toBe(true);
+        expect(body.result.content[0].text).not.toContain("db-3");
         expect(body.result.content[0].text).toMatch(/permission rule/i);
     });
 
