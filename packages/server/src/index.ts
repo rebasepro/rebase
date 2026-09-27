@@ -196,6 +196,11 @@ export type { FieldOperator, ParsedFieldOp } from "./api/rest/field-ops";
 // only place the rows earlier operations wrote exist.
 export { BATCH_REF_KEY, resolveBatchRefs } from "./api/rest/batch";
 export { declaredUniqueTargets, resolveConflictTarget } from "./api/rest/conflict-target";
+// A write through a parent sets the parent's relation, or the parent's key on
+// the child, which is not in the body the checks above read. The socket takes
+// nested paths too, and asks the question REST's nested routes ask.
+export { assertNestedWriteAllowed } from "./api/rest/nested-write-access";
+export type { NestedWriteHop, NestedWriteKind } from "./api/rest/nested-write-access";
 export { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./api/rest/etag";
 
 // =============================================================================

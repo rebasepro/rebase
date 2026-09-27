@@ -10,6 +10,7 @@ import { assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
+import { assertNestedWriteAllowed, type NestedWriteKind } from "./nested-write-access";
 import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag } from "./etag";
 import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
@@ -611,6 +612,19 @@ export class RestApiGenerator {
         }
 
         return { path: [root.slug, ...segments.slice(1)].join("/"), chain, relation };
+    }
+
+    /**
+     * Refuse a write through `nested` that sets a relation this caller may not
+     * write — the parent's relation, or the parent's key on the child. See
+     * {@link assertNestedWriteAllowed}; the socket asks it the same question.
+     */
+    private assertNestedRelationWritable(c: Context<HonoEnv>, nested: NestedPath, kind: NestedWriteKind): void {
+        assertNestedWriteAllowed({
+            parentCollection: nested.chain[nested.chain.length - 2],
+            relation: nested.relation,
+            targetCollection: nested.chain[nested.chain.length - 1]
+        }, kind, nested.path, requestViewer(c));
     }
 
     /**
@@ -1750,6 +1764,8 @@ id };
                 );
             }
 
+            this.assertNestedRelationWritable(c, nested, "create");
+
             return this.createRow(c, driver, row, body);
         });
 
@@ -1781,8 +1797,11 @@ id };
             // request to do two different writes at one address, and guessing an
             // order for them is how one of the two silently does not happen.
             if (JUNCTION_PIVOT_KEY in body) {
+                this.assertNestedRelationWritable(c, nested, "pivot");
                 return this.updateRelationPivotFromBody(c, driver, nested, parsed.id, body);
             }
+
+            this.assertNestedRelationWritable(c, nested, "update");
 
             return this.updateRow(c, driver, nestedRow(nested), parsed.id, body);
         };
@@ -1807,6 +1826,10 @@ id };
             const nested = this.resolveNestedPath(parsed.collectionPath);
 
             this.enforceSubcollectionApiKeyPermission(c, nested);
+
+            // Through a many-to-many path this drops the link — a write of the
+            // parent's relation.
+            this.assertNestedRelationWritable(c, nested, "unlink");
 
             return this.deleteRow(c, driver, nestedRow(nested), parsed.id);
         });

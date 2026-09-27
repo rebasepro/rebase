@@ -37,12 +37,16 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     ApiError: require("../../server/src/api/errors").ApiError,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    resolveConflictTarget: require("../../server/src/api/rest/conflict-target").resolveConflictTarget
+    resolveConflictTarget: require("../../server/src/api/rest/conflict-target").resolveConflictTarget,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    assertNestedWriteAllowed: require("../../server/src/api/rest/nested-write-access").assertNestedWriteAllowed
 }));
 
+import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
  * A write arriving over the socket used to skip the checks the REST routes run.
@@ -274,5 +278,120 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         await send({ type: "SAVE", requestId: "r-2", payload: { path: "unknown", values: { x: 1 } } });
 
         expect(saved).toHaveLength(1);
+    });
+});
+
+/**
+ * A write through a parent writes the parent's relation, and for a child that
+ * carries the parent's key, that key — which is not in the body the checks
+ * above read. The REST nested routes ask `assertNestedWriteAllowed`; so does
+ * this door.
+ */
+describe("a socket write through a parent's relation", () => {
+    const members = {
+        slug: "members", name: "Members", table: "members",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" },
+            band: { name: "Band", type: "relation", access: { write: ["hr"] }, relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" } }
+        }
+    } as unknown as CollectionConfig;
+    const bands: CollectionConfig = {
+        slug: "bands", name: "Bands", table: "bands",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" },
+            members: { name: "Members", type: "relation", relation: { kind: "hasMany", target: () => members, foreignKeyOnTarget: "band_id" } }
+        }
+    } as unknown as CollectionConfig;
+    const tags = {
+        slug: "tags", name: "Tags", table: "tags",
+        properties: { id: { name: "ID", type: "number", isId: "increment" }, name: { name: "Name", type: "string" } }
+    } as unknown as CollectionConfig;
+    const posts = {
+        slug: "posts", name: "Posts", table: "posts",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            tags: {
+                name: "Tags", type: "relation", access: { write: ["editor"] },
+                relation: { kind: "manyToMany", target: () => tags, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    let writes: unknown[];
+
+    const adapter = {
+        verifyToken: async (token: string) => ({ uid: `u-${token}`, roles: token.split(","), isAdmin: false })
+    } as unknown as AuthAdapter;
+
+    const connect = async (roles: string[]) => {
+        const handlers: Record<string, (...args: any[]) => any> = {};
+        const ws = {
+            send: jest.fn(),
+            on: (event: string, cb: (...args: any[]) => any) => { handlers[event] = cb; },
+            readyState: 1,
+            close: jest.fn()
+        };
+        mockWssInstance.on.mock.calls.find((c: any[]) => c[0] === "connection")[1](ws, { url: "/", headers: {} });
+        const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
+        await send({ type: "AUTHENTICATE", requestId: "auth", payload: { token: roles.join(",") } });
+        const last = () => JSON.parse(ws.send.mock.calls[ws.send.mock.calls.length - 1][0]);
+        return { send, last };
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        writes = [];
+        const registry = new PostgresCollectionRegistry();
+        registry.registerMultiple([bands, members, posts, tags]);
+        const driver = {
+            key: "postgres",
+            initialised: true,
+            registry,
+            save: async (props: unknown) => { writes.push(props); return {}; },
+            delete: async (props: unknown) => { writes.push(props); },
+            withAuth: undefined
+        } as unknown as PostgresBackendDriver;
+        createPostgresWebSocket({} as Server, { addClient: jest.fn() } as unknown as RealtimeService, driver, undefined, adapter);
+    });
+
+    const expectRefused = (frame: { type: string; payload: { error: { code: string; message: string } } }, field: string) => {
+        expect(frame.type).toBe("ERROR");
+        expect(frame.payload.error.code).toBe("FIELD_NOT_WRITABLE");
+        expect(frame.payload.error.message).toContain(`'${field}'`);
+    };
+
+    it("refuses a create under a parent whose key the caller may not set on the child", async () => {
+        const { send, last } = await connect(["viewer"]);
+        await send({ type: "SAVE", requestId: "s", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
+        expectRefused(last(), "bandId");
+        expect(writes).toEqual([]);
+    });
+
+    it("refuses a many-to-many link, made or dropped, the caller may not write", async () => {
+        const { send, last } = await connect(["viewer"]);
+        await send({ type: "SAVE", requestId: "a", payload: { path: "posts/1/tags", status: "new", values: { name: "new" } } });
+        expectRefused(last(), "tags");
+        await send({ type: "SAVE", requestId: "b", payload: { path: "posts/1/tags", id: 5, status: "existing", values: { name: "same" } } });
+        expectRefused(last(), "tags");
+        await send({ type: "DELETE", requestId: "c", payload: { row: { path: "posts/1/tags", id: 5 } } });
+        expectRefused(last(), "tags");
+        expect(writes).toEqual([]);
+    });
+
+    it("lets a caller holding the roles make them", async () => {
+        const { send } = await connect(["hr", "editor"]);
+        await send({ type: "SAVE", requestId: "s", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
+        await send({ type: "SAVE", requestId: "a", payload: { path: "posts/1/tags", status: "new", values: { name: "new" } } });
+        await send({ type: "DELETE", requestId: "c", payload: { row: { path: "posts/1/tags", id: 5 } } });
+        expect(writes).toHaveLength(3);
+    });
+
+    it("leaves an update through an owning parent alone: it moves nothing", async () => {
+        const { send } = await connect(["viewer"]);
+        await send({ type: "SAVE", requestId: "u", payload: { path: "bands/7/members", id: 3, status: "existing", values: { name: "renamed" } } });
+        expect(writes).toHaveLength(1);
     });
 });

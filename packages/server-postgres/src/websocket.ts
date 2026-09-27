@@ -2,7 +2,7 @@ import { RealtimeService, type SubscriptionAuthContext } from "./services/realti
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
-import { isNestedPath } from "./services/nested-path";
+import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
@@ -10,7 +10,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, type NestedWriteKind } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -583,6 +583,28 @@ roles: verifiedUser.roles }
                 };
 
                 /**
+                 * Refuse a write through a nested path that sets a relation
+                 * this caller may not write — the rule REST's nested routes
+                 * apply, from the same function. The body is checked by
+                 * `assertWriteRequest`; this is what the address writes.
+                 *
+                 * Silent for a root path, and for a nested one the registry
+                 * cannot walk: the driver refuses that with its own message.
+                 */
+                const assertNestedWrite = (path: unknown, kind: NestedWriteKind): void => {
+                    if (typeof path !== "string" || !isNestedPath(path) || !driver.registry) return;
+                    let hop;
+                    try {
+                        hop = resolveNestedPath(path, driver.registry);
+                    } catch {
+                        return;
+                    }
+                    if (!hop) return;
+                    const session = clientSessions.get(clientId);
+                    assertNestedWriteAllowed(hop, kind, path, { roles: session?.user?.roles ?? ["anon"] });
+                };
+
+                /**
                  * An upsert's options, under the rules `POST /api/data`
                  * applies to `?on_conflict=`: refused on a nested path,
                  * whose insert branch stamps the parent's key into the
@@ -695,6 +717,9 @@ colors: true }));
                         // supplied, and reading the rules out of it would let
                         // the caller choose which rules to be checked against.
                         assertWriteRequest(request.path, request.values as Record<string, unknown>);
+                        // A create is one when the driver takes it for one:
+                        // no id, or a status that asks for a new row.
+                        assertNestedWrite(request.path, request.id === undefined || request.status !== "existing" ? "create" : "update");
                         const delegate = await getScopedDelegate();
                         // The address, the values and the status, and nothing
                         // else the frame says — the DELETE case below is
@@ -725,6 +750,9 @@ colors: true }));
                         wsDebug("🗑️ [WebSocket Server] Processing DELETE_ENTITY request");
                         const request: DeleteProps = payload;
                         wsDebug("🗑️ [WebSocket Server] Deleting row:", request.row);
+                        // Through a many-to-many path this drops the link — a
+                        // write of the parent's relation.
+                        assertNestedWrite(request.row?.path, "unlink");
                         const delegate = await getScopedDelegate();
                         // The address and `hard`, and nothing else the frame
                         // says. The driver reads the row itself, and resolves
@@ -804,7 +832,12 @@ colors: true }));
                                 sendError("ERROR", "NOT_SUPPORTED", "SQL execution is not available for this driver.");
                                 break;
                             }
-                            const result = await admin.executeSql(sql, options);
+                            // A session of its own, reset before it goes back
+                            // to the pool: what a person types may `SET ROLE`,
+                            // and that must not reach the next request on
+                            // that connection. Set here, after the client's
+                            // options, so a frame cannot turn it off.
+                            const result = await admin.executeSql(sql, { ...options, isolateSession: true });
                             if (process.env.NODE_ENV !== "production") {
                                 wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                             }

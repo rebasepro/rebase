@@ -69,6 +69,7 @@ function assertEmailLinkBases
 function assertEveryKindBindable
 function assertFieldOpsValid
 function assertIfMatch
+function assertNestedWriteAllowed
 function assertNoFieldOpsOnCreate
 function assertQueryFieldsReadable
 function assertUploadWithinPropertyLimits
@@ -308,6 +309,7 @@ interface MetricsHandle { middleware, registry, setKnownCollections }
 interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verifiedAt }
 interface MfaFactor { createdAt, factorType, friendlyName, id, lastUsedCounter, uid, updatedAt, verified }
 interface MfaRepository { claimMfaFactorCounter, createMfaChallenge, createMfaFactor, createRecoveryCodes, deleteAllRecoveryCodes, deleteMfaFactor, getMfaChallengeById, getMfaFactorById, getMfaFactors, getUnusedRecoveryCodeCount, hasVerifiedMfaFactors, recordMfaChallengeAttempt, updateMfaFactorSecret, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
+interface NestedWriteHop { parentCollection, relation, targetCollection }
 interface OAuthProvider { id, schema, verify }
 interface OAuthProviderProfile { displayName, email, emailVerified, photoUrl, providerId }
 interface OutboundUrlGuardOptions { allowPrivateNetworks, lookup }
@@ -382,6 +384,7 @@ type JobStatus
 type JwtSigningAlgorithm
 type MagicLinkTemplateFunction
 type MetricSurface
+type NestedWriteKind
 type PasswordResetTemplateFunction
 type PublicJwk
 type RebaseBootEnv

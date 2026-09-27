@@ -283,3 +283,162 @@ describe("a nested count", () => {
         })]]);
     });
 });
+
+/**
+ * A write through a parent writes the parent's relation — and, for a child that
+ * carries its parent's key, that key.
+ *
+ * `POST /members { bandId: 7 }` is refused when `members.band` is closed to the
+ * caller. `POST /bands/7/members` sets the same column: the driver stamps it
+ * from the URL, after every check had looked only at the body. And a
+ * many-to-many path is set membership — `PATCH /posts/1 { tags: [5] }` is
+ * refused when `posts.tags` is closed, while `POST /posts/1/tags`,
+ * `PATCH /posts/1/tags/5`, a `_pivot` edit or `DELETE /posts/1/tags/5` changed
+ * the same links.
+ */
+describe("a write through a parent's relation", () => {
+    const members = {
+        slug: "members",
+        name: "Members",
+        table: "members",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" },
+            band: {
+                name: "Band",
+                type: "relation",
+                access: { write: ["hr"] },
+                relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    const bands: CollectionConfig = {
+        slug: "bands",
+        name: "Bands",
+        table: "bands",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" },
+            members: { name: "Members", type: "relation", relation: { kind: "hasMany", target: () => members, foreignKeyOnTarget: "band_id" } }
+        }
+    } as unknown as CollectionConfig;
+
+    const tags = {
+        slug: "tags",
+        name: "Tags",
+        table: "tags",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" }
+        }
+    } as unknown as CollectionConfig;
+
+    const posts = {
+        slug: "posts",
+        name: "Posts",
+        table: "posts",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            title: { name: "Title", type: "string" },
+            tags: {
+                name: "Tags",
+                type: "relation",
+                access: { write: ["editor"] },
+                relation: {
+                    kind: "manyToMany",
+                    target: () => tags,
+                    through: {
+                        table: "posts_tags",
+                        sourceColumn: "post_id",
+                        targetColumn: "tag_id",
+                        properties: { role: { name: "Role", type: "string" } }
+                    }
+                }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    function harness(roles: string[]) {
+        const calls: Call[] = [];
+        const record = (method: string, result: (props: Record<string, unknown>) => unknown) =>
+            async (props: Record<string, unknown>) => {
+                calls.push([method, props]);
+                return result(props);
+            };
+        const driver = {
+            key: "postgres",
+            initialised: true,
+            fetchOne: record("fetchOne", () => ({ id: 5, name: "t" })),
+            fetchCollection: record("fetchCollection", () => []),
+            count: record("count", () => 0),
+            save: record("save", (props) => ({ id: 5, ...(props.values as object) })),
+            delete: record("delete", () => undefined),
+            updateRelationPivot: record("updateRelationPivot", () => undefined)
+        } as unknown as DataDriver;
+        const app = new Hono();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => {
+            c.set("driver", driver);
+            c.set("user", { uid: "u1", roles });
+            await next();
+        });
+        app.route("/", new RestApiGenerator([bands, members, posts, tags], driver).generateRoutes());
+        const writes = () => calls.filter(([method]) => ["save", "delete", "updateRelationPivot"].includes(method));
+        return { app, writes };
+    }
+
+    const refused = async (res: Response, field: string) => {
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("FIELD_NOT_WRITABLE");
+        expect(body.error.message).toContain(`'${field}'`);
+    };
+
+    it("control: the body naming the key is refused at the root", async () => {
+        const { app, writes } = harness(["viewer"]);
+        await refused(await send(app, "POST", "/members", { name: "x", bandId: 7 }), "bandId");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("refuses a create under a parent whose key the caller may not set on the child", async () => {
+        const { app, writes } = harness(["viewer"]);
+        await refused(await send(app, "POST", "/bands/7/members", { name: "x" }), "bandId");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("creates under the parent for a caller who may set the key", async () => {
+        const { app, writes } = harness(["hr"]);
+        const res = await send(app, "POST", "/bands/7/members", { name: "x" });
+        expect(res.status).toBe(201);
+        expect(writes()).toHaveLength(1);
+    });
+
+    it("refuses every write that changes a many-to-many membership the caller may not write", async () => {
+        const { app, writes } = harness(["viewer"]);
+        await refused(await send(app, "PATCH", "/posts/1", { tags: [5] }), "tags");
+        await refused(await send(app, "POST", "/posts/1/tags", { name: "new" }), "tags");
+        await refused(await send(app, "PATCH", "/posts/1/tags/5", { name: "same" }), "tags");
+        await refused(await send(app, "PATCH", "/posts/1/tags/5", { _pivot: { role: "owner" } }), "tags");
+        await refused(await send(app, "DELETE", "/posts/1/tags/5"), "tags");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("lets a caller who may write the relation make every one of them", async () => {
+        const { app, writes } = harness(["editor"]);
+        expect((await send(app, "POST", "/posts/1/tags", { name: "new" })).status).toBe(201);
+        expect((await send(app, "PATCH", "/posts/1/tags/5", { name: "same" })).status).toBe(200);
+        expect((await send(app, "PATCH", "/posts/1/tags/5", { _pivot: { role: "owner" } })).status).toBe(204);
+        expect((await send(app, "DELETE", "/posts/1/tags/5")).status).toBe(204);
+        expect(writes()).toHaveLength(4);
+    });
+
+    it("leaves an update through an owning parent alone: it moves nothing", async () => {
+        // `PATCH /bands/7/members/3` is refused unless the row is already the
+        // band's, and does not write the key — so a closed `band` is not in it.
+        const { app, writes } = harness(["viewer"]);
+        const res = await send(app, "PATCH", "/bands/7/members/3", { name: "renamed" });
+        expect(res.status).toBe(200);
+        expect(writes()).toHaveLength(1);
+    });
+});
