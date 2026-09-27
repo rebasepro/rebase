@@ -33,7 +33,11 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     splitFieldOps: require("../../server/src/api/rest/field-ops").splitFieldOps,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer
+    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    ApiError: require("../../server/src/api/errors").ApiError,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    resolveConflictTarget: require("../../server/src/api/rest/conflict-target").resolveConflictTarget
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";
@@ -67,7 +71,8 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         properties: {
             id: { name: "ID", type: "string", isId: true },
             age: { name: "Age", type: "number", validation: { max: 120 } },
-            handle: { name: "Handle", type: "string", validation: { matches: "^[a-z]+$" } }
+            handle: { name: "Handle", type: "string", validation: { matches: "^[a-z]+$" } },
+            email: { name: "Email", type: "string", validation: { unique: true } }
         }
     };
 
@@ -194,6 +199,71 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
 
         expect(saved).toHaveLength(1);
         expect(saved[0]).toMatchObject({ values: { age: { $inc: 1 } } });
+    });
+
+    it("hands the driver the address, the values and the status — nothing else the frame says", async () => {
+        // `collection` was merged under the registry's in the driver, so a key
+        // the registry leaves unset was the caller's: `{ history: true }`
+        // recorded history for a collection that declares none. The DELETE
+        // frame was narrowed the same way for `softDelete`.
+        const { send } = connect();
+
+        await send({
+            type: "SAVE",
+            requestId: "r-3",
+            payload: {
+                path: "users",
+                id: "u-1",
+                status: "existing",
+                values: { age: 30 },
+                collection: { slug: "users", history: true },
+                previousValues: { age: 1 }
+            }
+        });
+
+        expect(saved).toEqual([{ path: "users", id: "u-1", status: "existing", values: { age: 30 } }]);
+    });
+
+    it("refuses an upsert through a parent, which would move the row it matched under that parent", async () => {
+        // `POST /owners/1/docs?on_conflict=…` is refused for this reason; the
+        // insert branch stamps the parent's key into the DO UPDATE, so Bob's
+        // doc 10 became owner 1's.
+        const { ws, send } = connect();
+
+        await send({
+            type: "SAVE",
+            requestId: "r-4",
+            payload: { path: "owners/1/docs", status: "new", upsert: true, values: { id: 10, title: "x" } }
+        });
+
+        expect(saved).toEqual([]);
+        expect(lastFrame(ws)).toMatchObject({ type: "ERROR", payload: { error: { code: "INVALID_CONFLICT_TARGET" } } });
+    });
+
+    it("refuses a conflict target that carries no uniqueness guarantee", async () => {
+        // Unchecked, it reached Postgres as 42P10 and came back a server fault.
+        const { ws, send } = connect();
+
+        await send({
+            type: "SAVE",
+            requestId: "r-5",
+            payload: { path: "users", status: "new", upsert: true, onConflict: ["age"], values: { age: 30 } }
+        });
+
+        expect(saved).toEqual([]);
+        expect(lastFrame(ws)).toMatchObject({ type: "ERROR", payload: { error: { code: "INVALID_CONFLICT_TARGET" } } });
+    });
+
+    it("passes an upsert on a declared unique target through", async () => {
+        const { send } = connect();
+
+        await send({
+            type: "SAVE",
+            requestId: "r-6",
+            payload: { path: "users", status: "new", upsert: true, onConflict: ["email"], values: { email: "a@b.c" } }
+        });
+
+        expect(saved).toEqual([{ path: "users", status: "new", values: { email: "a@b.c" }, upsert: true, onConflict: ["email"] }]);
     });
 
     it("says nothing about a path the registry does not know", async () => {

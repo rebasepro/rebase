@@ -2,6 +2,7 @@ import { RealtimeService, type SubscriptionAuthContext } from "./services/realti
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
+import { isNestedPath } from "./services/nested-path";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
@@ -9,7 +10,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -581,6 +582,31 @@ roles: verifiedUser.roles }
                     });
                 };
 
+                /**
+                 * An upsert's options, under the rules `POST /api/data`
+                 * applies to `?on_conflict=`: refused on a nested path,
+                 * whose insert branch stamps the parent's key into the
+                 * DO UPDATE and so moves the row it matched under this
+                 * parent; and a target that is a declared unique key of
+                 * the registry's collection, or a 400 naming the ones
+                 * there are rather than Postgres's 42P10.
+                 */
+                const upsertOptions = (request: SaveProps): Pick<SaveProps, "upsert" | "onConflict"> => {
+                    if (request.upsert !== true) return {};
+                    if (typeof request.path === "string" && isNestedPath(request.path)) {
+                        throw ApiError.badRequest(
+                            "An upsert is not accepted on a nested path: a row it matched would be moved " +
+                            "under this parent. Send the upsert to the collection directly.",
+                            "INVALID_CONFLICT_TARGET"
+                        );
+                    }
+                    const collection = driver.registry?.getCollectionByPath(request.path);
+                    const onConflict = collection
+                        ? resolveConflictTarget(request.onConflict, collection, { where: "`onConflict`" })
+                        : undefined;
+                    return { upsert: true, ...(onConflict && { onConflict }) };
+                };
+
                 // Helper to get correctly scoped delegate for the current request
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     // Check if the driver supports RLS-scoped delegates
@@ -670,7 +696,19 @@ colors: true }));
                         // the caller choose which rules to be checked against.
                         assertWriteRequest(request.path, request.values as Record<string, unknown>);
                         const delegate = await getScopedDelegate();
-                        const row = await delegate.save(request);
+                        // The address, the values and the status, and nothing
+                        // else the frame says — the DELETE case below is
+                        // narrowed for the same reason. A `collection` here was
+                        // merged under the registry's in the driver, so a key
+                        // the registry leaves unset was the caller's to set
+                        // (`history: true` on a collection declaring none).
+                        const row = await delegate.save({
+                            path: request.path,
+                            ...(request.id !== undefined && { id: request.id }),
+                            values: request.values,
+                            status: request.status,
+                            ...upsertOptions(request)
+                        });
                         wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(row, { depth: null,
 colors: true }));
                         const response = {
