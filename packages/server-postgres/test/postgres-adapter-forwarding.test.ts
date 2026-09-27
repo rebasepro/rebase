@@ -126,17 +126,21 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
             const driver = { marker: "driver" };
             const authConfig = { requireAuth: true };
             const authAdapter = { name: "clerk" };
+            // The data API's body and rate limits, for the socket's frames —
+            // dropped here, the socket has neither.
+            const limits = { maxPayload: 1024, dataRateLimit: async () => null };
 
             await createPostgresAdapter(config).initializeWebsockets!(
                 server,
                 realtimeService as never,
                 driver as never,
                 authConfig,
-                authAdapter
+                authAdapter as never,
+                limits
             );
 
             expect(initializeWebsockets).toHaveBeenCalledWith(
-                server, realtimeService, driver, authConfig, authAdapter
+                server, realtimeService, driver, authConfig, authAdapter, limits
             );
         });
     });
