@@ -27,6 +27,7 @@ import type {
     DatabaseAdmin,
     InitializedDriver,
     RealtimeProvider,
+    RealtimeSocketLimits,
     BootstrappedAuth
 } from "./backend";
 import type { HistoryConfig } from "../controllers/client";
@@ -90,6 +91,10 @@ export interface DatabaseAdapter {
      * already passed it, so it was dropped at every adapter that routed through
      * here — turning an adapter-authenticated server's socket into one that
      * accepted every client as already authenticated.
+     *
+     * `limits` are the data API's body and per-caller rate limits, for the
+     * socket's frames: it serves the same rows, and without them a frame had
+     * neither. Forwarded for the same reason `adapter` is.
      */
     initializeWebsockets?(
         server: unknown,
@@ -97,6 +102,7 @@ export interface DatabaseAdapter {
         driver: DataDriver,
         config?: unknown,
         adapter?: import("./auth_adapter").AuthAdapter,
+        limits?: RealtimeSocketLimits,
     ): Promise<void> | void;
 
     /**

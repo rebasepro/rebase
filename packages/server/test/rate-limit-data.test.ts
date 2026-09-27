@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { Hono } from "hono";
-import { createDataRateLimiter } from "../src/auth/rate-limiter";
+import { createDataRateLimiter, createDataRateLimitCheck } from "../src/auth/rate-limiter";
 import { MemoryRateLimitStore, RateLimitStore } from "../src/auth/rate-limit-store";
 
 /**
@@ -166,6 +166,73 @@ rate_limit: 1 });
         const res = await hit(app);
         expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
         expect(res.headers.get("X-RateLimit-Remaining")).toBe("4");
+    });
+});
+
+/**
+ * The same buckets, for a door that is not an HTTP request.
+ *
+ * The realtime socket serves the same rows the data API does, one frame per
+ * request, and used to count them only per connection — so opening more
+ * connections bought more budget. It counts through this check now, which must
+ * put a caller in the bucket the HTTP limiter would, or the two doors are two
+ * allowances.
+ */
+describe("createDataRateLimitCheck", () => {
+    let store: MemoryRateLimitStore;
+
+    beforeEach(() => {
+        store = new MemoryRateLimitStore();
+    });
+
+    afterEach(() => {
+        store.dispose();
+    });
+
+    const from = (uid: string | undefined, address = "5.5.5.5") => ({
+        uid,
+        header: (name: string) => name === "x-forwarded-for" ? address : undefined,
+        socketAddress: "10.0.0.1"
+    });
+
+    it("spends the allowance the HTTP limiter spends, for the same person", async () => {
+        const app = new Hono();
+        app.use("/*", async (c, next) => {
+            c.set("user" as never, { uid: "user-1" } as never);
+            await next();
+        });
+        app.use("/*", createDataRateLimiter({ store, user: 3 }));
+        app.get("/data", (c) => c.json({ ok: true }));
+        const check = createDataRateLimitCheck({ store, user: 3 });
+
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(200);
+        expect((await check(from("user-1")))?.allowed).toBe(true);
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(200);
+        // Three spent between the two doors.
+        expect((await check(from("user-1")))?.allowed).toBe(false);
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(429);
+    });
+
+    it("never limits the service identity", async () => {
+        const check = createDataRateLimitCheck({ store, user: 1 });
+        expect(await check(from("service"))).toBeNull();
+        expect(await check(from("service"))).toBeNull();
+    });
+
+    it("buckets a caller with no account by address, at the anonymous allowance", async () => {
+        const check = createDataRateLimitCheck({ store, anonymous: 1, user: 100, trustedProxyHops: 1 });
+
+        expect((await check(from(undefined, "9.9.9.9")))?.allowed).toBe(true);
+        expect((await check(from("anon", "9.9.9.9")))?.allowed).toBe(false);
+        expect((await check(from(undefined, "8.8.8.8")))?.allowed).toBe(true);
+    });
+
+    it("reads the connection's own address when no proxy is declared", async () => {
+        const check = createDataRateLimitCheck({ store, anonymous: 1 });
+
+        expect((await check(from(undefined, "9.9.9.9")))?.allowed).toBe(true);
+        // A different forwarded address from the same connection is the same caller.
+        expect((await check(from(undefined, "8.8.8.8")))?.allowed).toBe(false);
     });
 });
 

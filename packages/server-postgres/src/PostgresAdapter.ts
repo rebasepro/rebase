@@ -36,14 +36,16 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
             return undefined;
         },
 
-        // `adapter` is forwarded for the same reason the schema hooks below are:
-        // dropping an argument here is invisible at the call site and silent at
-        // runtime. This one decided whether the realtime socket authenticates at
-        // all — without it, a server whose auth comes from an AuthAdapter fell
-        // back to "is a jwtSecret set?", answered no, and admitted every client.
-        initializeWebsockets(server, realtimeService, driver, config, adapter) {
+        // `adapter` and `limits` are forwarded for the same reason the schema
+        // hooks below are: dropping an argument here is invisible at the call
+        // site and silent at runtime. `adapter` decided whether the realtime
+        // socket authenticates at all — without it, a server whose auth comes
+        // from an AuthAdapter fell back to "is a jwtSecret set?", answered no,
+        // and admitted every client. `limits` are the data API's body and rate
+        // limits; dropped, the socket has neither.
+        initializeWebsockets(server, realtimeService, driver, config, adapter, limits) {
             if (bootstrapper.initializeWebsockets) {
-                return bootstrapper.initializeWebsockets(server, realtimeService, driver, config, adapter);
+                return bootstrapper.initializeWebsockets(server, realtimeService, driver, config, adapter, limits);
             }
         },
 

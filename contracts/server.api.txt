@@ -618,6 +618,7 @@ interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, l
 interface CronResourceOptions { catchUpWindowSeconds, description, enabled, engine, label, schedule, timeoutSeconds, timezone, transport }
 interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
 interface DataDriver { admin, batchWrite, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany, updateRelationPivot }
+interface DataRateLimitCaller { header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
@@ -711,6 +712,7 @@ interface RawSQLSecurityRule { access, check, condition, mode, name, operation, 
 interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
 interface RealtimeChannelsConfig { bus, channels }
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
+interface RealtimeSocketLimits { dataRateLimit, maxPayload }
 interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions, port, runtime, schema, type, usersCollection }
 interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
 interface RebaseBundleFunction { file, name, portable, requires }

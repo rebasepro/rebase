@@ -2,14 +2,14 @@ import { RealtimeService, type SubscriptionAuthContext } from "./services/realti
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
-import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
+import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
-import { WebSocketServer, WebSocket } from "ws";
-import { Server } from "http";
+import { WebSocketServer, WebSocket, type RawData } from "ws";
+import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -82,6 +82,18 @@ const WS_RATE_WINDOW_MS = 60_000;
  * a considered product limit (see `docs/channel-authorization.md`).
  */
 const WS_CHANNEL_RATE_LIMIT = 7200;
+
+/**
+ * The largest frame a socket that has not authenticated may send, in bytes.
+ *
+ * All such a socket can usefully say is `AUTHENTICATE` with a token — a few
+ * KiB with custom claims — and everything else is answered `UNAUTHORIZED`.
+ * Without this, each of those answers came after the whole frame was buffered,
+ * stringified and parsed, up to the body limit: a handful of connections that
+ * never signed in could hold the process's memory. A larger frame closes the
+ * socket with 1009 before it is read.
+ */
+const MAX_UNAUTHENTICATED_FRAME_BYTES = 64 * 1024;
 
 /** Frames counted against the channel budget rather than the general one. */
 const CHANNEL_MESSAGE_TYPES = new Set([
@@ -195,12 +207,41 @@ function isAdminSession(session: ClientSession | undefined): boolean {
     return session.user.roles.some((r) => r === "admin");
 }
 
+/** A frame's size in bytes, however `ws` delivered it. */
+function frameBytes(data: RawData): number {
+    if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.length, 0);
+    return data.byteLength;
+}
+
+/**
+ * Where a connection comes from, as the data API's rate limiter reads an
+ * address: the upgrade request's headers (believed only as far as proxies are
+ * declared) and the socket's own address.
+ */
+function connectionOrigin(request: IncomingMessage | undefined): Omit<DataRateLimitCaller, "uid"> {
+    return {
+        header: (name) => {
+            const value = request?.headers[name];
+            return Array.isArray(value) ? value.join(", ") : value;
+        },
+        socketAddress: request?.socket?.remoteAddress
+    };
+}
+
+/**
+ * `limits` are the data API's, for the same rows reached through this door:
+ * frames larger than its body limit close the socket with 1009 before they are
+ * read, and every data frame counts in the caller's data-API bucket — the one
+ * their HTTP requests count in — rather than only in a budget per connection,
+ * which a caller multiplied by opening more.
+ */
 export function createPostgresWebSocket(
     server: Server,
     realtimeService: RealtimeService,
     driver: PostgresBackendDriver,
     authConfig?: WsAuthConfig,
-    authAdapter?: AuthAdapter
+    authAdapter?: AuthAdapter,
+    limits?: RealtimeSocketLimits
 ) {
     // Session map scoped to this factory invocation — prevents stale sessions
     // leaking across hot reloads or multiple factory calls.
@@ -227,7 +268,11 @@ export function createPostgresWebSocket(
         if (extras.length === 0) logger.debug(message);
         else logger.debug(message, { details: extras.length === 1 ? extras[0] : extras });
     };
-    const wss = new WebSocketServer({ server });
+    // `ws` defaults to 100 MiB. The data API refuses a body over its limit
+    // before any handler runs; this is the same limit, enforced by `ws` while
+    // it reads the frame. `0` is "none" to both.
+    const maxPayload = limits?.maxPayload ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
+    const wss = new WebSocketServer({ server, maxPayload: maxPayload > 0 ? maxPayload : 0 });
 
     // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
     // server doesn't surface as an unhandled 'error' event and crash the
@@ -256,8 +301,9 @@ export function createPostgresWebSocket(
         );
     }
 
-    wss.on("connection", (ws) => {
+    wss.on("connection", (ws, request?: IncomingMessage) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const origin = connectionOrigin(request);
         wsDebug(`WebSocket client connected: ${clientId}`);
 
         // Initialize client session
@@ -274,10 +320,22 @@ channelWindowStart: Date.now() });
             clientSessions.delete(clientId);
         });
 
+        // A frame over `maxPayload` is refused by `ws` as an `error` on this
+        // socket, then closed with 1009. An `error` with no listener is thrown
+        // by the emitter — out of the process — so the socket that set the
+        // limit listens for it rather than trusting a realtime provider to.
+        ws.on("error", (error: Error) => {
+            wsDebug(`WebSocket client ${clientId} error: ${error.message}`);
+        });
+
         // Route all messages through RealtimeService for unified handling
-        ws.on("message", async (message) => {
+        ws.on("message", async (message: RawData) => {
             let requestId: string | undefined;
             try {
+                if (!clientSessions.get(clientId)?.authenticated && frameBytes(message) > MAX_UNAUTHENTICATED_FRAME_BYTES) {
+                    ws.close(1009, "Authenticate before sending anything larger than a token.");
+                    return;
+                }
                 const {
                     type,
                     payload,
@@ -308,6 +366,43 @@ channelWindowStart: Date.now() });
                         }
                     }));
                 };
+
+                // Rate limiting: reject if client exceeds message limit.
+                // Channel frames are counted against their own budget — see
+                // WS_CHANNEL_RATE_LIMIT for why one shared counter starved them.
+                //
+                // Counted before the session is asked whether it has
+                // authenticated, so a socket that never does — sending
+                // `AUTHENTICATE` after `AUTHENTICATE`, each a token
+                // verification — spends this budget like any other.
+                {
+                    const session = clientSessions.get(clientId);
+                    if (session) {
+                        const now = Date.now();
+                        const isChannelFrame = CHANNEL_MESSAGE_TYPES.has(type);
+                        if (isChannelFrame) {
+                            if (now - session.channelWindowStart > WS_RATE_WINDOW_MS) {
+                                session.channelMessageCount = 0;
+                                session.channelWindowStart = now;
+                            }
+                            session.channelMessageCount++;
+                            if (session.channelMessageCount > WS_CHANNEL_RATE_LIMIT) {
+                                sendError("ERROR", "RATE_LIMITED", "Too many channel messages. Please slow down.");
+                                return;
+                            }
+                        } else {
+                            if (now - session.messageWindowStart > WS_RATE_WINDOW_MS) {
+                                session.messageCount = 0;
+                                session.messageWindowStart = now;
+                            }
+                            session.messageCount++;
+                            if (session.messageCount > WS_RATE_LIMIT) {
+                                sendError("ERROR", "RATE_LIMITED", "Too many requests. Please slow down.");
+                                return;
+                            }
+                        }
+                    }
+                }
 
                 if (type === "AUTHENTICATE") {
                     const { token } = payload || {};
@@ -398,43 +493,28 @@ roles: verifiedUser.roles }
                     }
                 }
 
-                // Rate limiting: reject if client exceeds message limit.
-                // Channel frames are counted against their own budget — see
-                // WS_CHANNEL_RATE_LIMIT for why one shared counter starved them.
-                {
-                    const session = clientSessions.get(clientId);
-                    if (session) {
-                        const now = Date.now();
-                        const isChannelFrame = CHANNEL_MESSAGE_TYPES.has(type);
-                        if (isChannelFrame) {
-                            if (now - session.channelWindowStart > WS_RATE_WINDOW_MS) {
-                                session.channelMessageCount = 0;
-                                session.channelWindowStart = now;
-                            }
-                            session.channelMessageCount++;
-                            if (session.channelMessageCount > WS_CHANNEL_RATE_LIMIT) {
-                                sendError("ERROR", "RATE_LIMITED", "Too many channel messages. Please slow down.");
-                                return;
-                            }
-                        } else {
-                            if (now - session.messageWindowStart > WS_RATE_WINDOW_MS) {
-                                session.messageCount = 0;
-                                session.messageWindowStart = now;
-                            }
-                            session.messageCount++;
-                            if (session.messageCount > WS_RATE_LIMIT) {
-                                sendError("ERROR", "RATE_LIMITED", "Too many requests. Please slow down.");
-                                return;
-                            }
-                        }
-                    }
-                }
-
                 // Admin-only operations require admin role
                 if (ADMIN_ONLY_TYPES.has(type)) {
                     const session = clientSessions.get(clientId);
                     if (!isAdminSession(session)) {
                         sendError("ERROR", "FORBIDDEN", "Admin access required for this operation");
+                        return;
+                    }
+                }
+
+                // A data frame is a data-API request by another door, and
+                // counts in the bucket that request would: this person's (or,
+                // with no account, this address's), shared with their HTTP
+                // requests and their other sockets. The counter above is per
+                // connection, so on its own a caller bought budget by
+                // opening sockets.
+                if (limits?.dataRateLimit && PUBLIC_TYPES.has(type)) {
+                    const decision = await limits.dataRateLimit({
+                        ...origin,
+                        uid: clientSessions.get(clientId)?.user?.uid
+                    });
+                    if (decision && !decision.allowed) {
+                        sendError("ERROR", "RATE_LIMITED", "Too many requests, please try again later.");
                         return;
                     }
                 }

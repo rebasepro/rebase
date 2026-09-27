@@ -20,7 +20,8 @@ import {
     type HistoryConfig,
     InitializedDriver,
     RealtimeProvider,
-    type RealtimeChannelsConfig
+    type RealtimeChannelsConfig,
+    type RealtimeSocketLimits
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService } from "./services/realtimeService";
@@ -1492,14 +1493,15 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // Currently Postgres doesn't need additional routes beyond what the coordinator mounts.
         },
 
-        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown): Promise<void> {
+        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown, limits?: RealtimeSocketLimits): Promise<void> {
             const { createPostgresWebSocket } = await import("./websocket");
             createPostgresWebSocket(
                 server as import("http").Server,
                 realtimeService as RealtimeService,
                 driver as PostgresBackendDriver,
                 config as { requireAuth?: boolean; jwtSecret?: string; serviceKey?: string },
-                adapter as AuthAdapter | undefined
+                adapter as AuthAdapter | undefined,
+                limits
             );
         }
     };

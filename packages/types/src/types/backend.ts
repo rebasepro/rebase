@@ -763,6 +763,46 @@ export type BackendFactory<TConfig extends BackendConfig = BackendConfig> =
 // =============================================================================
 
 /**
+ * A caller of the data API as its rate limiter buckets one outside an HTTP
+ * request: a realtime socket's frame, counted in the same bucket the same
+ * person's HTTP requests are.
+ * @group Backend
+ */
+export interface DataRateLimitCaller {
+    /**
+     * The signed-in user's uid. Absent, or the anonymous principal, buckets
+     * the caller by address at the anonymous allowance.
+     */
+    uid?: string;
+    /**
+     * A header of the request that opened the connection, by lower-case name:
+     * the proxy headers an address is read from when proxies are declared.
+     */
+    header(name: string): string | undefined;
+    /** The address the connection comes from. */
+    socketAddress?: string;
+}
+
+/**
+ * The data API's request limits, handed to the realtime socket so its frames
+ * carry the ones an HTTP request to the same rows does.
+ * @group Backend
+ */
+export interface RealtimeSocketLimits {
+    /**
+     * The largest frame accepted, in bytes — the data API's body limit. `0` or
+     * less for none. Defaults to the server's default body limit.
+     */
+    maxPayload?: number;
+    /**
+     * Count one data request from `caller` in the data API's per-caller
+     * buckets and say whether it is allowed; `null` for a caller who is not
+     * limited. Absent when the deployment has rate limiting off.
+     */
+    dataRateLimit?: (caller: DataRateLimitCaller) => Promise<{ allowed: boolean; retryAfterMs: number } | null>;
+}
+
+/**
  * A `BackendBootstrapper` encapsulates all driver-specific initialization logic.
  *
  * Instead of hard-coding Postgres setup into `initializeRebaseBackend()`,
@@ -991,7 +1031,7 @@ export interface BackendBootstrapper {
     /**
      * Initialize WebSocket server for realtime operations.
      */
-    initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter): Promise<void> | void;
+    initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter, limits?: RealtimeSocketLimits): Promise<void> | void;
 }
 
 /**

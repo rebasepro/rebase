@@ -130,7 +130,7 @@ import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
 import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./auth/api-keys/api-key-middleware";
 import { createRequireAuth } from "./auth/middleware";
-import { createDataRateLimiter, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
+import { createDataRateLimiter, createDataRateLimitCheck, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
@@ -3471,7 +3471,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // process has no subscribers; upgrading a connection for either is a
     // listener nobody asked for on a port nobody routes to.
     if (surfaces.realtime && defaultBootstrapper.initializeWebsockets && effectiveRealtimeService) {
-        await defaultBootstrapper.initializeWebsockets(config.server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter);
+        await defaultBootstrapper.initializeWebsockets(config.server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter, {
+            // The socket is another door into the rows the data router serves,
+            // and not under `${basePath}/*` where that router's body limit and
+            // rate limiter are registered: it carries both itself — the same
+            // body limit, and the same buckets in the same store, so a
+            // person's frames and requests spend one allowance.
+            maxPayload: config.maxBodySize,
+            dataRateLimit: rateLimitConfig ? createDataRateLimitCheck(rateLimitConfig) : undefined
+        });
     }
 
     logger.debug("Rebase Backend Initialized");

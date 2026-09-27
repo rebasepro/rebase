@@ -1,8 +1,8 @@
 import { MiddlewareHandler } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { isAnonymousUid } from "@rebasepro/types";
+import { isAnonymousUid, type DataRateLimitCaller } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
-import { MemoryRateLimitStore, RateLimitStore } from "./rate-limit-store";
+import { MemoryRateLimitStore, RateLimitDecision, RateLimitStore } from "./rate-limit-store";
 import { extractBearerToken } from "./bearer-token";
 import { isJwtConfigured, verifyAccessToken } from "./jwt";
 import { SERVICE_IDENTITY } from "./rls-scope";
@@ -247,15 +247,29 @@ function defaultKeyGenerator(
     c: Parameters<MiddlewareHandler<HonoEnv>>[0],
     trustedProxyHops: number = resolveTrustedProxyHops()
 ): string {
+    return clientAddress((name) => c.req.header(name), () => socketAddress(c), trustedProxyHops);
+}
+
+/**
+ * {@link defaultKeyGenerator}'s rule, over a request's headers and connection
+ * address rather than a Hono context — so a door that is not an HTTP request
+ * (the realtime socket's upgrade request) reads the caller's address the same
+ * way.
+ */
+function clientAddress(
+    header: (name: string) => string | undefined,
+    connectionAddress: () => string | undefined,
+    trustedProxyHops: number
+): string {
     if (trustedProxyHops === 0) {
         // Neither header is evidence of anything: both are trivially set by the
         // caller, and no proxy has been declared that would overwrite them.
-        warnIfProxiedButUntrusted(!!c.req.header("x-forwarded-for"));
-        return socketAddress(c) ?? "unknown";
+        warnIfProxiedButUntrusted(!!header("x-forwarded-for"));
+        return connectionAddress() ?? "unknown";
     }
 
     {
-        const forwardedFor = c.req.header("x-forwarded-for");
+        const forwardedFor = header("x-forwarded-for");
         if (forwardedFor) {
             const ips = forwardedFor.split(",").map(s => s.trim()).filter(Boolean);
             if (ips.length > 0) {
@@ -266,10 +280,10 @@ function defaultKeyGenerator(
         // A trusted proxy is declared to be in front, so this header is its to
         // set — and a proxy that sets only `X-Real-IP` (the stock nginx recipe)
         // is a normal deployment.
-        const realIp = c.req.header("x-real-ip");
+        const realIp = header("x-real-ip");
         if (realIp) return realIp;
     }
-    return socketAddress(c) ?? "unknown";
+    return connectionAddress() ?? "unknown";
 }
 
 /**
@@ -487,14 +501,12 @@ export const DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT = 3000;
 export function createDataRateLimiter(config: DataRateLimitConfig = {}): MiddlewareHandler<HonoEnv> {
     const {
         windowMs = 15 * 60 * 1000,
-        apiKey: apiKeyLimit = 1000,
-        user: userLimit = 1000,
-        anonymous: anonLimit = 300,
         // One store for every bucket: the keys are already namespaced, and a
         // shared store is what makes a shared limit possible.
         store = new MemoryRateLimitStore(windowMs)
     } = config;
     const trustedProxyHops = resolveTrustedProxyHops(config.trustedProxyHops);
+    const bucketFor = dataRateLimitBuckets(config);
 
     /**
      * Who this request is, for bucketing only.
@@ -531,38 +543,99 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         return payload.uid;
     };
 
+    const bucketOf = async (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<DataRateLimitBucket | null> => {
+        // The service key is not a caller to bound — see `dataRateLimitBuckets`.
+        // Read off the context, where the auth middleware put it.
+        const serviceIdentity = c.get("user") as { uid?: string } | undefined;
+        if (serviceIdentity?.uid === SERVICE_IDENTITY.uid) return null;
+        const apiKey = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
+        return bucketFor({
+            apiKey,
+            // An API key's bucket is its own; no token to verify behind it.
+            uid: apiKey ? undefined : await identify(c),
+            address: () => defaultKeyGenerator(c, trustedProxyHops)
+        });
+    };
+
     return createRateLimiter({
         windowMs,
         store,
         message: "Too many requests, please try again later.",
-        keyGenerator: async (c) => {
-            const key = c.get("apiKey") as { id: string } | undefined;
-            if (key) return `api-key:${key.id}`;
-            const uid = await identify(c);
-            if (uid) return `user:${uid}`;
-            return `ip:${defaultKeyGenerator(c, trustedProxyHops)}`;
-        },
-        resolveLimit: async (c) => {
-            // The service key is not a caller to bound. It is the deployment's
-            // own credential: it already reaches every row through
-            // `SERVICE_IDENTITY`, so a limit on it protects nothing that is not
-            // already open to whoever holds it. What it does reliably stop is
-            // the work the key exists for — backfills, migrations, imports,
-            // server-to-server jobs — which arrive as thousands of legitimate
-            // requests and met the ordinary signed-in-user allowance, because
-            // `identify` sees `uid: "service"` and buckets it as a user. A
-            // managed deployment has no `rateLimit` surface to raise, so the
-            // only way through was to sleep between writes.
-            //
-            // `null` means "skip the limiter", which `createRateLimiter`
-            // honours before it touches the store.
-            const serviceIdentity = c.get("user") as { uid?: string } | undefined;
-            if (serviceIdentity?.uid === SERVICE_IDENTITY.uid) return null;
-
-            const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
-            if (key) return key.rate_limit ?? apiKeyLimit;
-            return (await identify(c)) ? userLimit : anonLimit;
-        }
+        // Only asked when `resolveLimit` found a bucket.
+        keyGenerator: async (c) => (await bucketOf(c))?.key ?? `ip:${defaultKeyGenerator(c, trustedProxyHops)}`,
+        // `null` means "skip the limiter", which `createRateLimiter` honours
+        // before it touches the store.
+        resolveLimit: async (c) => (await bucketOf(c))?.limit ?? null
     });
 }
 
+/**
+ * The data API's per-caller limit, as a check rather than a middleware — for
+ * the door into the same data that is not an HTTP request.
+ *
+ * The realtime socket serves the rows the data API serves, one frame per
+ * request. It counted them per connection only, so a caller bought more budget
+ * by opening more sockets, and a frame never met the per-person limit its HTTP
+ * twin does. Built from the same config and store as
+ * {@link createDataRateLimiter}, it puts a caller in the same bucket under the
+ * same key: one person's allowance, spent through either door.
+ */
+export function createDataRateLimitCheck(
+    config: DataRateLimitConfig = {}
+): (caller: DataRateLimitCaller) => Promise<RateLimitDecision | null> {
+    const {
+        windowMs = 15 * 60 * 1000,
+        store = new MemoryRateLimitStore(windowMs)
+    } = config;
+    const trustedProxyHops = resolveTrustedProxyHops(config.trustedProxyHops);
+    const bucketFor = dataRateLimitBuckets(config);
+
+    return async (caller) => {
+        if (caller.uid === SERVICE_IDENTITY.uid) return null;
+        const bucket = bucketFor({
+            uid: caller.uid !== undefined && !isAnonymousUid(caller.uid) ? caller.uid : undefined,
+            address: () => clientAddress(caller.header, () => caller.socketAddress, trustedProxyHops)
+        });
+        return bucket ? store.hit(bucket.key, windowMs, bucket.limit) : null;
+    };
+}
+
+/** One caller's bucket in the data limiter's store, and its allowance there. */
+interface DataRateLimitBucket {
+    key: string;
+    limit: number;
+}
+
+/**
+ * Which bucket a data request counts in — the rule both doors share.
+ *
+ * Most specific first: an API key by its id, at its own `rate_limit`; a
+ * signed-in user by their uid; anyone else by address at the anonymous
+ * allowance, or not at all when that is `null`.
+ *
+ * The service key never reaches here: it is not a caller to bound. It is the
+ * deployment's own credential and already reaches every row through
+ * `SERVICE_IDENTITY`, so a limit on it protects nothing that is not already
+ * open to whoever holds it — while reliably stopping the backfills,
+ * migrations, imports and server-to-server jobs the key exists for, which
+ * arrive as thousands of legitimate requests. A managed deployment has no
+ * `rateLimit` surface to raise. Each door recognises it itself, where its
+ * identity is known.
+ */
+function dataRateLimitBuckets(config: DataRateLimitConfig): (who: {
+    apiKey?: { id: string; rate_limit?: number | null };
+    uid?: string;
+    address: () => string;
+}) => DataRateLimitBucket | null {
+    const {
+        apiKey: apiKeyLimit = 1000,
+        user: userLimit = 1000,
+        anonymous: anonLimit = 300
+    } = config;
+    return (who) => {
+        if (who.apiKey) return { key: `api-key:${who.apiKey.id}`, limit: who.apiKey.rate_limit ?? apiKeyLimit };
+        if (who.uid) return { key: `user:${who.uid}`, limit: userLimit };
+        if (anonLimit === null) return null;
+        return { key: `ip:${who.address()}`, limit: anonLimit };
+    };
+}
