@@ -1,9 +1,7 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { CollectionConfig } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
-import { createRequireAuth } from "../auth/middleware";
-import { requireAdmin } from "../auth";
 
 /** Bound once the generator is imported; the route closes over it. */
 let generateOpenApiSpecFn: typeof import("../api/openapi-generator").generateOpenApiSpec | null = null;
@@ -16,13 +14,17 @@ let generateOpenApiSpecFn: typeof import("../api/openapi-generator").generateOpe
  * active collection. A direct-transport collection is served by the client
  * against its own backend; documenting it here publishes a full set of CRUD
  * paths that 404, with a Try-It button next to each.
+ *
+ * `adminGate` is the runtime's admin gate — the middlewares every admin surface
+ * sits behind — for the spec when it is not public.
  */
 export async function mountOpenApiDocs(
     app: Hono<HonoEnv>,
     basePath: string,
     enableSwagger: boolean | undefined,
     serverCollections: CollectionConfig[],
-    requireAuth: boolean
+    requireAuth: boolean,
+    adminGate: MiddlewareHandler<HonoEnv>[]
 ): Promise<void> {
     if (serverCollections.length === 0) {
         // Still routed, and still a 404 — but one that says which 404 it is.
@@ -74,9 +76,12 @@ export async function mountOpenApiDocs(
     if (isPublic) {
         app.get(`${basePath}/docs`, (c) => spec(c));
     } else {
-        // The same two middlewares every other admin surface uses, so "admin"
-        // means one thing across the runtime.
-        app.get(`${basePath}/docs`, createRequireAuth({}), requireAdmin, (c) => spec(c));
+        // The gate every other admin surface sits behind, so "admin" means
+        // one thing across the runtime — including that it is read from the
+        // database: a demoted admin, or one who signed out everywhere, is not
+        // one for the rest of their token's hour.
+        app.use(`${basePath}/docs`, ...adminGate);
+        app.get(`${basePath}/docs`, (c) => spec(c));
     }
 
     if (process.env.NODE_ENV !== "production") {

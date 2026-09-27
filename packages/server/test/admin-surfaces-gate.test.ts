@@ -250,3 +250,75 @@ describe("admin surfaces when there is no authentication at all", () => {
         expect((await app.request("/api/cron")).status).toBe(501);
     });
 });
+
+/**
+ * The contract and the private API docs are admin surfaces, and "admin" is read
+ * off the database, not off the token — as every other admin surface reads it.
+ *
+ * Both were gated by `createRequireAuth` without the live checks, so a demoted
+ * admin, or one who had signed out everywhere, kept reading "a full map of the
+ * schema, including tables no security rule would ever expose" for the rest of
+ * the token's hour, while cron, logs and backups refused them.
+ */
+describe("the contract and the private docs read admin live", () => {
+    const liveBootstrapper: BackendBootstrapper = {
+        ...bootstrapper,
+        async initializeAuth() {
+            const authRepository = {
+                getUserRoleIds: async (uid: string) => (uid === "admin-1" || uid === "signed-out-1" ? ["admin"] : ["editor"]),
+                getTokensValidAfter: async (uid: string) => (uid === "signed-out-1" ? new Date(Date.now() + 60_000) : null)
+            };
+            return { userService: authRepository, authRepository };
+        }
+    } as unknown as BackendBootstrapper;
+
+    async function bootLive(): Promise<Hono> {
+        const app = new Hono();
+        const backend = await initializeRebaseBackend({
+            app: app as never,
+            server: {} as never,
+            collections: [collection("jobs")],
+            cronsDir: CRONS_DIR,
+            cronPersistence: false,
+            bootstrappers: [liveBootstrapper],
+            enableSwagger: false,
+            auth: publicDataPlane
+        } as never);
+        started.push({ app, stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.() });
+        return app;
+    }
+
+    it.each([
+        ["the contract", "/api/meta/contract"],
+        ["the private docs", "/api/docs"],
+        ["cron, for comparison", "/api/cron"]
+    ])("refuses %s to a token that still claims admin for a user who no longer is", async (_surface, url) => {
+        const app = await bootLive();
+        const token = await generateAccessToken("demoted-1", ["admin"]);
+
+        expect((await app.request(url, bearer(token))).status).toBe(403);
+    });
+
+    it.each([
+        ["the contract", "/api/meta/contract"],
+        ["the private docs", "/api/docs"]
+    ])("refuses %s to a token issued before its user signed out everywhere", async (_surface, url) => {
+        const app = await bootLive();
+        const token = await generateAccessToken("signed-out-1", ["admin"]);
+
+        const res = await app.request(url, bearer(token));
+
+        expect(res.status).toBe(401);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("SESSION_REVOKED");
+    });
+
+    it.each([
+        ["the contract", "/api/meta/contract"],
+        ["the private docs", "/api/docs"]
+    ])("serves %s to a current admin", async (_surface, url) => {
+        const app = await bootLive();
+        const token = await generateAccessToken("admin-1", ["admin"]);
+
+        expect((await app.request(url, bearer(token))).status).toBe(200);
+    });
+});

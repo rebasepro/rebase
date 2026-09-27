@@ -48,7 +48,7 @@ import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { ApiError, errorHandler } from "./api/errors";
 import { createSchemaDriftDetector } from "./api/schema-drift";
 import { installRootErrorHandler, installUnmatchedApiEnvelope } from "./api/root-error-handler";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
 import { logger, setLogLevel } from "./utils/logger";
@@ -2027,6 +2027,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const adminSurfacesGated = !!authAdapter && (
         isAuthAdapter(config.auth!) || !!(config.auth as RebaseAuthConfig).jwtSecret
     );
+    /**
+     * The admin gate itself: an `rk_` admin key, the service key, or a token
+     * whose user is an admin *now* — roles and revocation read from the
+     * database, never off the token. {@link applyAdminGate} puts it on a
+     * router; a surface mounted on a single path (the contract, the private
+     * docs) takes the same list, so "admin" means one thing everywhere.
+     */
+    const adminGate = (): MiddlewareHandler<HonoEnv>[] => [
+        ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
+        createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
+        requireAdmin
+    ];
     const applyAdminGate = (router: Hono<HonoEnv>, surface: string): void => {
         if (!adminSurfacesGated) {
             // No adapter and no `jwtSecret`: there is no credential this server
@@ -2054,12 +2066,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }, 501));
             return;
         }
-        if (apiKeyPreAuth) router.use("/*", apiKeyPreAuth);
-        router.use(
-            "/*",
-            createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
-            requireAdmin
-        );
+        router.use("/*", ...adminGate());
     };
 
     // The schema editor rewrites collection files, so it needs a collectionsDir
@@ -2737,7 +2744,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Follows the data surface: the document describes the collection routes, so
     // a process that does not serve them would publish a spec for URLs it 404s.
     if (surfaces.data) {
-        await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth));
+        await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth), adminGate());
     }
 
     // ─── Server-side singleton ────────────────────────────────────────────
@@ -3422,12 +3429,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // tried to perform, it is a document that is not there. Configure auth
         // and it returns.
         if (adminSurfacesGated) {
-            if (apiKeyPreAuth) contractRouter.use("/contract", apiKeyPreAuth);
-            contractRouter.use(
-                "/contract",
-                createRequireAuth({ serviceKey: internalServiceKey }),
-                requireAdmin
-            );
+            contractRouter.use("/contract", ...adminGate());
         } else {
             contractRouter.all("/contract", (c) => c.json({
                 error: {

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { mountOpenApiDocs } from "./docs";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
+import { createRequireAuth, requireAdmin } from "../auth/middleware";
 
 /**
  * Whether the OpenAPI spec is REACHABLE — not whether it is published.
@@ -16,9 +17,12 @@ const collections = [
     { name: "posts", path: "posts", properties: {} } as unknown as CollectionConfig
 ];
 
+/** An admin gate as the runtime builds one, minus the database it reads roles from. */
+const adminGate = [createRequireAuth({}), requireAdmin];
+
 function app(enableSwagger: boolean | undefined) {
     const a = new Hono<HonoEnv>();
-    return mountOpenApiDocs(a, "/api", enableSwagger, collections, false).then(() => a);
+    return mountOpenApiDocs(a, "/api", enableSwagger, collections, false, adminGate).then(() => a);
 }
 
 describe("mountOpenApiDocs", () => {
@@ -51,7 +55,7 @@ describe("mountOpenApiDocs", () => {
         // generated headless README points every new project at `/api/swagger`.
         // Same code and remedy `/api/data` gives, so the two cannot drift.
         const a = new Hono<HonoEnv>();
-        await mountOpenApiDocs(a, "/api", true, [], false);
+        await mountOpenApiDocs(a, "/api", true, [], false, adminGate);
 
         for (const path of ["/api/docs", "/api/swagger"]) {
             const res = await a.request(path);
