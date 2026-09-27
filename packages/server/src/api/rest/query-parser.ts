@@ -13,11 +13,12 @@ import {
     deserializeLogicalCondition,
     normalizeInclude,
     reconcileCursorOrder,
+    RESERVED_QUERY_KEYS,
     UnknownFilterOperatorError
 } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 import { ApiError } from "../errors";
-import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM, parseWithDeleted } from "./soft-delete-params";
+import { DELETED_QUERY_PARAM, parseWithDeleted } from "./soft-delete-params";
 import { assertQueryFieldsReadable } from "./field-access-query";
 
 export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
@@ -527,10 +528,12 @@ export function parseQueryOptions(
     // column of that name, which is a 400 `UNKNOWN_FILTER_FIELD` on the one
     // request that needs the parameter. So do `?deleted=` and `?hard=`, which
     // ask about the soft-delete stamp rather than name a column.
-    const reservedQueryKeys = ["limit", "offset", "page", "after", "orderBy", "include", "fields", "distinct", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "not", "where", "select", "groupBy", DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM];
+    //
+    // The list is shared with the SDK, which sends a filter on a column with
+    // one of these names inside `?where=` rather than as its own parameter.
     const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
-        if (reservedQueryKeys.includes(key)) continue;
+        if (RESERVED_QUERY_KEYS.has(key)) continue;
         filterDict[key] = rawValue;
     }
     // Both dialects may be sent together; an explicit `?field=op.value` wins

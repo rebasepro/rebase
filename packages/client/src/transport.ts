@@ -1,5 +1,5 @@
 import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
-import { serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
+import { RESERVED_QUERY_KEYS, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
 // The canonical client error now lives in `@rebasepro/types` so every package
@@ -255,21 +255,42 @@ export function buildQueryString(params?: FindParams): string {
         parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
     }
 
-    if (params.where) {
-        assertNoUndefinedFilterValues(params.where);
-        const serialized = serializeFilter(params.where);
-        for (const [field, value] of Object.entries(serialized)) {
-            if (Array.isArray(value)) {
-                for (const v of value) {
-                    parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(v)}`);
-                }
-            } else {
-                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(value)}`);
-            }
-        }
-    }
+    if (params.where) appendWhere(parts, params.where);
 
     return parts.length > 0 ? "?" + parts.join("&") : "";
+}
+
+/**
+ * Append a `where` to a query string, one `?<field>=<op>.<value>` parameter per
+ * condition.
+ *
+ * Except on a column whose name the server reads as a parameter of its own —
+ * `page`, `select`, `hard`, `where` ({@link RESERVED_QUERY_KEYS}). A filter on
+ * such a column sent as its own parameter is read as that parameter, and the
+ * filter is never applied. Those conditions go inside `?where=` instead, in the
+ * same dot-string spelling, which the server decodes through the same codec and
+ * merges in. A collection with no such column sends exactly what it did before.
+ */
+function appendWhere(parts: string[], where: Record<string, unknown>): void {
+    assertNoUndefinedFilterValues(where);
+    const serialized = serializeFilter(where);
+    const reserved: Record<string, string | string[]> = {};
+    for (const [field, value] of Object.entries(serialized)) {
+        if (RESERVED_QUERY_KEYS.has(field)) {
+            reserved[field] = value;
+            continue;
+        }
+        if (Array.isArray(value)) {
+            for (const v of value) {
+                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(v)}`);
+            }
+        } else {
+            parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(value)}`);
+        }
+    }
+    if (Object.keys(reserved).length > 0) {
+        parts.push(`where=${encodeURIComponent(JSON.stringify(reserved))}`);
+    }
 }
 
 /**
@@ -305,19 +326,7 @@ export function buildAggregateQueryString(params: AggregateParams): string {
         const serialized = (root.conditions ?? []).map(serializeLogicalCondition).join(",");
         parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
     }
-    if (params.where) {
-        assertNoUndefinedFilterValues(params.where);
-        const serialized = serializeFilter(params.where);
-        for (const [field, value] of Object.entries(serialized)) {
-            if (Array.isArray(value)) {
-                for (const v of value) {
-                    parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(v)}`);
-                }
-            } else {
-                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(value)}`);
-            }
-        }
-    }
+    if (params.where) appendWhere(parts, params.where);
 
     return "?" + parts.join("&");
 }

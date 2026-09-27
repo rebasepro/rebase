@@ -1053,6 +1053,7 @@ const REBASE_INTERNAL_PREFIXES
 const REBASE_INTERNAL_SCHEMAS
 const REBASE_INTERNAL_TABLES
 const REBASE_USER_ROLE
+const RESERVED_QUERY_KEYS
 const TENANT_INDEX_REASON
 const assertBeforeQueryIsPostgresOnly
 const buildPropertyCallbacks

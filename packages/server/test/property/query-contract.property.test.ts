@@ -21,8 +21,10 @@
 
 import fc from "fast-check";
 import { ALL_WHERE_FILTER_OPS, NULL_OPS, WhereFilterOp } from "@rebasepro/types";
-import { buildQueryString } from "../../../client/src/transport";
+import { RESERVED_QUERY_KEYS } from "@rebasepro/common";
+import { buildAggregateQueryString, buildQueryString } from "../../../client/src/transport";
 import { parseQueryOptions, MAX_LIST_LIMIT } from "../../src/api/rest/query-parser";
+import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM } from "../../src/api/rest/soft-delete-params";
 
 const RUNS = Number(process.env.FC_RUNS ?? 2000);
 
@@ -44,12 +46,8 @@ function honoQueries(queryString: string): Record<string, string[]> {
 const roundTrip = (params: Record<string, unknown>) =>
     parseQueryOptions(honoQueries(buildQueryString(params as never)));
 
-/** Field names that are not reserved query parameters — see the collision test below. */
-const RESERVED = [
-    "limit", "offset", "page", "orderBy", "include", "fields", "searchString",
-    "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where"
-];
-const fieldName = fc.stringMatching(/^[a-z][a-z0-9_]{0,10}$/).filter(f => !RESERVED.includes(f));
+/** Field names that are not reserved query parameters — see the tests at the bottom. */
+const fieldName = fc.stringMatching(/^[a-z][a-z0-9_]{0,10}$/).filter(f => !RESERVED_QUERY_KEYS.has(f));
 
 const scalarValue = fc.oneof(
     fc.stringMatching(/^[a-zA-Z0-9 @._%+-]{0,12}$/),
@@ -210,89 +208,50 @@ describe("client → server query contract", () => {
 describe("reserved parameter names", () => {
 
     /**
-     * **A real collision, pinned rather than asserted away.**
-     *
-     * The parser reserves fourteen query-parameter names, and the SDK serializes
-     * a filter as `?<field>=<op>.<value>`. A collection with a column named
-     * `page` — not exotic in a CMS — therefore sends `?page=eq.home`, which the
-     * server reads as a pagination instruction. The filter is not applied and
-     * nothing is reported: the read returns every row the caller may see,
-     * rather than the ones on the `home` page.
-     *
-     * `where`, `and`, `or`, `include`, `fields` and `limit` are all plausible
-     * column names with the same problem.
-     *
-     * Not fixed here: the fix is a wire change (namespacing filters, or an
-     * explicit `?where=` for colliding fields) and it needs to be chosen
-     * deliberately. What this test does is make the set of unusable column
-     * names explicit and fail if it grows silently — adding a reserved
-     * parameter name is, today, a breaking change for anyone whose schema
-     * already uses it.
+     * A collection is free to have a column named `page`, `select`, `hard` or
+     * `where`, and the SDK serialized every filter as `?<field>=<op>.<value>`.
+     * On a name the parser reads as a parameter, the filter was never applied:
+     * most were dropped with no diagnostic, so the read returned every row the
+     * caller may see; the window parameters answered 400. The SDK now sends a
+     * filter on such a column inside `?where=`, which the parser merges in.
      */
-    it("KNOWN: a filter on a reserved-name column is not applied", () => {
-        // `orderBy` still loses the filter with no diagnostic, which is the
-        // shape of the finding. `page` and `offset` used to as well; they now
-        // 400, because `eq.home` is not a whole number — loud, and still not
-        // the filter that was asked for.
-        const options = roundTrip({ where: { orderBy: ["==", "home"] } });
-        expect(options.where).toBeUndefined();
+    it("reserves the soft-delete switches the parser reads", () => {
+        expect(RESERVED_QUERY_KEYS.has(DELETED_QUERY_PARAM)).toBe(true);
+        expect(RESERVED_QUERY_KEYS.has(HARD_DELETE_QUERY_PARAM)).toBe(true);
+    });
 
-        expect(() => roundTrip({ where: { page: ["==", "home"] } })).toThrow();
+    it.each([...RESERVED_QUERY_KEYS])("applies a filter on a column named %p", (name) => {
+        const options = roundTrip({ where: { [name]: ["==", "x"], status: ["!=", "gone"] } });
+        expect(options.where).toEqual({ [name]: ["==", "x"], status: ["!=", "gone"] });
+    });
+
+    it("keeps every condition on a reserved-name column", () => {
+        const options = roundTrip({ where: { page: [[">=", 2], ["<", 5]], hard: ["in", ["a", "b,c"]] } });
+        expect(options.where).toEqual({ page: [[">=", "2"], ["<", "5"]], hard: ["in", ["a", "b,c"]] });
+    });
+
+    it("applies it through an aggregate's query string too", () => {
+        const qs = buildAggregateQueryString({
+            select: [{ fn: "count" }],
+            groupBy: ["status"],
+            where: { select: ["==", "x"], groupBy: ["is-null", null] }
+        } as never);
+        const query = honoQueries(qs);
+        expect(query.select).toEqual(["count()"]);
+        expect(query.groupBy).toEqual(["status"]);
+        expect(parseQueryOptions(query).where).toEqual({ select: ["==", "x"], groupBy: ["is-null", null] });
     });
 
     /**
-     * The full classification, because the names do not all fail the same way
-     * and the difference is the whole point: ten of the fourteen lose the
-     * filter with no diagnostic, while four 400 — `where` because `eq.x` is not
-     * JSON, and `limit`/`offset`/`page` because the window parameters refuse a
-     * value that is not a whole number instead of falling back to a default.
-     * All four are accidents of another check rather than collision handling,
-     * but loud is strictly better than silent here, and the table below is what
-     * the fix would have to make uniform.
-     */
-    it("pins how each reserved name fails", () => {
-        const classify = (name: string): "applied" | "silently-dropped" | "rejected" => {
-            try {
-                const options = roundTrip({ where: { [name]: ["==", "x"] } });
-                return options.where && name in options.where ? "applied" : "silently-dropped";
-            } catch {
-                return "rejected";
-            }
-        };
-        const actual = Object.fromEntries(RESERVED.map(n => [n, classify(n)]));
-        expect(actual).toEqual({
-            // Refused, not dropped: `?limit=eq.x` is not a whole number, and the
-            // window parameters answer that with a 400 rather than a default
-            // page or a silently ignored parameter.
-            limit: "rejected",
-            offset: "rejected",
-            page: "rejected",
-            orderBy: "silently-dropped",
-            include: "silently-dropped",
-            fields: "silently-dropped",
-            searchString: "silently-dropped",
-            vector_search: "silently-dropped",
-            vector: "silently-dropped",
-            vector_distance: "silently-dropped",
-            vector_threshold: "silently-dropped",
-            or: "silently-dropped",
-            and: "silently-dropped",
-            // The only one that tells the caller anything, and only by accident:
-            // `eq.x` fails `JSON.parse` in the where-dialect parser.
-            where: "rejected"
-        });
-    });
-
-    /**
-     * The complement, and the reassuring half: a field name that is *not*
-     * reserved always makes it through. This is what stops the finding above
-     * from being read as "filters are unreliable" — they are reliable
-     * everywhere except a nameable, finite set.
+     * The complement: a field name that is not reserved still travels as its
+     * own parameter, exactly as before.
      */
     it("applies a filter on any non-reserved column name", () => {
         fc.assert(fc.property(fieldName, field => {
             const options = roundTrip({ where: { [field]: ["==", "x"] } });
             expect(options.where && field in options.where).toBe(true);
+            expect(buildQueryString({ where: { [field]: ["==", "x"] } } as never))
+                .toBe(`?${encodeURIComponent(field)}=eq.x`);
         }), { numRuns: RUNS });
     });
 });

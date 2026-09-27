@@ -415,6 +415,28 @@ function readTuple(field: string, raw: unknown): [WhereFilterOp, unknown] | unde
 }
 
 // ---------------------------------------------------------------------------
+// Reserved query-parameter names
+// ---------------------------------------------------------------------------
+
+/**
+ * The query-parameter names a REST listing reads as something other than a
+ * field filter: pagination, sorting, includes, projection, search, the logical
+ * groups, the JSON `where` dialect, an aggregate's `select`/`groupBy`, and the
+ * soft-delete switches.
+ *
+ * One list for both ends. The server skips these names when it collects
+ * `?<field>=<op>.<value>` filters, and the SDK sends a filter on a column with
+ * one of these names inside `?where=` instead — a collection is free to have a
+ * `page`, `select` or `hard` column, and a filter on it sent as its own
+ * parameter was read as the parameter and never applied.
+ */
+export const RESERVED_QUERY_KEYS: ReadonlySet<string> = new Set([
+    "limit", "offset", "page", "after", "orderBy", "include", "fields", "distinct",
+    "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold",
+    "or", "and", "not", "where", "select", "groupBy", "deleted", "hard"
+]);
+
+// ---------------------------------------------------------------------------
 // Serialize: FilterValues → REST querystring
 // ---------------------------------------------------------------------------
 
