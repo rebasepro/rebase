@@ -1,5 +1,5 @@
 export { createJobStore } from "./job-store";
-export type { JobStore } from "./job-store";
+export type { JobClaim, JobStore } from "./job-store";
 export { createJobQueue, defaultBackoff, PermanentJobError } from "./job-queue";
 export type { JobQueue } from "./job-queue";
 export type {

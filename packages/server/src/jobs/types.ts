@@ -107,14 +107,16 @@ export interface JobQueueOptions {
     /** How often to look for work when the last look found none. Default 2000ms. */
     pollIntervalMs?: number;
     /**
-     * How long a claimed job may stay claimed before another worker may take
-     * it. Default 5 minutes.
+     * How long a claim may go unrenewed before another worker may take the job.
+     * Default 5 minutes.
      *
      * This is the only thing that recovers work from a worker that died holding
-     * it — a `SIGKILL`ed pod cannot release its own claim. It is therefore also
-     * the interval after which a job that legitimately runs longer than this
-     * gets a *second* worker running it concurrently, so it must exceed the
-     * slowest handler.
+     * it — a `SIGKILL`ed pod cannot release its own claim. A live worker renews
+     * the claim every third of this while the handler runs, so a handler may
+     * run longer than it; what it bounds is how long a dead worker's job waits.
+     * A worker whose event loop is blocked for longer than this cannot renew,
+     * and its job is run again beside it — though only the claim that holds
+     * the job when a run finishes gets to record its outcome.
      */
     visibilityTimeoutMs?: number;
     /** Attempts before a job is left `failed`. Default 3. */

@@ -355,6 +355,7 @@ export { createJobQueue, createJobStore, defaultBackoff } from "./jobs";
 export type {
     JobQueue,
     JobStore,
+    JobClaim,
     JobContext,
     JobHandler,
     JobRecord,

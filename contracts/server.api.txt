@@ -286,12 +286,13 @@ interface GCSStorageConfig { allowedMimeTypes, bucket, credentials, keyFilename,
 interface GoogleProviderConfig { clientId, clientSecret }
 interface ImageTransformOptions { fit, format, height, quality, width }
 interface InitializedDataSource { bootstrapper, connection, driverPackage, driverVersion, engine, key }
+interface JobClaim { attempt, workerId }
 interface JobContext { attempt, id, maxAttempts, payload, task }
 interface JobQueue { enqueue, isRunning, register, runOnce, start, stop }
 interface JobQueueClient { enqueue }
 interface JobQueueOptions { backoff, concurrency, enabled, maxAttempts, pollIntervalMs, tasks, visibilityTimeoutMs }
 interface JobRecord { attempts, createdAt, id, lastError, maxAttempts, payload, runAt, status, task, updatedAt }
-interface JobStore { claim, complete, ensureTable, fail, fetch, insert, reapExpired }
+interface JobStore { claim, complete, ensureTable, fail, fetch, heartbeat, insert, reapExpired }
 interface JwtSigningKeyConfig { algorithm, kid, privateKey }
 interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
 interface ListenCollectionRequest { collection, distinct, fields, filter, include, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch, withDeleted }

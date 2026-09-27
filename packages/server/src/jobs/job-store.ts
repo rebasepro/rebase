@@ -85,6 +85,23 @@ function isUniqueViolation(err: unknown): boolean {
 const ENQUEUE_FUNCTION = "rebase.enqueue_job";
 const ENQUEUE_SIGNATURE = `${ENQUEUE_FUNCTION}(text, jsonb, timestamptz, integer, text)`;
 
+/**
+ * Which claim an outcome belongs to: the worker holding the job, and the
+ * attempt that claim spent.
+ *
+ * The visibility timeout hands a job to a second worker when the first stops
+ * renewing its claim, and the first may still be running — slow, not dead. Its
+ * outcome is then about an attempt the table has moved past, and writing it
+ * would mark a running job `succeeded`, or send a finished one back to
+ * `pending` for another run. Both writes therefore apply only while the claim
+ * they name still holds the row. The attempt is part of the identity because a
+ * worker's own reaper can hand a job back to the same worker in another slot.
+ */
+export interface JobClaim {
+    workerId: string;
+    attempt: number;
+}
+
 export interface JobStore {
     ensureTable(): Promise<void>;
     /** Returns the new job's id, or `null` if an idempotency key matched unfinished work. */
@@ -102,12 +119,33 @@ export interface JobStore {
      * during a rollout would otherwise dead-letter the newer code's jobs.
      */
     claim(limit: number, workerId: string, tasks?: readonly string[]): Promise<JobRecord[]>;
-    complete(id: string): Promise<void>;
-    /** Back to `pending` with a later `runAt`, or `failed` when out of attempts. */
-    fail(id: string, error: string, retryAt: Date | null): Promise<void>;
+    /** Mark the job `succeeded` — a no-op once `claim` no longer holds it. */
+    complete(id: string, claim: JobClaim): Promise<void>;
+    /**
+     * Back to `pending` with a later `runAt`, or `failed` when out of attempts —
+     * a no-op once `claim` no longer holds it.
+     */
+    fail(id: string, error: string, retryAt: Date | null, claim: JobClaim): Promise<void>;
+    /**
+     * Renew `claim` on a job whose handler is still running, so the visibility
+     * timeout only ever reclaims a job from a worker that stopped renewing.
+     * Resolves with whether the claim still held. A store without it leaves a
+     * handler that outlives the timeout to be run a second time beside itself.
+     */
+    heartbeat?(id: string, claim: JobClaim): Promise<boolean>;
     /** Return jobs stranded by a worker that died holding them. Resolves with how many. */
     reapExpired(visibilityTimeoutMs: number): Promise<number>;
     fetch(id: string): Promise<JobRecord | null>;
+}
+
+/** The rows a claim's writes may touch: `$1` the job, `$2` the worker, `$3` the attempt. */
+const HELD_BY_CLAIM = "id = $1 AND status = 'running' AND locked_by = $2 AND attempts = $3";
+
+function warnStaleOutcome(id: string, claim: JobClaim, outcome: "success" | "failure"): void {
+    logger.warn(
+        `[jobs] Ignored the ${outcome} of attempt ${claim.attempt} of job ${id}: the job was reclaimed ` +
+        "from this worker while it ran, so that attempt's outcome is no longer the job's."
+    );
 }
 
 export function createJobStore(driver: DataDriver): JobStore | undefined {
@@ -328,31 +366,44 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
             return sqlRows<JobRow>(rows).map(toRecord);
         },
 
-        async complete(id: string): Promise<void> {
-            await exec(
+        async complete(id: string, claim: JobClaim): Promise<void> {
+            const rows = await exec(
                 `UPDATE ${TABLE} SET status = 'succeeded', locked_at = NULL, locked_by = NULL,
                         last_error = NULL, updated_at = now()
-                 WHERE id = $1`,
-                [id]
+                 WHERE ${HELD_BY_CLAIM}
+                 RETURNING id`,
+                [id, claim.workerId, claim.attempt]
             );
+            if (sqlRows(rows).length === 0) warnStaleOutcome(id, claim, "success");
         },
 
-        async fail(id: string, error: string, retryAt: Date | null): Promise<void> {
-            if (retryAt) {
-                await exec(
-                    `UPDATE ${TABLE} SET status = 'pending', run_at = $2, locked_at = NULL,
-                            locked_by = NULL, last_error = $3, updated_at = now()
-                     WHERE id = $1`,
-                    [id, retryAt.toISOString(), error]
+        async fail(id: string, error: string, retryAt: Date | null, claim: JobClaim): Promise<void> {
+            const rows = retryAt
+                ? await exec(
+                    `UPDATE ${TABLE} SET status = 'pending', run_at = $4, locked_at = NULL,
+                            locked_by = NULL, last_error = $5, updated_at = now()
+                     WHERE ${HELD_BY_CLAIM}
+                     RETURNING id`,
+                    [id, claim.workerId, claim.attempt, retryAt.toISOString(), error]
+                )
+                : await exec(
+                    `UPDATE ${TABLE} SET status = 'failed', locked_at = NULL, locked_by = NULL,
+                            last_error = $4, updated_at = now()
+                     WHERE ${HELD_BY_CLAIM}
+                     RETURNING id`,
+                    [id, claim.workerId, claim.attempt, error]
                 );
-                return;
-            }
-            await exec(
-                `UPDATE ${TABLE} SET status = 'failed', locked_at = NULL, locked_by = NULL,
-                        last_error = $2, updated_at = now()
-                 WHERE id = $1`,
-                [id, error]
+            if (sqlRows(rows).length === 0) warnStaleOutcome(id, claim, "failure");
+        },
+
+        async heartbeat(id: string, claim: JobClaim): Promise<boolean> {
+            const rows = await exec(
+                `UPDATE ${TABLE} SET locked_at = now()
+                 WHERE ${HELD_BY_CLAIM}
+                 RETURNING id`,
+                [id, claim.workerId, claim.attempt]
             );
+            return sqlRows(rows).length > 0;
         },
 
         async reapExpired(visibilityTimeoutMs: number): Promise<number> {

@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "../utils/logger.js";
-import type { JobStore } from "./job-store.js";
+import type { JobClaim, JobStore } from "./job-store.js";
 import type { EnqueueOptions, JobHandler, JobQueueClient, JobQueueOptions, JobRecord } from "./types.js";
 
 /**
@@ -75,9 +75,9 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         handlers.set(task, handler);
     }
 
-    // Identifies this process in `locked_by`. Purely diagnostic — the claim is
-    // enforced by the row lock, not by this — but "which pod had it when it
-    // stopped" is the first question anyone asks of a stuck job.
+    // Identifies this process in `locked_by`: "which pod had it when it
+    // stopped" is the first question anyone asks of a stuck job, and with the
+    // attempt it is the claim an outcome is written under (see `JobClaim`).
     const workerId = `${process.pid}-${randomUUID().slice(0, 8)}`;
 
     let timer: NodeJS.Timeout | null = null;
@@ -97,8 +97,34 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
     let reaping = false;
     let draining: Promise<void> | null = null;
 
+    /**
+     * Renew `claim` while its handler runs, at a third of the visibility
+     * timeout, so the reaper only ever takes a job from a worker that stopped
+     * renewing — a dead one — and never from one that is merely slow. Returns
+     * the stop.
+     */
+    function keepClaim(job: JobRecord, claim: JobClaim): () => void {
+        if (!store.heartbeat) return () => undefined;
+        const renew = store.heartbeat.bind(store);
+        const interval = setInterval(() => {
+            renew(job.id, claim).then((held) => {
+                if (held) return;
+                clearInterval(interval);
+                logger.warn(
+                    `[jobs] "${job.task}" lost its claim on attempt ${claim.attempt} while running; ` +
+                    "its outcome will not be recorded", { jobId: job.id }
+                );
+            }).catch((error: unknown) => {
+                logger.warn(`[jobs] Could not renew the claim on "${job.task}"`, { jobId: job.id, error });
+            });
+        }, Math.max(1, Math.floor(visibilityTimeoutMs / 3)));
+        interval.unref?.();
+        return () => clearInterval(interval);
+    }
+
     async function runJob(job: JobRecord): Promise<void> {
         const handler = handlers.get(job.task);
+        const claim: JobClaim = { workerId, attempt: job.attempts };
 
         if (!handler) {
             // Only reachable through a store that ignores the `tasks` filter on
@@ -111,20 +137,26 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             await store.fail(
                 job.id,
                 `No handler registered for task "${job.task}"`,
-                job.attempts < job.maxAttempts ? new Date(Date.now() + backoff(job.attempts)) : null
+                job.attempts < job.maxAttempts ? new Date(Date.now() + backoff(job.attempts)) : null,
+                claim
             );
             return;
         }
 
+        const releaseClaim = keepClaim(job, claim);
         try {
-            await handler({
-                id: job.id,
-                task: job.task,
-                payload: job.payload as never,
-                attempt: job.attempts,
-                maxAttempts: job.maxAttempts
-            } as never);
-            await store.complete(job.id);
+            try {
+                await handler({
+                    id: job.id,
+                    task: job.task,
+                    payload: job.payload as never,
+                    attempt: job.attempts,
+                    maxAttempts: job.maxAttempts
+                } as never);
+            } finally {
+                releaseClaim();
+            }
+            await store.complete(job.id, claim);
         } catch (error) {
             const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
             const permanent = error instanceof PermanentJobError;
@@ -132,7 +164,7 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
 
             // Truncated, because `last_error` holds a stack and a queue that
             // accumulates megabytes of them is its own outage.
-            await store.fail(job.id, message.slice(0, 4_000), willRetry ? new Date(Date.now() + backoff(job.attempts)) : null);
+            await store.fail(job.id, message.slice(0, 4_000), willRetry ? new Date(Date.now() + backoff(job.attempts)) : null, claim);
 
             if (willRetry) {
                 logger.warn(`[jobs] "${job.task}" failed on attempt ${job.attempts}/${job.maxAttempts}; retrying`, { jobId: job.id });
