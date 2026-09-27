@@ -136,7 +136,7 @@
   "packages/plugin-ai/src/components/FormEnhanceAction.tsx::React Hook useEffect has a missing dependency: 'updateSuggestedPrompts'. Either include it or remove the dependency array.": 1,
   "packages/plugin-insights/src/engine/useInsightsData.ts::React Hook useEffect has missing dependencies: 'context' and 'definition'. Either include them or remove the dependency array.": 1,
   "packages/studio/src/components/RLSEditor/RLSEditor.tsx::React Hook useCallback has a missing dependency: 't'. Either include it or remove the dependency array.": 1,
-  "packages/studio/src/components/SQLEditor/SQLEditor.tsx::React Hook useCallback has a missing dependency: 't'. Either include it or remove the dependency array.": 3,
+  "packages/studio/src/components/SQLEditor/SQLEditor.tsx::React Hook useCallback has a missing dependency: 't'. Either include it or remove the dependency array.": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::React Hook useCallback has missing dependencies: 'saveHistory' and 't'. Either include them or remove the dependency array.": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::React Hook useEffect has a missing dependency: 't'. Either include it or remove the dependency array.": 1,
   "packages/studio/src/components/StudioHomePage.tsx::React Hook useEffect has a missing dependency: 'breadcrumbs'. Either include it or remove the dependency array.": 1,
