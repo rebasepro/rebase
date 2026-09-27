@@ -2,6 +2,7 @@ import { and, isNotNull, isNull, SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getTableColumns } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
+import { softDeleteFieldOf } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**
@@ -27,9 +28,6 @@ import { toSnakeCase } from "@rebasepro/utils";
  * at the first delete, where it would be a 500 for whoever pressed the button.
  */
 
-/** The default field, when `softDelete: true` names none. */
-export const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
-
 /** How a caller asks about deleted rows. See `FetchCollectionProps.withDeleted`. */
 export type WithDeleted = boolean | "only" | undefined;
 
@@ -49,9 +47,8 @@ export interface SoftDeleteField {
  * worth avoiding — deletes would silently start removing rows.
  */
 export function resolveSoftDelete(collection: CollectionConfig | undefined): SoftDeleteField | undefined {
-    const declared = (collection as { softDelete?: boolean | { field?: string } } | undefined)?.softDelete;
-    if (!declared) return undefined;
-    const field = (typeof declared === "object" && declared.field) || DEFAULT_SOFT_DELETE_FIELD;
+    const field = softDeleteFieldOf(collection);
+    if (!field) return undefined;
     const property = (collection?.properties as Record<string, { columnName?: string }> | undefined)?.[field];
     return {
         field,

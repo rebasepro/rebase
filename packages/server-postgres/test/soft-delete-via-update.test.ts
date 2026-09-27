@@ -154,3 +154,34 @@ describe("an update may not stamp the soft-delete field", () => {
         expect(await deletedAtOf(1)).toBeNull();
     });
 });
+
+/**
+ * The restore through the doors that read the row first. `updateMany` and
+ * `batchWrite` look a row up before updating it, so a missing one is a 404 —
+ * and that read hides trashed rows, so the restore, an ordinary update of a
+ * row the default read hides, was a 404 too. `save` (the socket, MCP, the SDK
+ * in-process) does not read first, and restored.
+ */
+describe("a restore through the doors that read the row first", () => {
+    it("a bulk update (PATCH /bulk) clearing the field restores the row", async () => {
+        await driverOver(db).updateMany({ path: "posts", updates: [{ id: 2, values: { deletedAt: null } }] });
+
+        expect(await deletedAtOf(2)).toBeNull();
+    });
+
+    it("a `_batch` update clearing the field restores the row", async () => {
+        await driverOver(db).batchWrite({
+            operations: [{ op: "update", path: "posts", id: "2", values: { deletedAt: null } }]
+        });
+
+        expect(await deletedAtOf(2)).toBeNull();
+    });
+
+    it("any other bulk edit of a trashed row is still a 404", async () => {
+        await expect(driverOver(db).updateMany({
+            path: "posts", updates: [{ id: 2, values: { title: "edited in the trash" } }]
+        })).rejects.toMatchObject({ statusCode: 404 });
+
+        expect(await titleOf(2)).toBe("trashed");
+    });
+});

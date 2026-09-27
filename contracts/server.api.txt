@@ -1046,6 +1046,7 @@ const DEFAULT_MAX_PAGES
 const DEFAULT_ONE_OF_TYPE
 const DEFAULT_ONE_OF_VALUE
 const DEFAULT_PAGE_SIZE
+const DEFAULT_SOFT_DELETE_FIELD
 const DEFAULT_STRING_COLUMN_LENGTH
 const JUNCTION_TABLES_SQL
 const MAX_LOGICAL_NESTING_DEPTH
@@ -1175,6 +1176,7 @@ function resolveStoragePathString
 function resolveStorageSource
 function resolveStringColumnLength
 function resolveTenantWrite
+function restoresSoftDeletedRow
 function restrictedFieldNames { declared, refused }
 function revokeInternalTableAccess
 function revokeInternalTableSql
@@ -1185,6 +1187,7 @@ function serializeFilter
 function serializeInclude
 function serializeLogicalCondition
 function serializeOrderBy
+function softDeleteFieldOf
 function sortCollectionsBySlug
 function sortProperties
 function sqlRows

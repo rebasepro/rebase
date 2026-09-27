@@ -35,6 +35,9 @@ const docs = {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" },
         updated_at: { name: "Updated", type: "date", autoValue: "on_update" },
+        // `softDelete` records the deletion here; the boot check requires the
+        // property to be declared, as a date.
+        deletedAt: { name: "Deleted", type: "date" },
         notes: {
             name: "Notes",
             type: "relation",
@@ -411,5 +414,47 @@ describe("If-Match on DELETE", () => {
 
         expect(res.status).toBe(204);
         expect(tables.docs.has("d1")).toBe(false);
+    });
+});
+
+/**
+ * A restore is "an ordinary update setting the field back to `null`" — the
+ * documented contract (collections/soft-delete). Over REST it was a 404: the
+ * update's existence read hides trashed rows by default, so the row being
+ * restored was never found, while the socket, MCP and the SDK in-process —
+ * which write without that read — restored it.
+ */
+describe("restoring a soft-deleted row with PATCH", () => {
+    it("clears the field on a trashed row", async () => {
+        const { app, tables } = createHarness();
+        expect((await app.request("/docs/d1", { method: "DELETE" })).status).toBe(204);
+        expect((await app.request("/docs/d1")).status).toBe(404);
+
+        const res = await patch(app, "/docs/d1", { deletedAt: null });
+
+        expect(res.status).toBe(200);
+        expect(tables.docs.get("d1")?.deletedAt).toBeNull();
+        expect((await app.request("/docs/d1")).status).toBe(200);
+    });
+
+    it("honours an If-Match taken from the trash listing's read", async () => {
+        const { app } = createHarness();
+        expect((await app.request("/docs/d1", { method: "DELETE" })).status).toBe(204);
+        const etag = await etagOf(app, "/docs/d1?deleted=include");
+
+        const res = await patch(app, "/docs/d1", { deletedAt: null }, { "If-Match": etag });
+
+        expect(res.status).toBe(200);
+    });
+
+    it("still answers 404 to any other edit of a trashed row", async () => {
+        const { app, tables } = createHarness();
+        expect((await app.request("/docs/d1", { method: "DELETE" })).status).toBe(204);
+        const before = tables.docs.get("d1");
+
+        const res = await patch(app, "/docs/d1", { title: "Edited in the trash" });
+
+        expect(res.status).toBe(404);
+        expect(tables.docs.get("d1")).toBe(before);
     });
 });

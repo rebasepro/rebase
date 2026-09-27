@@ -43,7 +43,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
@@ -1609,10 +1609,16 @@ export class PostgresBackendDriver implements DataDriver {
                     // Read first so a missing row is a 404 rather than a silent
                     // no-op. `save` with status "existing" would otherwise write
                     // an UPDATE that matches nothing and report success.
+                    // A restore is an update of a row the default read hides;
+                    // see `restoresSoftDeletedRow`.
                     const existing = await txDriver.fetchOne({
                         path,
                         id: String(id),
-                        collection: collection as CollectionConfig
+                        collection: collection as CollectionConfig,
+                        withDeleted: restoresSoftDeletedRow(
+                            (collection as CollectionConfig | undefined) ?? this.registry?.getCollectionByPath(path),
+                            values as Record<string, unknown>
+                        ) ? true : undefined
                     });
                     if (!existing) {
                         throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
@@ -1756,7 +1762,13 @@ export class PostgresBackendDriver implements DataDriver {
                             const existing = await txDriver.fetchOne({
                                 path: operation.path,
                                 id: id!,
-                                collection: operation.collection as CollectionConfig
+                                collection: operation.collection as CollectionConfig,
+                                // A restore is an update of a row the default
+                                // read hides; see `restoresSoftDeletedRow`.
+                                withDeleted: restoresSoftDeletedRow(
+                                    (operation.collection as CollectionConfig | undefined) ?? this.registry?.getCollectionByPath(operation.path),
+                                    values as Record<string, unknown> | undefined
+                                ) ? true : undefined
                             });
                             if (!existing) {
                                 throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {

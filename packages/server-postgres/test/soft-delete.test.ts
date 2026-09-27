@@ -5,8 +5,8 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
+import { DEFAULT_SOFT_DELETE_FIELD } from "@rebasepro/common";
 import {
-    DEFAULT_SOFT_DELETE_FIELD,
     andSoftDelete,
     resolveSoftDelete,
     softDeleteColumn,

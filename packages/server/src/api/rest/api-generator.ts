@@ -4,7 +4,7 @@ import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { cursorToStartAfter, topLevelIncludeNames } from "@rebasepro/common";
+import { cursorToStartAfter, restoresSoftDeletedRow, topLevelIncludeNames } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
 import { assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
@@ -1099,11 +1099,18 @@ values: entity as Record<string, unknown> },
         // that had already committed — the same class of lie the delete
         // route exists to stop. A 404 or a failed precondition throws,
         // which releases the key, so neither burns it.
+        // A restore — the soft-delete field set back to `null` — is an ordinary
+        // update of a row every default read hides, so it looks the row up with
+        // the trashed ones included, as `?hard=true` does for the purge.
+        // Anything else stays an edit of live rows: a trashed one is a 404.
+        const restoring = restoresSoftDeletedRow(collection, body) ? true : undefined;
+
         return this.runIdempotent(c, body, async () => {
             const existingEntity = await driver.fetchOne({
                 path,
                 id,
-                collection: address.driverCollection
+                collection: address.driverCollection,
+                withDeleted: restoring
             });
 
             if (!existingEntity) {
@@ -1114,7 +1121,7 @@ values: entity as Record<string, unknown> },
             if (ifMatch) {
                 await assertIfMatch(
                     ifMatch,
-                    await this.rowForETag(driver, address, id, existingEntity),
+                    await this.rowForETag(driver, address, id, existingEntity, restoring),
                     collection,
                     { collection: collection.slug, id }
                 );
