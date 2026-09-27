@@ -94,6 +94,11 @@ describe("history is keyed by the collection, whatever path the write came in on
         expect(recorded).toEqual([{ tableName: "docs", id: "10", action: "update" }]);
     });
 
+    it("a copy is recorded as the create it is", async () => {
+        await driverOver(db).save({ path: "docs", values: { title: "copied" }, status: "copy" });
+        expect(recorded).toEqual([{ tableName: "docs", id: "11", action: "create" }]);
+    });
+
     it("so are a nested create and a nested delete", async () => {
         const driver = driverOver(db);
         const row = await driver.save({ path: "owners/1/docs", values: { title: "new" }, status: "new" });

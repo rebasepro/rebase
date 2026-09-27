@@ -1405,7 +1405,7 @@ export class PostgresBackendDriver implements DataDriver {
                     // appeared in the row's own history.
                     tableName: resolvedCollection.slug,
                     id: savedId,
-                    action: status === "new" ? "create" : "update",
+                    action: status === "existing" ? "update" : "create",
                     values: savedValues as Record<string, unknown>,
                     previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
                     updatedBy: this.user?.uid
