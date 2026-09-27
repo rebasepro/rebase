@@ -1229,6 +1229,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Refetches are reads: apply the same GUCs + reader-role downgrade as the
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
+            // `READ ONLY` like that path too (here, in the count and in the row
+            // refetch): an `afterRead` that writes is refused with 25006 on every
+            // request read, and a frame must not be the one door where it commits
+            // — once per row, per subscriber, on every change anyone makes.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
             // The subscriber this frame is for, so per-field `access.read` is
@@ -1342,7 +1346,7 @@ roles: ["anon"] };
                     }
 
                     return fetchedEntities;
-                })
+                }, { accessMode: "read only" })
             );
         }
 
@@ -1427,7 +1431,7 @@ roles: ["anon"] };
                         tx, this.registry,
                         () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
                     ));
-                });
+                }, { accessMode: "read only" });
             } else {
                 total = await countOnce(this.dataService);
             }
@@ -1604,7 +1608,7 @@ roles: ["anon"] };
                     }
 
                     return processedEntity;
-                })
+                }, { accessMode: "read only" })
             );
         }
 
