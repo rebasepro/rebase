@@ -2957,6 +2957,17 @@ yet, listed so that nobody reads a promise into them:
   Set `FRONTEND_URL` or `auth.email.resetPasswordUrl` to an absolute URL. See
   the entry under Fixed.
 
+##### Jobs & cron
+
+- **A custom job store must take a claim when it completes or fails a job.**
+  `JobStore.complete(id, claim)` and `fail(id, error, retryAt, claim)` now
+  receive a `JobClaim` (`{ workerId, attempt }`) and must change the row only
+  while that claim still holds it: running, locked by that worker, on that
+  attempt. The new optional `heartbeat(id, claim)` renews a running job's claim;
+  a store without it lets a handler that outlives the visibility timeout run a
+  second time beside itself. The built-in store implements both. See the entry
+  under Fixed.
+
 #### Added
 
 ##### Server & REST
@@ -3042,6 +3053,18 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Postgres
 
+- **An upsert that lands on a stored row updates it instead of resetting it to
+  create-time values.** Fields the request leaves out keep their stored values
+  rather than going back to their `defaultValue`, `created_by` and `created_at`
+  keep the original creator, `beforeSave`/`afterSave` get `status: "existing"`
+  with the previous values, and history records an update. This covers
+  `?on_conflict=`, bulk and `_batch` upserts, the SDK's `upsert()` and
+  `createMany(rows, { upsert: true })`, and a socket `SAVE { upsert: true }`. An
+  upsert on the key of a row outside the caller's `beforeQuery` scope is a 404
+  instead of a 500, and a natural-key upsert with nothing to update returns the
+  stored row instead of a 403. If your code relied on an upsert resetting
+  omitted fields to their defaults, it now has to send those fields.
+
 - **`rebase db push` asks before a column type change that can lose data.** The
   destructive gate only looked for DROP and TRUNCATE, so
   `ALTER COLUMN … TYPE date` or `TYPE integer` was approved automatically, even
@@ -3073,6 +3096,25 @@ yet, listed so that nobody reads a promise into them:
 
 ##### CLI
 
+- **Signing in to a control plane that only a repository's link file names asks
+  first, and is refused without a terminal.** `rebase cloud login` in a checkout
+  whose `.rebase/cloud.json` names a host you have not signed in to confirms
+  that host at a terminal, and answers `unknown_control_plane` in JSON mode or
+  without one. A script that signs in from such a checkout passes `--url` or
+  sets `REBASE_CLOUD_URL`. See the entry under Security.
+
+- **`rebase cloud domains` works on the project's list of hosts, as the console
+  does.** It wrote the project's single domain field, which the control plane
+  ignores once a project has host rows, so `remove` reported success while the
+  host stayed served, and `add` + `verify` called a host live that was never
+  served. `list` now shows every host, `add` registers one, and
+  `verify [domain]` and `remove <domain>` act on that host; naming the domain is
+  required when the project has more than one. `domains list --json` returns
+  `{ projectId, tenantHost, domains: [...] }`, and `add`, `verify` and `remove`
+  return that host's fields. A project whose one domain lives only in the old
+  field, and a control plane without the domains function, still work through
+  that field.
+
 - **`rebase build --output` refuses a build that produces more than one
   bundle.** Every app was built into the one directory, and each bundle build
   empties its directory first. On a stock scaffold the admin's static bundle
@@ -3099,6 +3141,17 @@ yet, listed so that nobody reads a promise into them:
 #### Fixed
 
 ##### Server & REST
+
+- **Restoring a soft-deleted row with a `PATCH` works.** Setting the soft-delete
+  field back to `null`, the documented restore, answered 404 on `PATCH /:id`,
+  `PATCH /bulk` and `_batch`, because the update looked the row up without the
+  trash. A restore now finds the trashed row and honours an `If-Match` taken
+  with `?deleted=include`; any other edit of a trashed row is still a 404.
+
+- **A `_batch` create or upsert, and a create over the realtime socket, that
+  misses a required field is refused naming the field.** It is a 400
+  `VALIDATION_CONSTRAINT` before anything is written, where it used to fail on
+  the database's NOT NULL error partway through the transaction.
 
 - **A request body that is not a JSON object is a 400.** A body of `null`
   produced a 500, and `42`, `true`, a string or an array were saved as a row's
@@ -3182,6 +3235,39 @@ yet, listed so that nobody reads a promise into them:
   enabled. Anything that boots and shuts a backend down in-process gained one
   more of each per boot.
 
+##### Runtime
+
+- **A shutdown with a realtime client connected finishes and closes the database
+  pool.** An open WebSocket held the HTTP server's close until the force timer,
+  and the process exited 1 without running its cleanup. Realtime clients are now
+  sent a close (1001) and dropped a second later if they do not answer, and a
+  drain that has to be forced still runs the cleanup and exits 0.
+
+- **A dependency install killed partway is redone on the next start.** An
+  install cut short by an OOM kill or a probe restart was taken for a finished
+  one, so functions importing a missing package failed behind a healthy probe
+  for the life of the pod, and a failed re-fetch could fall back to the
+  half-installed bundle. The install now leaves a marker until npm returns; a
+  tree carrying it is reinstalled, and never served as a fallback.
+
+- **A bundle download that stalls partway through its body is abandoned and
+  retried.** The timeout was cleared once the response headers arrived, so a
+  body that stopped arriving hung the boot until the startup probe restarted the
+  pod. It is now a deadline on progress: a slow download that keeps receiving
+  data still finishes.
+
+- **`REBASE_RLS_AUDIT=true` runs the scheduled RLS audit on a bundle boot.** On
+  the runtime image, `rebase start` and `rebase dev` it did nothing, and
+  `/api/admin/rls-audit` kept saying the audit was off. The project must declare
+  `@rebasepro/rls-check`; without it the boot refuses and names the package.
+
+- **A data or storage source whose key does not uppercase letter for letter
+  boots with the variables the CLI and the control plane set.** For a key such
+  as `straße`, `rebase dev` and the control plane write `DATABASE_URL__STRASSE`,
+  while the runtime asked for `DATABASE_URL__STRA_E` and refused to boot. It now
+  reads the written spelling first and its old one second, so no deployed
+  variable changes name.
+
 ##### Auth
 
 - **Custom token claims reach the database on backends with `config.auth`.** On
@@ -3223,6 +3309,40 @@ yet, listed so that nobody reads a promise into them:
   self-service reset from the same config already linked correctly.
 
 ##### Postgres
+
+- **A write whose callback caught a failed statement is refused, not reported as
+  saved.** A lookup or a refused job enqueue that failed inside a callback
+  aborted the transaction even when caught, and the write answered 200 or 201
+  while nothing was stored. It is now a 500 `TRANSACTION_ABORTED`, with the
+  failed statement in the log. A failed `context.data` write is still undone on
+  its own and leaves the save intact, and a failed inverse-relation update or
+  tenant lookup now reports its own error.
+
+- **A job, queue message or webhook enqueued from `afterSaveError` survives the
+  failed write.** On a request the hook ran inside the transaction being rolled
+  back, so what it enqueued was rolled back with it. It now runs after the
+  rollback, with a `context.data` of its own, and a hook that throws is logged
+  instead of replacing the save's own error.
+
+- **Creating a row under an explicit id inserts it under that id.** In-process
+  `create(values, id)`, MCP `create_document` with an `id` and a socket
+  `SAVE { id, status: "new" }` answered 404 for a new id and overwrote an
+  existing row with create-time values. A duplicate id is now a 409.
+
+- **Deleting through a many-to-many path unlinks a soft-deleting target.**
+  `DELETE /posts/1/tags/5`, where `tags` uses `softDelete`, soft-deleted the tag
+  for every post instead of removing post 1's link to it.
+
+- **A save or delete made through a nested path appears in the row's history.**
+  A write to `/owners/1/docs/10`, or a socket frame with that path, was recorded
+  under the path, so `GET /docs/10/history` never showed it. A copied row's
+  history entry now says create, not update.
+
+- **Provisioning the RLS helper functions releases its advisory lock on the
+  connection that took it.** With other queries on the pool, or behind a
+  transaction-mode pooler, the unlock ran on another connection and left the
+  lock held, so the next replica's boot waited on it until its statement timeout
+  and failed.
 
 - **A field operation can no longer take a value past the property's declared
   bounds.** `{ stock: { $inc: -1000 } }` on `stock: { validation: { min: 0 } }`
@@ -3400,6 +3520,19 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Realtime
 
+- **An `afterRead` that writes is refused on subscription refetches too.**
+  Refetches now read in a READ ONLY transaction, like every request read. Such a
+  hook used to commit once per row, per subscriber, on every change.
+
+- **Subscriptions refetch after the CDC or cross-instance LISTEN connection
+  reconnects.** Changes committed while that connection was down never reached
+  subscribers.
+
+- **With CDC on, an app write no longer hides another writer's change to the
+  same row.** A save that fired no trigger left its echo mark standing for five
+  seconds, and the next change psql, a cron or another instance made to that row
+  was dropped as the echo. The mark now lasts the 300 ms refetch debounce.
+
 - **A realtime socket that comes back re-sends its subscriptions and re-joins
   its channels.** Whether an open was a reconnect was judged by the backoff
   counter, and a fresh budget resets that to zero. After retries ran out (a
@@ -3482,6 +3615,17 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Jobs & cron
 
+- **A queue handler that runs past the visibility timeout keeps its claim.** The
+  worker renews the claim while the handler runs, so a slow job is no longer
+  reclaimed and run a second time beside itself, and an outcome reported by an
+  attempt that lost its claim no longer overwrites the job's (a finished job
+  could be sent back for another run). A custom job store needs changes; see
+  Breaking.
+
+- **A cron job's catch-up looks for its missed slot as of now, not as of boot.**
+  When an earlier job's catch-up took a long time, a later job ran a stale
+  pre-boot slot after newer slots had already run.
+
 - **Pausing a cron job reaches every process and survives redeploys, a manual
   trigger no longer runs beside a run on another process, and Studio shows real
   run counts on the api role.** Enable/disable, the trigger's "already
@@ -3546,6 +3690,12 @@ yet, listed so that nobody reads a promise into them:
 
 ##### MCP
 
+- **An MCP tool call the server refuses tells the model why.** A collection
+  callback's veto (`CALLBACK_REJECTED`) or another declared 4xx on an MCP write
+  reached the model as a generic failure that blamed a permission rule, so it
+  went looking for the wrong fix. The declared message is now passed on, as REST
+  passes it; a 5xx and any undeclared error stay masked.
+
 - **`/mcp` has the body limit and per-person rate limit the data API has.**
   `/mcp` is mounted outside `basePath`, so the server-wide body limit and data
   rate limiter never applied to it, and JSON-RPC batches were unlimited: one
@@ -3586,6 +3736,31 @@ yet, listed so that nobody reads a promise into them:
   case differed, and that message came back as a success.
 
 ##### Client SDK
+
+- **A retained realtime channel that reconnects more than one replay page behind
+  catches up fully.** It fetches every page before delivering live messages, and
+  messages the server no longer retains are reported as a `CHANNEL_HISTORY_GAP`
+  error instead of being skipped in silence.
+
+- **With offline mode on, a lost update or delete replays under the idempotency
+  key of its first attempt.** A delete that committed but lost its answer
+  replayed into a 404, so the row was restored locally and the delete reported
+  as failed. A field operation whose answer was lost now rejects with
+  `NETWORK_ERROR` and the key to retry it under, where
+  `OFFLINE_FIELD_OP_UNSUPPORTED` advised a retry that applied it twice.
+
+- **A filter value wrapped in parentheses matches that string.** A `find()`
+  value such as `(deleted)` or `(none)` was read over REST as a list, so `==`
+  matched nothing and `!=` matched everything.
+
+- **A filter on a column named like a query parameter is applied.** A `find()`,
+  `count()` or `aggregate()` condition on a column called `select`, `page`,
+  `hard`, `fields`, `where` or another reserved name was ignored in silence, or
+  refused with a 400.
+
+- **Offline queries compare two digit strings as text, as Postgres does.** A
+  text column holding zip codes or SKUs matched `"01234"` to `"1234"`, and
+  cached pages were sorted differently from the server's.
 
 - **A tab holding a stale refresh token takes its sibling tab's session instead
   of signing everyone out.** In json mode all tabs share one stored session, but
@@ -3645,6 +3820,27 @@ yet, listed so that nobody reads a promise into them:
   `functions.invoke()` sends them.
 
 ##### Admin (CMS & app)
+
+- **Editing one key of a spread map in the table keeps a sibling key edited just
+  before it.** The cell saved the map as it was when the row first rendered,
+  reverting the other key.
+
+- **A `clearOnDisabled` property is no longer written as `null` by every table
+  row that renders.** The table shows the stored value, and the value is cleared
+  only when a form saves, with inline editing on or off.
+
+- **Typing a date into a table cell saves it once, when it is complete.** Every
+  keystroke was saved, so typing a year stored 1902, 1920 and 0202 on the way.
+  The UI kit's `DateTimeField` also no longer reads a typed year below 100 as
+  19xx.
+
+- **The clear button of a relation or reference table cell cannot be hit while
+  it is hidden.** On a touch screen a tap on the cell could land on it and empty
+  the relation.
+
+- **Importing data with a column named like a built-in object property works.**
+  A CSV or JSON column called `constructor`, `toString` or `valueOf` crashed the
+  import's type inference; it is now inferred like any other.
 
 - **Signing out while `defineRolesFor` is still resolving keeps you signed
   out.** A slow roles lookup could finish after the sign-out and restore the old
@@ -3883,6 +4079,26 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Studio
 
+- **The SQL console refuses to edit a JOIN result whose key column name is
+  shared.** Editing a cell where two joined tables both return, say, `id`
+  updated the wrong row. The console now asks for an alias instead.
+
+- **The SQL console asks before a DELETE or UPDATE without its own WHERE.** The
+  word WHERE anywhere else, in another statement or a comment, skipped the
+  confirmation. TRUNCATE, DROP and an ALTER TABLE that drops a column or
+  constraint ask too.
+
+- **Editing a SQL console result writes to the database and role it was read
+  from.** After switching database or role, an edit sent the old rows' keys to
+  the newly selected one; it is now refused until the query runs again.
+
+- **Switching the storage browser to another source closes the preview and
+  clears the selection.** Delete could otherwise remove a same-named file from
+  the other source.
+
+- **Deleting a file from a row of the storage browser's list view asks first.**
+  It deleted at once.
+
 - **The SQL console's Explain no longer executes the statement.** It ran
   `EXPLAIN (FORMAT JSON, ANALYZE)` on the whole tab, and ANALYZE executes the
   query: explaining `DELETE FROM posts` deleted the rows without Run's
@@ -4071,6 +4287,49 @@ yet, listed so that nobody reads a promise into them:
 
 ##### CLI
 
+- **`rebase cloud deploy` refuses, and exits non-zero, while an earlier deploy
+  of yours is still running.** It followed that deploy and reported its success
+  as its own, so the code just uploaded was never built. It now answers
+  `deploy_in_progress`, names the running deploy and says nothing was deployed.
+
+- **`rebase cloud db backup list` and `backup create` name each backup by its
+  filename and size.** They printed `undefined … NaN MB` and "(unknown)".
+
+- **`rebase cloud db connect` keeps accepting connections after the first
+  hour.** Each new connection signs in with a refreshed token rather than the
+  one the tunnel started with, and a failed refresh closes that connection with
+  a hint to run `rebase cloud login`.
+
+- **A deploy whose build outlasts the session uploads with a refreshed token.**
+  The bundle, `--source` and rebuild-source uploads used the token read before
+  the build and failed with a 401 once it expired.
+
+- **A bare `rebase cloud deploy` names the uploaded source the platform will
+  rebuild.** After a rollback or a bundle deploy it said there was none, because
+  it read only the newest deployment.
+
+- **A deploy or `logs -f` keeps following through a failed status read.** One
+  502 or dropped connection while the control plane restarted exited 1 on a
+  deploy that went on to succeed. It now retries, and says `status_unreadable`
+  only if the status stays unreadable for over a minute.
+
+- **`rebase cloud deploy --source` refuses when it cannot read the project.** It
+  went ahead and could eject a managed project; pass `--eject` to go ahead
+  anyway.
+
+- **`rebase cloud deploy --json` prints a JSON error for a managed deploy
+  refused before the build.** A broken `rebase.json`, a declared-resource
+  problem or a `--bundle-dir` without a manifest left stdout empty.
+
+- **`rebase cloud rollback <id>` reaches a deployment older than the newest
+  100.** It said "not found" for a deployment the control plane would roll back
+  to.
+
+- **`rebase cloud env set` says where each deploy path reads a build-time
+  variable.** Refusing a `VITE_…` key, it told you to commit a `.env` that a
+  `--source` deploy never uploads. Its help also said `--force` overwrites a
+  variable that is already set; it only lets a build-time key through.
+
 - **A followed deploy prints its build log whole.** The control plane rewrites a
   heartbeat line at the end of the log every 30 seconds. The CLI treated the log
   as append-only, so every new chunk lost about 70 characters and a failed
@@ -4241,6 +4500,29 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Server & REST
 
+- **A row's history no longer serves a withheld field in `previous_values`.**
+  Only `values` was stripped by the caller's read rules, so a caller without
+  `hr` read the old salary off any update entry. Both stored snapshots are
+  stripped now.
+
+- **A field operation on a field the caller cannot read is refused.**
+  `{ score: { $inc: -n } }` on a hidden `score` with a `min` answered with the
+  bound whenever the value was below n, so about forty requests recovered it,
+  over REST, MCP and the socket alike. An operation on such a field is now a 400
+  `FIELD_NOT_READABLE`, as a filter on it is.
+
+- **A write through a parent may not set a relation the caller may not write.**
+  `POST /bands/7/members`, `PATCH` or `DELETE /posts/1/tags/5`, a `_pivot` edit,
+  or the same over the realtime socket, is refused with `FIELD_NOT_WRITABLE`
+  when the parent's relation property, or the parent key on the child, is closed
+  to the caller.
+
+- **The project contract and the private API docs check the caller's admin role
+  and session revocation live.** A demoted admin, or one signed out everywhere,
+  kept reading `/api/meta/contract` and the non-public `/api/docs` for the rest
+  of the token's life. Both now sit behind the gate every other admin surface
+  uses, which also accepts the service key and admin API keys.
+
 - **A nested path is checked against the collection it names, whatever its
   spelling.** The nested routes found their parent by its exact slug, but the
   driver also accepts the kebab-case slug and the table name. Through those
@@ -4299,6 +4581,16 @@ yet, listed so that nobody reads a promise into them:
   the field.
 
 ##### Auth
+
+- **Writing the users collection through the data API holds to the admin user
+  routes' rules.** Single, bulk and `_batch` updates and deletes, and the
+  realtime socket, could delete or demote the last administrator, skipped
+  `beforeUserDelete` and `afterUserDelete`, left a deleted user's sessions alive
+  and stored an email unnormalised. They now answer `LAST_ADMIN` and
+  `EMAIL_EXISTS` as `/admin/users` does, and `PUT /admin/users/:uid` checks a
+  demotion before it writes the email or password. A custom auth adapter can
+  implement the new optional `prepareUserUpdates`, `prepareUserDeletions` and
+  `finalizeUserDeletions`.
 
 - **An account made for someone else's email is no longer handed to its owner
   with the maker's way in still on it.** Nothing verifies the address an account
@@ -4375,6 +4667,17 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Postgres
 
+- **An update can no longer set the soft-delete field.** On a `softDelete`
+  collection, setting it to a value in an update is a 400 `FIELD_NOT_WRITABLE`:
+  only a delete stamps it, so the `delete` permission and
+  `beforeDelete`/`afterDelete` always apply. Setting it back to `null` to
+  restore a row is still an ordinary update, and an upsert never trashes a
+  stored row.
+
+- **An update can no longer rewrite `created_by` or `created_at`.** An
+  `on_create` date or `user_on_create` property in an update's body, or set by a
+  `beforeSave` hook, was written. The stored creator and creation time are kept.
+
 - **The WebSocket and MCP reads no longer serve fields the caller may not
   read.** The driver's `fetchCollection` (and text search) parsed rows without
   the per-field read strip, and so did `fetchOne` when it fell back from
@@ -4403,6 +4706,28 @@ yet, listed so that nobody reads a promise into them:
   join-path writes now leave those links alone.
 
 ##### Realtime
+
+- **The realtime socket holds to the data API's body and rate limits.** A frame
+  over `maxBodySize` closes the socket with 1009, as does a frame over 64 KiB
+  before the socket authenticates, and data frames count in the same per-person
+  rate-limit bucket as HTTP requests instead of only per connection.
+
+- **A socket read, count or subscription cannot filter, sort or project an
+  included relation, or vector-search, on a field the caller cannot read.** It
+  is refused with `FIELD_NOT_READABLE`, as over HTTP. A subscription stored its
+  `include` and applied it on every refetch without checking it.
+
+- **A socket save no longer takes the collection config from the client.** Only
+  the path, id, values and status reach the driver, and an upsert over the
+  socket is refused on a nested path and checked against the collection's unique
+  keys, as over HTTP. An upsert through a parent could move another parent's row
+  under it.
+
+- **A socket that signs in again re-scopes its open subscriptions and channel
+  memberships.** After a session refresh, a demotion or a switch of account they
+  kept refetching as the old identity. Each subscription now refetches as the
+  new one at once, one whose filter the new roles may not read ends with
+  `FIELD_NOT_READABLE`, and channel memberships are authorised again.
 
 - **A socket read may no longer filter, sort or project on a field its caller
   cannot read.** `COUNT`, `FETCH_COLLECTION`, `CHECK_UNIQUE_FIELD` and
@@ -4474,6 +4799,20 @@ yet, listed so that nobody reads a promise into them:
 
 ##### MCP
 
+- **The MCP write tools hold the users collection to the admin user routes'
+  rules, as the data API now does.** `delete_document` cannot delete the last
+  administrator, runs `beforeUserDelete` and `afterUserDelete` and ends the
+  user's sessions; `update_document` cannot demote the last administrator and
+  stores the email normalized (`EMAIL_EXISTS` on a taken one); and
+  `create_document` creates the user through the auth adapter, so the password
+  is hashed, the email normalized, `onCreateUser` runs and an invitation or a
+  temporary password is issued.
+
+- **Text stored in a row can no longer close the untrusted-data envelope around
+  a tool result.** The envelope's markers now carry a per-response id, and
+  marker-shaped text inside the data is broken up, so instructions in a row
+  cannot land outside the fence.
+
 - **The MCP query tool refuses a filter or sort on a field the caller cannot
   read.** `query_collection` only checked that a filter or `orderBy` field
   existed. A user without `access.read` on `salary` could ask for rows with
@@ -4531,6 +4870,12 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Studio
 
+- **SQL run in the Studio editor runs on a connection of its own, reset
+  afterwards.** A `SET ROLE rebase_user` left that pooled connection running as
+  that role, so later auth lookups, job and cron stores and history writes that
+  checked it out ran restricted until a restart. Session settings leaked the
+  same way.
+
 - **Importing a live RLS policy into the codebase no longer turns a restrictive
   policy into one everyone passes.** Both "Import to codebase" buttons (Studio's
   RLS editor and the collection editor's RLS tab) copied a policy's `TO` list,
@@ -4569,6 +4914,13 @@ yet, listed so that nobody reads a promise into them:
   row-level security.
 
 ##### CLI
+
+- **`rebase cloud login` no longer sends your password to a control plane named
+  only by a repository's `.rebase/cloud.json`.** A cloned repository could point
+  the login at any host. A host you have not signed in to before is now named
+  and confirmed at a terminal, and refused without one, or in JSON mode, unless
+  you pass `--url`. The default host and hosts you are already signed in to go
+  ahead as before.
 
 - **A deploy's source upload respects `.gitignore` outside a git repository, and
   never carries database dumps, `.rebase/` or dev secrets.** A project with no
