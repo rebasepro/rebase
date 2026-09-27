@@ -1,5 +1,5 @@
 ---
-sourceHash: 035955ac366c306b
+sourceHash: fcd4cffc00288949
 title: Soft delete
 sidebar_label: Soft delete
 description: Transforme a exclusão em um timestamp, oculte linhas marcadas de todas as leituras e restaure-as com uma atualização comum.
@@ -63,6 +63,24 @@ responderia à pergunta oposta.
 
 Uma **restauração** é uma atualização comum definindo o campo de volta para `null`. Não
 há verbo especial, porque não há estado especial — a linha nunca saiu do lugar.
+Via REST, é um `PATCH` — individual, `/bulk` ou `_batch` — cujo corpo define o
+campo como `null`:
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+Essa atualização é a única que alcança uma linha marcada. Qualquer outra edição dela responde
+`404`, como a linha responde a toda leitura padrão; restaure-a primeiro.
+
+O inverso não é uma atualização. Definir o campo com um valor é recusado com `400`
+`FIELD_NOT_WRITABLE` — exclua a linha em vez disso — de modo que a permissão `delete`,
+`beforeDelete` e `afterDelete` sempre se aplicam a ela. Um upsert pode criar uma linha
+que já esteja marcada, mas nunca marca uma que já estava armazenada.
+
+Uma exclusão por um caminho muitos-para-muitos, como `DELETE /api/data/posts/1/tags/5`,
+remove o vínculo do post 1 com a tag. Ela não faz soft delete da tag, que outros
+posts ainda usam.
 
 Um `DELETE` **real** é feito com `?hard=true` na chamada de exclusão. Ele precisa exatamente
 da mesma permissão que uma exclusão comum: é o mesmo verbo, e restringi-lo

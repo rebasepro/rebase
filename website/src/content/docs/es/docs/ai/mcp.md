@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a197121af0d5219
+sourceHash: 98f470ca4afe200d
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la compuerta de loopback que se interpone entre un agente y producción."
@@ -310,14 +310,20 @@ Las filas, los registros de usuario, los listados de almacenamiento, los trabajo
 salida de la CLI se devuelven envueltos en un contenedor explícito:
 
 ```text
-<<<UNTRUSTED_DATA source="list_documents">>>
+<<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
 [ … rows … ]
-<<<END_UNTRUSTED_DATA>>>
+<<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
 
 Cualquier cosa almacenada en tu base de datos fue escrita por alguien, y llega por
 el mismo canal que el contrato de herramientas que el asistente está siguiendo. El contenedor le indica
 al modelo que lo trate como contenido inerte en lugar de instrucciones.
+
+El `id` se genera de nuevo para cada respuesta, después de que se escribieran los datos, y
+solo el marcador de cierre que lo lleva cierra el bloque. El texto dentro de los datos con
+forma de marcador se rompe con un espacio de ancho cero, de modo que una fila que imprima
+`<<<END_UNTRUSTED_DATA>>>` no puede terminar el contenedor antes de tiempo y dejar fuera lo que
+le sigue.
 
 Es un marcador, no un entorno aislado (sandbox). Un asistente que disponga de estas herramientas solo será tan seguro
 como el contenido que le permitas leer.

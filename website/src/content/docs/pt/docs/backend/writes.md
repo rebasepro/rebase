@@ -1,5 +1,5 @@
 ---
-sourceHash: e87f3694489cd571
+sourceHash: 088ee7a6b8423f85
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -122,8 +122,8 @@ Uma operação responde à `validation` da propriedade como um valor. Os element
 
 ### Upsert em uma chave natural
 
-`POST /api/data/:slug?on_conflict=email` escreve
-`INSERT … ON CONFLICT (email) DO UPDATE` em vez de uma inserção simples. A rota em lote
+`POST /api/data/:slug?on_conflict=email` insere a linha, ou atualiza a que
+já contém esse email, em vez de falhar por causa dela. A rota em lote
 aceita o mesmo destino que `onConflict` junto a `upsert: true`, assim como cada operação de
 `upsert` de um lote.
 
@@ -154,9 +154,20 @@ uma que duplica dados.
 linha que ele encontrasse poderia estar sob outro pai, e o upsert a moveria para
 este. Envie o upsert para a rota própria da coleção.
 
-Uma linha que já existia mantém seu timestamp `on_create`. Um conflito significa que a
-criação da linha é um fato do passado, e uma reimportação noturna que redefinisse `createdAt`
-em tudo o que tocasse arruinaria qualquer consulta de "novidades desta semana".
+Um upsert que encontra uma linha armazenada é uma atualização dela. O servidor lê a linha
+que a chave indica, no escopo do chamador e dentro da transação da escrita, e
+executa a atualização comum: os campos do corpo são gravados, os que ele omite
+mantêm seus valores armazenados em vez de serem redefinidos para seu `defaultValue`,
+`beforeSave` e `afterSave` veem `status: "existing"` com os valores anteriores,
+e o histórico registra uma atualização. Uma linha que a leitura não conseguiu ver, ou uma inserida
+concorrentemente, ainda é capturada por `ON CONFLICT … DO UPDATE`, que define apenas o que
+o corpo e os hooks escreveram, além dos carimbos `on_update`. Uma chave que indica uma linha
+fora do escopo `beforeQuery` do chamador responde `404`.
+
+Uma linha que já existia mantém seu timestamp `on_create` e seu criador
+`user_on_create`. Um conflito significa que a criação da linha é um fato do
+passado, e uma reimportação noturna que redefinisse `createdAt` em tudo o que tocasse
+arruinaria qualquer consulta de "novidades desta semana".
 
 ### `Prefer: return=minimal`
 

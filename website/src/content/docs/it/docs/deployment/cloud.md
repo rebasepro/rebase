@@ -1,5 +1,5 @@
 ---
-sourceHash: 11eb4597bacc7658
+sourceHash: be8521ab898e66ea
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -40,6 +40,8 @@ rebase cloud projects create --name "My app" --subdomain my-app --link
 `projects create` non accetta argomenti posizionali. Il nome e il sottodominio sono flag ed entrambi sono obbligatori: su un terminale vengono richiesti in modo interattivo, mentre un'esecuzione headless che ometta uno dei due termina con `input_required` anziché inventarne uno. **Il sottodominio non è modificabile successivamente:** è l'host `<slug>.rebase.website` su cui risponde il progetto, quindi sceglilo con attenzione.
 
 `--link` associa questa directory al progetto nella stessa chiamata, quindi non c'è una fase di `link` separata. Scrive `.rebase/cloud.json`, che registra l'ID del progetto e lo slug. Quel file non è un segreto e non rappresenta le tue credenziali: queste si trovano in `~/.rebase/credentials.json`, scritto da `login`.
+
+Viene però incluso nel commit insieme al codice, quindi un repository clonato può indicare qualsiasi control plane. Quando l'host proviene solo da quel file, e non è né quello della piattaforma né uno su cui hai già effettuato l'accesso in precedenza, `login` lo indica e chiede conferma prima di inviarvi la tua email e la tua password. Senza un terminale, o con `--json`, rifiuta con `unknown_control_plane`; passa `--url <host>` (oppure imposta `REBASE_CLOUD_URL`) per accedere lì intenzionalmente.
 
 `billing setup` associa una carta all'organizzazione, una sola volta. È posizionato all'inizio della sequenza di proposito: il primo deploy di un progetto viene rifiutato senza una carta, e scoprirlo dopo aver completato l'upload di un bundle è l'ordine peggiore.
 
@@ -134,7 +136,7 @@ Nessun valore viene convalidato dalla CLI, intenzionalmente: i limiti appartengo
 | `start`, `stop`, `restart` | Sospensione di un progetto e ripristino |
 | `status`, `metrics`, `debug` | Cosa sta facendo e perché non funziona |
 | `env` | Variabili d'ambiente. `list` non stampa mai i valori; `--secret` è di sola scrittura |
-| `domains` | Domini personalizzati, record DNS da aggiungere e verifica |
+| `domains` | Domini personalizzati, record DNS da aggiungere e verifica. Un progetto può rispondere su più domini, ciascuno verificato separatamente; `verify` e `remove` accettano il dominio su cui agire, che può essere omesso solo quando ce n'è uno (per `verify`, uno ancora in attesa). `list --json` restituisce `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Connessione o creazione di un database, connessione dalla tua macchina, backup, ripristino e point-in-time recovery |
 | `extensions` | L'elenco consentito (allowlist) delle estensioni Postgres |
 | `storage` | Il bucket del progetto |
@@ -155,7 +157,7 @@ Detto chiaramente, perché scoprirlo in seguito è peggio:
 - **Nessun servizio self-service.** L'accesso viene concesso a scaglioni; non è prevista una procedura di registrazione e pagamento immediata.
 - **Nessun SLA pubblicato** e nessuna certificazione SOC 2. Se hai bisogno di uno dei due, segnalalo al momento della richiesta di accesso anziché darlo per scontato.
 - **Nessun deploy di preview o di branch**, e nessuna GitHub App proprietaria. Gli hook di deploy — URL segreti a cui puntare il webhook del repository — sono l'automazione supportata.
-- **La CI richiede credenziali umane.** Non è ancora disponibile un token macchina; `rebase cloud login` accetta un'email e una password. Passali come `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` da un gestore di segreti — `--password` memorizza la password nella cronologia della shell e nella tabella dei processi, e lo segnala prima di effettuare l'accesso.
+- **La CI richiede credenziali umane.** Non è ancora disponibile un token macchina; `rebase cloud login` accetta un'email e una password. Passali come `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` da un gestore di segreti — `--password` memorizza la password nella cronologia della shell e nella tabella dei processi, e lo segnala prima di effettuare l'accesso. Se il `.rebase/cloud.json` del repository indica un control plane diverso da quello della piattaforma, passalo anche come `--url`: senza un terminale, `login` si rifiuta di inviare una password a un host indicato soltanto dal file estratto.
 - **Il point-in-time recovery è disponibile solo da CLI.** La console mostra i backup; il flusso di lavoro di PITR a stadi si esegue con `rebase cloud db pitr`.
 - **Nessun endpoint pubblico per il database.** Un database gestito non è esposto a Internet, pertanto l'host visualizzato nella console è l'indirizzo utilizzato dal backend e non si risolve a nulla sulla tua macchina locale. `rebase cloud db connect` apre una porta locale collegata al database, incanalata tramite tunnel attraverso il control plane per tutto il tempo in cui viene mantenuta attiva — tuttavia non esiste un hostname permanente a cui un servizio di terze parti possa connettersi. Quel tunnel e la password visibile tramite `rebase cloud db info --reveal` richiedono entrambi il ruolo di owner o admin dell'organizzazione: lo stesso richiesto dall'editor SQL di Studio, poiché tutti e tre consentono l'accesso a una sessione sui tuoi dati di produzione.
 

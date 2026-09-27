@@ -1,5 +1,5 @@
 ---
-sourceHash: 659f1391627611c5
+sourceHash: 281093d0a10d0ae8
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
@@ -35,7 +35,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Insira a linha ou substitua aquela que já ocupa sua chave:
+Insira a linha ou atualize aquela que já ocupa sua chave:
 
 ```typescript
 await client.data.users.upsert(
@@ -44,9 +44,16 @@ await client.data.users.upsert(
 );
 ```
 
-Uma única instrução no servidor (`INSERT … ON CONFLICT DO UPDATE`), portanto, diferentemente de um
-`findById` seguido por um `create`-ou-`update`, ela não perde a condição de corrida entre os
-dois e, ao contrário do `create`, não falha quando a linha já existe.
+O servidor decide qual das duas dentro de uma única transação, e recorre a
+`INSERT … ON CONFLICT DO UPDATE`, portanto, diferentemente de um `findById` seguido por um
+`create`-ou-`update`, ela não perde a condição de corrida entre os dois e, ao contrário do
+`create`, não falha quando a linha já existe.
+
+Quando a linha existe, o upsert é uma atualização dela. Os campos que você envia são
+gravados e os que você omite mantêm seus valores armazenados — eles não são redefinidos
+para seu `defaultValue`. `beforeSave` e `afterSave` veem `status: "existing"`
+com os valores anteriores, e o histórico registra uma atualização. Uma chave que indica uma linha
+fora do escopo `beforeQuery` do chamador resulta em um 404.
 
 `onConflict` tem como padrão a chave primária, que é o alvo incorreto para a maioria das
 escritas em que um upsert é utilizado: indexado por um id serial que é uma simples
@@ -57,8 +64,8 @@ true }` na propriedade ou nas colunas de um [índice](/docs/backend/indexes/)
 `unique: true` — e qualquer outra coisa resultará em um erro 400 listando os alvos
 que realmente existem, em vez de um erro gerado de dentro de uma transação.
 
-O timestamp `on_create` de uma linha que já existia é mantido intacto: um
-conflito significa que sua criação é um fato do passado.
+O timestamp `on_create` e o criador `user_on_create` de uma linha que já existia
+são mantidos intactos: um conflito significa que sua criação é um fato do passado.
 
 ### Update
 

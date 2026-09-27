@@ -1,5 +1,5 @@
 ---
-sourceHash: 659f1391627611c5
+sourceHash: 281093d0a10d0ae8
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lots et écriture entre collections dans une seule transaction.
@@ -34,7 +34,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Insérez la ligne, ou remplacez celle qui occupe déjà sa clé :
+Insérez la ligne, ou mettez à jour celle qui occupe déjà sa clé :
 
 ```typescript
 await client.data.users.upsert(
@@ -43,9 +43,16 @@ await client.data.users.upsert(
 );
 ```
 
-Une seule instruction côté serveur (`INSERT … ON CONFLICT DO UPDATE`), donc contrairement à un
-`findById` suivi d'un `create` ou d'un `update`, elle ne peut pas perdre la course entre les
-deux, et contrairement à `create`, elle n'échoue pas lorsque la ligne est déjà présente.
+Le serveur décide de l'un ou l'autre au sein d'une seule transaction, et se rabat sur
+`INSERT … ON CONFLICT DO UPDATE`, donc contrairement à un `findById` suivi d'un `create` ou
+d'un `update`, l'upsert ne peut pas perdre la course entre les deux, et contrairement à `create`,
+il n'échoue pas lorsque la ligne est déjà présente.
+
+Lorsque la ligne est présente, l'upsert en est une mise à jour. Les champs que vous envoyez sont
+écrits et ceux que vous omettez conservent leurs valeurs stockées — ils ne sont pas réinitialisés
+à leur `defaultValue`. `beforeSave` et `afterSave` voient `status: "existing"` avec les valeurs
+précédentes, et l'historique enregistre une mise à jour. Une clé qui désigne une ligne hors de la
+portée `beforeQuery` de l'appelant donne une 404.
 
 `onConflict` cible par défaut la clé primaire, ce qui n'est pas la bonne cible pour la plupart
 des écritures pour lesquelles on utilise un upsert : indexé sur un identifiant séquentiel, il s'agit d'une simple
@@ -56,8 +63,8 @@ true }` sur la propriété, ou les colonnes d'un [index](/docs/backend/indexes/)
 — et tout autre élément renverra une erreur 400 listant les cibles
 existantes, plutôt qu'une erreur levée depuis l'intérieur d'une transaction.
 
-L'horodatage `on_create` d'une ligne qui existait déjà n'est pas modifié : un
-conflit signifie que sa création est un fait appartenant au passé.
+L'horodatage `on_create` et le créateur `user_on_create` d'une ligne qui existait déjà ne sont
+pas modifiés : un conflit signifie que sa création est un fait appartenant au passé.
 
 ### Update
 

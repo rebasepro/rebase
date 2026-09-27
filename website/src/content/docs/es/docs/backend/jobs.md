@@ -1,5 +1,5 @@
 ---
-sourceHash: 348b6c433874e80b
+sourceHash: 9a7137f85a2187fd
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
 description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.
@@ -73,16 +73,16 @@ Las filas fallidas se conservan 30 días; las exitosas, 3.
 
 ## Qué sucede cuando un worker muere
 
-Un proceso terminado a mitad de un trabajo no puede liberar su bloqueo, por lo que solo un tiempo de espera (timeout) liberará la fila. Los trabajos reclamados durante más tiempo que `visibilityTimeoutMs` (por defecto 5 minutos) se vuelven a reclamar: vuelven a `pending` si les quedan intentos; de lo contrario, se envían a la cola de fallidos (dead-letter) con un error que explica lo sucedido.
+Un proceso terminado a mitad de un trabajo no puede liberar su bloqueo, por lo que solo un tiempo de espera (timeout) liberará la fila. Mientras un handler se ejecuta, su worker renueva el bloqueo cada tercio de `visibilityTimeoutMs` (por defecto 5 minutos). Un bloqueo que pasa ese tiempo sin renovarse se vuelve a reclamar: vuelve a `pending` si al trabajo le quedan intentos; de lo contrario, se envía a la cola de fallidos (dead-letter) con un error que explica lo sucedido.
 
-Esta es también la razón por la cual el tiempo de espera debe superar a su handler más lento: pasado este límite, un segundo worker podría iniciar un trabajo que el primero todavía está ejecutando.
+Así, un handler lento en un worker vivo conserva su trabajo, tarde lo que tarde, y el tiempo de espera solo decide cuánto tardan en volver los trabajos de un worker muerto. Un intento que perdió su bloqueo tampoco puede sobrescribir el resultado del trabajo: su éxito o fallo se registra en el log y se descarta, y decide el intento que tenga el bloqueo.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 

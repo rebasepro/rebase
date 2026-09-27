@@ -272,6 +272,12 @@ afterSaveError: async ({
 }
 ```
 
+On a request, it runs once the failed write's transaction has rolled back, not
+inside it. Its `context.data` is a fresh one for the same caller, where each call
+is a transaction of its own, so a [job](/docs/backend/jobs), queue message or
+webhook it enqueues commits and survives the failure it reports. A throw from
+`afterSaveError` is logged, and the caller still gets the save's own error.
+
 ### `afterRead`
 
 Called after reading entities from the database. Transform the data for display.
@@ -451,6 +457,27 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` is a second connection, not part of this write]
+On Postgres, `context.client.dataAsAdmin` inside a request's callback runs in a
+transaction of its own, on another pooled connection, while the triggering
+write's transaction is still open. So it commits on its own, and stays if the
+write rolls back. It also cannot see the row being saved, which is not committed
+yet, and must not write it:
+
+- An admin write with a foreign key back to that row (an `audit_logs.article_id`
+  that references `articles`) fails its key check, and the caller's write fails
+  with it.
+- An admin write to the row being saved, or to any row this write has locked,
+  waits for the write's lock while the write waits for the callback. Postgres
+  cannot see that as a deadlock, so the request hangs until `statement_timeout`
+  (30 seconds by default) and then fails.
+
+For a record that has to reference the row, write it with `context.data`, which
+rides the write's transaction, or enqueue a [job](/docs/backend/jobs): a job
+enqueued from the callback commits with the write, and its handler runs after
+the commit.
+:::
+
 :::caution[This page used to say the opposite]
 Earlier versions of this page stated that callbacks always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited callbacks written on the assumption that they could always see everything.
 
@@ -469,7 +496,9 @@ So the triggering write and everything its callbacks wrote commit together or no
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
 - A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
 
-Let a failure throw when the triggering write should not survive it. Catch it when it should: the failed write is undone on its own, and the rest commits.
+Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a failed write is undone on its own, and the rest commits.
+
+Any other statement that fails on the write's transaction — a lookup, a job enqueue the database refused — aborts that transaction in Postgres, and catching the error in JavaScript does not undo that. The write is refused with **500 `TRANSACTION_ABORTED`** and nothing is stored, rather than answering success for a write that was rolled back. Let such a failure throw, or check for the condition before running the statement.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

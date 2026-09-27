@@ -1,5 +1,5 @@
 ---
-sourceHash: 035955ac366c306b
+sourceHash: fcd4cffc00288949
 title: Soft delete
 sidebar_label: Soft delete
 description: Trasforma l'eliminazione in un timestamp, nascondi le righe contrassegnate da ogni lettura e ripristinale con un normale aggiornamento.
@@ -63,6 +63,24 @@ alla domanda opposta.
 
 Un **ripristino** è un normale aggiornamento che reimposta il campo su `null`. Non esiste
 un verbo speciale, perché non esiste uno stato speciale: la riga non è mai stata spostata altrove.
+Tramite REST è un `PATCH` — singolo, `/bulk` o `_batch` — il cui body imposta il
+campo su `null`:
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+Quell'aggiornamento è l'unico che raggiunge una riga contrassegnata. Qualsiasi altra modifica
+di essa restituisce `404`, come fa la riga per ogni lettura predefinita; ripristinala prima.
+
+L'operazione inversa non è un aggiornamento. Impostare il campo su un valore viene rifiutato con `400`
+`FIELD_NOT_WRITABLE` — elimina invece la riga — così il permesso `delete`,
+`beforeDelete` e `afterDelete` si applicano sempre. Un upsert può creare una riga
+già contrassegnata, ma non contrassegna mai una riga già memorizzata.
+
+Un'eliminazione tramite un percorso many-to-many, come `DELETE /api/data/posts/1/tags/5`,
+rimuove il collegamento del post 1 al tag. Non esegue il soft delete del tag, che altri
+post utilizzano ancora.
 
 Una **vera** `DELETE` corrisponde a `?hard=true` nella chiamata di eliminazione. Richiede esattamente
 gli stessi permessi di un'eliminazione ordinaria: si tratta dello stesso verbo e gestirlo

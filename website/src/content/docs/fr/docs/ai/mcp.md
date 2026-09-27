@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a197121af0d5219
+sourceHash: 98f470ca4afe200d
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou tout client MCP à un projet Rebase — les 42 outils qu'il expose, l'identifiant avec lequel il s'authentifie, et la barrière de bouclage qui sépare un agent de la production.
@@ -309,14 +309,20 @@ Les lignes, les enregistrements utilisateurs, les listes de stockage, les tâche
 sorties CLI reviennent encapsulés dans une enveloppe explicite :
 
 ```text
-<<<UNTRUSTED_DATA source="list_documents">>>
+<<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
 [ … rows … ]
-<<<END_UNTRUSTED_DATA>>>
+<<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
 
 Tout ce qui est stocké dans votre base de données a été écrit par quelqu'un et arrive sur
 le même canal que le contrat d'outil suivi par l'assistant. L'enveloppe indique
 au modèle de le traiter comme du contenu inerte plutôt que comme des instructions.
+
+L'`id` est généré à neuf pour chaque réponse, après l'écriture des données, et
+seul le marqueur de fin qui le porte ferme le bloc. Tout texte des données qui a
+la forme d'un marqueur est coupé par une espace de largeur nulle, de sorte qu'une
+ligne qui affiche `<<<END_UNTRUSTED_DATA>>>` ne peut pas clore l'enveloppe
+prématurément et placer ce qui la suit à l'extérieur.
 
 Il s'agit d'un marqueur, pas d'un bac à sable (sandbox). Un assistant disposant de ces outils n'est sûr
 qu'à hauteur de la sécurité du contenu que vous lui permettez de lire.

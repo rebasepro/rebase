@@ -62,6 +62,24 @@ question.
 
 A **restore** is an ordinary update setting the field back to `null`. There is
 no special verb, because there is no special state — the row never went anywhere.
+Over REST it is a `PATCH` — single, `/bulk` or `_batch` — whose body sets the
+field to `null`:
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+That update is the one that reaches a stamped row. Any other edit of it answers
+`404`, as the row does to every default read; restore it first.
+
+The reverse is not an update. Setting the field to a value is refused with `400`
+`FIELD_NOT_WRITABLE` — delete the row instead — so the `delete` permission,
+`beforeDelete` and `afterDelete` always apply to it. An upsert may create a row
+that is already stamped, but never stamps one that was stored.
+
+A delete through a many-to-many path, like `DELETE /api/data/posts/1/tags/5`,
+removes post 1's link to the tag. It does not soft-delete the tag, which other
+posts still use.
 
 A **real** `DELETE` is `?hard=true` on the delete call. It needs exactly the
 same permission an ordinary delete does: it is the same verb, and gating it

@@ -1,5 +1,5 @@
 ---
-sourceHash: ceab8562a236c9de
+sourceHash: 1474038b1d0142aa
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
 description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.
@@ -136,14 +136,15 @@ Redaktionsschritt mit einer stillschweigenden Ausnahme machen, weshalb dies nich
 
 ## Blockierende vs. asynchrone Semantik
 
-**Jeder Callback in der folgenden Liste wird per `await` abgewartet, und alle laufen innerhalb der
-Transaktion, die den Schreibvorgang ausführt.** Es gibt keine „Fire-and-Forget“-Ebene: Die
-Zeile und alles, was ihre Callbacks getan haben, werden zusammen committet oder gar nicht.
+**Jeder Callback in der folgenden Liste wird per `await` abgewartet, und alle außer
+`afterSaveError` laufen innerhalb der Transaktion, die den Schreibvorgang ausführt.** Es gibt
+keine „Fire-and-Forget“-Ebene: Die Zeile und alles, was ihre Callbacks getan haben, werden
+zusammen committet oder gar nicht.
 
 - **`beforeSave`, `beforeDelete`** — Wenn der Callback einen Fehler auslöst (throw), wird die Operation mit einem HTTP 400 abgelehnt, der Ihre Nachricht und den Code `CALLBACK_REJECTED` enthält, und der Schreibvorgang in die Datenbank findet niemals statt. Werfen Sie einen `RebaseApiError` aus `@rebasepro/types`, um den Status selbst zu wählen – siehe [Entity-Callbacks](/docs/collections/callbacks#beforesave). Ein `beforeDelete`, das `false` *zurückgibt*, stellt dieselbe Verweigerung ohne Nachricht dar und antwortet mit **403** und diesem Code.
 - **`afterRead`** — Die zurückgegebene Zeile (oder transformierte Zeile) ist das, was der Aufrufer erhält. Ihre Transaktion ist `READ ONLY` – siehe [unten](#afterread-kann-nicht-schreiben).
 - **`afterSave`, `afterDelete`** — Werden *vor* dem Commit ausgeführt und abgewartet. Ein Fehler (throw) an dieser Stelle rollt die Zeile zurück und antwortet ebenfalls mit **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt. Sie halten die Transaktion während ihrer Ausführung offen; ein langsamer Hook blockiert somit Sperren (Locks).
-- **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg.
+- **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg. Bei einem Request läuft er, nachdem die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, mit einem `context`, dessen Aufrufe jeweils eine eigene Transaktion sind, sodass ein Job, den er einreiht, um den Fehler zu melden, erhalten bleibt. Ein Fehler (throw) aus ihm wird protokolliert; der Aufrufer erhält den eigenen Fehler des Speichervorgangs.
 
 :::caution[Diese Seite besagte früher das Gegenteil]
 Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“
@@ -169,7 +170,8 @@ ist sie nicht Teil des Schreibvorgangs und gehört daher nicht in den Hook.
 
 ### `afterRead` kann nicht schreiben
 
-Ein Lesezugriff im Request-Scope öffnet seine Transaktion als `READ ONLY`. `afterRead` läuft darin,
+Ein Lesezugriff im Request-Scope öffnet seine Transaktion als `READ ONLY`, ebenso das erneute
+Abrufen (Refetch) einer Realtime-Subscription. `afterRead` läuft darin,
 sodass **kein Schreibvorgang aus diesem Callback erfolgreich sein kann** — weder ein Erstellen
 über `context.data`, noch ein Update, noch ein Aufruf, der in einer aufgerufenen Hilfsfunktion verborgen ist. Postgres weist das
 Statement mit SQLSTATE `25006` ab, und der Aufrufer erhält als Antwort:

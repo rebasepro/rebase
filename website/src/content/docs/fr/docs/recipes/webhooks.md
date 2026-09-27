@@ -1,5 +1,5 @@
 ---
-sourceHash: 77aa7e43ab714fa6
+sourceHash: 9d8f8d760d14c7f4
 title: "Recette : Intégration de Webhooks"
 sidebar_label: Webhooks
 description: Utilisez les callbacks d'entité pour envoyer des webhooks à des services externes lorsque les données changent, sans maintenir ouverte la transaction de l'écriture.
@@ -171,8 +171,10 @@ const callbacks: CollectionCallbacks<Product> = {
 ## Gestion des Erreurs
 
 `afterSaveError` s'exécute lorsque l'enregistrement — ou n'importe quel callback `afterSave` —
-lève une exception. C'est un hook de notification, pas un sauvetage : **l'erreur est relancée après
-son exécution**, la transaction est annulée et la ligne n'est pas enregistrée.
+lève une exception. C'est un hook de notification, pas un sauvetage : la transaction est annulée, la
+ligne n'est pas enregistrée et **l'erreur est relancée après son exécution**. Lors d'une requête, il
+s'exécute une fois l'annulation terminée, en dehors de la transaction en échec, de sorte qu'une
+livraison qu'il confie à la file d'attente du dispatcher est conservée plutôt qu'annulée avec l'écriture.
 
 ```typescript
 import type { CollectionCallbacks } from "@rebasepro/types";

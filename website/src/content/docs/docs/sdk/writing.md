@@ -34,7 +34,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Insert the row, or replace the one already occupying its key:
+Insert the row, or update the one already occupying its key:
 
 ```typescript
 await client.data.users.upsert(
@@ -43,9 +43,16 @@ await client.data.users.upsert(
 );
 ```
 
-One statement server-side (`INSERT … ON CONFLICT DO UPDATE`), so unlike a
-`findById` followed by `create`-or-`update` it cannot lose the race between the
-two, and unlike `create` it does not fail when the row is already there.
+The server decides which inside one transaction, and falls back on
+`INSERT … ON CONFLICT DO UPDATE`, so unlike a `findById` followed by
+`create`-or-`update` it cannot lose the race between the two, and unlike
+`create` it does not fail when the row is already there.
+
+When the row is there, the upsert is an update of it. The fields you send are
+written and the ones you leave out keep their stored values — they are not reset
+to their `defaultValue`. `beforeSave` and `afterSave` see `status: "existing"`
+with the previous values, and history records an update. A key that names a row
+outside the caller's `beforeQuery` scope is a 404.
 
 `onConflict` defaults to the primary key, which is the wrong target for most of
 the writes an upsert is reached for: keyed on a serial id that is a plain
@@ -56,8 +63,8 @@ true }` on the property, or the columns of a `unique: true`
 [index](/docs/backend/indexes/) — and anything else is a 400 listing the targets
 that do exist, rather than an error raised from inside a transaction.
 
-The `on_create` timestamp of a row that already existed is left alone: a
-conflict means its creation is a fact about the past.
+The `on_create` timestamp and the `user_on_create` creator of a row that already
+existed are left alone: a conflict means its creation is a fact about the past.
 
 ### Update
 

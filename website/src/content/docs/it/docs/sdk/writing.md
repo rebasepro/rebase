@@ -1,5 +1,5 @@
 ---
-sourceHash: 659f1391627611c5
+sourceHash: 281093d0a10d0ae8
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.
@@ -34,7 +34,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Inserisce la riga, oppure sostituisce quella che ne occupa già la chiave:
+Inserisce la riga, oppure aggiorna quella che ne occupa già la chiave:
 
 ```typescript
 await client.data.users.upsert(
@@ -43,9 +43,16 @@ await client.data.users.upsert(
 );
 ```
 
-Si tratta di una singola istruzione lato server (`INSERT … ON CONFLICT DO UPDATE`), quindi, a differenza di un
+Il server decide quale delle due all'interno di un'unica transazione, e ripiega su
+`INSERT … ON CONFLICT DO UPDATE`, quindi, a differenza di un
 `findById` seguito da `create` o `update`, non può perdere la race condition tra le
 due operazioni e, a differenza di `create`, non fallisce se la riga esiste già.
+
+Quando la riga esiste, l'upsert è un aggiornamento di quella riga. I campi inviati vengono
+scritti e quelli omessi mantengono i valori memorizzati — non vengono reimpostati
+al loro `defaultValue`. `beforeSave` e `afterSave` vedono `status: "existing"`
+con i valori precedenti, e la cronologia registra un aggiornamento. Una chiave che indica una riga
+al di fuori dell'ambito `beforeQuery` del chiamante restituisce un 404.
 
 `onConflict` è impostato di default sulla chiave primaria, che è il target errato per la maggior parte
 delle scritture per cui si sceglie un upsert: basato su un ID seriale diventa un semplice
@@ -56,8 +63,8 @@ true }` sulla proprietà, oppure le colonne di un [indice](/docs/backend/indexes
 `unique: true` — qualsiasi altra cosa restituirà un errore 400 con l'elenco dei target
 effettivamente esistenti, anziché un errore generato dall'interno di una transazione.
 
-Il timestamp `on_create` di una riga già esistente non viene toccato: un
-conflitto indica che la sua creazione appartiene al passato.
+Il timestamp `on_create` e il creatore `user_on_create` di una riga già esistente non vengono
+toccati: un conflitto indica che la sua creazione appartiene al passato.
 
 ### Update
 

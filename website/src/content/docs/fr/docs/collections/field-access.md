@@ -1,5 +1,5 @@
 ---
-sourceHash: b3e463880abd2023
+sourceHash: 7184b66cc0913ef9
 title: Accès aux champs
 sidebar_label: Accès aux champs
 description: Permissions de lecture et d'écriture par propriété et par rôle. Un appelant autorisé par les règles de sécurité de la ligne ne reçoit toujours pas un champ que ses rôles ne permettent pas de lire.
@@ -115,6 +115,8 @@ Fournir une valeur pour un champ que vous ne pouvez pas écrire renvoie une erre
 | `VALIDATION_EXCLUDED_FIELDS` | `write` vaut `[]` (ou `excludeFromApi`). Personne ne peut l'écrire ; la réponse est identique pour tous les appelants. |
 
 Les deux comportent `details.violations` indexé par le nom envoyé sur le réseau. Ceci est appliqué lors de la création, des requêtes `PATCH`/`PUT`, `/bulk`, `_batch`, des upserts, des opérations de champ (`{ "salary": { "$inc": 1000 } }` cible `salary` comme n'importe quelle valeur) et de la trame WebSocket `SAVE`.
+
+Une opération de champ exige aussi `read` sur son champ. Une opération sur un champ que vous pouvez écrire mais pas lire est refusée avec `FIELD_NOT_READABLE` : savoir si elle a respecté une borne vous révélerait la valeur que vous n'êtes pas autorisé à voir.
 
 ## Recherche
 

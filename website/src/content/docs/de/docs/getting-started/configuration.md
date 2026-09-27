@@ -1,5 +1,5 @@
 ---
-sourceHash: 90b6bdcbc917bfb7
+sourceHash: 13da9556eb061931
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -209,7 +209,7 @@ Server-Image. Ein Projekt, für das `eject` ausgeführt wurde, steuert diese Ent
 
 | Variable | Beschreibung | Standard |
 |----------|--------------|----------|
-| `REBASE_RLS_AUDIT` | Führt die Prüfung auf Row-Level Security beim Start aus und bindet deren Endpunkt ein, welcher Tabellen meldet, die ohne Richtlinien bereitgestellt werden. | — |
+| `REBASE_RLS_AUDIT` | `true` führt die geplante [Prüfung auf Row-Level Security](/docs/rls-check#running-it-on-a-schedule) aus, welche Tabellen meldet, die ohne Richtlinien bereitgestellt werden. Das Projekt muss `@rebasepro/rls-check` unter seinen Abhängigkeiten deklarieren: Die Runtime liefert keine eigene Kopie mit, und ohne das Paket verweigert der Start und nennt es. `false` hält den Scan von diesem Prozess fern. | — |
 | `REBASE_BASE_PATH` | Basispfad für jede API-Route. Dem Client muss derselbe Pfad mitgeteilt werden – siehe [Ändern von `basePath`](#ändern-von-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Statische/Admin-Assets des Bundles aus diesem Prozess bereitstellen. Deaktivieren Sie dies, wenn ein CDN davor geschaltet ist. | `true` |
 | `REBASE_HISTORY` | [Entitätsänderungshistorie](/docs/backend/history) aufzeichnen. | `true` |

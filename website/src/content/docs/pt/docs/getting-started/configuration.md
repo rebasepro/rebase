@@ -1,5 +1,5 @@
 ---
-sourceHash: 90b6bdcbc917bfb7
+sourceHash: 13da9556eb061931
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -210,7 +210,7 @@ publicada. Um projeto que foi ejetado é responsável por essas decisões em seu
 
 | Variável | Descrição | Padrão |
 |----------|-------------|---------|
-| `REBASE_RLS_AUDIT` | Executa a auditoria de row-level security na inicialização e monta seu endpoint, que reporta tabelas que são servidas sem políticas. | — |
+| `REBASE_RLS_AUDIT` | `true` executa a [auditoria de row-level security](/docs/rls-check#running-it-on-a-schedule) agendada, que reporta tabelas que são servidas sem políticas. O projeto deve declarar `@rebasepro/rls-check` entre suas dependências: o runtime não inclui nenhuma cópia, e sem o pacote a inicialização é recusada, indicando-o. `false` mantém a varredura fora deste processo. | — |
 | `REBASE_BASE_PATH` | Caminho base para todas as rotas da API. O cliente deve ser configurado com o mesmo valor — veja [Alterando o `basePath`](#alterando-o-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve os assets estáticos/admin do bundle a partir deste processo. Desative quando houver uma CDN à frente. | `true` |
 | `REBASE_HISTORY` | Registra o [histórico de alterações de entidades](/docs/backend/history). | `true` |

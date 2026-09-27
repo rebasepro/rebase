@@ -1,5 +1,5 @@
 ---
-sourceHash: b3e463880abd2023
+sourceHash: 7184b66cc0913ef9
 title: Acesso a campos
 sidebar_label: Acesso a campos
 description: Permissões de leitura e escrita por propriedade com base em papéis. Um chamador autorizado pelas regras de segurança da linha ainda assim não recebe um campo que seus papéis não podem ler.
@@ -151,6 +151,10 @@ Ambos trazem `details.violations` indexados pelo nome do campo enviado na requis
 criações, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, operações de campo
 (`{ "salary": { "$inc": 1000 } }` referencia `salary` como qualquer valor faria) e no
 frame `SAVE` do WebSocket.
+
+Uma operação de campo também precisa de `read` no seu campo. Uma operação em um campo que você pode
+gravar, mas não ler, é recusada com `FIELD_NOT_READABLE`: saber se ela passou por um
+limite revelaria o valor que você não tem permissão para ver.
 
 ## Busca
 

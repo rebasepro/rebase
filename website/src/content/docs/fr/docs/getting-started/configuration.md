@@ -1,5 +1,5 @@
 ---
-sourceHash: 90b6bdcbc917bfb7
+sourceHash: 13da9556eb061931
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -210,7 +210,7 @@ Un projet éjecté prend ces décisions dans son propre code à la place.
 
 | Variable | Description | Valeur par défaut |
 |----------|-------------|-------------------|
-| `REBASE_RLS_AUDIT` | Exécute l'audit de sécurité au niveau des lignes au démarrage et monte son point de terminaison, qui signale les tables servies sans politiques. | — |
+| `REBASE_RLS_AUDIT` | `true` exécute l'[audit planifié de la sécurité au niveau des lignes](/docs/rls-check#running-it-on-a-schedule), qui signale les tables servies sans politiques. Le projet doit déclarer `@rebasepro/rls-check` parmi ses dépendances : le runtime n'en embarque aucune copie, et sans le package le démarrage est refusé, en le nommant. `false` maintient l'analyse désactivée sur ce processus. | — |
 | `REBASE_BASE_PATH` | Chemin de base pour chaque route d'API. Le client doit être informé de la même valeur — voir [Modifier `basePath`](#modifier-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Sert les ressources statiques/administratives du bundle depuis ce processus. Désactivez-le lorsqu'un CDN est placé devant. | `true` |
 | `REBASE_HISTORY` | Enregistre l'[historique des modifications d'entités](/docs/backend/history). | `true` |

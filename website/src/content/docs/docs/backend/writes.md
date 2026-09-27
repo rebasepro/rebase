@@ -134,10 +134,10 @@ the request-level validation.
 
 ### Upsert on a natural key
 
-`POST /api/data/:slug?on_conflict=email` writes
-`INSERT … ON CONFLICT (email) DO UPDATE` instead of a plain insert. The bulk
-route takes the same target as `onConflict` beside `upsert: true`, and so does
-each `upsert` operation of a batch.
+`POST /api/data/:slug?on_conflict=email` inserts the row, or updates the one
+that already holds that email, instead of failing on it. The bulk route takes
+the same target as `onConflict` beside `upsert: true`, and so does each `upsert`
+operation of a batch.
 
 ```bash
 curl -X POST '/api/data/users?on_conflict=email' \
@@ -165,10 +165,20 @@ ignoring it turns a re-runnable import into a duplicating one.
 row it matched could live under another parent, and the upsert would move it
 under this one. Send the upsert to the collection's own route.
 
-A row that already existed keeps its `on_create` timestamp. A conflict means the
-row's creation is a fact about the past, and a nightly re-import that reset
-`createdAt` on everything it touched would take every "new this week" query
-with it.
+An upsert that meets a stored row is an update of it. The server reads the row
+the key names, in the caller's scope and inside the write's transaction, and
+runs the ordinary update: the fields in the body are written, the ones it leaves
+out keep their stored values rather than being reset to their `defaultValue`,
+`beforeSave` and `afterSave` see `status: "existing"` with the previous values,
+and history records an update. A row the read could not see, or one inserted
+concurrently, is still caught by `ON CONFLICT … DO UPDATE`, which sets only what
+the body and the hooks wrote, and the `on_update` stamps. A key that names a row
+outside the caller's `beforeQuery` scope answers `404`.
+
+A row that already existed keeps its `on_create` timestamp and its
+`user_on_create` creator. A conflict means the row's creation is a fact about the
+past, and a nightly re-import that reset `createdAt` on everything it touched
+would take every "new this week" query with it.
 
 ### `Prefer: return=minimal`
 

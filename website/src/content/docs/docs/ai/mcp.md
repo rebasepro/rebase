@@ -309,14 +309,20 @@ Rows, user records, storage listings, cron jobs, function responses and CLI
 output come back wrapped in an explicit envelope:
 
 ```text
-<<<UNTRUSTED_DATA source="list_documents">>>
+<<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
 [ … rows … ]
-<<<END_UNTRUSTED_DATA>>>
+<<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
 
 Anything stored in your database was written by somebody, and it arrives on the
 same channel as the tool contract the assistant is following. The envelope tells
 the model to treat it as inert content rather than instructions.
+
+The `id` is minted fresh for every response, after the data was written, and
+only the end marker carrying it closes the block. Text inside the data that is
+shaped like a marker is broken with a zero-width space, so a row that prints
+`<<<END_UNTRUSTED_DATA>>>` cannot end the envelope early and put what follows it
+outside.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 348b6c433874e80b
+sourceHash: 9a7137f85a2187fd
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -73,16 +73,16 @@ Les lignes en échec sont conservées 30 jours ; celles ayant réussi, 3 jours.
 
 ## Que se passe-t-il lorsqu'un worker s'arrête brutalement
 
-Un processus interrompu en plein traitement ne peut pas libérer sa réservation ; seul un timeout permettra donc de débloquer la ligne. Les jobs réservés depuis plus longtemps que `visibilityTimeoutMs` (5 minutes par défaut) sont récupérés — retour à `pending` s'il leur reste des tentatives, sinon envoyés en rebut (dead-letter) avec une erreur explicitant ce qui s'est produit.
+Un processus interrompu en plein traitement ne peut pas libérer sa réservation ; seul un timeout permettra donc de débloquer la ligne. Pendant l'exécution d'un gestionnaire, son worker renouvelle la réservation à chaque tiers de `visibilityTimeoutMs` (5 minutes par défaut). Une réservation restée aussi longtemps sans être renouvelée est récupérée — retour à `pending` s'il reste des tentatives au job, sinon envoyée en rebut (dead-letter) avec une erreur explicitant ce qui s'est produit.
 
-C'est aussi pourquoi le timeout doit dépasser la durée de votre gestionnaire le plus lent : au-delà, un deuxième worker pourrait démarrer un job que le premier est encore en train d'exécuter.
+Ainsi, un gestionnaire lent sur un worker actif conserve son job, quelle que soit la durée du traitement, et le timeout ne détermine que le délai au bout duquel les jobs d'un worker mort reviennent. Une tentative qui a perdu sa réservation ne peut pas non plus écraser le résultat du job : son succès ou son échec est journalisé puis ignoré, et c'est la tentative qui détient la réservation qui tranche.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 

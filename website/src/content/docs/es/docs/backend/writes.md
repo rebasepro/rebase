@@ -1,5 +1,5 @@
 ---
-sourceHash: e87f3694489cd571
+sourceHash: 088ee7a6b8423f85
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -78,7 +78,7 @@ Una operación responde a la `validation` de la propiedad igual que un valor. Lo
 
 ### Upsert sobre una clave natural
 
-`POST /api/data/:slug?on_conflict=email` escribe `INSERT … ON CONFLICT (email) DO UPDATE` en lugar de una inserción simple. La ruta bulk admite el mismo objetivo como `onConflict` junto a `upsert: true`, al igual que cada operación `upsert` de un lote.
+`POST /api/data/:slug?on_conflict=email` inserta la fila, o actualiza la que ya tiene ese email, en lugar de fallar por ella. La ruta bulk admite el mismo objetivo como `onConflict` junto a `upsert: true`, al igual que cada operación `upsert` de un lote.
 
 ```bash
 curl -X POST '/api/data/users?on_conflict=email' \
@@ -97,7 +97,9 @@ Especificar un objetivo sin `upsert: true` en una escritura masiva también gene
 
 `?on_conflict=` se rechaza en una creación anidada (`INVALID_CONFLICT_TARGET`). La fila con la que coincidiera podría estar bajo otro padre, y el upsert la movería bajo este. Envíe el upsert a la ruta propia de la colección.
 
-Una fila que ya existía conserva su marca de tiempo `on_create`. Un conflicto implica que la creación de la fila es un hecho del pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que modificara alteraría por completo cualquier consulta de «nuevos esta semana».
+Un upsert que encuentra una fila almacenada es una actualización de ella. El servidor lee la fila que nombra la clave, en el ámbito del emisor de la llamada y dentro de la transacción de la escritura, y ejecuta la actualización ordinaria: se escriben los campos del cuerpo, los que omite conservan sus valores almacenados en lugar de restablecerse a su `defaultValue`, `beforeSave` y `afterSave` ven `status: "existing"` con los valores anteriores, y el historial registra una actualización. Una fila que la lectura no pudo ver, o una insertada de forma concurrente, la sigue capturando `ON CONFLICT … DO UPDATE`, que establece solo lo que escribieron el cuerpo y los hooks, y las marcas `on_update`. Una clave que nombra una fila fuera del ámbito `beforeQuery` del emisor de la llamada responde `404`.
+
+Una fila que ya existía conserva su marca de tiempo `on_create` y su creador `user_on_create`. Un conflicto implica que la creación de la fila es un hecho del pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que modificara alteraría por completo cualquier consulta de «nuevos esta semana».
 
 ### `Prefer: return=minimal`
 

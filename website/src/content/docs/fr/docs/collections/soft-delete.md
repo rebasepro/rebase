@@ -1,5 +1,5 @@
 ---
-sourceHash: 035955ac366c306b
+sourceHash: fcd4cffc00288949
 title: Soft delete
 sidebar_label: Soft delete
 description: Transformez la suppression en horodatage, masquez les lignes marquées de chaque lecture et restaurez-les avec une simple mise à jour.
@@ -47,7 +47,17 @@ Toute autre valeur renvoie une 400 plutôt qu'un repli silencieux. Un `?deleted=
 
 ## Restauration et suppression définitive
 
-Une **restauration** est une simple mise à jour réinitialisant le champ à `null`. Il n'y a pas de verbe spécifique, car il n'y a pas d'état particulier — la ligne n'a jamais disparu.
+Une **restauration** est une simple mise à jour réinitialisant le champ à `null`. Il n'y a pas de verbe spécifique, car il n'y a pas d'état particulier — la ligne n'a jamais disparu. En REST, il s'agit d'un `PATCH` — unitaire, `/bulk` ou `_batch` — dont le corps remet le champ à `null` :
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+Cette mise à jour est la seule qui atteint une ligne marquée. Toute autre modification de celle-ci répond `404`, comme la ligne le fait pour toute lecture par défaut ; restaurez-la d'abord.
+
+L'inverse n'est pas une mise à jour. Donner une valeur au champ est refusé avec une `400` `FIELD_NOT_WRITABLE` — supprimez plutôt la ligne —, de sorte que la permission `delete`, `beforeDelete` et `afterDelete` s'y appliquent toujours. Un upsert peut créer une ligne déjà marquée, mais ne marque jamais une ligne déjà stockée.
+
+Une suppression via un chemin plusieurs-à-plusieurs, comme `DELETE /api/data/posts/1/tags/5`, retire le lien entre le post 1 et le tag. Elle ne supprime pas logiquement le tag, que d'autres posts utilisent encore.
 
 Un **vrai** `DELETE` s'effectue avec `?hard=true` lors de l'appel de suppression. Il nécessite exactement la même permission qu'une suppression classique : il s'agit du même verbe, et restreindre son accès séparément créerait une seconde surface de contrôle d'accès pour une seule opération. Ce qui change, c'est la possibilité pour la ligne d'être restaurée ou non. Seuls les littéraux `true` ou `1` signifient « oui » ; une faute de frappe renvoie une 400, car un appelant ayant demandé une purge définitive et obtenant une suppression réversible croirait à tort que les données ont disparu.
 

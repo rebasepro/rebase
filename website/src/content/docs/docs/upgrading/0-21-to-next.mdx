@@ -16,9 +16,9 @@ come back when you move. 0.22 declares no breaking change, so this is one hop
 from 0.21.
 
 Three of these refuse at boot, naming the setting, rather than change behaviour
-quietly. The other four change who can sign in or what a key can reach: read
-those first if your app has API keys on nested paths, a custom auth repository,
-or guests that become accounts.
+quietly. Four change who can sign in or what a key can reach: read those first
+if your app has API keys on nested paths, a custom auth repository, or guests
+that become accounts. The last changes the contract of a custom job store.
 
 ---
 
@@ -138,3 +138,24 @@ absolute URL such as `https://app.example.com`.
 ```bash
 grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
 ```
+
+## 40. A custom job store takes a claim when it completes or fails a job
+
+A queue handler that outlived the visibility timeout was reclaimed while it was
+still running and started a second time beside itself. `complete` and `fail`
+found the job by its id alone, so the first attempt's success marked the job
+done while the second ran, and the second's failure sent the finished job back
+for a third run. The worker now renews its claim while a handler runs, and only
+the attempt that still holds a job may record its outcome.
+
+`JobStore.complete(id, claim)` and `fail(id, error, retryAt, claim)` receive a
+`JobClaim`, `{ workerId, attempt }`. The new optional `heartbeat(id, claim)`
+renews a running job's claim and resolves with whether it still held. The
+built-in store implements all three, so an app that uses it has nothing to do.
+
+**What to change:** in a custom `JobStore`, make `complete` and `fail` change the
+row only while the claim still holds it — running, locked by `claim.workerId`,
+on attempt `claim.attempt` — and do nothing otherwise. Add `heartbeat`, renewing
+the lock time under the same condition. A store without it still works, but a
+handler that outlives the visibility timeout is run twice. See
+[Background Jobs](/docs/backend/jobs/#what-happens-when-a-worker-dies).

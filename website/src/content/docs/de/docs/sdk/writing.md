@@ -1,5 +1,5 @@
 ---
-sourceHash: 659f1391627611c5
+sourceHash: 281093d0a10d0ae8
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -34,7 +34,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Fügen Sie die Zeile ein oder ersetzen Sie diejenige, die deren Schlüssel bereits belegt:
+Fügen Sie die Zeile ein oder aktualisieren Sie diejenige, die deren Schlüssel bereits belegt:
 
 ```typescript
 await client.data.users.upsert(
@@ -43,9 +43,16 @@ await client.data.users.upsert(
 );
 ```
 
-Ein einziges Statement serverseitig (`INSERT … ON CONFLICT DO UPDATE`), sodass es – anders als ein
-`findById` gefolgt von `create` oder `update` – die Race Condition zwischen den beiden nicht
-verlieren kann und – anders als `create` – nicht fehlschlägt, wenn die Zeile bereits vorhanden ist.
+Der Server entscheidet innerhalb einer Transaktion, welches von beiden, und greift auf
+`INSERT … ON CONFLICT DO UPDATE` zurück, sodass es – anders als ein `findById` gefolgt von
+`create` oder `update` – die Race Condition zwischen den beiden nicht verlieren kann und – anders
+als `create` – nicht fehlschlägt, wenn die Zeile bereits vorhanden ist.
+
+Ist die Zeile vorhanden, ist das Upsert ein Update dieser Zeile. Die Felder, die Sie senden, werden
+geschrieben, und die weggelassenen behalten ihre gespeicherten Werte – sie werden nicht auf ihren
+`defaultValue` zurückgesetzt. `beforeSave` und `afterSave` sehen `status: "existing"` mit den
+vorherigen Werten, und die Historie verzeichnet ein Update. Ein Schlüssel, der eine Zeile außerhalb
+des `beforeQuery`-Scopes des Aufrufers benennt, ergibt einen 404.
 
 `onConflict` ist standardmäßig der Primärschlüssel, was für die meisten Schreibvorgänge, für die ein
 Upsert genutzt wird, das falsche Ziel ist: Bei einem fortlaufenden ID-Schlüssel handelt es sich um
@@ -56,8 +63,8 @@ true }` auf der Eigenschaft oder die Spalten eines `unique: true`-[Index](/docs/
 und alles andere führt zu einem 400-Fehler, der die tatsächlich existierenden Ziele auflistet, statt
 zu einem Fehler innerhalb einer Transaktion.
 
-Der `on_create`-Zeitstempel einer bereits existierenden Zeile bleibt unberührt: Ein Konflikt
-bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
+Der `on_create`-Zeitstempel und der `user_on_create`-Ersteller einer bereits existierenden Zeile
+bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
 
 ### Update
 

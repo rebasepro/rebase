@@ -1,5 +1,5 @@
 ---
-sourceHash: 035955ac366c306b
+sourceHash: fcd4cffc00288949
 title: Soft Delete
 sidebar_label: Soft Delete
 description: Verwandeln Sie Löschvorgänge in einen Zeitstempel, blenden Sie mit Zeitstempel versehene Zeilen bei jedem Lesezugriff aus und stellen Sie sie mit einer normalen Aktualisierung wieder her.
@@ -67,6 +67,26 @@ Frage beantworten.
 Eine **Wiederherstellung** ist ein ganz normales Update, das das Feld wieder auf
 `null` setzt. Es gibt kein spezielles Verb, da es keinen speziellen Status gibt –
 die Zeile war nie weg.
+Über REST ist es ein `PATCH` – einzeln, `/bulk` oder `_batch` –, dessen Body das
+Feld auf `null` setzt:
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+Dieses Update ist dasjenige, das eine gestempelte Zeile erreicht. Jede andere
+Bearbeitung davon antwortet mit `404`, so wie die Zeile es bei jedem
+Standard-Lesezugriff tut; stellen Sie sie zuerst wieder her.
+
+Die Umkehrung ist kein Update. Das Setzen des Feldes auf einen Wert wird mit `400`
+`FIELD_NOT_WRITABLE` abgelehnt – löschen Sie die Zeile stattdessen –, sodass die
+`delete`-Berechtigung, `beforeDelete` und `afterDelete` immer dafür gelten. Ein
+Upsert kann eine Zeile erstellen, die bereits gestempelt ist, stempelt aber nie
+eine, die gespeichert war.
+
+Ein Löschvorgang über einen Many-to-Many-Pfad wie `DELETE /api/data/posts/1/tags/5`
+entfernt die Verknüpfung von Post 1 mit dem Tag. Er führt kein Soft Delete des Tags
+durch, den andere Posts weiterhin verwenden.
 
 Ein **echtes** `DELETE` erfolgt über `?hard=true` beim Delete-Aufruf. Es erfordert
 exakt dieselbe Berechtigung wie ein normaler Löschvorgang: Es ist dasselbe Verb,

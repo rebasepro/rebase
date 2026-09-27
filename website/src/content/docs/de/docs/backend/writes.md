@@ -1,5 +1,5 @@
 ---
-sourceHash: e87f3694489cd571
+sourceHash: 088ee7a6b8423f85
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -78,7 +78,7 @@ Eine Operation unterliegt der `validation` der Eigenschaft wie ein Wert. Hinzuge
 
 ### Upsert über einen natürlichen Schlüssel
 
-`POST /api/data/:slug?on_conflict=email` schreibt `INSERT … ON CONFLICT (email) DO UPDATE` anstelle eines einfachen Inserts. Die Bulk-Route akzeptiert dasselbe Ziel als `onConflict` neben `upsert: true`, ebenso wie jede `upsert`-Operation eines Batches.
+`POST /api/data/:slug?on_conflict=email` fügt die Zeile ein oder aktualisiert diejenige, die diese E-Mail bereits enthält, statt daran zu scheitern. Die Bulk-Route akzeptiert dasselbe Ziel als `onConflict` neben `upsert: true`, ebenso wie jede `upsert`-Operation eines Batches.
 
 ```bash
 curl -X POST '/api/data/users?on_conflict=email' \
@@ -97,7 +97,9 @@ Die Angabe eines Ziels ohne `upsert: true` bei einem Bulk-Schreibvorgang führt 
 
 `?on_conflict=` wird bei einem verschachtelten Create abgelehnt (`INVALID_CONFLICT_TARGET`). Die Zeile, die es trifft, könnte unter einem anderen Parent liegen, und das Upsert würde sie unter diesen verschieben. Senden Sie das Upsert an die eigene Route der Collection.
 
-Eine Zeile, die bereits existierte, behält ihren `on_create`-Zeitstempel. Ein Konflikt bedeutet, dass die Erstellung der Zeile ein Fakt der Vergangenheit ist; ein nächtlicher Re-Import, der `createdAt` bei jedem berührten Datensatz zurücksetzte, würde jede „Neu diese Woche“-Abfrage verfälschen.
+Ein Upsert, das auf eine gespeicherte Zeile trifft, ist ein Update dieser Zeile. Der Server liest die Zeile, die der Schlüssel benennt, im Scope des Aufrufers und innerhalb der Transaktion des Schreibvorgangs, und führt das gewöhnliche Update aus: Die Felder im Body werden geschrieben, die weggelassenen behalten ihre gespeicherten Werte, statt auf ihren `defaultValue` zurückgesetzt zu werden, `beforeSave` und `afterSave` sehen `status: "existing"` mit den vorherigen Werten, und die Historie verzeichnet ein Update. Eine Zeile, die das Lesen nicht sehen konnte, oder eine, die gleichzeitig eingefügt wurde, wird weiterhin von `ON CONFLICT … DO UPDATE` erfasst, das nur setzt, was der Body und die Hooks geschrieben haben, sowie die `on_update`-Stempel. Ein Schlüssel, der eine Zeile außerhalb des `beforeQuery`-Scopes des Aufrufers benennt, antwortet mit `404`.
+
+Eine Zeile, die bereits existierte, behält ihren `on_create`-Zeitstempel und ihren `user_on_create`-Ersteller. Ein Konflikt bedeutet, dass die Erstellung der Zeile ein Fakt der Vergangenheit ist; ein nächtlicher Re-Import, der `createdAt` bei jedem berührten Datensatz zurücksetzte, würde jede „Neu diese Woche“-Abfrage verfälschen.
 
 ### `Prefer: return=minimal`
 

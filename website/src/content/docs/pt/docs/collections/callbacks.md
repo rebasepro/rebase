@@ -1,5 +1,5 @@
 ---
-sourceHash: da1aaf2e9e970fb5
+sourceHash: 22ae93dbf7922d06
 title: Callbacks de Entidade
 sidebar_label: Callbacks
 description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
@@ -226,6 +226,8 @@ afterSaveError: async ({
 }
 ```
 
+Em uma requisição, ele é executado depois que a transação da gravação que falhou sofreu rollback, e não dentro dela. Seu `context.data` é um novo, para o mesmo chamador, em que cada chamada é uma transação própria, de modo que um [job](/docs/backend/jobs), uma mensagem de fila ou um webhook que ele enfileire realiza o commit e sobrevive à falha que relata. Um erro lançado por `afterSaveError` é registrado no log, e o chamador ainda recebe o erro do próprio salvamento.
+
 ### `afterRead`
 
 Chamado após a leitura de entidades do banco de dados. Transforme os dados para exibição.
@@ -405,6 +407,15 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` é uma segunda conexão, não parte desta gravação]
+No Postgres, `context.client.dataAsAdmin` dentro do callback de uma requisição é executado em uma transação própria, em outra conexão do pool, enquanto a transação da gravação acionadora ainda está aberta. Portanto, ele realiza o commit por conta própria e permanece se a gravação sofrer rollback. Ele também não consegue ver a linha que está sendo salva, que ainda não passou pelo commit, e não deve gravá-la:
+
+- Uma gravação de admin com uma chave estrangeira apontando para essa linha (um `audit_logs.article_id` que referencia `articles`) falha na verificação da chave, e a gravação do chamador falha junto com ela.
+- Uma gravação de admin na linha que está sendo salva, ou em qualquer linha que esta gravação tenha bloqueado, espera pelo lock da gravação enquanto a gravação espera pelo callback. O Postgres não consegue identificar isso como um deadlock, então a requisição fica travada até o `statement_timeout` (30 segundos por padrão) e então falha.
+
+Para um registro que precise referenciar a linha, grave-o com `context.data`, que usa a transação da gravação, ou enfileire um [job](/docs/backend/jobs): um job enfileirado a partir do callback realiza o commit junto com a gravação, e seu handler é executado após o commit.
+:::
+
 :::caution[Esta página costumava dizer o oposto]
 Versões anteriores desta página afirmavam que os callbacks sempre ignoravam o RLS e tinham "acesso total ao banco de dados, independentemente das permissões do usuário acionador". Isso estava errado, e errado na direção insegura — incentivava callbacks escritos sob a premissa de que sempre podiam ver tudo.
 
@@ -423,7 +434,9 @@ Portanto, a gravação que disparou o evento e tudo o que seus callbacks gravara
 - Assinantes em tempo real são notificados sobre a linha apenas após o commit, portanto, uma gravação revertida nunca é anunciada.
 - Um callback mantém a transação aberta enquanto executa; portanto, um callback lento significa um lock retido e uma conexão do pool ocupada.
 
-Permita que uma falha lance um erro quando a gravação de origem não deva sobreviver a ela. Trate-a com catch quando ela dever: a gravação com falha é desfeita isoladamente, e o restante realiza o commit.
+Permita que uma falha lance um erro quando a gravação de origem não deva sobreviver a ela. Trate-a com catch quando ela dever, mas apenas em torno de uma **gravação** de `context.data`: uma gravação com falha é desfeita isoladamente, e o restante realiza o commit.
+
+Qualquer outra instrução que falhe na transação da gravação — uma consulta, o enfileiramento de um job que o banco de dados recusou — aborta essa transação no Postgres, e capturar o erro em JavaScript não desfaz isso. A gravação é recusada com **500 `TRANSACTION_ABORTED`** e nada é armazenado, em vez de responder sucesso para uma gravação que sofreu rollback. Deixe uma falha desse tipo ser lançada, ou verifique a condição antes de executar a instrução.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

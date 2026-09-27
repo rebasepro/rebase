@@ -165,8 +165,9 @@ const callbacks: CollectionCallbacks<Product> = {
 ## Error Handling
 
 `afterSaveError` runs when the save — or any `afterSave` callback — throws. It is a notification
-hook, not a rescue: **the error is rethrown after it runs**, the transaction rolls back, and the
-row is not saved.
+hook, not a rescue: the transaction rolls back, the row is not saved, and **the error is rethrown
+after it runs**. On a request it runs once the rollback is done, outside the failed transaction, so a
+delivery it hands to the dispatcher's queue is kept rather than rolled back with the write.
 
 ```typescript
 import type { CollectionCallbacks } from "@rebasepro/types";

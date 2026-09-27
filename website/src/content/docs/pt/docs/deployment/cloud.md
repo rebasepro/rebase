@@ -1,5 +1,5 @@
 ---
-sourceHash: 11eb4597bacc7658
+sourceHash: be8521ab898e66ea
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -54,6 +54,13 @@ host `<slug>.rebase.website` no qual o projeto responde, portanto escolha-o com 
 etapa separada de `link`. Ele grava `.rebase/cloud.json`, que registra o id e o
 slug do projeto. Esse arquivo não é um segredo e não contém suas credenciais —
 elas ficam em `~/.rebase/credentials.json`, gravado pelo `login`.
+
+No entanto, ele é versionado junto com o código, então um repositório clonado pode indicar qualquer
+control plane. Quando o host vem apenas desse arquivo, e não é nem o da própria
+plataforma nem um em que você já tenha feito login antes, o `login` o nomeia e pergunta
+antes de enviar seu e-mail e sua senha para lá. Sem um terminal, ou com
+`--json`, ele recusa com `unknown_control_plane`; passe `--url <host>` (ou defina
+`REBASE_CLOUD_URL`) para fazer login nele de propósito.
 
 `billing setup` vincula um cartão à organização uma única vez. Ele vem primeiro na
 sequência propositalmente: o primeiro deploy de um projeto é recusado sem isso, e
@@ -186,7 +193,7 @@ janela de manutenção.
 | `start`, `stop`, `restart` | Pausar um projeto e reativá-lo |
 | `status`, `metrics`, `debug` | O que está fazendo e por que não está |
 | `env` | Variáveis de ambiente. `list` nunca exibe valores; `--secret` é somente gravação |
-| `domains` | Domínios personalizados, registros DNS a adicionar e verificação |
+| `domains` | Domínios personalizados, registros DNS a adicionar e verificação. Um projeto pode responder em vários, cada um verificado separadamente; `verify` e `remove` recebem o domínio sobre o qual agir, que só pode ser omitido quando houver apenas um (para `verify`, um ainda pendente). `list --json` retorna `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Anexar ou criar um banco de dados, conectar-se a ele a partir da sua máquina, backups, restauração e point-in-time recovery |
 | `extensions` | Lista de permissões (allowlist) de extensões do Postgres |
 | `storage` | O bucket do projeto |
@@ -228,7 +235,10 @@ Dito de forma direta, porque descobrir mais tarde é pior:
   `rebase cloud login` requer e-mail e senha. Passe-os como
   `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` a partir de um cofre de segredos —
   o uso de `--password` insere a senha no histórico da sua shell e na tabela de
-  processos, alertando sobre isso antes de autenticar.
+  processos, alertando sobre isso antes de autenticar. Se o `.rebase/cloud.json` do
+  repositório indicar um control plane diferente do da própria plataforma, passe-o também como `--url`:
+  sem um terminal, o `login` se recusa a enviar uma senha para um host que apenas
+  o arquivo do checkout indicou.
 - **Recuperação pontual (point-in-time recovery) apenas via CLI.** O console
   exibe backups; o fluxo em etapas de PITR é `rebase cloud db pitr`.
 - **Sem endpoint público de banco de dados.** Um banco de dados gerenciado não

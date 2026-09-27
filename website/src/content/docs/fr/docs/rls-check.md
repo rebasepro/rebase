@@ -1,5 +1,5 @@
 ---
-sourceHash: 3165c5299e4bc1f3
+sourceHash: 4027ec7cdd5a1a2f
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -150,6 +150,13 @@ const rlsAudit: RebaseBackendConfig["rlsAudit"] = {
 ```
 
 Passez cela en tant que `rlsAudit` dans l'objet fourni à `initializeRebaseBackend`.
+
+Sur le runtime — `rebase dev`, `rebase start` et l'image serveur publiée — il n'existe
+pas d'objet de ce type à fournir ; définissez donc plutôt `REBASE_RLS_AUDIT=true`, avec
+l'intervalle et le seuil par défaut. L'analyseur doit toujours provenir de votre projet :
+ajoutez `@rebasepro/rls-check` à ses dépendances pour que le bundle l'embarque. Le runtime
+n'en fournit aucune copie, et un démarrage qui demande l'audit sans le package refuse
+avant d'ouvrir une connexion, en nommant le package à ajouter.
 
 Le résultat est servi sur `GET /api/admin/rls-audit`, restreint aux administrateurs comme toute autre
 surface d'administration, et chaque exécution journalise une ligne — au niveau `warn` lorsqu'un constat

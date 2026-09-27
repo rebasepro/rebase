@@ -1,5 +1,5 @@
 ---
-sourceHash: b3e463880abd2023
+sourceHash: 7184b66cc0913ef9
 title: Accesso ai campi
 sidebar_label: Accesso ai campi
 description: Permessi di lettura e scrittura per proprietà in base al ruolo. Un chiamante ammesso dalle regole di sicurezza della riga non riceve comunque un campo che i suoi ruoli non possono leggere.
@@ -150,6 +150,10 @@ Entrambi contengono `details.violations` indicizzati in base al nome inviato sul
 su create, `PATCH`/`PUT`, `/bulk`, `_batch`, upsert, operazioni sui campi
 (`{ "salary": { "$inc": 1000 } }` fa riferimento a `salary` come qualsiasi valore) e sul
 frame WebSocket `SAVE`.
+
+Un'operazione sul campo richiede anche `read` su quel campo. Un'operazione su un campo che
+puoi scrivere ma non leggere viene rifiutata con `FIELD_NOT_READABLE`: sapere se ha superato
+un limite ti rivelerebbe il valore che non ti è consentito vedere.
 
 ## Ricerca
 

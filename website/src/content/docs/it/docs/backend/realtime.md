@@ -1,5 +1,5 @@
 ---
-sourceHash: dac64afe647bf1b0
+sourceHash: b49ac798fe385796
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -437,6 +437,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Superato il budget di frame del canale indicato sopra |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Un broadcast conservato non ha potuto essere salvato, quindi è stato scartato |
 | `CHANNEL_HISTORY_READ_FAILED` | Impossibile soddisfare una richiesta di recupero (catch-up) |
+| `CHANNEL_HISTORY_GAP` | Generato dal client: un recupero (catch-up) ha rilevato che il server non conserva più messaggi che questo client non ha mai ricevuto. `details` è `{ from, to }`, i numeri di sequenza persi. Risincronizza lo stato del canale dalla sua fonte di verità |
 | `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | Il broadcast ha raggiunto solo questa istanza — consulta [Il limite di 8 KB sul bus Postgres](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 Senza alcun gestore collegato, questi errori vengono registrati nei log come avvisi (warning). In precedenza venivano scartati del tutto: non c'era alcuna promise da rifiutare né un canale a cui recapitarli, per cui un broadcast vietato era indistinguibile da uno recapitato con successo.

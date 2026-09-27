@@ -1,5 +1,5 @@
 ---
-sourceHash: da1aaf2e9e970fb5
+sourceHash: 22ae93dbf7922d06
 title: Callback delle Entità
 sidebar_label: Callback
 description: Usa i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
@@ -226,6 +226,8 @@ afterSaveError: async ({
 }
 ```
 
+In una richiesta, viene eseguito una volta completato il rollback della transazione della scrittura fallita, non al suo interno. Il suo `context.data` è un'istanza nuova per lo stesso chiamante, in cui ogni chiamata è una transazione a sé, quindi un [job](/docs/backend/jobs), un messaggio di coda o un webhook che accoda viene confermato con un commit e sopravvive al fallimento che segnala. Un errore lanciato da `afterSaveError` viene registrato nei log, e il chiamante riceve comunque l'errore del salvataggio stesso.
+
 ### `afterRead`
 
 Chiamato dopo aver letto le entità dal database. Trasforma i dati per la visualizzazione.
@@ -405,6 +407,15 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` è una seconda connessione, non fa parte di questa scrittura]
+Su Postgres, `context.client.dataAsAdmin` all'interno del callback di una richiesta viene eseguito in una transazione a sé, su un'altra connessione del pool, mentre la transazione della scrittura scatenante è ancora aperta. Quindi esegue il commit per conto proprio, e rimane anche se la scrittura subisce un rollback. Inoltre non può vedere la riga in fase di salvataggio, che non è ancora stata confermata, e non deve scriverla:
+
+- Una scrittura admin con una chiave esterna che rimanda a quella riga (un `audit_logs.article_id` che fa riferimento ad `articles`) non supera il controllo della chiave, e la scrittura del chiamante fallisce con essa.
+- Una scrittura admin sulla riga in fase di salvataggio, o su qualsiasi riga che questa scrittura ha bloccato, attende il lock della scrittura mentre la scrittura attende il callback. Postgres non può riconoscerlo come un deadlock, quindi la richiesta resta sospesa fino a `statement_timeout` (30 secondi per impostazione predefinita) e poi fallisce.
+
+Per un record che deve fare riferimento alla riga, scrivilo con `context.data`, che viaggia sulla transazione della scrittura, oppure accoda un [job](/docs/backend/jobs): un job accodato dal callback viene confermato insieme alla scrittura, e il suo handler viene eseguito dopo il commit.
+:::
+
 :::caution[Questa pagina indicava precedentemente il contrario]
 Le versioni precedenti di questa pagina indicavano che i callback ignoravano sempre RLS e avevano "pieno accesso al database indipendentemente dai permessi dell'utente che li ha attivati". Questo non era corretto, ed era errato nella direzione non sicura — induceva a scrivere callback partendo dal presupposto che potessero sempre vedere tutto.
 
@@ -423,7 +434,9 @@ Di conseguenza, la scrittura scatenante e tutto ciò che i suoi callback hanno s
 - I sottoscrittori realtime ricevono la notifica della riga solo dopo il commit, pertanto una scrittura che ha subito un rollback non viene mai annunciata.
 - Un callback mantiene aperta la transazione durante la sua esecuzione, quindi un callback lento equivale a un blocco trattenuto e a una connessione del pool impegnata.
 
-Lascia che un fallimento generi un'eccezione quando la scrittura scatenante non deve sopravvivere ad esso. Intercettalo quando invece deve sopravvivere: solo la scrittura non riuscita viene annullata, e il resto viene salvato tramite commit.
+Lascia che un fallimento generi un'eccezione quando la scrittura scatenante non deve sopravvivere ad esso. Intercettalo quando invece deve sopravvivere, ma solo attorno a una **scrittura** di `context.data`: una scrittura non riuscita viene annullata da sola, e il resto viene salvato tramite commit.
+
+Qualsiasi altra istruzione che fallisce sulla transazione della scrittura — una ricerca, l'accodamento di un job rifiutato dal database — interrompe quella transazione in Postgres, e intercettare l'errore in JavaScript non lo annulla. La scrittura viene rifiutata con **500 `TRANSACTION_ABORTED`** e non viene memorizzato nulla, anziché rispondere con un successo per una scrittura che ha subito un rollback. Lascia che un fallimento di questo tipo generi un'eccezione, oppure verifica la condizione prima di eseguire l'istruzione.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

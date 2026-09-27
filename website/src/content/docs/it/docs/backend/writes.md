@@ -1,5 +1,5 @@
 ---
-sourceHash: e87f3694489cd571
+sourceHash: 088ee7a6b8423f85
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -131,8 +131,8 @@ Un'operazione risponde alla `validation` della proprietà come un valore. Gli el
 
 ### Upsert su una chiave naturale
 
-`POST /api/data/:slug?on_conflict=email` esegue
-`INSERT … ON CONFLICT (email) DO UPDATE` invece di un semplice inserimento. La
+`POST /api/data/:slug?on_conflict=email` inserisce la riga, oppure aggiorna
+quella che contiene già quell'email, invece di fallire su di essa. La
 rotta bulk accetta lo stesso target come `onConflict` insieme a `upsert: true`,
 e lo stesso vale per ogni operazione di `upsert` all'interno di un batch.
 
@@ -166,7 +166,20 @@ che genera duplicati.
 parent, e l'upsert la sposterebbe sotto questo. Invia l'upsert alla rotta propria
 della collezione.
 
-Una riga già esistente mantiene il proprio timestamp `on_create`. Un conflitto
+Un upsert che incontra una riga memorizzata è un aggiornamento di quella riga. Il
+server legge la riga indicata dalla chiave, nell'ambito del chiamante e all'interno
+della transazione della scrittura, ed esegue l'aggiornamento ordinario: i campi
+presenti nel corpo vengono scritti, quelli che omette mantengono i valori
+memorizzati anziché essere reimpostati al loro `defaultValue`, `beforeSave` e
+`afterSave` vedono `status: "existing"` con i valori precedenti, e la cronologia
+registra un aggiornamento. Una riga che la lettura non ha potuto vedere, o una
+inserita in modo concorrente, viene comunque intercettata da
+`ON CONFLICT … DO UPDATE`, che imposta soltanto ciò che hanno scritto il corpo e
+gli hook, più i timestamp `on_update`. Una chiave che indica una riga al di fuori
+dell'ambito `beforeQuery` del chiamante risponde `404`.
+
+Una riga già esistente mantiene il proprio timestamp `on_create` e il proprio
+creatore `user_on_create`. Un conflitto
 implica che la creazione della riga sia un evento passato, e una reimportazione
 notturna che reimpostasse `createdAt` su ogni record toccato comprometterebbe
 qualsiasi query basata su "nuovi di questa settimana".

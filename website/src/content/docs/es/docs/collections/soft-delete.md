@@ -1,5 +1,5 @@
 ---
-sourceHash: 035955ac366c306b
+sourceHash: fcd4cffc00288949
 title: Soft delete
 sidebar_label: Soft delete
 description: Convierte el borrado en una marca de tiempo, oculta las filas marcadas de cada lectura y restáuralas con una actualización ordinaria.
@@ -47,7 +47,17 @@ Cualquier otra cosa devuelve un 400 en lugar de un fallback silencioso. Que `?de
 
 ## Restaurar y eliminar de verdad
 
-Una **restauración** es una actualización ordinaria que vuelve a establecer el campo en `null`. No hay un verbo especial, porque no hay un estado especial: la fila nunca se fue a ningún lado.
+Una **restauración** es una actualización ordinaria que vuelve a establecer el campo en `null`. No hay un verbo especial, porque no hay un estado especial: la fila nunca se fue a ningún lado. Por REST es un `PATCH` — individual, `/bulk` o `_batch` — cuyo cuerpo establece el campo en `null`:
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+Esa actualización es la que llega a una fila marcada. Cualquier otra edición de ella responde `404`, igual que la fila responde a toda lectura por defecto; restáurala primero.
+
+Lo contrario no es una actualización. Establecer el campo en un valor se rechaza con `400` `FIELD_NOT_WRITABLE` — elimina la fila en su lugar —, de modo que el permiso `delete`, `beforeDelete` y `afterDelete` siempre se le aplican. Un upsert puede crear una fila que ya esté marcada, pero nunca marca una que ya estaba almacenada.
+
+Una eliminación a través de una ruta muchos a muchos, como `DELETE /api/data/posts/1/tags/5`, elimina el vínculo del post 1 con la etiqueta. No hace un soft delete de la etiqueta, que otros posts siguen usando.
 
 Un `DELETE` **real** es `?hard=true` en la llamada de eliminación. Requiere exactamente el mismo permiso que un borrado ordinario: es el mismo verbo, y restringirlo por separado supondría una segunda superficie de control de acceso para una sola operación. Lo que cambia es si la fila puede recuperarse o no. Solo el valor literal `true` o `1` significa que sí; un error tipográfico devuelve un 400, porque quien realiza la llamada solicitó purgar y, si obtuviera un soft delete, creería que los datos han desaparecido.
 

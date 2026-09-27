@@ -1,5 +1,5 @@
 ---
-sourceHash: dac64afe647bf1b0
+sourceHash: b49ac798fe385796
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -437,6 +437,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Dépassement du quota de trames de canal ci-dessus |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Une diffusion retenue n'a pas pu être persistée et a donc été abandonnée |
 | `CHANNEL_HISTORY_READ_FAILED` | Une requête de rattrapage n'a pas pu être satisfaite |
+| `CHANNEL_HISTORY_GAP` | Levée par le client : un rattrapage a constaté que le serveur ne conserve plus des messages que ce client n'a jamais reçus. `details` vaut `{ from, to }`, les numéros de séquence manqués. Resynchronisez l'état du canal depuis sa source de vérité |
 | `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | La diffusion n'a atteint que cette instance — voir [La limite de 8 Ko sur le bus Postgres](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 Si aucun gestionnaire n'est attaché, ces événements sont journalisés sous forme d'avertissement. Auparavant, ils étaient entièrement ignorés : il n'y avait aucune promesse à rejeter ni aucun canal auquel les transmettre, de sorte qu'une diffusion interdite ne pouvait pas être distinguée d'une diffusion menée à bien.

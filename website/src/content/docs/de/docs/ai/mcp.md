@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a197121af0d5219
+sourceHash: 98f470ca4afe200d
 title: MCP-Server
 sidebar_label: MCP-Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder beliebige MCP-Clients mit einem Rebase-Projekt – die 42 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate zwischen Agent und Produktion.
@@ -316,14 +316,20 @@ Zeilen, Benutzerdatensätze, Storage-Auflistungen, Cronjobs, Funktionsantworten 
 CLI-Ausgaben werden in einen expliziten Umschlag (Envelope) verpackt zurückgegeben:
 
 ```text
-<<<UNTRUSTED_DATA source="list_documents">>>
+<<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
 [ … rows … ]
-<<<END_UNTRUSTED_DATA>>>
+<<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
 
 Alles, was in Ihrer Datenbank gespeichert ist, wurde von irgendjemandem geschrieben und
 trifft auf demselben Kanal ein wie der Tool-Vertrag, dem der Assistent folgt. Der Envelope
 signalisiert dem Modell, dies als passiven Inhalt und nicht als Anweisungen zu behandeln.
+
+Die `id` wird für jede Antwort neu erzeugt, nachdem die Daten geschrieben wurden, und
+nur die Endmarkierung, die sie trägt, schließt den Block. Text innerhalb der Daten, der
+wie eine Markierung aussieht, wird mit einem Leerzeichen der Breite null aufgebrochen, sodass
+eine Zeile, die `<<<END_UNTRUSTED_DATA>>>` ausgibt, den Envelope nicht vorzeitig beenden und
+das, was darauf folgt, nach außen verlagern kann.
 
 Es ist eine Kennzeichnung, keine Sandbox. Ein Assistent mit diesen Tools ist nur so sicher
 wie der Inhalt, den Sie ihn lesen lassen.

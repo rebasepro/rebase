@@ -104,19 +104,22 @@ Failed rows are kept 30 days; successful ones 3.
 ## What happens when a worker dies
 
 A process killed mid-job cannot release its claim, so nothing but a timeout will
-free the row. Jobs claimed for longer than `visibilityTimeoutMs` (default 5
-minutes) are reclaimed — back to `pending` if they have attempts left, otherwise
-dead-lettered with an error saying what happened.
+free the row. While a handler runs, its worker renews the claim every third of
+`visibilityTimeoutMs` (default 5 minutes). A claim that has gone that long
+without being renewed is reclaimed — back to `pending` if the job has attempts
+left, otherwise dead-lettered with an error saying what happened.
 
-This is also why the timeout must exceed your slowest handler: past it, a second
-worker may start a job the first is still running.
+So a slow handler on a live worker keeps its job, however long it takes, and the
+timeout only decides how soon a dead worker's jobs come back. An attempt that
+lost its claim cannot overwrite the job's outcome either: its success or failure
+is logged and dropped, and whichever attempt holds the claim decides.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 

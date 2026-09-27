@@ -1,5 +1,5 @@
 ---
-sourceHash: da1aaf2e9e970fb5
+sourceHash: 22ae93dbf7922d06
 title: Callbacks d'entité
 sidebar_label: Callbacks
 description: Utilisez les callbacks de cycle de vie pour exécuter une logique personnalisée lors de la création, mise à jour, lecture ou suppression d'entités. Inclut l'API context.data pour les opérations inter-collections.
@@ -226,6 +226,8 @@ afterSaveError: async ({
 }
 ```
 
+Lors d'une requête, il s'exécute une fois la transaction de l'écriture en échec annulée (rollback), et non à l'intérieur de celle-ci. Son `context.data` est un nouveau contexte pour le même appelant, dans lequel chaque appel est une transaction à part entière ; un [job](/docs/backend/jobs), un message de file d'attente ou un webhook qu'il met en file d'attente est donc validé (commit) et survit à l'échec qu'il signale. Une exception levée par `afterSaveError` est journalisée, et l'appelant reçoit toujours l'erreur propre à l'enregistrement.
+
 ### `afterRead`
 
 Appelé après la lecture des entités depuis la base de données. Transformez les données pour l'affichage.
@@ -405,6 +407,15 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` est une seconde connexion, pas une partie de cette écriture]
+Sur Postgres, `context.client.dataAsAdmin` dans le callback d'une requête s'exécute dans une transaction qui lui est propre, sur une autre connexion du pool, alors que la transaction de l'écriture déclencheuse est encore ouverte. Il est donc validé (commit) de son côté, et subsiste si l'écriture est annulée (rollback). Il ne peut pas non plus voir la ligne en cours d'enregistrement, qui n'est pas encore validée, et ne doit pas l'écrire :
+
+- Une écriture administrateur dotée d'une clé étrangère pointant vers cette ligne (un `audit_logs.article_id` qui référence `articles`) échoue à la vérification de sa clé, et l'écriture de l'appelant échoue avec elle.
+- Une écriture administrateur sur la ligne en cours d'enregistrement, ou sur toute ligne verrouillée par cette écriture, attend le verrou de l'écriture pendant que l'écriture attend le callback. Postgres ne peut pas détecter cela comme un interblocage (deadlock), de sorte que la requête reste bloquée jusqu'à `statement_timeout` (30 secondes par défaut), puis échoue.
+
+Pour un enregistrement qui doit référencer la ligne, écrivez-le avec `context.data`, qui passe par la transaction de l'écriture, ou mettez en file d'attente un [job](/docs/backend/jobs) : un job mis en file d'attente depuis le callback est validé avec l'écriture, et son gestionnaire s'exécute après le commit.
+:::
+
 :::caution[Cette page indiquait auparavant le contraire]
 Les versions précédentes de cette page indiquaient que les callbacks contournaient toujours RLS et disposaient d'un « accès complet à la base de données indépendamment des permissions de l'utilisateur déclencheur ». C'était incorrect, et incorrect dans le sens le moins sûr — cela incitait à écrire des callbacks en partant du principe qu'ils pouvaient toujours tout voir.
 
@@ -423,7 +434,9 @@ Ainsi, l'écriture déclencheuse et tout ce que ses callbacks ont écrit sont va
 - Les abonnés en temps réel ne sont informés de la ligne qu'après le commit, de sorte qu'une écriture annulée n'est jamais annoncée.
 - Un callback maintient la transaction ouverte pendant son exécution, donc un callback lent équivaut à un verrou maintenu et une connexion du pool monopolisée.
 
-Laissez une défaillance lever une exception lorsque l'écriture déclencheuse ne doit pas lui survivre. Interceptez-la lorsqu'elle le doit : l'écriture qui a échoué est annulée isolément, et le reste est validé.
+Laissez une défaillance lever une exception lorsque l'écriture déclencheuse ne doit pas lui survivre. Interceptez-la lorsqu'elle le doit, mais uniquement autour d'une **écriture** `context.data` : une écriture qui a échoué est annulée isolément, et le reste est validé.
+
+Toute autre instruction qui échoue dans la transaction de l'écriture — une recherche, une mise en file d'attente de job refusée par la base de données — interrompt cette transaction dans Postgres, et intercepter l'erreur en JavaScript n'y change rien. L'écriture est refusée avec **500 `TRANSACTION_ABORTED`** et rien n'est enregistré, plutôt que de répondre par un succès pour une écriture qui a été annulée. Laissez un tel échec lever une exception, ou vérifiez la condition avant d'exécuter l'instruction.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

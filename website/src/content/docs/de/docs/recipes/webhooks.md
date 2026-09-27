@@ -1,5 +1,5 @@
 ---
-sourceHash: 77aa7e43ab714fa6
+sourceHash: 9d8f8d760d14c7f4
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
 description: Verwenden Sie Entity-Callbacks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offen zu halten.
@@ -171,8 +171,10 @@ const callbacks: CollectionCallbacks<Product> = {
 ## Fehlerbehandlung
 
 `afterSaveError` läuft, wenn das Speichern — oder irgendein `afterSave`-Callback — eine Exception
-wirft. Es ist ein Benachrichtigungs-Hook, keine Rettung: **der Fehler wird danach erneut geworfen**,
-die Transaktion wird zurückgerollt und die Zeile wird nicht gespeichert.
+wirft. Es ist ein Benachrichtigungs-Hook, keine Rettung: Die Transaktion wird zurückgerollt, die Zeile
+wird nicht gespeichert, und **der Fehler wird danach erneut geworfen**. Bei einem Request läuft er, sobald
+das Zurückrollen abgeschlossen ist, außerhalb der fehlgeschlagenen Transaktion, sodass eine Zustellung, die
+er an die Queue des Dispatchers übergibt, erhalten bleibt, statt mit dem Schreibvorgang zurückgerollt zu werden.
 
 ```typescript
 import type { CollectionCallbacks } from "@rebasepro/types";

@@ -417,7 +417,7 @@ platform upgrade can rebuild it; `--no-source` skips that once, and `cloud setti
 
 ```bash
 rebase cloud env list | set | unset | reveal | pull
-rebase cloud domains list | add | verify | remove
+rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```

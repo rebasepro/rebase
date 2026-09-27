@@ -1,5 +1,5 @@
 ---
-sourceHash: 77aa7e43ab714fa6
+sourceHash: 9d8f8d760d14c7f4
 title: "Receita: Integração de Webhook"
 sidebar_label: Webhooks
 description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam, sem manter aberta a transação da escrita.
@@ -169,8 +169,10 @@ const callbacks: CollectionCallbacks<Product> = {
 ## Tratamento de Erros
 
 `afterSaveError` é executado quando a gravação — ou qualquer callback `afterSave` — lança uma
-exceção. É um hook de notificação, não um resgate: **o erro é relançado depois que ele roda**, a
-transação é desfeita e a linha não é gravada.
+exceção. É um hook de notificação, não um resgate: a transação é desfeita, a linha não é gravada e
+**o erro é relançado depois que ele roda**. Em uma requisição, ele roda depois que o rollback termina,
+fora da transação que falhou, então uma entrega que ele passa para a fila do dispatcher é mantida em vez
+de ser desfeita junto com a escrita.
 
 ```typescript
 import type { CollectionCallbacks } from "@rebasepro/types";

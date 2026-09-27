@@ -1,5 +1,5 @@
 ---
-sourceHash: 348b6c433874e80b
+sourceHash: 9a7137f85a2187fd
 title: Tarefas em Segundo Plano
 sidebar_label: Tarefas em Segundo Plano
 description: Uma fila de jobs durável, baseada em Postgres — trabalho que sobrevive a reinicializações, com novas tentativas usando backoff e falhas mantidas em vez de descartadas.
@@ -73,16 +73,16 @@ Linhas com falha são mantidas por 30 dias; as bem-sucedidas, por 3.
 
 ## O que acontece quando um worker morre
 
-Um processo encerrado no meio de um job não pode liberar sua reivindicação, então nada além de um timeout liberará a linha. Jobs reivindicados por mais tempo do que `visibilityTimeoutMs` (padrão de 5 minutos) são recuperados — voltando para `pending` se ainda tiverem tentativas restantes, ou enviados para dead-letter com um erro explicando o ocorrido.
+Um processo encerrado no meio de um job não pode liberar sua reivindicação, então nada além de um timeout liberará a linha. Enquanto um handler é executado, seu worker renova a reivindicação a cada terço de `visibilityTimeoutMs` (padrão de 5 minutos). Uma reivindicação que passou todo esse tempo sem ser renovada é recuperada — voltando para `pending` se o job ainda tiver tentativas restantes, ou enviada para dead-letter com um erro explicando o ocorrido.
 
-É também por isso que o timeout deve exceder o seu handler mais lento: passado esse tempo, um segundo worker pode iniciar um job que o primeiro ainda está executando.
+Assim, um handler lento em um worker vivo mantém seu job, por mais tempo que leve, e o timeout só decide quão cedo os jobs de um worker morto voltam. Uma tentativa que perdeu sua reivindicação também não pode sobrescrever o resultado do job: seu sucesso ou falha é registrado no log e descartado, e quem decide é a tentativa que detém a reivindicação.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 

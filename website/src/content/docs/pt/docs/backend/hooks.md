@@ -1,5 +1,5 @@
 ---
-sourceHash: ceab8562a236c9de
+sourceHash: 1474038b1d0142aa
 title: Hooks Globais de Backend
 sidebar_label: Hooks Globais
 description: Aplique callbacks de ciclo de vida transversais a todas as coleções no nível do servidor usando CollectionCallbacks.
@@ -136,14 +136,14 @@ etapa de mascaramento com uma exceção silenciosa, portanto essa opção não �
 
 ## Semântica de Bloqueio vs. Assíncrona
 
-**Cada callback na lista abaixo é aguardado (`awaited`), e todos eles são executados dentro da
-transação que processa a escrita.** Não existe uma camada "dispare e esqueça" (fire and forget): a
+**Cada callback na lista abaixo é aguardado (`awaited`), e todos eles, exceto
+`afterSaveError`, são executados dentro da transação que processa a escrita.** Não existe uma camada "dispare e esqueça" (fire and forget): a
 linha e tudo o que seus callbacks fizeram são confirmados juntos ou nada é confirmado.
 
 - **`beforeSave`, `beforeDelete`** — se o callback lançar um erro (throw), a operação é rejeitada com um HTTP 400 contendo sua mensagem e o código `CALLBACK_REJECTED`, e a escrita no banco de dados nunca acontece. Lance um `RebaseApiError` de `@rebasepro/types` para definir o status você mesmo — consulte [Entity Callbacks](/docs/collections/callbacks#beforesave). Um `beforeDelete` que *retorna* `false` resulta na mesma recusa sem mensagem, respondendo **403** com esse código.
 - **`afterRead`** — a linha retornada (ou a linha transformada) é o que o chamador recebe. Sua transação é `READ ONLY` — consulte [abaixo](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — são executados *antes* do commit, aguardados (`awaited`). Um erro lançado aqui desfaz a escrita da linha (rollback) e responde com o mesmo **400 `CALLBACK_REJECTED`**, com `details.stage` indicando o hook. Eles mantêm a transação aberta enquanto são executados, portanto, um callback lento significa um lock mantido por mais tempo.
-- **`afterSaveError`** — é executado quando o salvamento falha, durante o fluxo de saída.
+- **`afterSaveError`** — é executado quando o salvamento falha, durante o fluxo de saída. Em uma requisição, ele é executado depois que a transação da escrita que falhou sofreu rollback, com um `context` em que cada chamada é uma transação própria, de modo que um job que ele enfileire para relatar a falha é mantido. Um erro lançado por ele é registrado no log; o chamador recebe o erro do próprio salvamento.
 
 :::caution[Esta página costumava afirmar o oposto]
 Versões anteriores afirmavam que `afterSave` e `afterDelete` "são executados após o commit da
@@ -169,7 +169,8 @@ não faz parte da escrita, portanto não deve estar no hook.
 
 ### `afterRead` não pode realizar escritas
 
-Uma leitura com escopo de requisição abre sua transação como `READ ONLY`. O `afterRead` é executado dentro
+Uma leitura com escopo de requisição abre sua transação como `READ ONLY`, assim como o refetch
+de uma assinatura realtime. O `afterRead` é executado dentro
 dela, portanto **nenhuma escrita originada desse callback pode ter sucesso** — nem uma criação
 com `context.data`, nem uma atualização, nem mesmo uma oculta dentro de uma função auxiliar que ele chame. O Postgres recusa a
 instrução com o SQLSTATE `25006`, e o chamador recebe a resposta:

@@ -54,6 +54,13 @@ separate `link` step. It writes `.rebase/cloud.json`, which records the project 
 and slug. That file is not a secret and it is not your credentials — those live
 in `~/.rebase/credentials.json`, written by `login`.
 
+It is committed with the code, though, so a cloned repository can name any
+control plane. When the host comes only from that file, and it is neither the
+platform's own nor one you have signed in to before, `login` names it and asks
+before sending your email and password there. Without a terminal, or with
+`--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
+`REBASE_CLOUD_URL`) to sign in there on purpose.
+
 `billing setup` attaches a card to the organization, once. It is first in the
 sequence on purpose: the first deploy of a project is refused without one, and
 finding that out after a bundle has finished uploading is the worse order.
@@ -182,7 +189,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
-| `domains` | Custom domains, the DNS records to add, and verification |
+| `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
@@ -220,7 +227,10 @@ Stated plainly, because finding out later is worse:
   `rebase cloud login` takes an email and a password. Pass them as
   `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD` from a secret store —
   `--password` puts the password in your shell history and in the process table,
-  and says so before it signs you in.
+  and says so before it signs you in. If the repository's `.rebase/cloud.json`
+  names a control plane other than the platform's own, pass it as `--url` too:
+  without a terminal, `login` refuses to send a password to a host that only
+  the checked-out file named.
 - **Point-in-time recovery is CLI-only.** The console shows backups; the staged
   PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the

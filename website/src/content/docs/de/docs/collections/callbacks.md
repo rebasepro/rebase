@@ -1,5 +1,5 @@
 ---
-sourceHash: da1aaf2e9e970fb5
+sourceHash: 22ae93dbf7922d06
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für kollektionsübergreifende Operationen.
@@ -226,6 +226,8 @@ afterSaveError: async ({
 }
 ```
 
+Bei einem Request läuft er, sobald die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, nicht innerhalb dieser. Sein `context.data` ist ein neues für denselben Aufrufer, in dem jeder Aufruf eine eigene Transaktion ist, sodass ein [Job](/docs/backend/jobs), eine Queue-Nachricht oder ein Webhook, den er einreiht, committet wird und den Fehler, den er meldet, überdauert. Ein Fehler (Throw) aus `afterSaveError` wird protokolliert, und der Aufrufer erhält weiterhin den eigenen Fehler des Speichervorgangs.
+
 ### `afterRead`
 
 Wird nach dem Lesen von Entitäten aus der Datenbank aufgerufen. Transformieren Sie die Daten für die Anzeige.
@@ -405,6 +407,15 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` ist eine zweite Verbindung, nicht Teil dieses Schreibvorgangs]
+Unter Postgres läuft `context.client.dataAsAdmin` im Callback eines Requests in einer eigenen Transaktion, auf einer anderen Verbindung aus dem Pool, während die Transaktion des auslösenden Schreibvorgangs noch offen ist. Es committet also für sich allein und bleibt bestehen, wenn der Schreibvorgang zurückgerollt wird. Es kann außerdem die gerade gespeicherte Zeile nicht sehen, da sie noch nicht committet ist, und darf sie nicht schreiben:
+
+- Ein Admin-Schreibvorgang mit einem Fremdschlüssel zurück auf diese Zeile (eine `audit_logs.article_id`, die auf `articles` verweist) scheitert an seiner Schlüsselprüfung, und der Schreibvorgang des Aufrufers scheitert mit ihm.
+- Ein Admin-Schreibvorgang auf die gerade gespeicherte Zeile oder auf eine beliebige Zeile, die dieser Schreibvorgang gesperrt hat, wartet auf die Sperre des Schreibvorgangs, während der Schreibvorgang auf den Callback wartet. Postgres kann das nicht als Deadlock erkennen, sodass der Request bis zum `statement_timeout` (standardmäßig 30 Sekunden) hängt und dann fehlschlägt.
+
+Für einen Datensatz, der auf die Zeile verweisen muss, schreiben Sie ihn mit `context.data`, das auf der Transaktion des Schreibvorgangs mitläuft, oder reihen Sie einen [Job](/docs/backend/jobs) ein: Ein aus dem Callback eingereihter Job wird mit dem Schreibvorgang committet, und sein Handler läuft nach dem Commit.
+:::
+
 :::caution[Diese Seite besagte früher das Gegenteil]
 Frühere Versionen dieser Seite gaben an, dass Callbacks RLS immer umgehen und „vollen Datenbankzugriff unabhängig von den Berechtigungen des auslösenden Benutzers“ haben. Das war falsch, und zwar in die unsichere Richtung — es verleitete dazu, Callbacks in der Annahme zu schreiben, dass sie immer alles sehen könnten.
 
@@ -423,7 +434,9 @@ Der auslösende Schreibvorgang und alles, was seine Callbacks geschrieben haben,
 - Realtime-Abonnenten erfahren erst nach dem Commit von der Zeile; ein zurückgerollter Schreibvorgang wird also niemals angekündigt.
 - Ein Callback hält die Transaktion während seiner Ausführung offen. Ein langsamer Callback bedeutet daher eine gehaltene Sperre und eine blockierte Verbindung im Connection-Pool.
 
-Lassen Sie einen Fehler werfen, wenn der auslösende Schreibvorgang diesen nicht überstehen soll. Fangen Sie ihn ab, wenn er überstehen soll: Der fehlgeschlagene Schreibvorgang wird isoliert rückgängig gemacht, und der Rest wird committet.
+Lassen Sie einen Fehler werfen, wenn der auslösende Schreibvorgang diesen nicht überstehen soll. Fangen Sie ihn ab, wenn er überstehen soll, aber nur um einen `context.data`-**Schreibvorgang** herum: Ein fehlgeschlagener Schreibvorgang wird isoliert rückgängig gemacht, und der Rest wird committet.
+
+Jede andere Anweisung, die auf der Transaktion des Schreibvorgangs fehlschlägt — eine Abfrage, ein von der Datenbank abgelehntes Einreihen eines Jobs —, bricht diese Transaktion in Postgres ab, und das Abfangen des Fehlers in JavaScript macht das nicht rückgängig. Der Schreibvorgang wird mit **500 `TRANSACTION_ABORTED`** abgelehnt und nichts wird gespeichert, statt Erfolg für einen Schreibvorgang zu melden, der zurückgerollt wurde. Lassen Sie einen solchen Fehler werfen, oder prüfen Sie die Bedingung, bevor Sie die Anweisung ausführen.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

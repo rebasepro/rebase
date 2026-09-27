@@ -1,5 +1,5 @@
 ---
-sourceHash: 348b6c433874e80b
+sourceHash: 9a7137f85a2187fd
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.
@@ -73,16 +73,16 @@ Fehlgeschlagene Zeilen werden 30 Tage aufbewahrt; erfolgreiche 3 Tage.
 
 ## Was passiert, wenn ein Worker abstürzt
 
-Ein Prozess, der mitten im Job beendet wird, kann seinen Anspruch (Claim) nicht freigeben, sodass nur ein Timeout die Zeile freigeben kann. Jobs, die länger als `visibilityTimeoutMs` (Standard: 5 Minuten) beansprucht wurden, werden zurückgefordert – zurück zu `pending`, wenn noch Versuche übrig sind, andernfalls werden sie als Dead-Letter mit einer entsprechenden Fehlermeldung markiert.
+Ein Prozess, der mitten im Job beendet wird, kann seinen Anspruch (Claim) nicht freigeben, sodass nur ein Timeout die Zeile freigeben kann. Während ein Handler läuft, erneuert sein Worker den Anspruch nach jeweils einem Drittel von `visibilityTimeoutMs` (Standard: 5 Minuten). Ein Anspruch, der so lange nicht erneuert wurde, wird zurückgefordert – zurück zu `pending`, wenn der Job noch Versuche übrig hat, andernfalls wird er als Dead-Letter mit einer entsprechenden Fehlermeldung markiert.
 
-Aus diesem Grund muss der Timeout auch länger sein als Ihr langsamster Handler: Danach könnte ein zweiter Worker einen Job starten, den der erste noch ausführt.
+Ein langsamer Handler auf einem lebenden Worker behält seinen Job also, egal wie lange er braucht, und der Timeout entscheidet nur, wie schnell die Jobs eines abgestürzten Workers zurückkommen. Ein Versuch, der seinen Anspruch verloren hat, kann auch das Ergebnis des Jobs nicht überschreiben: Sein Erfolg oder Fehlschlag wird protokolliert und verworfen, und es entscheidet derjenige Versuch, der den Anspruch hält.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3e463880abd2023
+sourceHash: 7184b66cc0913ef9
 title: Acceso a campos
 sidebar_label: Acceso a campos
 description: Permisos de lectura y escritura por propiedad según el rol. Un emisor al que las reglas de seguridad de la fila permiten el paso aún así no recibe un campo que sus roles no pueden leer.
@@ -115,6 +115,8 @@ Un valor para un campo en el que no puedes escribir devuelve un **400**, nunca u
 | `VALIDATION_EXCLUDED_FIELDS` | `write` es `[]` (o `excludeFromApi`). Nadie puede escribir en él; la respuesta es la misma para cualquier emisor. |
 
 Ambos incluyen `details.violations` indexados por el nombre enviado en la petición. Se aplica en creaciones, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, operaciones de campo (`{ "salary": { "$inc": 1000 } }` hace referencia a `salary` al igual que cualquier valor) y en la trama `SAVE` de WebSocket.
+
+Una operación de campo también necesita `read` sobre su campo. Una operación sobre un campo que puedes escribir pero no leer se rechaza con `FIELD_NOT_READABLE`: si superó o no un límite te revelaría el valor que no se te permite ver.
 
 ## Búsqueda
 

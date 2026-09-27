@@ -209,7 +209,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `REBASE_RLS_AUDIT` | Run the row-level-security audit at boot and mount its endpoint, which reports tables that are served without policies. | — |
+| `REBASE_RLS_AUDIT` | `true` runs the scheduled [row-level-security audit](/docs/rls-check#running-it-on-a-schedule), which reports tables that are served without policies. The project must declare `@rebasepro/rls-check` among its dependencies: the runtime ships no copy, and without the package the boot refuses, naming it. `false` keeps the scan off this process. | — |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |

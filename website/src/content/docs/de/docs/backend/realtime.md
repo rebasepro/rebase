@@ -1,5 +1,5 @@
 ---
-sourceHash: dac64afe647bf1b0
+sourceHash: b49ac798fe385796
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.
@@ -437,6 +437,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Das oben genannte Kanal-Frame-Budget wurde überschritten |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Ein gespeicherter Broadcast konnte nicht persistent gesichert werden und wurde daher verworfen |
 | `CHANNEL_HISTORY_READ_FAILED` | Eine Catch-up-Anfrage konnte nicht bedient werden |
+| `CHANNEL_HISTORY_GAP` | Vom Client ausgelöst: Ein Catch-up hat festgestellt, dass der Server Nachrichten, die dieser Client nie erhalten hat, nicht mehr vorhält. `details` ist `{ from, to }`, die verpassten Sequenznummern. Synchronisieren Sie den Zustand des Kanals erneut aus seiner maßgeblichen Quelle |
 | `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | Der Broadcast hat nur diese Instanz erreicht – siehe [Das 8-KB-Limit auf dem Postgres-Bus](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 Wenn kein Handler zugewiesen ist, werden diese als Warnung protokolliert. Früher wurden sie gänzlich verworfen: Es gab kein Promise, das abgewiesen werden konnte, und keinen Kanal für die Zustellung, sodass ein verbotener Broadcast nicht von einem zugestellten zu unterscheiden war.

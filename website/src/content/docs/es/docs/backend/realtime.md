@@ -1,5 +1,5 @@
 ---
-sourceHash: dac64afe647bf1b0
+sourceHash: b49ac798fe385796
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -437,6 +437,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Has superado el límite de tramas por canal mencionado anteriormente |
 | `CHANNEL_HISTORY_WRITE_FAILED` | No se pudo persistir una difusión retenida, por lo que fue descartada |
 | `CHANNEL_HISTORY_READ_FAILED` | No se pudo atender una solicitud para ponerse al día |
+| `CHANNEL_HISTORY_GAP` | Lo genera el cliente: al ponerse al día se descubrió que el servidor ya no conserva mensajes que este cliente nunca recibió. `details` es `{ from, to }`, los números de secuencia perdidos. Vuelve a sincronizar el estado del canal desde su fuente de verdad |
 | `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | La difusión solo llegó a esta instancia; consulta [El límite de 8 KB en el bus de Postgres](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 Si no se adjunta ningún controlador, estos se registran como una advertencia. Antes se descartaban por completo: no había ninguna promesa que rechazar ni ningún canal al que entregar, por lo que una difusión prohibida no se podía distinguir de una entregada.

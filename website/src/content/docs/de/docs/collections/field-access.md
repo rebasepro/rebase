@@ -1,5 +1,5 @@
 ---
-sourceHash: b3e463880abd2023
+sourceHash: 7184b66cc0913ef9
 title: Feldzugriff
 sidebar_label: Feldzugriff
 description: Lese- und Schreibberechtigungen auf Eigenschaftsebene nach Rolle. Ein Aufrufer, den die Sicherheitsregeln der Zeile durchlassen, erhält dennoch kein Feld, das seine Rollen nicht lesen dürfen.
@@ -151,6 +151,10 @@ Beide enthalten `details.violations`, geschlüsselt nach dem übertragenen Namen
 bei create, `PATCH`/`PUT`, `/bulk`, `_batch`, Upserts, Feldoperationen
 (`{ "salary": { "$inc": 1000 } }` benennt `salary` wie jeder andere Wert auch) und dem
 WebSocket-`SAVE`-Frame.
+
+Eine Feldoperation benötigt außerdem `read` auf ihrem Feld. Eine Operation auf einem Feld, das Sie
+schreiben, aber nicht lesen dürfen, wird mit `FIELD_NOT_READABLE` abgelehnt: Ob sie eine Schranke
+passiert hat, würde Ihnen den Wert verraten, den Sie nicht sehen dürfen.
 
 ## Suche
 

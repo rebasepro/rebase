@@ -1,5 +1,5 @@
 ---
-sourceHash: 348b6c433874e80b
+sourceHash: 9a7137f85a2187fd
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -73,16 +73,16 @@ Le righe con esito negativo vengono conservate per 30 giorni; quelle riuscite pe
 
 ## Cosa succede quando un worker si arresta
 
-Un processo terminato durante l'esecuzione di un job non può rilasciare la presa in carico (claim), quindi solo un timeout potrà liberare la riga. I job bloccati per un tempo superiore a `visibilityTimeoutMs` (predefinito: 5 minuti) vengono recuperati — tornando a `pending` se hanno ancora tentativi disponibili, altrimenti spostati in dead-letter con un errore che spiega l'accaduto.
+Un processo terminato durante l'esecuzione di un job non può rilasciare la presa in carico (claim), quindi solo un timeout potrà liberare la riga. Mentre un handler è in esecuzione, il suo worker rinnova la presa in carico ogni terzo di `visibilityTimeoutMs` (predefinito: 5 minuti). Una presa in carico rimasta senza rinnovo per tutto quel tempo viene recuperata — tornando a `pending` se il job ha ancora tentativi disponibili, altrimenti spostata in dead-letter con un errore che spiega l'accaduto.
 
-Questo è anche il motivo per cui il timeout deve essere superiore al tuo handler più lento: oltre tale limite, un secondo worker potrebbe avviare un job che il primo sta ancora eseguendo.
+Quindi un handler lento su un worker attivo mantiene il proprio job, per quanto tempo impieghi, e il timeout decide soltanto quanto presto tornano disponibili i job di un worker che si è arrestato. Neppure un tentativo che ha perso la propria presa in carico può sovrascrivere l'esito del job: il suo successo o fallimento viene registrato nei log e scartato, e decide il tentativo che detiene la presa in carico.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 

@@ -150,6 +150,13 @@ const rlsAudit: RebaseBackendConfig["rlsAudit"] = {
 
 Pass that as `rlsAudit` in the object you hand `initializeRebaseBackend`.
 
+On the runtime — `rebase dev`, `rebase start` and the published server image —
+there is no such object to hand over, so set `REBASE_RLS_AUDIT=true` instead,
+with the default interval and threshold. The scanner still has to come from your
+project: add `@rebasepro/rls-check` to its dependencies so the bundle carries it.
+The runtime ships no copy of its own, and a boot that asks for the audit without
+the package refuses before opening a connection, naming the package to add.
+
 The result is served at `GET /api/admin/rls-audit`, admin-gated like every other
 admin surface, and each run logs one line — at `warn` when a finding reaches
 `warnAtSeverity`, at `info` otherwise:

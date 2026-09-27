@@ -1,5 +1,5 @@
 ---
-sourceHash: 659f1391627611c5
+sourceHash: 281093d0a10d0ae8
 title: Escritura de datos
 sidebar_label: Escritura de datos
 description: create, upsert, update y delete con el SDK — operaciones de campo, escrituras condicionales, claves de idempotencia, escrituras por lotes y escritura entre colecciones en una sola transacción.
@@ -36,7 +36,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Inserta la fila o reemplaza la que ya esté ocupando su clave:
+Inserta la fila o actualiza la que ya esté ocupando su clave:
 
 ```typescript
 await client.data.users.upsert(
@@ -45,9 +45,16 @@ await client.data.users.upsert(
 );
 ```
 
-Una sola sentencia en el servidor (`INSERT … ON CONFLICT DO UPDATE`), por lo que, a diferencia de
-un `findById` seguido de `create` o `update`, no puede perder la condición de carrera
-entre ambos, y a diferencia de `create`, no falla cuando la fila ya existe.
+El servidor decide cuál de las dos dentro de una transacción, y recurre a
+`INSERT … ON CONFLICT DO UPDATE`, por lo que, a diferencia de un `findById` seguido de
+`create` o `update`, no puede perder la condición de carrera entre ambos, y a diferencia de
+`create`, no falla cuando la fila ya existe.
+
+Cuando la fila existe, el upsert es una actualización de ella. Los campos que envías se
+escriben y los que omites conservan sus valores almacenados: no se restablecen a su
+`defaultValue`. `beforeSave` y `afterSave` ven `status: "existing"` con los valores
+anteriores, y el historial registra una actualización. Una clave que nombra una fila fuera
+del ámbito `beforeQuery` de quien llama es un 404.
 
 `onConflict` utiliza por defecto la clave primaria, que no es el destino adecuado para la mayoría
 de las escrituras para las que se recurre a un upsert: con una clave basada en un id secuencial,
@@ -58,8 +65,8 @@ true }` en la propiedad, o las columnas de un [índice](/docs/backend/indexes/) 
 cualquier otra cosa devolverá un error 400 listando los destinos que sí existen, en lugar de un error
 generado desde el interior de una transacción.
 
-La marca de tiempo `on_create` de una fila que ya existía no se modifica: un
-conflicto significa que su creación es un hecho del pasado.
+La marca de tiempo `on_create` y el creador `user_on_create` de una fila que ya existía no se
+modifican: un conflicto significa que su creación es un hecho del pasado.
 
 ### Update
 

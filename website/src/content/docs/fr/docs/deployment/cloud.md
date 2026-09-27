@@ -1,5 +1,5 @@
 ---
-sourceHash: 11eb4597bacc7658
+sourceHash: be8521ab898e66ea
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -54,6 +54,13 @@ inventer un. **Le sous-domaine n'est pas modifiable par la suite :** il s'agit d
 `link` distincte. Il écrit `.rebase/cloud.json`, qui enregistre l'identifiant et le slug du projet.
 Ce fichier n'est pas un secret et ne contient pas vos identifiants — ceux-ci résident
 dans `~/.rebase/credentials.json`, écrit par `login`.
+
+Il est toutefois commité avec le code, de sorte qu'un dépôt cloné peut désigner n'importe quel
+plan de contrôle. Lorsque l'hôte ne provient que de ce fichier, et qu'il n'est ni celui de la
+plateforme ni un hôte auquel vous vous êtes déjà connecté, `login` le nomme et vous demande
+confirmation avant d'y envoyer votre email et votre mot de passe. Sans terminal, ou avec
+`--json`, il refuse avec `unknown_control_plane` ; passez `--url <host>` (ou définissez
+`REBASE_CLOUD_URL`) pour vous y connecter délibérément.
 
 `billing setup` associe une carte bancaire à l'organisation, une seule fois. Cette commande est
 intentionnellement placée en premier dans la séquence : le premier déploiement d'un projet est refusé sans carte, et
@@ -182,7 +189,7 @@ sauf celle qui redémarre la base de données, qui attend une fenêtre de mainte
 | `start`, `stop`, `restart` | Mettre un projet en pause et le relancer |
 | `status`, `metrics`, `debug` | Ce qu'il fait, et pourquoi il ne le fait pas |
 | `env` | Variables d'environnement. `list` n'affiche jamais les valeurs ; `--secret` est en écriture seule |
-| `domains` | Domaines personnalisés, enregistrements DNS à ajouter et vérification |
+| `domains` | Domaines personnalisés, enregistrements DNS à ajouter et vérification. Un projet peut répondre sur plusieurs domaines, chacun vérifié séparément ; `verify` et `remove` prennent le domaine concerné, qui ne peut être omis que lorsqu'il n'y en a qu'un (pour `verify`, un seul encore en attente). `list --json` renvoie `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Rattacher ou créer une base de données, s'y connecter depuis votre machine, sauvegardes, restauration et récupération à un point dans le temps |
 | `extensions` | La liste d'autorisation des extensions Postgres |
 | `storage` | Le bucket du projet |
@@ -220,7 +227,10 @@ Exposé clairement, car le découvrir plus tard est bien pire :
   `rebase cloud login` prend une adresse e-mail et un mot de passe. Transmettez-les via
   `REBASE_CLOUD_EMAIL` et `REBASE_CLOUD_PASSWORD` depuis un gestionnaire de secrets —
   `--password` place le mot de passe dans l'historique de votre shell et dans la table des processus,
-  et vous en avertit avant de vous connecter.
+  et vous en avertit avant de vous connecter. Si le fichier `.rebase/cloud.json` du dépôt
+  désigne un plan de contrôle autre que celui de la plateforme, passez-le aussi avec `--url` :
+  sans terminal, `login` refuse d'envoyer un mot de passe à un hôte que seul le fichier
+  extrait (checkout) désignait.
 - **La récupération à un point dans le temps (PITR) se fait uniquement via la CLI.** La console affiche les sauvegardes ; le flux de
   travail PITR par étapes s'effectue avec `rebase cloud db pitr`.
 - **Aucun point de terminaison de base de données public.** Une base de données managée n'est pas exposée à

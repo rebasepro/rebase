@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e9e7017aff81af7
+sourceHash: 2415f0f60ed62277
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -376,7 +376,7 @@ un `.env` — affinché un aggiornamento della piattaforma possa ricostruirlo;
 
 ```bash
 rebase cloud env list | set | unset | reveal | pull
-rebase cloud domains list | add | verify | remove
+rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```

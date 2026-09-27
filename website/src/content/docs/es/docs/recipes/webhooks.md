@@ -1,5 +1,5 @@
 ---
-sourceHash: 77aa7e43ab714fa6
+sourceHash: 9d8f8d760d14c7f4
 title: "Receta: Integración de Webhooks"
 sidebar_label: Webhooks
 description: Utiliza las devoluciones de llamada de la entidad para enviar webhooks a servicios externos cuando los datos cambien, sin mantener abierta la transacción de la escritura.
@@ -169,8 +169,10 @@ const callbacks: CollectionCallbacks<Product> = {
 ## Gestión de Errores
 
 `afterSaveError` se ejecuta cuando el guardado — o cualquier devolución de llamada `afterSave` —
-lanza una excepción. Es un hook de notificación, no un rescate: **el error se relanza después de
-ejecutarlo**, la transacción se deshace y la fila no se guarda.
+lanza una excepción. Es un hook de notificación, no un rescate: la transacción se deshace, la fila
+no se guarda y **el error se relanza después de ejecutarlo**. En una solicitud se ejecuta una vez
+completado el rollback, fuera de la transacción fallida, de modo que una entrega que pase a la cola
+del dispatcher se conserva en lugar de deshacerse junto con la escritura.
 
 ```typescript
 import type { CollectionCallbacks } from "@rebasepro/types";

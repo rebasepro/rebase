@@ -1,5 +1,5 @@
 ---
-sourceHash: dac64afe647bf1b0
+sourceHash: b49ac798fe385796
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -437,6 +437,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Ultrapassou o limite de frames do canal mencionado acima |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Um broadcast retido não pôde ser persistido, então foi descartado |
 | `CHANNEL_HISTORY_READ_FAILED` | Uma solicitação de recuperação (catch-up) não pôde ser atendida |
+| `CHANNEL_HISTORY_GAP` | Emitido pelo cliente: uma recuperação (catch-up) descobriu que o servidor não retém mais mensagens que este cliente nunca recebeu. `details` é `{ from, to }`, os números de sequência perdidos. Ressincronize o estado do canal a partir de sua fonte da verdade |
 | `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | O broadcast alcançou apenas esta instância — veja [O limite de 8 KB no barramento do Postgres](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 Sem nenhum handler anexado, esses eventos são registrados no log como aviso. Eles costumavam ser completamente descartados: não havia promise para rejeitar e nenhum canal para entregar, então um broadcast proibido era indistinguível de um entregue.

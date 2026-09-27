@@ -1,5 +1,5 @@
 ---
-sourceHash: ceab8562a236c9de
+sourceHash: 1474038b1d0142aa
 title: Hooks globales del backend
 sidebar_label: Hooks globales
 description: Aplica callbacks de ciclo de vida transversales a cada colección a nivel de servidor usando CollectionCallbacks.
@@ -136,14 +136,14 @@ ofuscación con una excepción silenciosa, por lo que no se ofrece.
 
 ## Semántica bloqueante vs. asíncrona
 
-**Cada callback en la lista a continuación se espera con `await`, y todos ellos se ejecutan dentro de la
-transacción que procesa la escritura.** No existe un nivel de "disparar y olvidar": la
+**Cada callback en la lista a continuación se espera con `await`, y todos ellos salvo
+`afterSaveError` se ejecutan dentro de la transacción que procesa la escritura.** No existe un nivel de "disparar y olvidar": la
 fila y todo lo que hicieron sus callbacks se confirman (commit) juntos o no se confirma nada.
 
 - **`beforeSave`, `beforeDelete`** — si el callback lanza un error (throw), la operación se rechaza con un HTTP 400 que incluye su mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lance un `RebaseApiError` de `@rebasepro/types` para elegir el estado usted mismo — consulte [Callbacks de entidad](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo sin mensaje, y responde **403** con ese código.
 - **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, con `await`. Si lanzan un error aquí, se revierte (rollback) la fila y se responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantiene un bloqueo activo.
-- **`afterSaveError`** — se ejecuta cuando el guardado falló, en la salida.
+- **`afterSaveError`** — se ejecuta cuando el guardado falló, en la salida. En una solicitud se ejecuta después de que la transacción de la escritura fallida se haya revertido, con un `context` en el que cada llamada es una transacción propia, de modo que un trabajo que encole para informar del fallo se conserva. Un error que lance se registra en el log; el emisor de la llamada recibe el error del propio guardado.
 
 :::caution[Esta página solía decir lo contrario]
 Las versiones anteriores decían que `afterSave` y `afterDelete` "se ejecutan después de que la transacción
@@ -169,7 +169,8 @@ no es parte de la escritura, por lo que no debe ir dentro del hook.
 
 ### `afterRead` no puede escribir {#afterread-cannot-write}
 
-Una lectura con alcance de solicitud abre su transacción en modo `READ ONLY`. `afterRead` se ejecuta dentro
+Una lectura con alcance de solicitud abre su transacción en modo `READ ONLY`, y también lo hace la
+relectura de una suscripción en tiempo real. `afterRead` se ejecuta dentro
 de ella, por lo que **ninguna escritura desde ese callback puede tener éxito** — ni una creación con `context.data`,
 ni una actualización, ni una oculta dentro de una función auxiliar a la que invoque. Postgres rechaza la
 instrucción con SQLSTATE `25006`, y al emisor de la llamada se le responde:

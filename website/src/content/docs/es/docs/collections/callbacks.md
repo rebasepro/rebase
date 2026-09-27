@@ -1,5 +1,5 @@
 ---
-sourceHash: da1aaf2e9e970fb5
+sourceHash: 22ae93dbf7922d06
 title: Callbacks de entidades
 sidebar_label: Callbacks
 description: Usa callbacks de ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -226,6 +226,8 @@ afterSaveError: async ({
 }
 ```
 
+En una solicitud, se ejecuta una vez que la transacción de la escritura fallida se ha revertido, no dentro de ella. Su `context.data` es uno nuevo, para la misma identidad de quien llama, en el que cada llamada es una transacción propia, por lo que un [job](/docs/backend/jobs), mensaje de cola o webhook que encole se confirma y sobrevive al fallo del que informa. Un error lanzado desde `afterSaveError` se registra en el log, y quien llama sigue recibiendo el error del propio guardado.
+
 ### `afterRead`
 
 Se llama después de leer entidades de la base de datos. Transforma los datos para su visualización.
@@ -405,6 +407,15 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` es una segunda conexión, no parte de esta escritura]
+En Postgres, `context.client.dataAsAdmin` dentro del callback de una solicitud se ejecuta en una transacción propia, en otra conexión del pool, mientras la transacción de la escritura desencadenante sigue abierta. Así que se confirma por su cuenta, y permanece si la escritura se revierte. Tampoco puede ver la fila que se está guardando, que todavía no se ha confirmado, y no debe escribirla:
+
+- Una escritura de administrador con una clave foránea de vuelta a esa fila (un `audit_logs.article_id` que referencia `articles`) falla en la comprobación de la clave, y la escritura de quien llama falla con ella.
+- Una escritura de administrador en la fila que se está guardando, o en cualquier fila que esta escritura haya bloqueado, espera al bloqueo de la escritura mientras la escritura espera al callback. Postgres no puede verlo como un interbloqueo (deadlock), así que la solicitud se queda colgada hasta `statement_timeout` (30 segundos por defecto) y luego falla.
+
+Para un registro que tenga que referenciar la fila, escríbelo con `context.data`, que va en la transacción de la escritura, o encola un [job](/docs/backend/jobs): un job encolado desde el callback se confirma con la escritura, y su handler se ejecuta después del commit.
+:::
+
 :::caution[Esta página solía decir lo contrario]
 Las versiones anteriores de esta página indicaban que los callbacks siempre omitían RLS y tenían "acceso completo a la base de datos independientemente de los permisos del usuario que los activaba". Eso era incorrecto, e incorrecto en el sentido inseguro — invitaba a escribir callbacks asumiendo que siempre podrían ver todo.
 
@@ -423,7 +434,9 @@ Por lo tanto, la escritura desencadenante y todo lo que escribieron sus callback
 - Los suscriptores en tiempo real se enteran de la fila solo después del commit, por lo que una escritura que se revirtió nunca se anuncia.
 - Un callback mantiene la transacción abierta mientras se ejecuta, por lo que uno lento representa un bloqueo retenido y una conexión del pool ocupada.
 
-Deja que un fallo lance un error cuando la escritura desencadenante no deba sobrevivir a él. Captúralo cuando sí deba: solo se deshace la escritura fallida y el resto se confirma.
+Deja que un fallo lance un error cuando la escritura desencadenante no deba sobrevivir a él. Captúralo cuando sí deba, pero solo en torno a una **escritura** de `context.data`: una escritura fallida se deshace por sí sola y el resto se confirma.
+
+Cualquier otra sentencia que falle en la transacción de la escritura — una consulta, un encolado de job que la base de datos rechazó — aborta esa transacción en Postgres, y capturar el error en JavaScript no lo deshace. La escritura se rechaza con **500 `TRANSACTION_ABORTED`** y no se almacena nada, en lugar de responder con éxito a una escritura que se revirtió. Deja que ese fallo lance un error, o comprueba la condición antes de ejecutar la sentencia.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

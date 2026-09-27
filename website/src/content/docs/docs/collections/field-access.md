@@ -150,6 +150,10 @@ create, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, field operations
 (`{ "salary": { "$inc": 1000 } }` names `salary` like any value does) and the
 WebSocket `SAVE` frame.
 
+A field operation also needs `read` on its field. An operation on a field you may
+write but not read is refused with `FIELD_NOT_READABLE`: whether it passed a
+bound would tell you the value you are not allowed to see.
+
 ## Search
 
 The fallback search — a collection with no `search` block — matches `ILIKE` across

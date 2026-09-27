@@ -1,5 +1,5 @@
 ---
-sourceHash: e87f3694489cd571
+sourceHash: 088ee7a6b8423f85
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -78,7 +78,7 @@ Une opération obéit à la `validation` de la propriété comme une valeur. Les
 
 ### Upsert sur une clé naturelle
 
-`POST /api/data/:slug?on_conflict=email` génère l'instruction `INSERT … ON CONFLICT (email) DO UPDATE` au lieu d'une simple insertion. La route bulk prend la même cible sous le nom `onConflict` aux côtés de `upsert: true`, tout comme chaque opération `upsert` d'un lot (batch).
+`POST /api/data/:slug?on_conflict=email` insère la ligne, ou met à jour celle qui détient déjà cet email, au lieu d'échouer sur elle. La route bulk prend la même cible sous le nom `onConflict` aux côtés de `upsert: true`, tout comme chaque opération `upsert` d'un lot (batch).
 
 ```bash
 curl -X POST '/api/data/users?on_conflict=email' \
@@ -97,7 +97,9 @@ Indiquer une cible sans `upsert: true` lors d'une écriture en masse renvoie ég
 
 `?on_conflict=` est refusé sur une création imbriquée (`INVALID_CONFLICT_TARGET`). La ligne qu'il trouverait pourrait se trouver sous un autre parent, et l'upsert la déplacerait sous celui-ci. Envoyez l'upsert à la route propre de la collection.
 
-Une ligne qui existait déjà conserve son horodatage `on_create`. Un conflit signifie que la création de la ligne est un fait passé, et un réimport nocturne réinitialisant `createdAt` sur chaque élément touché fausserait toutes les requêtes du type « nouveautés de la semaine ».
+Un upsert qui rencontre une ligne stockée est une mise à jour de celle-ci. Le serveur lit la ligne désignée par la clé, dans la portée de l'appelant et au sein de la transaction de l'écriture, puis exécute la mise à jour ordinaire : les champs du corps sont écrits, ceux qu'il omet conservent leurs valeurs stockées au lieu d'être réinitialisés à leur `defaultValue`, `beforeSave` et `afterSave` voient `status: "existing"` avec les valeurs précédentes, et l'historique enregistre une mise à jour. Une ligne que la lecture n'a pas pu voir, ou une ligne insérée de manière concurrente, est tout de même interceptée par `ON CONFLICT … DO UPDATE`, qui ne définit que ce que le corps et les hooks ont écrit, ainsi que les horodatages `on_update`. Une clé qui désigne une ligne hors de la portée `beforeQuery` de l'appelant répond `404`.
+
+Une ligne qui existait déjà conserve son horodatage `on_create` et son créateur `user_on_create`. Un conflit signifie que la création de la ligne est un fait passé, et un réimport nocturne réinitialisant `createdAt` sur chaque élément touché fausserait toutes les requêtes du type « nouveautés de la semaine ».
 
 ### `Prefer: return=minimal`
 

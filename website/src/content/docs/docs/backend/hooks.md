@@ -135,14 +135,15 @@ redaction step with a silent exception, so it is not on offer.
 
 ## Blocking vs. Async Semantics
 
-**Every callback in the list below is awaited, and all of them run inside the
-transaction that carries the write.** There is no "fire and forget" tier: the
-row and everything its callbacks did commit together or not at all.
+**Every callback in the list below is awaited, and all of them but
+`afterSaveError` run inside the transaction that carries the write.** There is
+no "fire and forget" tier: the row and everything its callbacks did commit
+together or not at all.
 
 - **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave). A `beforeDelete` that *returns* `false` is the same refusal with no message, and answers **403** with that code.
 - **`afterRead`** — the returned row (or transformed row) is what the caller receives. Its transaction is `READ ONLY` — see [below](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — run *before* the commit, awaited. A throw here rolls the row back and answers the same **400 `CALLBACK_REJECTED`**, with `details.stage` naming the hook. They hold the transaction open while they run, so a slow one is a lock held.
-- **`afterSaveError`** — runs when the save failed, on the way out.
+- **`afterSaveError`** — runs when the save failed, on the way out. On a request it runs after the failed write's transaction has rolled back, with a `context` whose every call is a transaction of its own, so a job it enqueues to report the failure is kept. A throw from it is logged; the caller gets the save's own error.
 
 :::caution[This page used to say the opposite]
 Earlier versions said `afterSave` and `afterDelete` "run after the transaction
@@ -168,7 +169,8 @@ is not part of the write, so it does not go in the hook.
 
 ### `afterRead` cannot write
 
-A request-scoped read opens its transaction `READ ONLY`. `afterRead` runs inside
+A request-scoped read opens its transaction `READ ONLY`, and so does a realtime
+subscription's refetch. `afterRead` runs inside
 it, so **no write from that callback can succeed** — not a `context.data`
 create, not an update, not one buried in a helper it calls. Postgres refuses the
 statement with SQLSTATE `25006`, and the caller is answered:
