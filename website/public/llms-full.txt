@@ -747,7 +747,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `REBASE_RLS_AUDIT` | Run the row-level-security audit at boot and mount its endpoint, which reports tables that are served without policies. | — |
+| `REBASE_RLS_AUDIT` | `true` runs the scheduled [row-level-security audit](/docs/rls-check#running-it-on-a-schedule), which reports tables that are served without policies. The project must declare `@rebasepro/rls-check` among its dependencies: the runtime ships no copy, and without the package the boot refuses, naming it. `false` keeps the scan off this process. | — |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
@@ -1338,9 +1338,9 @@ come back when you move. 0.22 declares no breaking change, so this is one hop
 from 0.21.
 
 Three of these refuse at boot, naming the setting, rather than change behaviour
-quietly. The other four change who can sign in or what a key can reach: read
-those first if your app has API keys on nested paths, a custom auth repository,
-or guests that become accounts.
+quietly. Four change who can sign in or what a key can reach: read those first
+if your app has API keys on nested paths, a custom auth repository, or guests
+that become accounts. The last changes the contract of a custom job store.
 
 ---
 
@@ -1460,6 +1460,27 @@ absolute URL such as `https://app.example.com`.
 ```bash
 grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
 ```
+
+### 40. A custom job store takes a claim when it completes or fails a job
+
+A queue handler that outlived the visibility timeout was reclaimed while it was
+still running and started a second time beside itself. `complete` and `fail`
+found the job by its id alone, so the first attempt's success marked the job
+done while the second ran, and the second's failure sent the finished job back
+for a third run. The worker now renews its claim while a handler runs, and only
+the attempt that still holds a job may record its outcome.
+
+`JobStore.complete(id, claim)` and `fail(id, error, retryAt, claim)` receive a
+`JobClaim`, `{ workerId, attempt }`. The new optional `heartbeat(id, claim)`
+renews a running job's claim and resolves with whether it still held. The
+built-in store implements all three, so an app that uses it has nothing to do.
+
+**What to change:** in a custom `JobStore`, make `complete` and `fail` change the
+row only while the claim still holds it — running, locked by `claim.workerId`,
+on attempt `claim.attempt` — and do nothing otherwise. Add `heartbeat`, renewing
+the lock time under the same condition. A store without it still works, but a
+handler that outlives the visibility timeout is run twice. See
+[Background Jobs](/docs/backend/jobs/#what-happens-when-a-worker-dies).
 
 ## Upgrading 0.18 to 0.21
 
@@ -3307,6 +3328,14 @@ yet, listed so that nobody reads a promise into them:
   `//reset-password`.** A frontend URL with a trailing slash produced a double
   slash that a React Router `/reset-password` route does not match. The
   self-service reset from the same config already linked correctly.
+
+- **A user created through `POST /users/bulk`, a `_batch` create or a realtime
+  socket `SAVE` is created as `POST /users` creates one.** The password is
+  accepted and hashed (or generated), the email is stored normalized, the
+  account is verified, `onCreateUser` runs, and the invitation or temporary
+  password is delivered once the write commits. These doors wrote the row
+  directly: a user with no password, no invitation, and the email as typed, so
+  sign-in, password reset and magic links never found it.
 
 ##### Postgres
 
@@ -12019,10 +12048,10 @@ the request-level validation.
 
 #### Upsert on a natural key
 
-`POST /api/data/:slug?on_conflict=email` writes
-`INSERT … ON CONFLICT (email) DO UPDATE` instead of a plain insert. The bulk
-route takes the same target as `onConflict` beside `upsert: true`, and so does
-each `upsert` operation of a batch.
+`POST /api/data/:slug?on_conflict=email` inserts the row, or updates the one
+that already holds that email, instead of failing on it. The bulk route takes
+the same target as `onConflict` beside `upsert: true`, and so does each `upsert`
+operation of a batch.
 
 ```bash
 curl -X POST '/api/data/users?on_conflict=email' \
@@ -12050,10 +12079,20 @@ ignoring it turns a re-runnable import into a duplicating one.
 row it matched could live under another parent, and the upsert would move it
 under this one. Send the upsert to the collection's own route.
 
-A row that already existed keeps its `on_create` timestamp. A conflict means the
-row's creation is a fact about the past, and a nightly re-import that reset
-`createdAt` on everything it touched would take every "new this week" query
-with it.
+An upsert that meets a stored row is an update of it. The server reads the row
+the key names, in the caller's scope and inside the write's transaction, and
+runs the ordinary update: the fields in the body are written, the ones it leaves
+out keep their stored values rather than being reset to their `defaultValue`,
+`beforeSave` and `afterSave` see `status: "existing"` with the previous values,
+and history records an update. A row the read could not see, or one inserted
+concurrently, is still caught by `ON CONFLICT … DO UPDATE`, which sets only what
+the body and the hooks wrote, and the `on_update` stamps. A key that names a row
+outside the caller's `beforeQuery` scope answers `404`.
+
+A row that already existed keeps its `on_create` timestamp and its
+`user_on_create` creator. A conflict means the row's creation is a fact about the
+past, and a nightly re-import that reset `createdAt` on everything it touched
+would take every "new this week" query with it.
 
 #### `Prefer: return=minimal`
 
@@ -12875,6 +12914,10 @@ Both carry `details.violations` keyed by the wire name you sent. Enforced on
 create, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, field operations
 (`{ "salary": { "$inc": 1000 } }` names `salary` like any value does) and the
 WebSocket `SAVE` frame.
+
+A field operation also needs `read` on its field. An operation on a field you may
+write but not read is refused with `FIELD_NOT_READABLE`: whether it passed a
+bound would tell you the value you are not allowed to see.
 
 ### Search
 
@@ -14950,6 +14993,24 @@ question.
 
 A **restore** is an ordinary update setting the field back to `null`. There is
 no special verb, because there is no special state — the row never went anywhere.
+Over REST it is a `PATCH` — single, `/bulk` or `_batch` — whose body sets the
+field to `null`:
+
+```bash
+curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
+```
+
+That update is the one that reaches a stamped row. Any other edit of it answers
+`404`, as the row does to every default read; restore it first.
+
+The reverse is not an update. Setting the field to a value is refused with `400`
+`FIELD_NOT_WRITABLE` — delete the row instead — so the `delete` permission,
+`beforeDelete` and `afterDelete` always apply to it. An upsert may create a row
+that is already stamped, but never stamps one that was stored.
+
+A delete through a many-to-many path, like `DELETE /api/data/posts/1/tags/5`,
+removes post 1's link to the tag. It does not soft-delete the tag, which other
+posts still use.
 
 A **real** `DELETE` is `?hard=true` on the delete call. It needs exactly the
 same permission an ordinary delete does: it is the same verb, and gating it
@@ -15231,6 +15292,12 @@ afterSaveError: async ({
 }
 ```
 
+On a request, it runs once the failed write's transaction has rolled back, not
+inside it. Its `context.data` is a fresh one for the same caller, where each call
+is a transaction of its own, so a [job](/docs/backend/jobs), queue message or
+webhook it enqueues commits and survives the failure it reports. A throw from
+`afterSaveError` is logged, and the caller still gets the save's own error.
+
 #### `afterRead`
 
 Called after reading entities from the database. Transform the data for display.
@@ -15410,6 +15477,27 @@ afterSave: async ({ context }) => {
 }
 ```
 
+:::caution[`dataAsAdmin` is a second connection, not part of this write]
+On Postgres, `context.client.dataAsAdmin` inside a request's callback runs in a
+transaction of its own, on another pooled connection, while the triggering
+write's transaction is still open. So it commits on its own, and stays if the
+write rolls back. It also cannot see the row being saved, which is not committed
+yet, and must not write it:
+
+- An admin write with a foreign key back to that row (an `audit_logs.article_id`
+  that references `articles`) fails its key check, and the caller's write fails
+  with it.
+- An admin write to the row being saved, or to any row this write has locked,
+  waits for the write's lock while the write waits for the callback. Postgres
+  cannot see that as a deadlock, so the request hangs until `statement_timeout`
+  (30 seconds by default) and then fails.
+
+For a record that has to reference the row, write it with `context.data`, which
+rides the write's transaction, or enqueue a [job](/docs/backend/jobs): a job
+enqueued from the callback commits with the write, and its handler runs after
+the commit.
+:::
+
 :::caution[This page used to say the opposite]
 Earlier versions of this page stated that callbacks always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited callbacks written on the assumption that they could always see everything.
 
@@ -15428,7 +15516,9 @@ So the triggering write and everything its callbacks wrote commit together or no
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
 - A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
 
-Let a failure throw when the triggering write should not survive it. Catch it when it should: the failed write is undone on its own, and the rest commits.
+Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a failed write is undone on its own, and the rest commits.
+
+Any other statement that fails on the write's transaction — a lookup, a job enqueue the database refused — aborts that transaction in Postgres, and catching the error in JavaScript does not undo that. The write is refused with **500 `TRANSACTION_ABORTED`** and nothing is stored, rather than answering success for a write that was rolled back. Let such a failure throw, or check for the condition before running the statement.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {
@@ -16122,6 +16212,10 @@ Both carry `details.violations` keyed by the wire name you sent. Enforced on
 create, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, field operations
 (`{ "salary": { "$inc": 1000 } }` names `salary` like any value does) and the
 WebSocket `SAVE` frame.
+
+A field operation also needs `read` on its field. An operation on a field you may
+write but not read is refused with `FIELD_NOT_READABLE`: whether it passed a
+bound would tell you the value you are not allowed to see.
 
 ### Search
 
@@ -17561,10 +17655,10 @@ the request-level validation.
 
 #### Upsert on a natural key
 
-`POST /api/data/:slug?on_conflict=email` writes
-`INSERT … ON CONFLICT (email) DO UPDATE` instead of a plain insert. The bulk
-route takes the same target as `onConflict` beside `upsert: true`, and so does
-each `upsert` operation of a batch.
+`POST /api/data/:slug?on_conflict=email` inserts the row, or updates the one
+that already holds that email, instead of failing on it. The bulk route takes
+the same target as `onConflict` beside `upsert: true`, and so does each `upsert`
+operation of a batch.
 
 ```bash
 curl -X POST '/api/data/users?on_conflict=email' \
@@ -17592,10 +17686,20 @@ ignoring it turns a re-runnable import into a duplicating one.
 row it matched could live under another parent, and the upsert would move it
 under this one. Send the upsert to the collection's own route.
 
-A row that already existed keeps its `on_create` timestamp. A conflict means the
-row's creation is a fact about the past, and a nightly re-import that reset
-`createdAt` on everything it touched would take every "new this week" query
-with it.
+An upsert that meets a stored row is an update of it. The server reads the row
+the key names, in the caller's scope and inside the write's transaction, and
+runs the ordinary update: the fields in the body are written, the ones it leaves
+out keep their stored values rather than being reset to their `defaultValue`,
+`beforeSave` and `afterSave` see `status: "existing"` with the previous values,
+and history records an update. A row the read could not see, or one inserted
+concurrently, is still caught by `ON CONFLICT … DO UPDATE`, which sets only what
+the body and the hooks wrote, and the `on_update` stamps. A key that names a row
+outside the caller's `beforeQuery` scope answers `404`.
+
+A row that already existed keeps its `on_create` timestamp and its
+`user_on_create` creator. A conflict means the row's creation is a fact about the
+past, and a nightly re-import that reset `createdAt` on everything it touched
+would take every "new this week" query with it.
 
 #### `Prefer: return=minimal`
 
@@ -17996,8 +18100,8 @@ the ID you got. Read the response header.
 | `DISTINCT_NOT_APPLICABLE` | 400 | `?distinct=true` was combined with a search or vector query. Both attach a per-row score, so no two rows are ever equal and `DISTINCT` would collapse nothing — it would look like it worked and change nothing. | Drop one of the two. |
 | `DISTINCT_ORDER_BY_NOT_SELECTED` | 400 | A `distinct` read is ordered by a column it does not return. A `SELECT DISTINCT` can only be ordered by columns in its select list, or the rows it collapses have no defined order. `details.fields` names them. | Add those fields to `?fields=`, or drop them from `?orderBy=`. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
-| `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`). A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. `details.violations` names each field. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
-| `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
+| `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`) — or a field operation (`$inc`, `$push`, …) targets one, where a refused bound would reveal the stored value. A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. `details.violations` names each field. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
+| `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. The same code refuses a write through a parent that sets a relation the caller may not write, and an update that sets a `softDelete` field to a value — only a delete stamps it. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
 | `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | An earlier request with the same `Idempotency-Key` is still running. | Retry once it finishes. |
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
 | `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` named a function that is not `count`, `sum`, `avg`, `min` or `max`. | Use one of those; the message lists them. |
@@ -18045,6 +18149,7 @@ the ID you got. Read the response header.
 | `TENANT_IMMUTABLE` | 400 | A write would move a row from one tenant to another. A row cannot change tenant. `details.violations` names the field. | Create the row in the other tenant and delete this one, or write with a role in `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | The write names a tenant this caller does not belong to; the database would refuse it as well. | Write into a tenant the caller belongs to, or authenticate as one that belongs to it. |
 | `TENANT_REQUIRED` | 400 | The collection is tenant-scoped and the tenant cannot be inferred: the request carries none, or the caller belongs to several. | Send the tenant field explicitly, or authenticate as a caller belonging to exactly one. |
+| `TRANSACTION_ABORTED` | 500 | A statement on the write's transaction failed and a callback caught the error. Postgres had already aborted the transaction, so the write was rolled back and nothing was stored. Only a failed `context.data` write is undone on its own and safe to catch. | Let the failure throw, or check before running the statement. See [Transaction Semantics](/docs/collections/callbacks/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
@@ -21360,6 +21465,7 @@ channel.onError((error) => {
 | `RATE_LIMITED` | Past the channel frame budget above |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
+| `CHANNEL_HISTORY_GAP` | Raised by the client: a catch-up found that the server no longer retains messages this client never received. `details` is `{ from, to }`, the sequence numbers missed. Resync the channel's state from its source of truth |
 | `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
 With no handler attached, these are logged as a warning. They used to be
@@ -22957,19 +23063,22 @@ Failed rows are kept 30 days; successful ones 3.
 ### What happens when a worker dies
 
 A process killed mid-job cannot release its claim, so nothing but a timeout will
-free the row. Jobs claimed for longer than `visibilityTimeoutMs` (default 5
-minutes) are reclaimed — back to `pending` if they have attempts left, otherwise
-dead-lettered with an error saying what happened.
+free the row. While a handler runs, its worker renews the claim every third of
+`visibilityTimeoutMs` (default 5 minutes). A claim that has gone that long
+without being renewed is reclaimed — back to `pending` if the job has attempts
+left, otherwise dead-lettered with an error saying what happened.
 
-This is also why the timeout must exceed your slowest handler: past it, a second
-worker may start a job the first is still running.
+So a slow handler on a live worker keeps its job, however long it takes, and the
+timeout only decides how soon a dead worker's jobs come back. An attempt that
+lost its claim cannot overwrite the job's outcome either: its success or failure
+is logged and dropped, and whichever attempt holds the claim decides.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
     pollIntervalMs: 2_000,       // when the last look found nothing
-    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+    visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
 
@@ -23707,14 +23816,15 @@ redaction step with a silent exception, so it is not on offer.
 
 ### Blocking vs. Async Semantics
 
-**Every callback in the list below is awaited, and all of them run inside the
-transaction that carries the write.** There is no "fire and forget" tier: the
-row and everything its callbacks did commit together or not at all.
+**Every callback in the list below is awaited, and all of them but
+`afterSaveError` run inside the transaction that carries the write.** There is
+no "fire and forget" tier: the row and everything its callbacks did commit
+together or not at all.
 
 - **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave). A `beforeDelete` that *returns* `false` is the same refusal with no message, and answers **403** with that code.
 - **`afterRead`** — the returned row (or transformed row) is what the caller receives. Its transaction is `READ ONLY` — see [below](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — run *before* the commit, awaited. A throw here rolls the row back and answers the same **400 `CALLBACK_REJECTED`**, with `details.stage` naming the hook. They hold the transaction open while they run, so a slow one is a lock held.
-- **`afterSaveError`** — runs when the save failed, on the way out.
+- **`afterSaveError`** — runs when the save failed, on the way out. On a request it runs after the failed write's transaction has rolled back, with a `context` whose every call is a transaction of its own, so a job it enqueues to report the failure is kept. A throw from it is logged; the caller gets the save's own error.
 
 :::caution[This page used to say the opposite]
 Earlier versions said `afterSave` and `afterDelete` "run after the transaction
@@ -23740,7 +23850,8 @@ is not part of the write, so it does not go in the hook.
 
 #### `afterRead` cannot write
 
-A request-scoped read opens its transaction `READ ONLY`. `afterRead` runs inside
+A request-scoped read opens its transaction `READ ONLY`, and so does a realtime
+subscription's refetch. `afterRead` runs inside
 it, so **no write from that callback can succeed** — not a `context.data`
 create, not an update, not one buried in a helper it calls. Postgres refuses the
 statement with SQLSTATE `25006`, and the caller is answered:
@@ -33572,7 +33683,7 @@ const newProduct = await client.data.products.create(
 
 #### Upsert
 
-Insert the row, or replace the one already occupying its key:
+Insert the row, or update the one already occupying its key:
 
 ```typescript
 await client.data.users.upsert(
@@ -33581,9 +33692,16 @@ await client.data.users.upsert(
 );
 ```
 
-One statement server-side (`INSERT … ON CONFLICT DO UPDATE`), so unlike a
-`findById` followed by `create`-or-`update` it cannot lose the race between the
-two, and unlike `create` it does not fail when the row is already there.
+The server decides which inside one transaction, and falls back on
+`INSERT … ON CONFLICT DO UPDATE`, so unlike a `findById` followed by
+`create`-or-`update` it cannot lose the race between the two, and unlike
+`create` it does not fail when the row is already there.
+
+When the row is there, the upsert is an update of it. The fields you send are
+written and the ones you leave out keep their stored values — they are not reset
+to their `defaultValue`. `beforeSave` and `afterSave` see `status: "existing"`
+with the previous values, and history records an update. A key that names a row
+outside the caller's `beforeQuery` scope is a 404.
 
 `onConflict` defaults to the primary key, which is the wrong target for most of
 the writes an upsert is reached for: keyed on a serial id that is a plain
@@ -33594,8 +33712,8 @@ true }` on the property, or the columns of a `unique: true`
 [index](/docs/backend/indexes/) — and anything else is a 400 listing the targets
 that do exist, rather than an error raised from inside a transaction.
 
-The `on_create` timestamp of a row that already existed is left alone: a
-conflict means its creation is a fact about the past.
+The `on_create` timestamp and the `user_on_create` creator of a row that already
+existed are left alone: a conflict means its creation is a fact about the past.
 
 #### Update
 
@@ -36127,14 +36245,20 @@ Rows, user records, storage listings, cron jobs, function responses and CLI
 output come back wrapped in an explicit envelope:
 
 ```text
-<<<UNTRUSTED_DATA source="list_documents">>>
+<<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
 [ … rows … ]
-<<<END_UNTRUSTED_DATA>>>
+<<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
 
 Anything stored in your database was written by somebody, and it arrives on the
 same channel as the tool contract the assistant is following. The envelope tells
 the model to treat it as inert content rather than instructions.
+
+The `id` is minted fresh for every response, after the data was written, and
+only the end marker carrying it closes the block. Text inside the data that is
+shaped like a marker is broken with a zero-width space, so a row that prints
+`<<<END_UNTRUSTED_DATA>>>` cannot end the envelope early and put what follows it
+outside.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.
@@ -37040,7 +37164,7 @@ platform upgrade can rebuild it; `--no-source` skips that once, and `cloud setti
 
 ```bash
 rebase cloud env list | set | unset | reveal | pull
-rebase cloud domains list | add | verify | remove
+rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
@@ -37678,6 +37802,13 @@ const rlsAudit: RebaseBackendConfig["rlsAudit"] = {
 ```
 
 Pass that as `rlsAudit` in the object you hand `initializeRebaseBackend`.
+
+On the runtime — `rebase dev`, `rebase start` and the published server image —
+there is no such object to hand over, so set `REBASE_RLS_AUDIT=true` instead,
+with the default interval and threshold. The scanner still has to come from your
+project: add `@rebasepro/rls-check` to its dependencies so the bundle carries it.
+The runtime ships no copy of its own, and a boot that asks for the audit without
+the package refuses before opening a connection, naming the package to add.
 
 The result is served at `GET /api/admin/rls-audit`, admin-gated like every other
 admin surface, and each run logs one line — at `warn` when a finding reaches
@@ -39160,6 +39291,13 @@ separate `link` step. It writes `.rebase/cloud.json`, which records the project 
 and slug. That file is not a secret and it is not your credentials — those live
 in `~/.rebase/credentials.json`, written by `login`.
 
+It is committed with the code, though, so a cloned repository can name any
+control plane. When the host comes only from that file, and it is neither the
+platform's own nor one you have signed in to before, `login` names it and asks
+before sending your email and password there. Without a terminal, or with
+`--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
+`REBASE_CLOUD_URL`) to sign in there on purpose.
+
 `billing setup` attaches a card to the organization, once. It is first in the
 sequence on purpose: the first deploy of a project is refused without one, and
 finding that out after a bundle has finished uploading is the worse order.
@@ -39288,7 +39426,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
-| `domains` | Custom domains, the DNS records to add, and verification |
+| `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
@@ -39326,7 +39464,10 @@ Stated plainly, because finding out later is worse:
   `rebase cloud login` takes an email and a password. Pass them as
   `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD` from a secret store —
   `--password` puts the password in your shell history and in the process table,
-  and says so before it signs you in.
+  and says so before it signs you in. If the repository's `.rebase/cloud.json`
+  names a control plane other than the platform's own, pass it as `--url` too:
+  without a terminal, `login` refuses to send a password to a host that only
+  the checked-out file named.
 - **Point-in-time recovery is CLI-only.** The console shows backups; the staged
   PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the
@@ -41601,8 +41742,9 @@ const callbacks: CollectionCallbacks<Product> = {
 ### Error Handling
 
 `afterSaveError` runs when the save — or any `afterSave` callback — throws. It is a notification
-hook, not a rescue: **the error is rethrown after it runs**, the transaction rolls back, and the
-row is not saved.
+hook, not a rescue: the transaction rolls back, the row is not saved, and **the error is rethrown
+after it runs**. On a request it runs once the rollback is done, outside the failed transaction, so a
+delivery it hands to the dispatcher's queue is kept rather than rolled back with the write.
 
 ```typescript
 

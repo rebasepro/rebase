@@ -416,6 +416,14 @@ description: Every released change to Rebase — new features, fixes, and the br
   slash that a React Router `/reset-password` route does not match. The
   self-service reset from the same config already linked correctly.
 
+- **A user created through `POST /users/bulk`, a `_batch` create or a realtime
+  socket `SAVE` is created as `POST /users` creates one.** The password is
+  accepted and hashed (or generated), the email is stored normalized, the
+  account is verified, `onCreateUser` runs, and the invitation or temporary
+  password is delivered once the write commits. These doors wrote the row
+  directly: a user with no password, no invitation, and the email as typed, so
+  sign-in, password reset and magic links never found it.
+
 #### Postgres
 
 - **A write whose callback caught a failed statement is refused, not reported as
