@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { sql } from "drizzle-orm";
 import { ApiError, logger, type AmbientTransaction } from "@rebasepro/server";
+import type { RebaseCallContext } from "@rebasepro/types";
 import type { DrizzleClient } from "../interfaces";
 import { extractPgError } from "../utils/pg-error-utils";
 
@@ -31,6 +32,8 @@ export class WriteTransactionScope implements AmbientTransaction {
     private readonly commitHooks: Array<() => void> = [];
     /** The first tracked statement that failed, whether or not its caller caught it. */
     private failure?: unknown;
+    private readonly settledHooks: Array<(context: RebaseCallContext) => Promise<void>> = [];
+    private settledContext?: RebaseCallContext;
 
     /** The transaction handle, for statements in this package that are already written against drizzle. */
     tx?: DrizzleClient;
@@ -126,6 +129,42 @@ export class WriteTransactionScope implements AmbientTransaction {
             );
             refusal.cause = this.failure ?? error;
             throw refusal;
+        }
+    }
+
+    /**
+     * What a hook deferred with {@link afterSettled} is handed as `context`:
+     * the same caller, on a driver where every call is a transaction of its
+     * own. The write's transaction is gone by the time the hook runs, so a
+     * context bound to it would be bound to a connection back in the pool.
+     */
+    setSettledContext(context: RebaseCallContext): void {
+        this.settledContext = context;
+    }
+
+    /**
+     * Run `fn` once this write's transaction is over, whichever way it went,
+     * outside it — for what a failure hook hands off (a job, a queue message,
+     * a webhook), which must not ride the transaction the failure rolls back.
+     * `false` when this scope has no context to hand it; the caller runs it
+     * itself then.
+     */
+    afterSettled(fn: (context: RebaseCallContext) => Promise<void>): boolean {
+        if (!this.settledContext) return false;
+        this.settledHooks.push(fn);
+        return true;
+    }
+
+    /** The transaction committed or rolled back: run what was waiting for either. */
+    async settled(): Promise<void> {
+        const context = this.settledContext;
+        if (!context) return;
+        for (const hook of this.settledHooks.splice(0)) {
+            try {
+                await storage.run(undefined, () => hook(context));
+            } catch (error) {
+                logger.error("[transaction] A hook deferred to the end of the write threw", { error });
+            }
         }
     }
 

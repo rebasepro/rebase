@@ -48,7 +48,7 @@ import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegi
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
 import { resolveSoftDelete } from "./services/soft-delete";
-import { runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
+import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
@@ -1393,42 +1393,45 @@ export class PostgresBackendDriver implements DataDriver {
         } catch (error) {
             if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
                 const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-                // What the hook exists to see. It was documented from the start
-                // and never passed, so `props.error` was `undefined` in every
-                // handler ever written against the guide. `id` is the caller's
-                // when there is one — `"unknown"` was a string standing where a
-                // real key belonged — and `previousValues` is whatever the
-                // pre-write read managed to fetch, rather than a hardcoded
-                // `undefined` that hid an update's before-state.
-                const errorProps = {
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    error,
-                    context: contextForCallback
+                // Global, then collection, then property — each on its own,
+                // and guarded: a hook that throws cannot replace the failure
+                // the caller is owed with its own.
+                const runHooks = async (context: RebaseCallContext) => {
+                    // What the hook exists to see. It was documented from the
+                    // start and never passed, so `props.error` was `undefined`
+                    // in every handler ever written against the guide. `id` is
+                    // the caller's when there is one, and `previousValues` is
+                    // whatever the pre-write read managed to fetch.
+                    const errorProps = {
+                        collection: callbackCollection,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        error,
+                        context
+                    };
+                    for (const [tier, hook] of [
+                        ["global", globalCallbacks?.afterSaveError],
+                        ["collection", callbacks?.afterSaveError],
+                        ["property", propertyCallbacks?.afterSaveError]
+                    ] as const) {
+                        if (!hook) continue;
+                        try {
+                            await hook(errorProps);
+                        } catch (hookError) {
+                            logger.error(`[save] The ${tier} afterSaveError hook for "${path}" threw; answering with the save's own failure`, { error: hookError });
+                        }
+                    }
                 };
-                // 1. Global callbacks first
-                if (globalCallbacks?.afterSaveError) {
-                    await globalCallbacks.afterSaveError({
-                        collection: callbackCollection,
-                        ...errorProps
-                    });
-                }
-                // 2. Collection callbacks second
-                if (callbacks?.afterSaveError) {
-                    await callbacks.afterSaveError({
-                        collection: callbackCollection,
-                        ...errorProps
-                    });
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.afterSaveError) {
-                    await propertyCallbacks.afterSaveError({
-                        collection: callbackCollection,
-                        ...errorProps
-                    });
+                // The hook is for alerting, and the documented way to alert is
+                // a job. Inside a request's write it waits for that write's
+                // transaction to end: it used to run inside it, so what it
+                // enqueued rode the transaction this failure rolls back, and
+                // vanished with it. Run after, it commits on its own.
+                if (!currentWriteScope()?.afterSettled(runHooks)) {
+                    await runHooks(contextForCallback);
                 }
             }
             throw error;
@@ -2536,6 +2539,19 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // cleared, so a read nested in a write's callback is not taken for it.
         // See `write-transaction-scope.ts`.
         const writeScope = options?.accessMode === "read only" ? undefined : new WriteTransactionScope();
+        // What a hook deferred to the end of this write (`afterSaveError`) is
+        // handed: this caller, on this driver, where every call is a
+        // transaction of its own — the write's is over by then.
+        const client = this.delegate.client;
+        writeScope?.setSettledContext({
+            user: this.user,
+            driver: this,
+            data: this.data,
+            get client() {
+                return requireCallbackClient(client);
+            },
+            storageSource: client?.storage as StorageSource
+        });
 
         // The same identity the transaction is about to hand Postgres, made
         // available to the row walk so per-field `access.read` is applied to
@@ -2617,9 +2633,13 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 await writeScope?.assertCommittable();
                 return out;
             }, options)).finally(() => writeScope?.close())
-        );
+        ).catch(async (error: unknown) => {
+            await writeScope?.settled();
+            throw error;
+        });
 
         writeScope?.committed();
+        await writeScope?.settled();
 
         for (const notification of pendingNotifications) {
             try {
