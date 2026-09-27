@@ -282,7 +282,29 @@ describe("WebSocket Server authorization", () => {
                 payload: { sql: "SELECT * FROM users", options: { role: "postgres" } }
             });
 
-            expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SELECT * FROM users", { role: "postgres" });
+            // On a session of its own, reset before the pool reuses it: a
+            // `SET ROLE` typed into the editor must not outlive the statement.
+            expect(mockDriver.admin.executeSql).toHaveBeenCalledWith(
+                "SELECT * FROM users", { role: "postgres", isolateSession: true });
+        });
+
+        it("keeps the editor's session isolated even when the frame asks otherwise", async () => {
+            mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
+            (mockDriver.admin.executeSql as jest.Mock).mockResolvedValue({ rows: [] } as never);
+            const { messageCallback } = connect();
+
+            await send(messageCallback, {
+                type: "AUTHENTICATE",
+                requestId: "auth-admin",
+                payload: { token: "valid-admin-token" }
+            });
+            await send(messageCallback, {
+                type: "EXECUTE_SQL",
+                requestId: "req-admin",
+                payload: { sql: "SET ROLE rebase_user", options: { isolateSession: false } }
+            });
+
+            expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SET ROLE rebase_user", { isolateSession: true });
         });
     });
 });
@@ -382,7 +404,7 @@ describe("WebSocket Server SQL error handling", () => {
         );
 
         // Verify executeSql was called
-        expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SELECT * FROM orders", { role: "demo" });
+        expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SELECT * FROM orders", { role: "demo", isolateSession: true });
 
         // Verify the client received a clean ERROR payload rather than crashing the socket
         expect(mockWs.send).toHaveBeenCalled();

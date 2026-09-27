@@ -479,8 +479,14 @@ export interface DataTransformer {
 export interface SQLAdmin {
     /**
      * Execute raw SQL against the database.
+     *
+     * `isolateSession` runs it on a connection of its own and resets that
+     * connection's session state — role, session authorization, settings —
+     * before it is reused. For SQL a person wrote (the Studio editor), which
+     * may `SET ROLE` and must not leave that on a pooled connection the
+     * server's own queries use next.
      */
-    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
+    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean }): Promise<Record<string, unknown>[]>;
 
     /**
      * Fetch the available databases on the server.
