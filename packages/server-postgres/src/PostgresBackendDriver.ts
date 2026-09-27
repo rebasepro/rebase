@@ -1,4 +1,5 @@
 import { DataService } from "./services/dataService";
+import { createStampKeys } from "./services/PersistService";
 import { hasBeforeQuery } from "./services/read-scope";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
@@ -1187,6 +1188,15 @@ export class PostgresBackendDriver implements DataDriver {
                 status: status ?? "new",
                 uid: this.user?.uid
             });
+            // And an update leaves the create-time stamps alone. They record
+            // who made the row and when, which no later write can change; left
+            // to the body (or a hook), any row writer could reattribute a row
+            // they edited — `created_by` is the column that exists to stop that.
+            if (status === "existing") {
+                const kept: Record<string, unknown> = { ...updatedValues };
+                for (const key of createStampKeys(resolvedCollection.properties)) delete kept[key];
+                updatedValues = kept as Partial<EntityValues<M>>;
+            }
         }
 
         // Tenancy, last of the three stamps and for the same reason they are
