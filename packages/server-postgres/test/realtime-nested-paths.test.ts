@@ -115,13 +115,18 @@ describe("realtime over nested paths", () => {
         Reflect.set(realtime, "cdcActive", true);
 
         await realtime.notifyUpdate("authors/1/posts", "43", { id: 43 }, undefined, true, "app");
-        expect(await refreshed()).toContain("all-posts");
-        const delivered = ws.send.mock.calls.length;
 
-        // CDC reports the same commit under the table's own collection.
+        // CDC reports the same commit under the table's own collection. Its
+        // NOTIFY arrives at commit, before the refetch the app emit scheduled.
+        jest.advanceTimersByTime(20);
         await Reflect.apply(Reflect.get(realtime, "handleCdcEvent"), realtime, [
             { schema: "public", table: "posts", op: "UPDATE", row: { id: 43, title: "t" } }
         ]);
+        expect(await refreshed()).toContain("all-posts");
+        const delivered = ws.send.mock.calls.length;
+        // One frame per subscriber, not one for the write and one for its echo.
+        expect(delivered).toBe(4);
+
         await refreshed();
         expect(ws.send.mock.calls.length).toBe(delivered);
     });

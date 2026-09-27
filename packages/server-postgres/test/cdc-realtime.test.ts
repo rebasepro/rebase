@@ -168,15 +168,42 @@ describe("RealtimeService — database-level CDC", () => {
         // subscriber-scoped refetch. It no longer delivers the written row
         // inline, so the delivery only happens once the debounce fires.
         await service.notifyUpdate("posts", "1", { id: 1, path: "posts", values: { title: "via API" } } as any, undefined, true, "app");
-        await flushTimers();
-        const afterApp = ws.send.mock.calls.length;
-        expect(afterApp).toBeGreaterThan(0);
 
-        // The same committed change echoes back through CDC — it must NOT double-deliver.
+        // The same committed change echoes back through CDC — NOTIFY is
+        // delivered at commit, so before that refetch has run. It must NOT
+        // double-deliver.
+        jest.advanceTimersByTime(20);
         await emitCdc(service, { schema: "public", table: "posts", op: "UPDATE", row: { id: 1, title: "via API" } });
         await flushTimers();
 
-        expect(ws.send.mock.calls.length).toBe(afterApp);
+        expect(ws.send.mock.calls.length).toBe(1);
+        await flushTimers();
+        expect(ws.send.mock.calls.length).toBe(1);
+    });
+
+    it("delivers another writer's change to the same row once the app write's refetch has run", async () => {
+        // An app save that touches no row of the table (a to-many relation
+        // only, an empty payload) is announced, but no trigger fires, so no
+        // echo ever comes to consume its mark. Held for seconds, that mark
+        // swallowed the next change anyone else made to the row — psql, a
+        // cron, another instance — and the subscriber kept the old rows.
+        const ws = new MockWebSocket() as any;
+        service.addClient("client-6", ws);
+        await service.handleClientMessage("client-6", {
+            type: "subscribe_one",
+            payload: { path: "posts", id: "1", subscriptionId: "sub-6" }
+        });
+        await service.notifyUpdate("posts", "1", null, undefined, true, "app");
+        await flushTimers();
+        ws.send.mockClear();
+        mockFetchEntity.mockClear();
+
+        jest.advanceTimersByTime(1000);
+        await emitCdc(service, { schema: "public", table: "posts", op: "UPDATE", row: { id: 1, title: "closed in psql" } });
+        await flushTimers();
+
+        expect(mockFetchEntity).toHaveBeenCalled();
+        expect(ws.send).toHaveBeenCalledTimes(1);
     });
 
     it("does NOT suppress a CDC event for a different row", async () => {

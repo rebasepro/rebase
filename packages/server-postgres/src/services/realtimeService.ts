@@ -399,8 +399,20 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * and always flow through. Keyed → expiry timestamp (ms).
      */
     private recentAppEmits = new Map<string, number>();
-    /** How long an app-emit key suppresses its own CDC echo. Covers NOTIFY round-trip latency. */
-    private static readonly CDC_DEDUP_WINDOW_MS = 5000;
+    /**
+     * How long an app-emit key suppresses its own CDC echo: the refetch
+     * debounce, and no longer.
+     *
+     * The mark cannot tell an echo from another writer's change to the same
+     * row, and a save that touches no row of the table (a to-many relation
+     * only, an empty payload) is announced with no echo ever coming to consume
+     * it. Held for seconds, it swallowed the next change psql, a cron or
+     * another instance made to that row. Inside the debounce nothing is lost:
+     * the refetch the app emit scheduled has not started yet — its timer fires
+     * no earlier than this — and it reads after any commit whose NOTIFY has
+     * already arrived. An echo later than that costs one more refetch.
+     */
+    private static readonly CDC_DEDUP_WINDOW_MS = RealtimeService.REFETCH_DEBOUNCE_MS;
 
     constructor(private db: NodePgDatabase<any>, private registry: PostgresCollectionRegistry) {
         super();
