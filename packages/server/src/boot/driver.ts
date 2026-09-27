@@ -212,6 +212,24 @@ function isModuleNotFound(error: unknown): boolean {
 }
 
 /**
+ * What to `import()` for a package the bundle may have brought with it: its
+ * entry under the first of `resolveFrom` that has it installed, else the bare
+ * name, which resolves from wherever the runtime itself is installed.
+ */
+export function resolveBundlePackage(packageName: string, resolveFrom: string[]): {
+    specifier: string;
+    /** Where the package was found, when it resolved from a `node_modules` tree. */
+    packageDir?: string;
+} {
+    for (const root of resolveFrom) {
+        const packageDir = findPackageDir(root, packageName);
+        const entry = packageDir ? resolvePackageEntry(packageDir) : undefined;
+        if (entry) return { specifier: pathToFileURL(entry).href, packageDir };
+    }
+    return { specifier: packageName };
+}
+
+/**
  * Import a driver package, resolving its factories under either naming scheme.
  *
  * The generic names are the contract going forward; the Postgres-specific ones
@@ -224,18 +242,7 @@ async function importDriver(packageName: string, resolveFrom: string[] = []): Pr
     /** Where the driver was found, when it resolved from a `node_modules` tree. */
     packageDir?: string;
 }> {
-    let specifier = packageName;
-    let resolvedDir: string | undefined;
-
-    for (const root of resolveFrom) {
-        const packageDir = findPackageDir(root, packageName);
-        const entry = packageDir ? resolvePackageEntry(packageDir) : undefined;
-        if (entry) {
-            specifier = pathToFileURL(entry).href;
-            resolvedDir = packageDir;
-            break;
-        }
-    }
+    const { specifier, packageDir: resolvedDir } = resolveBundlePackage(packageName, resolveFrom);
 
     let mod: DriverModule;
     try {

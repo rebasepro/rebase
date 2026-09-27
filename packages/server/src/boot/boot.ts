@@ -44,6 +44,7 @@ import {
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources } from "./sources";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
+import { resolveRlsAuditOptions } from "./rls-audit-option";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
@@ -269,6 +270,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const resolvedSources = resolveDataSources(process.env, dataSourceDefs);
     const schema = await loadBundleSchema(bundle);
     const driverRoots = bundleResolutionRoots(bundle.dir);
+    // Before any connection opens: an audit that was asked for and cannot run
+    // is refused here, not after the pools are up.
+    const rlsAudit = await resolveRlsAuditOptions(env, driverRoots);
     const dataSources = await initializeDataSources(resolvedSources, schema, driverRoots);
     warnOnDriverSkew(dataSources, readRuntimeVersion(driverRoots));
 
@@ -376,6 +380,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         callbacks: configExports.callbacks,
         auth: resolveAuthOptions(env, usersCollection),
         history: env.REBASE_HISTORY,
+        rlsAudit,
         enableSwagger: resolveEnableSwagger(env),
         compression: env.REBASE_COMPRESSION,
         maxBodySize: env.REBASE_MAX_BODY_SIZE,
