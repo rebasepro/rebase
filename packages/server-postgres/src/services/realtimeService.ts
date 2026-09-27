@@ -780,10 +780,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // strip keeps the value out of every frame; a subscription filtered
             // on it would still answer, row by row, whether it matches. Judged
             // against the subscriber's roles, and `anon` for a socket that never
-            // signed in: an absent viewer is the trusted server plane.
+            // signed in: an absent viewer is the trusted server plane. The
+            // request itself, with the sort as parsed above — not a re-listed
+            // copy of some of its keys, which is how the stored `include`
+            // went unchecked while every refetch applied it.
             try {
                 assertReadRequestReadable(
-                    { filter: request.filter, logical: request.logical, orderBy, fields: request.fields },
+                    { ...request, orderBy },
                     collection,
                     { roles: authContext?.roles ?? ["anon"] }
                 );

@@ -48,6 +48,22 @@ const staff = {
     }
 } as unknown as CollectionConfig;
 
+/**
+ * A collection whose rows reach `staff` through a relation, so an `include`
+ * reads `staff`'s columns — and a vector only HR may read.
+ */
+const depts = {
+    name: "Depts",
+    slug: "depts",
+    table: "depts",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" },
+        embedding: { name: "Embedding", type: "vector", dimensions: 3, access: { read: ["hr"] } },
+        staff: { name: "Staff", type: "relation", relation: { kind: "hasMany", target: () => staff, foreignKeyOnTarget: "dept_id" } }
+    }
+} as unknown as CollectionConfig;
+
 type Frame = { type: string; requestId?: string; payload?: { error?: { code?: string; message?: string } } };
 
 describe("the socket's request frames", () => {
@@ -93,7 +109,7 @@ describe("the socket's request frames", () => {
         jest.clearAllMocks();
         mockWssInstance = null;
         driver = {
-            registry: { getCollectionByPath: (path: string) => (path === "staff" ? staff : undefined) },
+            registry: { getCollectionByPath: (path: string) => (path === "staff" ? staff : path === "depts" ? depts : undefined) },
             fetchCollection: jest.fn(async () => []),
             count: jest.fn(async () => 1),
             checkUniqueField: jest.fn(async () => false)
@@ -143,6 +159,48 @@ describe("the socket's request frames", () => {
         expect(driver.fetchCollection).not.toHaveBeenCalled();
     });
 
+    it("refuses an include that filters or sorts a relation's target on a field the caller cannot read", async () => {
+        // `GET /api/data/depts?include=…` answers this 400. Answered here, it
+        // returns each department with exactly the staff paid over 100k — the
+        // value stripped, the membership not — and `orderBy` + `limit: 1`
+        // names the best paid.
+        const { ws, send } = await connect(["user"]);
+        const includes = [
+            { staff: { where: { salary: [">", 100000] } } },
+            { staff: { orderBy: [["salary", "desc"]], limit: 1 } },
+            { staff: { fields: ["name", "salary"] } }
+        ];
+        for (const include of includes) {
+            for (const type of ["FETCH_COLLECTION", "COUNT"]) {
+                await send({ type, requestId: "f", payload: { path: "depts", include } });
+                refusedFor(lastFrame(ws), "salary");
+            }
+        }
+        expect(driver.fetchCollection).not.toHaveBeenCalled();
+        expect(driver.count).not.toHaveBeenCalled();
+    });
+
+    it("refuses a vector search over a vector the caller cannot read", async () => {
+        // Distances from points the caller chose locate the vector; a threshold
+        // alone answers "is it within r of here".
+        const { ws, send } = await connect(["user"]);
+        const vectorSearch = { property: "embedding", vector: [1, 0, 0], threshold: 0.1 };
+        for (const type of ["FETCH_COLLECTION", "COUNT"]) {
+            await send({ type, requestId: "v", payload: { path: "depts", vectorSearch } });
+            refusedFor(lastFrame(ws), "embedding");
+        }
+        expect(driver.fetchCollection).not.toHaveBeenCalled();
+        expect(driver.count).not.toHaveBeenCalled();
+    });
+
+    it("serves an include and a vector search the caller may read", async () => {
+        const { ws, send } = await connect(["hr"]);
+        await send({ type: "FETCH_COLLECTION", requestId: "f", payload: { path: "depts", include: { staff: { where: { salary: [">", 1] } } } } });
+        expect(lastFrame(ws).type).toBe("FETCH_COLLECTION_SUCCESS");
+        await send({ type: "FETCH_COLLECTION", requestId: "v", payload: { path: "depts", vectorSearch: { property: "embedding", vector: [1, 0, 0] } } });
+        expect(lastFrame(ws).type).toBe("FETCH_COLLECTION_SUCCESS");
+    });
+
     it("refuses a CHECK_UNIQUE_FIELD on a field the caller cannot read", async () => {
         const { ws, send } = await connect(["user"]);
         await send({ type: "CHECK_UNIQUE_FIELD", requestId: "u", payload: { path: "staff", name: "passwordHash", value: "hash-a" } });
@@ -179,7 +237,7 @@ describe("subscribe_collection", () => {
 
     beforeEach(() => {
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([staff]);
+        registry.registerMultiple([staff, depts]);
         // No database: a refused subscription never reaches one, and the
         // allowed case below only asserts that it got past the check.
         realtime = new RealtimeService({} as never, registry);
@@ -206,6 +264,17 @@ describe("subscribe_collection", () => {
 
     it("refuses one sorted on a role-restricted field", async () => {
         await subscribe({ orderBy: "salary" });
+        expect(frames()[0]?.payload?.error?.code).toBe("FIELD_NOT_READABLE");
+        expect(realtime.subscriptions.has("s1")).toBe(false);
+    });
+
+    it("refuses one whose include filters the target on a field the subscriber cannot read", async () => {
+        // The live version of the same oracle: every refetch re-answers which
+        // departments employ someone over the line.
+        await realtime.handleClientMessage("c1", {
+            type: "subscribe_collection",
+            payload: { path: "depts", subscriptionId: "s1", include: { staff: { where: { salary: [">", 100000] } } } }
+        }, { uid: "u1", roles: ["user"] });
         expect(frames()[0]?.payload?.error?.code).toBe("FIELD_NOT_READABLE");
         expect(realtime.subscriptions.has("s1")).toBe(false);
     });
