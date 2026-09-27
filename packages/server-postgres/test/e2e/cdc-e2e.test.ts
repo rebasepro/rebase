@@ -74,6 +74,9 @@ class CollectingSocket {
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no-op: no close/error handling needed in the test */ }
+    // `RealtimeService.destroy()` closes every client socket on shutdown.
+    close() { this.readyState = 3; /* WebSocket.CLOSED */ }
+    terminate() { this.readyState = 3; }
     parsed() { return this.messages.map((m) => JSON.parse(m)); }
     clear() { this.messages = []; }
 }
