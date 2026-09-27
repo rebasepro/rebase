@@ -33,6 +33,24 @@ describe("local query engine", () => {
             expect(matchesOperator(10, "<", "9")).toBe(false);
         });
 
+        /**
+         * Two strings are two strings. Rows arrive typed — a declared number is
+         * served as a number — and the filter value is the caller's own, so a
+         * string row value means a text column, where Postgres compares text:
+         * `'01234' = '1234'` is false and `ORDER BY code` puts "10" before "9".
+         */
+        it("compares two strings as text, even when both are digits", () => {
+            expect(looseEquals("1234", "01234")).toBe(false);
+            expect(looseEquals("1e3", "1000")).toBe(false);
+            expect(matchesOperator("1234", "==", "01234")).toBe(false);
+            expect(matchesOperator("01234", "!=", "1234")).toBe(true);
+            expect(matchesOperator("10", "in", ["10.0"])).toBe(false);
+            expect(compareValues("10", "9")).toBeLessThan(0);
+            // A number on one side still reads the other as a number.
+            expect(looseEquals(3, "3")).toBe(true);
+            expect(looseEquals("3", 3)).toBe(true);
+        });
+
         it("treats a comparison against NULL as unknown, not as false-or-true", () => {
             // `WHERE status != 'done'` does not return rows with a NULL status.
             expect(matchesOperator(null, "!=", "done")).toBe(false);
@@ -379,8 +397,6 @@ describe("local query engine", () => {
          */
         it("accepts a column this page holds only as numbers", () => {
             expect(isLocallySortable([{ id: 1, n: 3 }, { id: 2, n: 10 }], ["n", "asc"])).toBe(true);
-            // The wire's type erasure is already undone by `compareValues`.
-            expect(isLocallySortable([{ id: 1, n: "3" }, { id: 2, n: "10" }], ["n", "asc"])).toBe(true);
             // Dates normalise to instants before any comparison happens.
             expect(isLocallySortable(
                 [{ id: 1, at: new Date(1) }, { id: 2, at: new Date(2) }], ["at", "desc"]
@@ -390,6 +406,12 @@ describe("local query engine", () => {
         it("refuses a column holding text, whose order is the database's to decide", () => {
             expect(isLocallySortable([{ id: 1, name: "apple" }, { id: 2, name: "Banana" }], ["name", "asc"]))
                 .toBe(false);
+            // Digits are text too: a declared number arrives as a number, so a
+            // string here is a text column, which Postgres orders "10", "100",
+            // "9" — and a numeric re-sort would put 9 first.
+            expect(isLocallySortable(
+                [{ id: 1, code: "10" }, { id: 2, code: "100" }, { id: 3, code: "9" }], ["code", "asc"]
+            )).toBe(false);
             // One text value is enough — a column is one type, and the page that
             // happens to be cached does not get to vote.
             expect(isLocallySortable([{ id: 1, n: 3 }, { id: 2, n: "x" }], ["n", "asc"])).toBe(false);

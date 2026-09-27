@@ -25,9 +25,10 @@ import { splitSearchTerms } from "@rebasepro/utils";
  *   would have included them.
  * - `ORDER BY` puts nulls last ascending and first descending, which is the
  *   Postgres default.
- * - The wire format carries no types, so values arriving as strings are
- *   compared numerically against numeric columns and as instants against
- *   date columns. `["==", "3"]` matches the number `3`, as it does server-side.
+ * - A filter value may arrive as a string (off a URL, say), so a string is
+ *   compared numerically against a number and as an instant against a date.
+ *   `["==", "3"]` matches the number `3`, as it does server-side. Two strings
+ *   compare as text: `"01234"` is not `"1234"`.
  *
  * Two things it deliberately approximates, both flagged by
  * {@link isExactlyEvaluable}: `searchString` becomes a case-insensitive
@@ -88,12 +89,18 @@ export function compareValues(a: unknown, b: unknown): number | undefined {
         return l - r;
     }
 
-    // A numeric string on either side means the wire dropped the type; compare
-    // as numbers so `["<", "10"]` does not order "10" before "9" as text.
-    const leftNum = typeof left === "number" ? left : numericOrNaN(left);
-    const rightNum = typeof right === "number" ? right : numericOrNaN(right);
-    if (!Number.isNaN(leftNum) && !Number.isNaN(rightNum)) {
-        return leftNum < rightNum ? -1 : leftNum > rightNum ? 1 : 0;
+    // Numbers compare as numbers, and so does a numeric string against a
+    // number: a filter value read off a URL is a string, and `["<", "10"]`
+    // against a number column must not order 10 before 9 as text. Two strings
+    // stay text. Rows arrive typed — a declared number is served as a number —
+    // so a string row value is a text column, where Postgres says
+    // `'01234' <> '1234'` and orders "10" before "9".
+    if (isNumeric(left) || isNumeric(right)) {
+        const leftNum = numericOrNaN(left);
+        const rightNum = numericOrNaN(right);
+        if (!Number.isNaN(leftNum) && !Number.isNaN(rightNum)) {
+            return leftNum < rightNum ? -1 : leftNum > rightNum ? 1 : 0;
+        }
     }
 
     // One side is a date-shaped string and the other an instant.
@@ -109,6 +116,10 @@ export function compareValues(a: unknown, b: unknown): number | undefined {
     const rightStr = String(right);
     if (collator) return collator.compare(leftStr, rightStr);
     return leftStr < rightStr ? -1 : leftStr > rightStr ? 1 : 0;
+}
+
+function isNumeric(value: unknown): value is number | bigint {
+    return typeof value === "number" || typeof value === "bigint";
 }
 
 function numericOrNaN(value: unknown): number {
@@ -130,12 +141,17 @@ function toTime(value: unknown): number | undefined {
     return undefined;
 }
 
-/** Equality with the wire's type erasure allowed for, but never across NULL. */
+/**
+ * Equality with a string filter value allowed to name a number, a boolean or
+ * an instant, but never across NULL. Two strings are equal only when they are
+ * the same string, as text is in Postgres.
+ */
 export function looseEquals(a: unknown, b: unknown): boolean {
     const left = toComparable(a);
     const right = toComparable(b);
     if (isNullish(left) || isNullish(right)) return isNullish(left) && isNullish(right);
     if (left === right) return true;
+    if (typeof left === "string" && typeof right === "string") return false;
     const cmp = compareValues(left, right);
     return cmp === 0;
 }
@@ -495,14 +511,14 @@ function logicalReachesThroughRelation(
  *
  * Asked of the rows rather than of the query, because unlike a filter this one
  * *is* decidable from the data in hand: {@link compareValues} reaches the
- * collator only when it cannot read both operands as numbers, and `toComparable`
- * has already turned dates and relations into numbers and ids by then. If every
+ * collator only when neither operand is a number, and `toComparable` has
+ * already turned dates and relations into numbers and ids by then. If every
  * value on the sort column normalises to a number, the collator is unreachable
  * and the local order is the server's order.
  *
  * A text column is therefore refused — see {@link isExactlyEvaluable} for why
- * the two cannot be made to agree — and so is a column this page happens to see
- * only as strings, which is the same thing from here.
+ * the two cannot be made to agree — including one holding only digits, which
+ * Postgres orders as text ("10", "100", "9").
  *
  * Nulls are fine either way: they are ordered by an explicit rule (last
  * ascending, first descending) that matches Postgres and never reaches the
@@ -527,9 +543,6 @@ export function isLocallySortable(
         if (isNullish(value)) return true;
         if (typeof value === "number" || typeof value === "boolean") return true;
         if (typeof value === "bigint") return true;
-        // A numeric string is compared as a number, so it is safe too — this is
-        // the wire's type erasure, which `compareValues` already undoes.
-        if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) return true;
         return false;
     }));
 }
