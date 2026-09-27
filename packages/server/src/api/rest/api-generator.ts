@@ -182,6 +182,12 @@ function junctionCollectionFor(relation: ResolvedRelation): CollectionConfig | u
     return getJunctionConfigForRelation(relation.through);
 }
 
+/** Whether `collection` is the auth collection — its rows are the users. */
+function isAuthCollection(collection: CollectionConfig): boolean {
+    const auth = collection.auth;
+    return auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
+}
+
 /**
  * Lightweight REST API generator that leverages existing Rebase DataDriver.
  * Supports `include` query parameter for eager-loading relations via Drizzle.
@@ -363,7 +369,27 @@ export class RestApiGenerator {
             });
 
             return this.runIdempotent(c, body, async () => {
-                const written = await driver.batchWrite!({
+                // The auth collection's updates and deletes are user
+                // administration, as on its own routes: checked together,
+                // before the transaction opens.
+                const userUpdates: ParsedBatchOperation[] = [];
+                const userDeletes: string[] = [];
+                let usersCollection: CollectionConfig | undefined;
+                for (const operation of operations) {
+                    const collection = bySlug.get(operation.collection)!;
+                    if (!isAuthCollection(collection) || operation.id === undefined) continue;
+                    usersCollection = collection;
+                    if (operation.op === "update" && operation.values) userUpdates.push(operation);
+                    if (operation.op === "delete") userDeletes.push(String(operation.id));
+                }
+                if (usersCollection && userUpdates.length > 0) {
+                    const prepared = await this.prepareUserUpdates(usersCollection, userUpdates.map(operation => ({
+                        uid: String(operation.id),
+                        values: operation.values!
+                    })));
+                    userUpdates.forEach((operation, index) => { operation.values = prepared[index]; });
+                }
+                const written = await this.deletingUsers(usersCollection, userDeletes, () => driver.batchWrite!({
                     operations: operations.map((operation: ParsedBatchOperation) => ({
                         op: operation.op,
                         path: getCollectionDataPath(bySlug.get(operation.collection)!),
@@ -373,7 +399,7 @@ export class RestApiGenerator {
                         onConflict: operation.onConflict,
                         ref: operation.ref
                     }))
-                });
+                }));
                 return {
                     data: written.map((row) => (row ? this.formatResponse(row) : null)),
                     meta: { operations: written.length }
@@ -707,6 +733,41 @@ export class RestApiGenerator {
     }
 
     /**
+     * Updates to rows of the auth collection, checked and put in stored form
+     * by the auth adapter — `AuthAdapter.prepareUserUpdates`. Those rows are
+     * the users, so an update is user administration and holds to what
+     * `/admin/users` holds to: the last administrator stays one, an email is
+     * stored the way sign-in looks it up. Any other collection's values, and
+     * an adapter with no such step, pass through unchanged.
+     */
+    private async prepareUserUpdates(
+        collection: CollectionConfig,
+        updates: { uid: string; values: Record<string, unknown> }[]
+    ): Promise<Record<string, unknown>[]> {
+        if (updates.length === 0 || !isAuthCollection(collection) || !this.authAdapter?.prepareUserUpdates) {
+            return updates.map(update => update.values);
+        }
+        return this.authAdapter.prepareUserUpdates(updates);
+    }
+
+    /**
+     * Delete rows of the auth collection as user administration: the adapter's
+     * checks and `beforeUserDelete` before (either may refuse), its session
+     * cleanup and `afterUserDelete` after. See {@link prepareUserUpdates}.
+     */
+    private async deletingUsers<T>(
+        collection: CollectionConfig | undefined,
+        uids: string[],
+        remove: () => Promise<T>
+    ): Promise<T> {
+        const adapter = collection && isAuthCollection(collection) && uids.length > 0 ? this.authAdapter : undefined;
+        await adapter?.prepareUserDeletions?.(uids);
+        const result = await remove();
+        await adapter?.finalizeUserDeletions?.(uids);
+        return result;
+    }
+
+    /**
      * Get the request-scoped driver. Throws if none is set — never falls
      * back to the unscoped `this.driver` to avoid bypassing RLS/auth.
      */
@@ -924,7 +985,7 @@ export class RestApiGenerator {
         );
 
         const isAuth = collection.auth;
-        const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+        const authCollection = isAuthCollection(collection);
 
         const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
 
@@ -935,7 +996,7 @@ export class RestApiGenerator {
         // for everything else. Skipping the check outright (as this used
         // to) meant a typo on the users table was silently dropped and
         // answered 201, while the same typo on `posts` was a 400.
-        if (!isAuthCollection) {
+        if (!authCollection) {
             assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
             assertWriteValuesValid(body, collection, { status: "new" });
             assertNoFieldOpsOnCreate(body, "A create");
@@ -953,7 +1014,7 @@ export class RestApiGenerator {
             }
         }
 
-        if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
+        if (authCollection && this.authAdapter?.prepareUserCreation) {
             const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
 
             const entity = await driver.save({
@@ -1059,10 +1120,11 @@ values: entity as Record<string, unknown> },
                 );
             }
 
+            const [values] = await this.prepareUserUpdates(collection, [{ uid: id, values: body }]);
             const entity = await driver.save({
                 path,
                 id,
-                values: body,
+                values,
                 collection: address.driverCollection,
                 status: "existing"
             });
@@ -1126,7 +1188,7 @@ values: entity as Record<string, unknown> },
                 );
             }
 
-            await driver.delete({
+            await this.deletingUsers(collection, [id], () => driver.delete({
                 hard: hardDelete,
                 row: {
                     // The address is the one in the URL, not something read
@@ -1138,7 +1200,7 @@ values: entity as Record<string, unknown> },
                     path
                 },
                 collection: address.driverCollection
-            });
+            }));
             return null;
         }, () => new Response(null, { status: 204 }));
     }
@@ -1456,11 +1518,15 @@ values: entity as Record<string, unknown> },
             });
 
             return this.runIdempotent(c, body, async () => {
+                const values = await this.prepareUserUpdates(resolvedCollection, updates.map((entry) => ({
+                    uid: String(entry.id),
+                    values: entry.data as Record<string, unknown>
+                })));
                 const written = await driver.updateMany!({
                     path,
-                    updates: updates.map((entry) => ({
+                    updates: updates.map((entry, index) => ({
                         id: entry.id as string | number,
-                        values: entry.data as Record<string, unknown>
+                        values: values[index]
                     })),
                     collection: resolvedCollection
                 });
@@ -1507,12 +1573,12 @@ values: entity as Record<string, unknown> },
             }
 
             return this.runIdempotent(c, body, async () => {
-                await driver.deleteMany!({
+                await this.deletingUsers(resolvedCollection, ids.map(String), () => driver.deleteMany!({
                     hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
                     path,
                     ids: ids as (string | number)[],
                     collection: resolvedCollection
-                });
+                }));
                 return { meta: { deleted: ids.length } };
             }, (result) => c.json(result as never));
         });

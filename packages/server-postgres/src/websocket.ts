@@ -612,6 +612,25 @@ roles: verifiedUser.roles }
                 };
 
                 /**
+                 * The auth collection's rows are the users, so a write to one
+                 * is user administration — the auth adapter's to check, as it
+                 * is on the REST routes and `/admin/users`. `undefined` for any
+                 * other collection, or an adapter with nothing to say.
+                 */
+                const userAdminFor = (path: unknown): AuthAdapter | undefined => {
+                    if (typeof path !== "string" || !authAdapter) return undefined;
+                    let collection;
+                    try {
+                        collection = driver.registry?.getCollectionByPath(path);
+                    } catch {
+                        return undefined;
+                    }
+                    const auth = collection?.auth;
+                    const isAuthCollection = auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
+                    return isAuthCollection ? authAdapter : undefined;
+                };
+
+                /**
                  * An upsert's options, under the rules `POST /api/data`
                  * applies to `?on_conflict=`: refused on a nested path,
                  * whose insert branch stamps the parent's key into the
@@ -734,10 +753,16 @@ colors: true }));
                         // merged under the registry's in the driver, so a key
                         // the registry leaves unset was the caller's to set
                         // (`history: true` on a collection declaring none).
+                        const userAdmin = request.status === "existing" && request.id !== undefined
+                            ? userAdminFor(request.path)
+                            : undefined;
+                        const [values] = userAdmin?.prepareUserUpdates
+                            ? await userAdmin.prepareUserUpdates([{ uid: String(request.id), values: request.values as Record<string, unknown> }])
+                            : [request.values];
                         const row = await delegate.save({
                             path: request.path,
                             ...(request.id !== undefined && { id: request.id }),
-                            values: request.values,
+                            values,
                             status: request.status,
                             ...upsertOptions(request)
                         });
@@ -769,10 +794,14 @@ colors: true }));
                         // survived: `softDelete: { field: "title" }` turned
                         // this DELETE into an UPDATE of `title` that no
                         // `beforeSave` and no write validator saw.
+                        const userAdmin = userAdminFor(request.row?.path);
+                        const uids = [String(request.row.id)];
+                        await userAdmin?.prepareUserDeletions?.(uids);
                         await delegate.delete({
                             row: { id: request.row.id, path: request.row.path },
                             hard: request.hard
                         });
+                        await userAdmin?.finalizeUserDeletions?.(uids);
                         wsDebug("🗑️ [WebSocket Server] DELETE_ENTITY completed successfully");
                         const response = {
                             type: "DELETE_SUCCESS",

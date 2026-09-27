@@ -34,7 +34,7 @@ import { isBootstrapWindowOpen } from "./registration-policy";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
 import { createAdminUsersRoute } from "./admin-users-route";
-import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
+import { prepareAdminUserValues, finalizeAdminUserCreation, authCollectionUserAdmin } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
 import type { AuthHooks, ResolvedAuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -377,6 +377,11 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 collectionAuthConfig
             });
         },
+
+        // A write to the auth collection through the data API is user
+        // administration, and holds to what `/admin/users` holds to — the
+        // same rules and hooks, from the same functions.
+        ...authCollectionUserAdmin({ authRepo: authRepository, resolvedHooks: resolvedOps }),
 
         async getCapabilities(): Promise<AuthAdapterCapabilities> {
             // Detect bootstrap mode: are there any users, and may the first one

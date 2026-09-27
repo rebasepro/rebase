@@ -2,7 +2,9 @@
  * Admin User Operations
  *
  * Shared utilities and orchestration for admin-initiated user management
- * (user creation via REST API, password reset via admin panel).
+ * (user creation via REST API, password reset via admin panel), and the rules
+ * user administration holds to whichever door it arrives by — the admin user
+ * routes, or the auth collection through the data API.
  *
  * Hook resolution order:
  * 1. Collection-level hook (`auth.onCreateUser` on the collection) — closest to the data
@@ -16,11 +18,13 @@ import type { AuthRepository } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type {
+    AuthAdapter,
     AuthCollectionConfig,
     AuthCollectionContext,
     UserCreationFinalizeResult,
     UserCreationPrepareResult
 } from "@rebasepro/types";
+import { ApiError } from "../api/errors";
 import { getUserInvitationTemplate, resolveEmailBranding, USER_INVITATION_LINK_TTL_MS } from "../email/templates";
 import { resolveEmailLinkBase } from "../email/link-base";
 import { logger } from "../utils/logger";
@@ -298,5 +302,142 @@ invitationSent: prepared.invitationSent }
         invitationSent: result.invitationSent,
         ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {}),
         ...(result.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
+    };
+}
+
+// ─── User Administration Rules ──────────────────────────────────────────────
+//
+// What `PUT` and `DELETE /admin/users/:uid` refuse, as functions, so the other
+// door into the same rows — the auth collection through the data API — refuses
+// it too. That door was the admin panel's own Users view, and it deleted the
+// last administrator, skipped `beforeUserDelete`, and stored emails as typed.
+
+/**
+ * Refuse a change that leaves no administrator: `leaving` are users losing the
+ * role (demoted, or deleted), and the project must keep at least one.
+ *
+ * Judged over the whole set, so a bulk write that takes every admin at once is
+ * refused even though each of its rows alone would leave one behind.
+ */
+async function assertAdministratorsRemain(
+    authRepo: AuthRepository,
+    leaving: readonly string[],
+    message: string
+): Promise<void> {
+    const admins: string[] = [];
+    for (const uid of new Set(leaving)) {
+        if ((await authRepo.getUserRoleIds(uid)).includes("admin")) admins.push(uid);
+    }
+    if (admins.length === 0) return;
+    const { total } = await authRepo.listUsersPaginated({ roleId: "admin", limit: 1 });
+    if (total <= admins.length) {
+        throw ApiError.forbidden(message, "LAST_ADMIN");
+    }
+}
+
+/** Refuse deleting these users when that would leave the project with no administrator. */
+export async function assertUserDeletionsAllowed(
+    authRepo: AuthRepository,
+    uids: readonly string[]
+): Promise<void> {
+    await assertAdministratorsRemain(
+        authRepo,
+        uids,
+        uids.length > 1 ? "Cannot delete every administrator" : "Cannot delete the last administrator"
+    );
+}
+
+/** Refuse setting these users' roles when that would leave the project with no administrator. */
+export async function assertRoleChangesAllowed(
+    authRepo: AuthRepository,
+    changes: ReadonlyArray<{ uid: string; roles: readonly unknown[] }>
+): Promise<void> {
+    await assertAdministratorsRemain(
+        authRepo,
+        changes.filter(change => !change.roles.includes("admin")).map(change => change.uid),
+        changes.length > 1 ? "Cannot demote every administrator" : "Cannot demote the last administrator"
+    );
+}
+
+/**
+ * A user's new email, in the form sign-in looks it up by — or a 409 when
+ * another account holds it.
+ *
+ * Sign-in, password reset and magic links all find the account by
+ * `normalizeEmail(input)`. An address stored as typed is one those lookups
+ * never match: its owner is locked out, and registering the address again hits
+ * the case-insensitive unique index.
+ */
+export async function normalizeUserEmailChange(
+    authRepo: AuthRepository,
+    uid: string,
+    email: string
+): Promise<string> {
+    const normalized = normalizeEmail(email);
+    // The same 409 `POST /users` and registration give. Both engines also map
+    // the unique index behind it, which covers the race; the check is what
+    // answers for a custom repository that does not — unchecked, a plain
+    // collision was a 500.
+    const holder = await authRepo.getUserByEmail(normalized);
+    if (holder && holder.id !== uid) {
+        throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+    }
+    return normalized;
+}
+
+/**
+ * Run `afterUserDelete` without letting it fail the deletion it follows: the
+ * user is already gone, so a failing listener is logged, not answered.
+ */
+export function runAfterUserDelete(resolvedHooks: ResolvedAuthHooks, uid: string): void {
+    if (!resolvedHooks.afterUserDelete) return;
+    resolvedHooks.afterUserDelete(uid).catch(err => {
+        logger.error("[AuthHooks] afterUserDelete error", {
+            error: err instanceof Error ? err.message : err
+        });
+    });
+}
+
+/**
+ * The auth adapter's side of user administration through the auth collection
+ * (`AuthAdapter.prepareUserUpdates` and the deletion pair): the admin user
+ * routes' rules and hooks, for the data API's writes to the same rows.
+ */
+export function authCollectionUserAdmin(ctx: {
+    authRepo: AuthRepository;
+    resolvedHooks: ResolvedAuthHooks;
+}): Required<Pick<AuthAdapter, "prepareUserUpdates" | "prepareUserDeletions" | "finalizeUserDeletions">> {
+    const { authRepo, resolvedHooks } = ctx;
+    return {
+        async prepareUserUpdates(updates) {
+            await assertRoleChangesAllowed(
+                authRepo,
+                updates.flatMap(({ uid, values }) => Array.isArray(values.roles) ? [{ uid, roles: values.roles }] : [])
+            );
+            const prepared: Record<string, unknown>[] = [];
+            for (const { uid, values } of updates) {
+                prepared.push(typeof values.email === "string"
+                    ? { ...values, email: await normalizeUserEmailChange(authRepo, uid, values.email) }
+                    : values);
+            }
+            return prepared;
+        },
+
+        async prepareUserDeletions(uids) {
+            await assertUserDeletionsAllowed(authRepo, uids);
+            // Throws to prevent the deletion — before any row goes.
+            if (resolvedHooks.beforeUserDelete) {
+                for (const uid of uids) await resolvedHooks.beforeUserDelete(uid);
+            }
+        },
+
+        async finalizeUserDeletions(uids) {
+            for (const uid of uids) {
+                // The sessions end with the account on every engine, not only
+                // where the refresh tokens cascade with the row.
+                await authRepo.deleteAllRefreshTokensForUser(uid);
+                runAfterUserDelete(resolvedHooks, uid);
+            }
+        }
     };
 }

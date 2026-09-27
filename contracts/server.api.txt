@@ -551,7 +551,7 @@ interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key,
 interface ApiKeysAPI { createKey, getKey, listKeys, revokeKey, updateKey }
 interface ArrayProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
 interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
-interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, getCapabilities, id, initialize, prepareUserCreation, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
+interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
 interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement }
 interface AuthClaimPolicyOperand { kind, name }
 interface AuthClient { canRestoreSession, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }

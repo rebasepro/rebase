@@ -423,3 +423,98 @@ describe("a socket write through a parent's relation", () => {
         expect(writes).toHaveLength(1);
     });
 });
+
+/**
+ * The auth collection's rows are the users, and the socket is a door into them
+ * too. It asks the auth adapter what `/admin/users` and the data API's REST
+ * routes ask: the last administrator stays one, `beforeUserDelete` may veto,
+ * and an email is stored the way sign-in looks it up.
+ */
+describe("a socket write to the auth collection", () => {
+    const users = {
+        slug: "users", name: "Users", table: "users", auth: { enabled: true },
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            email: { name: "Email", type: "string" },
+            roles: { name: "Roles", type: "array", of: { name: "Role", type: "string" } }
+        }
+    };
+
+    let writes: unknown[];
+    let userAdmin: { prepareUserUpdates: jest.Mock; prepareUserDeletions: jest.Mock; finalizeUserDeletions: jest.Mock };
+
+    const connect = async () => {
+        const handlers: Record<string, (...args: any[]) => any> = {};
+        const ws = {
+            send: jest.fn(),
+            on: (event: string, cb: (...args: any[]) => any) => { handlers[event] = cb; },
+            readyState: 1,
+            close: jest.fn()
+        };
+        mockWssInstance.on.mock.calls.find((c: any[]) => c[0] === "connection")[1](ws, { url: "/", headers: {} });
+        const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
+        await send({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "admin" } });
+        const last = () => JSON.parse(ws.send.mock.calls[ws.send.mock.calls.length - 1][0]);
+        return { send, last };
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        writes = [];
+        userAdmin = {
+            prepareUserUpdates: jest.fn(async (updates: { values: Record<string, unknown> }[]) =>
+                updates.map(({ values }) => typeof values.email === "string" ? { ...values, email: values.email.toLowerCase() } : values)),
+            prepareUserDeletions: jest.fn(async (uids: string[]) => {
+                if (uids.includes("admin-1")) {
+                    // eslint-disable-next-line @typescript-eslint/no-require-imports
+                    const { ApiError } = require("../../server/src/api/errors");
+                    throw ApiError.forbidden("Cannot delete the last administrator", "LAST_ADMIN");
+                }
+            }),
+            finalizeUserDeletions: jest.fn(async () => undefined)
+        };
+        const adapter = {
+            verifyToken: async () => ({ uid: "admin-1", roles: ["admin"], isAdmin: true }),
+            ...userAdmin
+        } as unknown as AuthAdapter;
+        const driver = {
+            key: "postgres",
+            initialised: true,
+            registry: { getCollectionByPath: (path: string) => (path === "users" ? users : undefined) },
+            save: async (props: unknown) => { writes.push(props); return {}; },
+            delete: async (props: unknown) => { writes.push(props); },
+            withAuth: undefined
+        } as unknown as PostgresBackendDriver;
+        createPostgresWebSocket({} as Server, { addClient: jest.fn(), rescopeClient: jest.fn() } as unknown as RealtimeService, driver, undefined, adapter);
+    });
+
+    it("stores an update in the form the auth adapter puts it in", async () => {
+        const { send } = await connect();
+
+        await send({ type: "SAVE", requestId: "s", payload: { path: "users", id: "u-2", status: "existing", values: { email: "Ann@Example.COM" } } });
+
+        expect(userAdmin.prepareUserUpdates).toHaveBeenCalledWith([{ uid: "u-2", values: { email: "Ann@Example.COM" } }]);
+        expect(writes).toEqual([expect.objectContaining({ values: { email: "ann@example.com" } })]);
+    });
+
+    it("refuses a delete the auth adapter refuses, and deletes nothing", async () => {
+        const { send, last } = await connect();
+
+        await send({ type: "DELETE", requestId: "d", payload: { row: { path: "users", id: "admin-1" } } });
+
+        expect(last()).toMatchObject({ type: "ERROR", payload: { error: { code: "LAST_ADMIN" } } });
+        expect(writes).toEqual([]);
+        expect(userAdmin.finalizeUserDeletions).not.toHaveBeenCalled();
+    });
+
+    it("finalizes a delete it allowed, after the row is gone", async () => {
+        const { send } = await connect();
+
+        await send({ type: "DELETE", requestId: "d", payload: { row: { path: "users", id: "u-2" } } });
+
+        expect(userAdmin.prepareUserDeletions).toHaveBeenCalledWith(["u-2"]);
+        expect(writes).toHaveLength(1);
+        expect(userAdmin.finalizeUserDeletions).toHaveBeenCalledWith(["u-2"]);
+    });
+});

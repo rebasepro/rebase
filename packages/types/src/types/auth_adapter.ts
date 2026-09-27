@@ -548,6 +548,44 @@ export interface AuthAdapter {
         clearPassword?: string
     ): Promise<UserCreationFinalizeResult>;
 
+    // ── User Administration Through the Auth Collection ─────────────────
+
+    /**
+     * Check, and put in stored form, updates to rows of the auth collection
+     * that arrive through the data API — `PATCH /<users>/:id`, `PATCH /bulk`,
+     * `_batch`, the realtime socket.
+     *
+     * Those rows are the users, so an update to one is user administration,
+     * and has to hold to what the admin user routes hold to: no update that
+     * leaves the project without an administrator, and an email stored the
+     * way sign-in looks it up. Throws to refuse; the updates are judged
+     * together, so a bulk demotion of every admin is refused even though each
+     * row alone would pass.
+     *
+     * If not implemented, the values are written as they arrived.
+     *
+     * @returns Each update's values, as they should be written, in order.
+     */
+    prepareUserUpdates?(
+        updates: ReadonlyArray<{ uid: string; values: Record<string, unknown> }>
+    ): Promise<Record<string, unknown>[]>;
+
+    /**
+     * Check a deletion of these users through the data API before any row goes,
+     * and run the hooks that may veto it (`beforeUserDelete`). Throws to
+     * refuse — for one that would leave the project without an administrator,
+     * among others.
+     *
+     * If not implemented, the rows are deleted as any other.
+     */
+    prepareUserDeletions?(uids: readonly string[]): Promise<void>;
+
+    /**
+     * After those users' rows are deleted through the data API: end their
+     * sessions and run the after-delete hooks (`afterUserDelete`).
+     */
+    finalizeUserDeletions?(uids: readonly string[]): Promise<void>;
+
     // ── Service Key (optional) ──────────────────────────────────────────
 
     /**

@@ -19,7 +19,15 @@ import type { AuthRepository } from "./interfaces";
 import { createRequireAuth, requireAdmin } from "./middleware";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
-import { prepareAdminUserValues, finalizeAdminUserCreation, completeUserCreation } from "./admin-user-ops";
+import {
+    prepareAdminUserValues,
+    finalizeAdminUserCreation,
+    completeUserCreation,
+    assertRoleChangesAllowed,
+    assertUserDeletionsAllowed,
+    normalizeUserEmailChange,
+    runAfterUserDelete
+} from "./admin-user-ops";
 import { replaceUserPassword } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
@@ -356,17 +364,15 @@ values: prepResult.values },
             throw ApiError.notFound("User not found");
         }
 
+        // Refused before anything is written, so a refused demotion does not
+        // leave the email or password it arrived with applied.
+        if (roles !== undefined && Array.isArray(roles)) {
+            await assertRoleChangesAllowed(authRepo, [{ uid, roles }]);
+        }
+
         const updates: Record<string, unknown> = {};
         if (email !== undefined) {
-            updates.email = normalizeEmail(email);
-            // The same 409 `POST /users` and registration give. Both engines
-            // also map the unique index behind it, which covers the race; the
-            // check is what answers for a custom repository that does not —
-            // unchecked, a plain collision was a 500.
-            const holder = await authRepo.getUserByEmail(normalizeEmail(email));
-            if (holder && holder.id !== uid) {
-                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
-            }
+            updates.email = await normalizeUserEmailChange(authRepo, uid, email);
         }
         if (displayName !== undefined) updates.displayName = displayName;
 
@@ -390,19 +396,6 @@ values: prepResult.values },
         }
 
         if (roles !== undefined && Array.isArray(roles)) {
-            const currentRoles = await authRepo.getUserRoleIds(uid);
-            const wasAdmin = currentRoles.includes("admin");
-            const willBeAdmin = roles.includes("admin");
-
-            if (wasAdmin && !willBeAdmin) {
-                const adminUsers = await authRepo.listUsersPaginated({
-                    roleId: "admin",
-                    limit: 1
-                });
-                if (adminUsers.total <= 1) {
-                    throw ApiError.forbidden("Cannot demote the last administrator", "LAST_ADMIN");
-                }
-            }
             await authRepo.setUserRoles(uid, roles);
         }
 
@@ -425,16 +418,7 @@ values: prepResult.values },
             throw ApiError.notFound("User not found");
         }
 
-        const roles = await authRepo.getUserRoleIds(uid);
-        if (roles.includes("admin")) {
-            const adminUsers = await authRepo.listUsersPaginated({
-                roleId: "admin",
-                limit: 1
-            });
-            if (adminUsers.total <= 1) {
-                throw ApiError.forbidden("Cannot delete the last administrator", "LAST_ADMIN");
-            }
-        }
+        await assertUserDeletionsAllowed(authRepo, [uid]);
 
         // The delete hooks fire here, because this is where users are deleted.
         //
@@ -461,13 +445,7 @@ values: prepResult.values },
         await authRepo.deleteAllRefreshTokensForUser(uid);
         await authRepo.deleteUser(uid);
 
-        if (ops.afterUserDelete) {
-            ops.afterUserDelete(uid).catch(err => {
-                logger.error("[AuthHooks] afterUserDelete error", {
-                    error: err instanceof Error ? err.message : err
-                });
-            });
-        }
+        runAfterUserDelete(ops, uid);
 
         return c.json({ success: true });
     });
