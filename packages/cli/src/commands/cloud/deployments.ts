@@ -22,7 +22,8 @@ import {
     fail,
     reportError,
     type CloudClient,
-    cloudRows
+    cloudRows,
+    cloudRow
 } from "./context";
 
 /** A deployment row, as the data API hands it back (camel or snake columns). */
@@ -360,6 +361,30 @@ export function resolveDeploymentIdArg(rawArgs: string[], command: string) {
 id: positionals[0] };
 }
 
+/**
+ * One deployment by id, when it belongs to `projectId`; undefined otherwise.
+ *
+ * A read that fails is "not found" too: the caller's refusal says so, and the
+ * control plane checks the same ownership again before rolling back.
+ */
+async function deploymentOfProject(
+    client: CloudClient,
+    deploymentId: string,
+    projectId: string
+): Promise<DeploymentRow | undefined> {
+    let row: Record<string, unknown> | undefined;
+    try {
+        row = (await client.data.collection("deployments").findById(deploymentId)) as Record<string, unknown> | undefined;
+    } catch {
+        return undefined;
+    }
+    if (!row) return undefined;
+    const owner = row.project ?? row.projectId ?? row.project_id;
+    const ownerId = typeof owner === "object" && owner !== null && "id" in owner ? owner.id : owner;
+    if (ownerId !== undefined && ownerId !== null && String(ownerId) !== projectId) return undefined;
+    return cloudRow<DeploymentRow>(row);
+}
+
 export async function rollbackCommand(rawArgs: string[]): Promise<void> {
     // `rollback [deploymentId]` — the id, when given, is the only argument.
     const { flags: args, id: explicitId } = resolveDeploymentIdArg(rawArgs, "cloud rollback");
@@ -380,7 +405,9 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
     // deliberate exit, never a server error to re-wrap.
     let target: DeploymentRow | undefined;
     if (explicitId) {
-        target = rows!.find((d) => String(d.id) === explicitId);
+        // The page is the newest 100. An id named outright may be older, so it
+        // is read on its own before it is called missing.
+        target = rows!.find((d) => String(d.id) === explicitId) ?? await deploymentOfProject(client, explicitId, projectId);
         if (!target) fail(`Deployment ${explicitId} not found for project ${projectRef}.`, undefined, "not_found");
         // Refuse locally rather than let the server 409 — this is the safety
         // contract, mirrored from the backend's rollback rule.

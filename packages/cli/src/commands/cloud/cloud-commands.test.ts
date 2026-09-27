@@ -386,6 +386,61 @@ find: async () => ({ data: rows }) }));
         const parsed = JSON.parse(cap.output().trim());
         expect(parsed.rolledBackTo).toBe("d2");
     });
+
+    /**
+     * The history page is the newest 100 deploys, and an id named outright was
+     * looked up only there: on a project with more, `rollback <older id>` said
+     * "not found" for a deployment the control plane would have rolled back to.
+     */
+    describe("an id older than the history page", () => {
+        function clientWith(older: Record<string, unknown> | undefined, invoke: ReturnType<typeof vi.fn>) {
+            const client = fakeClient({ invoke, find: async () => ({ data: rows }) });
+            return {
+                ...client,
+                data: {
+                    collection: (name: string) => ({
+                        ...client.data.collection(name),
+                        findById: async (id: string) => (name === "deployments" && id === older?.id ? older : undefined)
+                    })
+                }
+            };
+        }
+
+        it("is read on its own and rolled back to", async () => {
+            const invoke = vi.fn(async (_n: string, body: unknown) => ({
+                success: true,
+                deployment: { id: "d4" },
+                rolledBackTo: (body as { deploymentId?: string }).deploymentId,
+                imageUrl: "img:0"
+            }));
+            useClient(clientWith({ id: "d0", status: "success", imageUrl: "img:0", projectId: "proj_1" }, invoke));
+
+            const cap = captureStdout();
+            await rollbackCommand(["node", "rebase", "cloud", "rollback", "d0", "--yes", "--json"]);
+            cap.restore();
+
+            expect(invoke).toHaveBeenCalledTimes(1);
+            expect((invoke.mock.calls[0][1] as { deploymentId: string }).deploymentId).toBe("d0");
+        });
+
+        it("is not found when it belongs to another project", async () => {
+            const invoke = vi.fn(async () => ({}));
+            useClient(clientWith({ id: "d0", status: "success", imageUrl: "img:0", projectId: "proj_2" }, invoke));
+
+            const cap = captureStdout();
+            const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+                throw new Error("__exit__");
+            }) as never);
+            await expect(
+                rollbackCommand(["node", "rebase", "cloud", "rollback", "d0", "--yes", "--json"])
+            ).rejects.toThrow("__exit__");
+            cap.restore();
+            exit.mockRestore();
+
+            expect(invoke).not.toHaveBeenCalled();
+            expect(JSON.parse(cap.output().trim()).error.code).toBe("not_found");
+        });
+    });
 });
 
 /* ── db info: password hidden unless --reveal ───────────────────── */
