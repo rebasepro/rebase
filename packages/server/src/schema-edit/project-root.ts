@@ -97,7 +97,25 @@ export function commitPathsFor(
 export function usesVersionedMigrations(collectionsDir: string): boolean {
     const projectRoot = findProjectRoot(collectionsDir);
     if (!projectRoot) return false;
-    const dir = path.join(projectRoot, "drizzle", "migrations");
+    return MIGRATION_DIRS.some(relative => holdsMigrations(path.join(projectRoot, relative)));
+}
+
+/**
+ * Where a project's migrations can be, project-relative.
+ *
+ * The driver writes `drizzle/migrations/` relative to the directory it runs in,
+ * and every `rebase db` subcommand runs it from the backend, which the CLI takes
+ * to be `backend/` — so that is where a scaffolded project keeps them. Looking
+ * only at the project root answered "no migrations" for every one of those, and
+ * the warning this feeds never appeared. The root stays on the list because the
+ * driver run from there writes there.
+ */
+const MIGRATION_DIRS = [
+    path.join("backend", "drizzle", "migrations"),
+    path.join("drizzle", "migrations")
+];
+
+function holdsMigrations(dir: string): boolean {
     try {
         return fs.existsSync(dir) && fs.readdirSync(dir).some(f => f.endsWith(".sql"));
     } catch {

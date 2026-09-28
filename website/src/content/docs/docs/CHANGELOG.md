@@ -42,6 +42,16 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+#### Server & REST
+
+- **A live schema edit now reminds a project that keeps migrations to run
+  `rebase db generate`.** The reminder only appeared when migrations were in
+  `drizzle/migrations/` at the project root. `rebase db generate` writes them
+  next to the backend, in `backend/drizzle/migrations/`, so in a scaffolded
+  project the reminder never appeared. The change reached the database and
+  the repository, but the next environment built from migrations did not get
+  it. Both places are checked now.
+
 #### Admin (CMS & app)
 
 - **The list view keeps its scroll position when you come back from a record

@@ -13,7 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { findProjectRoot, commitPathsFor } from "../src/schema-edit/project-root";
+import { findProjectRoot, commitPathsFor, usesVersionedMigrations } from "../src/schema-edit/project-root";
 
 const made: string[] = [];
 
@@ -107,5 +107,51 @@ describe("relocating the commit paths", () => {
         for (const value of Object.values(paths ?? {})) {
             expect(value).not.toContain("\\");
         }
+    });
+});
+
+/**
+ * Whether the live editor has to say "run `rebase db generate`" after applying.
+ *
+ * Asked of the directory the migrations are really in. Every `rebase db`
+ * subcommand runs the driver from the backend directory, and the driver writes
+ * `drizzle/migrations/` relative to where it runs — so a scaffolded project
+ * keeps them in `backend/drizzle/migrations/`, as this repository's own demo
+ * does. Looking only at the project root answered "no migrations" for every
+ * such project, and the warning never appeared.
+ */
+describe("knowing whether a project replays migrations", () => {
+    const withFile = (root: string, file: string) => {
+        fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
+        fs.writeFileSync(path.join(root, file), "CREATE TABLE posts ();\n");
+    };
+
+    it("finds them beside the backend, where `rebase db generate` writes them", () => {
+        const root = tree(["config/collections"], "");
+        withFile(root, "backend/drizzle/migrations/0001_init.sql");
+        expect(usesVersionedMigrations(path.join(root, "config/collections"))).toBe(true);
+    });
+
+    it("finds them at the project root, where the driver writes when run from there", () => {
+        const root = tree(["config/collections"], "");
+        withFile(root, "drizzle/migrations/0001_init.sql");
+        expect(usesVersionedMigrations(path.join(root, "config/collections"))).toBe(true);
+    });
+
+    it("finds them for a project in a subdirectory of its repository", () => {
+        const root = tree(["app/config/collections"], "app");
+        withFile(root, "app/backend/drizzle/migrations/0001_init.sql");
+        expect(usesVersionedMigrations(path.join(root, "app/config/collections"))).toBe(true);
+    });
+
+    it("says no when the directory holds no migration, only Atlas's bookkeeping", () => {
+        const root = tree(["config/collections"], "");
+        withFile(root, "backend/drizzle/migrations/atlas.sum");
+        expect(usesVersionedMigrations(path.join(root, "config/collections"))).toBe(false);
+    });
+
+    it("says no for a project with no migrations directory at all", () => {
+        const root = tree(["config/collections", "backend/src"], "");
+        expect(usesVersionedMigrations(path.join(root, "config/collections"))).toBe(false);
     });
 });
