@@ -404,7 +404,9 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         setSortBy,
         filterValues,
         checkFilterCombination,
-        searchString
+        searchString,
+        onScroll,
+        initialScroll
     } = tableController;
 
     const resolvedCollection = collection;
@@ -852,6 +854,10 @@ position });
                 highlightedIds={highlightedIds}
                 selectionEnabled={selectionEnabled}
                 emptyComponent={emptyComponent}
+                // Opening a record full screen unmounts this list; the
+                // controller keeps where it was, and these hand it back.
+                onScroll={onScroll}
+                initialScroll={initialScroll}
                 size={size}
                 selectedEntityId={selectedEntityId}
                 header={header}

@@ -6,6 +6,7 @@ import {
 import { cls } from "../util";
 
 import { CollectionSize } from "./ListView";
+import { getScrollParent, useScrollParentRestoration, type ViewScrollEvent } from "./useScrollParentRestoration";
 
 export type CardViewProps<T> = {
     data: T[];
@@ -23,11 +24,7 @@ export type CardViewProps<T> = {
     selectionEnabled?: boolean;
     onSelectionChange?: (item: T, selected: boolean) => void;
 
-    onScroll?: (props: {
-        scrollDirection: "forward" | "backward";
-        scrollOffset: number;
-        scrollUpdateWasRequested: boolean;
-    }) => void;
+    onScroll?: (props: ViewScrollEvent) => void;
     initialScroll?: number;
 
     size?: CollectionSize;
@@ -65,19 +62,6 @@ function getGridColumnsClass(size: CollectionSize): string {
     }
 }
 
-function getScrollParent(element: HTMLElement | null): HTMLElement | null {
-    if (!element) return null;
-    let parent = element.parentElement;
-    while (parent) {
-        const overflowY = window.getComputedStyle(parent).overflowY;
-        if (overflowY === "auto" || overflowY === "scroll") {
-            return parent;
-        }
-        parent = parent.parentElement;
-    }
-    return document.documentElement;
-}
-
 export function CardView<T>({
     data,
     dataLoading = false,
@@ -101,7 +85,6 @@ export function CardView<T>({
     emptyComponent
 }: CardViewProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const hasRestoredScroll = useRef(false);
     const isLoadingMore = useRef(false);
 
     // Sync mutable ref with pagination settings to avoid resetting listeners
@@ -153,51 +136,7 @@ export function CardView<T>({
         };
     }, [setItemCount]);
 
-    // Scroll restoration
-    useEffect(() => {
-        if (!containerRef.current || !initialScroll || hasRestoredScroll.current || data.length === 0) return;
-
-        const scrollEl = getScrollParent(containerRef.current);
-        if (!scrollEl) return;
-
-        let attempts = 0;
-        const maxAttempts = 5;
-
-        const tryRestore = () => {
-            if (scrollEl.scrollHeight >= initialScroll || attempts >= maxAttempts) {
-                scrollEl.scrollTop = initialScroll;
-                hasRestoredScroll.current = true;
-            } else {
-                attempts++;
-                requestAnimationFrame(tryRestore);
-            }
-        };
-
-        requestAnimationFrame(tryRestore);
-    }, [initialScroll, data.length]);
-
-    // Scroll tracking: call onScroll callback
-    const lastScrollOffset = useRef(0);
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el || !onScroll) return;
-        const scrollEl = getScrollParent(el);
-        if (!scrollEl) return;
-
-        const handleScroll = () => {
-            const currentOffset = scrollEl.scrollTop;
-            const direction = currentOffset > lastScrollOffset.current ? "forward" : "backward";
-            lastScrollOffset.current = currentOffset;
-            onScroll({
-                scrollDirection: direction,
-                scrollOffset: currentOffset,
-                scrollUpdateWasRequested: false
-            });
-        };
-
-        scrollEl.addEventListener("scroll", handleScroll, { passive: true });
-        return () => scrollEl.removeEventListener("scroll", handleScroll);
-    }, [onScroll]);
+    useScrollParentRestoration({ containerRef, initialScroll, onScroll, dataLength: data.length });
 
     const getItemId = useCallback((item: T): string | number => {
         if (item && typeof item === "object" && "id" in item) {

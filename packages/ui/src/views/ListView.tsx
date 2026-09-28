@@ -4,6 +4,7 @@ import {
     Typography
 } from "../components";
 import { cls } from "../util";
+import { getScrollParent, useScrollParentRestoration, type ViewScrollEvent } from "./useScrollParentRestoration";
 
 export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
 
@@ -32,6 +33,14 @@ export type ListViewProps<T> = {
     selectionEnabled?: boolean;
     onSelectionChange?: (item: T, selected: boolean) => void;
     emptyComponent?: React.ReactNode;
+
+    /**
+     * Called with the scroll parent's offset as it scrolls, and restored from
+     * `initialScroll` on mount — the list does not scroll itself, the page
+     * around it does.
+     */
+    onScroll?: (props: ViewScrollEvent) => void;
+    initialScroll?: number;
 
     size?: CollectionSize;
     selectedEntityId?: string | number;
@@ -70,21 +79,6 @@ function getEstimatedRowHeight(size: CollectionSize): number {
 const OVERSCAN_COUNT = 8;
 const LOAD_MORE_THRESHOLD = 400;
 
-function getScrollParent(element: HTMLElement | null): HTMLElement | null {
-    let parent = element?.parentElement ?? null;
-    while (parent) {
-        const style = getComputedStyle(parent);
-        if (
-            style.overflowY === "auto" || style.overflowY === "scroll" ||
-            style.overflow === "auto" || style.overflow === "scroll"
-        ) {
-            return parent;
-        }
-        parent = parent.parentElement;
-    }
-    return document.documentElement;
-}
-
 export function ListView<T>({
     data,
     dataLoading = false,
@@ -102,6 +96,8 @@ export function ListView<T>({
     onSelectionChange,
     emptyComponent,
 
+    onScroll,
+    initialScroll,
     size = "m",
     selectedEntityId,
     header,
@@ -158,21 +154,23 @@ export function ListView<T>({
             }
         };
 
-        const onScroll = () => {
+        const onScrollEvent = () => {
             if (rafId === null) rafId = requestAnimationFrame(update);
         };
 
-        scrollEl.addEventListener("scroll", onScroll, { passive: true });
+        scrollEl.addEventListener("scroll", onScrollEvent, { passive: true });
         const ro = new ResizeObserver(() => update());
         ro.observe(scrollEl);
         update();
 
         return () => {
-            scrollEl.removeEventListener("scroll", onScroll);
+            scrollEl.removeEventListener("scroll", onScrollEvent);
             ro.disconnect();
             if (rafId !== null) cancelAnimationFrame(rafId);
         };
     }, [setItemCount]);
+
+    useScrollParentRestoration({ containerRef, initialScroll, onScroll, dataLength: data.length });
 
     const totalHeight = data.length * estimatedRowHeight;
     const startIndex = Math.max(0, Math.floor(effectiveScrollTop / estimatedRowHeight) - OVERSCAN_COUNT);

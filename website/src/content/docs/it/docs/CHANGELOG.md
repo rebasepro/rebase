@@ -11,6 +11,17 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+### Fixed
+
+#### Admin (CMS & app)
+
+- **The list view keeps its scroll position when you come back from a record
+  opened full screen.** Full screen replaces the collection view, and the list
+  view, unlike the table and card views, never saved or restored its offset.
+  Going back landed at the top with only the first page loaded. It now returns
+  to the same rows. The card view also stops jumping back slightly the first
+  time more rows load after a fresh visit.
+
 ## [0.23.0] - 2026-09-27
 
 ### Breaking
