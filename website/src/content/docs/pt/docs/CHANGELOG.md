@@ -11,6 +11,39 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+### Breaking
+
+#### CLI
+
+- **`rebase db push` and `rebase db generate` write their SQL to `.rebase/sql/`
+  instead of `drizzle/`.** This covers `schema.sql`, `policies.sql`,
+  `search.sql`, `vector.sql` and `triggers.sql`. Both commands regenerate these
+  files from the collections before reading them, so the copy in the
+  repository was never read, and it showed up in the diff of every collection
+  change. The new directory ignores itself and is not committed. On the first
+  run after upgrading, the command deletes the old generated copies in
+  `drizzle/` and names them, so you can commit the deletion. A file there that
+  the generator did not write is kept, and so are the migrations. If one of
+  your scripts reads `drizzle/policies.sql`, point it at
+  `.rebase/sql/policies.sql` and run `rebase db push` or `rebase db generate`
+  first.
+
+- **`rebase dev --generate` is removed, because what it did is now the
+  default.** `rebase dev` regenerates the SDK types in `generated/sdk/` on
+  start and on every save under `config/collections/`, as it already did for
+  the Drizzle schema. Before this, the SDK was only regenerated with the flag,
+  so a fresh clone had no SDK types until someone ran `rebase generate-sdk`.
+  Passing `--generate` or `-g` now stops with a message telling you to drop
+  it, and `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` are no longer read.
+
+#### Server & REST
+
+- **A live schema edit commits the collection and `schema.generated.ts`, and
+  no SQL.** The commit also carried the five SQL files, but it wrote them at
+  the project root while the CLI writes them next to the backend, so a project
+  could hold two copies that disagreed. `SchemaCommitPaths` and
+  `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
+
 ### Fixed
 
 #### Admin (CMS & app)

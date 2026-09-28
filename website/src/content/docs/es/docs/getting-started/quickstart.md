@@ -1,5 +1,5 @@
 ---
-sourceHash: 7b2e4e449b0ca1dc
+sourceHash: ff637239bf2fa695
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -163,7 +163,7 @@ export const collections = [
 
 ## Crea la tabla
 
-Guarda el archivo. Eso es todo: `rebase dev` regenera `backend/src/schema.generated.ts` a partir de tus colecciones, reinicia el backend y el arranque crea la nueva tabla, por lo que tu colección **Products** aparecerá en la navegación.
+Guarda el archivo. Eso es todo: `rebase dev` regenera `backend/src/schema.generated.ts` y los tipos del SDK en `generated/sdk/` a partir de tus colecciones, reinicia el backend y el arranque crea la nueva tabla, por lo que tu colección **Products** aparecerá en la navegación.
 
 Lo mismo ocurre con una propiedad añadida a una colección que ya tienes: guarda y la columna estará allí.
 

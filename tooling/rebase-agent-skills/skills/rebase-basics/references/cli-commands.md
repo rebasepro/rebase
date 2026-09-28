@@ -65,7 +65,6 @@ rebase init my-app --yes --database-url "postgresql://user:pass@host:5432/db" --
 | `--backend-only` | `-b` | Only start the backend server |
 | `--frontend-only` | `-f` | Only start the frontend server |
 | `--port` | `-P` | Set the backend port (default: deterministic per-project hash) |
-| `--generate` | `-g` | Auto-regenerate schema + SDK on startup and file changes |
 
 > **IMPORTANT FOR AGENTS:** Each project automatically receives a **unique default port** derived from its directory path (range 3001–3999), preventing collisions when running multiple Rebase instances. The resolved port is saved to `.rebase-dev-port` for affinity across restarts. The backend URL is saved to `.rebase-dev-url` so scripts can read it. The frontend receives `VITE_API_URL` automatically.
 
@@ -75,9 +74,7 @@ rebase init my-app --yes --database-url "postgresql://user:pass@host:5432/db" --
 3. Previously saved port from `.rebase-dev-port` (port affinity)
 4. Deterministic hash from project path (unique per project)
 
-**Auto-generation:** Disabled by default. Enable with `--generate` or by setting `REBASE_AUTO_GENERATE=true` / `REBASE_GENERATE=true` in your environment. When enabled, the CLI:
-- Runs `schema generate` + `generate-sdk` once on startup
-- Watches `config/collections/` for file changes and regenerates automatically
+**Generated files stay current on their own.** On startup and on every save under `config/collections/`, the CLI regenerates the Drizzle schema (`backend/src/schema.generated.ts`) and the SDK types (`generated/sdk/`). There is no flag for it and nothing to run by hand.
 
 ```bash
 # Start everything (default)
@@ -85,9 +82,6 @@ rebase dev
 
 # Backend only on a specific port
 rebase dev --backend-only --port 3005
-
-# With auto-generation of schema/SDK on collection file changes
-rebase dev --generate
 ```
 
 ### `rebase build`

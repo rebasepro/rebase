@@ -68,6 +68,11 @@ Generate a fully typed client from your collection definitions:
 rebase generate-sdk
 ```
 
+While `rebase dev` is running you do not need to: it regenerates the types in
+`generated/sdk/` on start and on every save under `config/collections/`. Run the
+command yourself in CI, in a frontend repository that has no collections
+(`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
+
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
 
 ```typescript

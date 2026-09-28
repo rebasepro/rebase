@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fb63312e30e41a2
+sourceHash: a6d76e5410cf6910
 title: Struttura del progetto
 sidebar_label: Struttura del progetto
 description: Comprendi la struttura di un progetto Rebase — frontend, backend e configurazione delle collection.
@@ -175,7 +175,7 @@ Lo `slug` diventa il percorso URL nell'interfaccia di amministrazione e l'endpoi
 3. **Il frontend** le legge (tramite il plugin Vite) per renderizzare tabelle, moduli e navigazione
 4. **La CLI** le legge per generare i file di migrazione con `rebase schema generate`
 
-Mentre `rebase dev` è in esecuzione, il salvataggio di un file all'interno di `config/collections/` rigenera `backend/src/schema.generated.ts` e riavvia il backend; all'avvio vengono create le tabelle e le colonne mancanti. Al di fuori di `rebase dev`, la stessa operazione corrisponde a `rebase schema generate`.
+Mentre `rebase dev` è in esecuzione, il salvataggio di un file all'interno di `config/collections/` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` e riavvia il backend; all'avvio vengono create le tabelle e le colonne mancanti. Al di fuori di `rebase dev`, gli stessi passaggi corrispondono a `rebase schema generate` e `rebase generate-sdk`.
 
 ## Prossimi passi
 

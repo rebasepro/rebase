@@ -412,7 +412,7 @@ trigger a seed script, a migration backfill or one row fixed in `psql` left the
 column claiming the row had not changed, and anything reading it to decide what
 to re-index or re-send skipped that row.
 
-The trigger lives in `drizzle/triggers.sql`, applied by `rebase db push` and at
+The trigger is generated into `.rebase/sql/triggers.sql`, applied by `rebase db push` and at
 boot by the schema ensure — Atlas cannot manage it, for the same reason it
 cannot manage the full-text search helpers.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: df84abf06690d9ce
+sourceHash: bc6c73dcfd10b400
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."
@@ -189,7 +189,7 @@ Rebase speichert und durchsucht Embeddings, berechnet sie jedoch nicht.
   weist sie mit `type "vector" does not exist` auf einer Datenbank ab, die keines
   von beidem hat, und nennt dabei beide Auswege.
 
-Die Spalte, ihr ANN-Index und das `CREATE EXTENSION` werden in `drizzle/vector.sql`
+Die Spalte, ihr ANN-Index und das `CREATE EXTENSION` werden in `.rebase/sql/vector.sql`
 generiert, neben `schema.sql` und `policies.sql`, und `rebase db push` wendet sie
 für Sie an. Sie haben eine eigene Datei, da Atlas — die Engine hinter `db push` —
 seinen Diff berechnet, indem es `schema.sql` in einer temporären Scratch-Datenbank

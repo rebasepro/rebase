@@ -1,5 +1,5 @@
 ---
-sourceHash: 7253b4b5232fa542
+sourceHash: dbaee87f7378ffd7
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -48,7 +48,7 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts", "drizzle/schema.sql"]
+  "files": ["backend/src/schema.generated.ts"]
 }
 ```
 
@@ -117,12 +117,11 @@ fazer em vez disso.
 
 ## O que é comitado
 
-Não apenas o arquivo da coleção. Uma alteração de schema mexe em vários
-artefatos gerados, e um desatualizado quebra o próximo deploy:
+Não apenas o arquivo da coleção. O schema Drizzle é gerado a partir dele, e um
+desatualizado quebra o próximo deploy, então os dois vão no mesmo commit:
 
 - `config/collections/<name>.ts` — a própria coleção
 - `backend/src/schema.generated.ts` — o schema Drizzle
-- `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
 Esses caminhos são relativos ao seu **projeto**, não ao seu repositório. Quando
 os dois são a mesma coisa — um projeto `rebase init`, que é o caso comum —, não
@@ -130,6 +129,9 @@ há nada com o que se preocupar. Quando o seu projeto fica em um subdiretório d
 um repositório maior, os caminhos recebem o prefixo dele, localizado ao subir a
 partir do diretório de coleções até o `rebase.json` mais próximo. Um projeto sem
 `rebase.json` mantém os caminhos simples.
+
+Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o próprio
+SQL a partir das coleções a cada execução, em `.rebase/sql/`, que fica no gitignore.
 
 A mensagem de commit descreve a alteração em vez de simplesmente anunciar uma, e
 é atribuída ao administrador que a realizou. Uma alteração de schema com autor e
@@ -190,9 +192,8 @@ formato do Atlas com um arquivo de integridade, gerado por um binário externo
 contra um banco de dados temporário, e um servidor em execução não possui nenhum
 dos dois.
 
-O que ele grava é `drizzle/schema.sql` — que é exatamente contra o que o
-`rebase db generate` gera diffs. Portanto, a migração está a apenas um comando de
-distância:
+O que ele comita é a coleção, e é a partir dela que o `rebase db generate`
+grava a migração. Portanto, a migração está a apenas um comando de distância:
 
 ```bash
 rebase db generate

@@ -100,8 +100,8 @@ export interface LiveSchemaRoutesConfig {
      *
      * Absent for a project that *is* the repository, which is what the defaults
      * describe. Present for one in a subdirectory, where the defaults would
-     * write `backend/` and `drizzle/` beside `.git` and leave the project's real
-     * generated files untouched — committing a source change alongside a stale
+     * write `backend/` beside `.git` and leave the project's real generated
+     * file untouched — committing a source change alongside a stale
      * schema, which is the failure committing the whole change exists to avoid.
      */
     commitPaths?: Partial<SchemaCommitPaths>;
@@ -110,8 +110,8 @@ export interface LiveSchemaRoutesConfig {
      * environment.
      *
      * If it does, applying here is not the whole job: the DDL runs against
-     * *this* database and `drizzle/schema.sql` is committed, but no migration
-     * is written — a server cannot mint one, since that needs Atlas and a
+     * *this* database and the collection is committed, but no migration is
+     * written — a server cannot mint one, since that needs Atlas and a
      * throwaway database. The next environment built by replaying migrations
      * would not have this change, and nothing would have said so.
      */
@@ -472,8 +472,8 @@ function followUpFor(config: LiveSchemaRoutesConfig, statements: string[]): stri
     return [
         "This project keeps versioned migrations, and applying here does not write one — " +
         "a migration needs Atlas and a throwaway database, which a running server does not " +
-        "have. `drizzle/schema.sql` has been committed and is what Atlas diffs against, so " +
-        "run `rebase db generate` to record this change. Without it, the next environment " +
+        "have. The collection has been committed, and `rebase db generate` writes the migration " +
+        "from it, so run that to record this change. Without it, the next environment " +
         "built by replaying migrations will not have it."
     ];
 }

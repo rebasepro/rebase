@@ -83,8 +83,10 @@ section is background; this is the actual sequence.
    `rebase build` and the runtime all read the barrel, never the directory
    listing, so a collection left out of it fails silently rather than loudly.
 3. `rebase schema generate` — collections become
-   `backend/src/schema.generated.ts`. `rebase dev` does this for you on every
-   restart, so on a running dev server the step is a way to see the file now.
+   `backend/src/schema.generated.ts`. `rebase dev` does this for you on start
+   and on every save under `config/collections/`, together with the SDK types in
+   `generated/sdk/`, so on a running dev server the step is a way to see the
+   file now.
 4. **On the managed database: nothing.** Boot creates the new table. Restart
    `rebase dev` (or let it restart itself) and the collection is there.
    With your own `DATABASE_URL`: `rebase db push` in development, or

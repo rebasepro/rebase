@@ -33,7 +33,7 @@ const SAFE_PLAN: LiveSchemaPlan = {
         detail: 'New optional property "subtitle" — adds column "subtitle".'
     }],
     statements: ['ALTER TABLE "public"."posts" ADD COLUMN IF NOT EXISTS "subtitle" TEXT;'],
-    files: ["backend/src/collections/posts.ts", "drizzle/schema.sql"],
+    files: ["backend/src/collections/posts.ts", "backend/src/schema.generated.ts"],
     message: "feat(schema): add subtitle to posts",
     withheldConstraints: []
 };

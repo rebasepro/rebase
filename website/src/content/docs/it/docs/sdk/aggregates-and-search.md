@@ -1,5 +1,5 @@
 ---
-sourceHash: df84abf06690d9ce
+sourceHash: bc6c73dcfd10b400
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -181,7 +181,7 @@ cerca gli embedding, non li calcola.
   le soluzioni possibili.
 
 La colonna, il suo indice ANN e quel `CREATE EXTENSION` vengono generati all'interno di
-`drizzle/vector.sql`, accanto a `schema.sql` e `policies.sql`, e `rebase db
+`.rebase/sql/vector.sql`, accanto a `schema.sql` e `policies.sql`, e `rebase db
 push` li applica automaticamente. Risiedono in un file separato perché Atlas — il
 motore alla base di `db push` — calcola il proprio diff materializzando `schema.sql` in un
 database temporaneo (scratch) che viene cancellato all'inizio di ogni esecuzione, quindi un `VECTOR(n)` lì dentro

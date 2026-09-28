@@ -108,31 +108,27 @@ describe("additiveStatements — the delta between two ensure plans", () => {
 });
 
 describe("generateSchemaCommit", () => {
-    it("writes every generated artifact a deploy depends on", async () => {
+    it("writes the generated schema and nothing the CLI regenerates anyway", async () => {
+        // `schema.sql`, `policies.sql` and the rest are rendered by `db push` and
+        // `db generate` into the gitignored `.rebase/sql/` before either reads
+        // them. A commit that carries them adds a copy nothing reads — at the
+        // project root, where the CLI never looks.
         const commit = await generateSchemaCommit({
             before: [],
             after: [collection("posts", { title: str() })]
         });
 
-        expect(commit.files.map(f => f.path).sort()).toEqual([
-            DEFAULT_COMMIT_PATHS.ddlFile,
-            DEFAULT_COMMIT_PATHS.policiesFile,
-            DEFAULT_COMMIT_PATHS.schemaFile,
-            DEFAULT_COMMIT_PATHS.searchFile,
-            DEFAULT_COMMIT_PATHS.triggersFile,
-            DEFAULT_COMMIT_PATHS.vectorFile
-        ].sort());
+        expect(commit.files.map(f => f.path)).toEqual([DEFAULT_COMMIT_PATHS.schemaFile]);
+        expect(commit.files.some(f => f.path.endsWith(".sql"))).toBe(false);
     });
 
-    it("generates the real artifacts, not placeholders", async () => {
+    it("generates the real artifact, not a placeholder", async () => {
         const commit = await generateSchemaCommit({
             before: [],
             after: [collection("posts", { title: str() })]
         });
-        const ddl = commit.files.find(f => f.path === DEFAULT_COMMIT_PATHS.ddlFile)!;
         const schema = commit.files.find(f => f.path === DEFAULT_COMMIT_PATHS.schemaFile)!;
 
-        expect(ddl.contents).toMatch(/CREATE TABLE[\s\S]*posts/i);
         expect(schema.contents).toContain("posts");
         expect(schema.contents.length).toBeGreaterThan(50);
     });
@@ -146,7 +142,7 @@ describe("generateSchemaCommit", () => {
         });
 
         expect(commit.files[0]).toEqual(source);
-        expect(commit.files).toHaveLength(7);
+        expect(commit.files).toHaveLength(2);
     });
 
     it("honours custom paths", async () => {
@@ -155,9 +151,7 @@ describe("generateSchemaCommit", () => {
             after: [collection("posts")],
             paths: { schemaFile: "src/generated/schema.ts" }
         });
-        expect(commit.files.some(f => f.path === "src/generated/schema.ts")).toBe(true);
-        // The unnamed ones keep their defaults.
-        expect(commit.files.some(f => f.path === DEFAULT_COMMIT_PATHS.ddlFile)).toBe(true);
+        expect(commit.files.map(f => f.path)).toEqual(["src/generated/schema.ts"]);
     });
 
     it("reports the statements alongside the files", async () => {
@@ -168,11 +162,11 @@ describe("generateSchemaCommit", () => {
         expect(commit.statements.some(s => /ADD COLUMN[\s\S]*subtitle/i.test(s))).toBe(true);
     });
 
-    it("still writes the artifacts when the change needs no DDL", async () => {
+    it("still writes the generated schema when the change needs no DDL", async () => {
         const same = [collection("posts", { title: str() })];
         const commit = await generateSchemaCommit({ before: same, after: same });
         expect(commit.statements).toEqual([]);
-        expect(commit.files).toHaveLength(6);
+        expect(commit.files.map(f => f.path)).toEqual([DEFAULT_COMMIT_PATHS.schemaFile]);
     });
 });
 

@@ -162,9 +162,10 @@ export async function findRunningDaemon(projectRoot: string): Promise<DaemonStat
  * A hidden subcommand rather than a second build entry: under `tsx` this file
  * is `src/dev-db/daemon.ts` and in a published CLI it is bundled into
  * `dist/index.js`, and in both cases the executable to re-invoke is the one
- * already running.
+ * already running. `rebase dev` re-runs itself the same way to regenerate the
+ * SDK types.
  */
-function resolveCliEntry(): string {
+export function resolveCliEntry(): string {
     // `process.argv[1]` is `bin/rebase.js` for a real invocation, which is
     // exactly what should be re-run. Under a test runner it is the runner, so
     // fall back to this module's own directory.

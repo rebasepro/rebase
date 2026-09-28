@@ -1,5 +1,5 @@
 ---
-sourceHash: 476cbf3fe099d5c3
+sourceHash: 3c5a26968b75b8b0
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -413,7 +413,7 @@ déclencheur, un script de seed, un rétro-remplissage de migration ou une ligne
 colonne prétendre que la ligne n'a pas changé, et tout processus la lisant pour décider quoi
 réindexer ou renvoyer ignorerait cette ligne.
 
-Le déclencheur réside dans `drizzle/triggers.sql`, appliqué par `rebase db push` et au
+Le déclencheur est généré dans `.rebase/sql/triggers.sql`, appliqué par `rebase db push` et au
 démarrage par la vérification du schéma — Atlas ne peut pas le gérer, pour la même raison qu'il
 ne peut pas gérer les utilitaires de recherche textuelle intégrale (full-text search).
 

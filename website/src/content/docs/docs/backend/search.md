@@ -96,7 +96,7 @@ Postgres recomputes the column on every write of a source field and refuses any
 attempt to write it directly, so the index cannot drift from the row. The column
 is never returned by the API.
 
-They are generated into `drizzle/search.sql`, next to `schema.sql` and
+They are generated into `.rebase/sql/search.sql`, next to `schema.sql` and
 `policies.sql`, and `rebase db push` applies them for you — nothing extra to
 run. They get their own file because a generated `tsvector` column needs an
 `IMMUTABLE` helper function to exist first (`unaccent` is only `STABLE`, and
@@ -107,7 +107,8 @@ One consequence worth knowing if you deploy by migration rather than by push:
 adding a `search` block on its own produces no migration, because the schema
 Atlas compares has not changed. `rebase db generate` says so when it happens.
 The block is still applied by `rebase db push` and by the boot-time schema
-ensure; to put it in a migration explicitly, append `drizzle/search.sql` to one.
+ensure; to put it in a migration explicitly, append `.rebase/sql/search.sql`,
+which `rebase db generate` has just written, to one.
 
 ### Changing the block later
 

@@ -33,7 +33,7 @@ const collection = (slug: string, properties: Record<string, unknown> = {}): Col
     ({ slug, name: slug, properties }) as unknown as CollectionConfig;
 
 const okPlan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
-    files: [{ path: "drizzle/schema.sql", contents: "CREATE TABLE posts ();" }],
+    files: [{ path: "backend/src/schema.generated.ts", contents: "export const tables = {};" }],
     statements: ['ALTER TABLE "public"."posts" ADD COLUMN IF NOT EXISTS "subtitle" TEXT;'],
     classified: { changes: [], verdict: "safe", applicable: true },
     message: "feat(schema): add subtitle to posts",
@@ -150,7 +150,7 @@ describe("POST /plan", () => {
         expect(await res.json()).toMatchObject({
             applicable: true,
             verdict: "safe",
-            files: ["drizzle/schema.sql"]
+            files: ["backend/src/schema.generated.ts"]
         });
         // Planned, and nothing else.
         expect(events).toEqual(["plan"]);
@@ -196,7 +196,7 @@ describe("POST /apply", () => {
             })
         });
         await post("/apply", change);
-        expect(staged).toEqual(["config/collections/posts.ts", "drizzle/schema.sql"]);
+        expect(staged).toEqual(["config/collections/posts.ts", "backend/src/schema.generated.ts"]);
     });
 
     it("writes NOTHING when the change is refused", async () => {
@@ -233,7 +233,7 @@ describe("POST /apply", () => {
             getRepository: () => ({
                 root: "/tmp/project",
                 currentBranch: async () => "main",
-                dirtyPaths: async () => ["drizzle/schema.sql"],
+                dirtyPaths: async () => ["backend/src/schema.generated.ts"],
                 writeFiles: async () => undefined,
                 commit: async () => "sha"
             })
@@ -504,7 +504,7 @@ describe("writing the source without tripping the dirty check", () => {
         committed = ((await res.json()) as { committed: { files: string[] } }).committed.files;
 
         expect(committed).toContain("config/collections/posts.ts");
-        expect(committed).toContain("drizzle/schema.sql");
+        expect(committed).toContain("backend/src/schema.generated.ts");
     });
 
     it("still refuses when somebody else's work is in the way", async () => {
@@ -651,9 +651,9 @@ describe("the collection id", () => {
  *
  * Live editing cannot write a migration: that is Atlas's format with an
  * integrity file, minted by an external binary against a throwaway database,
- * and a running server has neither. What it *does* write is
- * `drizzle/schema.sql`, which is exactly what `rebase db generate` diffs
- * against — so the migration is one command away, and the only real hazard is
+ * and a running server has neither. What it *does* write is the collection,
+ * which is exactly what `rebase db generate` renders its migration from — so
+ * the migration is one command away, and the only real hazard is
  * nobody saying so. A project that deploys by replaying migrations would build
  * its next environment without this change, having been told it was applied.
  */

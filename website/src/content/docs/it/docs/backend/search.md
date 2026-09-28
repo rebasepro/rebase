@@ -1,5 +1,5 @@
 ---
-sourceHash: b40aeb5aa87322cc
+sourceHash: bd5c3797254d822d
 title: Ricerca
 sidebar_label: Ricerca
 description: Come si comporta .search() per impostazione predefinita e come abilitare la ricerca full-text con ranking per una collection Postgres sui campi specificati — inclusi contenuti JSONB e array.
@@ -75,9 +75,9 @@ const { data } = await client.data.talents
 
 Una colonna `tsvector`, `GENERATED ALWAYS AS … STORED`, e un indice GIN su di essa. Postgres ricalcola la colonna a ogni scrittura di un campo sorgente e rifiuta qualsiasi tentativo di scriverla direttamente, impedendo che l'indice si disallinei dalla riga. La colonna non viene mai restituita dalle API.
 
-Queste definizioni vengono generate in `drizzle/search.sql`, accanto a `schema.sql` e `policies.sql`, e `rebase db push` le applica automaticamente — non è necessario eseguire nulla in più. Si trovano in un file dedicato perché una colonna generata `tsvector` richiede prima l'esistenza di una funzione helper `IMMUTABLE` (`unaccent` è solo `STABLE` e l'appiattimento di un documento `jsonb` necessita di una funzione che restituisce un set di righe), e Atlas — il motore alla base di `db push` — non può gestire le funzioni nel suo piano gratuito.
+Queste definizioni vengono generate in `.rebase/sql/search.sql`, accanto a `schema.sql` e `policies.sql`, e `rebase db push` le applica automaticamente — non è necessario eseguire nulla in più. Si trovano in un file dedicato perché una colonna generata `tsvector` richiede prima l'esistenza di una funzione helper `IMMUTABLE` (`unaccent` è solo `STABLE` e l'appiattimento di un documento `jsonb` necessita di una funzione che restituisce un set di righe), e Atlas — il motore alla base di `db push` — non può gestire le funzioni nel suo piano gratuito.
 
-Una conseguenza importante da sapere se effettui il deploy tramite migrazioni anziché tramite push: l'aggiunta isolata di un blocco `search` non produce alcuna migrazione, poiché lo schema confrontato da Atlas non è cambiato. `rebase db generate` lo notifica quando ciò accade. Il blocco viene comunque applicato da `rebase db push` e dal controllo dello schema all'avvio; per inserirlo esplicitamente in una migrazione, accoda `drizzle/search.sql` a quest'ultima.
+Una conseguenza importante da sapere se effettui il deploy tramite migrazioni anziché tramite push: l'aggiunta isolata di un blocco `search` non produce alcuna migrazione, poiché lo schema confrontato da Atlas non è cambiato. `rebase db generate` lo notifica quando ciò accade. Il blocco viene comunque applicato da `rebase db push` e dal controllo dello schema all'avvio; per inserirlo esplicitamente in una migrazione, accoda a quest'ultima `.rebase/sql/search.sql`, che `rebase db generate` ha appena scritto.
 
 ### Modificare il blocco in un secondo momento
 

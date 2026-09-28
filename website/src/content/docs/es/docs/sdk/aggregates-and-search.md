@@ -1,5 +1,5 @@
 ---
-sourceHash: df84abf06690d9ce
+sourceHash: bc6c73dcfd10b400
 title: Agregaciones y búsqueda
 sidebar_label: Agregaciones y búsqueda
 description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y ejecuta búsquedas de texto completo y vectoriales desde el cliente."
@@ -141,7 +141,7 @@ const { data } = await client.data.docs
 
   Si no indicas nada, Rebase no instala nada; instálala tú manualmente una vez. De cualquier manera, la columna se crea, y Postgres la rechazará con `type "vector" does not exist` en una base de datos que no tenga ninguna de las dos opciones, indicando ambas soluciones.
 
-La columna, su índice ANN y ese `CREATE EXTENSION` se generan en `drizzle/vector.sql`, junto a `schema.sql` y `policies.sql`, y `rebase db push` los aplica por ti. Tienen un archivo propio porque Atlas —el motor detrás de `db push`— calcula sus diferencias materializando `schema.sql` en una base de datos temporal que borra al inicio de cada ejecución, por lo que un `VECTOR(n)` allí se resuelve contra una base de datos que nunca puede tener pgvector.
+La columna, su índice ANN y ese `CREATE EXTENSION` se generan en `.rebase/sql/vector.sql`, junto a `schema.sql` y `policies.sql`, y `rebase db push` los aplica por ti. Tienen un archivo propio porque Atlas —el motor detrás de `db push`— calcula sus diferencias materializando `schema.sql` en una base de datos temporal que borra al inicio de cada ejecución, por lo que un `VECTOR(n)` allí se resuelve contra una base de datos que nunca puede tener pgvector.
 
 `rebase db generate` añade ese archivo a la migración que escribe, de modo que una migración reproducida contra una base de datos limpia también crea la columna. Un cambio exclusivo en la propiedad vector no genera ninguna migración, porque el esquema que Atlas compara no ha cambiado; `db generate` lo notificará cuando esto ocurra.
 

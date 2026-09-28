@@ -25,6 +25,7 @@ import {
     resolveComposeUrl,
     type PreparedDatabase
 } from "../dev-db/prepare";
+import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -42,7 +43,7 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
-import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
@@ -215,20 +216,15 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
  *
  * @param projectRoot   Absolute path the relative entries are resolved against.
  * @param paths         The `REBASE_DEV_*` map from {@link devRuntimeEnv}.
- * @param includeConfig Whether `config/` is watched here. It is only when
- *                      auto-generation is off; with `--generate` a dedicated
- *                      watcher already regenerates the schema and SDK, and tsx
- *                      restarts on the files that produces.
  */
 export function devWatchIncludes(
     projectRoot: string,
-    paths: { REBASE_DEV_FUNCTIONS?: string; REBASE_DEV_CRONS?: string },
-    includeConfig: boolean
+    paths: { REBASE_DEV_FUNCTIONS?: string; REBASE_DEV_CRONS?: string }
 ): string[] {
     const dirs = [paths.REBASE_DEV_FUNCTIONS, paths.REBASE_DEV_CRONS]
         .filter((entry): entry is string => Boolean(entry))
         .map(entry => path.resolve(projectRoot, entry));
-    if (includeConfig) dirs.push(path.join(projectRoot, "config"));
+    dirs.push(path.join(projectRoot, "config"));
     return dirs;
 }
 
@@ -491,7 +487,6 @@ export const DEV_FLAGS = {
     "--backend-only": Boolean,
     "--frontend-only": Boolean,
     "--port": Number,
-    "--generate": Boolean,
     /**
      * Point this run at a database of your own, ahead of everything else.
      *
@@ -510,7 +505,6 @@ export const DEV_FLAGS = {
     // flag you have to look up every time, which is the opposite of what a short
     // flag is for. `--project` keeps `-p`; port moves here.
     "-P": "--port",
-    "-g": "--generate",
     // Opts out of the database preflight in `ensureDevDatabase`. Named for what
     // it withholds rather than for the mechanism: a reader reaching for this
     // wants "leave my database alone", not "skip step one of three".
@@ -593,6 +587,47 @@ async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
         const message = error instanceof Error ? error.message : String(error);
         console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Could not regenerate the database schema: ${message}`)}`);
         console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Collection reads will fail until it succeeds.`)}`);
+    }
+}
+
+/**
+ * Make `generated/sdk` match the collections, the same way the schema is kept.
+ *
+ * This used to happen only under `--generate`, and `generated/` is gitignored,
+ * so a fresh clone had no SDK types at all until someone ran
+ * `rebase generate-sdk`, and every collection edit left the typed client one
+ * step behind. A frontend compiling against a `Database` type that no longer
+ * describes the backend is the drift this whole command exists to prevent.
+ *
+ * A child process rather than a call into `generateSdkCommand`: that loads the
+ * collections through jiti, whose module cache would hand the second
+ * regeneration the collections the first one loaded. And this CLI re-run
+ * directly, not `pnpm exec rebase`: the package manager's pre-run dependency
+ * check can start an install on every save, and its `rebase` is whichever one
+ * it resolves, not necessarily the one running `dev`.
+ *
+ * The generator's own output is a usage guide meant for a person who ran it by
+ * hand, so it is captured, and on failure only the lines that say what went
+ * wrong are shown — not the stack under them. Like the schema, a failure never
+ * stops `dev`.
+ */
+async function regenerateSdk(projectRoot: string): Promise<void> {
+    if (!projectHasCollections(projectRoot)) return;
+    const entry = resolveCliEntry();
+    const { execPath, prefixArgs } = resolveSpawn(entry);
+    try {
+        await execa(execPath, [...prefixArgs, entry, "generate-sdk"], {
+            cwd: projectRoot,
+            all: true
+        });
+    } catch (error) {
+        const output = typeof error === "object" && error !== null && "all" in error && typeof error.all === "string"
+            ? error.all
+            : "";
+        const cause = output.split("\n").filter(line => line.trim() && !/^\s+at /.test(line)).slice(-6);
+        console.log(`  ${chalk.yellow("⚠")} ${chalk.gray("Could not regenerate the SDK types in generated/sdk.")}`);
+        if (cause.length > 0) console.log(chalk.gray(cause.map(line => `    ${line.trim()}`).join("\n")));
+        console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase generate-sdk")} to see why.`)}`);
     }
 }
 
@@ -693,6 +728,16 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
+    // Removed rather than kept as a no-op: what it switched on is how `dev`
+    // always behaves now. Named, so the answer is "drop it" rather than a
+    // generic unknown-option error that reads like a typo.
+    if (rawArgs.includes("--generate") || rawArgs.includes("-g")) {
+        throw new UsageError(
+            "`rebase dev --generate` is gone: dev now regenerates the schema and the SDK types " +
+            "on every start and every collection save. Drop the flag."
+        );
+    }
+
     const { flags: args } = parseCommandArgs({
         spec: DEV_FLAGS,
         rawArgs,
@@ -708,8 +753,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // and a slow collector must never be in front of it.
     void recordEvent("cli.dev", {
         backend_only: Boolean(args["--backend-only"]),
-        frontend_only: Boolean(args["--frontend-only"]),
-        generate: Boolean(args["--generate"])
+        frontend_only: Boolean(args["--frontend-only"])
     }, { projectRoot });
     const backendDir = findBackendDir(projectRoot);
     const frontendDir = findFrontendDir(projectRoot);
@@ -722,9 +766,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * is the one database a scaffolded project would otherwise get.
      */
     const noDb = Boolean(args["--no-db"]) || parseEnvBoolean(process.env.REBASE_DEV_NO_DB) === true;
-    const shouldGenerate = args["--generate"]
-        || parseEnvBoolean(process.env.REBASE_AUTO_GENERATE) === true
-        || parseEnvBoolean(process.env.REBASE_GENERATE) === true;
 
     // Resolve the ports ONCE, before starting anything. Both, because the
     // backend is told where the frontend will be and cannot be told later: its
@@ -764,9 +805,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // when it declines is in `ensureDevDatabase`; the frontend-only case is
     // decided here because there is no backend to need a database at all.
     if (!frontendOnly) {
-        // Before the database, because it needs no database and because the
-        // push below regenerates anyway on the one path that reaches it.
-        await ensureGeneratedSchema(projectRoot);
+        // Before the database, because neither needs one and because the push
+        // below regenerates the schema anyway on the one path that reaches it.
+        // Side by side: they read the same collections and write different
+        // files, so the SDK costs nothing on top of the schema's two seconds.
+        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
         await runDatabasePreflight({
             projectRoot,
             disabled: noDb,
@@ -1181,7 +1224,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // A generated schema that a *library upgrade* invalidated, repaired before
         // the backend sees it.
         //
-        // Distinct from the drift warning further down, which watches
+        // Distinct from the regeneration further down, which watches
         // `config/collections` and so only fires when the developer edits
         // something. This case has no edit: 0.13 derives `category_id` where 0.12
         // derived `categorie_id`, from an unchanged collection. Boot-ensure renames
@@ -1190,8 +1233,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // rename does not run twice. Regenerating is the whole fix, and the release
         // note promises the rename is handled, so do it rather than announce it.
         //
-        // Runs regardless of `--generate`: this is not "keep my schema fresh", it
-        // is "do not hand the runtime a file that cannot boot".
+        // Not the same thing as the regeneration at startup: this is not "keep
+        // my schema fresh", it is "do not hand the runtime a file that cannot
+        // boot".
         try {
             const activePlugin = getActiveBackendPlugin(backendDir);
             const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
@@ -1207,80 +1251,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             // driver too old to know the subcommand, or a collections directory
             // that will not load all land here, and the boot itself reports each
             // of them better than a preflight can.
-        }
-
-        // Initial schema and SDK generation (disabled by default, enabled via --generate or env var)
-        if (shouldGenerate) {
-            console.log(chalk.gray("  → Ensuring schema and SDK are generated on start..."));
-            try {
-                const activePlugin = getActiveBackendPlugin(backendDir);
-                const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
-                if (pluginCli) {
-                    await execa(tsxBin, [pluginCli, "schema", "generate"], {
-                        cwd: backendDir,
-                        stdio: "inherit",
-                        env
-                    });
-                }
-                const sdkCmd = getPMCommands(detectPackageManager(projectRoot)).exec("rebase", ["generate-sdk"]);
-                await execa(sdkCmd[0], sdkCmd.slice(1), {
-                    cwd: projectRoot,
-                    stdio: "inherit",
-                    env
-                });
-                console.log(chalk.green("  ✓ Initial schema and SDK generated successfully.\n"));
-            } catch (err: unknown) {
-                console.error(chalk.red(`  ✗ Initial schema/SDK generation failed: ${err instanceof Error ? err.message : err}\n`));
-            }
-
-            // Watch collections folder for changes
-            const collectionsDir = path.join(projectRoot, "config", "collections");
-            if (fs.existsSync(collectionsDir)) {
-                let watchDebounce: NodeJS.Timeout | null = null;
-                // The SQL schema and the SDK do not answer to the same edits.
-                // The SDK is generated from the collections `index` module, which
-                // can re-export anything the project puts under this directory,
-                // so every change is a reason to rebuild it. The Drizzle schema
-                // covers only the SQL-backed collections the loader reads — see
-                // `affectsSqlSchema`. Tracked across the debounce window because
-                // one burst can touch both kinds of file.
-                let sqlSchemaAffected = false;
-                fs.watch(collectionsDir, { recursive: true }, (eventType, filename) => {
-                    if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
-
-                    sqlSchemaAffected = sqlSchemaAffected || affectsSqlSchema(collectionsDir, filename);
-                    if (watchDebounce) clearTimeout(watchDebounce);
-                    watchDebounce = setTimeout(async () => {
-                        const regenerateSchema = sqlSchemaAffected;
-                        sqlSchemaAffected = false;
-                        console.log(chalk.yellow(
-                            `\n  🔄 Collection change detected (${filename}). Regenerating ${regenerateSchema ? "schema & SDK" : "SDK"}...`
-                        ));
-                        try {
-                            const activePlugin = getActiveBackendPlugin(backendDir);
-                            const pluginCli = regenerateSchema && activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
-                            if (pluginCli) {
-                                await execa(tsxBin, [pluginCli, "schema", "generate"], {
-                                    cwd: backendDir,
-                                    stdio: "inherit",
-                                    env
-                                });
-                            }
-                            const sdkCmd = getPMCommands(detectPackageManager(projectRoot)).exec("rebase", ["generate-sdk"]);
-                            await execa(sdkCmd[0], sdkCmd.slice(1), {
-                                cwd: projectRoot,
-                                stdio: "inherit",
-                                env
-                            });
-                            console.log(chalk.green(
-                                `  ✓ ${regenerateSchema ? "Schema & SDK" : "SDK"} regenerated successfully. Hono will reload.`
-                            ));
-                        } catch (err: unknown) {
-                            console.error(chalk.red(`  ✗ Failed to regenerate schema/SDK: ${err instanceof Error ? err.message : err}`));
-                        }
-                    }, 300);
-                });
-            }
         }
 
         // A project with its own `backend/src/index.ts` runs it, exactly as
@@ -1301,73 +1271,83 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
 
         const watchArgs = ["watch", "--conditions", "development", quoteForShell(entryTarget)];
-        for (const dir of devWatchIncludes(projectRoot, runtimePaths, !shouldGenerate)) {
+        for (const dir of devWatchIncludes(projectRoot, runtimePaths)) {
             watchArgs.splice(1, 0, "--include", quoteForShell(dir));
         }
 
-        if (!shouldGenerate) {
-            // Watch the collections folder and regenerate the schema from it.
-            //
-            // This used to print a box telling the reader to run `rebase schema
-            // generate` themselves, which made the documented first edit fail
-            // in a way nothing named. tsx restarts the backend on a config
-            // change, boot's additive ensure adds the new column to the
-            // database — and then the very first save of a row carrying it
-            // answered 400 VALIDATION_UNKNOWN_FIELDS, because the driver looked
-            // its columns up in `backend/src/schema.generated.ts` and that file
-            // was still the one generated before the edit.
-            //
-            // The driver reads the database now, so that particular 400 is gone
-            // at the root. This stays because the file is still what `db push`,
-            // Atlas, `eject` and the developer's own imports read, and a file
-            // that silently falls behind the collections during a dev session is
-            // a surprise waiting at the next deploy. It is the same call `dev`
-            // already makes at startup: no database, idempotent, about two
-            // seconds. The reader's single instruction is still "save the file".
-            const collectionsDir = path.join(projectRoot, "config", "collections");
-            if (fs.existsSync(collectionsDir)) {
-                let driftDebounce: NodeJS.Timeout | null = null;
-                fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
-                    if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
-                    // Only a change to a SQL-backed collection can put the
-                    // generated schema out of sync — a Firestore collection has
-                    // nothing to generate, push or check for drift.
-                    if (!affectsSqlSchema(collectionsDir, filename)) return;
-                    if (driftDebounce) clearTimeout(driftDebounce);
-                    driftDebounce = setTimeout(() => {
-                        void (async () => {
-                            // The box is drawn at a fixed width, so a name longer
-                            // than the cell would push the right border off.
-                            const shown = filename!.length > 31 ? `…${filename!.slice(-30)}` : filename!.padEnd(31);
-                            console.log([
-                                "",
-                                chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
-                                chalk.yellow("  │  🔄 Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
-                                chalk.yellow("  │     Regenerating the schema…                                 │"),
-                                chalk.yellow("  └──────────────────────────────────────────────────────────────┘")
-                            ].join("\n"));
+        // Watch the collections folder and regenerate what is derived from it.
+        //
+        // This used to print a box telling the reader to run `rebase schema
+        // generate` themselves, which made the documented first edit fail in a
+        // way nothing named. tsx restarts the backend on a config change, boot's
+        // additive ensure adds the new column to the database — and then the
+        // very first save of a row carrying it answered 400
+        // VALIDATION_UNKNOWN_FIELDS, because the driver looked its columns up in
+        // `backend/src/schema.generated.ts` and that file was still the one
+        // generated before the edit.
+        //
+        // The driver reads the database now, so that particular 400 is gone at
+        // the root. This stays because the file is still what `eject` and the
+        // developer's own imports read, and the SDK types are what a frontend
+        // compiles against: either one silently falling behind the collections
+        // during a dev session is a surprise waiting at the next deploy. The
+        // reader's single instruction is still "save the file".
+        const collectionsDir = path.join(projectRoot, "config", "collections");
+        if (fs.existsSync(collectionsDir)) {
+            let debounce: NodeJS.Timeout | null = null;
+            // The SQL schema and the SDK do not answer to the same edits. The
+            // SDK is generated from the collections `index` module, which can
+            // re-export anything the project puts under this directory, so every
+            // change is a reason to rebuild it. The Drizzle schema covers only the
+            // SQL-backed collections the loader reads — a Firestore collection
+            // has nothing to generate, push or check for drift. Tracked across the
+            // debounce window because one burst can touch both kinds of file.
+            let sqlSchemaAffected = false;
+            let changed = "";
+            fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
+                if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
+                sqlSchemaAffected = sqlSchemaAffected || affectsSqlSchema(collectionsDir, filename);
+                changed = filename;
+                if (debounce) clearTimeout(debounce);
+                debounce = setTimeout(() => {
+                    const regenerateSchema = sqlSchemaAffected;
+                    sqlSchemaAffected = false;
+                    void (async () => {
+                        if (!regenerateSchema) {
+                            await regenerateSdk(projectRoot);
+                            return;
+                        }
+                        // The box is drawn at a fixed width, so a name longer
+                        // than the cell would push the right border off.
+                        const shown = changed.length > 31 ? `…${changed.slice(-30)}` : changed.padEnd(31);
+                        console.log([
+                            "",
+                            chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
+                            chalk.yellow("  │  🔄 Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
+                            chalk.yellow("  │     Regenerating the schema and the SDK types…               │"),
+                            chalk.yellow("  └──────────────────────────────────────────────────────────────┘")
+                        ].join("\n"));
 
-                            await ensureGeneratedSchema(projectRoot);
+                        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
 
-                            console.log([
-                                chalk.green("  ✓ Schema regenerated. The backend restarts and boot creates what"),
-                                chalk.green("    is missing — a new collection, a new property."),
-                                // `db push` is the remedy for what boot leaves alone, and it
-                                // cannot run against the managed database at all: Atlas plans
-                                // by diffing against a second, empty database, and PGlite
-                                // serves exactly one. Naming it there sends the reader to a
-                                // command that answers with a refusal.
-                                ...(managed
-                                    ? [chalk.gray("    A renamed column, a narrowed type or a removed field needs your"),
-                                       chalk.gray("    own PostgreSQL: set DATABASE_URL, then rebase db push.")]
-                                    : [chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
-                                       chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`)]),
-                                ""
-                            ].join("\n"));
-                        })();
-                    }, 500);
-                });
-            }
+                        console.log([
+                            chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),
+                            chalk.green("    creates what is missing — a new collection, a new property."),
+                            // `db push` is the remedy for what boot leaves alone, and it
+                            // cannot run against the managed database at all: Atlas plans
+                            // by diffing against a second, empty database, and PGlite
+                            // serves exactly one. Naming it there sends the reader to a
+                            // command that answers with a refusal.
+                            ...(managed
+                                ? [chalk.gray("    A renamed column, a narrowed type or a removed field needs your"),
+                                   chalk.gray("    own PostgreSQL: set DATABASE_URL, then rebase db push.")]
+                                : [chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
+                                   chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`)]),
+                            ""
+                        ].join("\n"));
+                    })();
+                }, 500);
+            });
         }
 
         const backendChild = execa(
@@ -1647,7 +1627,6 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--backend-only, -b")}    Only start the backend server
   ${chalk.blue("--frontend-only, -f")}   Only start the frontend server
   ${chalk.blue("--port, -P")}            Backend port (default: auto-detected per project)
-  ${chalk.blue("--generate, -g")}        Enable automatic schema and SDK generation on startup and file changes
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}  Use this Postgres, ahead of everything else
   ${chalk.blue("--docker")}              Use the project's docker-compose ${chalk.gray("db")} service
   ${chalk.blue("--no-db")}               Start no database at all
@@ -1703,8 +1682,8 @@ ${chalk.green.bold("Description")}
   try the next available port. The frontend is started only after the
   backend is ready, and VITE_API_URL is injected automatically.
 
-  By default, automatic schema and SDK generation is disabled on startup
-  and file changes. Pass --generate (-g) or set REBASE_AUTO_GENERATE=true
-  in your environment to enable it.
+  On startup and on every save under config/collections, the Drizzle
+  schema (backend/src/schema.generated.ts) and the SDK types
+  (generated/sdk) are regenerated from the collections.
 `);
 }

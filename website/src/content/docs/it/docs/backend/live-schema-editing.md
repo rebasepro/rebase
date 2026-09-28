@@ -1,5 +1,5 @@
 ---
-sourceHash: 7253b4b5232fa542
+sourceHash: dbaee87f7378ffd7
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -38,7 +38,7 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts", "drizzle/schema.sql"]
+  "files": ["backend/src/schema.generated.ts"]
 }
 ```
 
@@ -85,13 +85,14 @@ Il percorso di ensure all'avvio segnala la stessa cosa come avviso. Prima dell'i
 
 ## Cosa viene committato
 
-Non solo il file della collection. Una modifica dello schema tocca diversi elementi generati, e un file non aggiornato comprometterebbe il deploy successivo:
+Non solo il file della collection. Da esso viene generato lo schema Drizzle, e uno schema non aggiornato compromette il deploy successivo, quindi entrambi finiscono nello stesso commit:
 
 - `config/collections/<name>.ts` — la collection stessa
 - `backend/src/schema.generated.ts` — lo schema Drizzle
-- `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
 Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando i due coincidono — un progetto `rebase init`, che rappresenta il caso comune — non c'è nulla di cui preoccuparsi. Quando il progetto si trova in una sottodirectory di un repository più grande, i percorsi includono il relativo prefisso, individuato risalendo dalla directory delle collection fino al `rebase.json` più vicino. Un progetto senza `rebase.json` mantiene i percorsi semplici.
+
+Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
 
 Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito all'amministratore che l'ha effettuata. Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo repository.
 
@@ -136,7 +137,7 @@ oppure `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. Il commit viene quindi att
 
 L'applicazione in questo contesto **non** scrive una migrazione, e non può farlo: una migrazione adotta il formato di Atlas con un file di integrità, generato da un binario esterno a fronte di un database usa e getta, e un server in esecuzione non dispone di nessuno dei due.
 
-Ciò che invece scrive è `drizzle/schema.sql` — esattamente il file con cui `rebase db generate` calcola il diff. Di conseguenza, la migrazione è a portata di un solo comando:
+Ciò che invece committa è la collection, ed è a partire da essa che `rebase db generate` scrive la migrazione. Di conseguenza, la migrazione è a portata di un solo comando:
 
 ```bash
 rebase db generate

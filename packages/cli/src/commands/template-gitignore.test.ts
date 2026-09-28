@@ -60,12 +60,20 @@ describe("the scaffold's .gitignore", () => {
         // The counter-check: `*.dump` and `backups/` must not swallow source.
         for (const file of [
             "config/collections/posts.ts",
-            "drizzle/schema.sql",
+            "backend/src/schema.generated.ts",
             "drizzle/migrations/20260714000000_init.sql",
             "backend/package.json"
         ]) {
             expect(isIgnored(file), `${file} must stay tracked`).toBe(false);
         }
+    });
+
+    it("ignores the SQL `db push` renders, which is regenerated before every read", () => {
+        // `.rebase/sql/` beside the backend, where `db push` and `db generate`
+        // write `schema.sql`, `policies.sql` and the rest. The directory also
+        // ignores itself, for projects scaffolded before this rule existed.
+        expect(isIgnored("backend/.rebase/sql/schema.sql")).toBe(true);
+        expect(isIgnored("backend/.rebase/sql/policies.sql")).toBe(true);
     });
 
     it("keeps ignoring the uploads directory it already ignored", () => {

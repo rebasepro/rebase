@@ -179,7 +179,7 @@ searches embeddings, it does not compute them.
   ways out.
 
 The column, its ANN index and that `CREATE EXTENSION` are generated into
-`drizzle/vector.sql`, next to `schema.sql` and `policies.sql`, and `rebase db
+`.rebase/sql/vector.sql`, next to `schema.sql` and `policies.sql`, and `rebase db
 push` applies them for you. They have a file of their own because Atlas — the
 engine behind `db push` — computes its diff by materialising `schema.sql` in a
 scratch database it wipes at the start of every run, so a `VECTOR(n)` in there

@@ -208,9 +208,10 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 4. **The CLI** reads them to generate migration files with `rebase schema generate`
 
 While `rebase dev` is running, saving a file under `config/collections/`
-regenerates `backend/src/schema.generated.ts` and restarts the backend, and boot
-creates the tables and columns that are missing. Outside `rebase dev` the same
-step is `rebase schema generate`.
+regenerates `backend/src/schema.generated.ts` and the SDK types in
+`generated/sdk/`, restarts the backend, and boot creates the tables and columns
+that are missing. Outside `rebase dev` the same steps are `rebase schema generate`
+and `rebase generate-sdk`.
 
 ## Next Steps
 

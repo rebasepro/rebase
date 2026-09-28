@@ -1,5 +1,5 @@
 ---
-sourceHash: df84abf06690d9ce
+sourceHash: bc6c73dcfd10b400
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et regroupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -190,7 +190,7 @@ ne les calcule pas.
   l'un ni l'autre, en indiquant les deux solutions possibles.
 
 La colonne, son index ANN et ce `CREATE EXTENSION` sont générés dans
-`drizzle/vector.sql`, aux côtés de `schema.sql` et `policies.sql`, et `rebase db
+`.rebase/sql/vector.sql`, aux côtés de `schema.sql` et `policies.sql`, et `rebase db
 push` les applique pour vous. Ils disposent de leur propre fichier car Atlas —
 le moteur derrière `db push` — calcule son diff en matérialisant `schema.sql`
 dans une base de données temporaire qu'il réinitialise au début de chaque

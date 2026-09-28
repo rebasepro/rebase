@@ -32,10 +32,7 @@ import {
  */
 const plan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
     files: [
-        { path: "backend/src/schema.generated.ts", contents: "export const schema = 1;" },
-        { path: "drizzle/schema.sql", contents: "CREATE TABLE posts ();" },
-        { path: "drizzle/policies.sql", contents: "" },
-        { path: "drizzle/search.sql", contents: "" }
+        { path: "backend/src/schema.generated.ts", contents: "export const schema = 1;" }
     ],
     statements: ['ALTER TABLE "public"."posts" ADD COLUMN IF NOT EXISTS "subtitle" TEXT;'],
     classified: { changes: [], verdict: "safe", applicable: true },
@@ -106,7 +103,7 @@ describe("the happy path", () => {
             apply: async () => undefined
         });
         expect(written).toContain("config/collections/posts.ts");
-        expect(written).toContain("drizzle/schema.sql");
+        expect(written).toContain("backend/src/schema.generated.ts");
     });
 
     it("stages exactly the files it wrote, and nothing else", async () => {
@@ -119,12 +116,7 @@ describe("the happy path", () => {
             repository: repo,
             apply: async () => undefined
         });
-        expect(staged.sort()).toEqual([
-            "backend/src/schema.generated.ts",
-            "drizzle/policies.sql",
-            "drizzle/schema.sql",
-            "drizzle/search.sql"
-        ]);
+        expect(staged).toEqual(["backend/src/schema.generated.ts"]);
     });
 
     it("skips the apply when the change needs no DDL, and still reports success", async () => {
@@ -157,7 +149,7 @@ describe("nothing happens when the change is refused", () => {
 
     it("refuses before writing when the tree already has our files modified", async () => {
         const { repo, calls } = fakeRepository({
-            dirtyPaths: async () => ["drizzle/schema.sql", "some/other/file.ts"]
+            dirtyPaths: async () => ["backend/src/schema.generated.ts", "some/other/file.ts"]
         });
 
         await expect(applySchemaChange({
@@ -171,7 +163,7 @@ describe("nothing happens when the change is refused", () => {
 
     it("names only the conflicting paths, not every dirty file in the tree", async () => {
         const { repo } = fakeRepository({
-            dirtyPaths: async () => ["drizzle/schema.sql", "README.md"]
+            dirtyPaths: async () => ["backend/src/schema.generated.ts", "README.md"]
         });
 
         const err = await applySchemaChange({
@@ -180,7 +172,7 @@ describe("nothing happens when the change is refused", () => {
             apply: async () => undefined
         }).catch(e => e as DirtyWorkingTreeError);
 
-        expect(err.paths).toEqual(["drizzle/schema.sql"]);
+        expect(err.paths).toEqual(["backend/src/schema.generated.ts"]);
         expect(err.message).not.toContain("README.md");
     });
 

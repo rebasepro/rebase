@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fb63312e30e41a2
+sourceHash: a6d76e5410cf6910
 title: Estrutura do Projeto
 sidebar_label: Estrutura do Projeto
 description: Entenda a estrutura de um projeto Rebase — frontend, backend e configuração de coleções.
@@ -175,7 +175,7 @@ O `slug` torna-se o caminho da URL na interface administrativa e o endpoint da A
 3. **O frontend** as lê (via plugin do Vite) para renderizar tabelas, formulários e navegação
 4. **A CLI** as lê para gerar arquivos de migração com `rebase schema generate`
 
-Enquanto o `rebase dev` estiver em execução, salvar um arquivo em `config/collections/` regenera `backend/src/schema.generated.ts` e reinicia o backend, e a inicialização cria as tabelas e colunas que estiverem faltando. Fora do `rebase dev`, essa mesma etapa é realizada com `rebase schema generate`.
+Enquanto o `rebase dev` estiver em execução, salvar um arquivo em `config/collections/` regenera `backend/src/schema.generated.ts` e os tipos do SDK em `generated/sdk/`, reinicia o backend, e a inicialização cria as tabelas e colunas que estiverem faltando. Fora do `rebase dev`, essas mesmas etapas são realizadas com `rebase schema generate` e `rebase generate-sdk`.
 
 ## Próximos Passos
 

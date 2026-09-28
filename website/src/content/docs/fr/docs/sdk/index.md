@@ -1,5 +1,5 @@
 ---
-sourceHash: 99ef7c91f36d48db
+sourceHash: 14c3049677a7af03
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -65,6 +65,11 @@ Générez un client entièrement typé à partir des définitions de vos collect
 ```bash
 rebase generate-sdk
 ```
+
+Pendant que `rebase dev` tourne, vous n'en avez pas besoin : il régénère les types dans
+`generated/sdk/` au démarrage et à chaque enregistrement sous `config/collections/`. Lancez
+vous-même la commande en CI, dans un dépôt frontend sans collections
+(`rebase generate-sdk --from link`), ou partout où `rebase dev` ne tourne pas.
 
 Passez ensuite le paramètre de type `Database` à `createRebaseClient` pour bénéficier d'une autocomplétion complète :
 

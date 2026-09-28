@@ -12,7 +12,7 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 | `rebase db url` | Print the connection string in use — it pipes straight into `psql` |
 | `pnpm db:migrate` | Apply the migration files in `backend/drizzle/migrations`. Needs your own PostgreSQL, not the managed development database |
 | `pnpm schema:introspect` | Existing tables → collection definitions in `config/collections/`. That directory ends headless mode; see rule 1 |
-| `pnpm generate:sdk` | Regenerate the typed client from `config/collections/` — so in a headless project it has nothing to read until you introspect |
+| `pnpm generate:sdk` | Regenerate the typed client from `config/collections/` — so in a headless project it has nothing to read until you introspect. Once there are collections, `pnpm dev` does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
 | `pnpm example` | Run `scripts/example.ts` against the running backend — the SDK, end to end |

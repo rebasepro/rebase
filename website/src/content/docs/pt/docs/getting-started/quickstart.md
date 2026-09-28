@@ -1,5 +1,5 @@
 ---
-sourceHash: 7b2e4e449b0ca1dc
+sourceHash: ff637239bf2fa695
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e coloque-o para rodar localmente em menos de 2 minutos.
@@ -185,8 +185,8 @@ export const collections = [
 ## Criar a Tabela
 
 Salve o arquivo. Essa é toda a etapa: o `rebase dev` regenera
-`backend/src/schema.generated.ts` a partir de suas collections, reinicia o backend,
-e a inicialização cria a nova tabela — assim, sua collection **Products** aparece na
+`backend/src/schema.generated.ts` e os tipos do SDK em `generated/sdk/` a partir de suas
+collections, reinicia o backend, e a inicialização cria a nova tabela — assim, sua collection **Products** aparece na
 navegação.
 
 O mesmo vale para uma propriedade adicionada a uma collection que você já possui: salve,

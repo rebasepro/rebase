@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fb63312e30e41a2
+sourceHash: a6d76e5410cf6910
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
 description: "Conozca la estructura de un proyecto Rebase: frontend, backend y configuración de colecciones."
@@ -209,9 +209,10 @@ El `slug` se convierte en la ruta URL en la interfaz de administración y en el 
 4. **La CLI** las lee para generar archivos de migración con `rebase schema generate`
 
 Mientras `rebase dev` está en ejecución, guardar un archivo en `config/collections/`
-regenera `backend/src/schema.generated.ts` y reinicia el backend, y el arranque
-crea las tablas y columnas que falten. Fuera de `rebase dev`, el paso equivalente
-es `rebase schema generate`.
+regenera `backend/src/schema.generated.ts` y los tipos del SDK en
+`generated/sdk/`, reinicia el backend, y el arranque crea las tablas y columnas
+que falten. Fuera de `rebase dev`, los pasos equivalentes son
+`rebase schema generate` y `rebase generate-sdk`.
 
 ## Próximos pasos
 

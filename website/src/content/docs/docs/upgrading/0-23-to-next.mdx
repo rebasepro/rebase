@@ -1,0 +1,82 @@
+---
+slug: docs/upgrading/0-23-to-next
+title: Upgrading 0.23 to the next release
+sidebar_label: 0.23 → next
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists.
+---
+
+# Upgrading 0.23 → next
+
+**Nothing here is released yet.** These are the `### Breaking` entries of the
+changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
+this documentation site publishes from `main`, so they are described here before
+the version that carries them exists on npm. If you installed from npm you are
+on 0.23 and none of this has reached you — read it to know what is coming, and
+come back when you move.
+
+All three are about generated files. None of them changes your schema, your data
+or your API: they change what lands in your repository, and what `rebase dev`
+does without being asked.
+
+---
+
+## 41. `db push` and `db generate` write their SQL to `.rebase/sql/`
+
+`rebase db push` and `rebase db generate` render your collections to five SQL
+files: `schema.sql`, `policies.sql`, `search.sql`, `vector.sql` and
+`triggers.sql`. They were written into `drizzle/`, beside the migrations, and
+committed. Both commands regenerate all five before reading any of them, so the
+committed copy was never read, and it showed up in the diff of every collection
+change. They are now written to `.rebase/sql/`, relative to the directory the
+command runs in — `backend/.rebase/sql/` in a scaffolded project. The directory
+writes its own `.gitignore`, so it is never committed.
+
+The first run after upgrading deletes the old copies in `drizzle/` and names
+each one. It deletes only files that open with the generator's header, so a file
+you wrote there stays, and so do the migrations in `drizzle/migrations/`.
+
+**What to change:** commit the deletion the first run reports. If a script or a
+CI step reads one of these files, point it at `.rebase/sql/` and run
+`rebase db push` or `rebase db generate` before it: a fresh checkout no longer
+has the file.
+
+```bash
+grep -rnE "drizzle/(schema|policies|search|vector|triggers)\.sql" --exclude-dir=node_modules .
+```
+
+## 42. `rebase dev` no longer takes `--generate`
+
+What the flag switched on is what `rebase dev` always does now. On start and on
+every save under `config/collections/`, it regenerates the SDK types in
+`generated/sdk/`, as it already did for the Drizzle schema. Before, the SDK was
+regenerated only with the flag, so a fresh clone had no SDK types until someone
+ran `rebase generate-sdk`. Passing `--generate` or `-g` stops with a message
+telling you to drop it, and `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` are no
+longer read.
+
+**What to change:** remove `--generate` and `-g` from every script that starts
+`rebase dev`, and delete `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` from your
+`.env` files. `rebase generate-sdk` is unchanged: keep it in CI, in a frontend
+repository that has no collections (`--from link`), and anywhere `rebase dev` is
+not running.
+
+```bash
+grep -rnE "rebase dev.*(--generate|-g)|REBASE_(AUTO_)?GENERATE" --exclude-dir=node_modules .
+```
+
+## 43. A live schema edit commits no SQL
+
+A change applied from the admin panel's
+[live schema editor](/docs/backend/live-schema-editing/) commits the collection
+and `backend/src/schema.generated.ts`, and nothing else. It also used to commit
+the five SQL files, but it wrote them at the project root while the CLI writes
+them beside the backend, so a project could hold two copies that disagreed.
+`SchemaCommitPaths` and `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
+
+**What to change:** nothing, unless your code reads `DEFAULT_COMMIT_PATHS` or
+builds a `SchemaCommitPaths` — then drop `ddlFile`, `policiesFile`, `searchFile`,
+`vectorFile` and `triggersFile`, which TypeScript now reports. If a live edit
+committed those files to a `drizzle/` directory at your project root, nothing
+reads them: delete them. A project that keeps versioned migrations still runs
+`rebase db generate` after a live edit, and it writes the migration from the
+committed collection.

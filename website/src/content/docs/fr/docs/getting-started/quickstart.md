@@ -1,5 +1,5 @@
 ---
-sourceHash: 7b2e4e449b0ca1dc
+sourceHash: ff637239bf2fa695
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -184,9 +184,9 @@ export const collections = [
 ## Créer la table
 
 Enregistrez le fichier. C'est tout ce qu'il y a à faire : `rebase dev` régénère
-`backend/src/schema.generated.ts` à partir de vos collections, redémarre le backend,
-et le démarrage crée la nouvelle table — votre collection **Products** apparaît alors dans la
-navigation.
+`backend/src/schema.generated.ts` et les types du SDK dans `generated/sdk/` à partir de vos
+collections, redémarre le backend, et le démarrage crée la nouvelle table — votre collection
+**Products** apparaît alors dans la navigation.
 
 Il en va de même pour une propriété ajoutée à une collection existante : sauvegardez,
 et la colonne est créée.

@@ -19,6 +19,13 @@ The backend uses a **two-step process**:
 1. **`rebase schema generate`** reads your Rebase collection definitions and generates a Drizzle ORM schema file (`schema.generated.ts`)
 2. **`rebase db push`** or **`rebase db generate` + `rebase db migrate`** applies the schema to the database
 
+On the way, `db push` and `db generate` render the collections to SQL in `.rebase/sql/`
+beside the backend (`backend/.rebase/sql/` in a scaffolded project): `schema.sql` is
+Atlas's desired state, and `policies.sql`, `search.sql`, `vector.sql` and `triggers.sql`
+are applied by Rebase itself. Both commands rewrite all five from the collections on
+every run, and the directory ignores itself — never edit or commit them. Migrations
+are what you commit, in `drizzle/migrations/`.
+
 ## Prerequisites
 
 - PostgreSQL 14+ (local or Docker)
@@ -43,7 +50,7 @@ rebase db push
 # 1. Generate Drizzle schema
 rebase schema generate
 
-# 2. Generate SQL migration files (creates timestamped .sql in ./drizzle/)
+# 2. Generate SQL migration files (creates timestamped .sql in ./drizzle/migrations/)
 rebase db generate
 
 # 3. Review the generated SQL before applying!
@@ -611,7 +618,7 @@ The `shutdown(timeoutMs?: number)` method (default timeout: 15000ms) performs:
   now decided by the name — `<table>_<columns>_ix_<7 hex>` / `_ux_` is Rebase's, everything else
   is excluded from the diff and never touched. Deleting a declaration still drops that index, on
   purpose. Never rename a hand-written index to look generated.
-- **Review generated SQL** — always inspect the `.sql` files in `./drizzle/` before applying
+- **Review generated SQL** — always inspect the new migration in `./drizzle/migrations/` before applying
 - **Collections directory** — Collection definitions are defined in the `config/collections/` directory.
 
 ## Troubleshooting

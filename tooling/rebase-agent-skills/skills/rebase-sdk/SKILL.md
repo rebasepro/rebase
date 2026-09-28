@@ -12,11 +12,13 @@ The Rebase SDK consists of two packages that work together to provide end-to-end
 
 The generated types are passed as a generic parameter to the client, providing full type safety across all operations.
 
-> **IMPORTANT FOR AGENTS:** Always generate the SDK types first before writing client code. Use the `rebase_generate_sdk` MCP tool or `npx @rebasepro/cli generate-sdk` CLI command. The generated types live at `./generated/sdk/database.types.ts` relative to the project root.
+> **IMPORTANT FOR AGENTS:** Make sure the SDK types are current before writing client code. While `rebase dev` is running they are: it regenerates them on start and on every save under `config/collections/`. Otherwise use the `rebase_generate_sdk` MCP tool or `npx @rebasepro/cli generate-sdk` CLI command. The generated types live at `./generated/sdk/database.types.ts` relative to the project root.
 
 ## SDK Generation
 
 ### How to Generate
+
+**Under `rebase dev`:** nothing to run. It regenerates `./generated/sdk/` on start and on every save under `config/collections/`. Generate it yourself in CI, in a frontend repository with no collections (`generate-sdk --from link` or `--from <url>`), or when `rebase dev` is not running.
 
 **Via MCP tool (preferred):**
 

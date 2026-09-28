@@ -1,5 +1,5 @@
 ---
-sourceHash: 2415f0f60ed62277
+sourceHash: c30e838bf7e3f20c
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -58,6 +58,10 @@ rebase dev
 ```
 
 Startet sowohl Frontend als auch Backend mit Hot Reloading.
+
+Beim Start und bei jedem Speichern unter `config/collections/` generiert es das
+Drizzle-Schema (`backend/src/schema.generated.ts`) und die SDK-Typen
+(`generated/sdk/`) neu, sodass keines von beiden hinter Ihren Collections zurückbleibt.
 
 Beide Ports werden vom Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte nebeneinander laufen können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Pinnen Sie einen Port mit `rebase dev --port 3001` fest.
 
@@ -158,7 +162,7 @@ Generiert SQL-Migrationsdateien aus Schemaänderungen:
 rebase db generate
 ```
 
-Erstellt mit Zeitstempeln versehene Migrationsdateien in `drizzle/`, die überprüft und committet werden können.
+Erstellt mit Zeitstempeln versehene Migrationsdateien in `drizzle/migrations/`, die überprüft und committet werden können.
 
 ### `rebase db migrate`
 

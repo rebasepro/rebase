@@ -1,5 +1,5 @@
 ---
-sourceHash: 7b2e4e449b0ca1dc
+sourceHash: ff637239bf2fa695
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -163,7 +163,7 @@ export const collections = [
 
 ## Crea la tabella
 
-Salva il file. Non serve altro: `rebase dev` rigenera `backend/src/schema.generated.ts` a partire dalle tue collezioni, riavvia il backend e l'avvio crea la nuova tabella — così la collezione **Products** compare direttamente nella barra di navigazione.
+Salva il file. Non serve altro: `rebase dev` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` a partire dalle tue collezioni, riavvia il backend e l'avvio crea la nuova tabella — così la collezione **Products** compare direttamente nella barra di navigazione.
 
 La stessa logica si applica all'aggiunta di una proprietà a una collezione esistente: salva e la colonna sarà subito pronta.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fb20a4af48774ee
+sourceHash: 01f06c4ce72b27dc
 slug: fr/docs/upgrading
 title: Mise à niveau
 description: Ce qui casse lorsque vous migrez une application existante vers la version actuelle, et comment traiter chaque problème.
@@ -7,10 +7,11 @@ description: Ce qui casse lorsque vous migrez une application existante vers la 
 
 # Mettre à niveau une application existante
 
-Six étapes, de la plus récente à la plus ancienne. Commencez par celle qui se trouve juste au-dessus de votre version actuelle et descendez — ou, si vous partez de la version 0.12, commencez par le bas et remontez.
+Sept étapes, de la plus récente à la plus ancienne. Commencez par celle qui se trouve juste au-dessus de votre version actuelle et descendez — ou, si vous partez de la version 0.12, commencez par le bas et remontez.
 
 | Vous êtes en | À lire | Ce que cela implique |
 |---|---|---|
+| **0.23** | [0.23 → suivante](/docs/upgrading/0-23-to-next/) | Pas encore publiée : ce qui est fusionné sur `main` et déjà décrit dans cette documentation. Le SQL que produisent `db push` et `db generate` quitte `drizzle/` pour `.rebase/sql/`, qui n'est pas commité, l'option `--generate` de `rebase dev` disparaît parce que `dev` régénère toujours les types du SDK, et une modification de schéma en direct n'inclut aucun SQL dans son commit. |
 | **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | Une clé d'API sur un chemin imbriqué a besoin de `read` sur ses parents, les variables numériques et durées de session illisibles empêchent le démarrage, un dépôt d'authentification personnalisé a besoin de `unlinkUserIdentity`, et la conversion d'un invité en compte exige le captcha `register`. 0.22 ne déclare aucun changement incompatible : c'est donc une seule étape depuis 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` ne compile plus dans un callback de collection — effectuez vos requêtes via `context.data` — et `selectedEntities` cède la place à une sélection qui peut désigner des lignes que personne n'a chargées. Les versions 0.19 et 0.20 ne déclarent aucun changement cassant, il s'agit donc d'une seule étape depuis la 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Onze changements cassants, la plupart étant des erreurs de compilation plutôt que des changements de comportement silencieux. `rebase.data` disparaît au runtime, les plages de peer dependencies sont restreintes aux carets (^), et la version minimale de Node passe à 22.22.0. |

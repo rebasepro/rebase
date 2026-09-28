@@ -45,13 +45,15 @@ and plans the change:
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
-   rebase schema generate                       (the same command also
-            │                                    writes the SQL below)
-            ▼                                           │
-  backend/src/schema.generated.ts                        ▼
-  the Drizzle schema the runtime            drizzle/schema.sql      ← Atlas's desired state
-  reads and writes rows through             policies.sql            ← RLS, applied separately
-                                            search.sql, vector.sql  ← Atlas cannot manage these
+   rebase schema generate                   (db push and db generate write
+            │                               the SQL below on every run, into
+            ▼                               .rebase/sql/, which is not committed)
+  backend/src/schema.generated.ts                       │
+  the Drizzle schema the runtime                        ▼
+  reads and writes rows through             schema.sql              ← Atlas's desired state
+                                            policies.sql            ← RLS, applied separately
+                                            search.sql, vector.sql, ← Atlas cannot manage these
+                                            triggers.sql
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
@@ -69,7 +71,9 @@ and plans the change:
 
 `db push` is the development loop; `db generate` + `db migrate` is the
 reviewable one, and the one to use in production. Both go through the same
-generated SQL, so they cannot disagree about what your collections mean. See
+generated SQL, so they cannot disagree about what your collections mean, and
+both write it afresh from the collections before reading it, so there is no copy
+in your repository to fall behind. The migrations are what you commit. See
 [Schema Generation](/docs/cli/schema) for every flag.
 
 ### Example

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7b2e4e449b0ca1dc
+sourceHash: ff637239bf2fa695
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -184,7 +184,8 @@ export const collections = [
 ## Die Tabelle erstellen
 
 Speichern Sie die Datei. Das ist bereits der gesamte Schritt: `rebase dev` regeneriert
-`backend/src/schema.generated.ts` aus Ihren Collections, startet das Backend neu
+`backend/src/schema.generated.ts` und die SDK-Typen in `generated/sdk/` aus Ihren
+Collections, startet das Backend neu
 und der Bootvorgang erstellt die neue Tabelle — sodass Ihre Collection **Products** in der
 Navigation erscheint.
 

@@ -1972,7 +1972,10 @@ of the array produces no error and no table; it simply is not there. (The
 directory scan in `generate_sdk.ts` is a *fallback* for projects with no index
 file at all, so a project that has one gets the array or nothing.)
 
-Then apply the changes to the database:
+Then apply the changes to the database. While `rebase dev` is running, saving
+the file already regenerates the Drizzle schema and the SDK types in
+`generated/sdk/`, and boot creates the missing tables and columns. The commands
+below are for everything else:
 
 ```bash
 # All commands run from the project root directory unless noted

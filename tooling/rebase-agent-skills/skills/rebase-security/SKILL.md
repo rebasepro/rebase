@@ -459,7 +459,7 @@ const callbacks: CollectionCallbacks = {
 
 > **The honest caveat:** on Postgres this is defence in depth, not the
 > authorization model. Authorization is RLS — `securityRules` in a collection are
-> a *source for code generation* (`db push` → `policies.sql` → `pg_policies`), and
+> a *source for code generation* (`db push` → `.rebase/sql/policies.sql` → `pg_policies`), and
 > nothing on the data path reads them at runtime. Callbacks run in the
 > application, so anything reaching the database by another route (psql, a cron,
 > the SQL editor) never sees them. Use them for redaction and validation; use RLS
@@ -593,6 +593,11 @@ rebase doctor --policies
 ```
 
 It exits non-zero on drift, so it works as a CI gate.
+
+There is no policy file in the repository to review. `db push` and `db generate`
+write `.rebase/sql/policies.sql` from the collections on every run, and that
+directory is gitignored. The collections are the source, and `pg_policies` is what
+the database enforces.
 
 ### Membership-Scoped Access (RLS, no N+1)
 

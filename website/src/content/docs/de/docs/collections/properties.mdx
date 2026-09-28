@@ -1,5 +1,5 @@
 ---
-sourceHash: 476cbf3fe099d5c3
+sourceHash: 3c5a26968b75b8b0
 title: Eigenschaften
 sidebar_label: Eigenschaften
 description: Eigenschaftstypen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt die Typen String, Number, Boolean, Date, Array, Map, Reference, Relation und Geopoint.
@@ -415,7 +415,7 @@ Zeile dazu führen, dass die Spalte behauptet, die Zeile habe sich nicht geände
 was sie liest, um zu entscheiden, was neu indiziert oder erneut gesendet werden soll, würde
 diese Zeile überspringen.
 
-Der Trigger befindet sich in `drizzle/triggers.sql` und wird von `rebase db push` sowie beim
+Der Trigger wird in `.rebase/sql/triggers.sql` generiert und von `rebase db push` sowie beim
 Start durch die Schema-Prüfung angewendet – Atlas kann ihn aus demselben Grund nicht verwalten,
 aus dem es die Volltextsuch-Helfer nicht verwalten kann.
 

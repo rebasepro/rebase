@@ -5,8 +5,8 @@
  * `schemaCommand`, `generatePostgresDdlCommand` and the Atlas argv assembly
  * each re-enter the loader with the same line — and then both generators wrote
  * an *empty* schema: `drizzle/schema.sql` truncated to `CREATE SCHEMA IF NOT
- * EXISTS "rebase";`, `src/schema.generated.ts` to ten lines. Both are committed
- * artifacts. The push that followed planned a `DROP TABLE` for every table in
+ * EXISTS "rebase";`, `src/schema.generated.ts` to ten lines. Both were committed
+ * artifacts then. The push that followed planned a `DROP TABLE` for every table in
  * the database, and the only thing between a typo and that was the destructive
  * gate.
  *

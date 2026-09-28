@@ -1,5 +1,5 @@
 ---
-sourceHash: 476cbf3fe099d5c3
+sourceHash: 3c5a26968b75b8b0
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização de interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -414,7 +414,7 @@ Sem o trigger, um script de seed, um backfill de migração ou uma linha corrigi
 deixaria a coluna indicando que a linha não havia sido alterada, e qualquer rotina lendo isso
 para decidir o que reindexar ou reenviar ignoraria essa linha.
 
-O trigger reside em `drizzle/triggers.sql`, aplicado por `rebase db push` e na inicialização
+O trigger é gerado em `.rebase/sql/triggers.sql`, aplicado por `rebase db push` e na inicialização
 pela verificação de schema — o Atlas não pode gerenciá-lo, pelo mesmo motivo que não pode
 gerenciar os utilitários de busca textual (full-text search).
 

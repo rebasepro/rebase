@@ -72,27 +72,19 @@ export interface ClassifiedSchemaChanges {
 export interface SchemaCommitPaths {
     /** Drizzle schema, imported by the backend. */
     schemaFile: string;
-    /** Declarative DDL, what `db push` applies and Atlas diffs against. */
-    ddlFile: string;
-    policiesFile: string;
-    searchFile: string;
-    /** Vector columns and ANN indexes — like search, applied by Rebase not Atlas. */
-    vectorFile: string;
-    /**
-     * `autoValue: "on_update"` triggers and the function they share. Atlas's
-     * free tier will not parse a desired state containing a function, so this
-     * is applied by Rebase like search and vector.
-     */
-    triggersFile: string;
 }
 
+/**
+ * The SQL `db push` and `db generate` render — `schema.sql`, `policies.sql` and
+ * the rest — is not here, and must not come back. Both commands regenerate it
+ * from the collections before reading it, so nothing ever read a committed
+ * copy; it lives in the gitignored `.rebase/sql/`. When the commit carried it,
+ * it carried a second copy besides: these paths are from the project root,
+ * while the CLI writes beside the backend, so a live edit left `drizzle/` and
+ * `backend/drizzle/` disagreeing about the schema.
+ */
 export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
-    schemaFile: "backend/src/schema.generated.ts",
-    ddlFile: "drizzle/schema.sql",
-    policiesFile: "drizzle/policies.sql",
-    searchFile: "drizzle/search.sql",
-    vectorFile: "drizzle/vector.sql",
-    triggersFile: "drizzle/triggers.sql"
+    schemaFile: "backend/src/schema.generated.ts"
 };
 
 /** One file the commit writes, as content rather than as a path on a disk. */

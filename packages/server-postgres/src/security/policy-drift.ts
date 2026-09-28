@@ -10,7 +10,7 @@
  * table is indistinguishable from a table with no data.
  *
  * Expected policies are parsed from `generatePostgresPoliciesDdl`, the same
- * function `db push` uses to write `drizzle/policies.sql`, so this compares
+ * function `db push` uses to write `.rebase/sql/policies.sql`, so this compares
  * against exactly what would be applied rather than a reimplementation.
  */
 import { RLS_UID_SQL, type CollectionConfig } from "@rebasepro/types";

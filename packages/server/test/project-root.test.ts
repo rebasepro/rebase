@@ -3,8 +3,8 @@
  *
  * The failure this prevents is quiet and expensive: for a project in a
  * subdirectory, the defaults resolve against the repository root, so the commit
- * writes `backend/` and `drizzle/` beside `.git` and leaves the project's real
- * generated files untouched. A source change then lands alongside a stale
+ * writes `backend/` beside `.git` and leaves the project's real generated
+ * file untouched. A source change then lands alongside a stale
  * schema — the exact failure that committing the *whole* change exists to
  * avoid, arriving through the design itself.
  */
@@ -69,11 +69,7 @@ describe("relocating the commit paths", () => {
     it("prefixes them for a project in a subdirectory", () => {
         const root = tree(["app/config/collections"], "app");
         expect(commitPathsFor(path.join(root, "app/config/collections"), root)).toEqual({
-            schemaFile: "app/backend/src/schema.generated.ts",
-            ddlFile: "app/drizzle/schema.sql",
-            policiesFile: "app/drizzle/policies.sql",
-            searchFile: "app/drizzle/search.sql",
-            vectorFile: "app/drizzle/vector.sql"
+            schemaFile: "app/backend/src/schema.generated.ts"
         });
     });
 
@@ -83,7 +79,7 @@ describe("relocating the commit paths", () => {
             path.join(root, "packages/apps/shop/config/collections"),
             root
         );
-        expect(paths?.ddlFile).toBe("packages/apps/shop/drizzle/schema.sql");
+        expect(paths?.schemaFile).toBe("packages/apps/shop/backend/src/schema.generated.ts");
     });
 
     it("leaves them alone when there is no marker", () => {

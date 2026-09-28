@@ -83,8 +83,6 @@ const NOT_OURS = new Map([
     ["JEST_WORKER_ID", "the test runner's; read to refuse a dev secret under test"],
     ["VITEST_WORKER_ID", "the test runner's; read to refuse a dev secret under test"],
     ["REBASE_E2E", "a test hook: the e2e suite sets it to skip a prompt"],
-    ["REBASE_AUTO_GENERATE", "a test hook for `rebase dev`"],
-    ["REBASE_GENERATE", "a test hook for `rebase dev`"],
     ["REBASE_RESET_EMAIL", "a test hook for `rebase auth reset-password`"],
     ["REBASE_RESET_PASSWORD", "a test hook for `rebase auth reset-password`"],
     ["REBASE_DEV_PROJECT_ROOT", "set by `rebase dev` for the child process it spawns"],

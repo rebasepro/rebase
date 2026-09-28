@@ -1,5 +1,5 @@
 ---
-sourceHash: 827d73a898f837eb
+sourceHash: 81b13d22398a2dd5
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -90,7 +90,32 @@ rebase db push
 - Lê o esquema Drizzle gerado
 - Aplica as mudanças diretamente ao banco de dados (CREATE, ALTER, DROP)
 - Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, ou uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`). Pergunta em um terminal e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim
+- Aplica as políticas RLS das suas coleções e **remove as políticas que um push anterior substituiu**
 - **Não** cria arquivos de migração
+
+**Os arquivos que ele gera no caminho**, todos em `.rebase/sql/` no diretório do backend. `db push` e `db generate` escrevem os cinco a partir das suas coleções a cada execução, antes de ler qualquer um deles, então nada leria uma cópia incluída em um commit. O diretório traz seu próprio `.gitignore` e nunca entra em um commit.
+
+| Arquivo | Contém |
+|------|-------|
+| `schema.sql` | Tabelas, colunas, constraints e índices — o estado desejado do Atlas, e o único que ele compara |
+| `policies.sql` | As políticas RLS em que suas `securityRules` são compiladas |
+| `search.sql` | As funções de busca de texto completo e as colunas geradas, para coleções com um bloco `search` |
+| `vector.sql` | Extensões pgvector e índices ANN |
+| `triggers.sql` | `rebase.set_updated_at()` e os triggers `BEFORE UPDATE` por trás de `autoValue: "on_update"` |
+
+O Atlas gerencia o primeiro e nada mais, então `db push` e o ajuste do schema na inicialização aplicam os outros quatro por conta própria. Um deploy **só com migrações** — um que executa `db migrate` e nunca `db push` — precisa incluir esses quatro em uma migração manualmente; `db generate` avisa quando uma mudança é invisível para o Atlas.
+
+Um projeto que fez commit desses arquivos em `drizzle/` em uma versão anterior tem essas cópias removidas na primeira execução, e o comando cita cada uma para que você possa fazer commit da remoção. Ele remove apenas arquivos que começam com o cabeçalho do gerador. Um arquivo que você mesmo escreveu permanece, assim como `drizzle/migrations/`.
+
+:::note[Editar uma regra de segurança renomeia sua política]
+Uma regra sem um `name` explícito é compilada como `<table>_<op>_<hash>`, em que o hash cobre a semântica da regra — então *editar* uma regra (em vez de adicionar uma) produz uma política com um novo nome e deixa a antiga para trás.
+
+Isso importava muito antes: o Postgres combina políticas `PERMISSIVE` com OR, então um `USING (rebase.uid() IS NOT NULL)` substituído continuava concedendo tudo, por mais restrita que fosse a sua substituta. Tornar uma regra mais restrita não tinha efeito, e o push informava sucesso.
+
+Agora o `db push` reconcilia isso: remove as políticas geradas que não correspondem mais a nenhuma regra e informa — sem remover — qualquer política com nome personalizado que suas coleções não descrevem, já que ela não se distingue de SQL que alguém escreveu de propósito.
+
+Para auditar um banco de dados que recebeu push antes dessa mudança, execute `rebase doctor --policies`. Funciona como um gate de CI: sai com código diferente de zero quando há drift, e também quando não conseguiu executar a verificação — sem `DATABASE_URL`, um caminho `--collections` que não se resolve, uma leitura de `pg_policies` não concedida ao papel de CI. Um gate que não conseguiu olhar não passou.
+:::
 
 :::caution
 `db push` modifica o banco de dados diretamente. Use-o apenas em desenvolvimento. Para produção, use `db generate` + `db migrate` para criar arquivos de migração revisáveis.
@@ -106,7 +131,7 @@ rebase db generate
 
 **O que ele faz:**
 - Compara o esquema Drizzle com o estado atual do banco de dados
-- Produz arquivos de migração SQL com carimbo de data/hora no diretório `drizzle/`
+- Produz arquivos de migração SQL com carimbo de data/hora em `drizzle/migrations/`
 - Os arquivos podem ser revisados, editados e commitados no controle de versão
 
 As migrações geradas são arquivos SQL simples — você pode inspecioná-las e modificá-las antes de aplicá-las.
@@ -120,7 +145,7 @@ rebase db migrate
 ```
 
 **O que ele faz:**
-- Lê o diretório `drizzle/` em busca de migrações não aplicadas
+- Lê `drizzle/migrations/` em busca de migrações não aplicadas
 - Aplica-as em ordem ao banco de dados
 - Rastreia quais migrações foram aplicadas
 
@@ -175,6 +200,10 @@ rebase generate-sdk
 - Gera tipos TypeScript para todas as entidades em `generated/sdk/`
 - Produz um arquivo `database.types.ts` para uso com `createRebaseClient<Database>()`
 
+O `rebase dev` executa isto para você ao iniciar e a cada salvamento em
+`config/collections/`. Execute-o você mesmo no CI, em um repositório que não tem
+coleções (veja `--from` abaixo), ou onde quer que o `rebase dev` não esteja em execução.
+
 **Opções:**
 
 | Flag | Descrição |
@@ -228,9 +257,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/
+# 4. Review the generated SQL in drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/
+git add drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —

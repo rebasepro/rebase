@@ -38,33 +38,28 @@ describe("devWatchIncludes", () => {
         REBASE_DEV_CRONS: "backend/crons"
     };
 
-    it("watches the functions and crons directories, absolute", () => {
-        expect(devWatchIncludes("/srv/app", paths, false)).toEqual([
+    it("watches the functions, crons and config directories, absolute", () => {
+        expect(devWatchIncludes("/srv/app", paths)).toEqual([
             path.join("/srv/app", "backend", "functions"),
-            path.join("/srv/app", "backend", "crons")
+            path.join("/srv/app", "backend", "crons"),
+            path.join("/srv/app", "config")
         ]);
-    });
-
-    it("adds config/ only when auto-generation is off", () => {
-        expect(devWatchIncludes("/srv/app", paths, true))
-            .toContain(path.join("/srv/app", "config"));
-        expect(devWatchIncludes("/srv/app", paths, false))
-            .not.toContain(path.join("/srv/app", "config"));
     });
 
     it("honours a manifest that moved the directories", () => {
         expect(devWatchIncludes("/srv/app", {
             REBASE_DEV_FUNCTIONS: "services/api/handlers",
             REBASE_DEV_CRONS: "services/api/schedules"
-        }, false)).toEqual([
+        })).toEqual([
             path.join("/srv/app", "services", "api", "handlers"),
-            path.join("/srv/app", "services", "api", "schedules")
+            path.join("/srv/app", "services", "api", "schedules"),
+            path.join("/srv/app", "config")
         ]);
     });
 
     it("drops an entry the manifest did not resolve", () => {
-        expect(devWatchIncludes("/srv/app", { REBASE_DEV_FUNCTIONS: "backend/functions" }, false))
-            .toEqual([path.join("/srv/app", "backend", "functions")]);
+        expect(devWatchIncludes("/srv/app", { REBASE_DEV_FUNCTIONS: "backend/functions" }))
+            .toEqual([path.join("/srv/app", "backend", "functions"), path.join("/srv/app", "config")]);
     });
 });
 
@@ -302,6 +297,14 @@ describe("the dev help and the dev flag spec", () => {
         for (const flag of longFlags) {
             expect(help, `${flag} is accepted by the parser but missing from --help`).toContain(flag);
         }
+    });
+
+    it.each(["--generate", "-g"])("refuses the removed %s by name, not as a typo", async (flag) => {
+        // What it switched on is the default now. A generic "unknown option"
+        // would send the reader hunting for the right spelling of a flag that
+        // no longer has one.
+        await expect(devCommand(["node", "rebase", "dev", flag]))
+            .rejects.toThrow(/--generate` is gone.*Drop the flag/s);
     });
 
     it("names only rebase.json keys the manifest carries", async () => {

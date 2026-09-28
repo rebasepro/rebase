@@ -307,8 +307,8 @@ export const collections = [
 ### Create the Table
 
 Save the file. That is the whole step: `rebase dev` regenerates
-`backend/src/schema.generated.ts` from your collections, restarts the backend,
-and boot creates the new table — so your **Products** collection appears in the
+`backend/src/schema.generated.ts` and the SDK types in `generated/sdk/` from your
+collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
 navigation.
 
 The same is true of a property added to a collection you already have: save,
@@ -532,9 +532,10 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 4. **The CLI** reads them to generate migration files with `rebase schema generate`
 
 While `rebase dev` is running, saving a file under `config/collections/`
-regenerates `backend/src/schema.generated.ts` and restarts the backend, and boot
-creates the tables and columns that are missing. Outside `rebase dev` the same
-step is `rebase schema generate`.
+regenerates `backend/src/schema.generated.ts` and the SDK types in
+`generated/sdk/`, restarts the backend, and boot creates the tables and columns
+that are missing. Outside `rebase dev` the same steps are `rebase schema generate`
+and `rebase generate-sdk`.
 
 ### Next Steps
 
@@ -1248,11 +1249,12 @@ and the fix.
 
 ## Upgrading an existing app
 
-Six hops, newest first. Start at the one above the version you are on and work
+Seven hops, newest first. Start at the one above the version you are on and work
 downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
+| **0.23** | [0.23 → next](/docs/upgrading/0-23-to-next/) | Not released yet: what is merged on `main` and already described in these docs. The SQL `db push` and `db generate` render moves out of `drizzle/` into the uncommitted `.rebase/sql/`, the `--generate` flag of `rebase dev` is gone because `dev` always regenerates the SDK types, and a live schema edit commits no SQL. |
 | **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | An API key on a nested path needs `read` on its parents, unreadable numeric variables and session lifetimes refuse to boot, a custom auth repository needs `unlinkUserIdentity`, and guest upgrades take the `register` captcha. 0.22 declares no breaking change, so this is one hop from 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` stops compiling in a collection callback — query through `context.data` — and `selectedEntities` gives way to a selection that can stand for rows nobody has loaded. 0.19 and 0.20 declare no breaking change, so this is one hop from 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Eleven breaking changes, most of them compile errors rather than silent behaviour changes. `rebase.data` disappears at runtime, peer ranges narrow to carets, and the Node floor moves to 22.22.0. |
@@ -1324,6 +1326,84 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Changelog](/docs/changelog/) — the release notes each of these sections summarises
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
+
+## Upgrading 0.23 to the next release
+
+## Upgrading 0.23 → next
+
+**Nothing here is released yet.** These are the `#### Breaking` entries of the
+changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
+this documentation site publishes from `main`, so they are described here before
+the version that carries them exists on npm. If you installed from npm you are
+on 0.23 and none of this has reached you — read it to know what is coming, and
+come back when you move.
+
+All three are about generated files. None of them changes your schema, your data
+or your API: they change what lands in your repository, and what `rebase dev`
+does without being asked.
+
+---
+
+### 41. `db push` and `db generate` write their SQL to `.rebase/sql/`
+
+`rebase db push` and `rebase db generate` render your collections to five SQL
+files: `schema.sql`, `policies.sql`, `search.sql`, `vector.sql` and
+`triggers.sql`. They were written into `drizzle/`, beside the migrations, and
+committed. Both commands regenerate all five before reading any of them, so the
+committed copy was never read, and it showed up in the diff of every collection
+change. They are now written to `.rebase/sql/`, relative to the directory the
+command runs in — `backend/.rebase/sql/` in a scaffolded project. The directory
+writes its own `.gitignore`, so it is never committed.
+
+The first run after upgrading deletes the old copies in `drizzle/` and names
+each one. It deletes only files that open with the generator's header, so a file
+you wrote there stays, and so do the migrations in `drizzle/migrations/`.
+
+**What to change:** commit the deletion the first run reports. If a script or a
+CI step reads one of these files, point it at `.rebase/sql/` and run
+`rebase db push` or `rebase db generate` before it: a fresh checkout no longer
+has the file.
+
+```bash
+grep -rnE "drizzle/(schema|policies|search|vector|triggers)\.sql" --exclude-dir=node_modules .
+```
+
+### 42. `rebase dev` no longer takes `--generate`
+
+What the flag switched on is what `rebase dev` always does now. On start and on
+every save under `config/collections/`, it regenerates the SDK types in
+`generated/sdk/`, as it already did for the Drizzle schema. Before, the SDK was
+regenerated only with the flag, so a fresh clone had no SDK types until someone
+ran `rebase generate-sdk`. Passing `--generate` or `-g` stops with a message
+telling you to drop it, and `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` are no
+longer read.
+
+**What to change:** remove `--generate` and `-g` from every script that starts
+`rebase dev`, and delete `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` from your
+`.env` files. `rebase generate-sdk` is unchanged: keep it in CI, in a frontend
+repository that has no collections (`--from link`), and anywhere `rebase dev` is
+not running.
+
+```bash
+grep -rnE "rebase dev.*(--generate|-g)|REBASE_(AUTO_)?GENERATE" --exclude-dir=node_modules .
+```
+
+### 43. A live schema edit commits no SQL
+
+A change applied from the admin panel's
+[live schema editor](/docs/backend/live-schema-editing/) commits the collection
+and `backend/src/schema.generated.ts`, and nothing else. It also used to commit
+the five SQL files, but it wrote them at the project root while the CLI writes
+them beside the backend, so a project could hold two copies that disagreed.
+`SchemaCommitPaths` and `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
+
+**What to change:** nothing, unless your code reads `DEFAULT_COMMIT_PATHS` or
+builds a `SchemaCommitPaths` — then drop `ddlFile`, `policiesFile`, `searchFile`,
+`vectorFile` and `triggersFile`, which TypeScript now reports. If a live edit
+committed those files to a `drizzle/` directory at your project root, nothing
+reads them: delete them. A project that keeps versioned migrations still runs
+`rebase db generate` after a live edit, and it writes the migration from the
+committed collection.
 
 ## Upgrading 0.21 to 0.23
 
@@ -2914,6 +2994,39 @@ yet, listed so that nobody reads a promise into them:
 ## Changelog
 
 ### [Unreleased]
+
+#### Breaking
+
+##### CLI
+
+- **`rebase db push` and `rebase db generate` write their SQL to `.rebase/sql/`
+  instead of `drizzle/`.** This covers `schema.sql`, `policies.sql`,
+  `search.sql`, `vector.sql` and `triggers.sql`. Both commands regenerate these
+  files from the collections before reading them, so the copy in the
+  repository was never read, and it showed up in the diff of every collection
+  change. The new directory ignores itself and is not committed. On the first
+  run after upgrading, the command deletes the old generated copies in
+  `drizzle/` and names them, so you can commit the deletion. A file there that
+  the generator did not write is kept, and so are the migrations. If one of
+  your scripts reads `drizzle/policies.sql`, point it at
+  `.rebase/sql/policies.sql` and run `rebase db push` or `rebase db generate`
+  first.
+
+- **`rebase dev --generate` is removed, because what it did is now the
+  default.** `rebase dev` regenerates the SDK types in `generated/sdk/` on
+  start and on every save under `config/collections/`, as it already did for
+  the Drizzle schema. Before this, the SDK was only regenerated with the flag,
+  so a fresh clone had no SDK types until someone ran `rebase generate-sdk`.
+  Passing `--generate` or `-g` now stops with a message telling you to drop
+  it, and `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` are no longer read.
+
+##### Server & REST
+
+- **A live schema edit commits the collection and `schema.generated.ts`, and
+  no SQL.** The commit also carried the five SQL files, but it wrote them at
+  the project root while the CLI writes them next to the backend, so a project
+  could hold two copies that disagreed. `SchemaCommitPaths` and
+  `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
 
 #### Fixed
 
@@ -12249,6 +12362,11 @@ Generate a fully typed client from your collection definitions:
 rebase generate-sdk
 ```
 
+While `rebase dev` is running you do not need to: it regenerates the types in
+`generated/sdk/` on start and on every save under `config/collections/`. Run the
+command yourself in CI, in a frontend repository that has no collections
+(`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
+
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
 
 ```typescript
@@ -13878,7 +13996,7 @@ trigger a seed script, a migration backfill or one row fixed in `psql` left the
 column claiming the row had not changed, and anything reading it to decide what
 to re-index or re-send skipped that row.
 
-The trigger lives in `drizzle/triggers.sql`, applied by `rebase db push` and at
+The trigger is generated into `.rebase/sql/triggers.sql`, applied by `rebase db push` and at
 boot by the schema ensure — Atlas cannot manage it, for the same reason it
 cannot manage the full-text search helpers.
 
@@ -18551,7 +18669,7 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts", "drizzle/schema.sql"]
+  "files": ["backend/src/schema.generated.ts"]
 }
 ```
 
@@ -18619,12 +18737,11 @@ instead.
 
 ### What gets committed
 
-Not just the collection file. A schema change touches several generated
-artifacts, and a stale one breaks the next deploy:
+Not just the collection file. The Drizzle schema is generated from it, and a
+stale one breaks the next deploy, so both go in the same commit:
 
 - `config/collections/<name>.ts` — the collection itself
 - `backend/src/schema.generated.ts` — the Drizzle schema
-- `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
 Those paths are relative to your **project**, not to your repository. When the
 two are the same — a `rebase init` project, which is the usual case — there is
@@ -18632,6 +18749,9 @@ nothing to think about. When your project sits in a subdirectory of a larger
 repository, the paths are prefixed with it, found by walking up from your
 collections directory to the nearest `rebase.json`. A project with no
 `rebase.json` keeps the plain paths.
+
+No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
+from the collections on every run, into `.rebase/sql/`, which is gitignored.
 
 The commit message describes the change rather than announcing one, and is
 attributed to the admin who made it. A schema change with an author and a diff
@@ -18690,8 +18810,8 @@ Applying here does **not** write a migration, and cannot: a migration is Atlas's
 format with an integrity file, minted by an external binary against a throwaway
 database, and a running server has neither.
 
-What it does write is `drizzle/schema.sql` — which is exactly what
-`rebase db generate` diffs against. So the migration is one command away:
+What it does commit is the collection, and that is what `rebase db generate`
+writes the migration from. So the migration is one command away:
 
 ```bash
 rebase db generate
@@ -21756,7 +21876,7 @@ Postgres recomputes the column on every write of a source field and refuses any
 attempt to write it directly, so the index cannot drift from the row. The column
 is never returned by the API.
 
-They are generated into `drizzle/search.sql`, next to `schema.sql` and
+They are generated into `.rebase/sql/search.sql`, next to `schema.sql` and
 `policies.sql`, and `rebase db push` applies them for you — nothing extra to
 run. They get their own file because a generated `tsvector` column needs an
 `IMMUTABLE` helper function to exist first (`unaccent` is only `STABLE`, and
@@ -21767,7 +21887,8 @@ One consequence worth knowing if you deploy by migration rather than by push:
 adding a `search` block on its own produces no migration, because the schema
 Atlas compares has not changed. `rebase db generate` says so when it happens.
 The block is still applied by `rebase db push` and by the boot-time schema
-ensure; to put it in a migration explicitly, append `drizzle/search.sql` to one.
+ensure; to put it in a migration explicitly, append `.rebase/sql/search.sql`,
+which `rebase db generate` has just written, to one.
 
 #### Changing the block later
 
@@ -32884,6 +33005,11 @@ Generate a fully typed client from your collection definitions:
 rebase generate-sdk
 ```
 
+While `rebase dev` is running you do not need to: it regenerates the types in
+`generated/sdk/` on start and on every save under `config/collections/`. Run the
+command yourself in CI, in a frontend repository that has no collections
+(`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
+
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
 
 ```typescript
@@ -34139,7 +34265,7 @@ searches embeddings, it does not compute them.
   ways out.
 
 The column, its ANN index and that `CREATE EXTENSION` are generated into
-`drizzle/vector.sql`, next to `schema.sql` and `policies.sql`, and `rebase db
+`.rebase/sql/vector.sql`, next to `schema.sql` and `policies.sql`, and `rebase db
 push` applies them for you. They have a file of their own because Atlas — the
 engine behind `db push` — computes its diff by materialising `schema.sql` in a
 scratch database it wipes at the start of every run, so a `VECTOR(n)` in there
@@ -36811,7 +36937,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -36922,7 +37048,7 @@ Generate SQL migration files from schema changes:
 rebase db generate
 ```
 
-Creates timestamped migration files in `drizzle/` that can be reviewed and committed.
+Creates timestamped migration files in `drizzle/migrations/` that can be reviewed and committed.
 
 #### `rebase db migrate`
 
@@ -37459,7 +37585,10 @@ rebase db push
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 
-**The files it generates on the way**, all under `drizzle/`:
+**The files it generates on the way**, all under `.rebase/sql/` in the backend
+directory. `db push` and `db generate` write all five from your collections on
+every run, before reading any of them, so a committed copy would be read by
+nothing. The directory carries its own `.gitignore` and is never committed.
 
 | File | Holds |
 |------|-------|
@@ -37473,6 +37602,11 @@ Atlas manages the first and nothing else, so `db push` and the boot-time schema
 ensure apply the other four themselves. A **migration-only** deployment — one
 that runs `db migrate` and never `db push` — has to fold those four into a
 migration by hand; `db generate` says so when a change is invisible to Atlas.
+
+A project that committed these files to `drizzle/` under an earlier release has
+those copies deleted on its first run, and the command names each one so you can
+commit the deletion. It deletes only files that open with the generator's
+header. A file you wrote yourself stays, and so does `drizzle/migrations/`.
 
 :::note[Editing a security rule renames its policy]
 A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
@@ -37498,7 +37632,7 @@ rebase db generate
 
 **What it does:**
 - Compares the Drizzle schema against the current database state
-- Produces timestamped SQL migration files in the `drizzle/` directory
+- Produces timestamped SQL migration files in `drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
 
 The generated migrations are plain SQL files — you can inspect and modify them before applying.
@@ -37512,7 +37646,7 @@ rebase db migrate
 ```
 
 **What it does:**
-- Reads the `drizzle/` directory for unapplied migrations
+- Reads `drizzle/migrations/` for unapplied migrations
 - Applies them in order to the database
 - Tracks which migrations have been applied
 
@@ -37579,6 +37713,10 @@ rebase generate-sdk
 - Generates TypeScript types for all entities in `generated/sdk/`
 - Produces a `database.types.ts` file for use with `createRebaseClient<Database>()`
 
+`rebase dev` runs this for you on start and on every save under
+`config/collections/`. Run it yourself in CI, in a repository that has no
+collections (see `--from` below), or anywhere `rebase dev` is not running.
+
 **Options:**
 
 | Flag | Description |
@@ -37639,9 +37777,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/
+# 4. Review the generated SQL in drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/
+git add drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —
@@ -38335,13 +38473,15 @@ and plans the change:
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
-   rebase schema generate                       (the same command also
-            │                                    writes the SQL below)
-            ▼                                           │
-  backend/src/schema.generated.ts                        ▼
-  the Drizzle schema the runtime            drizzle/schema.sql      ← Atlas's desired state
-  reads and writes rows through             policies.sql            ← RLS, applied separately
-                                            search.sql, vector.sql  ← Atlas cannot manage these
+   rebase schema generate                   (db push and db generate write
+            │                               the SQL below on every run, into
+            ▼                               .rebase/sql/, which is not committed)
+  backend/src/schema.generated.ts                       │
+  the Drizzle schema the runtime                        ▼
+  reads and writes rows through             schema.sql              ← Atlas's desired state
+                                            policies.sql            ← RLS, applied separately
+                                            search.sql, vector.sql, ← Atlas cannot manage these
+                                            triggers.sql
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
@@ -38359,7 +38499,9 @@ and plans the change:
 
 `db push` is the development loop; `db generate` + `db migrate` is the
 reviewable one, and the one to use in production. Both go through the same
-generated SQL, so they cannot disagree about what your collections mean. See
+generated SQL, so they cannot disagree about what your collections mean, and
+both write it afresh from the collections before reading it, so there is no copy
+in your repository to fall behind. The migrations are what you commit. See
 [Schema Generation](/docs/cli/schema) for every flag.
 
 #### Example

@@ -39,17 +39,9 @@
  */
 import {
     DEFAULT_COMMIT_PATHS,
-    declaredDatabaseExtensions,
     type CollectionConfig,
     type SchemaCommitPaths
 } from "@rebasepro/types";
-import {
-    generatePostgresDdl,
-    generatePostgresPoliciesDdl,
-    generatePostgresSearchDdl,
-    generatePostgresTriggersDdl,
-    generatePostgresVectorDdl
-} from "./generate-postgres-ddl-logic";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     planCollectionSchemaEnsure,
@@ -214,37 +206,13 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
         );
     }
 
-    // The same split `rebase db generate` writes, and it has to be the same:
-    // these files land in the repository, and the next `db push` runs Atlas
-    // against `schema.sql`. Generated whole, it carries the RLS policies (which
-    // Atlas would then own and drop), the search helpers (which its free tier
-    // refuses to parse at all) and `VECTOR(n)` (which its dev database cannot
-    // resolve) — so a live schema edit used to leave behind a desired-state
-    // file that `db push` chokes on.
+    // The Drizzle schema alone. The SQL `db push` and `db generate` render is
+    // not part of a schema change: both regenerate it from the collections
+    // before reading it, into the gitignored `.rebase/sql/`, so a copy in the
+    // commit would be read by nothing — and was worse than dead weight, since
+    // it landed at the project root while the CLI writes beside the backend.
     const generated: SchemaCommitFile[] = [
-        { path: paths.schemaFile, contents: generateSchema(input.after) },
-        {
-            path: paths.ddlFile,
-            contents: generatePostgresDdl(input.after, {
-                includePolicies: false,
-                includeSearch: false,
-                includeVector: false
-            })
-        },
-        { path: paths.policiesFile, contents: generatePostgresPoliciesDdl(input.after) },
-        { path: paths.searchFile, contents: generatePostgresSearchDdl(input.after) },
-        {
-            path: paths.vectorFile,
-            // The registry, because this runs inside the booted server, which
-            // has already evaluated the project's `resources.ts`. A commit that
-            // wrote a `vector.sql` disagreeing with the one `rebase db
-            // generate` produces would show up as drift in the repository the
-            // moment anyone regenerated.
-            contents: generatePostgresVectorDdl(input.after, {
-                extensions: declaredDatabaseExtensions()
-            })
-        },
-        { path: paths.triggersFile, contents: generatePostgresTriggersDdl(input.after) }
+        { path: paths.schemaFile, contents: generateSchema(input.after) }
     ];
 
     // Both sides planned once, here, rather than through `additiveStatements` —

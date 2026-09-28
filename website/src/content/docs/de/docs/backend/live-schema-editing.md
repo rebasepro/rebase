@@ -1,5 +1,5 @@
 ---
-sourceHash: 7253b4b5232fa542
+sourceHash: dbaee87f7378ffd7
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -46,7 +46,7 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts", "drizzle/schema.sql"]
+  "files": ["backend/src/schema.generated.ts"]
 }
 ```
 
@@ -114,12 +114,11 @@ zu tun ist.
 
 ## Was committet wird
 
-Nicht nur die Collection-Datei. Eine Schemaänderung betrifft mehrere generierte
-Artefakte, und ein veraltetes Artefakt bringt den nächsten Deploy zum Scheitern:
+Nicht nur die Collection-Datei. Das Drizzle-Schema wird aus ihr generiert, und ein
+veraltetes Schema bringt den nächsten Deploy zum Scheitern, also landen beide im selben Commit:
 
 - `config/collections/<name>.ts` — die Collection selbst
 - `backend/src/schema.generated.ts` — das Drizzle-Schema
-- `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
 Diese Pfade sind relativ zu Ihrem **Projekt**, nicht zu Ihrem Repository. Wenn
 beide identisch sind – ein `rebase init`-Projekt, was der Regelfall ist –, gibt es
@@ -127,6 +126,9 @@ nichts zu bedenken. Wenn sich Ihr Projekt in einem Unterverzeichnis eines größ
 Repositorys befindet, werden die Pfade mit diesem vorangestellt, ermittelt durch das Durchsuchen
 von Ihrem Collections-Verzeichnis aufwärts zur nächsten `rebase.json`. Ein Projekt ohne
 `rebase.json` behält die einfachen Pfade bei.
+
+Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben ihr
+SQL bei jedem Lauf aus den Collections nach `.rebase/sql/`, das von Git ignoriert wird.
 
 Die Commit-Nachricht beschreibt die Änderung, anstatt nur eine anzukündigen, und wird
 dem Admin zugeschrieben, der sie vorgenommen hat. Eine Schemaänderung mit einem Autor und einem Diff
@@ -185,8 +187,8 @@ Das Anwenden hier schreibt **keine** Migration und kann dies auch nicht: Eine Mi
 Format mit einer Integritätsdatei, erzeugt von einer externen Binärdatei gegen eine temporäre
 Wegwerf-Datenbank – und ein laufender Server hat keines von beiden.
 
-Was es jedoch schreibt, ist `drizzle/schema.sql` – was genau das ist, wogegen
-`rebase db generate` ein Diff bildet. Die Migration ist also nur einen Befehl entfernt:
+Was es jedoch committet, ist die Collection – und genau daraus schreibt
+`rebase db generate` die Migration. Die Migration ist also nur einen Befehl entfernt:
 
 ```bash
 rebase db generate

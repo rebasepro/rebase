@@ -56,7 +56,7 @@ export interface LiveSchemaPlan {
      *
      * Empty almost always. The case it exists for: a project that replays
      * versioned migrations, where applying here changes *this* database and
-     * commits `drizzle/schema.sql`, but writes no migration — so the next
+     * commits the collection, but writes no migration — so the next
      * environment built from migrations would not have the change.
      */
     followUp?: string[];

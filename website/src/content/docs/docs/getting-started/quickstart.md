@@ -184,8 +184,8 @@ export const collections = [
 ## Create the Table
 
 Save the file. That is the whole step: `rebase dev` regenerates
-`backend/src/schema.generated.ts` from your collections, restarts the backend,
-and boot creates the new table — so your **Products** collection appears in the
+`backend/src/schema.generated.ts` and the SDK types in `generated/sdk/` from your
+collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
 navigation.
 
 The same is true of a property added to a collection you already have: save,

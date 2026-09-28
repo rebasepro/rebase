@@ -1,5 +1,5 @@
 ---
-sourceHash: b40aeb5aa87322cc
+sourceHash: bd5c3797254d822d
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como habilitar a busca de texto completo ranqueada em uma coleção Postgres nos campos especificados — incluindo conteúdo JSONB e array.
@@ -100,7 +100,7 @@ O Postgres recalcula a coluna a cada gravação de um campo de origem e recusa
 qualquer tentativa de gravá-la diretamente, para que o índice não fique desalinhado
 com a linha. A coluna nunca é retornada pela API.
 
-Eles são gerados em `drizzle/search.sql`, junto a `schema.sql` e `policies.sql`,
+Eles são gerados em `.rebase/sql/search.sql`, junto a `schema.sql` e `policies.sql`,
 e o `rebase db push` os aplica para você — nada extra para executar. Eles têm seu
 próprio arquivo porque uma coluna `tsvector` gerada precisa que uma função auxiliar
 `IMMUTABLE` exista primeiro (`unaccent` é apenas `STABLE`, e achatar um documento
@@ -112,7 +112,7 @@ push: adicionar um bloco `search` por conta própria não produz nenhuma migraç
 porque o schema que o Atlas compara não mudou. O `rebase db generate` avisa quando
 isso acontece. O bloco ainda é aplicado pelo `rebase db push` e pela verificação
 de schema na inicialização; para incluí-lo em uma migração explicitamente, anexe
-`drizzle/search.sql` a uma.
+`.rebase/sql/search.sql`, que o `rebase db generate` acabou de gravar, a uma.
 
 ### Alterando o bloco posteriormente
 

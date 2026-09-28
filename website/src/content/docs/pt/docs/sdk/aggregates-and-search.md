@@ -1,5 +1,5 @@
 ---
-sourceHash: df84abf06690d9ce
+sourceHash: bc6c73dcfd10b400
 title: Agregações e busca
 sidebar_label: Agregações e busca
 description: "Faça contagens, somas e agrupamentos com o SDK, filtre dentro de colunas JSON e execute busca textual e vetorial a partir do cliente."
@@ -181,7 +181,7 @@ busca embeddings, ele não os computa.
   indicando ambas as alternativas para resolver.
 
 A coluna, seu índice ANN e esse `CREATE EXTENSION` são gerados em
-`drizzle/vector.sql`, ao lado de `schema.sql` e `policies.sql`, e o `rebase db
+`.rebase/sql/vector.sql`, ao lado de `schema.sql` e `policies.sql`, e o `rebase db
 push` os aplica para você. Eles têm um arquivo próprio porque o Atlas — o
 mecanismo por trás do `db push` — calcula seu diff materializando o `schema.sql` em um
 banco de dados temporário que ele limpa no início de cada execução, portanto, um `VECTOR(n)` lá dentro

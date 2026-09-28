@@ -11,6 +11,7 @@ import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-
 import { out, outWarn } from "./cli-output";
 import type { CollectionConfig } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
+import { generatedSqlDir } from "./generated-sql";
 
 
 
@@ -489,11 +490,11 @@ export async function dropDevDatabase(databaseUrl: string, devDatabaseUrl: strin
 /**
  * The generated SQL for the project's `search` blocks, if it has any.
  *
- * @param drizzleDir directory holding the generated SQL. Defaults to `drizzle`
- *        under the working directory.
+ * @param sqlDir directory holding the generated SQL. Defaults to
+ *        `.rebase/sql` under the working directory.
  */
-export function readSearchDdl(drizzleDir: string = path.resolve(process.cwd(), "drizzle")): string {
-    const searchFile = path.join(drizzleDir, "search.sql");
+export function readSearchDdl(sqlDir: string = generatedSqlDir()): string {
+    const searchFile = path.join(sqlDir, "search.sql");
     if (!fs.existsSync(searchFile)) return "";
     return fs.readFileSync(searchFile, "utf-8").trim();
 }
@@ -513,9 +514,9 @@ export function readSearchDdl(drizzleDir: string = path.resolve(process.cwd(), "
  */
 export async function applySearchDdl(
     databaseUrl: string,
-    drizzleDir: string = path.resolve(process.cwd(), "drizzle")
+    sqlDir: string = generatedSqlDir()
 ): Promise<void> {
-    const sql = readSearchDdl(drizzleDir);
+    const sql = readSearchDdl(sqlDir);
     if (!sql) return;
 
     const { Client } = await import("pg");
@@ -627,11 +628,11 @@ export async function dropGeneratedColumns(
 /**
  * The generated SQL for the project's `vector` properties, if it has any.
  *
- * @param drizzleDir directory holding the generated SQL. Defaults to `drizzle`
- *        under the working directory.
+ * @param sqlDir directory holding the generated SQL. Defaults to
+ *        `.rebase/sql` under the working directory.
  */
-export function readVectorDdl(drizzleDir: string = path.resolve(process.cwd(), "drizzle")): string {
-    const vectorFile = path.join(drizzleDir, "vector.sql");
+export function readVectorDdl(sqlDir: string = generatedSqlDir()): string {
+    const vectorFile = path.join(sqlDir, "vector.sql");
     if (!fs.existsSync(vectorFile)) return "";
     return fs.readFileSync(vectorFile, "utf-8").trim();
 }
@@ -653,9 +654,9 @@ export function readVectorDdl(drizzleDir: string = path.resolve(process.cwd(), "
  */
 export async function applyVectorDdl(
     databaseUrl: string,
-    drizzleDir: string = path.resolve(process.cwd(), "drizzle")
+    sqlDir: string = generatedSqlDir()
 ): Promise<void> {
-    const sql = readVectorDdl(drizzleDir);
+    const sql = readVectorDdl(sqlDir);
     if (!sql) return;
 
     const { vectorExtensionHint } = await import("./schema/vector-index");
@@ -695,11 +696,11 @@ export async function getVectorExcludes(collectionsPath: string): Promise<string
  * The generated SQL for the project's `autoValue: "on_update"` properties, if
  * it has any.
  *
- * @param drizzleDir directory holding the generated SQL. Defaults to `drizzle`
- *        under the working directory.
+ * @param sqlDir directory holding the generated SQL. Defaults to
+ *        `.rebase/sql` under the working directory.
  */
-export function readTriggersDdl(drizzleDir: string = path.resolve(process.cwd(), "drizzle")): string {
-    const triggersFile = path.join(drizzleDir, "triggers.sql");
+export function readTriggersDdl(sqlDir: string = generatedSqlDir()): string {
+    const triggersFile = path.join(sqlDir, "triggers.sql");
     if (!fs.existsSync(triggersFile)) return "";
     return fs.readFileSync(triggersFile, "utf-8").trim();
 }
@@ -720,9 +721,9 @@ export function readTriggersDdl(drizzleDir: string = path.resolve(process.cwd(),
  */
 export async function applyTriggersDdl(
     databaseUrl: string,
-    drizzleDir: string = path.resolve(process.cwd(), "drizzle")
+    sqlDir: string = generatedSqlDir()
 ): Promise<void> {
-    const sql = readTriggersDdl(drizzleDir);
+    const sql = readTriggersDdl(sqlDir);
     if (!sql) return;
 
     const { Client } = await import("pg");

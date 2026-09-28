@@ -45,7 +45,7 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts", "drizzle/schema.sql"]
+  "files": ["backend/src/schema.generated.ts"]
 }
 ```
 
@@ -113,12 +113,11 @@ instead.
 
 ## What gets committed
 
-Not just the collection file. A schema change touches several generated
-artifacts, and a stale one breaks the next deploy:
+Not just the collection file. The Drizzle schema is generated from it, and a
+stale one breaks the next deploy, so both go in the same commit:
 
 - `config/collections/<name>.ts` — the collection itself
 - `backend/src/schema.generated.ts` — the Drizzle schema
-- `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
 Those paths are relative to your **project**, not to your repository. When the
 two are the same — a `rebase init` project, which is the usual case — there is
@@ -126,6 +125,9 @@ nothing to think about. When your project sits in a subdirectory of a larger
 repository, the paths are prefixed with it, found by walking up from your
 collections directory to the nearest `rebase.json`. A project with no
 `rebase.json` keeps the plain paths.
+
+No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
+from the collections on every run, into `.rebase/sql/`, which is gitignored.
 
 The commit message describes the change rather than announcing one, and is
 attributed to the admin who made it. A schema change with an author and a diff
@@ -184,8 +186,8 @@ Applying here does **not** write a migration, and cannot: a migration is Atlas's
 format with an integrity file, minted by an external binary against a throwaway
 database, and a running server has neither.
 
-What it does write is `drizzle/schema.sql` — which is exactly what
-`rebase db generate` diffs against. So the migration is one command away:
+What it does commit is the collection, and that is what `rebase db generate`
+writes the migration from. So the migration is one command away:
 
 ```bash
 rebase db generate

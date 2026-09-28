@@ -60,6 +60,7 @@ import { ScratchDatabase } from "./cli-scratch-database";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
+import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
@@ -356,7 +357,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         out("");
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
-        await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", "file://drizzle/schema.sql"], collectionsPath);
+        await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], collectionsPath);
         // The diff cannot be told to ignore the carved-out objects the way the
         // apply can, so the drop it plans for them is taken back out of the
         // file it just wrote. A migration that was nothing else is deleted.
@@ -454,7 +455,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // migration is self-contained: Atlas replays migrations
                     // against a clean dev database where `rebase.uid()` would
                     // not otherwise exist.
-                    const policiesFile = path.resolve(process.cwd(), "drizzle", "policies.sql");
+                    const policiesFile = path.join(generatedSqlDir(), "policies.sql");
                     if (fs.existsSync(policiesFile)) {
                         const policiesContent = fs.readFileSync(policiesFile, "utf-8");
                         fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
@@ -481,8 +482,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 "  ℹ No migration written — nothing in this change is visible to Atlas.\n" +
                 "    Search, vector, trigger and RLS DDL are applied by `rebase db push`, and at\n" +
                 "    boot by the schema ensure. For a migration-only deployment, add\n" +
-                "    drizzle/search.sql, drizzle/vector.sql, drizzle/triggers.sql and\n" +
-                "    drizzle/policies.sql to a migration by hand."
+                `    ${GENERATED_SQL_DIR}/search.sql, vector.sql, triggers.sql and\n` +
+                "    policies.sql to a migration by hand."
             ));
         }
 
@@ -519,7 +520,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // SQL and gate anything destructive.
             const plan = await runAtlas(
                 "schema",
-                ["apply", "--to", "file://drizzle/schema.sql", "--dry-run"],
+                ["apply", "--to", DESIRED_STATE_URL, "--dry-run"],
                 collectionsPath,
                 { captureStdout: true }
             );
@@ -655,7 +656,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             }
 
             try {
-                await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
+                await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath);
             } catch (err) {
                 // Atlas rolled its transaction back, so the columns those
                 // expressions read are as they were and the definitions in
@@ -860,7 +861,7 @@ async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
 
 async function applyPolicies(databaseUrl: string): Promise<void> {
     try {
-        const policiesPath = path.resolve(process.cwd(), "drizzle", "policies.sql");
+        const policiesPath = path.join(generatedSqlDir(), "policies.sql");
         if (!fs.existsSync(policiesPath)) return;
         
         out(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
@@ -1531,7 +1532,19 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
     }
 
     const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
-    const outputPath = argsList["--output"] || path.join("drizzle", "schema.sql");
+    const outputPath = argsList["--output"] || path.join(GENERATED_SQL_DIR, "schema.sql");
+
+    // Only for the default location: an explicit `--output` is somebody's own
+    // arrangement, and its directory is theirs to manage.
+    if (!argsList["--output"]) {
+        const retired = prepareGeneratedSqlDir();
+        if (retired.length > 0) {
+            out(chalk.gray(
+                `  Generated SQL is written to ${GENERATED_SQL_DIR}/ now, which is not committed. ` +
+                `Removed the old copies — commit the deletion:\n    ${retired.join(", ")}`
+            ));
+        }
+    }
 
     const cmdParts = [
         ddl.bin,

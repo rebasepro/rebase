@@ -1,5 +1,5 @@
 ---
-sourceHash: 476cbf3fe099d5c3
+sourceHash: 3c5a26968b75b8b0
 title: Propiedades
 sidebar_label: Propiedades
 description: Los tipos de propiedades definen el tipo de dato, la validación y el renderizado de la interfaz de usuario para cada campo en una colección. Rebase admite los tipos string, number, boolean, date, array, map, reference, relation y geopoint.
@@ -382,7 +382,7 @@ updatedAt: {
 
 `on_update` es un trigger de base de datos, no solo una marca a nivel de aplicación. Rebase escribe la columna en cada guardado que realiza —de modo que un hook `beforeSave` ve el nuevo valor— e instala un trigger `BEFORE UPDATE` que la escribe para todos los demás. Sin el trigger, un script de seed, el backfill de una migración o una fila corregida en `psql` dejaban la columna indicando que la fila no había cambiado, y cualquier proceso que la leyera para decidir qué reindexar o reenviar ignoraba esa fila.
 
-El trigger reside en `drizzle/triggers.sql`, aplicado por `rebase db push` y al iniciar por la verificación del esquema — Atlas no puede gestionarlo, por la misma razón que no puede gestionar las herramientas de búsqueda de texto completo (full-text search).
+El trigger se genera en `.rebase/sql/triggers.sql`, aplicado por `rebase db push` y al iniciar por la verificación del esquema — Atlas no puede gestionarlo, por la misma razón que no puede gestionar las herramientas de búsqueda de texto completo (full-text search).
 
 ### Opciones de Date
 

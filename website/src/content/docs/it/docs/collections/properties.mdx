@@ -1,5 +1,5 @@
 ---
-sourceHash: 476cbf3fe099d5c3
+sourceHash: 3c5a26968b75b8b0
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dati, la validazione e il rendering dell'interfaccia utente per ogni campo in una collection. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -406,7 +406,7 @@ installa un trigger `BEFORE UPDATE` che la aggiorna per qualsiasi altra operazio
 trigger, uno script di seed, un backfill di migrazione o una riga modificata manualmente in `psql` lascerebbero
 la colonna invariata, e qualsiasi processo che la legge per decidere cosa reindicizzare o reinviare salterebbe quella riga.
 
-Il trigger si trova in `drizzle/triggers.sql`, applicato da `rebase db push` e all'avvio
+Il trigger viene generato in `.rebase/sql/triggers.sql`, applicato da `rebase db push` e all'avvio
 dalla sincronizzazione dello schema — Atlas non è in grado di gestirlo, per lo stesso motivo per cui non può gestire gli helper di ricerca full-text.
 
 ### Opzioni Date

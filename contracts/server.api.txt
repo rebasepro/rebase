@@ -422,7 +422,7 @@ const BATCH_REF_KEY
 const BUNDLE_FORMAT_VERSION
 const CANONICAL_TO_REST
 const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
-const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
+const DEFAULT_COMMIT_PATHS { schemaFile }
 const DEFAULT_DATA_SOURCE_KEY
 const DEFAULT_FILTERABLE_RELATION_KINDS
 const DEFAULT_FUZZY_THRESHOLD
@@ -764,7 +764,7 @@ interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
 interface SchemaChange { collection, detail, kind, property, remedy, verdict }
 interface SchemaChangeFile { contents, path }
 interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
-interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
+interface SchemaCommitPaths { schemaFile }
 interface SchemaEditingAdmin { planSchemaChange }
 interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, mode, unaccent }
 interface SearchField { path, weight }

@@ -59,7 +59,7 @@ export const generatePolicyStatements = (
 };
 
 /**
- * `drizzle/schema.sql` — the desired state Atlas diffs the database against.
+ * `.rebase/sql/schema.sql` — the desired state Atlas diffs the database against.
  *
  * Synchronous. It was `async` with nothing to await, which made every caller
  * (the writer script, the doctor, the live editor, two gates) carry a promise
@@ -71,12 +71,12 @@ export const generatePostgresDdl = (
     options: DdlRenderOptions = {}
 ): string => renderPostgresDdl(planSchema(allCollections), options);
 
-/** `drizzle/policies.sql` — the RLS policies. Atlas has no model for a policy. */
+/** `.rebase/sql/policies.sql` — the RLS policies. Atlas has no model for a policy. */
 export const generatePostgresPoliciesDdl = (allCollections: CollectionConfig[]): string =>
     renderPoliciesDdl(planSchema(allCollections));
 
 /**
- * `drizzle/search.sql` — everything a `search` block needs, as a file Rebase
+ * `.rebase/sql/search.sql` — everything a `search` block needs, as a file Rebase
  * applies itself.
  *
  * Search is one of the parts of the schema Atlas does not own, for two
@@ -108,7 +108,7 @@ export const searchExcludePatterns = (allCollections: CollectionConfig[]): strin
     searchExcludePatternsOf(planSchema(allCollections));
 
 /**
- * `drizzle/vector.sql` — the `vector` columns, their ANN indexes and, when a
+ * `.rebase/sql/vector.sql` — the `vector` columns, their ANN indexes and, when a
  * database declared it, the extension.
  *
  * Vector is out of Atlas's hands for a narrower reason than search: not that
@@ -128,7 +128,7 @@ export const vectorExcludePatterns = (allCollections: CollectionConfig[]): strin
     vectorExcludePatternsOf(planSchema(allCollections));
 
 /**
- * `drizzle/triggers.sql` — the `BEFORE UPDATE` triggers behind
+ * `.rebase/sql/triggers.sql` — the `BEFORE UPDATE` triggers behind
  * `autoValue: "on_update"`, and the one function they share.
  *
  * A trigger is a function plus a binding, so it is carved out of Atlas's view

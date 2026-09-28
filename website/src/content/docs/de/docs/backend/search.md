@@ -1,5 +1,5 @@
 ---
-sourceHash: b40aeb5aa87322cc
+sourceHash: bd5c3797254d822d
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie Sie eine Postgres-Collection für die gerankte Volltextsuche über die von Ihnen benannten Felder aktivieren – einschließlich JSONB- und Array-Inhalten.
@@ -103,7 +103,7 @@ Postgres berechnet die Spalte bei jedem Schreibvorgang eines Quellfelds neu und
 verweigert jeden Versuch, direkt hineinzuschreiben, sodass der Index nicht von
 der Zeile abweichen kann. Die Spalte wird niemals von der API zurückgegeben.
 
-Sie werden in `drizzle/search.sql` generiert, neben `schema.sql` und
+Sie werden in `.rebase/sql/search.sql` generiert, neben `schema.sql` und
 `policies.sql`, und `rebase db push` wendet sie für Sie an – es muss nichts
 Zusätzliches ausgeführt werden. Sie erhalten eine eigene Datei, da eine generierte
 `tsvector`-Spalte voraussetzt, dass zuvor eine `IMMUTABLE`-Hilfsfunktion existiert
@@ -116,7 +116,8 @@ Das Hinzufügen eines `search`-Blocks allein erzeugt keine Migration, da sich da
 von Atlas verglichene Schema nicht geändert hat. `rebase db generate` weist
 darauf hin, wenn dies passiert. Der Block wird dennoch durch `rebase db push`
 und durch die Schema-Sicherstellung beim Start angewendet; um ihn explizit in
-eine Migration aufzunehmen, hängen Sie `drizzle/search.sql` an eine Migration an.
+eine Migration aufzunehmen, hängen Sie `.rebase/sql/search.sql`, das
+`rebase db generate` gerade geschrieben hat, an eine Migration an.
 
 ### Nachträgliches Ändern des Blocks
 

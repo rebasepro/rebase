@@ -1,16 +1,15 @@
 /**
  * Where a project's generated artifacts belong, relative to its repository.
  *
- * `DEFAULT_COMMIT_PATHS` names them as `backend/src/schema.generated.ts`,
- * `drizzle/schema.sql` and so on, which is correct read from the **project**
- * root and wrong read from anywhere else. The repository resolves what it is
+ * `DEFAULT_COMMIT_PATHS` names `backend/src/schema.generated.ts`, which is
+ * correct read from the **project** root and wrong read from anywhere else. The repository resolves what it is
  * given against its own root, and those two coincide only when the project is
  * the whole repository.
  *
  * A `rebase init` project is exactly that, so this was invisible. A project in
  * a subdirectory — an app inside a monorepo, this repository's own `app/` —
- * is not: the commit created `backend/` and `drizzle/` beside `.git`, left the
- * real generated files untouched, and committed a source change alongside a
+ * is not: the commit created `backend/` beside `.git`, left the real generated
+ * file untouched, and committed a source change alongside a
  * stale schema. That is the failure the commit-the-whole-change design exists
  * to prevent, arriving through the design itself.
  *
@@ -78,13 +77,7 @@ export function commitPathsFor(
     if (prefix === "" || prefix.startsWith("..")) return undefined;
 
     const relocate = (p: string) => path.posix.join(...prefix.split(path.sep), p);
-    return {
-        schemaFile: relocate(DEFAULT_COMMIT_PATHS.schemaFile),
-        ddlFile: relocate(DEFAULT_COMMIT_PATHS.ddlFile),
-        policiesFile: relocate(DEFAULT_COMMIT_PATHS.policiesFile),
-        searchFile: relocate(DEFAULT_COMMIT_PATHS.searchFile),
-        vectorFile: relocate(DEFAULT_COMMIT_PATHS.vectorFile)
-    };
+    return { schemaFile: relocate(DEFAULT_COMMIT_PATHS.schemaFile) };
 }
 
 /**
@@ -94,8 +87,9 @@ export function commitPathsFor(
  * migration is Atlas's format with an integrity file, minted by an external
  * binary against a throwaway database. A server process has neither.
  *
- * What it *does* write is `drizzle/schema.sql`, which is exactly the input
- * `rebase db generate` diffs against — so the migration is one command away.
+ * What it *does* write is the collection source, which is exactly what
+ * `rebase db generate` renders its desired state from — so the migration is
+ * one command away.
  * The hazard is nobody saying so. A project that deploys by replaying
  * migrations would build its next environment without this change, having been
  * told the change was applied.

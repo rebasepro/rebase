@@ -125,12 +125,13 @@ describe("live schema editing, end to end", () => {
         expect(await columnsOf("posts")).toHaveProperty("subtitle");
 
         // …and the repository really has the commit, carrying the generated
-        // artifacts a deploy depends on, not just the collection file.
+        // schema a deploy depends on, not just the collection file — and none
+        // of the SQL the CLI renders into the gitignored `.rebase/sql/`.
         expect(git("log", "-1", "--pretty=%s")).toContain("subtitle");
         expect(git("log", "-1", "--pretty=%an")).toBe("Panel");
         const committed = git("show", "--name-only", "--pretty=", "HEAD").split("\n");
         expect(committed).toContain("backend/src/schema.generated.ts");
-        expect(committed).toContain("drizzle/schema.sql");
+        expect(committed.filter(file => file.endsWith(".sql"))).toEqual([]);
 
         // The existing row survived. An additive change must not rewrite data.
         const { rows } = await admin.query("SELECT id, title, subtitle FROM public.posts");
@@ -217,7 +218,7 @@ describe("live schema editing, end to end", () => {
         // repository is now ahead of the database, which is the ordinary state
         // between an edit and a deploy, and boot reconciles it.
         expect(git("rev-parse", "HEAD")).not.toBe(headBefore);
-        expect(git("show", "--name-only", "--pretty=", "HEAD")).toContain("drizzle/schema.sql");
+        expect(git("show", "--name-only", "--pretty=", "HEAD")).toContain("backend/src/schema.generated.ts");
         expect(await columnsOf("posts")).not.toHaveProperty("summary");
     }, 180_000);
 

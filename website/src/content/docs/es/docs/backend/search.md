@@ -1,5 +1,5 @@
 ---
-sourceHash: b40aeb5aa87322cc
+sourceHash: bd5c3797254d822d
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo habilitar en una colección de Postgres la búsqueda de texto completo con relevancia en los campos que indiques, incluyendo contenido JSONB y arrays.
@@ -75,9 +75,9 @@ const { data } = await client.data.talents
 
 Una columna `tsvector`, `GENERATED ALWAYS AS … STORED`, y un índice GIN sobre ella. Postgres recalcula la columna en cada escritura de un campo de origen y rechaza cualquier intento de escribir en ella directamente, por lo que el índice no puede desincronizarse de la fila. La columna nunca es devuelta por la API.
 
-Se generan en `drizzle/search.sql`, junto a `schema.sql` y `policies.sql`, y `rebase db push` los aplica por ti —sin nada adicional que ejecutar. Obtienen su propio archivo porque una columna `tsvector` generada necesita que exista primero una función auxiliar `IMMUTABLE` (`unaccent` es solo `STABLE`, y aplanar un documento `jsonb` necesita una función que devuelva un conjunto de resultados), y Atlas —el motor detrás de `db push`— no puede gestionar funciones en su nivel gratuito.
+Se generan en `.rebase/sql/search.sql`, junto a `schema.sql` y `policies.sql`, y `rebase db push` los aplica por ti —sin nada adicional que ejecutar. Obtienen su propio archivo porque una columna `tsvector` generada necesita que exista primero una función auxiliar `IMMUTABLE` (`unaccent` es solo `STABLE`, y aplanar un documento `jsonb` necesita una función que devuelva un conjunto de resultados), y Atlas —el motor detrás de `db push`— no puede gestionar funciones en su nivel gratuito.
 
-Una consecuencia que vale la pena conocer si despliegas mediante migraciones en lugar de push: agregar un bloque `search` por sí solo no produce ninguna migración, porque el esquema que compara Atlas no ha cambiado. `rebase db generate` lo indica cuando ocurre. El bloque todavía se aplica mediante `rebase db push` y mediante la verificación del esquema en el momento de arranque; para incluirlo explícitamente en una migración, añade `drizzle/search.sql` a una de ellas.
+Una consecuencia que vale la pena conocer si despliegas mediante migraciones en lugar de push: agregar un bloque `search` por sí solo no produce ninguna migración, porque el esquema que compara Atlas no ha cambiado. `rebase db generate` lo indica cuando ocurre. El bloque todavía se aplica mediante `rebase db push` y mediante la verificación del esquema en el momento de arranque; para incluirlo explícitamente en una migración, añade a una de ellas `.rebase/sql/search.sql`, que `rebase db generate` acaba de escribir.
 
 ### Modificar el bloque más adelante
 

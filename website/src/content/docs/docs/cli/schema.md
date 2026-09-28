@@ -108,7 +108,10 @@ rebase db push
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 
-**The files it generates on the way**, all under `drizzle/`:
+**The files it generates on the way**, all under `.rebase/sql/` in the backend
+directory. `db push` and `db generate` write all five from your collections on
+every run, before reading any of them, so a committed copy would be read by
+nothing. The directory carries its own `.gitignore` and is never committed.
 
 | File | Holds |
 |------|-------|
@@ -122,6 +125,11 @@ Atlas manages the first and nothing else, so `db push` and the boot-time schema
 ensure apply the other four themselves. A **migration-only** deployment — one
 that runs `db migrate` and never `db push` — has to fold those four into a
 migration by hand; `db generate` says so when a change is invisible to Atlas.
+
+A project that committed these files to `drizzle/` under an earlier release has
+those copies deleted on its first run, and the command names each one so you can
+commit the deletion. It deletes only files that open with the generator's
+header. A file you wrote yourself stays, and so does `drizzle/migrations/`.
 
 :::note[Editing a security rule renames its policy]
 A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
@@ -147,7 +155,7 @@ rebase db generate
 
 **What it does:**
 - Compares the Drizzle schema against the current database state
-- Produces timestamped SQL migration files in the `drizzle/` directory
+- Produces timestamped SQL migration files in `drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
 
 The generated migrations are plain SQL files — you can inspect and modify them before applying.
@@ -161,7 +169,7 @@ rebase db migrate
 ```
 
 **What it does:**
-- Reads the `drizzle/` directory for unapplied migrations
+- Reads `drizzle/migrations/` for unapplied migrations
 - Applies them in order to the database
 - Tracks which migrations have been applied
 
@@ -228,6 +236,10 @@ rebase generate-sdk
 - Generates TypeScript types for all entities in `generated/sdk/`
 - Produces a `database.types.ts` file for use with `createRebaseClient<Database>()`
 
+`rebase dev` runs this for you on start and on every save under
+`config/collections/`. Run it yourself in CI, in a repository that has no
+collections (see `--from` below), or anywhere `rebase dev` is not running.
+
 **Options:**
 
 | Flag | Description |
@@ -290,9 +302,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/
+# 4. Review the generated SQL in drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/
+git add drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —

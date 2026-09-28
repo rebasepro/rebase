@@ -56,7 +56,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -167,7 +167,7 @@ Generate SQL migration files from schema changes:
 rebase db generate
 ```
 
-Creates timestamped migration files in `drizzle/` that can be reviewed and committed.
+Creates timestamped migration files in `drizzle/migrations/` that can be reviewed and committed.
 
 ### `rebase db migrate`
 

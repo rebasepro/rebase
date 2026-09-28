@@ -1,5 +1,5 @@
 ---
-sourceHash: 2415f0f60ed62277
+sourceHash: c30e838bf7e3f20c
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -58,6 +58,8 @@ rebase dev
 ```
 
 Inicia tanto el frontend como el backend con recarga en caliente (hot reloading).
+
+Al arrancar y en cada guardado bajo `config/collections/`, regenera el esquema de Drizzle (`backend/src/schema.generated.ts`) y los tipos del SDK (`generated/sdk/`), para que ninguno de los dos se quede atrás respecto a tus colecciones.
 
 Ambos puertos se derivan de la ruta del proyecto, por lo que varios proyectos de Rebase pueden ejecutarse simultáneamente. Utiliza las URLs que imprime `rebase dev`. Fija uno con `rebase dev --port 3001`.
 
@@ -157,7 +159,7 @@ Genera archivos de migración SQL a partir de cambios en el esquema:
 rebase db generate
 ```
 
-Crea archivos de migración con marca de tiempo en `drizzle/` que se pueden revisar y confirmar (commit).
+Crea archivos de migración con marca de tiempo en `drizzle/migrations/` que se pueden revisar y confirmar (commit).
 
 ### `rebase db migrate`
 
