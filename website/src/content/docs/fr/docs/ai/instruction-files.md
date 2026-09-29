@@ -63,7 +63,7 @@ serveur à la racine du projet, et un chemin absolu est la seule ligne de ce
 fichier qui ne peut pas être commitée. Il est là parce que
 `~/.rebase/projects.json` vaut pour toute la machine — un projet qui ne nomme
 aucun répertoire retombe sur ce que le dernier projet de cette machine y a
-enregistré. Voir [la priorité](/fr/docs/ai/mcp#sur-quel-répertoire-il-agit).
+enregistré. Voir [la priorité](/fr/docs/ai/mcp#sur-quel-répertoire-il-opère).
 
 ## Pourquoi un pointeur plutôt qu'une copie
 

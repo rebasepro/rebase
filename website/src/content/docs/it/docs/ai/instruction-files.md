@@ -62,7 +62,7 @@ nella radice del progetto, e un percorso assoluto è l'unica riga di quel file c
 non può essere committata. C'è perché `~/.rebase/projects.json` vale per l'intera
 macchina — un progetto che non nomina una directory propria ricade su ciò che vi
 ha salvato l'ultimo progetto di quella macchina. Vedi
-[la precedenza](/it/docs/ai/mcp#su-quale-directory-agisce).
+[la precedenza](/it/docs/ai/mcp#su-quale-directory-opera).
 
 ## Perché un puntatore invece di una copia
 
