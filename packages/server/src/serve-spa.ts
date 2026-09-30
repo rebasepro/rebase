@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import * as path from "path";
 import * as fs from "fs";
@@ -65,18 +65,39 @@ export interface ServeSPAConfig {
      * generator emitted a real file per route.
      */
     spa?: boolean;
+
+    /**
+     * Whether this app answers a request under `basePath` at all (default:
+     * every one).
+     *
+     * For apps told apart by hostname as well as by path, which `excludePaths`
+     * cannot express: two apps can both be rooted at "/", one on
+     * `admin.example.com` and one on every other hostname, and no list of paths
+     * says which of them a request belongs to. The caller, which sees every
+     * app, decides; each mount asks. A request this returns `false` for passes
+     * through everything the mount registers — assets, caching, compression and
+     * the fallback alike — as if the mount were not there, because an app that
+     * declined the fallback but still served its files would answer the other
+     * app's hostname with its own `/assets/*`.
+     */
+    owns?: (request: StaticAppRequest) => boolean;
 }
 
-/**
- * Is `requestPath` the excluded path `prefix`, or something beneath it?
- *
- * Segment-aware on purpose. A plain `startsWith` reads "/api" as excluding
- * "/apidocs", and "/admin" as excluding "/administrators" — both ordinary
- * client-side routes of the app rooted at "/", both then answered with a 404
- * because the SPA fallback declined them and nothing else claims the path.
- * `apiBasePath` is always in the exclusion list, so this reached single-app
- * setups too, not just the multi-app ones the list was added for.
- */
+/** What {@link ServeSPAConfig.owns} is asked about. */
+export interface StaticAppRequest {
+    /**
+     * The `Host` the request named, exactly as sent: any case, and possibly
+     * with a port or a trailing dot. The request URL's host when the header is
+     * absent, as it is on a request built in-process.
+     *
+     * Never `X-Forwarded-Host`. The proxy in front of the runtime passes the
+     * original `Host` through, and a forwarded header is one any client can
+     * write — reading it would let a request for the site choose the admin.
+     */
+    host: string;
+    /** The request path, as routed. */
+    path: string;
+}
 
 /**
  * A request path that must never reach the static file server.
@@ -130,7 +151,21 @@ async function resolvesInsideBuild(frontendPath: string, relativePath: string): 
     }
 }
 
-function isUnderPath(requestPath: string, prefix: string): boolean {
+/**
+ * Is `requestPath` the path `prefix`, or something beneath it?
+ *
+ * Segment-aware on purpose. A plain `startsWith` reads "/api" as excluding
+ * "/apidocs", and "/admin" as excluding "/administrators" — both ordinary
+ * client-side routes of the app rooted at "/", both then answered with a 404
+ * because the SPA fallback declined them and nothing else claims the path.
+ * `apiBasePath` is always in the exclusion list, so this reached single-app
+ * setups too, not just the multi-app ones the list was added for.
+ *
+ * Exported because deciding which app owns a request asks the same question of
+ * each app's own path, and two readings of "under" would disagree at exactly
+ * the boundary this exists for.
+ */
+export function isUnderPath(requestPath: string, prefix: string): boolean {
     // "/" would exclude everything below it, which is every request.
     const trimmed = prefix.replace(/\/+$/, "");
     if (trimmed === "") return true;
@@ -281,6 +316,22 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // silently answer for every app mounted after it.
     const scope = isRoot ? "/*" : `${basePath}/*`;
 
+    // Every middleware below asks this first. The `Host` header rather than the
+    // URL wherever there is one, because that is the value the proxy in front
+    // passed through; the URL is the fallback for a request built in-process,
+    // which may carry no header at all.
+    const { owns } = config;
+    const declines = (c: Context): boolean => owns !== undefined && !owns({
+        host: c.req.header("host") ?? new URL(c.req.url).host,
+        path: c.req.path
+    });
+    // A third-party middleware cannot ask for itself. Returned as it came when
+    // there is no `owns`, so a mount without one registers exactly what it
+    // always has.
+    const unlessDeclined = (handler: MiddlewareHandler): MiddlewareHandler => owns === undefined
+        ? handler
+        : async (c, next) => declines(c) ? next() : handler(c, next);
+
     // Compress the bundle. The API is compressed by `configureMiddlewares`, but
     // that is scoped to the API base path — static assets are served here, and
     // the JS bundle is the single largest thing most apps ship.
@@ -304,6 +355,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // An explicit header already on the response wins: a route that has thought
     // about its own caching knows more than a default does.
     app.use(scope, async (c, next) => {
+        if (declines(c)) return next();
         await next();
         if (c.res.headers.has("cache-control")) return;
         // 404s and redirects are not the build's artifacts to cache. A 304 is,
@@ -315,6 +367,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // Before `serveStatic`, because it is what `serveStatic` will otherwise
     // answer. See {@link isForbiddenStaticPath} and {@link resolvesInsideBuild}.
     app.use(scope, async (c, next) => {
+        if (declines(c)) return next();
         const requestPath = isRoot ? c.req.path : (c.req.path.slice(basePath.length) || "/");
 
         if (isForbiddenStaticPath(requestPath)) {
@@ -331,14 +384,14 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         return next();
     });
 
-    app.use(scope, responseCompression());
-    app.use(scope, serveStatic({
+    app.use(scope, unlessDeclined(responseCompression()));
+    app.use(scope, unlessDeclined(serveStatic({
         root: path.relative(process.cwd(), frontendPath),
         precompressed: true,
         // The prefix is a serving concern, not a directory: `/admin/assets/x.js`
         // lives at `<adminBuild>/assets/x.js`.
         ...(isRoot ? {} : { rewriteRequestPath: (p: string) => p.slice(basePath.length) || "/" })
-    }));
+    })));
 
     if (!spa) {
         logger.info(`✅ Static serving enabled at ${basePath} from: ${frontendPath}`);
@@ -353,8 +406,9 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
 
     // SPA fallback - serve index.html for all non-excluded routes under basePath
     app.get(scope, async (c, next) => {
-        // Skip excluded paths (API, health checks, sibling apps).
-        if (allExcludePaths.some(p => isUnderPath(c.req.path, p))) {
+        // Skip excluded paths (API, health checks, sibling apps), and requests
+        // another app owns.
+        if (declines(c) || allExcludePaths.some(p => isUnderPath(c.req.path, p))) {
             return next();
         }
 

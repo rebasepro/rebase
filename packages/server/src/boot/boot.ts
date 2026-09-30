@@ -26,7 +26,7 @@ import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { installRootErrorHandler } from "../api/root-error-handler";
 import { describeCauseChain, logger, type Logger } from "../utils/logger";
-import { nestedAppPaths, serveSPA } from "../serve-spa";
+import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
@@ -43,6 +43,7 @@ import {
     type LoadedBundle
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources } from "./sources";
+import { planStaticAppMounts } from "./static-routing";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveRlsAuditOptions } from "./rls-audit-option";
 import { resolveAuthOptions } from "./options";
@@ -500,20 +501,22 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
 
     // ── Static assets ────────────────────────────────────────────────────────
     // Mounted last: each app's `serveSPA` ends in a catch-all under its own
-    // prefix, so anything registered after it would never be reached.
+    // prefix, so anything registered after it would never be reached — and
+    // for the same reason every route above answers on every hostname, an
+    // app's own included.
     //
     // `bundle.staticApps` arrives longest-path-first, which puts the "/"-rooted
-    // app last. Ordering alone is not enough, though — every app also excludes
-    // the apps nested beneath it, or a miss under "/admin" would be answered
-    // with the site's index.html at the admin's URL. See `nestedAppPaths` for
-    // why it is only those.
+    // app last. Ordering alone is not enough, though — every app also declines
+    // what its siblings own, or a miss under "/admin" would be answered with
+    // the site's index.html at the admin's URL. `planStaticAppMounts` decides
+    // which rule does that.
     if (env.REBASE_SERVE_STATIC) {
-        for (const staticApp of bundle.staticApps) {
-            const siblings = nestedAppPaths(staticApp.path, bundle.staticApps
-                .filter(other => other !== staticApp)
-                .map(other => other.path));
-            logger.info("Serving static assets", { path: staticApp.dir,
-at: staticApp.path });
+        for (const { app: staticApp, siblingPaths, owns } of planStaticAppMounts(bundle.staticApps)) {
+            logger.info("Serving static assets", {
+                path: staticApp.dir,
+                at: staticApp.path,
+                ...(staticApp.host ? { host: staticApp.host } : {})
+            });
             serveSPA(app, {
                 frontendPath: staticApp.dir,
                 basePath: staticApp.path,
@@ -523,7 +526,8 @@ at: staticApp.path });
                 // verifier's fetch with index.html — a 200 of HTML, which
                 // reads as "this issuer has no keys" rather than as a routing
                 // mistake.
-                excludePaths: ["/health", "/livez", "/metrics", "/.well-known", ...siblings],
+                excludePaths: ["/health", "/livez", "/metrics", "/.well-known", ...siblingPaths],
+                owns,
                 spa: staticApp.spa
             });
         }
@@ -688,20 +692,19 @@ async function bootStaticApp(
 
     // Mounted last: each app's serveSPA ends in a catch-all under its prefix.
     // Same ordering and sibling-exclusion rules as the backend path above.
-    for (const staticApp of bundle.staticApps) {
-        const siblings = nestedAppPaths(staticApp.path, bundle.staticApps
-            .filter(other => other !== staticApp)
-            .map(other => other.path));
+    for (const { app: staticApp, siblingPaths, owns } of planStaticAppMounts(bundle.staticApps)) {
         logger.info("Serving static app", {
             app: bundle.manifest.app,
             path: staticApp.dir,
-            at: staticApp.path
+            at: staticApp.path,
+            ...(staticApp.host ? { host: staticApp.host } : {})
         });
         serveSPA(app, {
             frontendPath: staticApp.dir,
             basePath: staticApp.path,
             apiBasePath: basePath,
-            excludePaths: ["/health", "/livez", "/metrics", ...siblings],
+            excludePaths: ["/health", "/livez", "/metrics", ...siblingPaths],
+            owns,
             spa: staticApp.spa
         });
     }

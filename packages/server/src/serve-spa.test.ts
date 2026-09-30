@@ -10,7 +10,9 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Hono } from "hono";
-import { nestedAppPaths, serveSPA } from "./serve-spa";
+import { serveSPA } from "./serve-spa";
+import { compareStaticApps } from "./boot/bundle";
+import { planStaticAppMounts } from "./boot/static-routing";
 
 interface MountedApp {
     path: string;
@@ -31,7 +33,8 @@ function writeApp(name: string, files: Record<string, string>): string {
 }
 
 /**
- * Mount apps exactly as `bootFromBundle` does: longest path first, and every
+ * Mount apps exactly as `bootFromBundle` does: in the loader's order, and
+ * through the same planner — which, for apps that name no hostname, has every
  * app excluding the apps nested beneath it.
  */
 function mount(apps: MountedApp[]): Hono {
@@ -40,16 +43,13 @@ function mount(apps: MountedApp[]): Hono {
     app.get("/health", (c) => c.json({ status: "ok" }));
     app.get("/api/things", (c) => c.json({ ok: true }));
 
-    const ordered = [...apps].sort((a, b) => b.path.length - a.path.length);
-    for (const staticApp of ordered) {
-        const siblings = nestedAppPaths(staticApp.path, ordered
-            .filter(other => other !== staticApp)
-            .map(other => other.path));
+    for (const { app: staticApp, siblingPaths, owns } of planStaticAppMounts([...apps].sort(compareStaticApps))) {
         serveSPA(app, {
             frontendPath: staticApp.dir,
             basePath: staticApp.path,
             apiBasePath: "/api",
-            excludePaths: ["/health", "/livez", "/metrics", ...siblings],
+            excludePaths: ["/health", "/livez", "/metrics", ...siblingPaths],
+            owns,
             spa: staticApp.spa
         });
     }

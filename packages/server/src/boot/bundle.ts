@@ -4,10 +4,12 @@ import { pathToFileURL } from "url";
 import {
     BUNDLE_FORMAT_VERSION,
     RUNTIME_CONTRACT_VERSION,
+    isValidAppHost,
     type CollectionConfig,
     type CollectionCallbacks,
     type DataSourceDefinition,
     type RebaseBundleManifest,
+    type RebaseBundleStatic,
     type StorageSourceDefinition
 } from "@rebasepro/types";
 import type { StorageAuthorize } from "../storage/types";
@@ -54,10 +56,36 @@ export interface LoadedBundle {
 export interface LoadedStaticApp {
     /** Public base path, e.g. `/` or `/admin`. */
     path: string;
+    /**
+     * The one hostname this app answers on, lowercase — see
+     * {@link RebaseBundleStatic.host}. Absent means every hostname.
+     */
+    host?: string;
     /** Absolute path to the built assets. */
     dir: string;
     /** Serve `index.html` for unmatched paths under `path`. */
     spa: boolean;
+}
+
+/**
+ * The order static apps are mounted in, which is also the order they are
+ * matched in: longest path first, and at an equal path the app that names a
+ * hostname before the one that does not.
+ *
+ * Longest first because the "/"-rooted app's catch-all would otherwise claim
+ * every sibling's URLs. Host first at an equal path because `admin.example.com`
+ * at "/" is a more specific claim than "every hostname" at "/" — the host-less
+ * app still answers on every other hostname, it just loses this one.
+ *
+ * The CLI orders `entry.static` the same way when it builds; this does not rely
+ * on that, because a bundle's order is whatever the program that wrote it chose.
+ */
+export function compareStaticApps(
+    a: Pick<LoadedStaticApp, "path" | "host">,
+    b: Pick<LoadedStaticApp, "path" | "host">
+): number {
+    return b.path.length - a.path.length
+        || Number(b.host !== undefined) - Number(a.host !== undefined);
 }
 
 /**
@@ -245,16 +273,45 @@ export function loadBundle(bundleDir: string): LoadedBundle {
         cronsDir: resolveEntry(entry.crons, "crons"),
         staticApps: (entry.static ?? [])
             .map(item => {
+                // Before the directory check, so a bad hostname is reported
+                // even on an app whose build is missing.
+                const host = readStaticAppHost(item);
                 const resolved = resolveEntry(item.dir, `static app "${item.path}"`);
-                return resolved ? { path: item.path,
-dir: resolved,
-spa: item.spa !== false } : undefined;
+                if (!resolved) return undefined;
+                return {
+                    path: item.path,
+                    // Only when declared, so an app without one is the same
+                    // object it always was.
+                    ...(host !== undefined ? { host } : {}),
+                    dir: resolved,
+                    spa: item.spa !== false
+                };
             })
             .filter((item): item is LoadedStaticApp => item !== undefined)
-            // Longest path first, "/" last: the root app's catch-all would
-            // otherwise claim every sibling's URLs.
-            .sort((a, b) => b.path.length - a.path.length)
+            .sort(compareStaticApps)
     };
+}
+
+/**
+ * Read a static app's hostname, refusing one that is not a hostname.
+ *
+ * Refused rather than dropped: an app whose `host` is ignored is not an app
+ * served somewhere else, it is an app served on every hostname — at "/", that
+ * is the admin answering on the site's domain. The CLI and the control plane
+ * both validate the same field with the same function, so a bundle reaching
+ * here with a bad one was written by something else, and saying so at boot is
+ * the only place left to say it.
+ */
+function readStaticAppHost(item: RebaseBundleStatic): string | undefined {
+    const host: unknown = item.host;
+    if (host === undefined) return undefined;
+    if (typeof host === "string" && isValidAppHost(host)) return host;
+    const name = item.name ?? path.basename(item.dir);
+    throw new BundleError(
+        `Static app "${name}" (at ${item.path}) declares host ${JSON.stringify(host)}, which is not a hostname this runtime can serve it on.`,
+        "A static app's host is a lowercase public DNS name such as \"admin.example.com\" — no scheme, port or path. " +
+        "Fix the app's `path` in rebase.json and rebuild with `rebase build`."
+    );
 }
 
 /**
