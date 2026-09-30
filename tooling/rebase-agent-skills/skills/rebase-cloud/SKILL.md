@@ -57,14 +57,19 @@ One container per app. The backend container handles:
 - **`/api/*`** — the data API, auth, realtime, storage
 - **everything else** — your built frontend as a static SPA (via `serveSPA()`)
 
-There is **no separate admin URL** — the admin panel is part of your frontend,
-so where it appears depends on what your frontend is:
+The admin panel is part of a frontend, not a service of its own, so where it
+appears depends on what your frontend is — and on whether `rebase.json` gives
+the app that holds it a hostname of its own:
 
 | Project type | What the root URL shows | Where the admin is |
 |---|---|---|
 | Default scaffold (`rebase init`) | The admin panel itself (login / bootstrap) | `/` — the frontend **is** the admin |
 | Custom product frontend | Your product app | Wherever you mount it — commonly `/admin` |
+| Admin as its own app with `"path": "https://admin.example.com"` | Your product app | `https://admin.example.com/`, once its DNS verifies — see [Multi-app projects](#multi-app-projects) |
 | Backend-only (`rebase init --headless`) | Nothing (API only) | Not deployed |
+
+The `cms` field of the app in `rebase.json` is what the console's *Open CMS*
+link points at; on an app with a hostname it is a path on that hostname.
 
 > **IMPORTANT FOR AGENTS:** On the **first visit** to a freshly deployed
 > project's admin, Rebase shows the bootstrap screen ("Create your admin
@@ -281,7 +286,8 @@ One container can serve several apps at different paths. Declare them in
       "root": "admin",
       "build": "npm run build --workspace admin",
       "output": "admin/dist",
-      "path": "/admin"
+      "path": "/admin",
+      "cms": "/admin"
     }
   }
 }
@@ -316,6 +322,69 @@ The build refuses a misbuilt app rather than shipping a blank page:
     The app would load a blank page. Set `base` from REBASE_APP_BASE in its
     build config
 ```
+
+### An app on its own hostname
+
+A static app's `path` may be a full `https://` URL instead. The app then answers
+only on that hostname, and every app without one keeps answering on all the
+others:
+
+```jsonc
+"web": {
+  "type": "static", "root": "frontend", "output": "frontend/dist",
+  "path": "/"
+},
+"admin": {
+  "type": "static", "root": "admin", "output": "admin/dist",
+  "path": "https://admin.example.com",
+  "cms": "/"
+}
+```
+
+`admin.example.com` serves `admin`; the project's `*.rebase.website` host and
+every other hostname serve `web`. Of the apps that may answer a request, the
+longest path wins, and at an equal path the one naming the hostname wins. So
+`"https://admin.example.com/cms"` takes only `/cms` on that hostname, and the
+rest of `admin.example.com` goes to `web`.
+
+What stays the same:
+
+- **`/api` and the other backend paths answer on every hostname**, before any
+  app. The admin calls the API on its own hostname; it needs no API URL or CORS
+  change. `https://admin.example.com/api` is refused as a `path`, like `/api`.
+- **The build uses the path part.** `https://admin.example.com` builds with
+  `REBASE_APP_BASE=/`.
+- **`cms` is always a path** — the path on the app's hostname, inside its path
+  part. The console's *Open CMS* link then points at `https://admin.example.com/`.
+- **A hostname belongs to an app, not a route.** A CMS that is one route of a
+  single SPA (`"cms": "/admin"` on `web`) stays at `/admin` on every hostname.
+  To give it a hostname, it has to be an app of its own, with its own build.
+
+What `rebase cloud deploy` does with the hostname:
+
+1. Registers it on the project — the same row `rebase cloud domains add`
+   writes. A hostname another project holds, or one under the platform's own
+   domain, fails the deploy before rollout.
+2. If its DNS is already published, verifies it; it is live when the deploy
+   finishes, and the platform issues its TLS certificate.
+3. If not, the deploy still succeeds and prints the records to create (a TXT
+   for ownership, a CNAME to the project — an A at an apex) and the command to
+   run afterwards:
+
+```bash
+rebase cloud domains verify admin.example.com
+```
+
+Until it verifies, `admin` is reachable nowhere: the one hostname it answers on
+does not reach the project yet. Removing the app from `rebase.json` does not
+remove the hostname — `rebase cloud domains remove` does.
+
+> **IMPORTANT FOR AGENTS:** A deploy of a `rebase.json` with a URL `path`
+> registers a custom domain on the project, which is a change to the hosted
+> platform like `domains add` — the same "asked in this conversation" rule
+> covers it. The DNS records are the user's to publish: hand them the records
+> the deploy printed and the `verify` command, and do not poll `verify` in a
+> loop — nothing changes until someone edits their DNS zone.
 
 ---
 
@@ -395,6 +464,11 @@ rebase cloud domains remove app.example.com
 ```
 
 TLS is issued automatically once verification passes.
+
+A deploy also registers every hostname `rebase.json` gives a static app as its
+`path`, and verifies it when the records are already there — see
+[An app on its own hostname](#an-app-on-its-own-hostname). Those hosts show up
+here like any other.
 
 ---
 

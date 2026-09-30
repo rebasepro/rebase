@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a78fa791d3bc114
+sourceHash: 3dfefd8103a76481
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -7,17 +7,18 @@ description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docke
 
 ## Cosa Serve una Distribuzione
 
-Un progetto Rebase si distribuisce come **un server a un URL** (su Rebase Cloud: `https://<project>.rebase.website`). Quel server gestisce:
+Un progetto Rebase si distribuisce come **un server** (su Rebase Cloud: `https://<project>.rebase.website`). Quel server gestisce:
 
 - **`/api/*`** — l'API dei dati, l'autenticazione, il tempo reale e l'archiviazione
 - **tutto il resto** — il tuo `frontend/` compilato come SPA statica
 
-Non c'è un URL di amministrazione separato: il pannello di amministrazione fa parte del tuo frontend, quindi dove appare dipende da cosa è il tuo frontend.
+Non c'è un servizio di amministrazione separato: il pannello di amministrazione fa parte di un frontend, quindi dove appare dipende da cosa è il tuo frontend, e dal fatto che tu gli dia o meno un hostname tutto suo.
 
 | Tipo di progetto | L'URL radice mostra | Il pannello di amministrazione si trova a |
 |--------------|----------------|-------------------|
 | Scaffold predefinito (`rebase init`) | Il pannello di amministrazione | `/` — il frontend **è** l'amministrazione |
 | Frontend di prodotto personalizzato | La tua app | Dove lo monti, comunemente `/admin` — vedi [Cambiare l'URL di Base](#cambiare-lurl-di-base) |
+| Amministrazione come app su un hostname tutto suo | La tua app | `https://admin.example.com/`, servito dallo stesso server — vedi [Cambiare l'URL di Base](#cambiare-lurl-di-base) |
 | Progetto solo backend | Nulla (solo API) | Non distribuito |
 
 :::note[Prima visita]
@@ -258,7 +259,7 @@ Cloud Run e altre piattaforme serverless sono senza stato. Usa l'**archiviazione
 
 ## Cambiare l'URL di Base
 
-Se vuoi che l'amministrazione venga eseguita su un sotto-percorso (ad es. `/admin`), cambia una riga — il `path` dell'app in `rebase.json`:
+Se vuoi che l'amministrazione venga eseguita su un sotto-percorso (ad es. `/admin`), cambia il `path` dell'app in `rebase.json`, e con esso il suo `cms`:
 
 ```json title="rebase.json"
 "admin": {
@@ -266,11 +267,16 @@ Se vuoi che l'amministrazione venga eseguita su un sotto-percorso (ad es. `/admi
     "root": "frontend",
     "build": "npm run build --workspace frontend",
     "output": "frontend/dist",
-    "path": "/admin"
+    "path": "/admin",
+    "cms": "/admin"
 }
 ```
 
-`rebase build` lo passa a Vite come `base` (tramite `REBASE_APP_BASE`), Vite lo restituisce come `import.meta.env.BASE_URL`, e il `main.tsx` dello scaffold lo passa già al router — così gli asset, le route e il server concordano senza che il prefisso sia scritto in tre posti:
+`cms` indica dove si trova il CMS, a cui punta il link di Rebase Cloud, e deve stare all'interno del `path` dell'app. Lo scaffold li imposta entrambi su `/`, quindi spostare solo `path` viene rifiutato: il CMS resterebbe su `/`, fuori da un'app che ora parte da `/admin`.
+
+Per dare all'amministrazione un hostname tutto suo invece di un sotto-percorso, rendi `path` un URL completo — `"path": "https://admin.example.com"` — e lascia `cms` su `"/"`. L'amministrazione risponde allora solo su quell'hostname, e non sull'indirizzo del progetto, quindi resta irraggiungibile finché il DNS dell'hostname non viene verificato. Anche su quell'hostname l'API resta su `/api`. Vedi [Un'app su un hostname tutto suo](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) per come vengono abbinate le richieste e cosa fa un deploy su Rebase Cloud con l'hostname.
+
+`rebase build` passa `path` a Vite come `base` (tramite `REBASE_APP_BASE`), Vite lo restituisce come `import.meta.env.BASE_URL`, e il `main.tsx` dello scaffold lo passa già al router — così gli asset, le route e il server concordano senza che il prefisso sia scritto in tre posti:
 
 ```tsx title="frontend/src/main.tsx"
 // At "/" this is "".

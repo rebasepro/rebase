@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a78fa791d3bc114
+sourceHash: 3dfefd8103a76481
 title: Bereitstellung
 sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -7,17 +7,18 @@ description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder m
 
 ## Was eine Bereitstellung ausliefert
 
-Ein Rebase-Projekt wird als **ein Server unter einer URL** bereitgestellt (auf Rebase Cloud: `https://<project>.rebase.website`). Dieser Server übernimmt:
+Ein Rebase-Projekt wird als **ein Server** bereitgestellt (auf Rebase Cloud: `https://<project>.rebase.website`). Dieser Server übernimmt:
 
 - **`/api/*`** — die Daten-API, Authentifizierung, Echtzeit und Speicher
 - **alles andere** — Ihr gebautes `frontend/` als statische SPA
 
-Es gibt keine separate Admin-URL: Das Admin-Panel ist Teil Ihres Frontends, daher hängt es davon ab, was Ihr Frontend ist, wo es erscheint.
+Es gibt keinen separaten Admin-Dienst: Das Admin-Panel ist Teil eines Frontends, daher hängt es davon ab, was Ihr Frontend ist und ob Sie ihm einen eigenen Hostnamen geben, wo es erscheint.
 
 | Projekttyp | Root-URL zeigt | Admin-Panel befindet sich unter |
 |--------------|----------------|-------------------|
 | Standard-Scaffold (`rebase init`) | Das Admin-Panel | `/` — das Frontend **ist** der Admin |
 | Benutzerdefiniertes Produkt-Frontend | Ihre App | Wo Sie es einbinden, üblicherweise `/admin` — siehe [Basis-URL ändern](#basis-url-ändern) |
+| Admin als App auf einem eigenen Hostnamen | Ihre App | `https://admin.example.com/`, vom selben Server ausgeliefert — siehe [Basis-URL ändern](#basis-url-ändern) |
 | Reines Backend-Projekt | Nichts (nur API) | Nicht bereitgestellt |
 
 :::note[Erster Besuch]
@@ -259,7 +260,7 @@ Cloud Run und andere serverlose Plattformen sind zustandslos. Verwenden Sie **S3
 
 ## Basis-URL ändern
 
-Wenn die Administration unter einem Unterpfad laufen soll (z. B. `/admin`), ändern Sie eine Zeile — den `path` der App in `rebase.json`:
+Wenn die Administration unter einem Unterpfad laufen soll (z. B. `/admin`), ändern Sie den `path` der App in `rebase.json` und mit ihm ihr `cms`:
 
 ```json title="rebase.json"
 "admin": {
@@ -267,11 +268,16 @@ Wenn die Administration unter einem Unterpfad laufen soll (z. B. `/admin`), änd
     "root": "frontend",
     "build": "npm run build --workspace frontend",
     "output": "frontend/dist",
-    "path": "/admin"
+    "path": "/admin",
+    "cms": "/admin"
 }
 ```
 
-`rebase build` übergibt ihn Vite als `base` (über `REBASE_APP_BASE`), Vite gibt ihn als `import.meta.env.BASE_URL` zurück, und die `main.tsx` des Scaffolds reicht ihn bereits an den Router weiter — so stimmen Assets, Routen und Server überein, ohne dass das Präfix an drei Stellen steht:
+`cms` gibt an, wo das CMS liegt, worauf Rebase Cloud verlinkt, und muss innerhalb des `path` der App liegen. Das Scaffold setzt beide auf `/`, daher wird es abgelehnt, nur `path` zu verschieben — das CMS läge dann unter `/`, außerhalb einer App, die jetzt bei `/admin` beginnt.
+
+Um der Administration statt eines Unterpfads einen eigenen Hostnamen zu geben, machen Sie `path` zu einer vollständigen URL — `"path": "https://admin.example.com"` — und lassen `cms` auf `"/"`. Die Administration antwortet dann nur auf diesem Hostnamen und nicht mehr unter der eigenen Adresse des Projekts, ist also nicht erreichbar, bis das DNS des Hostnamens verifiziert ist. Die API bleibt auch auf diesem Hostnamen unter `/api`. Unter [Eine App auf einem eigenen Hostnamen](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) steht, wie Anfragen zugeordnet werden und was ein Deployment auf Rebase Cloud mit dem Hostnamen macht.
+
+`rebase build` übergibt `path` an Vite als `base` (über `REBASE_APP_BASE`), Vite gibt ihn als `import.meta.env.BASE_URL` zurück, und die `main.tsx` des Scaffolds reicht ihn bereits an den Router weiter — so stimmen Assets, Routen und Server überein, ohne dass das Präfix an drei Stellen steht:
 
 ```tsx title="frontend/src/main.tsx"
 // At "/" this is "".

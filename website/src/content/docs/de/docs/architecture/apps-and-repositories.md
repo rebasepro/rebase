@@ -1,5 +1,5 @@
 ---
-sourceHash: f90b94eda083f704
+sourceHash: 5db546fe110a140a
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -13,7 +13,7 @@ Funktionen. Eine **App** ist etwas, das damit kommuniziert.
 | Typ | Beschreibung |
 | --- | --- |
 | `backend` | Die Collections, Hooks und Funktionen, die die API definieren. Genau eine pro Projekt. |
-| `static` | Ein gebautes Client-Bundle – eine SPA oder statische Website, ausgeliefert unter einem eigenen Pfad. |
+| `static` | Ein gebautes Client-Bundle – eine SPA oder statische Website, ausgeliefert unter einem eigenen Pfad oder auf einem eigenen Hostnamen. |
 
 Das ist die gesamte Liste. Das Admin-Panel ist eine `static`-App wie jede andere: Es
 wird in Ihrem Repository auf Basis Ihrer Collections gebaut, weshalb benutzerdefinierte
@@ -85,14 +85,15 @@ wo sich Ihr Admin-Panel befindet. Wenn Sie es nicht explizit angeben, weiß es n
 Wer diese Information hat, nutzt sie:
 
 - **Rebase Cloud** platziert einen *Open CMS*-Link im Projekt-Header und führt die
-  Adresse in der Projektübersicht auf. Ohne `cms` kann die Konsole nur den
+  Adresse in der Projektübersicht auf – auf dem eigenen Hostnamen der App, wenn
+  sie einen hat. Ohne `cms` kann die Konsole nur den
   Projekt-Host anbieten – wodurch das CMS nur erreicht wird, wenn es zufällig im
   Root-Verzeichnis liegt.
 - **`rebase dev`** gibt die CMS-URL im Start-Banner aus, wenn es sich nicht
   einfach um die Startseite des Frontends handelt.
 - **`rebase apps list`** zeigt sie neben der App an, die sie bereitstellt.
 
-Zwei Varianten, und beide sind üblich:
+Drei Varianten, und alle sind üblich:
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -100,11 +101,17 @@ Zwei Varianten, und beide sind üblich:
 
 // The CMS is one route of a bigger app, sharing its session and its client.
 "web": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/admin" }
+
+// The CMS is an app of its own, on a hostname of its own — see the next section.
+"admin": { "type": "static", "root": "admin", "output": "admin/dist", "path": "https://admin.example.com", "cms": "/" }
 ```
 
-Der Wert ist die Adresse, die Sie eingeben würden, kein relativer Pfad zu `path`, und
-er muss innerhalb der deklarierenden App liegen – der SPA-Fallback dieser App liefert
-die Antwort. Ein Projekt hat ein CMS; ein zweites zu deklarieren ist ein Fehler und kein
+Der Wert ist der Pfad, den Sie nach dem Hostnamen eingeben würden, kein relativer
+Pfad zu `path`, und er muss innerhalb der deklarierenden App liegen – der
+SPA-Fallback dieser App liefert die Antwort. Er ist immer ein Pfad, auch wenn der
+`path` der App eine URL ist: Das CMS liegt dann unter diesem Pfad auf dem Hostnamen
+der App, `"cms": "/"` oben bedeutet also `https://admin.example.com/`. Ein Projekt
+hat ein CMS; ein zweites zu deklarieren ist ein Fehler und kein
 Münzwurf darüber, worauf die Konsole verlinkt.
 
 `path` ist sowohl ein Input zur **Build-Zeit** als auch zur Auslieferung. Eine unter
@@ -131,6 +138,132 @@ explizit wünschen:
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
+
+## Eine App auf einem eigenen Hostnamen
+
+`path` kann auch eine vollständige `https://`-URL sein, was der App einen
+eigenen Hostnamen gibt:
+
+```jsonc
+{
+  "rebase": "^1",
+  "apps": {
+    "backend": { "type": "backend", "runtime": "managed" },
+    "web": {
+      "type": "static",
+      "root": "frontend",
+      "build": "npm run build --workspace frontend",
+      "output": "frontend/dist",
+      "path": "/"
+    },
+    "admin": {
+      "type": "static",
+      "root": "admin",
+      "build": "npm run build --workspace admin",
+      "output": "admin/dist",
+      "path": "https://admin.example.com",
+      "cms": "/"
+    }
+  }
+}
+```
+
+`https://admin.example.com` liefert `admin` aus. Jeder andere Hostname, auf dem
+das Projekt antwortet – `example.com` oder die eigene Adresse des Projekts auf
+Rebase Cloud –, liefert `web` aus, und `admin` ist dort überhaupt nicht
+erreichbar. Es bleibt ein einziger Prozess und ein einziges Deployment; der
+Hostname entscheidet nur, welche App eine Anfrage beantwortet.
+
+Zwei Regeln entscheiden das:
+
+- Eine App mit Hostnamen antwortet nur auf diesem Hostnamen. Eine App ohne
+  antwortet auf jedem Hostnamen.
+- Von den verbleibenden Apps gewinnt die mit dem längsten Pfad, wie bisher. Bei
+  gleichem Pfad gewinnt die App, die den Hostnamen nennt, gegen die, die es
+  nicht tut.
+
+Im Beispiel liegen beide Apps unter `/`, also wählt die zweite Regel auf
+`admin.example.com` die App `admin`. Deklarieren Sie das Admin-Panel stattdessen
+unter `"https://admin.example.com/cms"`, antwortet es auf diesem Hostnamen nur
+unter `/cms`: `admin.example.com/pricing` geht an `web`. Ein Hostname grenzt
+ein, wo eine App antwortet; er übergibt ihr nicht alles auf diesem Hostnamen.
+Zwei Apps dürfen sich nicht zugleich Hostnamen und Pfad teilen.
+
+Das Backend ist keine App, und ein Hostname verschiebt es nicht. `/api`,
+`/health` und die anderen Pfade, die das Backend reserviert, werden auf jedem
+Hostnamen beantwortet, bevor irgendeine App an die Reihe kommt – also ist
+`https://admin.example.com/api` dieselbe API wie `https://example.com/api`. Eine
+App, die ihren eigenen Origin aufruft – die leere `VITE_API_URL` des Scaffolds –,
+braucht weder eine eigene API-URL noch eine CORS-Einstellung. Aus demselben Grund
+werden diese Pfade nach einem Hostnamen genauso abgelehnt wie allein:
+`https://admin.example.com/api` ist nicht gültiger als `/api`.
+
+Alles andere an `path` gilt für den Teil nach dem Hostnamen. Die App wird
+weiterhin dafür gebaut: `https://admin.example.com` wird mit `REBASE_APP_BASE`
+gleich `/` gebaut, `https://admin.example.com/cms` mit `/cms`, und ein Bundler,
+der das ignoriert, liefert weiterhin eine weiße Seite. `cms` ist ein Pfad auf dem
+Hostnamen der App, innerhalb dieses Pfadteils. Die URL muss mit `https://`
+beginnen und einen Hostnamen und einen Pfad enthalten, sonst nichts – keinen
+Port, keine Query und kein Fragment. Ein bloßes `admin.example.com` wird
+abgelehnt, zusammen mit der URL, die gemeint war.
+
+Lokal wird nichts nach Hostnamen geroutet. `rebase dev` startet die App in
+`frontend/` an der Wurzel eines localhost-Ports, wie bisher, und für eine App
+mit Hostnamen gibt sein Banner zusätzlich die `https://`-Adresse aus, die sie
+nach dem Deployment haben wird.
+
+Beim Self-Hosting trifft der Prozess dieselbe Wahl anhand des `Host`-Headers
+jeder Anfrage. Den Hostnamen auf den Server zeigen zu lassen und ihm ein
+Zertifikat zu geben, ist Ihre Sache, wie beim Haupt-Hostnamen des Projekts, und
+ein vorgeschalteter Reverse Proxy muss den ursprünglichen `Host` durchreichen –
+Caddy tut das standardmäßig, nginx braucht `proxy_set_header Host $host;`.
+`X-Forwarded-Host` wird nicht gelesen, weil jeder Client einen senden kann.
+
+### Auf Rebase Cloud
+
+`rebase cloud deploy` registriert den Hostnamen im Projekt – dasselbe, was
+`rebase cloud domains add` tut –, es gibt also keinen separaten Schritt, den man
+vergessen könnte. Was danach passiert, hängt vom DNS ab:
+
+- **Die Records existieren bereits.** Das Deployment verifiziert den Hostnamen,
+  und er ist live, wenn das Deployment abgeschlossen ist.
+- **Sie existieren nicht.** Das Deployment läuft trotzdem durch und gibt die
+  zwei anzulegenden Records aus: einen TXT-Record, der belegt, dass der Name
+  Ihnen gehört, und einen CNAME, der ihn auf das Projekt zeigen lässt (einen
+  A-Record, wenn der Hostname der Apex der Domain ist).
+
+Sobald die Records veröffentlicht sind:
+
+```bash
+rebase cloud domains verify admin.example.com
+```
+
+`rebase cloud domains list` gibt die Records erneut aus, falls sie Ihnen
+abhandenkommen. Sobald die Verifizierung erfolgreich ist, stellt die Plattform
+das HTTPS-Zertifikat für den Hostnamen aus; es gibt nichts hochzuladen. Bis
+dahin antwortet `admin` nirgends, weil der einzige Hostname, auf dem es
+antwortet, das Projekt noch nicht erreicht – der Rest des Projekts ist so oder
+so live.
+
+Die Konsole folgt der App auf ihren Hostnamen: Der *Open CMS*-Link und die
+CMS-Adresse in der Projektübersicht lauten `https://admin.example.com/`, nicht
+der Projekt-Host.
+
+Ein Hostname, den bereits ein anderes Projekt hält, lässt das Deployment
+fehlschlagen, bevor irgendetwas ausgerollt wird, ebenso einer unter der eigenen
+Domain der Plattform. Wird die App aus `rebase.json` entfernt, bleibt der
+Hostname im Projekt registriert; entfernen Sie ihn mit
+`rebase cloud domains remove admin.example.com`.
+
+### Ein Hostname gehört zu einer App, nicht zu einer Route
+
+Ein Hostname wird einer ganzen App gegeben. Er kann nicht auf eine Route
+innerhalb einer App zeigen. Wenn das CMS eine Route einer einzelnen SPA ist –
+`web` unter `/` mit `"cms": "/admin"` –, liegt es unter `/admin`, auf jedem
+Hostnamen, auf dem das Projekt antwortet. Gäben Sie dieser App
+`https://admin.example.com`, würde die ganze SPA dorthin wandern, mit dem CMS
+weiterhin unter `/admin` darin. Um dem CMS einen eigenen Hostnamen zu geben,
+machen Sie es zu einer eigenen App mit eigenem Build, wie im Beispiel oben.
 
 ## Apps bauen und deployen
 

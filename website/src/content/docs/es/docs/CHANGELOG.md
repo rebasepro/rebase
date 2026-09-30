@@ -61,6 +61,20 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   pass `--agent` (`-a`), e.g. `rebase init my-app --yes --agent claude,cursor`.
   Before, `rebase init` only printed `rebase skills install`.
 
+- **A static app can have a hostname of its own.** Its `path` in `rebase.json`
+  may be a full URL, such as `"path": "https://admin.example.com"`. The app
+  then answers only on that hostname, and every app without one keeps
+  answering on the others. The longest path still wins a request, and at an
+  equal path the app naming the hostname wins. `/api` and the other backend
+  paths answer on every hostname before any app. The app is built for the path
+  part of the URL, and `cms` stays a path, on the app's hostname. On Rebase
+  Cloud, `rebase cloud deploy` registers the hostname on the project and
+  verifies it if its DNS records are already published. If they are not, the
+  deploy prints the records and `rebase cloud domains verify <host>` to run
+  once they are. The console's *Open CMS* link then points at the hostname.
+  Before, every app answered on every hostname the project had, so the admin
+  could only be a path such as `/admin`.
+
 ### Fixed
 
 #### Server & REST

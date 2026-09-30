@@ -1,5 +1,5 @@
 ---
-sourceHash: f90b94eda083f704
+sourceHash: 5db546fe110a140a
 title: App e repository
 sidebar_label: App & repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ognuna delle quali può risiedere nel proprio repository.
@@ -13,7 +13,7 @@ funzioni. Un'**app** è qualsiasi cosa comunichi con esso.
 | Tipo | Descrizione |
 | --- | --- |
 | `backend` | Le collection, gli hook e le funzioni che definiscono l'API. Esattamente uno per progetto. |
-| `static` | Un bundle client compilato: una SPA o un sito statico, servito sul proprio percorso. |
+| `static` | Un bundle client compilato: una SPA o un sito statico, servito sul proprio percorso, o su un hostname tutto suo. |
 
 Questo è l'elenco completo. Il pannello di amministrazione è un'app `static` come
 qualsiasi altra: viene compilato nel tuo repository, in base alle tue collection,
@@ -88,14 +88,15 @@ nessun sistema può saperlo.
 I sistemi che ne sono a conoscenza lo utilizzano in questo modo:
 
 - **Rebase Cloud** inserisce un link *Open CMS* nell'intestazione del progetto ed
-  elenca l'indirizzo nella panoramica del progetto. Senza `cms`, la console può
+  elenca l'indirizzo nella panoramica del progetto, sull'hostname dell'app quando
+  ne ha uno. Senza `cms`, la console può
   offrire solo l'host del progetto, che raggiunge il CMS solo se questo si trova per
   caso alla radice.
 - **`rebase dev`** stampa l'URL del CMS nel banner di avvio quando questo non coincide
   semplicemente con la home page del frontend.
 - **`rebase apps list`** lo mostra accanto all'app che lo serve.
 
-Due forme possibili, ed entrambe comuni:
+Tre forme possibili, tutte comuni:
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -103,11 +104,17 @@ Due forme possibili, ed entrambe comuni:
 
 // The CMS is one route of a bigger app, sharing its session and its client.
 "web": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/admin" }
+
+// The CMS is an app of its own, on a hostname of its own — see the next section.
+"admin": { "type": "static", "root": "admin", "output": "admin/dist", "path": "https://admin.example.com", "cms": "/" }
 ```
 
-Il valore è l'indirizzo che digiteresti, non un percorso relativo a `path`, e deve
-trovarsi all'interno dell'app che lo dichiara: è il fallback SPA di quell'app a
-rispondere lì. Un progetto ha un solo CMS; dichiararne un secondo è un errore,
+Il valore è il percorso che digiteresti dopo l'hostname, non un percorso relativo
+a `path`, e deve trovarsi all'interno dell'app che lo dichiara: è il fallback SPA
+di quell'app a rispondere lì. È sempre un percorso, anche quando il `path`
+dell'app è un URL: il CMS si trova allora a quel percorso sull'hostname dell'app,
+quindi `"cms": "/"` qui sopra significa `https://admin.example.com/`. Un progetto
+ha un solo CMS; dichiararne un secondo è un errore,
 piuttosto che tirare a indovinare a quale dei due punterà la console.
 
 `path` è un parametro utile sia in fase di **build** che di serving. Un'app montata su
@@ -133,6 +140,126 @@ da quella delle directory, e `rebase apps init` la rende esplicita su richiesta:
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
+
+## Un'app su un hostname tutto suo
+
+`path` può anche essere un URL `https://` completo, che dà all'app un hostname
+tutto suo:
+
+```jsonc
+{
+  "rebase": "^1",
+  "apps": {
+    "backend": { "type": "backend", "runtime": "managed" },
+    "web": {
+      "type": "static",
+      "root": "frontend",
+      "build": "npm run build --workspace frontend",
+      "output": "frontend/dist",
+      "path": "/"
+    },
+    "admin": {
+      "type": "static",
+      "root": "admin",
+      "build": "npm run build --workspace admin",
+      "output": "admin/dist",
+      "path": "https://admin.example.com",
+      "cms": "/"
+    }
+  }
+}
+```
+
+`https://admin.example.com` serve `admin`. Ogni altro hostname su cui risponde
+il progetto — `example.com`, o l'indirizzo del progetto su Rebase Cloud — serve
+`web`, e lì `admin` non è raggiungibile affatto. Resta un unico processo e un
+unico deploy; l'hostname decide solo quale app risponde a una richiesta.
+
+Lo decidono due regole:
+
+- Un'app con un hostname risponde solo su quell'hostname. Un'app senza risponde
+  su tutti.
+- Tra le app rimaste vince quella con il percorso più lungo, come sempre. A
+  parità di percorso, l'app che nomina l'hostname vince su quella che non lo fa.
+
+Nell'esempio entrambe le app sono su `/`, quindi su `admin.example.com` la
+seconda regola sceglie `admin`. Dichiara invece l'admin su
+`"https://admin.example.com/cms"` e risponderà solo sotto `/cms` su
+quell'hostname: `admin.example.com/pricing` va a `web`. Un hostname restringe
+dove un'app risponde; non le consegna tutto ciò che sta su quell'hostname. Due
+app non possono avere in comune sia l'hostname sia il percorso.
+
+Il backend non è un'app, e un hostname non lo sposta. `/api`, `/health` e gli
+altri percorsi riservati al backend ricevono risposta prima che venga
+consultata qualsiasi app, su ogni hostname, quindi
+`https://admin.example.com/api` è la stessa API di `https://example.com/api`.
+Un'app che chiama la propria origine — il `VITE_API_URL` vuoto dello scaffold —
+non ha bisogno di un URL dell'API tutto suo né di alcuna impostazione CORS. Per
+lo stesso motivo quei percorsi vengono rifiutati dopo un hostname esattamente
+come da soli: `https://admin.example.com/api` non è più valido di `/api`.
+
+Tutto il resto di `path` si applica alla parte dopo l'hostname. L'app viene
+comunque compilata per quella parte: `https://admin.example.com` viene compilato
+con `REBASE_APP_BASE` impostato a `/`, `https://admin.example.com/cms` con
+`/cms`, e un bundler che lo ignora produce comunque una pagina vuota. `cms` è un
+percorso sull'hostname dell'app, all'interno di quella parte di percorso. L'URL
+deve essere `https://` e contenere un hostname e un percorso e nient'altro:
+niente porta, query o frammento. Un `admin.example.com` scritto da solo viene
+rifiutato, indicando l'URL che avrebbe dovuto essere.
+
+In locale, niente viene instradato per hostname. `rebase dev` esegue l'app in
+`frontend/` alla radice di una porta di localhost, come ha sempre fatto, e per
+un'app con un hostname il suo banner stampa anche l'indirizzo `https://` che
+avrà una volta distribuita.
+
+In self-hosting, il processo fa la stessa scelta a partire dall'header `Host`
+di ogni richiesta. Puntare l'hostname al server e dargli un certificato spetta a
+te, come per l'hostname principale del progetto, e un reverse proxy davanti deve
+inoltrare l'`Host` originale: Caddy lo fa di default, nginx ha bisogno di
+`proxy_set_header Host $host;`. `X-Forwarded-Host` non viene letto, perché
+qualsiasi client può inviarne uno.
+
+### Su Rebase Cloud
+
+`rebase cloud deploy` registra l'hostname sul progetto — quello che fa
+`rebase cloud domains add` — quindi non c'è un passaggio separato da
+dimenticare. Cosa succede dopo dipende dal DNS:
+
+- **I record esistono già.** Il deploy verifica l'hostname, che è attivo al
+  termine del deploy.
+- **Non esistono.** Il deploy va avanti e stampa i due record da creare: un
+  record TXT che dimostra che il nome è tuo e un CNAME che lo punta al progetto
+  (un record A, se l'hostname è l'apex del dominio).
+
+Una volta pubblicati i record:
+
+```bash
+rebase cloud domains verify admin.example.com
+```
+
+`rebase cloud domains list` stampa di nuovo i record se li perdi. Quando la
+verifica passa, la piattaforma emette il certificato HTTPS per l'hostname; non
+c'è niente da caricare. Fino ad allora `admin` non risponde da nessuna parte,
+perché l'unico hostname su cui risponde non raggiunge ancora il progetto; il
+resto del progetto è attivo in ogni caso.
+
+La console segue l'app sul suo hostname: il link *Open CMS* e l'indirizzo del
+CMS nella panoramica del progetto sono `https://admin.example.com/`, non l'host
+del progetto.
+
+Un hostname già detenuto da un altro progetto fa fallire il deploy prima che
+venga distribuito qualsiasi cosa, e lo stesso vale per uno sotto il dominio
+della piattaforma. Togliere l'app da `rebase.json` lascia l'hostname registrato
+sul progetto; rimuovilo con `rebase cloud domains remove admin.example.com`.
+
+### Un hostname appartiene a un'app, non a una route
+
+Un hostname viene dato a un'intera app. Non può puntare a una route al suo
+interno. Quando il CMS è una route di un'unica SPA — `web` su `/` con
+`"cms": "/admin"` — si trova su `/admin`, su ogni hostname a cui risponde il
+progetto. Dare a quell'app `https://admin.example.com` sposterebbe lì l'intera
+SPA, con il CMS ancora su `/admin` al suo interno. Per dare al CMS un hostname
+tutto suo, rendilo un'app a sé, con la propria build, come nell'esempio sopra.
 
 ## Compilazione e deploy delle app
 

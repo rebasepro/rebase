@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a78fa791d3bc114
+sourceHash: 3dfefd8103a76481
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.
@@ -7,17 +7,18 @@ description: Implante seu projeto Rebase em produção usando Docker, plataforma
 
 ## O que uma Implantação Serve
 
-Um projeto Rebase é implantado como **um servidor em uma URL** (na Rebase Cloud: `https://<project>.rebase.website`). Esse servidor cuida de:
+Um projeto Rebase é implantado como **um servidor** (na Rebase Cloud: `https://<project>.rebase.website`). Esse servidor cuida de:
 
 - **`/api/*`** — a API de dados, autenticação, tempo real e armazenamento
 - **todo o resto** — o seu `frontend/` compilado como uma SPA estática
 
-Não há uma URL de administração separada: o painel de administração faz parte do seu frontend, então onde ele aparece depende do que o seu frontend é.
+Não há um serviço de administração separado: o painel de administração faz parte de um frontend, então onde ele aparece depende do que o seu frontend é, e de você lhe dar ou não um hostname só seu.
 
 | Tipo de projeto | A URL raiz mostra | O painel de administração está em |
 |--------------|----------------|-------------------|
 | Scaffold padrão (`rebase init`) | O painel de administração | `/` — o frontend **é** o admin |
 | Frontend de produto personalizado | Sua app | Onde você o montar, comumente `/admin` — veja [Alterar a URL Base](#alterar-a-url-base) |
+| Administração como app num hostname só seu | Sua app | `https://admin.example.com/`, servido pelo mesmo servidor — veja [Alterar a URL Base](#alterar-a-url-base) |
 | Projeto somente backend | Nada (apenas API) | Não implantado |
 
 :::note[Primeira visita]
@@ -256,7 +257,7 @@ Cloud Run e outras plataformas serverless são sem estado. Use **armazenamento S
 
 ## Alterar a URL Base
 
-Se quiser que a administração seja executada num sub-caminho (por ex. `/admin`), mude uma linha — o `path` da app em `rebase.json`:
+Se quiser que a administração seja executada num sub-caminho (por ex. `/admin`), mude o `path` da app em `rebase.json`, e o seu `cms` com ele:
 
 ```json title="rebase.json"
 "admin": {
@@ -264,11 +265,16 @@ Se quiser que a administração seja executada num sub-caminho (por ex. `/admin`
     "root": "frontend",
     "build": "npm run build --workspace frontend",
     "output": "frontend/dist",
-    "path": "/admin"
+    "path": "/admin",
+    "cms": "/admin"
 }
 ```
 
-`rebase build` passa-o ao Vite como `base` (através de `REBASE_APP_BASE`), o Vite devolve-o como `import.meta.env.BASE_URL`, e o `main.tsx` do scaffold já o entrega ao router — assim os assets, as rotas e o servidor concordam sem que o prefixo esteja escrito em três sítios:
+`cms` indica onde está o CMS, para onde o Rebase Cloud aponta o link, e tem de estar dentro do `path` da app. O scaffold define ambos como `/`, por isso mudar apenas o `path` é recusado — o CMS ficaria em `/`, fora de uma app que agora começa em `/admin`.
+
+Para dar à administração um hostname só seu em vez de um sub-caminho, faça do `path` uma URL completa — `"path": "https://admin.example.com"` — e deixe o `cms` em `"/"`. A administração passa então a responder apenas nesse hostname, e não no endereço do próprio projeto, por isso fica inacessível até o DNS do hostname ser verificado. A API continua em `/api` também nesse hostname. Veja [Um app em um hostname só seu](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) para saber como os pedidos são encaminhados e o que um deploy no Rebase Cloud faz com o hostname.
+
+`rebase build` passa o `path` ao Vite como `base` (através de `REBASE_APP_BASE`), o Vite devolve-o como `import.meta.env.BASE_URL`, e o `main.tsx` do scaffold já o entrega ao router — assim os assets, as rotas e o servidor concordam sem que o prefixo esteja escrito em três sítios:
 
 ```tsx title="frontend/src/main.tsx"
 // At "/" this is "".

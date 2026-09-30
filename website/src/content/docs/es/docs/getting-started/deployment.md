@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a78fa791d3bc114
+sourceHash: 3dfefd8103a76481
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -7,17 +7,18 @@ description: Despliega tu proyecto Rebase a producción usando Docker, plataform
 
 ## Qué Sirve un Despliegue
 
-Un proyecto Rebase se despliega como **un servidor en una URL** (en Rebase Cloud: `https://<project>.rebase.website`). Ese servidor gestiona:
+Un proyecto Rebase se despliega como **un servidor** (en Rebase Cloud: `https://<project>.rebase.website`). Ese servidor gestiona:
 
 - **`/api/*`** — la API de datos, la autenticación, el tiempo real y el almacenamiento
 - **todo lo demás** — tu `frontend/` compilado como una SPA estática
 
-No hay una URL de administración separada: el panel de administración forma parte de tu frontend, por lo que dónde aparece depende de qué sea tu frontend.
+No hay un servicio de administración separado: el panel de administración forma parte de un frontend, por lo que dónde aparece depende de qué sea tu frontend, y de si le das o no un nombre de host propio.
 
 | Tipo de proyecto | La URL raíz muestra | El panel de administración está en |
 |--------------|----------------|-------------------|
 | Scaffold predeterminado (`rebase init`) | El panel de administración | `/` — el frontend **es** el administrador |
 | Frontend de producto personalizado | Tu app | Donde lo montes, comúnmente `/admin` — consulta [Cambiar la URL Base](#cambiar-la-url-base) |
+| Administración como app en un nombre de host propio | Tu app | `https://admin.example.com/`, servido por el mismo servidor — consulta [Cambiar la URL Base](#cambiar-la-url-base) |
 | Proyecto solo backend | Nada (solo API) | No desplegado |
 
 :::note[Primera visita]
@@ -258,7 +259,7 @@ Cloud Run y otras plataformas serverless son sin estado. Usa **almacenamiento S3
 
 ## Cambiar la URL Base
 
-Si quieres que el panel de administración se ejecute en una sub-ruta (p. ej. `/admin`), cambia una línea — el `path` de la app en `rebase.json`:
+Si quieres que el panel de administración se ejecute en una sub-ruta (p. ej. `/admin`), cambia el `path` de la app en `rebase.json`, y su `cms` con él:
 
 ```json title="rebase.json"
 "admin": {
@@ -266,11 +267,16 @@ Si quieres que el panel de administración se ejecute en una sub-ruta (p. ej. `/
     "root": "frontend",
     "build": "npm run build --workspace frontend",
     "output": "frontend/dist",
-    "path": "/admin"
+    "path": "/admin",
+    "cms": "/admin"
 }
 ```
 
-`rebase build` se lo pasa a Vite como `base` (mediante `REBASE_APP_BASE`), Vite lo devuelve como `import.meta.env.BASE_URL`, y el `main.tsx` del scaffold ya se lo entrega al router — así los assets, las rutas y el servidor coinciden sin escribir el prefijo en tres sitios:
+`cms` indica dónde está el CMS, al que enlaza Rebase Cloud, y tiene que estar dentro del `path` de la app. El scaffold pone ambos en `/`, así que mover solo `path` se rechaza — el CMS quedaría en `/`, fuera de una app que ahora empieza en `/admin`.
+
+Para darle al panel de administración un nombre de host propio en lugar de una sub-ruta, convierte `path` en una URL completa — `"path": "https://admin.example.com"` — y deja `cms` en `"/"`. El panel de administración pasa a responder solo en ese nombre de host, y no en la dirección propia del proyecto, así que no es accesible hasta que se verifique el DNS del nombre de host. La API sigue en `/api` también en ese nombre de host. Consulta [Una app en un nombre de host propio](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) para ver cómo se asignan las solicitudes y qué hace un despliegue en Rebase Cloud con el nombre de host.
+
+`rebase build` le pasa `path` a Vite como `base` (mediante `REBASE_APP_BASE`), Vite lo devuelve como `import.meta.env.BASE_URL`, y el `main.tsx` del scaffold ya se lo entrega al router — así los assets, las rutas y el servidor coinciden sin escribir el prefijo en tres sitios:
 
 ```tsx title="frontend/src/main.tsx"
 // At "/" this is "".

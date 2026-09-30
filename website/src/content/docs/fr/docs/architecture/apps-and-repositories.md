@@ -1,5 +1,5 @@
 ---
-sourceHash: f90b94eda083f704
+sourceHash: 5db546fe110a140a
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -12,7 +12,7 @@ Un **projet** est le backend : la base de données, l'authentification, le stock
 | Type | Ce que c'est |
 | --- | --- |
 | `backend` | Les collections, hooks et fonctions qui définissent l'API. Exactement une par projet. |
-| `static` | Un bundle client compilé — une SPA ou un site statique, servi sur son propre chemin d'accès. |
+| `static` | Un bundle client compilé — une SPA ou un site statique, servi sur son propre chemin d'accès, ou sur un nom d'hôte bien à lui. |
 
 C'est la liste complète. Le panneau d'administration est une application `static` comme les autres : elle est compilée dans votre dépôt, en fonction de vos collections, c'est pourquoi les champs personnalisés et les vues personnalisées y fonctionnent dès le premier jour.
 
@@ -65,11 +65,11 @@ Le CMS est un composant React dans votre propre frontend, son adresse est donc u
 
 Les outils qui le connaissent l'utilisent :
 
-- **Rebase Cloud** place un lien *Ouvrir le CMS* dans l'en-tête du projet et affiche l'adresse sur la vue d'ensemble du projet. Sans `cms`, la console ne peut proposer que l'hôte du projet — qui n'atteint le CMS que si celui-ci se trouve par hasard à la racine.
+- **Rebase Cloud** place un lien *Ouvrir le CMS* dans l'en-tête du projet et affiche l'adresse sur la vue d'ensemble du projet — sur le nom d'hôte propre à l'application lorsqu'elle en a un. Sans `cms`, la console ne peut proposer que l'hôte du projet — qui n'atteint le CMS que si celui-ci se trouve par hasard à la racine.
 - **`rebase dev`** affiche l'URL du CMS dans sa bannière de démarrage lorsqu'il ne s'agit pas simplement de la page d'accueil du frontend.
 - **`rebase apps list`** l'affiche à côté de l'application qui la sert.
 
-Deux configurations, toutes deux courantes :
+Trois configurations, toutes courantes :
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -77,9 +77,12 @@ Deux configurations, toutes deux courantes :
 
 // The CMS is one route of a bigger app, sharing its session and its client.
 "web": { "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/", "cms": "/admin" }
+
+// The CMS is an app of its own, on a hostname of its own — see the next section.
+"admin": { "type": "static", "root": "admin", "output": "admin/dist", "path": "https://admin.example.com", "cms": "/" }
 ```
 
-La valeur est l'adresse que vous saisiriez, et non un chemin relatif à `path`, et elle doit se trouver dans l'application qui la déclare — le fallback SPA de cette application étant ce qui y répond. Un projet possède un seul CMS ; en déclarer un deuxième constitue une erreur plutôt qu'un tirage à pile ou face pour savoir vers lequel la console pointe.
+La valeur est le chemin que vous saisiriez après le nom d'hôte, et non un chemin relatif à `path`, et elle doit se trouver dans l'application qui la déclare — le fallback SPA de cette application étant ce qui y répond. C'est toujours un chemin, même quand le `path` de l'application est une URL : le CMS se trouve alors à ce chemin sur le nom d'hôte de l'application, si bien que `"cms": "/"` ci-dessus désigne `https://admin.example.com/`. Un projet possède un seul CMS ; en déclarer un deuxième constitue une erreur plutôt qu'un tirage à pile ou face pour savoir vers lequel la console pointe.
 
 `path` est une entrée au moment du **build** ainsi qu'au moment du service. Une application montée sur `/admin` doit être *compilée* pour `/admin`, sinon `index.html` se charge et tous les assets renvoient une erreur 404 — une page blanche sans aucune erreur apparente. `rebase build` transmet la valeur sous forme de `REBASE_APP_BASE`, que votre bundler lit comme son chemin de base :
 
@@ -99,6 +102,74 @@ Un projet existant n'en a pas besoin. La CLI déduit la même structure à parti
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
+
+## Une application sur son propre nom d'hôte
+
+`path` peut aussi être une URL `https://` complète, ce qui donne à l'application un nom d'hôte bien à elle :
+
+```jsonc
+{
+  "rebase": "^1",
+  "apps": {
+    "backend": { "type": "backend", "runtime": "managed" },
+    "web": {
+      "type": "static",
+      "root": "frontend",
+      "build": "npm run build --workspace frontend",
+      "output": "frontend/dist",
+      "path": "/"
+    },
+    "admin": {
+      "type": "static",
+      "root": "admin",
+      "build": "npm run build --workspace admin",
+      "output": "admin/dist",
+      "path": "https://admin.example.com",
+      "cms": "/"
+    }
+  }
+}
+```
+
+`https://admin.example.com` sert `admin`. Tous les autres noms d'hôte sur lesquels le projet répond — `example.com`, ou l'adresse du projet sur Rebase Cloud — servent `web`, et `admin` n'y est pas joignable du tout. Il s'agit toujours d'un seul processus et d'un seul déploiement ; le nom d'hôte décide seulement quelle application répond à une requête.
+
+Deux règles en décident :
+
+- Une application dotée d'un nom d'hôte ne répond que sur ce nom d'hôte. Une application sans nom d'hôte répond sur tous.
+- Parmi les applications restantes, celle dont le chemin est le plus long l'emporte, comme toujours. À chemin égal, l'application qui nomme le nom d'hôte l'emporte sur celle qui ne le nomme pas.
+
+Dans l'exemple, les deux applications sont sur `/`, donc sur `admin.example.com` la seconde règle choisit `admin`. Déclarez plutôt l'administration sur `"https://admin.example.com/cms"` et elle ne répond que sous `/cms` sur ce nom d'hôte : `admin.example.com/pricing` va à `web`. Un nom d'hôte restreint l'endroit où une application répond ; il ne lui confie pas tout ce qui se trouve sur ce nom d'hôte. Deux applications ne peuvent pas partager à la fois un nom d'hôte et un chemin.
+
+Le backend n'est pas une application, et un nom d'hôte ne le déplace pas. `/api`, `/health` et les autres chemins réservés par le backend reçoivent une réponse avant qu'aucune application ne soit consultée, sur tous les noms d'hôte ; `https://admin.example.com/api` est donc la même API que `https://example.com/api`. Une application qui appelle sa propre origine — le `VITE_API_URL` vide du scaffold — n'a besoin ni d'une URL d'API à elle ni d'aucun réglage CORS. Pour la même raison, ces chemins sont refusés après un nom d'hôte tout comme seuls : `https://admin.example.com/api` n'est pas plus valide que `/api`.
+
+Tout le reste de ce qui concerne `path` s'applique à la partie située après le nom d'hôte. L'application est toujours compilée pour elle : `https://admin.example.com` est compilé avec `REBASE_APP_BASE` à `/`, `https://admin.example.com/cms` avec `/cms`, et un bundler qui l'ignore donne toujours une page blanche. `cms` est un chemin sur le nom d'hôte de l'application, à l'intérieur de cette partie chemin. L'URL doit commencer par `https://` et contenir un nom d'hôte et un chemin, rien d'autre — ni port, ni query, ni fragment. Un `admin.example.com` seul est refusé, avec l'URL qu'il aurait dû être.
+
+En local, rien n'est routé par nom d'hôte. `rebase dev` lance l'application de `frontend/` à la racine d'un port de localhost, comme toujours, et pour une application dotée d'un nom d'hôte sa bannière affiche aussi l'adresse `https://` qu'elle aura une fois déployée.
+
+En auto-hébergement, le processus fait le même choix à partir de l'en-tête `Host` de chaque requête. Faire pointer le nom d'hôte vers le serveur et lui fournir un certificat vous revient, comme pour le nom d'hôte principal du projet, et un reverse proxy placé devant doit transmettre l'en-tête `Host` d'origine — Caddy le fait par défaut, nginx a besoin de `proxy_set_header Host $host;`. `X-Forwarded-Host` n'est pas lu, parce que n'importe quel client peut en envoyer un.
+
+### Sur Rebase Cloud
+
+`rebase cloud deploy` enregistre le nom d'hôte sur le projet — ce que fait `rebase cloud domains add` — il n'y a donc pas d'étape séparée à oublier. La suite dépend du DNS :
+
+- **Les enregistrements existent déjà.** Le déploiement vérifie le nom d'hôte, qui est en ligne à la fin du déploiement.
+- **Ils n'existent pas.** Le déploiement se poursuit et affiche les deux enregistrements à créer : un enregistrement TXT qui prouve que le nom vous appartient, et un CNAME qui le fait pointer vers le projet (un enregistrement A si le nom d'hôte est l'apex du domaine).
+
+Une fois les enregistrements publiés :
+
+```bash
+rebase cloud domains verify admin.example.com
+```
+
+`rebase cloud domains list` affiche de nouveau les enregistrements si vous les perdez. Quand la vérification réussit, la plateforme émet le certificat HTTPS du nom d'hôte ; il n'y a rien à téléverser. D'ici là, `admin` ne répond nulle part, puisque le seul nom d'hôte sur lequel elle répond n'atteint pas encore le projet — le reste du projet est en ligne dans tous les cas.
+
+La console suit l'application sur son nom d'hôte : le lien *Ouvrir le CMS* et l'adresse du CMS sur la vue d'ensemble du projet sont `https://admin.example.com/`, et non l'hôte du projet.
+
+Un nom d'hôte déjà détenu par un autre projet fait échouer le déploiement avant que quoi que ce soit ne soit mis en production, tout comme un nom d'hôte situé sous le domaine propre de la plateforme. Retirer l'application de `rebase.json` laisse le nom d'hôte enregistré sur le projet ; supprimez-le avec `rebase cloud domains remove admin.example.com`.
+
+### Un nom d'hôte appartient à une application, pas à une route
+
+Un nom d'hôte est donné à une application entière. Il ne peut pas pointer vers une route à l'intérieur de l'une d'elles. Quand le CMS est une route d'une seule SPA — `web` sur `/` avec `"cms": "/admin"` — il se trouve sur `/admin`, sur chaque nom d'hôte auquel le projet répond. Donner `https://admin.example.com` à cette application y déplacerait la SPA entière, avec le CMS toujours sur `/admin` à l'intérieur. Pour donner au CMS un nom d'hôte bien à lui, faites-en une application à part entière, avec son propre build, comme dans l'exemple ci-dessus.
 
 ## Compiler et déployer des applications
 

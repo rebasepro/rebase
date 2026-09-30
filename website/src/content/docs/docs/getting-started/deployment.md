@@ -6,17 +6,18 @@ description: Deploy your Rebase project to production using Docker, cloud platfo
 
 ## What a Deployment Serves
 
-A Rebase project deploys as **one server at one URL** (on Rebase Cloud: `https://<project>.rebase.website`). That server handles:
+A Rebase project deploys as **one server** (on Rebase Cloud: `https://<project>.rebase.website`). That server handles:
 
 - **`/api/*`** — the data API, authentication, realtime, and storage
 - **everything else** — your built `frontend/` as a static SPA
 
-There is no separate admin URL: the admin panel is part of your frontend, so where it appears depends on what your frontend is.
+There is no separate admin service: the admin panel is part of a frontend, so where it appears depends on what your frontend is, and on whether you give it a hostname of its own.
 
 | Project type | Root URL shows | Admin panel is at |
 |--------------|----------------|-------------------|
 | Default scaffold (`rebase init`) | The admin panel | `/` — the frontend **is** the admin |
 | Custom product frontend | Your app | Wherever you mount it, commonly `/admin` — see [Changing the Base URL](#changing-the-base-url) |
+| Admin as an app on its own hostname | Your app | `https://admin.example.com/`, served by the same server — see [Changing the Base URL](#changing-the-base-url) |
 | Backend-only project | Nothing (API only) | Not deployed |
 
 :::note[First visit]
@@ -276,8 +277,8 @@ Cloud Run and other serverless platforms are stateless. Use **S3 storage** inste
 
 ## Changing the Base URL
 
-If you want the admin to run at a sub-path (e.g. `/admin`), change one line —
-the app's `path` in `rebase.json`:
+If you want the admin to run at a sub-path (e.g. `/admin`), change the app's
+`path` in `rebase.json`, and its `cms` with it:
 
 ```json title="rebase.json"
 "admin": {
@@ -285,11 +286,25 @@ the app's `path` in `rebase.json`:
     "root": "frontend",
     "build": "npm run build --workspace frontend",
     "output": "frontend/dist",
-    "path": "/admin"
+    "path": "/admin",
+    "cms": "/admin"
 }
 ```
 
-`rebase build` passes that to Vite as `base` (via `REBASE_APP_BASE`), Vite gives
+`cms` is where the CMS is, which Rebase Cloud links to, and it has to be inside
+the app's `path`. The scaffold sets both to `/`, so moving `path` alone is
+refused — the CMS would be at `/`, outside an app that now starts at `/admin`.
+
+To give the admin a hostname of its own instead of a sub-path, make `path` a
+full URL — `"path": "https://admin.example.com"` — and leave `cms` at `"/"`.
+The admin then answers only on that hostname, and not on the project's own
+address, so it is unreachable until the hostname's DNS verifies. The API stays
+at `/api` on that hostname too. See
+[An app on its own hostname](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname)
+for how requests are matched and what a Rebase Cloud deploy does with the
+hostname.
+
+`rebase build` passes `path` to Vite as `base` (via `REBASE_APP_BASE`), Vite gives
 it back as `import.meta.env.BASE_URL`, and the scaffold's `main.tsx` already
 feeds it to the router — so the assets, the routes and the server all agree
 without the prefix being written down three times:

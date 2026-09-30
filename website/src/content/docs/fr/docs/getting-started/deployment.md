@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a78fa791d3bc114
+sourceHash: 3dfefd8103a76481
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou de configurations manuelles.
@@ -7,17 +7,18 @@ description: Déployez votre projet Rebase en production à l'aide de Docker, de
 
 ## Ce qu'un déploiement sert
 
-Un projet Rebase se déploie comme **un serveur à une URL** (sur Rebase Cloud : `https://<project>.rebase.website`). Ce serveur gère :
+Un projet Rebase se déploie comme **un serveur** (sur Rebase Cloud : `https://<project>.rebase.website`). Ce serveur gère :
 
 - **`/api/*`** — l'API de données, l'authentification, le temps réel et le stockage
 - **tout le reste** — votre `frontend/` compilé en tant que SPA statique
 
-Il n'y a pas d'URL d'administration séparée : le panneau d'administration fait partie de votre frontend, donc l'endroit où il apparaît dépend de ce qu'est votre frontend.
+Il n'y a pas de service d'administration séparé : le panneau d'administration fait partie d'un frontend, donc l'endroit où il apparaît dépend de ce qu'est votre frontend, et du fait que vous lui donniez ou non un nom d'hôte bien à lui.
 
 | Type de projet | L'URL racine affiche | Le panneau d'administration se trouve à |
 |--------------|----------------|-------------------|
 | Scaffold par défaut (`rebase init`) | Le panneau d'administration | `/` — le frontend **est** l'administration |
 | Frontend produit personnalisé | Votre app | Là où vous le montez, généralement `/admin` — voir [Changer l'URL de base](#changer-lurl-de-base) |
+| Administration comme app sur son propre nom d'hôte | Votre app | `https://admin.example.com/`, servi par le même serveur — voir [Changer l'URL de base](#changer-lurl-de-base) |
 | Projet backend uniquement | Rien (API seulement) | Non déployé |
 
 :::note[Première visite]
@@ -259,7 +260,7 @@ Cloud Run et d'autres plateformes serverless sont sans état. Utilisez le **stoc
 
 ## Changer l'URL de base
 
-Si vous voulez que l'administration tourne sur un sous-chemin (par ex. `/admin`), changez une ligne — le `path` de l'app dans `rebase.json` :
+Si vous voulez que l'administration tourne sur un sous-chemin (par ex. `/admin`), changez le `path` de l'app dans `rebase.json`, et son `cms` avec :
 
 ```json title="rebase.json"
 "admin": {
@@ -267,11 +268,16 @@ Si vous voulez que l'administration tourne sur un sous-chemin (par ex. `/admin`)
     "root": "frontend",
     "build": "npm run build --workspace frontend",
     "output": "frontend/dist",
-    "path": "/admin"
+    "path": "/admin",
+    "cms": "/admin"
 }
 ```
 
-`rebase build` le passe à Vite comme `base` (via `REBASE_APP_BASE`), Vite le renvoie comme `import.meta.env.BASE_URL`, et le `main.tsx` du scaffold le donne déjà au routeur — les assets, les routes et le serveur s'accordent donc sans que le préfixe soit écrit à trois endroits :
+`cms` indique où se trouve le CMS, vers lequel pointe le lien de Rebase Cloud, et il doit se trouver à l'intérieur du `path` de l'app. Le scaffold les règle tous deux sur `/`, donc déplacer `path` seul est refusé — le CMS resterait sur `/`, hors d'une app qui commence désormais à `/admin`.
+
+Pour donner à l'administration un nom d'hôte bien à elle plutôt qu'un sous-chemin, faites de `path` une URL complète — `"path": "https://admin.example.com"` — et laissez `cms` à `"/"`. L'administration ne répond alors que sur ce nom d'hôte, et plus sur l'adresse propre du projet ; elle reste donc injoignable tant que le DNS du nom d'hôte n'est pas vérifié. L'API reste aussi sur `/api` sur ce nom d'hôte. Voir [Une application sur son propre nom d'hôte](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) pour la façon dont les requêtes sont attribuées et ce qu'un déploiement sur Rebase Cloud fait du nom d'hôte.
+
+`rebase build` passe `path` à Vite comme `base` (via `REBASE_APP_BASE`), Vite le renvoie comme `import.meta.env.BASE_URL`, et le `main.tsx` du scaffold le donne déjà au routeur — les assets, les routes et le serveur s'accordent donc sans que le préfixe soit écrit à trois endroits :
 
 ```tsx title="frontend/src/main.tsx"
 // At "/" this is "".
