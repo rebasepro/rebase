@@ -69,6 +69,13 @@ description: Every released change to Rebase — new features, fixes, and the br
   the repository, but the next environment built from migrations did not get
   it. Both places are checked now.
 
+- **A static app nested inside another's path serves its deep links.** With
+  one app at `/admin` and another at `/admin/beta`, a link such as
+  `/admin/beta/settings` answered 404 instead of `/admin/beta`'s
+  `index.html`. Every app declined the paths of all the others, including
+  the app it sits inside, so both apps turned the request down. Each app now
+  declines only the apps nested beneath it.
+
 #### Admin (CMS & app)
 
 - **The list view keeps its scroll position when you come back from a record

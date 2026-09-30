@@ -26,7 +26,7 @@ import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { installRootErrorHandler } from "../api/root-error-handler";
 import { describeCauseChain, logger, type Logger } from "../utils/logger";
-import { serveSPA } from "../serve-spa";
+import { nestedAppPaths, serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
@@ -504,14 +504,14 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     //
     // `bundle.staticApps` arrives longest-path-first, which puts the "/"-rooted
     // app last. Ordering alone is not enough, though — every app also excludes
-    // its siblings, or a miss under "/admin" would be answered with the site's
-    // index.html at the admin's URL.
+    // the apps nested beneath it, or a miss under "/admin" would be answered
+    // with the site's index.html at the admin's URL. See `nestedAppPaths` for
+    // why it is only those.
     if (env.REBASE_SERVE_STATIC) {
         for (const staticApp of bundle.staticApps) {
-            const siblings = bundle.staticApps
+            const siblings = nestedAppPaths(staticApp.path, bundle.staticApps
                 .filter(other => other !== staticApp)
-                .map(other => other.path)
-                .filter(other => other !== "/");
+                .map(other => other.path));
             logger.info("Serving static assets", { path: staticApp.dir,
 at: staticApp.path });
             serveSPA(app, {
@@ -689,10 +689,9 @@ async function bootStaticApp(
     // Mounted last: each app's serveSPA ends in a catch-all under its prefix.
     // Same ordering and sibling-exclusion rules as the backend path above.
     for (const staticApp of bundle.staticApps) {
-        const siblings = bundle.staticApps
+        const siblings = nestedAppPaths(staticApp.path, bundle.staticApps
             .filter(other => other !== staticApp)
-            .map(other => other.path)
-            .filter(other => other !== "/");
+            .map(other => other.path));
         logger.info("Serving static app", {
             app: bundle.manifest.app,
             path: staticApp.dir,

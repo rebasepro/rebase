@@ -1,5 +1,6 @@
 /**
- * A real boot, serving two apps from one bundle.
+ * A real boot, serving two apps from one bundle — plus a third nested inside
+ * the second, which is where a path-only exclusion rule goes wrong.
  *
  * `serve-spa.test.ts` mounts apps the way boot mounts them; this one lets boot
  * do it, from a bundle on disk. It is the closest thing to the self-host
@@ -36,6 +37,10 @@ function writeTwoAppBundle(): string {
     // Built for /admin, as `rebase build` asserts it must be.
     write("static/admin/index.html", '<script src="/admin/assets/app.js"></script>ADMIN_INDEX');
     write("static/admin/assets/app.js", "ADMIN_ASSET");
+    // Nested inside the admin's path: the CLI refuses only two apps at the
+    // same path, so `/admin/beta` beside `/admin` is a valid project.
+    write("static/beta/index.html", '<script src="/admin/beta/assets/app.js"></script>BETA_INDEX');
+    write("static/beta/assets/app.js", "BETA_ASSET");
 
     write("manifest.json", JSON.stringify({
         bundleFormat: BUNDLE_FORMAT_VERSION,
@@ -46,7 +51,8 @@ function writeTwoAppBundle(): string {
         entry: {
             static: [
                 { path: "/", dir: "static/site", spa: true },
-                { path: "/admin", dir: "static/admin", spa: true }
+                { path: "/admin", dir: "static/admin", spa: true },
+                { path: "/admin/beta", dir: "static/beta", spa: true }
             ]
         },
         hooks: { native: false },
@@ -78,8 +84,8 @@ afterAll(async () => {
 });
 
 describe("booting a two-app static bundle", () => {
-    it("loads both apps, longest path first", () => {
-        expect(booted!.bundle.staticApps.map(a => a.path)).toEqual(["/admin", "/"]);
+    it("loads every app, longest path first", () => {
+        expect(booted!.bundle.staticApps.map(a => a.path)).toEqual(["/admin/beta", "/admin", "/"]);
     });
 
     it("serves the site at the root", async () => {
@@ -101,6 +107,15 @@ describe("booting a two-app static bundle", () => {
         const { body } = await get("/admin/collections/posts");
         expect(body).toContain("ADMIN_INDEX");
         expect(body).not.toBe("SITE_INDEX");
+    });
+
+    it("answers a deep link under the nested app with the nested app's index", async () => {
+        // It used to be a 404: the nested app declined it for being under
+        // "/admin", and the admin declined it for being under "/admin/beta".
+        const { status, body } = await get("/admin/beta/some/route");
+        expect(status).toBe(200);
+        expect(body).toContain("BETA_INDEX");
+        expect((await get("/admin/beta/assets/app.js")).body).toBe("BETA_ASSET");
     });
 
     it("answers a deep link at the root with the site's index", async () => {

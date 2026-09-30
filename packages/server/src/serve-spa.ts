@@ -138,6 +138,22 @@ function isUnderPath(requestPath: string, prefix: string): boolean {
 }
 
 /**
+ * The paths of the apps nested inside the one at `basePath` — what its SPA
+ * fallback must leave to them, as `excludePaths`.
+ *
+ * Only those beneath it. Every other app's path used to be excluded, ancestors
+ * included, and an app at `/admin/beta` beside one at `/admin` then declined
+ * every deep link it had: each is under "/admin". The enclosing app declined
+ * them too, as it should, and a URL two apps were mounted for answered 404. An
+ * ancestor's path can never be right here — anything that reaches this app's
+ * fallback is under it — and an unrelated app's path can never match, so the
+ * apps beneath are the whole list.
+ */
+export function nestedAppPaths(basePath: string, otherPaths: readonly string[]): string[] {
+    return otherPaths.filter(other => other !== basePath && isUnderPath(other, basePath));
+}
+
+/**
  * Extensions a build emits, never a client-side route.
  *
  * An allowlist rather than "does the last segment contain a dot": entity routes

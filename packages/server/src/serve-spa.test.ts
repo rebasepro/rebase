@@ -10,7 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Hono } from "hono";
-import { serveSPA } from "./serve-spa";
+import { nestedAppPaths, serveSPA } from "./serve-spa";
 
 interface MountedApp {
     path: string;
@@ -32,7 +32,7 @@ function writeApp(name: string, files: Record<string, string>): string {
 
 /**
  * Mount apps exactly as `bootFromBundle` does: longest path first, and every
- * app excluding its siblings.
+ * app excluding the apps nested beneath it.
  */
 function mount(apps: MountedApp[]): Hono {
     const app = new Hono();
@@ -42,10 +42,9 @@ function mount(apps: MountedApp[]): Hono {
 
     const ordered = [...apps].sort((a, b) => b.path.length - a.path.length);
     for (const staticApp of ordered) {
-        const siblings = ordered
+        const siblings = nestedAppPaths(staticApp.path, ordered
             .filter(other => other !== staticApp)
-            .map(other => other.path)
-            .filter(other => other !== "/");
+            .map(other => other.path));
         serveSPA(app, {
             frontendPath: staticApp.dir,
             basePath: staticApp.path,
@@ -133,6 +132,70 @@ describe("serveSPA with two apps in one process", () => {
 
     it("does not swallow the health probe", async () => {
         expect((await get(twoApps(), "/health")).body).toBe('{"status":"ok"}');
+    });
+});
+
+function nestedApps(options: { root?: boolean; betaSpa?: boolean } = {}): Hono {
+    const { root = true, betaSpa = true } = options;
+    return mount([
+        ...(root ? [{ path: "/", spa: true, dir: writeApp("site", { "index.html": "SITE_INDEX" }) }] : []),
+        {
+            path: "/admin",
+            spa: true,
+            dir: writeApp("admin", { "index.html": "ADMIN_INDEX", "assets/x.js": "ADMIN_ASSET" })
+        },
+        {
+            path: "/admin/beta",
+            spa: betaSpa,
+            dir: writeApp("beta", { "index.html": "BETA_INDEX", "assets/x.js": "BETA_ASSET" })
+        }
+    ]);
+}
+
+// An app may sit inside another app's path — `/admin/beta` beside `/admin`; the
+// CLI refuses only two apps at the SAME path. Every app used to decline all its
+// siblings' paths, ancestors included, so the nested app declined its own deep
+// links because they are under "/admin", and "/admin" declined them because
+// they are under "/admin/beta": a 404 for a URL two apps were mounted to serve.
+describe("serveSPA with one app nested inside another", () => {
+    it("answers a deep link under the nested app with the nested app's index", async () => {
+        const { status, body } = await get(nestedApps(), "/admin/beta/some/route");
+        expect(status).toBe(200);
+        expect(body).toBe("BETA_INDEX");
+    });
+
+    it("answers the nested app's own path, and its assets", async () => {
+        const app = nestedApps();
+        expect((await get(app, "/admin/beta")).body).toBe("BETA_INDEX");
+        expect((await get(app, "/admin/beta/assets/x.js")).body).toBe("BETA_ASSET");
+    });
+
+    it("still gives the enclosing app everything else under its path", async () => {
+        const app = nestedApps();
+        expect((await get(app, "/admin")).body).toBe("ADMIN_INDEX");
+        expect((await get(app, "/admin/other/route")).body).toBe("ADMIN_INDEX");
+        expect((await get(app, "/admin/assets/x.js")).body).toBe("ADMIN_ASSET");
+        // A segment boundary, not a prefix: this is the enclosing app's route.
+        expect((await get(app, "/admin/betamax")).body).toBe("ADMIN_INDEX");
+    });
+
+    it("keeps the root app out of both", async () => {
+        const app = nestedApps();
+        expect((await get(app, "/deep/link")).body).toBe("SITE_INDEX");
+        expect((await get(app, "/admin/beta/deep")).body).not.toBe("SITE_INDEX");
+    });
+
+    it("works the same with no app at the root", async () => {
+        const app = nestedApps({ root: false });
+        expect((await get(app, "/admin/beta/deep")).body).toBe("BETA_INDEX");
+        expect((await get(app, "/admin/deep")).body).toBe("ADMIN_INDEX");
+    });
+
+    it("does not answer a nested static site's missing file with the enclosing app's index", async () => {
+        // The enclosing app must still decline what is under the nested app.
+        const { status, body } = await get(nestedApps({ betaSpa: false }), "/admin/beta/missing.html");
+        expect(status).toBe(404);
+        expect(body).not.toBe("ADMIN_INDEX");
     });
 });
 
