@@ -137,6 +137,20 @@ export interface RebaseStaticAppConfig {
      * loads and every asset 404s: a blank page with no server error. `rebase
      * build` passes it as `REBASE_APP_BASE` and asserts the emitted HTML honours
      * it. Changing this value requires rebuilding the app.
+     *
+     * **Or a full URL, to give the app a hostname of its own:**
+     * `"https://admin.example.com"`, or `"https://admin.example.com/cms"` for a
+     * path under it. The app then answers only on that hostname, and every app
+     * without one keeps answering on all the others. The URL form is split by
+     * {@link parseAppAddress}: the hostname travels as the bundle's
+     * {@link RebaseBundleStatic.host}, and the path part is what the rules above
+     * (and `REBASE_APP_BASE`) apply to. HTTPS only, with no port, query or
+     * fragment — a hostname is served over TLS by the platform, not chosen per
+     * request.
+     *
+     * On Rebase Cloud the deploy registers the hostname on the project. It is
+     * live once its DNS records verify, which the deploy prints when they don't
+     * yet.
      */
     path?: string;
     /**
@@ -203,6 +217,84 @@ export function reservedPrefixFor(path: string): string | undefined {
     return RESERVED_BACKEND_PREFIXES.find(
         reserved => normalized === reserved || normalized.startsWith(`${reserved}/`)
     );
+}
+
+/**
+ * Where a static app answers: on one hostname or all of them, at a path.
+ *
+ * `host` absent is every hostname the project is served on.
+ */
+export interface AppAddress {
+    host?: string;
+    path: string;
+}
+
+export type AppAddressResult =
+    | { ok: true; address: AppAddress }
+    | { ok: false; reason: string };
+
+/**
+ * Split a static app's declared `path` into the hostname it claims and the path
+ * under it.
+ *
+ * `"/admin"` is `{ path: "/admin" }`, returned as written: the path rules
+ * (leading slash, no `..`, reserved prefixes) belong to the caller, which
+ * applies them to the path part of either form. `"https://admin.example.com/cms"`
+ * is `{ host: "admin.example.com", path: "/cms" }`.
+ *
+ * Shared because three parties must read the same value the same way: the CLI
+ * while `rebase.json` is edited, the control plane at deploy intake (a bundle can
+ * come from any CLI, or none), and the runtime choosing which app answers.
+ */
+export function parseAppAddress(value: string): AppAddressResult {
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+        // A bare hostname is the likeliest mistake, and "must start with /" would
+        // not say what was meant.
+        if (!value.startsWith("/") && isValidAppHost(value.toLowerCase().replace(/\/.*$/, ""))) {
+            return { ok: false, reason: `looks like a hostname — write it as a URL: "https://${value}"` };
+        }
+        return { ok: true, address: { path: value } };
+    }
+
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        return { ok: false, reason: "is not a valid URL" };
+    }
+    if (url.protocol !== "https:") {
+        return { ok: false, reason: `must use https — the platform serves every hostname over TLS: "https://${url.host}${url.pathname === "/" ? "" : url.pathname}"` };
+    }
+    if (url.username || url.password) return { ok: false, reason: "must not contain credentials" };
+    if (url.port) return { ok: false, reason: "must not name a port — a hostname is served on 443" };
+    // `new URL` drops an empty "?" or "#", so test the text as well.
+    if (url.search || url.hash || /[?#]/.test(value)) {
+        return { ok: false, reason: "must not have a query or fragment" };
+    }
+    if (!isValidAppHost(url.hostname)) {
+        return { ok: false, reason: `names "${url.hostname}", which is not a public hostname` };
+    }
+    // The rules a path is held to are the caller's, so hand back what was
+    // written after the host, not what `URL` normalised it to — a `..` resolved
+    // away here would slip past the check that exists to refuse it.
+    const authorityAndPath = value.slice(value.indexOf("//") + 2);
+    const slash = authorityAndPath.indexOf("/");
+    return { ok: true, address: { host: url.hostname, path: slash === -1 ? "/" : authorityAndPath.slice(slash) } };
+}
+
+/**
+ * Whether `host` is a public DNS name an app can be given: lowercase labels of
+ * letters, digits and hyphens, at least two of them, not an IP address and not
+ * `localhost`. Internationalised names arrive here already in punycode.
+ */
+export function isValidAppHost(host: string): boolean {
+    if (host.length === 0 || host.length > 253 || host !== host.toLowerCase()) return false;
+    const labels = host.split(".");
+    if (labels.length < 2) return false;
+    const label = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+    if (!labels.every(part => label.test(part))) return false;
+    // An all-numeric last label is an IPv4 address, never a TLD.
+    return !/^[0-9]+$/.test(labels[labels.length - 1]);
 }
 
 /**
@@ -400,8 +492,22 @@ export interface RebaseBundleEntrypoints {
 
 /** One built static app inside a bundle. */
 export interface RebaseBundleStatic {
-    /** Public base path, e.g. `/` or `/admin`. */
+    /** Public base path, e.g. `/` or `/admin`. Always a path, never a URL. */
     path: string;
+    /**
+     * The one hostname this app answers on, lowercase, e.g. `admin.example.com`.
+     *
+     * Absent means every hostname the project is served on, which is what every
+     * app was before this field existed. Present, the app answers only for
+     * requests whose `Host` is exactly this — the path part of its address is
+     * still `path`. At an equal `path`, an app naming the request's hostname
+     * wins over one that does not.
+     *
+     * A runtime that predates this field ignores it and would mount two apps at
+     * the same `path`, so a bundle carrying it must only ever reach a runtime
+     * that reads it. The control plane enforces that at intake.
+     */
+    host?: string;
     /** Bundle-relative directory holding the built assets. */
     dir: string;
     /** Serve `index.html` for unmatched paths under `path`. */
