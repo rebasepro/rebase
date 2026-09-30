@@ -52,6 +52,16 @@ describe("parseAppAddress", () => {
         ["ftp://admin.example.com", /must use https/],
         ["https://user:pw@admin.example.com", /credentials/],
         ["https://admin.example.com:8443", /port/],
+        // `new URL` drops a default port, so ":443" has to be caught on the text.
+        ["https://admin.example.com:443", /port/],
+        ["https://admin.example.com:", /port/],
+        ["https://admin.example.com/?next=a:b", /query or fragment/],
+        // `new URL` reads "\" as "/", and the path would be lost, not refused.
+        ["https://admin.example.com\\cms", /backslashes/],
+        // …and strips tabs and newlines, accepting a host that was never written.
+        ["https://admin.exa\tmple.com", /control characters/],
+        ["https://admin.example.com\n", /control characters/],
+        ["https://admin.example.com/c ms", /spaces/],
         ["https://admin.example.com/?x=1", /query or fragment/],
         ["https://admin.example.com/#top", /query or fragment/],
         ["https://admin.example.com?", /query or fragment/],

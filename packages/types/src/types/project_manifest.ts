@@ -256,6 +256,19 @@ export function parseAppAddress(value: string): AppAddressResult {
         return { ok: true, address: { path: value } };
     }
 
+    // `new URL` forgives what a manifest should not: it strips tabs and newlines,
+    // reads "\" as "/", and drops a default ":443". Each would make the address
+    // mean something other than what was written, so these are judged on the
+    // text, before the parser can tidy them away.
+    // eslint-disable-next-line no-control-regex
+    if (/[\s\\\u0000-\u001f\u007f]/.test(value)) {
+        return { ok: false, reason: "must not contain spaces, control characters or backslashes" };
+    }
+    const authority = value.slice(value.indexOf("//") + 2).split(/[/?#]/)[0];
+    if (/:[^@]*$/.test(authority) && !authority.startsWith("[")) {
+        return { ok: false, reason: "must not name a port — a hostname is served on 443" };
+    }
+
     let url: URL;
     try {
         url = new URL(value);
