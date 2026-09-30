@@ -270,3 +270,89 @@ export async function uploadBundle(
     if (!data.bundleId) throw new Error("Bundle upload endpoint did not return a bundle id.");
     return data.bundleId;
 }
+
+/** One DNS record a hostname needs, as the control plane lists it. */
+export interface DeployHostRecord {
+    type: string;
+    name: string;
+    values: string[];
+}
+
+/**
+ * A hostname an app in this deploy is declared on, as the deploy found it.
+ *
+ * The control plane registers each one on the project as it deploys — an app
+ * whose `path` is `https://admin.example.com` needs that host on the project
+ * before anything can route it — and a new one starts `pending`, because it is
+ * served only once its DNS is published and verified. `records` is what to
+ * publish, present for a pending host.
+ */
+export interface DeployHost {
+    host: string;
+    status: "verified" | "pending";
+    records?: DeployHostRecord[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function recordFrom(value: unknown): DeployHostRecord | null {
+    if (!isRecord(value) || typeof value.type !== "string" || typeof value.name !== "string") return null;
+    const values = Array.isArray(value.values) ? value.values.filter((v): v is string => typeof v === "string") : [];
+    return values.length > 0 ? { type: value.type, name: value.name, values } : null;
+}
+
+/**
+ * The `hosts` a deploy response carries, read defensively.
+ *
+ * `undefined` when there is no such field, which is what a control plane that
+ * predates host-routed apps answers: the caller then leaves `hosts` out of its
+ * own output rather than reporting an empty set nobody looked for. An entry
+ * with no hostname is dropped, and any status but `verified` is pending — the
+ * same rule `cloud domains` reads rows by, because an unreadable status must
+ * not print as live.
+ */
+export function deployHostsFrom(response: unknown): DeployHost[] | undefined {
+    if (!isRecord(response) || !Array.isArray(response.hosts)) return undefined;
+    const hosts: DeployHost[] = [];
+    for (const entry of response.hosts) {
+        if (!isRecord(entry) || typeof entry.host !== "string" || entry.host === "") continue;
+        const records = Array.isArray(entry.records)
+            ? entry.records.map(recordFrom).filter((r): r is DeployHostRecord => r !== null)
+            : [];
+        hosts.push({
+            host: entry.host,
+            status: entry.status === "verified" ? "verified" : "pending",
+            ...(records.length > 0 ? { records } : {})
+        });
+    }
+    return hosts;
+}
+
+/**
+ * What to tell somebody whose deploy declared a hostname that is not live yet.
+ *
+ * A deploy that succeeds with an app on a hostname nobody can reach reads as a
+ * broken deploy, so each pending host gets its own block: that it is registered
+ * but waiting, the records to create, and the command that finishes the job.
+ * The records come from the control plane, never composed here — A or CNAME
+ * depends on apex-vs-subdomain and on the ingress behind the project, which
+ * the CLI cannot know. Plain text: the caller colours it.
+ */
+export function pendingHostNotices(hosts: DeployHost[]): Array<{ headline: string; details: string[] }> {
+    return hosts
+        .filter(host => host.status !== "verified")
+        .map(({ host, records }) => ({
+            headline: `${host} is registered on this project, but not served until its DNS is verified.`,
+            details: [
+                ...(records?.length
+                    ? [
+                        "Create these records with your DNS provider:",
+                        ...records.map(record => `  ${record.type}  ${record.name}  →  ${record.values.join(", ")}`)
+                    ]
+                    : ["See the records it needs with `rebase cloud domains list`."]),
+                `Then run \`rebase cloud domains verify ${host}\`.`
+            ]
+        }));
+}

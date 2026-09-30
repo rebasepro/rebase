@@ -15,7 +15,13 @@
  * root path, so multiple Rebase instances never collide.
  */
 import chalk from "chalk";
-import { DEFAULT_RESOURCE_KEY, parseEnvBoolean } from "@rebasepro/types";
+import {
+    DEFAULT_RESOURCE_KEY,
+    parseEnvBoolean,
+    type AppAddress,
+    type RebaseProjectManifest,
+    type RebaseStaticAppConfig
+} from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
 import {
@@ -29,7 +35,14 @@ import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { cmsMountOf, findBackendApp, loadManifest, resolveBackendPaths } from "../manifest";
+import {
+    cmsMountOf,
+    findBackendApp,
+    formatAppAddress,
+    loadManifest,
+    resolveBackendPaths,
+    staticAppAddress
+} from "../manifest";
 import {
     requireProjectRoot,
     findBackendDir,
@@ -393,6 +406,119 @@ export function databaseEndpoint(url: string | null | undefined): string | null 
     const name = parsed.pathname.replace(/^\//, "");
 
     return `${host}${parsed.port ? `:${parsed.port}` : ""}${name ? `/${name}` : ""}`;
+}
+
+/**
+ * What the start banner needs to know about a project's static apps.
+ *
+ * `rebase dev` runs one frontend: Vite in `frontend/`, at the root of its own
+ * localhost port, whatever path or hostname the manifest declares for it. So an
+ * app's local address and its deployed one are different things, and for an app
+ * with a hostname of its own they share nothing at all — appending its address
+ * to the local URL would print `http://localhost:5173https://admin.example.com`.
+ */
+export interface DevStaticShape {
+    declaresStaticApp: boolean;
+    /** The declared app whose `root` is the `frontend/` that `rebase dev` runs, if one is. */
+    served?: { appName: string; address: AppAddress };
+    /** Where the CMS is, when an app declares one. */
+    cms?: {
+        appName: string;
+        /** Always a path. */
+        path: string;
+        /** The serving app's hostname, when its `path` names one. */
+        host?: string;
+        /** Whether the app serving it is the one `rebase dev` runs, so it has a local address. */
+        servedLocally: boolean;
+    };
+}
+
+/**
+ * Read {@link DevStaticShape} out of a loaded manifest. Exported for its test.
+ *
+ * Which declared app is running is decided by its `root` being `frontend/`,
+ * because that directory is what `startFrontend` launches and nothing else is.
+ * When no declared app has that root, which app serves the CMS cannot be told,
+ * and it is read as the frontend that does run — what the banner has always
+ * assumed, and right for every project `rebase init` scaffolds.
+ */
+export function devStaticShape(
+    manifest: RebaseProjectManifest,
+    projectRoot: string,
+    frontendDir: string | null
+): DevStaticShape {
+    const statics: Array<[string, RebaseStaticAppConfig]> = [];
+    for (const [name, app] of Object.entries(manifest.apps ?? {})) {
+        if (app.type === "static") statics.push([name, app]);
+    }
+
+    let served: DevStaticShape["served"];
+    if (frontendDir) {
+        const running = path.resolve(frontendDir);
+        const match = statics.find(([, app]) => path.resolve(projectRoot, app.root) === running);
+        if (match) served = { appName: match[0], address: staticAppAddress(match[0], match[1]) };
+    }
+
+    const mount = cmsMountOf(manifest);
+    return {
+        declaresStaticApp: statics.length > 0,
+        ...(served ? { served } : {}),
+        ...(mount
+            ? {
+                cms: {
+                    appName: mount.appName,
+                    path: mount.path,
+                    ...(mount.host ? { host: mount.host } : {}),
+                    servedLocally: served ? served.appName === mount.appName : true
+                }
+            }
+            : {})
+    };
+}
+
+/**
+ * The banner's lines for a project with a frontend. Exported for its test.
+ *
+ * Every address is printed whole, once: the local one Vite answers on, and —
+ * for an app with a hostname — the https URL it answers on once deployed, on a
+ * line of its own beneath it. A CMS in an app `rebase dev` does not run gets its
+ * deployed address and a note saying so, rather than a localhost URL that the
+ * running frontend's SPA fallback would answer with the wrong app.
+ */
+export function appBannerLines(frontendUrl: string, api: string, shape: DevStaticShape): Array<[string, string]> {
+    const deployedNote = (address: string): [string, string] => ["         ", `${address} when deployed`];
+    const lines: Array<[string, string]> = [
+        ["", ""],
+        ["✦ Rebase Admin App is ready!", ""],
+        ["➜ Admin: ", frontendUrl]
+    ];
+    const servedDeployed = shape.served?.address.host ? formatAppAddress(shape.served.address) : undefined;
+    if (servedDeployed) lines.push(deployedNote(servedDeployed));
+    // Both, because both are needed and only one was printed. The admin URL is
+    // where you log in; the API URL is what every SDK client, curl and Swagger
+    // link needs — and it is not derivable from the other, since the two ports
+    // are derived separately from this project's path.
+    lines.push(["➜ API:   ", api]);
+
+    // The CMS, when it is not simply the frontend's home page. Printed rather
+    // than assumed: a project that mounts `<RebaseCMS>` at `/admin` inside its
+    // product app has an admin URL that appears nowhere — not in the build, not
+    // in the running server, not here — and finding it meant reading the
+    // frontend's source.
+    const cms = shape.cms;
+    if (!cms) return lines;
+    const cmsDeployed = cms.host ? formatAppAddress({ host: cms.host, path: cms.path }) : undefined;
+    if (!cms.servedLocally) {
+        lines.push(["➜ CMS:   ", cmsDeployed ?? cms.path]);
+        lines.push(["         ", `(app "${cms.appName}" — rebase dev only starts frontend/)`]);
+        return lines;
+    }
+    // The CMS at the root of the running app is the Admin line, deployed
+    // address included, and printing it twice only makes the box longer.
+    if (cms.path === "/" && cmsDeployed === servedDeployed) return lines;
+    lines.push(["➜ CMS:   ", cms.path === "/" ? frontendUrl : `${frontendUrl.replace(/\/$/, "")}${cms.path}`]);
+    if (cmsDeployed) lines.push(deployedNote(cmsDeployed));
+    return lines;
 }
 
 /**
@@ -832,23 +958,19 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * a shape that has no such directory reads as a broken scaffold on the
      * very first run of the very command the headless quickstart names.
      */
-    const staticShape = (() => {
+    const staticShape = ((): DevStaticShape => {
         try {
-            const { manifest } = loadManifest(projectRoot);
-            return {
-                declaresStaticApp: Object.values(manifest.apps ?? {}).some(app => app.type === "static"),
-                // Where the banner's "Admin" link actually reaches the CMS. For
-                // the scaffolded project that is the frontend's root and the two
-                // are the same URL; for a project that mounts the CMS as one
-                // route of a larger app they are not, and the banner was sending
-                // the reader to the product's home page.
-                cmsPath: cmsMountOf(manifest)?.path
-            };
+            // Where the banner's "Admin" link actually reaches the CMS, and
+            // where each is once deployed. For the scaffolded project the CMS
+            // is the frontend's root and the two are the same URL; for a
+            // project that mounts the CMS as one route of a larger app, or in
+            // an app of its own, they are not.
+            return devStaticShape(loadManifest(projectRoot).manifest, projectRoot, frontendDir);
         } catch {
             // A manifest that will not load is a different problem, reported
             // elsewhere. Fall back to the directory, which is what this check
             // used to be.
-            return { declaresStaticApp: Boolean(frontendDir), cmsPath: undefined };
+            return { declaresStaticApp: Boolean(frontendDir) };
         }
     })();
     const declaresStaticApp = staticShape.declaresStaticApp;
@@ -893,27 +1015,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const api = `http://localhost:${resolvedBackendPort}`;
             /** `[label, value]` per line; an empty pair is a blank line. */
             const lines: Array<[string, string]> = declaresStaticApp
-                ? [
-                    ["", ""],
-                    ["✦ Rebase Admin App is ready!", ""],
-                    ["➜ Admin: ", stripAnsi(frontendUrl)],
-                    // Both, because both are needed and only one was printed.
-                    // The admin URL is where you log in; the API URL is what
-                    // every SDK client, curl and Swagger link needs — and it is
-                    // not derivable from the other, since the two ports are
-                    // derived separately from this project's path.
-                    ["➜ API:   ", api]
-                ]
+                ? appBannerLines(stripAnsi(frontendUrl), api, staticShape)
                 : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
-
-            // The CMS, when it is not simply the frontend's home page. Printed
-            // rather than assumed: a project that mounts `<RebaseCMS>` at
-            // `/admin` inside its product app has an admin URL that appears
-            // nowhere — not in the build, not in the running server, not here —
-            // and finding it meant reading the frontend's source.
-            if (declaresStaticApp && staticShape.cmsPath && staticShape.cmsPath !== "/") {
-                lines.push(["➜ CMS:   ", `${stripAnsi(frontendUrl).replace(/\/$/, "")}${staticShape.cmsPath}`]);
-            }
 
             if (!declaresStaticApp) {
                 // Only when it is actually mounted. A project with no tables

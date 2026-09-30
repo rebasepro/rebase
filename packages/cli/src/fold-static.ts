@@ -23,6 +23,7 @@ import path from "path";
 import { execa } from "execa";
 import chalk from "chalk";
 import { foldStaticIntoBundle } from "./bundle";
+import { compareMountOrder, staticAppAddress } from "./manifest";
 import { toolStdio } from "./utils/tool-stdio";
 
 /** The apps section of a project manifest, as much of it as folding needs. */
@@ -54,6 +55,8 @@ export interface FoldOutcome {
     fileCount: number;
     /** Public base path this app was folded in at. */
     path: string;
+    /** The one hostname it answers on, when its `path` names one. */
+    host?: string;
 }
 
 /** A static app as folding sees it, with the manifest's defaults applied. */
@@ -61,8 +64,14 @@ export interface FoldableApp {
     name: string;
     build?: string;
     output?: string;
-    /** Public base path, defaulted to `/`. */
+    /**
+     * Public base path, defaulted to `/`. Always a path: when the manifest's
+     * `path` is a URL, this is the part after the hostname, which is what the
+     * app is built for and mounted at.
+     */
     path: string;
+    /** The one hostname this app answers on, when its `path` is a URL. */
+    host?: string;
     /** SPA fallback, defaulted to `true`. */
     spa: boolean;
     /** Where this app mounts the Rebase CMS, if it does. */
@@ -73,8 +82,9 @@ export interface FoldableApp {
  * Every static app in the manifest, in mount order.
  *
  * Longest path first, so the `/`-rooted app is registered last — its catch-all
- * would otherwise claim its siblings' URLs. Pure, so the ordering is testable
- * without a filesystem.
+ * would otherwise claim its siblings' URLs — and, at an equal path, the app with
+ * a hostname before the one without (see `compareMountOrder`). Pure, so the
+ * ordering is testable without a filesystem.
  */
 export function foldableApps(manifest: FoldableManifest): {
     apps: FoldableApp[];
@@ -91,17 +101,19 @@ export function foldableApps(manifest: FoldableManifest): {
 reason: `"${name}" declares no output directory — not folded in.` });
             continue;
         }
+        const { host, path: appPath } = staticAppAddress(name, app);
         apps.push({
             name,
             build: app.build,
             output: app.output,
-            path: app.path ?? "/",
+            path: appPath,
+            ...(host ? { host } : {}),
             spa: app.spa ?? true,
             cms: app.cms
         });
     }
 
-    apps.sort((a, b) => b.path.length - a.path.length);
+    apps.sort(compareMountOrder);
     return { apps,
 skipped };
 }
@@ -159,6 +171,12 @@ export function assertBuiltForPath(
  * The declared path is a build-time input, not only a serving concern: Vite
  * reads `base` from REBASE_APP_BASE, and the trailing slash is that field's
  * convention. See `assertBuiltForPath`.
+ *
+ * For an app declared at a URL these carry the path part only — `/` for
+ * `https://admin.example.com`. The hostname is where the platform routes the
+ * app, not something its assets should name: an absolute `base` would pin
+ * every script to production, so `vite preview` and any other hostname the app
+ * is opened on would load it from somewhere else.
  *
  * ## NODE_ENV
  *
@@ -249,12 +267,14 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
             assetsDir,
             appName: app.name,
             path: app.path,
+            host: app.host,
             spa: app.spa,
             cms: app.cms
         });
         outcomes.push({ appName: app.name,
 fileCount,
-path: app.path });
+path: app.path,
+...(app.host ? { host: app.host } : {}) });
     }
 
     return outcomes;

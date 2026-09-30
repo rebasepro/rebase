@@ -22,7 +22,15 @@ import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
 import { toolStdio } from "../utils/tool-stdio";
-import { buildableApps, findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
+import {
+    buildableApps,
+    findBackendApp,
+    formatAppAddress,
+    loadManifest,
+    ManifestError,
+    resolveBackendPaths,
+    staticAppAddress
+} from "../manifest";
 import {
     buildBundle,
     buildStaticBundle,
@@ -370,7 +378,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 for (const outcome of folded ?? []) {
                     console.log(
                         chalk.green(`    ✓ ${outcome.appName} folded in`) +
-                        chalk.dim(` (${outcome.fileCount} file(s) → served at ${outcome.path})`)
+                        chalk.dim(` (${outcome.fileCount} file(s) → served at ${formatAppAddress(outcome)})`)
                     );
                 }
             }
@@ -409,7 +417,10 @@ export async function buildAssetApp(
     options: { quietStdout?: boolean } = {}
 ): Promise<string | undefined> {
     const asset = app as RebaseStaticAppConfig;
-    const basePath = asset.path ?? "/";
+    // The path part is what the app is built for and mounted at; the hostname,
+    // when `path` names one, only travels in the bundle.
+    const address = staticAppAddress(name, asset);
+    const basePath = address.path;
     const say = (line: string): void => {
         if (options.quietStdout) console.error(line);
         else console.log(line);
@@ -462,13 +473,14 @@ export async function buildAssetApp(
         outDir,
         runtimeRange,
         path: basePath,
+        host: address.host,
         spa: asset.spa ?? true,
         cms: asset.cms
     });
     const rel = path.relative(projectRoot, result.outDir);
     say(
         chalk.green(`  ✓ static bundle → ${rel}/`) +
-        chalk.dim(` (${result.fileCount} file(s) → served at ${basePath})`)
+        chalk.dim(` (${result.fileCount} file(s) → served at ${formatAppAddress(address)})`)
     );
     return result.outDir;
 }

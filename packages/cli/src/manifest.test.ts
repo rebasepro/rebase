@@ -7,11 +7,14 @@ import {
     assessManagedCompatibility,
     buildableApps,
     cmsMountOf,
+    compareMountOrder,
     CURRENT_RUNTIME_RANGE,
+    formatAppAddress,
     loadManifest,
     ManifestError,
     resolveBackendPaths,
     selectDeployApp,
+    staticAppAddress,
     synthesizeManifest,
     validateManifest,
     writeManifest
@@ -348,6 +351,167 @@ path: "/admin" }
             });
             expect(issues).toEqual([]);
         });
+
+        it("rejects a value that is not a string, naming both forms", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: 42 } }
+            });
+            expect(issues.find(i => i.path === "apps.admin.path")?.message)
+                .toMatch(/absolute path like "\/admin", or a URL like "https:\/\/admin\.example\.com"/);
+        });
+
+        it("refuses an empty segment, which no router serves as written", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "/admin//panel" } }
+            });
+            expect(issues.find(i => i.path === "apps.admin.path")?.message).toMatch(/no empty segment/);
+        });
+    });
+
+    /**
+     * A static app on a hostname of its own: `path` written as an https URL.
+     *
+     * The split is `parseAppAddress` in `@rebasepro/types`, shared with the
+     * control plane and the runtime. What the CLI adds is the path rules on the
+     * path part, the (host, path) uniqueness rule, and errors that name the
+     * field and give the fix in the form the author wrote it — the one place a
+     * mistake here is cheap to hear about.
+     */
+    describe("static.path as a URL", () => {
+        function pathIssue(value: unknown): string | undefined {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: value } }
+            });
+            return issues.find(i => i.path === "apps.admin.path")?.message;
+        }
+
+        it("accepts a site on the project host beside an admin on its own hostname", () => {
+            // The shape the feature exists for: both at "/", told apart by host.
+            const { manifest, issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    backend: { type: "backend", runtime: "managed" },
+                    web: { type: "static", root: "frontend", output: "frontend/dist", path: "/", spa: true },
+                    admin: { type: "static", root: "admin", output: "admin/dist", path: "https://admin.dadaki.com", cms: "/" }
+                }
+            });
+            expect(issues).toEqual([]);
+            expect(manifest?.apps.admin).toMatchObject({ path: "https://admin.dadaki.com", cms: "/" });
+        });
+
+        it("accepts a path under the hostname", () => {
+            expect(pathIssue("https://admin.example.com/cms")).toBeUndefined();
+        });
+
+        it("accepts a trailing slash on a bare hostname, which is its root", () => {
+            expect(pathIssue("https://admin.example.com/")).toBeUndefined();
+        });
+
+        it("accepts a hostname that happens to be named like a reserved path", () => {
+            // Reserved prefixes are paths. `api.example.com` is somebody's
+            // hostname, and refusing it would be a rule the router never applies.
+            expect(pathIssue("https://api.example.com")).toBeUndefined();
+        });
+
+        it.each([
+            ["http://admin.example.com", /must use https.*"https:\/\/admin\.example\.com"/],
+            ["ftp://admin.example.com", /must use https/],
+            ["https://user:secret@admin.example.com", /must not contain credentials/],
+            ["https://admin.example.com:8443", /must not name a port/],
+            ["https://admin.example.com/?preview=1", /must not have a query or fragment/],
+            ["https://admin.example.com/#top", /must not have a query or fragment/],
+            ["https://admin.example.com?", /must not have a query or fragment/],
+            ["https://localhost", /"localhost", which is not a public hostname/],
+            ["https://127.0.0.1", /not a public hostname/],
+            ["https://[::1]", /not a public hostname/],
+            ["https://admin", /"admin", which is not a public hostname/],
+            ["https://", /is not a valid URL/],
+            ["admin.example.com", /looks like a hostname — write it as a URL: "https:\/\/admin\.example\.com"/],
+            ["//admin.example.com", /URL without its scheme — write "https:\/\/admin\.example\.com"/]
+        ])("refuses %j, saying why", (value, reason) => {
+            expect(pathIssue(value)).toMatch(reason);
+        });
+
+        it.each([
+            ["https://admin.example.com/cms/", /must not end with a slash — write "https:\/\/admin\.example\.com\/cms", not "https:\/\/admin\.example\.com\/cms\/"/],
+            ["https://admin.example.com/../x", /plain path after the hostname.*"https:\/\/admin\.example\.com\/admin"/],
+            ["https://admin.example.com//cms", /no empty segment/]
+        ])("holds the path part of %j to the path rules, with the fix in URL form", (value, reason) => {
+            expect(pathIssue(value)).toMatch(reason);
+        });
+
+        it.each(["https://admin.example.com/api", "https://admin.example.com/health/live", "https://admin.example.com/metrics"])(
+            "refuses a reserved path under a hostname: %s",
+            (value) => {
+                // The API's routes are registered before any app's on every
+                // hostname, so an app here never answers — or, mounted first,
+                // answers the API's requests with its own index.html.
+                expect(pathIssue(value)).toMatch(/the backend serves that path on every hostname, this one included/);
+            }
+        );
+
+        it("refuses two apps at one hostname and path, whatever case the hostname was written in", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    admin: { type: "static", root: "a", output: "a/dist", path: "https://admin.example.com" },
+                    panel: { type: "static", root: "p", output: "p/dist", path: "https://Admin.Example.com/" }
+                }
+            });
+            expect(issues.find(i => i.path === "apps.panel.path")?.message)
+                .toMatch(/cannot serve the same path — "admin" is already at "https:\/\/admin\.example\.com"/);
+        });
+
+        it.each([
+            ["the same path with and without a hostname", "/", "https://admin.example.com"],
+            ["one hostname at two paths", "https://admin.example.com", "https://admin.example.com/docs"],
+            ["two hostnames at one path", "https://admin.example.com", "https://docs.example.com"]
+        ])("allows %s", (_label, first, second) => {
+            // An app with no hostname is its own value, not a wildcard: at an
+            // equal path, the one naming the request's hostname wins there and
+            // the other answers everywhere else.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    one: { type: "static", root: "a", output: "a/dist", path: first },
+                    two: { type: "static", root: "b", output: "b/dist", path: second }
+                }
+            });
+            expect(issues).toEqual([]);
+        });
+    });
+
+    describe("staticAppAddress", () => {
+        it("splits a URL into its lowercased hostname and the path part", () => {
+            expect(staticAppAddress("admin", { path: "https://Admin.Example.com/cms" }))
+                .toEqual({ host: "admin.example.com", path: "/cms" });
+        });
+
+        it("reads a bare hostname as its root", () => {
+            expect(staticAppAddress("admin", { path: "https://admin.example.com" }))
+                .toEqual({ host: "admin.example.com", path: "/" });
+        });
+
+        it("leaves a path alone, and an absent one at the root", () => {
+            expect(staticAppAddress("web", { path: "/admin" })).toEqual({ path: "/admin" });
+            expect(staticAppAddress("web", {})).toEqual({ path: "/" });
+        });
+
+        it("throws, naming the field, on a value validation would have refused", () => {
+            // Guessing an address for it would build or mount the app somewhere
+            // it was never declared.
+            expect(() => staticAppAddress("admin", { path: "http://admin.example.com" }))
+                .toThrow(/apps\.admin\.path must use https/);
+        });
+
+        it("prints an address the way it is declared", () => {
+            expect(formatAppAddress({ path: "/admin" })).toBe("/admin");
+            expect(formatAppAddress({ host: "admin.example.com", path: "/" })).toBe("https://admin.example.com");
+            expect(formatAppAddress({ host: "admin.example.com", path: "/cms" })).toBe("https://admin.example.com/cms");
+        });
     });
 
     /**
@@ -463,6 +627,45 @@ cms: "/staff/admin" }
             expect(issues.find(i => i.path === "apps.staff.cms")?.message)
                 .toMatch(/one CMS.*"site"/);
         });
+
+        it("accepts a CMS at the root of an app on its own hostname", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "https://admin.example.com", cms: "/" } }
+            });
+            expect(issues).toEqual([]);
+        });
+
+        it("measures containment against the path part of a URL", () => {
+            const accepted = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "https://admin.example.com/cms", cms: "/cms/panel" } }
+            });
+            expect(accepted.issues).toEqual([]);
+
+            // Nothing on admin.example.com answers "/other" for this app — it
+            // mounts at "/cms" there — so a console link to it would be a 404.
+            const refused = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "https://admin.example.com/cms", cms: "/other" } }
+            });
+            expect(refused.issues.find(i => i.path === "apps.admin.cms")?.message)
+                .toMatch(/must be inside this app's path — it is at "https:\/\/admin\.example\.com\/cms", so it cannot serve "\/other"/);
+        });
+
+        it.each([
+            ["https://admin.example.com/cms", /must be a path, not a URL.*Write "\/cms"/],
+            ["//admin.example.com/cms", /must be a path, not a URL.*Write "\/cms"/],
+            ["http://admin.example.com", /must be a path, not a URL/]
+        ])("refuses %j, which puts a hostname where only a path goes", (cms, reason) => {
+            // The app's `path` already says which hostname it answers on; a
+            // second one here could only disagree with it.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "https://admin.example.com/cms", cms } }
+            });
+            expect(issues.find(i => i.path === "apps.admin.cms")?.message).toMatch(reason);
+        });
     });
 });
 
@@ -542,6 +745,17 @@ root: "a",
 output: "a/dist",
 somethingElseEntirely: 1 });
         expect(warnings.join(" ")).not.toMatch(/Did you mean/);
+    });
+
+    it.each(["host", "hostname", "domain"])("answers a `%s` field with the URL form it was reaching for", (field) => {
+        // "Your CLI may be older than this manifest" is false here, and sends
+        // the reader off to upgrade a CLI that already does what they wanted.
+        const { issues } = validate({ type: "static", root: "a", output: "a/dist", path: "/cms", [field]: "https://admin.example.com/" });
+
+        expect(issues).toEqual([]);
+        expect(warnings.join(" ")).toMatch(new RegExp(`apps\\.admin\\.${field} is not a field`));
+        expect(warnings.join(" ")).toMatch(/"path": "https:\/\/admin\.example\.com\/cms"/);
+        expect(warnings.join(" ")).not.toMatch(/older than this manifest/);
     });
 });
 
@@ -661,6 +875,30 @@ runtime: "managed" as const },
         writeManifest(scratch, original);
 
         expect(loadManifest(scratch).manifest.apps).toEqual(original.apps);
+    });
+
+    it("keeps a URL path as written through a rewrite", () => {
+        // `rebase eject` loads the manifest and writes it back. A load that
+        // stored the split pieces would have that rewrite turn
+        // "https://admin.example.com" into "/" — the app silently moved off
+        // its hostname, in a commit about the backend's runtime.
+        const original = {
+            rebase: "^1",
+            apps: {
+                admin: {
+                    type: "static" as const,
+                    root: "admin",
+                    output: "admin/dist",
+                    path: "https://Admin.Example.com/cms",
+                    cms: "/cms"
+                }
+            }
+        };
+        fs.writeFileSync(path.join(scratch, "rebase.json"), JSON.stringify(original));
+
+        writeManifest(scratch, loadManifest(scratch).manifest);
+
+        expect(JSON.parse(fs.readFileSync(path.join(scratch, "rebase.json"), "utf8")).apps).toEqual(original.apps);
     });
 });
 
@@ -838,6 +1076,20 @@ describe("cmsMountOf", () => {
             }
         });
         expect(mount).toMatchObject({ appName: "web", path: "/admin" });
+        expect(mount).not.toHaveProperty("host");
+    });
+
+    it("keeps the CMS a path, and says which hostname it is on", () => {
+        // A caller holding a local or project URL must not append the app's
+        // `path` to it — that is how `http://localhost:5173https://…` happens.
+        const mount = cmsMountOf({
+            rebase: "^1",
+            apps: {
+                web: { type: "static", root: "frontend", output: "frontend/dist", path: "/" },
+                admin: { type: "static", root: "admin", output: "admin/dist", path: "https://Admin.Dadaki.com", cms: "/" }
+            }
+        });
+        expect(mount).toMatchObject({ appName: "admin", path: "/", host: "admin.dadaki.com" });
     });
 
     it("is undefined when no app declares one", () => {
@@ -847,6 +1099,25 @@ describe("cmsMountOf", () => {
             rebase: "^1",
             apps: { web: { type: "static", root: "f", output: "f/dist", path: "/" } }
         })).toBeUndefined();
+    });
+});
+
+describe("compareMountOrder", () => {
+    it("mounts the longest path first, and at an equal path the app with a hostname first", () => {
+        // The runtime's matching rule, as a sort: on admin.example.com the app
+        // naming it wins at "/", and the app on every hostname answers the rest.
+        const order = [
+            { path: "/" },
+            { host: "admin.example.com", path: "/" },
+            { path: "/docs" },
+            { host: "admin.example.com", path: "/cms/panel" }
+        ].sort(compareMountOrder);
+        expect(order).toEqual([
+            { host: "admin.example.com", path: "/cms/panel" },
+            { path: "/docs" },
+            { host: "admin.example.com", path: "/" },
+            { path: "/" }
+        ]);
     });
 });
 

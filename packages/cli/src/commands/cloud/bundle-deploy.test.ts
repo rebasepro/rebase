@@ -4,7 +4,15 @@ import os from "os";
 import path from "path";
 import { execFileSync } from "child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readBundleManifest, bundleDeployBody, bundleCommit, packBundleForUpload, declaredAppsFrom } from "./bundle-deploy";
+import {
+    readBundleManifest,
+    bundleDeployBody,
+    bundleCommit,
+    packBundleForUpload,
+    declaredAppsFrom,
+    deployHostsFrom,
+    pendingHostNotices
+} from "./bundle-deploy";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 
 let scratch: string;
@@ -280,5 +288,74 @@ describe("bundleDeployBody carries the rebuild source and the downgrade opt-in o
         expect("allowFrameworkDowngrade" in bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest, allowFrameworkDowngrade: false }))
             .toBe(false);
         expect("allowFrameworkDowngrade" in bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest })).toBe(false);
+    });
+});
+
+describe("deployHostsFrom", () => {
+    it("is undefined for a control plane that sends no hosts at all", () => {
+        // Absent is not empty: an older control plane never looked.
+        expect(deployHostsFrom({ success: true, deployment: { id: "d1" } })).toBeUndefined();
+        expect(deployHostsFrom({ hosts: "admin.example.com" })).toBeUndefined();
+        expect(deployHostsFrom(null)).toBeUndefined();
+    });
+
+    it("reads each host, and anything but verified as pending", () => {
+        // An unreadable status must not print as live.
+        expect(deployHostsFrom({
+            hosts: [
+                { host: "admin.example.com", status: "verified" },
+                { host: "docs.example.com", status: "checking" },
+                { host: "shop.example.com" }
+            ]
+        })).toEqual([
+            { host: "admin.example.com", status: "verified" },
+            { host: "docs.example.com", status: "pending" },
+            { host: "shop.example.com", status: "pending" }
+        ]);
+    });
+
+    it("drops what it cannot print rather than printing half of it", () => {
+        expect(deployHostsFrom({
+            hosts: [
+                { status: "pending" },
+                { host: "", status: "pending" },
+                "admin.example.com",
+                {
+                    host: "admin.example.com",
+                    status: "pending",
+                    records: [
+                        { type: "CNAME", name: "admin.example.com", values: ["shop.rebase.app", 7] },
+                        { type: "TXT", name: "_rebase.admin.example.com", values: [] },
+                        { name: "no-type", values: ["x"] }
+                    ]
+                }
+            ]
+        })).toEqual([
+            {
+                host: "admin.example.com",
+                status: "pending",
+                records: [{ type: "CNAME", name: "admin.example.com", values: ["shop.rebase.app"] }]
+            }
+        ]);
+    });
+});
+
+describe("pendingHostNotices", () => {
+    it("has nothing to say when every hostname is live", () => {
+        expect(pendingHostNotices([{ host: "admin.example.com", status: "verified" }])).toEqual([]);
+    });
+
+    it("gives each pending hostname its records and the command that finishes the job", () => {
+        const [notice] = pendingHostNotices([{
+            host: "admin.example.com",
+            status: "pending",
+            records: [{ type: "A", name: "admin.example.com", values: ["203.0.113.7", "203.0.113.8"] }]
+        }]);
+        expect(notice.headline).toMatch(/^admin\.example\.com is registered on this project, but not served until its DNS is verified/);
+        expect(notice.details).toEqual([
+            "Create these records with your DNS provider:",
+            "  A  admin.example.com  →  203.0.113.7, 203.0.113.8",
+            "Then run `rebase cloud domains verify admin.example.com`."
+        ]);
     });
 });

@@ -507,15 +507,45 @@ path: "/admin" });
         expect(fs.readFileSync(path.join(bundleDir, "static", "admin", "index.html"), "utf8")).toBe("admin");
 
         const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        // Both, listed in mount order — the "/" app after the one beneath it,
+        // whichever was folded first.
         expect(manifest.entry.static).toEqual([
-            { path: "/",
-dir: "static/site",
-spa: true,
-name: "site" },
             { path: "/admin",
 dir: "static/admin",
 spa: true,
-name: "admin" }
+name: "admin" },
+            { path: "/",
+dir: "static/site",
+spa: true,
+name: "site" }
+        ]);
+    });
+
+    it("records an app's hostname beside its path, and lists the bundle in mount order", () => {
+        // `host` is how the runtime tells two apps at "/" apart, so a fold
+        // that dropped it would mount both on every hostname — and the first
+        // mounted would answer for both. The order is the matching rule's:
+        // longest path first, and at an equal path the app naming a hostname.
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: {} });
+        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "index.html": "web" }), appName: "web", path: "/", spa: true });
+        foldStaticIntoBundle({
+            bundleDir,
+            assetsDir: assets({ "index.html": "admin" }),
+            appName: "admin",
+            path: "/",
+            host: "admin.example.com",
+            spa: true,
+            cms: "/"
+        });
+        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "index.html": "docs" }), appName: "docs", path: "/docs", spa: false });
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toEqual([
+            { path: "/docs", dir: "static/docs", spa: false, name: "docs" },
+            { path: "/", host: "admin.example.com", dir: "static/admin", spa: true, name: "admin", cms: "/" },
+            { path: "/", dir: "static/web", spa: true, name: "web" }
         ]);
     });
 

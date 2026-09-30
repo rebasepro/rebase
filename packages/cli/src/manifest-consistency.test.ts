@@ -480,8 +480,11 @@ describe("rebase.json — the reserved paths agree", () => {
     }
 
     it("refuses in the schema exactly what the type reserves", () => {
+        // On the path part of either form: the API's routes answer first on
+        // every hostname, so `https://admin.example.com/api` is as reserved as
+        // `/api`.
         const names = RESERVED_BACKEND_PREFIXES.map(p => p.slice(1)).join("|");
-        expect(schemaReservedPattern()).toBe(`^/(${names})(/|$)`);
+        expect(schemaReservedPattern()).toBe(`^(?:[Hh][Tt][Tt][Pp][Ss]://[^/]+)?/(${names})(/|$)`);
     });
 
     it("rejects a reserved path and accepts a lookalike, by that pattern", () => {
@@ -500,5 +503,78 @@ rejected: true });
 rejected: re.test(allowed) }).toEqual({ path: allowed,
 rejected: false });
         }
+        for (const reserved of RESERVED_BACKEND_PREFIXES) {
+            expect(re.test(`https://admin.example.com${reserved}`)).toBe(true);
+        }
+        // A hostname is not a path: `api.example.com` is somebody's domain.
+        for (const allowed of ["https://api.example.com", "https://health.example.com/", "https://admin.example.com/apidocs"]) {
+            expect({ path: allowed,
+rejected: re.test(allowed) }).toEqual({ path: allowed,
+rejected: false });
+        }
+    });
+});
+
+/**
+ * A static app's `path` — a path, or an https URL naming its hostname — is
+ * judged the same way by the editor and the CLI.
+ *
+ * Two hand-written rules for one field, as above, and the URL form roughly
+ * triples the ways they can disagree: the scheme, the hostname rules
+ * `parseAppAddress` applies, and the path rules applied to the part after the
+ * hostname. A disagreement either way is a bug somebody meets: an editor
+ * blessing a value `rebase build` refuses, or a red squiggle on a manifest the
+ * CLI deploys.
+ */
+describe("rebase.json — the static path rules agree", () => {
+    const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
+
+    const SAMPLES = [
+        // Paths.
+        "/", "/admin", "/docs/api", "/admin/", "admin", "../admin", "/admin/..", "/a//b",
+        "//admin.example.com", "/api", "/api/v2", "/apidocs",
+        // URLs the CLI accepts.
+        "https://admin.example.com", "https://admin.example.com/", "https://admin.example.com/cms",
+        "https://Admin.Example.com/CMS", "HTTPS://admin.example.com", "https://api.example.com",
+        "https://a-b.c-d.example.co.uk/x/y", "https://xn--bcher-kva.example", "https://bücher.example",
+        "https://123.example.com",
+        // URLs it refuses, one per reason.
+        "http://admin.example.com", "ftp://admin.example.com", "https://user@admin.example.com",
+        "https://admin.example.com:8443", "https://admin.example.com/?x=1", "https://admin.example.com/#top",
+        "https://admin.example.com?", "https://localhost", "https://127.0.0.1", "https://[::1]",
+        "https://admin", "https://", "https://admin.example.com.", "https://admin..example.com",
+        "https://-admin.example.com", "https://a_b.example.com", "admin.example.com",
+        "https://admin.example.com/cms/", "https://admin.example.com/../x", "https://admin.example.com//cms",
+        "https://admin.example.com/api", "https://admin.example.com/metrics/x",
+        // What `new URL` would forgive: a default port, "\" for "/", whitespace.
+        "https://admin.example.com:443", "https://admin.example.com\\cms", "https://admin.exa\tmple.com",
+        "https://admin.example.com/c ms"
+    ];
+
+    function schemaAccepts(value: string): boolean {
+        const node = JSON.parse(fs.readFileSync(schemaPath, "utf8")).$defs.staticApp.properties.path;
+        const matchesAForm = (node.anyOf as Array<{ pattern: string }>).some(form => new RegExp(form.pattern).test(value));
+        return matchesAForm && !new RegExp(node.not.pattern).test(value);
+    }
+
+    function cliAccepts(value: string): boolean {
+        const { issues } = validateManifest({
+            rebase: "^1",
+            apps: { web: { type: "static", root: "web", output: "web/dist", path: value } }
+        });
+        return !issues.some(issue => issue.path === "apps.web.path");
+    }
+
+    it.each(SAMPLES)("judges %j the same way on both sides", (value) => {
+        expect({ value,
+schema: schemaAccepts(value) }).toEqual({ value,
+schema: cliAccepts(value) });
+    });
+
+    it("gives `cms` the path form only", () => {
+        // The CMS is on its app's own hostname; a URL there could only disagree.
+        const cms = JSON.parse(fs.readFileSync(schemaPath, "utf8")).$defs.staticApp.properties.cms;
+        expect(new RegExp(cms.pattern).test("/admin")).toBe(true);
+        expect(new RegExp(cms.pattern).test("https://admin.example.com/admin")).toBe(false);
     });
 });

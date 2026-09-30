@@ -19,7 +19,9 @@ import fs from "fs";
 import path from "path";
 import {
     findStorageSuffixCollision,
+    parseAppAddress,
     reservedPrefixFor,
+    type AppAddress,
     type ManagedCompatibility,
     type RebaseAppConfig,
     type RebaseBackendAppConfig,
@@ -83,44 +85,155 @@ const REMOVED_APP_TYPES: Record<string, string> = {
 const RESERVED_APP_NAMES = new Set(["api", "health", "metrics", "livez", "_rebase"]);
 
 /**
- * Validate a static app's public base path.
+ * Validate a URL path an app is served at: a static app's `path`, or the path
+ * part of it when `path` is a URL, and `cms`.
  *
  * Normalizes to "no trailing slash, except for the root" so that mounting and
  * the `REBASE_APP_BASE` build variable have one shape to reason about.
+ *
+ * `origin` is `https://<host>` when the path came out of a URL, and is only
+ * used to phrase the fix in the form the author wrote: telling someone who
+ * wrote `"https://admin.example.com/cms/"` to write `"/cms"` would be telling
+ * them to drop the hostname.
  */
 function checkAppPath(
     value: unknown,
     fieldPath: string,
-    issues: ManifestValidationIssue[]
+    issues: ManifestValidationIssue[],
+    origin = ""
 ): string | undefined {
     if (value === undefined) return undefined;
-    if (typeof value !== "string" || !value.startsWith("/") || value.includes("..")) {
+    if (typeof value !== "string" || !value.startsWith("/")) {
         issues.push({
             path: fieldPath,
             message: 'must be an absolute path like "/admin"'
         });
         return undefined;
     }
+    // Before the `..` and empty-segment rules, which it would otherwise trip
+    // with a message about paths. `//admin.example.com` is a URL with the
+    // scheme left off, and mounting it as a path is not what was meant.
+    if (!origin && value.startsWith("//")) {
+        issues.push({
+            path: fieldPath,
+            message: `looks like a URL without its scheme — write "https:${value}" to give this app its own hostname`
+        });
+        return undefined;
+    }
+    if (value.includes("..") || value.includes("//")) {
+        issues.push({
+            path: fieldPath,
+            message: origin
+                ? `must have a plain path after the hostname, with no ".." and no empty segment — like "${origin}/admin"`
+                : 'must be an absolute path like "/admin", with no ".." and no empty segment'
+        });
+        return undefined;
+    }
     if (value !== "/" && value.endsWith("/")) {
         issues.push({
             path: fieldPath,
-            message: 'must not end with a slash — write "/admin", not "/admin/"'
+            message: `must not end with a slash — write "${origin}${value.slice(0, -1)}", not "${origin}${value}"`
         });
         return undefined;
     }
     // Mounting is longest-path-first, so an app at `/api` outranks the API and
     // every request to it is answered with that app's index.html — a 200 of HTML
-    // where the caller wanted JSON, from a deployment that looks healthy.
+    // where the caller wanted JSON, from a deployment that looks healthy. A
+    // hostname does not change that: the backend's routes are registered before
+    // any app's, on every hostname the project answers on.
     const reserved = reservedPrefixFor(value);
     if (reserved) {
         issues.push({
             path: fieldPath,
-            message: `cannot be "${reserved}" or nest under it — the backend serves that path, ` +
-                "and an app mounted there would answer the API's requests with its own index.html"
+            message: `cannot be "${reserved}" or nest under it — the backend serves that path` +
+                (origin ? " on every hostname, this one included" : "") +
+                ", and an app mounted there would answer the API's requests with its own index.html"
         });
         return undefined;
     }
     return value;
+}
+
+/**
+ * Validate a static app's `path`, which is either a path or an https URL that
+ * also gives the app a hostname of its own.
+ *
+ * The split is {@link parseAppAddress}, shared with the control plane and the
+ * runtime so that all three read one value the same way. What it leaves to the
+ * caller — the path rules — are {@link checkAppPath}'s, applied to the path
+ * part of either form.
+ */
+function checkAppAddress(
+    value: unknown,
+    fieldPath: string,
+    issues: ManifestValidationIssue[]
+): AppAddress | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== "string") {
+        issues.push({
+            path: fieldPath,
+            message: 'must be an absolute path like "/admin", or a URL like "https://admin.example.com"'
+        });
+        return undefined;
+    }
+    const parsed = parseAppAddress(value);
+    if (!parsed.ok) {
+        issues.push({ path: fieldPath, message: parsed.reason });
+        return undefined;
+    }
+    const { host } = parsed.address;
+    const appPath = checkAppPath(parsed.address.path, fieldPath, issues, host ? `https://${host}` : "");
+    if (appPath === undefined) return undefined;
+    return host ? { host, path: appPath } : { path: appPath };
+}
+
+/**
+ * Where a validated static app answers: its hostname, if its `path` names one,
+ * and the path under it.
+ *
+ * The manifest keeps `path` as it was written, URL and all, because it is also
+ * what `writeManifest` puts back: storing the split pieces instead would have
+ * `rebase eject` rewrite `"https://admin.example.com"` to `"/"` and drop the
+ * hostname from a file the developer never asked it to touch. Everything that
+ * mounts, builds or prints an app reads it through here instead, so there is
+ * one reading of the field.
+ *
+ * Throws on a value `validateManifest` would have refused. Every caller holds a
+ * manifest that came through it, so reaching the throw means one did not — and
+ * guessing an address for it would build or mount the app somewhere it was
+ * never declared.
+ */
+export function staticAppAddress(name: string, app: { path?: string }): AppAddress {
+    if (app.path === undefined) return { path: "/" };
+    const parsed = parseAppAddress(app.path);
+    if (!parsed.ok) {
+        throw new ManifestError(`apps.${name}.path ${parsed.reason}`, [{ path: `apps.${name}.path`, message: parsed.reason }]);
+    }
+    return parsed.address;
+}
+
+/**
+ * An address as a developer would type it: the path alone for an app on every
+ * hostname, the https URL for one on its own. The root of a hostname prints as
+ * the bare origin — `https://admin.example.com`, which is how it is declared.
+ */
+export function formatAppAddress(address: AppAddress): string {
+    if (!address.host) return address.path;
+    return `https://${address.host}${address.path === "/" ? "" : address.path}`;
+}
+
+/**
+ * The order static apps are mounted in, and the order a bundle lists them.
+ *
+ * Longest path first, so an app at `/` is registered after the apps beneath it
+ * and its catch-all cannot claim their URLs. At an equal path, the app bound to
+ * a hostname goes first: on that hostname it is the one that answers, and the
+ * app on every hostname answers the rest. That is the runtime's matching rule,
+ * restated as a sort so a bundle reads in the order it is served.
+ */
+export function compareMountOrder(a: AppAddress, b: AppAddress): number {
+    if (a.path.length !== b.path.length) return b.path.length - a.path.length;
+    return (a.host ? 0 : 1) - (b.host ? 0 : 1);
 }
 
 /**
@@ -142,20 +255,33 @@ function isUnderPath(candidate: string, parent: string): boolean {
  * it. The app's SPA fallback is what answers that URL, so a `cms` outside its
  * `path` names an address this app will never serve. That is a link the console
  * would then offer to a 404, which is worse than the missing link it replaces.
+ *
+ * Always a path, even on an app whose `path` is a URL. The app's address
+ * already says which hostname it answers on, and a second hostname here could
+ * only disagree with it; `cms` says where on that hostname the CMS is.
  */
 function checkCmsPath(
     value: unknown,
-    appPath: string,
+    app: AppAddress,
     fieldPath: string,
     issues: ManifestValidationIssue[]
 ): string | undefined {
     if (value === undefined) return undefined;
-    const cms = checkAppPath(value, fieldPath, issues);
-    if (cms === undefined) return undefined;
-    if (!isUnderPath(cms, appPath)) {
+    if (typeof value === "string" && (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("//"))) {
+        const parsed = parseAppAddress(value.startsWith("//") ? `https:${value}` : value);
         issues.push({
             path: fieldPath,
-            message: `must be inside this app's path — it is at "${appPath}", so it cannot serve "${cms}". ` +
+            message: "must be a path, not a URL — the CMS is a route of this app, which is served where its " +
+                "`path` says" + (parsed.ok ? `. Write "${parsed.address.path}"` : "")
+        });
+        return undefined;
+    }
+    const cms = checkAppPath(value, fieldPath, issues);
+    if (cms === undefined) return undefined;
+    if (!isUnderPath(cms, app.path)) {
+        issues.push({
+            path: fieldPath,
+            message: `must be inside this app's path — it is at "${formatAppAddress(app)}", so it cannot serve "${cms}". ` +
                 "The CMS is a route of this app, not a separate deployment; if it really lives elsewhere, " +
                 "declare that app and put `cms` on it instead"
         });
@@ -230,6 +356,14 @@ const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
 };
 
 /**
+ * Fields people reach for to give a static app a hostname, which is spelled as
+ * a URL in `path` instead. Named so the warning says that, rather than "your
+ * CLI may be older than this manifest" — which is false here and sends the
+ * reader to upgrade a CLI that already does what they wanted.
+ */
+const HOSTNAME_FIELDS = new Set(["host", "hostname", "domain"]);
+
+/**
  * Report a field this CLI does not recognise.
  *
  * A warning rather than an error, and the distinction matters in both
@@ -248,6 +382,18 @@ function warnUnknownFields(name: string, raw: Record<string, unknown>, type: str
 
     for (const field of Object.keys(raw)) {
         if (known.includes(field)) continue;
+        if (type === "static" && HOSTNAME_FIELDS.has(field)) {
+            const value = raw[field];
+            const host = typeof value === "string" && value.trim() !== ""
+                ? value.trim().replace(/^[a-z]+:\/\//i, "").replace(/\/+$/, "")
+                : "admin.example.com";
+            const under = typeof raw.path === "string" && raw.path.startsWith("/") && raw.path !== "/" ? raw.path : "";
+            console.warn(
+                `⚠ rebase.json: apps.${name}.${field} is not a field — it is ignored. To serve this app on its ` +
+                `own hostname, write its path as a URL: "path": "https://${host}${under}"`
+            );
+            continue;
+        }
         const suggestion = known.find(candidate => isNearMiss(candidate, field));
         console.warn(
             `⚠ rebase.json: apps.${name}.${field} is not a field this CLI knows.` +
@@ -393,15 +539,17 @@ message: "must be a string command" });
                 issues.push({ path: `${base}.spa`,
 message: "must be a boolean" });
             }
-            const appPath = checkAppPath(raw.path, `${base}.path`, issues);
-            checkCmsPath(raw.cms, appPath ?? "/", `${base}.cms`, issues);
-            // See the backend branch: constructed for the same reasons.
+            const address = checkAppAddress(raw.path, `${base}.path`, issues);
+            checkCmsPath(raw.cms, address ?? { path: "/" }, `${base}.cms`, issues);
+            // See the backend branch: constructed for the same reasons. `path`
+            // is kept as written — see `staticAppAddress` for why the split
+            // pieces are not what the manifest stores.
             return {
                 type: "static",
                 root: raw.root as string,
                 build: raw.build as string | undefined,
                 output: raw.output as string,
-                path: appPath,
+                path: address ? raw.path as string : undefined,
                 spa: raw.spa as boolean | undefined,
                 cms: raw.cms as string | undefined
             };
@@ -475,21 +623,27 @@ message: "name is reserved" });
         });
     }
 
-    // Two apps at one path is not a preference conflict — the first one mounted
-    // swallows the other's URLs, and the loser looks like it deployed fine.
-    const byPath = new Map<string, string>();
+    // Two apps at one address is not a preference conflict — the first one
+    // mounted swallows the other's URLs, and the loser looks like it deployed
+    // fine. The address is the hostname and the path together: an app at "/" on
+    // admin.example.com and one at "/" everywhere else are two different
+    // addresses, and that pair is the point of giving an app a hostname. An app
+    // with no hostname is its own value here, not a wildcard that collides with
+    // every hostname — at an equal path the one naming the hostname wins there.
+    const byAddress = new Map<string, string>();
     for (const [name, app] of Object.entries(apps)) {
         if (app.type !== "static") continue;
-        const at = app.path ?? "/";
-        const owner = byPath.get(at);
+        const address = staticAppAddress(name, app);
+        const key = `${address.host ?? ""} ${address.path}`;
+        const owner = byAddress.get(key);
         if (owner) {
             issues.push({
                 path: `apps.${name}.path`,
-                message: `two apps cannot serve the same path — "${owner}" is already at "${at}"`
+                message: `two apps cannot serve the same path — "${owner}" is already at "${formatAppAddress(address)}"`
             });
             continue;
         }
-        byPath.set(at, name);
+        byAddress.set(key, name);
     }
 
     // One CMS per project. Not a taste ruling: everything downstream — the
@@ -763,13 +917,18 @@ app: app as RebaseBackendAppConfig };
  * Returns the *serving* app alongside the path, because a caller with a base URL
  * needs to know which app answers there — and because the path alone cannot say
  * whether the CMS is the whole of an app or one route of it.
+ *
+ * `path` is always a path. `host` is the serving app's hostname, when its `path`
+ * gives it one: the CMS is then at `https://<host><path>` and nowhere else, and
+ * a caller holding a local or project base URL must not put the path on that.
  */
 export function cmsMountOf(
     manifest: RebaseProjectManifest
-): { appName: string; app: RebaseStaticAppConfig; path: string } | undefined {
+): { appName: string; app: RebaseStaticAppConfig; path: string; host?: string } | undefined {
     for (const [name, app] of Object.entries(manifest.apps)) {
         if (app.type !== "static" || typeof app.cms !== "string") continue;
-        return { appName: name, app: app as RebaseStaticAppConfig, path: app.cms };
+        const { host } = staticAppAddress(name, app);
+        return { appName: name, app: app as RebaseStaticAppConfig, path: app.cms, ...(host ? { host } : {}) };
     }
     return undefined;
 }

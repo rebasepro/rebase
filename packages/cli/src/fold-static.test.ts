@@ -5,7 +5,8 @@ import { spawnSync } from "child_process";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { afterEach, describe, expect, it } from "vitest";
-import { assertBuiltForPath, foldableApps, staticBuildEnv } from "./fold-static";
+import { assertBuiltForPath, foldableApps, foldFrontendIntoBundle, staticBuildEnv } from "./fold-static";
+import { buildAssetApp } from "./commands/build";
 
 describe("choosing which frontends to serve from the backend", () => {
     it("folds the single static app", () => {
@@ -79,6 +80,25 @@ cms: "/admin" }
         const { apps, skipped } = foldableApps({ apps: { backend: { type: "backend" } } });
         expect(apps).toEqual([]);
         expect(skipped).toEqual([]);
+    });
+
+    it("carries an app's hostname apart from its path, and mounts it before the app without one", () => {
+        // Two apps at "/" is the whole point of a hostname: on admin.dadaki.com
+        // the admin answers, everywhere else the site does. Mounted the other
+        // way round, the site's catch-all would answer for both.
+        const { apps } = foldableApps({
+            apps: {
+                web: { type: "static", output: "frontend/dist", path: "/" },
+                admin: { type: "static", output: "admin/dist", path: "https://Admin.Dadaki.com", cms: "/" },
+                docs: { type: "static", output: "docs/dist", path: "https://docs.dadaki.com/guide" }
+            }
+        });
+        expect(apps.map(({ name, host, path: at }) => ({ name, host, path: at }))).toEqual([
+            { name: "docs", host: "docs.dadaki.com", path: "/guide" },
+            { name: "admin", host: "admin.dadaki.com", path: "/" },
+            { name: "web", host: undefined, path: "/" }
+        ]);
+        expect(apps.find(a => a.name === "web")).not.toHaveProperty("host");
     });
 
     it("explains a static app that declares no output", () => {
@@ -267,5 +287,80 @@ describe("a caller whose stdout carries a JSON result", () => {
         // Both drivers' builds, and the static bundle's own summary line.
         expect(run.stderr.match(/vite v6 building/g)).toHaveLength(2);
         expect(run.stderr).toContain("static bundle →");
+    });
+});
+
+/**
+ * An app on its own hostname, through both drivers that build one.
+ *
+ * The hostname has to reach the bundle — it is all the control plane and the
+ * runtime ever see of it — while the app is built for, and asserted against,
+ * the path part alone. A `REBASE_APP_BASE` of `https://admin.example.com/`
+ * would pin every asset to production.
+ */
+describe("an app declared at a URL", () => {
+    let root: string;
+
+    afterEach(() => {
+        if (root) fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    /** A build command that records the base it was given and emits an index.html rooted there. */
+    function buildInto(output: string): string {
+        return `mkdir -p ${output} && printf '%s' "$REBASE_APP_BASE" > ${output}/base.txt`
+            + ` && printf '<script src="%sassets/x.js"></script>' "$REBASE_APP_BASE" > ${output}/index.html`;
+    }
+
+    it("folds the hostname into entry.static and builds for the path part", async () => {
+        root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-fold-host-")));
+        fs.mkdirSync(path.join(root, "dist-bundle"));
+        fs.writeFileSync(path.join(root, "dist-bundle", "manifest.json"), JSON.stringify({ bundleFormat: 2, entry: {} }));
+
+        const outcomes = await foldFrontendIntoBundle({
+            projectRoot: root,
+            manifest: {
+                apps: {
+                    web: { type: "static", build: buildInto("web/dist"), output: "web/dist", path: "/" },
+                    admin: { type: "static", build: buildInto("admin/dist"), output: "admin/dist", path: "https://admin.example.com/cms", cms: "/cms" }
+                }
+            },
+            bundleDir: path.join(root, "dist-bundle"),
+            log: () => undefined,
+            quietStdout: true
+        });
+
+        expect(fs.readFileSync(path.join(root, "admin/dist/base.txt"), "utf8")).toBe("/cms/");
+        expect(outcomes).toEqual([
+            { appName: "admin", fileCount: 2, path: "/cms", host: "admin.example.com" },
+            { appName: "web", fileCount: 2, path: "/" }
+        ]);
+        const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist-bundle", "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toEqual([
+            { path: "/cms", host: "admin.example.com", dir: "static/admin", spa: true, name: "admin", cms: "/cms" },
+            { path: "/", dir: "static/web", spa: true, name: "web" }
+        ]);
+    });
+
+    it("puts the hostname in a standalone static bundle too", async () => {
+        // `rebase cloud deploy admin` ships the app on its own, through
+        // `buildAssetApp` — the path most likely to be the one a hostname
+        // app actually deploys through.
+        root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-static-host-")));
+        const app = {
+            type: "static" as const,
+            root: "admin",
+            build: buildInto("admin/dist"),
+            output: "admin/dist",
+            path: "https://admin.example.com/cms",
+            cms: "/cms"
+        };
+
+        const outDir = await buildAssetApp(root, "admin", app, "^1", undefined, { quietStdout: true });
+
+        expect(fs.readFileSync(path.join(root, "admin/dist/base.txt"), "utf8")).toBe("/cms/");
+        const manifest = JSON.parse(fs.readFileSync(path.join(outDir ?? "", "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toEqual([
+            { path: "/cms", host: "admin.example.com", dir: "static", spa: true, name: "admin", cms: "/cms" }
+        ]);
     });
 });

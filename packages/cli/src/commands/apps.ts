@@ -19,9 +19,11 @@ import { failAsJson, requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
+    formatAppAddress,
     loadManifest,
     ManifestError,
     manifestExists,
+    staticAppAddress,
     synthesizeManifest,
     writeManifest
 } from "../manifest";
@@ -84,7 +86,15 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
     }
 }
 
-function describeApp(app: RebaseAppConfig): string {
+/**
+ * One app's line in `rebase apps list`.
+ *
+ * A static app shows its full address — the https URL when its `path` gives it
+ * a hostname — and the CMS as the address a browser would open. `CMS at /` on
+ * an app that lives on `admin.example.com` reads as the project's own root,
+ * which is the one place that CMS is not.
+ */
+export function describeApp(name: string, app: RebaseAppConfig): string {
     switch (app.type) {
         case "backend":
             return app.runtime === "custom"
@@ -95,9 +105,11 @@ function describeApp(app: RebaseAppConfig): string {
                 ? `custom runtime — ${app.dockerfile ?? "Dockerfile"}`
                     + (app.context && app.context !== "." ? ` (context: ${app.context})` : "")
                 : `managed runtime, config: ${app.config ?? "config"}`;
-        case "static":
-            return `${app.root} → ${app.output} @ ${app.path ?? "/"}`
-                + (app.cms ? `  ${chalk.magenta(`CMS at ${app.cms}`)}` : "");
+        case "static": {
+            const address = staticAppAddress(name, app);
+            return `${app.root} → ${app.output} @ ${formatAppAddress(address)}`
+                + (app.cms ? `  ${chalk.magenta(`CMS at ${formatAppAddress({ ...address, path: app.cms })}`)}` : "");
+        }
         default:
             return "";
     }
@@ -139,7 +151,7 @@ async function listApps(asJson: boolean): Promise<void> {
     const width = Math.max(...entries.map(([name]) => name.length));
     for (const [name, app] of entries) {
         console.log(
-            `  ${chalk.cyan(name.padEnd(width))}  ${chalk.dim(app.type.padEnd(8))}  ${describeApp(app)}`
+            `  ${chalk.cyan(name.padEnd(width))}  ${chalk.dim(app.type.padEnd(8))}  ${describeApp(name, app)}`
         );
     }
 

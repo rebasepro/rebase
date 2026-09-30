@@ -17,7 +17,7 @@ import net from "net";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devStaticShape, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -579,5 +579,103 @@ describe("pinnedPortRefusal", () => {
 
     it("says nothing about a pinned port that is free", async () => {
         expect(await pinnedPortRefusal(await freePort(), true)).toBeNull();
+    });
+});
+
+/**
+ * The banner's app lines, for projects whose apps are not all on the project's
+ * own host.
+ *
+ * `rebase dev` runs one frontend — Vite in `frontend/`, at the root of a
+ * localhost port — whatever address the manifest declares for it. The banner
+ * used to build the CMS line by appending the declared value to the local URL,
+ * which for an app on its own hostname prints
+ * `http://localhost:5173https://admin.example.com`: a URL that is neither.
+ */
+describe("the banner's app lines", () => {
+    const LOCAL = "http://localhost:5173";
+    const API = "http://localhost:3001";
+    const root = "/work/project";
+    const frontendDir = path.join(root, "frontend");
+
+    function shapeOf(apps: Record<string, unknown>): ReturnType<typeof devStaticShape> {
+        const { manifest, issues } = validateManifest({ rebase: "^1", apps });
+        expect(issues).toEqual([]);
+        if (!manifest) throw new Error("the fixture manifest did not validate");
+        return devStaticShape(manifest, root, frontendDir);
+    }
+
+    /** Every value the box would print, so a test can say what must never appear. */
+    const values = (lines: Array<[string, string]>): string[] => lines.map(([label, value]) => `${label}${value}`.trim());
+
+    it("prints exactly what it always did for the scaffolded project", () => {
+        // One app, at the root, and the whole of it is the CMS: the Admin line
+        // is the CMS line, so there is no second one.
+        const shape = shapeOf({ admin: { type: "static", root: "frontend", output: "frontend/dist", path: "/", cms: "/" } });
+        expect(appBannerLines(LOCAL, API, shape)).toEqual([
+            ["", ""],
+            ["✦ Rebase Admin App is ready!", ""],
+            ["➜ Admin: ", LOCAL],
+            ["➜ API:   ", API]
+        ]);
+    });
+
+    it("still points at a CMS mounted as one route of the running app", () => {
+        const shape = shapeOf({ web: { type: "static", root: "frontend", output: "frontend/dist", path: "/", cms: "/admin" } });
+        expect(appBannerLines(LOCAL, API, shape)).toContainEqual(["➜ CMS:   ", `${LOCAL}/admin`]);
+    });
+
+    it("prints a hostname app's local address and its deployed one, never glued together", () => {
+        const shape = shapeOf({
+            admin: { type: "static", root: "frontend", output: "frontend/dist", path: "https://admin.example.com", cms: "/" }
+        });
+        const lines = appBannerLines(LOCAL, API, shape);
+
+        expect(lines).toContainEqual(["➜ Admin: ", LOCAL]);
+        expect(values(lines)).toContain("https://admin.example.com when deployed");
+        expect(values(lines).join("\n")).not.toMatch(/localhost:\d+https?:/);
+        // The CMS is the whole app, so it is the Admin line and is not repeated.
+        expect(lines.filter(([label]) => label.startsWith("➜ CMS"))).toEqual([]);
+    });
+
+    it("gives a CMS route on a hostname app both its addresses", () => {
+        const shape = shapeOf({
+            admin: { type: "static", root: "frontend", output: "frontend/dist", path: "https://admin.example.com", cms: "/cms" }
+        });
+        const lines = appBannerLines(LOCAL, API, shape);
+
+        expect(lines).toContainEqual(["➜ CMS:   ", `${LOCAL}/cms`]);
+        expect(values(lines)).toContain("https://admin.example.com/cms when deployed");
+    });
+
+    it("sends a CMS in an app `rebase dev` does not run to where it is deployed, and says so", () => {
+        // The dadaki shape: the site is `frontend/`, the admin is its own app on
+        // its own hostname. A localhost CMS URL here would be answered by the
+        // site's SPA fallback — the wrong app, looking like a broken CMS.
+        const shape = shapeOf({
+            web: { type: "static", root: "frontend", output: "frontend/dist", path: "/", spa: true },
+            admin: { type: "static", root: "admin", output: "admin/dist", path: "https://admin.dadaki.com", cms: "/" }
+        });
+        const lines = appBannerLines(LOCAL, API, shape);
+
+        expect(lines).toContainEqual(["➜ CMS:   ", "https://admin.dadaki.com"]);
+        expect(values(lines)).toContain('(app "admin" — rebase dev only starts frontend/)');
+        expect(values(lines).filter(v => v.startsWith("➜ CMS")).join()).not.toContain("localhost");
+    });
+
+    it("does not offer a localhost URL for a CMS in another app, hostname or not", () => {
+        const shape = shapeOf({
+            web: { type: "static", root: "frontend", output: "frontend/dist", path: "/" },
+            staff: { type: "static", root: "staff", output: "staff/dist", path: "/staff", cms: "/staff" }
+        });
+        expect(appBannerLines(LOCAL, API, shape)).toContainEqual(["➜ CMS:   ", "/staff"]);
+    });
+
+    it("reads the CMS as the running frontend's when no declared app is `frontend/`", () => {
+        // Which app serves it cannot be told, and the frontend that does run is
+        // what the banner has always assumed.
+        const shape = shapeOf({ web: { type: "static", root: "apps/web", output: "apps/web/dist", path: "/", cms: "/admin" } });
+        expect(shape.cms?.servedLocally).toBe(true);
+        expect(appBannerLines(LOCAL, API, shape)).toContainEqual(["➜ CMS:   ", `${LOCAL}/admin`]);
     });
 });

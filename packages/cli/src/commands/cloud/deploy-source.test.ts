@@ -807,3 +807,95 @@ describe("contradictory flags", () => {
         expect(requests).toEqual([]);
     });
 });
+
+/**
+ * A deploy whose apps are declared on hostnames of their own.
+ *
+ * The control plane registers each hostname on the project as it deploys, and
+ * a new one is pending until its DNS is published and verified — so the app
+ * deploys and nobody can reach it. The deploy is the moment to say so, with the
+ * records to create; otherwise a green deploy of an admin on
+ * `admin.dadaki.com` reads as a deploy that ships nothing.
+ */
+describe("a deploy that declares a hostname", () => {
+    const HOSTS = [
+        {
+            host: "admin.dadaki.com",
+            status: "pending",
+            records: [
+                { type: "CNAME", name: "admin.dadaki.com", values: ["shop.rebase.app"] },
+                { type: "TXT", name: "_rebase.admin.dadaki.com", values: ["rebase-verify=abc123"] }
+            ]
+        },
+        { host: "docs.dadaki.com", status: "verified" }
+    ];
+
+    beforeEach(() => {
+        bundle("static");
+        controlPlane();
+    });
+
+    it("says which hostname is waiting, what to publish, and what to run after", async () => {
+        invoke.mockResolvedValueOnce({ success: true, deployment: { id: "d1" }, managed: true, hosts: HOSTS });
+
+        await deploy();
+
+        const out = said.join("\n");
+        expect(out).toContain("admin.dadaki.com is registered on this project, but not served until its DNS is verified.");
+        expect(out).toContain("CNAME  admin.dadaki.com  →  shop.rebase.app");
+        expect(out).toContain("TXT  _rebase.admin.dadaki.com  →  rebase-verify=abc123");
+        expect(out).toContain("rebase cloud domains verify admin.dadaki.com");
+        // A verified hostname is live; it is not a problem to report.
+        expect(out).not.toContain("docs.dadaki.com is registered");
+    });
+
+    it("points at `domains list` when the control plane sent no records", async () => {
+        invoke.mockResolvedValueOnce({
+            success: true, deployment: { id: "d1" }, managed: true, hosts: [{ host: "admin.dadaki.com", status: "pending" }]
+        });
+
+        await deploy();
+
+        expect(said.join("\n")).toContain("rebase cloud domains list");
+        expect(said.join("\n")).toContain("rebase cloud domains verify admin.dadaki.com");
+    });
+
+    it("passes the hostnames through in JSON mode", async () => {
+        invoke.mockResolvedValueOnce({ success: true, deployment: { id: "d1" }, managed: true, hosts: HOSTS });
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await deploy();
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        expect(JSON.parse(stdout.join("")).hosts).toEqual(HOSTS);
+    });
+
+    it("says nothing, and adds no field, when the control plane predates hostnames", async () => {
+        // The default stand-in answers without `hosts`, as every control plane
+        // before this change does. An empty `hosts: []` would claim the deploy
+        // looked and found none.
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await deploy();
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        expect("hosts" in JSON.parse(stdout.join(""))).toBe(false);
+        expect(said.join("\n")).not.toContain("not served until");
+    });
+});

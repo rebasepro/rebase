@@ -32,7 +32,7 @@ import {
     type RebaseBundleFunction,
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
-import { resolveBackendPaths } from "./manifest";
+import { compareMountOrder, resolveBackendPaths } from "./manifest";
 import { cliVersion } from "./utils/version";
 import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
@@ -1838,14 +1838,16 @@ export function foldStaticIntoBundle(options: {
     assetsDir: string;
     /** The app's name in `rebase.json`. Names its directory inside the bundle. */
     appName: string;
-    /** Public base path this app is served under. */
+    /** Public base path this app is served under. Always a path, never a URL. */
     path: string;
+    /** The one hostname this app answers on, when its manifest `path` names one. */
+    host?: string;
     /** Serve `index.html` for unmatched paths under `path`. */
     spa: boolean;
     /** Where this app mounts the Rebase CMS, if it does. */
     cms?: string;
 }): { fileCount: number; dir: string } {
-    const { bundleDir, assetsDir, appName, path: basePath, spa, cms } = options;
+    const { bundleDir, assetsDir, appName, path: basePath, host, spa, cms } = options;
     const manifestPath = path.join(bundleDir, "manifest.json");
     if (!fs.existsSync(manifestPath)) {
         throw new Error(`No manifest at ${manifestPath} — build the backend bundle first.`);
@@ -1878,13 +1880,17 @@ force: true });
     // not by guessing a directory name.
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as RebaseBundleManifest;
     const existing = (manifest.entry?.static ?? []).filter(entry => entry.dir !== dir);
+    // Sorted into mount order rather than left in folding order, so the bundle
+    // reads the way it is served whatever order its apps were folded in — a
+    // refold of one app appends it after siblings it may have to outrank.
     manifest.entry = {
         ...manifest.entry,
         static: [...existing, { path: basePath,
+...(host ? { host } : {}),
 dir,
 spa,
 name: appName,
-...(cms ? { cms } : {}) }]
+...(cms ? { cms } : {}) }].sort(compareMountOrder)
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
@@ -1898,8 +1904,10 @@ export function buildStaticBundle(options: {
     assetsDir: string;
     outDir: string;
     runtimeRange: string;
-    /** Public base path. Default `/` — a standalone bundle owns its origin. */
+    /** Public base path. Default `/` — a standalone bundle owns its origin. Always a path. */
     path?: string;
+    /** The one hostname this app answers on, when its manifest `path` names one. */
+    host?: string;
     /** Serve `index.html` for unmatched paths. Default `true`. */
     spa?: boolean;
     /** Where this app mounts the Rebase CMS, if it does. */
@@ -1937,8 +1945,11 @@ export function buildStaticBundle(options: {
         // Normally `/` — a standalone bundle owns its origin. It carries the
         // app's declared path rather than hardcoding one so that the bundle
         // agrees with what the assets were actually *built* for; serving a
-        // `/admin`-built app at `/` is the blank-page failure in reverse.
+        // `/admin`-built app at `/` is the blank-page failure in reverse. Its
+        // hostname travels too: this bundle is all the control plane sees of
+        // the app, and the hostname is what it registers on the project.
         entry: { static: [{ path: basePath,
+...(options.host ? { host: options.host } : {}),
 dir: "static",
 spa: options.spa ?? true,
 name: appName,

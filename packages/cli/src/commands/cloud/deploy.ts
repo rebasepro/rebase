@@ -42,13 +42,16 @@ import {
     uploadBundle,
     bundleDeployBody,
     bundleCommit,
-    declaredAppsFrom
+    declaredAppsFrom,
+    deployHostsFrom,
+    pendingHostNotices,
+    type DeployHost
 } from "./bundle-deploy";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
-import { loadManifest, findBackendApp, resolveBackendPaths, selectDeployApp } from "../../manifest";
+import { loadManifest, findBackendApp, formatAppAddress, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
 import type { RebaseAppConfig, RebaseBackendAppConfig, RebaseProjectManifest } from "@rebasepro/types";
@@ -372,7 +375,7 @@ app: target.app as RebaseBackendAppConfig };
                 });
                 for (const outcome of folded) {
                     progress(chalk.gray(
-                        `  folded ${outcome.appName} in (${outcome.fileCount} file(s), served at ${outcome.path})`
+                        `  folded ${outcome.appName} in (${outcome.fileCount} file(s), served at ${formatAppAddress(outcome)})`
                     ));
                 }
             } catch (err) {
@@ -536,15 +539,18 @@ async function uploadAndTrigger(opts: {
 
     let deploymentId: string;
     let managed: boolean;
+    let hosts: DeployHost[] | undefined;
     try {
         const res = await client.functions.invoke<{
             success: boolean;
             deployment: { id: string | number };
             managed?: boolean;
+            hosts?: unknown;
         }>("deploy", body);
         if (!res?.deployment?.id) fail("Control plane did not return a deployment id.");
         deploymentId = String(res.deployment.id);
         managed = res.managed === true;
+        hosts = deployHostsFrom(res);
     } catch (e) {
         // A refused bundle is a decision with a code and a remedy, not a
         // transport failure — the same branch `resolveTriggerFailure` takes
@@ -571,12 +577,14 @@ async function uploadAndTrigger(opts: {
             () => {
                 console.log(chalk.green(`  ✓ Managed deploy started (deployment ${deploymentId}).`));
                 console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud logs`."));
+                printPendingHosts(hosts);
             },
             { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
-following: false }
+following: false,
+...(hosts ? { hosts } : {}) }
         );
         await record(false, "not_followed");
         return;
@@ -593,14 +601,35 @@ following: false }
         timeoutMs: opts.timeoutMs,
         projectId,
         url,
+        hosts,
         onTerminal: (ended) => record(true, ended)
     });
-    emit(() => {}, { success: true,
+    emit(() => printPendingHosts(hosts), { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
 following: true,
-status });
+status,
+...(hosts ? { hosts } : {}) });
+}
+
+/**
+ * Say which of a deploy's hostnames are not live yet, and how to make them so.
+ *
+ * Printed last, under the verdict, because that is where somebody looks for
+ * the address they just deployed to — and an app on a hostname whose DNS was
+ * never published would otherwise read as a deploy that succeeded and serves
+ * nothing. In JSON mode the same facts travel as `hosts` in the result.
+ */
+function printPendingHosts(hosts: DeployHost[] | undefined): void {
+    const notices = pendingHostNotices(hosts ?? []);
+    if (notices.length === 0) return;
+    console.log("");
+    for (const notice of notices) {
+        console.log(chalk.yellow(`  ⚠ ${notice.headline}`));
+        for (const line of notice.details) console.log(`    ${line}`);
+        console.log("");
+    }
 }
 
 /* ─── what a deploy with nothing attached is actually going to build ─────────
@@ -1333,20 +1362,22 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     const frameworkVersion = resolveFrameworkVersion(args["--source"] ?? process.cwd());
     if (frameworkVersion) body.frameworkVersion = frameworkVersion;
 
-    let triggered: { deploymentId: string; deduplicated: boolean };
+    let triggered: { deploymentId: string; deduplicated: boolean; hosts: DeployHost[] | undefined };
     try {
         const res = await client.functions.invoke<{
             success: boolean;
             deployment: { id: string | number };
             deduplicated?: boolean;
+            hosts?: unknown;
         }>("deploy", body);
         if (!res?.deployment?.id) fail("Control plane did not return a deployment id.");
         triggered = { deploymentId: String(res.deployment.id),
-deduplicated: res.deduplicated === true };
+deduplicated: res.deduplicated === true,
+hosts: deployHostsFrom(res) };
     } catch (e) {
         resolveTriggerFailure(e);
     }
-    const { deploymentId, deduplicated } = triggered;
+    const { deploymentId, deduplicated, hosts } = triggered;
 
     if (!isJsonMode()) {
         console.log(
@@ -1363,11 +1394,13 @@ deduplicated: res.deduplicated === true };
             () => {
                 console.log(chalk.gray("  Not following logs (--no-follow). Check status with `rebase cloud logs`."));
                 console.log("");
+                printPendingHosts(hosts);
             },
             { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: false,
+...(hosts ? { hosts } : {}),
 ...warningPayload(warnings) }
         );
         await recordDeploy({ followed: false, status: "not_followed", deduplicated, frameworkVersion, startedAt });
@@ -1392,15 +1425,17 @@ following: false,
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
         url,
+        hosts,
         onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, frameworkVersion, startedAt })
     });
     emit(
-        () => {},
+        () => printPendingHosts(hosts),
         { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: true,
 status,
+...(hosts ? { hosts } : {}),
 ...warningPayload(warnings) }
     );
 }
@@ -1611,6 +1646,13 @@ async function streamBuildLogs(
         projectId?: string;
         url?: string;
         /**
+         * The hostnames the deploy response named. The verified ones are
+         * printed under the project's own URL on success: an app on a hostname
+         * of its own is not at the project URL, and that address is the one the
+         * person who deployed it is looking for.
+         */
+        hosts?: DeployHost[];
+        /**
          * Called once with the state the follow ended in (a terminal status, or
          * `timeout`) before anything else happens, a non-zero exit included.
          */
@@ -1701,6 +1743,9 @@ async function streamBuildLogs(
                 // host is worse than none.
                 const url = await deployedUrl(client, opts);
                 if (url) console.log(`  ${chalk.cyan(`https://${url}`)}`);
+                for (const { host } of (opts.hosts ?? []).filter(h => h.status === "verified")) {
+                    if (host !== url) console.log(`  ${chalk.cyan(`https://${host}`)}`);
+                }
                 console.log("");
             }
             return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };
