@@ -508,10 +508,12 @@ function isTenantClaimSource
 function isTenantMembershipSource
 function isToMany
 function isUnsupported
+function isValidAppHost
 function isValidEngine
 function nestAdminCollectionKeys
 function nestAdminKeysOf
 function nestAdminPropertyKeys
+function parseAppAddress
 function parseEnvBoolean
 function parseRelationAggregateSort
 function queue
@@ -551,6 +553,7 @@ interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_pref
 interface ApiKeyPermission { collection, operations }
 interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeysAPI { createKey, getKey, listKeys, revokeKey, updateKey }
+interface AppAddress { host, path }
 interface ArrayProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
 interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
@@ -722,7 +725,7 @@ interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions
 interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
 interface RebaseBundleFunction { file, name, portable, requires }
 interface RebaseBundleManifest { app, build, bundleFormat, collections, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage }
-interface RebaseBundleStatic { cms, dir, name, path, spa }
+interface RebaseBundleStatic { cms, dir, host, name, path, spa }
 interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
 interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }
 interface RebaseProjectContract { collectionSlugs, collections, generatedAt, runtime, schemaVersion }
@@ -826,6 +829,7 @@ type AfterSaveErrorProps
 type AggregateRow
 type AggregateSelect
 type AnyCollectionConfig
+type AppAddressResult
 type AuthChangeEvent
 type BackendFactory
 type BackupDestinationKind
