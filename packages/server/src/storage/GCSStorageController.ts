@@ -259,14 +259,18 @@ export class GCSStorageController implements StorageController {
         const gcsBucket = client.bucket(resolvedBucket);
 
         // Fetch files (objects) matching the prefix
-        const [files, , filesApiResponse] = await gcsBucket.getFiles({
-            prefix: listingPrefix(prefix),
+        const folderPrefix = listingPrefix(prefix);
+        const [listed, , filesApiResponse] = await gcsBucket.getFiles({
+            prefix: folderPrefix,
             delimiter: "/",
             maxResults: options?.maxResults ?? 1000,
             pageToken: options?.pageToken,
             autoPaginate: false
         });
 
+        // The folder's own marker object is not something in the folder —
+        // see `S3StorageController.listObjects`.
+        const files = listed.filter(file => file.name !== folderPrefix);
         const items: StorageReference[] = files.map(file => ({
             bucket: resolvedBucket,
             fullPath: file.name,

@@ -201,6 +201,46 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect((await request("/api/storage/metadata/docs")).status).toBe(404);
     });
 
+    // ── Listings ───────────────────────────────────────────────────────
+
+    it("lists a folder's contents without the folder's own marker", async () => {
+        expect((await createFolder("docs")).status).toBe(201);
+        await h.controller.putObject({ file: textFile("a.txt", "x"), key: "docs/a.txt" });
+
+        const inside = await h.controller.listObjects("docs");
+        // S3 and GCS return the zero-byte `docs/` marker as an object of its
+        // own when the listed prefix is `docs/` — an entry with an empty name.
+        expect(inside.items.map(i => i.fullPath)).toEqual(["docs/a.txt"]);
+        expect(inside.items.map(i => i.name)).toEqual(["a.txt"]);
+        expect(inside.prefixes).toEqual([]);
+
+        const root = await h.controller.listObjects("");
+        expect(root.items).toEqual([]);
+        expect(root.prefixes.map(p => p.fullPath)).toEqual(["docs"]);
+    });
+
+    it("pages a listing so every entry comes back exactly once", async () => {
+        for (const name of ["e", "a", "d", "b", "c"]) {
+            await h.controller.putObject({ file: textFile(`${name}.txt`, name), key: `pages/${name}.txt` });
+        }
+        await h.controller.putObject({ file: textFile("x.txt", "x"), key: "pages/sub/x.txt" });
+
+        const items: string[] = [];
+        const prefixes: string[] = [];
+        let pageToken: string | undefined;
+        let pages = 0;
+        do {
+            const page = await h.controller.listObjects("pages", { maxResults: 2, pageToken });
+            items.push(...page.items.map(i => i.fullPath));
+            prefixes.push(...page.prefixes.map(p => p.fullPath));
+            pageToken = page.nextPageToken;
+            expect(++pages).toBeLessThan(10);
+        } while (pageToken);
+
+        expect(items.sort()).toEqual(["pages/a.txt", "pages/b.txt", "pages/c.txt", "pages/d.txt", "pages/e.txt"]);
+        expect(prefixes).toEqual(["pages/sub"]);
+    });
+
     it("reads back what it stored, and nothing for a missing key", async () => {
         await h.controller.putObject({ file: textFile("a.txt", "hello", "text/plain"), key: "rt/a.txt" });
         const object = await h.controller.getObject("rt/a.txt");

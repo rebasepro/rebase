@@ -340,9 +340,10 @@ export class S3StorageController implements StorageController {
         const s3 = await loadS3();
         const client = await this.getClient();
 
+        const folderPrefix = listingPrefix(prefix);
         const command = new s3.ListObjectsV2Command({
             Bucket: resolvedBucket,
-            Prefix: listingPrefix(prefix),
+            Prefix: folderPrefix,
             MaxKeys: options?.maxResults ?? 1000,
             ContinuationToken: options?.pageToken,
             Delimiter: "/" // This gives us folder-like behavior
@@ -350,7 +351,13 @@ export class S3StorageController implements StorageController {
 
         const response = await client.send(command);
 
-        const items: StorageReference[] = (response.Contents || []).map(obj => ({
+        // The folder's own marker — the zero-byte `folder/` object that
+        // `POST /folder` writes — is in `Contents` when the listed prefix is
+        // that folder. It is how the folder exists, not something in it, and
+        // listed it is an entry with an empty name. Local storage has no such
+        // object to list.
+        const objects = (response.Contents || []).filter(obj => obj.Key !== folderPrefix);
+        const items: StorageReference[] = objects.map(obj => ({
             bucket: resolvedBucket,
             fullPath: obj.Key || "",
             name: (obj.Key || "").split("/").pop() || "",
