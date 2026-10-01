@@ -326,6 +326,10 @@ updated, deleted, or paged past — and the cursor is derived from it), and
 `excludeFromApi` columns stay hidden whether or not they are named. An unknown
 column is a 400 `UNKNOWN_FIELD` rather than a row quietly missing a field.
 
+A relation named in `?include=` comes back whether or not `?fields=` names it:
+`?include=author&fields=title` returns `title`, the key and `author`. Naming the
+relation in `?fields=` as well is allowed and changes nothing.
+
 `?distinct=true` collapses rows identical over those columns:
 
 ```bash

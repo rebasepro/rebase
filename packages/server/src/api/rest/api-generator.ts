@@ -4,7 +4,7 @@ import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { cursorToStartAfter, restoresSoftDeletedRow, topLevelIncludeNames } from "@rebasepro/common";
+import { cursorToStartAfter, restoresSoftDeletedRow } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
 import { assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
@@ -1406,7 +1406,7 @@ export class RestApiGenerator {
                 [read.row],
                 queryOptions.fields,
                 resolvedCollection,
-                { include: topLevelIncludeNames(queryOptions.include) }
+                { include: queryOptions.include }
             )[0];
 
             return c.json(body);
@@ -1830,7 +1830,7 @@ id };
                     [read.row],
                     queryOptions.fields,
                     nestedCollection,
-                    { include: topLevelIncludeNames(queryOptions.include) }
+                    { include: queryOptions.include }
                 )[0]);
             } else {
                 // GET /parent/:parentId/child — list entities.
@@ -2059,7 +2059,7 @@ id };
             entities,
             queryOptions.fields,
             collection,
-            { include: topLevelIncludeNames(queryOptions.include) }
+            { include: queryOptions.include }
         );
 
         const offset = queryOptions.offset ?? 0;

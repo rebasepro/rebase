@@ -56,13 +56,30 @@ import {
     type StartingState
 } from "../../../server/test/contract/door-parity-contract";
 
+const peopleTable = pgTable("people", {
+    id: varchar("id").primaryKey(),
+    name: varchar("name")
+});
+
 const docsTable = pgTable("docs", {
     id: varchar("id").primaryKey(),
     title: varchar("title"),
+    // Keyed by the wire name, as a generated schema keys a foreign key.
+    authorId: varchar("author_id"),
     due: timestamp("due", { withTimezone: true, mode: "string" }),
     created_at: timestamp("created_at", { withTimezone: true, mode: "string" }),
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
+
+const peopleCollection = {
+    slug: "people",
+    name: "People",
+    table: "people",
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        name: { name: "Name", type: "string" }
+    }
+} as unknown as CollectionConfig;
 
 /** Every collection hook that ran, in order; `afterRead` is left out (see the contract). */
 const hookLog: string[] = [];
@@ -82,6 +99,7 @@ const docsCollection = {
     properties: {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" },
+        author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => peopleCollection } },
         due: { name: "Due", type: "date" },
         created_at: { name: "Created", type: "date", autoValue: "on_create" },
         deletedAt: { name: "Deleted at", type: "date" }
@@ -199,7 +217,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
         try {
             const out = await definition.run(args, {
                 driver: driver as unknown as DataDriver,
-                collections: [docsCollection],
+                collections: [peopleCollection, docsCollection],
                 caller: { ...USER, scope: "mcp:read mcp:write", clientId: "door-parity" }
             });
             return { ok: true, ...(tool === "delete_document" ? {} : { row: out as Record<string, unknown> }) };
@@ -237,8 +255,9 @@ describe("door parity: one operation, one answer (E2E)", () => {
             delete: async (id, { hard }) =>
                 fromHttp(await http("DELETE", `/docs/${id}${hard ? "?hard=true" : ""}`)),
             get: async (id) => fromHttp(await http("GET", `/docs/${id}`), json => ({ row: json })),
-            list: async (id, { include }) => fromHttp(
-                await http("GET", `/docs?id=${encodeURIComponent(id)}${include ? `&include=${include.join(",")}` : ""}`),
+            list: async (id, { include, fields }) => fromHttp(
+                await http("GET", `/docs?id=${encodeURIComponent(id)}`
+                    + `${include ? `&include=${include.join(",")}` : ""}${fields ? `&fields=${fields.join(",")}` : ""}`),
                 json => ({ rows: json.data })
             )
         },
@@ -290,8 +309,10 @@ describe("door parity: one operation, one answer (E2E)", () => {
                     ? { ok: true, row: payload.row }
                     : { ok: false, code: "NOT_FOUND", message: "FETCH_ONE answered row: null" }
             ),
-            list: async (id, { include }) => fromFrame(
-                await frame("FETCH_COLLECTION", { path: "docs", filter: { id: ["==", id] }, ...(include ? { include } : {}) }),
+            list: async (id, { include, fields }) => fromFrame(
+                await frame("FETCH_COLLECTION", {
+                    path: "docs", filter: { id: ["==", id] }, ...(include ? { include } : {}), ...(fields ? { fields } : {})
+                }),
                 payload => ({ ok: true, rows: payload.rows })
             )
         },
@@ -315,9 +336,11 @@ describe("door parity: one operation, one answer (E2E)", () => {
                     ? { ok: true, row }
                     : { ok: false, status: 404, code: "NOT_FOUND", message: "findById answered undefined" };
             }),
-            list: (id, { include }) => settle(async () => ({
+            list: (id, { include, fields }) => settle(async () => ({
                 ok: true,
-                rows: (await docs().find({ where: { id: ["==", id] }, ...(include ? { include } : {}) })).data
+                rows: (await docs().find({
+                    where: { id: ["==", id] }, ...(include ? { include } : {}), ...(fields ? { fields } : {})
+                })).data
             }))
         }
     };
@@ -325,7 +348,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
     async function stage(state: StartingState, id: string): Promise<void> {
         if (state === "absent") return;
         await observer.query(
-            "INSERT INTO public.docs (id, title, due, created_at, deleted_at) VALUES ($1, $2, $3, now(), $4)",
+            "INSERT INTO public.docs (id, title, author_id, due, created_at, deleted_at) VALUES ($1, $2, 'p-1', $3, now(), $4)",
             [id, STORED_TITLE, DUE, state === "trashed" ? new Date().toISOString() : null]
         );
     }
@@ -361,9 +384,12 @@ describe("door parity: one operation, one answer (E2E)", () => {
             }
         }
         await observer.query(`
+            CREATE TABLE public.people (id varchar PRIMARY KEY, name varchar);
+            INSERT INTO public.people (id, name) VALUES ('p-1', 'Ada');
             CREATE TABLE public.docs (
                 id varchar PRIMARY KEY,
                 title varchar,
+                author_id varchar REFERENCES public.people(id),
                 due timestamptz,
                 created_at timestamptz,
                 deleted_at timestamptz
@@ -375,7 +401,8 @@ describe("door parity: one operation, one answer (E2E)", () => {
         const historyInTransaction = await ensureHistoryTableExists(db as never);
 
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([docsCollection]);
+        registry.registerMultiple([peopleCollection, docsCollection]);
+        registry.registerTable(peopleTable, "people");
         registry.registerTable(docsTable, "docs");
         realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(
@@ -394,7 +421,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             await next();
         });
         app.route("/api/data", createHistoryRoutes({ historyService, registry: registry as never, driver }));
-        app.route("/api/data", new RestApiGenerator([docsCollection], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator([peopleCollection, docsCollection], driver).generateRoutes());
 
         // The socket, signed in as the same caller.
         server = createServer();

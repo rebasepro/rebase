@@ -79,14 +79,36 @@ describe("response field selection", () => {
         expect(Object.keys(projected).sort()).toEqual(["author", "id", "title"]);
     });
 
-    it("drops a loaded relation the caller did not ask to be returned", () => {
+    it("returns an included relation the projection does not name", () => {
+        // This pinned the opposite — a relation loaded and then dropped — which
+        // the SDK documents against ("loaded whether or not it appears in
+        // `fields`") and which `listen()` never did.
         const withAuthor = { ...row(), author: { id: "a1", name: "Ada" } };
 
         const [projected] = projectResponseFields(
             [withAuthor], ["title"], posts, { include: ["author"] }
         );
 
-        expect(projected).not.toHaveProperty("author");
+        expect(Object.keys(projected).sort()).toEqual(["author", "id", "title"]);
+    });
+
+    it("returns every relation under `include=*`", () => {
+        const authors = {
+            slug: "authors", name: "Authors", table: "authors",
+            properties: { id: { name: "ID", type: "string", isId: true } }
+        } as unknown as CollectionConfig;
+        const postsWithAuthor = {
+            ...posts,
+            properties: {
+                ...posts.properties,
+                author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } }
+            }
+        } as unknown as CollectionConfig;
+        const withAuthor = { ...row(), author: { id: "a1" } };
+
+        const [projected] = projectResponseFields([withAuthor], ["title"], postsWithAuthor, { include: ["*"] });
+
+        expect(Object.keys(projected).sort()).toEqual(["author", "id", "title"]);
     });
 
     it("checks nothing against a collection that declares no properties", () => {

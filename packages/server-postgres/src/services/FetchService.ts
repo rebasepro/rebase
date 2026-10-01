@@ -890,6 +890,7 @@ target });
 
         const keep = new Set(fields);
         if (!distinct) for (const pk of idInfoArray) keep.add(pk.fieldName);
+        const relations = resolveCollectionRelations(collection);
 
         const projection: Record<string, unknown> = {};
         for (const name of keep) {
@@ -898,6 +899,10 @@ target });
             // Present on the table but not in `available` means it was excluded
             // — hidden, and staying hidden. Absent from both is a typo.
             if (tableColumns[name] !== undefined) continue;
+            // A relation is not a column: `include` loads it, and naming it in
+            // `fields` too is how a caller says to return it. Read as a typo,
+            // `fields=title,author&include=author` was a 400 on every door.
+            if (name in relations) continue;
             throw ApiError.badRequest(
                 `Unknown field '${name}' in \`fields\` on collection `
                 + `'${collection.slug ?? collection.name}'. Valid fields: `

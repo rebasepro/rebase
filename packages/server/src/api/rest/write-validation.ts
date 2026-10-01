@@ -1,9 +1,10 @@
-import { CollectionConfig, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type IncludeSpec, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
 import {
     type FieldViewer,
     enumToObjectEntries,
     fieldKeyForColumn,
     getJunctionConfigForRelation,
+    normalizeInclude,
     resolveCollectionRelations,
     resolvePrimaryKeys,
     restrictedFieldNames
@@ -862,26 +863,33 @@ export function projectResponseFields<T extends Record<string, unknown>>(
     rows: T[],
     fields: readonly string[] | undefined,
     collection: CollectionConfig,
-    options?: { include?: readonly string[] }
+    options?: { include?: IncludeSpec }
 ): T[] {
     if (!fields || fields.length === 0) return rows;
 
+    const relations = resolveCollectionRelations(collection);
     const declared = new Set<string>(Object.keys(collection.properties ?? {}));
     // The record is keyed by the property name the relation is reached under,
     // which is the name a caller would put in `fields`.
-    for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
+    for (const [key, relation] of Object.entries(relations)) {
         declared.add(key);
         if (relation.kind === "belongsTo") {
             declared.add(fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
         }
     }
-    // `include` decides what is *loaded*; `fields` decides what is *returned*.
-    // So `include=author&fields=title,author` yields both, and naming the
-    // relation in `fields` without including it yields nothing for it — there
-    // was nothing fetched to return. Included names are accepted here so that
-    // a relation reached only through `include` (one the collection does not
-    // declare as a property) is not rejected as unknown.
-    for (const included of options?.include ?? []) declared.add(included);
+    // A relation named in `include` is returned whether or not `fields` names
+    // it: `fields` narrows the row's own columns, and asking for a relation is
+    // already saying to return it. It used to be loaded and then dropped here
+    // unless `fields` named it too, while the socket and `listen()` returned
+    // it — so `find()` and `listen()` answered one query with two rows, and the
+    // SDK's documentation described the one this route did not serve. `*` is
+    // every relation. Naming one in `fields` without including it returns
+    // nothing for it: there was nothing loaded to return.
+    const include = normalizeInclude(options?.include);
+    const included = include
+        ? [...Object.keys(include.tree), ...(include.wildcard ? Object.keys(relations) : [])]
+        : [];
+    for (const name of included) declared.add(name);
     declared.add("id");
 
     // A collection that declares nothing describes nothing to check against —
@@ -903,7 +911,7 @@ export function projectResponseFields<T extends Record<string, unknown>>(
     // a collection declares no key at all; drivers other than Postgres still
     // serve rows with a literal `id`, so that stays the fallback.
     const primaryKeys = resolvePrimaryKeys(collection).map(key => key.fieldName);
-    const keep = new Set<string>([...fields, ...(primaryKeys.length > 0 ? primaryKeys : ["id"])]);
+    const keep = new Set<string>([...fields, ...included, ...(primaryKeys.length > 0 ? primaryKeys : ["id"])]);
     return rows.map(row => {
         const projected: Record<string, unknown> = {};
         for (const key of Object.keys(row)) {

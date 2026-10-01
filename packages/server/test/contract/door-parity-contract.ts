@@ -70,7 +70,7 @@ export type Operation =
      * A list read narrowed to the case's key, so "the result is empty" is a
      * property of the starting state rather than of what else the table holds.
      */
-    | { op: "list"; include?: string[] };
+    | { op: "list"; include?: string[]; fields?: string[] };
 
 /** How a door's answer is classed. */
 export type Outcome =
@@ -126,6 +126,10 @@ export interface Expectation {
     state: StartingState;
     /** The stored title after the operation (and the returned row's, on a success that returns one). */
     title?: string;
+    /** The exact keys every returned row carries, sorted. */
+    keys?: string[];
+    /** How many rows a list read returns. */
+    rows?: number;
 }
 
 export interface ParityCase {
@@ -287,6 +291,31 @@ export const PARITY_CASES: readonly ParityCase[] = [
         }
     },
     {
+        // REST and the SDK's `find()` loaded the relation and threw it away;
+        // the socket and `listen()` kept it. The SDK docs: "A relation named
+        // in `include` is loaded whether or not it appears in `fields`".
+        name: "a list read with a projection keeps the relation it includes",
+        finding: "DD-2",
+        given: "live",
+        when: { op: "list", include: ["author"], fields: ["title"] },
+        then: { outcome: "ok", hooks: [], history: [], ...live(), rows: 1, keys: ["author", "id", "title"] }
+    },
+    {
+        // Naming the included relation in `fields` too was a 400 UNKNOWN_FIELD
+        // on every door: the column projection read `author` as a typo.
+        name: "a list read may name the relation it includes in its projection",
+        finding: "DD-2",
+        given: "live",
+        when: { op: "list", include: ["author"], fields: ["title", "author"] },
+        then: { outcome: "ok", hooks: [], history: [], ...live(), rows: 1, keys: ["author", "id", "title"] }
+    },
+    {
+        name: "a list read including a relation the collection does not have",
+        given: "live",
+        when: { op: "list", include: ["nope"] },
+        then: { outcome: "invalid", code: "UNKNOWN_RELATION", hooks: [], history: [], ...live() }
+    },
+    {
         name: "a read of a trashed row",
         given: "trashed",
         when: { op: "get" },
@@ -322,6 +351,9 @@ export function judge(expected: Expectation, observed: Observed): string[] {
                 wrong.push(`answered ${answer.status} — "created" — for a write that updated a stored row`);
             }
             const returned = answer.row ? [answer.row] : answer.rows ?? [];
+            if (expected.rows !== undefined && answer.rows && answer.rows.length !== expected.rows) {
+                wrong.push(`returned ${answer.rows.length} rows, expected ${expected.rows}`);
+            }
             for (const row of returned) {
                 const envelopes = envelopePaths(JSON.parse(JSON.stringify(row)));
                 if (envelopes.length > 0) {
@@ -329,6 +361,10 @@ export function judge(expected: Expectation, observed: Observed): string[] {
                 }
                 if (expected.title !== undefined && "title" in row && row.title !== expected.title) {
                     wrong.push(`returned title ${JSON.stringify(row.title)}, expected ${JSON.stringify(expected.title)}`);
+                }
+                const keys = Object.keys(row).sort();
+                if (expected.keys !== undefined && JSON.stringify(keys) !== JSON.stringify(expected.keys)) {
+                    wrong.push(`returned a row with keys [${keys.join(", ")}], expected [${expected.keys.join(", ")}]`);
                 }
             }
         }
