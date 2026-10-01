@@ -241,9 +241,11 @@ only the response headers it exposes. Expose the ones the SDK reads, or
 `etagOf(row)` is always `undefined` there — an `ifMatch` write then goes out
 with no `If-Match` — and a 429 loses its `Retry-After`:
 
-```typescript no-verify
+```typescript
+import express from "express";
 import cors from "cors";
 
+const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,

@@ -232,6 +232,9 @@ const EXTERNAL_PACKAGES = new Set([
     "@fontsource-variable/inter",
     "@fontsource/jetbrains-mono",
     "bcrypt",
+    // Express's CORS middleware, for a custom server that exposes the headers
+    // the SDK reads (`backend/custom-server.md`).
+    "cors",
     "dotenv",
     "drizzle-kit",
     "express",
