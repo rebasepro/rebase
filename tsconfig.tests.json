@@ -183,6 +183,7 @@
     // a client production does not have.
     "packages/server/test/storage-controller-contract.test.ts",
     "packages/server/test/helpers/fake-object-stores.ts",
+    "packages/server/test/tus-protocol.test.ts",
     // `packages/server-postgres` carries 1037, so one file, and it is half a
     // test without this line. It pins a callback's `context.client` to its
     // type: the runtime half fails when the server hands a `data` the type

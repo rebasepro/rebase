@@ -80,6 +80,16 @@ interface TusUpload {
     /** Whether the upload has been fully received and finalized. */
     completed: boolean;
     /**
+     * A PATCH is being received for this upload.
+     *
+     * The offset is checked before the body is read and the chunk written
+     * after, so two PATCHes at the same offset — a client re-sending a chunk
+     * whose first attempt stalled, which is the retry TUS clients make — both
+     * passed the check and both landed. The file was stored with the chunk
+     * twice and the upload reported success.
+     */
+    receiving?: boolean;
+    /**
      * Who created the upload.
      *
      * Kept because a resumable upload finishes on a later request than the one
@@ -441,58 +451,87 @@ export class TusHandler {
         });
     }
 
-    /** `PATCH /tus/:id` — Append data to an upload. */
+    /** `PATCH /tus/:id` — Write one chunk of an upload, at its offset. */
     async patch(c: Context, id: string): Promise<Response> {
         const upload = this.ownedUpload(c, id);
         if (upload.completed) {
             throw ApiError.badRequest("Upload already completed");
         }
 
-        // Validate offset
-        const offsetHeader = c.req.header("Upload-Offset");
-        if (!offsetHeader) {
-            throw ApiError.badRequest("Upload-Offset header is required");
+        // One chunk at a time. A second PATCH while one is being received is
+        // refused rather than queued: it is almost always the client's retry of
+        // the very chunk in flight, and whichever of the two finishes first
+        // decides the offset the other would have to be written at. 423 is what
+        // tusd answers here, and what tus-js-client backs off and retries on.
+        if (upload.receiving) {
+            throw new ApiError(
+                423,
+                "UPLOAD_LOCKED",
+                "Another chunk of this upload is being received. Ask for its offset (HEAD) and resume from there."
+            );
         }
-        const offset = parseInt(offsetHeader, 10);
-        if (offset !== upload.offset) {
-            throw ApiError.conflict("Offset mismatch");
-        }
+        upload.receiving = true;
 
-        // Validate content type
-        const contentType = c.req.header("Content-Type");
-        if (contentType !== "application/offset+octet-stream") {
-            throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/offset+octet-stream");
-        }
-
-        // Read chunk and append to temp file
-        const body = await c.req.arrayBuffer();
-        const chunk = Buffer.from(body);
-
-        // Prevent overrun
-        if (upload.offset + chunk.length > upload.size) {
-            throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Chunk exceeds declared Upload-Length");
-        }
-
-        const fh = await open(upload.filePath, "a");
         try {
-            await fh.write(chunk);
-        } finally {
-            await fh.close();
-        }
-        upload.offset += chunk.length;
-
-        // Finalize if complete
-        if (upload.offset >= upload.size) {
-            await this.finalize(upload);
-        }
-
-        return new Response(null, {
-            status: 204,
-            headers: {
-                "Tus-Resumable": "1.0.0",
-                "Upload-Offset": String(upload.offset)
+            // Validate offset
+            const offsetHeader = c.req.header("Upload-Offset");
+            if (!offsetHeader) {
+                throw ApiError.badRequest("Upload-Offset header is required");
             }
-        });
+            const offset = parseInt(offsetHeader, 10);
+            if (offset !== upload.offset) {
+                throw ApiError.conflict("Offset mismatch");
+            }
+
+            // Validate content type
+            const contentType = c.req.header("Content-Type");
+            if (contentType !== "application/offset+octet-stream") {
+                throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/offset+octet-stream");
+            }
+
+            // Read chunk
+            const body = await c.req.arrayBuffer();
+            const chunk = Buffer.from(body);
+
+            // The upload may have been cancelled while the body arrived.
+            if (this.uploads.get(id) !== upload) {
+                throw ApiError.notFound("Upload not found");
+            }
+
+            // Prevent overrun
+            if (offset + chunk.length > upload.size) {
+                throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Chunk exceeds declared Upload-Length");
+            }
+
+            // At the offset the client declared and the check above held it
+            // to — not appended wherever the file happens to end. The two are
+            // the same while the lock holds; written positionally, a temp file
+            // that disagrees with the bookkeeping is overwritten rather than
+            // extended.
+            const fh = await open(upload.filePath, "r+");
+            try {
+                await fh.write(chunk, 0, chunk.length, offset);
+                await fh.truncate(offset + chunk.length);
+            } finally {
+                await fh.close();
+            }
+            upload.offset = offset + chunk.length;
+
+            // Finalize if complete
+            if (upload.offset >= upload.size) {
+                await this.finalize(upload);
+            }
+
+            return new Response(null, {
+                status: 204,
+                headers: {
+                    "Tus-Resumable": "1.0.0",
+                    "Upload-Offset": String(upload.offset)
+                }
+            });
+        } finally {
+            upload.receiving = false;
+        }
     }
 
     /** `DELETE /tus/:id` — Cancel and remove an upload. */
