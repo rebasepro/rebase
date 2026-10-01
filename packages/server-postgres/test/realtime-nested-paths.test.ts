@@ -104,6 +104,18 @@ describe("realtime over nested paths", () => {
         expect(await refreshed()).toEqual(["ada-post-43", "ada-posts", "all-posts", "post-43"]);
     });
 
+    it("a nested list re-subscribed under its own id still hears a write through the root path", async () => {
+        // A re-subscribe replaces the subscription. The nested paths a write
+        // is aliased to are kept per path, with a count, and the replacement
+        // once took the count down without putting it back.
+        await realtime.handleClientMessage("client-1", { type: "subscribe_collection", payload: { path: "authors/1/posts", subscriptionId: "ada-posts" } });
+        await realtime.handleClientMessage("client-1", { type: "unsubscribe", subscriptionId: "ada-post-43" });
+        ws.send.mockClear();
+
+        await realtime.notifyUpdate("posts", "43", { id: 43 }, undefined, false);
+        expect(await refreshed()).toEqual(["ada-posts", "all-posts", "post-43"]);
+    });
+
     it("a write through the root path reaches the nested list and the nested row subscriber", async () => {
         await realtime.notifyUpdate("posts", "43", { id: 43 }, undefined, false);
         expect(await refreshed()).toEqual(["ada-post-43", "ada-posts", "all-posts", "post-43"]);

@@ -24,7 +24,7 @@ import {
     type RealtimeSocketLimits
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { RealtimeService } from "./services/realtimeService";
+import { RealtimeService, parseMaxSubscriptionsPerSocket } from "./services/realtimeService";
 import { buildCollectionRegistry } from "./collections/buildRegistry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
@@ -686,6 +686,19 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             // Create services
             const realtimeService = new RealtimeService(schemaAwareDb, registry);
+            // The per-socket subscription ceiling. Checked here, before anything
+            // else boots: a ceiling someone set and mistyped must not quietly
+            // become another number.
+            const ceilingFromEnv = process.env.REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET?.trim();
+            if (ceilingFromEnv) {
+                realtimeService.maxSubscriptionsPerSocket = parseMaxSubscriptionsPerSocket(
+                    ceilingFromEnv, "REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET"
+                );
+            } else if (pgConfig.realtime?.maxSubscriptionsPerSocket !== undefined) {
+                realtimeService.maxSubscriptionsPerSocket = parseMaxSubscriptionsPerSocket(
+                    pgConfig.realtime.maxSubscriptionsPerSocket, "realtime.maxSubscriptionsPerSocket"
+                );
+            }
 
             // Initialize read replica connection if configured
             let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;

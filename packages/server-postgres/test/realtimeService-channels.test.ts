@@ -637,12 +637,11 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             const dummyEntity = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
             await service.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
-            const refetchTimers = (service as unknown as {
-                refetchTimers: Map<string, ReturnType<typeof setTimeout>>
-            }).refetchTimers;
             // Without a pending timer there is nothing to cancel and the rest of
             // this test would pass against a destroy() that cancels nothing.
-            expect(refetchTimers.size).toBe(1);
+            // Counted on the clock rather than on a private map, which the
+            // refetch groups replaced.
+            expect(jest.getTimerCount()).toBeGreaterThanOrEqual(1);
 
             const sendsBeforeDestroy = ws.send.mock.calls.length;
             await service.destroy();
@@ -650,7 +649,6 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             // The handles are dropped, not merely orphaned: a timer left armed
             // keeps the process (and, in a pooled deployment, the connection it
             // refetches on) alive past shutdown.
-            expect(refetchTimers.size).toBe(0);
             expect(jest.getTimerCount()).toBe(0);
 
             jest.advanceTimersByTime(500);

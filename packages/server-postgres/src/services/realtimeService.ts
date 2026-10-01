@@ -214,7 +214,11 @@ export type DataDriverSubscriptionRequest = {
  * last delivery *started* the last one *delivered*.
  */
 type Subscription = {
+    /** The id the client named it by — what every frame for it carries. */
+    subscriptionId: string;
     clientId: string;
+    /** The {@link SubscriptionGroup} whose refetch answers it. */
+    groupKey: string;
     type: "collection" | "single";
     path: string;
     id?: string | number;
@@ -240,6 +244,78 @@ type Subscription = {
  * `mayReportFailure()` asks whether this delivery's failure may be reported.
  */
 type DeliveryCheck = (() => boolean) & { mayReportFailure: () => boolean };
+
+/**
+ * Subscriptions one read answers: the same path, the same request, read as the
+ * same principal.
+ *
+ * Every delivery is a refetch under the subscriber's own scope, which is what
+ * keeps a frame from carrying a row its reader may not see. It used to be one
+ * refetch — and, for a list, one count — per subscription, so a write to a
+ * list a thousand people had open cost two thousand transactions, queued on the
+ * pool every REST request shares. Subscriptions whose refetch would run the
+ * same query as the same principal get the same rows, so they share one: the
+ * group's. A frame is still built from a read under the reader's own identity;
+ * only who else asked the identical question changes.
+ *
+ * An in-process listener is a group of one — its callback receives the rows
+ * themselves, and two listeners must not share an array either may mutate.
+ */
+type SubscriptionGroup = {
+    key: string;
+    path: string;
+    type: "collection" | "single";
+    /** The row a single-row group reads, as a string. */
+    id?: string;
+    collectionRequest?: StoredCollectionRequest;
+    authContext?: SubscriptionAuthContext;
+    /** The subscriptions in the group, by internal key. */
+    members: Set<string>;
+    /**
+     * Who the next refetch is for: `"all"` after a change on the path, or the
+     * members that asked on their own — a re-scoped subscription, say.
+     */
+    pending: Set<string> | "all";
+    /** When the last change arrived; the refetch waits for a quiet debounce window. */
+    lastChangeAt: number;
+    timer?: ReturnType<typeof setTimeout>;
+};
+
+/** `JSON.stringify` with object keys sorted, so equal requests have one spelling. */
+function canonicalJson(value: unknown): string {
+    return JSON.stringify(value, (_key, nested: unknown) => {
+        if (!nested || typeof nested !== "object" || Array.isArray(nested)) return nested;
+        return Object.fromEntries(Object.entries(nested).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    });
+}
+
+/**
+ * The default ceiling on subscriptions one socket may hold.
+ *
+ * Each collection subscription is a refetch on every write to its collection;
+ * without a ceiling one socket could open tens of thousands and turn every
+ * write anyone made into as many transactions. The SDK shares identical
+ * subscriptions on a socket, so a real page holds one per distinct list or
+ * record on screen — the admin panel's tables, forms and reference previews
+ * stay well under this. See `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET`.
+ */
+export const DEFAULT_MAX_SUBSCRIPTIONS_PER_SOCKET = 1000;
+
+/**
+ * Read a subscription ceiling, refusing anything that is not a positive whole
+ * number. A typo here does not fall back to a default: the ceiling is a limit
+ * someone chose, and silently running with another one is how it stops
+ * meaning anything.
+ */
+export function parseMaxSubscriptionsPerSocket(value: unknown, source: string): number {
+    const parsed = typeof value === "string" && value.trim() !== "" ? Number(value.trim()) : value;
+    if (typeof parsed !== "number" || !Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(
+            `${source} must be a positive whole number of subscriptions per socket — got ${JSON.stringify(value)}.`
+        );
+    }
+    return parsed;
+}
 
 /**
  * How long a client gets to answer the close frame at shutdown before its
@@ -357,11 +433,43 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /** How often stale roster rows from other instances are reaped. */
     private static readonly PRESENCE_SWEEP_INTERVAL_MS = 10000; // 10s
     private dataService: DataService;
-    // Enhanced subscriptions storage with full request parameters
+    /**
+     * Every subscription, by {@link subscriptionKey} — the client's own id
+     * qualified by the client that chose it.
+     *
+     * Keyed by the bare id, this was one namespace for every socket: two raw
+     * clients that both counted from `"sub-1"` replaced each other's
+     * subscription without a word, and either one's `unsubscribe` ended the
+     * other's.
+     */
     private _subscriptions = new Map<string, Subscription>();
 
-    // Add callback storage for DataDriver subscriptions
+    /** In-process listeners' callbacks, by subscription key. */
     private subscriptionCallbacks = new Map<string, (data: Record<string, unknown>[] | Record<string, unknown> | null) => void>();
+
+    /** Each client's subscriptions, by key — for its ceiling and its disconnect. */
+    private subscriptionsByClient = new Map<string, Set<string>>();
+
+    /** Subscriptions one refetch answers — see {@link SubscriptionGroup}. */
+    private groups = new Map<string, SubscriptionGroup>();
+    /**
+     * The collection groups on each path, and the single-row groups at each
+     * `path` + id: what a change looks up, instead of walking every
+     * subscription on the server once per changed row.
+     */
+    private collectionGroupsByPath = new Map<string, Set<SubscriptionGroup>>();
+    private singleGroupsByAddress = new Map<string, Set<SubscriptionGroup>>();
+    /**
+     * Every path a subscription holds, with the collection it lands on and how
+     * many hold it — the candidates `aliasPaths` considers, resolved once.
+     */
+    private subscribedPaths = new Map<string, { slug?: string; count: number }>();
+
+    /**
+     * How many subscriptions one socket may hold; set from config at boot. See
+     * {@link DEFAULT_MAX_SUBSCRIPTIONS_PER_SOCKET}.
+     */
+    public maxSubscriptionsPerSocket = DEFAULT_MAX_SUBSCRIPTIONS_PER_SOCKET;
 
     private driver?: DataDriver;
 
@@ -376,8 +484,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private broadcasting = false;
     /** Reconnection timer handle. */
     private reconnectTimer?: ReturnType<typeof setTimeout>;
-    /** Debounce timers for collection refetches to prevent refetch storms. */
-    private refetchTimers = new Map<string, ReturnType<typeof setTimeout>>();
     /** Debounce window (ms) for coalescing rapid row updates into a single correctness refetch. */
     private static readonly REFETCH_DEBOUNCE_MS = 300;
 
@@ -454,9 +560,220 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         this.driver = driver;
     }
 
-    // Make subscriptions accessible for DataDriver
-    get subscriptions() {
-        return this._subscriptions;
+    /**
+     * The live subscriptions by the id their client gave them — for tests and
+     * diagnostics. Two clients may use one id; this view shows the last.
+     */
+    get subscriptions(): ReadonlyMap<string, Subscription> {
+        return new Map([...this._subscriptions.values()].map((subscription) => [subscription.subscriptionId, subscription]));
+    }
+
+    // =============================================================================
+    // Subscription registry and refetch groups
+    // =============================================================================
+
+    /** The internal key of `subscriptionId` as `clientId` named it. */
+    private subscriptionKey(clientId: string, subscriptionId: string): string {
+        return `${clientId}\u0000${subscriptionId}`;
+    }
+
+    /**
+     * The group a subscription's refetch belongs to. Socket subscriptions that
+     * would run the same read as the same principal share one; an in-process
+     * listener is always alone — see {@link SubscriptionGroup}.
+     */
+    private groupKeyFor(
+        key: string,
+        shared: boolean,
+        target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext }
+    ): string {
+        if (!shared) return `listener\u0000${key}`;
+        const auth = target.authContext ?? { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
+        return canonicalJson({
+            type: target.type,
+            path: target.path,
+            id: target.type === "single" ? String(target.id) : undefined,
+            request: target.type === "collection" ? (target.collectionRequest ?? {}) : undefined,
+            // Exactly what the refetch binds: `applyAuthContext` and the field
+            // viewer read these and nothing else.
+            uid: auth.uid,
+            roles: auth.roles ?? [],
+            isAnonymous: auth.isAnonymous === true,
+            claims: auth.claims
+        });
+    }
+
+    /**
+     * Register (or replace) a subscription under `key`, in its group and in
+     * every index that finds it.
+     */
+    private registerSubscription(key: string, subscription: Subscription): void {
+        const previous = this._subscriptions.get(key);
+        if (previous) this.leaveGroup(key, previous);
+        this._subscriptions.set(key, subscription);
+
+        let owned = this.subscriptionsByClient.get(subscription.clientId);
+        if (!owned) this.subscriptionsByClient.set(subscription.clientId, owned = new Set());
+        owned.add(key);
+
+        let group = this.groups.get(subscription.groupKey);
+        if (!group) {
+            group = {
+                key: subscription.groupKey,
+                path: subscription.path,
+                type: subscription.type,
+                ...(subscription.type === "single" ? { id: String(subscription.id) } : {}),
+                collectionRequest: subscription.collectionRequest,
+                authContext: subscription.authContext,
+                members: new Set(),
+                pending: new Set(),
+                lastChangeAt: 0
+            };
+            this.groups.set(group.key, group);
+            const [index, address] = group.type === "collection"
+                ? [this.collectionGroupsByPath, group.path]
+                : [this.singleGroupsByAddress, `${group.path}\u0000${group.id}`];
+            let bucket = index.get(address);
+            if (!bucket) index.set(address, bucket = new Set());
+            bucket.add(group);
+        }
+        group.members.add(key);
+
+        // Counted once per registration; `leaveGroup` above took the replaced
+        // one's count back.
+        const held = this.subscribedPaths.get(subscription.path);
+        if (held) held.count++;
+        else this.subscribedPaths.set(subscription.path, { slug: this.collectionSlugAt(subscription.path), count: 1 });
+    }
+
+    /** Remove the subscription under `key` from everything that holds it. */
+    private dropSubscription(key: string): void {
+        const subscription = this._subscriptions.get(key);
+        this.subscriptionCallbacks.delete(key);
+        if (!subscription) return;
+        this._subscriptions.delete(key);
+        this.leaveGroup(key, subscription);
+        const owned = this.subscriptionsByClient.get(subscription.clientId);
+        owned?.delete(key);
+        if (owned?.size === 0) this.subscriptionsByClient.delete(subscription.clientId);
+    }
+
+    /** Take `subscription` out of its group and path count; a group left empty goes, timer and all. */
+    private leaveGroup(key: string, subscription: Subscription): void {
+        const held = this.subscribedPaths.get(subscription.path);
+        if (held && --held.count <= 0) this.subscribedPaths.delete(subscription.path);
+
+        const group = this.groups.get(subscription.groupKey);
+        if (!group) return;
+        group.members.delete(key);
+        if (group.pending !== "all") group.pending.delete(key);
+        if (group.members.size > 0) return;
+        if (group.timer) clearTimeout(group.timer);
+        this.groups.delete(group.key);
+        const [index, address] = group.type === "collection"
+            ? [this.collectionGroupsByPath, group.path]
+            : [this.singleGroupsByAddress, `${group.path}\u0000${group.id}`];
+        const bucket = index.get(address);
+        bucket?.delete(group);
+        if (bucket?.size === 0) index.delete(address);
+    }
+
+    /**
+     * Ask for a refetch of `group` once changes have been quiet for the
+     * debounce window — for every member, or only for `member`.
+     *
+     * The window is measured from the last change, as a debounce is, but the
+     * timer is not re-armed per change: a 10k-row statement is 10k changes,
+     * and re-arming a timer per change per group was work in proportion to
+     * both. A change only moves the timestamp; the timer, when it fires early,
+     * waits out the rest.
+     */
+    private scheduleGroupRefetch(group: SubscriptionGroup, member?: string): void {
+        if (member === undefined) group.pending = "all";
+        else if (group.pending !== "all") group.pending.add(member);
+        group.lastChangeAt = Date.now();
+        if (!group.timer) this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS);
+    }
+
+    private armGroupTimer(group: SubscriptionGroup, delayMs: number): void {
+        group.timer = setTimeout(() => {
+            group.timer = undefined;
+            if (this.groups.get(group.key) !== group) return;
+            const quietFor = Date.now() - group.lastChangeAt;
+            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS) {
+                this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS - quietFor);
+                return;
+            }
+            void this.refetchGroup(group);
+        }, delayMs);
+    }
+
+    /**
+     * One read for the group, delivered to each member it is for.
+     *
+     * Each member still claims its own delivery slot before the read and
+     * checks it after (see {@link beginDelivery}), so a member that left, was
+     * replaced or was overtaken while the read ran is skipped exactly as it
+     * was when it had a read of its own. A socket frame is serialised once and
+     * only its subscription id differs per member.
+     */
+    private async refetchGroup(group: SubscriptionGroup): Promise<void> {
+        const keys = group.pending === "all" ? [...group.members] : [...group.pending];
+        group.pending = new Set();
+
+        const targets: Array<{ key: string; subscription: Subscription; canDeliver: DeliveryCheck; callback?: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void }> = [];
+        for (const key of keys) {
+            const subscription = this._subscriptions.get(key);
+            if (!subscription || subscription.groupKey !== group.key) continue;
+            if (subscription.clientId === "driver") {
+                const callback = this.subscriptionCallbacks.get(key);
+                if (!callback) continue;
+                targets.push({ key, subscription, canDeliver: this.beginDelivery(key, subscription), callback });
+            } else if (this.clients.has(subscription.clientId)) {
+                targets.push({ key, subscription, canDeliver: this.beginDelivery(key, subscription) });
+            }
+        }
+        if (targets.length === 0) return;
+
+        try {
+            if (group.type === "collection") {
+                const request = group.collectionRequest ?? {};
+                const rows = await this.fetchCollectionWithAuth(group.path, request, group.authContext);
+                const toSockets = targets.some((target) => !target.callback);
+                const meta = toSockets
+                    ? await this.collectionMetaWithAuth(group.path, request, rows, group.authContext)
+                    : undefined;
+                let frameTail: string | undefined;
+                for (const target of targets) {
+                    if (!target.canDeliver()) continue;
+                    if (target.callback) {
+                        target.callback(rows);
+                        continue;
+                    }
+                    frameTail ??= this.collectionFrameTail(rows, group.path, meta);
+                    this.sendRaw(
+                        target.subscription.clientId,
+                        `{"type":"collection_update","subscriptionId":${JSON.stringify(target.subscription.subscriptionId)},${frameTail}`
+                    );
+                }
+            } else {
+                const row = (await this.fetchEntityWithAuth(group.path, group.id!, group.authContext)) ?? null;
+                for (const target of targets) {
+                    if (!target.canDeliver()) continue;
+                    if (target.callback) target.callback(row);
+                    else this.sendSingleUpdate(target.subscription.clientId, target.subscription.subscriptionId, row);
+                }
+            }
+        } catch (error) {
+            for (const target of targets) {
+                if (target.callback) {
+                    logger.error(`❌ [RealtimeService] Error in a refetch for DataDriver subscription ${target.subscription.subscriptionId}`, { error });
+                    this.reportDriverFetchFailure(target.subscription, target.canDeliver, error);
+                } else {
+                    this.reportSocketFetchFailure(target.subscription.clientId, target.subscription.subscriptionId, group.path, error, target.canDeliver);
+                }
+            }
+        }
     }
 
     /**
@@ -484,16 +801,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * that is the send itself failing (a row that will not serialise) after the
      * check passed and before anything reached the subscriber.
      */
-    private beginDelivery(subscriptionId: string, subscription: Subscription): DeliveryCheck {
+    private beginDelivery(key: string, subscription: Subscription): DeliveryCheck {
         const seq = ++subscription.started;
         const canDeliver = () => {
-            if (this._subscriptions.get(subscriptionId) !== subscription) return false;
+            if (this._subscriptions.get(key) !== subscription) return false;
             if (seq <= subscription.delivered) return false;
             subscription.delivered = seq;
             return true;
         };
         const mayReportFailure = () =>
-            canDeliver() || (this._subscriptions.get(subscriptionId) === subscription && subscription.delivered === seq);
+            canDeliver() || (this._subscriptions.get(key) === subscription && subscription.delivered === seq);
         return Object.assign(canDeliver, { mayReportFailure });
     }
 
@@ -519,28 +836,36 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
     ): void {
         this.debugLog("📋 [RealtimeService] Starting DataDriver subscription:", subscriptionId, request.authContext ? "(with auth)" : "(no auth)");
-        const subscription: Subscription = { clientId: "driver", ...request, started: 0, delivered: 0 };
-        this._subscriptions.set(subscriptionId, subscription);
-        this.subscriptionCallbacks.set(subscriptionId, callback);
-        void this.deliverFirstToDataDriver(subscriptionId, subscription, callback);
+        const key = this.subscriptionKey("driver", subscriptionId);
+        const subscription: Subscription = {
+            subscriptionId,
+            clientId: "driver",
+            groupKey: this.groupKeyFor(key, false, request),
+            ...request,
+            started: 0,
+            delivered: 0
+        };
+        this.registerSubscription(key, subscription);
+        this.subscriptionCallbacks.set(key, callback);
+        void this.deliverFirstToDataDriver(key, subscription, callback);
     }
 
     private async deliverFirstToDataDriver(
-        subscriptionId: string,
+        key: string,
         subscription: Subscription,
         callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
     ): Promise<void> {
         // Claimed before the fetch, as the socket's first fetch claims it: this
         // is the oldest read, so a refetch started while it runs outranks it.
-        const canDeliver = this.beginDelivery(subscriptionId, subscription);
+        const canDeliver = this.beginDelivery(key, subscription);
         try {
             const data = subscription.type === "collection"
                 ? await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext)
                 : (await this.fetchEntityWithAuth(subscription.path, String(subscription.id), subscription.authContext)) ?? null;
             if (canDeliver()) callback(data);
         } catch (error) {
-            logger.error(`❌ [RealtimeService] Error in the first fetch for DataDriver subscription ${subscriptionId}`, { error: error });
-            this.reportDriverFetchFailure(subscriptionId, subscription, canDeliver, error);
+            logger.error(`❌ [RealtimeService] Error in the first fetch for DataDriver subscription ${subscription.subscriptionId}`, { error: error });
+            this.reportDriverFetchFailure(subscription, canDeliver, error);
         }
     }
 
@@ -557,9 +882,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         callback?: (rows: Record<string, unknown>[]) => void,
         onError?: (error: unknown) => void
     ): void {
-        this._subscriptions.set(subscriptionId, {
-            clientId: config.clientId,
-            type: "collection",
+        const key = this.subscriptionKey(config.clientId, subscriptionId);
+        const target = {
+            type: "collection" as const,
             path: config.path,
             collectionRequest: {
                 filter: config.filter as Record<string, unknown> | undefined,
@@ -570,14 +895,20 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 databaseId: config.databaseId,
                 searchString: config.searchString,
                 searchExplain: config.searchExplain
-            },
+            }
+        };
+        this.registerSubscription(key, {
+            subscriptionId,
+            clientId: config.clientId,
+            groupKey: this.groupKeyFor(key, false, target),
+            ...target,
             onError,
             started: 0,
             delivered: 0
         });
 
         if (callback) {
-            this.subscriptionCallbacks.set(subscriptionId, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
+            this.subscriptionCallbacks.set(key, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
         }
     }
 
@@ -590,27 +921,35 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         callback?: (row: Record<string, unknown> | null) => void,
         onError?: (error: unknown) => void
     ): void {
-        this._subscriptions.set(subscriptionId, {
+        const key = this.subscriptionKey(config.clientId, subscriptionId);
+        const target = { type: "single" as const, path: config.path, id: config.id };
+        this.registerSubscription(key, {
+            subscriptionId,
             clientId: config.clientId,
-            type: "single",
-            path: config.path,
-            id: config.id,
+            groupKey: this.groupKeyFor(key, false, target),
+            ...target,
             onError,
             started: 0,
             delivered: 0
         });
 
         if (callback) {
-            this.subscriptionCallbacks.set(subscriptionId, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
+            this.subscriptionCallbacks.set(key, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
         }
     }
 
     /**
-     * Unsubscribe from a subscription (RealtimeProvider interface)
+     * Unsubscribe an in-process subscription (RealtimeProvider interface).
+     *
+     * By id alone, because the in-process callers hold nothing else — so a
+     * socket's subscription under the same id is not this one, and is left
+     * alone. A socket ends its own through the `unsubscribe` frame.
      */
     unsubscribe(subscriptionId: string): void {
-        this._subscriptions.delete(subscriptionId);
-        this.subscriptionCallbacks.delete(subscriptionId);
+        for (const [key, subscription] of [...this._subscriptions.entries()]) {
+            if (subscription.subscriptionId !== subscriptionId || this.clients.has(subscription.clientId)) continue;
+            this.dropSubscription(key);
+        }
     }
 
     // =============================================================================
@@ -638,19 +977,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     async removeClient(clientId: string) {
         this.clients.delete(clientId);
 
-        // Remove all subscriptions, callbacks, and pending refetch timers for this client
-        for (const [subscriptionId, subscription] of this._subscriptions.entries()) {
-            if (subscription.clientId === clientId) {
-                this._subscriptions.delete(subscriptionId);
-                this.subscriptionCallbacks.delete(subscriptionId);
-
-                // Cancel any pending debounced refetch timers
-                for (const prefix of ["ws_", "drv_", "wse_", "drve_"]) {
-                    const key = `${prefix}${subscriptionId}`;
-                    const timer = this.refetchTimers.get(key);
-                    if (timer) { clearTimeout(timer); this.refetchTimers.delete(key); }
-                }
-            }
+        // Remove all subscriptions and callbacks for this client; a group it
+        // was the last member of goes with its pending refetch.
+        for (const key of [...(this.subscriptionsByClient.get(clientId) ?? [])]) {
+            this.dropSubscription(key);
         }
 
         // The shared rows go before the announcement, not after it. Every
@@ -718,8 +1048,30 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         }
     }
 
+    /**
+     * Refuse a new subscription past the socket's ceiling, and say so.
+     *
+     * Every collection subscription is a refetch on every write to its
+     * collection, so a socket allowed to open them without limit could turn
+     * each write anyone makes into tens of thousands of transactions. Replacing
+     * a subscription the socket already holds — the same id again — is not a
+     * new one and always passes. Returns whether the subscription may go ahead.
+     */
+    private admitSubscription(clientId: string, subscriptionId: string): boolean {
+        const held = this.subscriptionsByClient.get(clientId);
+        if (!held || held.size < this.maxSubscriptionsPerSocket) return true;
+        if (held.has(this.subscriptionKey(clientId, subscriptionId))) return true;
+        const message =
+            `This connection already holds ${held.size} subscriptions, the most one connection may hold ` +
+            `(REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET, or realtime.maxSubscriptionsPerSocket). Unsubscribe from one first.`;
+        logger.warn(`[RealtimeService] Refused a subscription for ${clientId}: ${held.size} held, ceiling ${this.maxSubscriptionsPerSocket}`);
+        this.sendError(clientId, message, subscriptionId, "TOO_MANY_SUBSCRIPTIONS");
+        return false;
+    }
+
     private async handleCollectionSubscription(clientId: string, request: RealTimeListenCollectionProps, authContext?: SubscriptionAuthContext) {
         const subscriptionId = request.subscriptionId;
+        const key = this.subscriptionKey(clientId, subscriptionId);
         // Out here so the `catch` can check it. It is claimed before the fetch
         // starts, so a failed fetch always has one.
         let canDeliver: DeliveryCheck | undefined;
@@ -734,6 +1086,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 this.sendError(clientId, msg, subscriptionId);
                 return;
             }
+
+            if (!this.admitSubscription(clientId, subscriptionId)) return;
 
             // A vector search cannot be served here, and the parameter used to
             // be read for one thing only — the limit default below — and then
@@ -811,46 +1165,47 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
 
             // Store subscription with full request parameters and auth context for RLS
+            const collectionRequest: StoredCollectionRequest = {
+                filter: request.filter,
+                logical: request.logical,
+                orderBy,
+                order: request.order,
+                limit: boundedLimit,
+                // `page` wins over `offset`, exactly as `FindParams`
+                // documents and the REST parser applies it — one rule, so a
+                // live list and the fetch behind it land on the same window.
+                offset: request.page != null && request.page > 0
+                    ? (request.page - 1) * boundedLimit
+                    : request.offset,
+                startAfter: request.startAfter as Record<string, unknown> | undefined,
+                databaseId: request.collection?.databaseId,
+                searchString: request.searchString,
+                searchExplain: request.searchExplain,
+                // Stored, so every refetch answers the same query the
+                // initial fetch did. A field declared on the incoming props
+                // and not stored here is accepted over the wire and then
+                // silently ignored — which is what `offset` and `logical`
+                // both were.
+                include: request.include,
+                fields: request.fields,
+                distinct: request.distinct
+            };
+            const target = { type: "collection" as const, path: request.path, collectionRequest, authContext };
             const subscription: Subscription = {
+                subscriptionId,
                 clientId,
-                type: "collection",
-                path: request.path,
-                collectionRequest: {
-                    filter: request.filter,
-                    logical: request.logical,
-                    orderBy,
-                    order: request.order,
-                    limit: boundedLimit,
-                    // `page` wins over `offset`, exactly as `FindParams`
-                    // documents and the REST parser applies it — one rule, so a
-                    // live list and the fetch behind it land on the same window.
-                    offset: request.page != null && request.page > 0
-                        ? (request.page - 1) * boundedLimit
-                        : request.offset,
-                    startAfter: request.startAfter as Record<string, unknown> | undefined,
-                    databaseId: request.collection?.databaseId,
-                    searchString: request.searchString,
-                    searchExplain: request.searchExplain,
-                    // Stored, so every refetch answers the same query the
-                    // initial fetch did. A field declared on the incoming props
-                    // and not stored here is accepted over the wire and then
-                    // silently ignored — which is what `offset` and `logical`
-                    // both were.
-                    include: request.include,
-                    fields: request.fields,
-                    distinct: request.distinct
-                },
-                authContext,
+                groupKey: this.groupKeyFor(key, true, target),
+                ...target,
                 started: 0,
                 delivered: 0
             };
-            this._subscriptions.set(subscriptionId, subscription);
+            this.registerSubscription(key, subscription);
 
             // The subscription is registered before this fetch runs, so a write
             // arriving in that window starts a refetch of its own — with nothing
             // ordering the two. Claim a slot first: this fetch is the oldest, so
             // if the refetch answers first, this one no longer delivers.
-            canDeliver = this.beginDelivery(subscriptionId, subscription);
+            canDeliver = this.beginDelivery(key, subscription);
 
             // Send initial data. Built from the request the subscription just
             // stored, so the first answer and every refetch after it cannot
@@ -875,6 +1230,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     private async handleEntitySubscription(clientId: string, request: RealTimeListenEntityProps, authContext?: SubscriptionAuthContext) {
         const subscriptionId = request.subscriptionId;
+        const key = this.subscriptionKey(clientId, subscriptionId);
         // As in the collection case: claimed before the fetch, checked in the `catch`.
         let canDeliver: DeliveryCheck | undefined;
 
@@ -889,22 +1245,24 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return;
             }
 
+            if (!this.admitSubscription(clientId, subscriptionId)) return;
+
             // Store subscription in memory with auth context for RLS
+            const target = { type: "single" as const, path: request.path, id: request.id, authContext };
             const subscription: Subscription = {
+                subscriptionId,
                 clientId,
-                type: "single",
-                path: request.path,
-                id: request.id,
-                authContext,
+                groupKey: this.groupKeyFor(key, true, target),
+                ...target,
                 started: 0,
                 delivered: 0
             };
-            this._subscriptions.set(subscriptionId, subscription);
+            this.registerSubscription(key, subscription);
 
             // Same race as the collection case: a write landing between the
             // registration above and this fetch starts a refetch that can answer
             // first, and this one must not overwrite it afterwards.
-            canDeliver = this.beginDelivery(subscriptionId, subscription);
+            canDeliver = this.beginDelivery(key, subscription);
 
             // Send initial data
             const row = await this.fetchEntityWithAuth(
@@ -966,8 +1324,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * again, when one is installed, and left when it refuses.
      */
     async rescopeClient(clientId: string, authContext: SubscriptionAuthContext): Promise<void> {
-        for (const [subscriptionId, subscription] of [...this._subscriptions.entries()]) {
-            if (subscription.clientId !== clientId) continue;
+        for (const key of [...(this.subscriptionsByClient.get(clientId) ?? [])]) {
+            const subscription = this._subscriptions.get(key);
+            if (!subscription) continue;
+            const subscriptionId = subscription.subscriptionId;
 
             if (subscription.type === "collection" && subscription.collectionRequest) {
                 const collection = this.registry.getCollectionByPath(subscription.path);
@@ -994,13 +1354,18 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 }
             }
 
-            const rescoped: Subscription = { ...subscription, authContext, started: 0, delivered: 0 };
-            this._subscriptions.set(subscriptionId, rescoped);
-            if (rescoped.type === "single" && rescoped.id !== undefined) {
-                this.debouncedSingleRefetch(subscriptionId, rescoped.path, String(rescoped.id), rescoped);
-            } else if (rescoped.type === "collection" && rescoped.collectionRequest) {
-                this.debouncedCollectionRefetch(subscriptionId, rescoped.path, rescoped);
-            }
+            // A new identity is a new group: the read it shares is now the one
+            // its new principal's subscriptions run.
+            const rescoped: Subscription = {
+                ...subscription,
+                authContext,
+                groupKey: this.groupKeyFor(key, true, { ...subscription, authContext }),
+                started: 0,
+                delivered: 0
+            };
+            this.registerSubscription(key, rescoped);
+            const group = this.groups.get(rescoped.groupKey);
+            if (group) this.scheduleGroupRefetch(group, key);
         }
 
         const authorizer = this.channelAuthorizer;
@@ -1021,15 +1386,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         }
     }
 
-    private async handleUnsubscribe(_clientId: string, subscriptionId: string) {
-        this._subscriptions.delete(subscriptionId);
-        this.subscriptionCallbacks.delete(subscriptionId);
-        // Cancel any pending debounced refetch
-        for (const prefix of ["ws_", "drv_", "wse_", "drve_"]) {
-            const key = `${prefix}${subscriptionId}`;
-            const timer = this.refetchTimers.get(key);
-            if (timer) { clearTimeout(timer); this.refetchTimers.delete(key); }
-        }
+    /**
+     * End a socket's own subscription. Only its own: the id is the client's,
+     * so another socket's subscription under the same id is a different one.
+     */
+    private async handleUnsubscribe(clientId: string, subscriptionId: string) {
+        this.dropSubscription(this.subscriptionKey(clientId, subscriptionId));
     }
 
     /**
@@ -1086,13 +1448,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         // Process each path that needs notification
         for (const notifyPath of pathsToNotify) {
-            await this.notifyPathUpdate(notifyPath, path, id, row, databaseId);
+            this.notifyPathUpdate(notifyPath, path, id);
         }
 
         // Each alias is an address of this very row, so its single-row
         // subscribers match by id exactly as the written path's do.
         for (const alias of aliases) {
-            await this.notifyPathUpdate(alias, alias, id, row, databaseId);
+            this.notifyPathUpdate(alias, alias, id);
         }
 
         // Broadcast to other instances via pg_notify (only for local mutations).
@@ -1145,133 +1507,19 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * being able to know, without asking the database as this subscriber,
      * whether this subscriber may see the row at all.
      */
-    private async notifyPathUpdate(notifyPath: string, originalPath: string, id: string, row: Record<string, unknown> | null, _databaseId?: string) {
+    private notifyPathUpdate(notifyPath: string, originalPath: string, id: string) {
         this.debugLog(`📡 [RealtimeService] Notifying path: ${notifyPath} (original: ${originalPath})`);
 
-        // Find all relevant subscriptions for this specific path
-        const allSubscriptions = Array.from(this._subscriptions.entries()).filter(([, sub]) => {
-            const isPathMatch = sub.path === notifyPath;
-
-            // For row subscriptions, check if the id matches (only for exact path matches)
-            if (sub.type === "single") {
-                return isPathMatch && (notifyPath === originalPath ? sub.id === id : true);
-            }
-            // For collection subscriptions, it's always relevant if the path matches
-            if (sub.type === "collection") {
-                return isPathMatch;
-            }
-            return false;
-        });
-
-        this.debugLog(`📡 [RealtimeService] Found ${allSubscriptions.length} subscriptions for path: ${notifyPath}`);
-
-        // Separate WebSocket subscriptions from DataDriver callback subscriptions
-        const webSocketSubscriptions = allSubscriptions.filter(([, sub]) =>
-            sub.clientId !== "driver" && this.clients.has(sub.clientId)
-        );
-
-        const driverSubscriptions = allSubscriptions.filter(([subscriptionId, sub]) =>
-            sub.clientId === "driver" && this.subscriptionCallbacks.has(subscriptionId)
-        );
-
-        // Handle WebSocket subscriptions
-        for (const [subscriptionId, subscription] of webSocketSubscriptions) {
-            try {
-                if (subscription.type === "single" && notifyPath === originalPath) {
-                    this.debouncedSingleRefetch(subscriptionId, notifyPath, id, subscription);
-                } else if (subscription.type === "collection" && subscription.collectionRequest) {
-                    this.debouncedCollectionRefetch(subscriptionId, notifyPath, subscription);
-                }
-            } catch (error) {
-                const sanitized = sanitizeErrorForClient(error, notifyPath);
-                this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
-            }
+        // Every list on the path may have changed. A single-row subscription
+        // is asked only at the written path, and only for its own row: a
+        // parent path is a different record.
+        for (const group of this.collectionGroupsByPath.get(notifyPath) ?? []) {
+            this.scheduleGroupRefetch(group);
         }
-
-        // Handle DataDriver callback subscriptions
-        for (const [subscriptionId, subscription] of driverSubscriptions) {
-            try {
-                const callback = this.subscriptionCallbacks.get(subscriptionId);
-                if (!callback) continue;
-
-                if (subscription.type === "single" && notifyPath === originalPath) {
-                    this.debouncedSingleDriverRefetch(subscriptionId, notifyPath, id, subscription, callback);
-                } else if (subscription.type === "collection" && subscription.collectionRequest) {
-                    // Debounce collection refetches for DataDriver subscriptions too
-                    this.debouncedDriverRefetch(subscriptionId, notifyPath, subscription, callback);
-                }
-            } catch (error) {
-                logger.error(`❌ [RealtimeService] Error processing DataDriver subscription ${subscriptionId}`, { error: error });
-            }
+        if (notifyPath !== originalPath) return;
+        for (const group of this.singleGroupsByAddress.get(`${notifyPath}\u0000${id}`) ?? []) {
+            this.scheduleGroupRefetch(group);
         }
-    }
-
-    /**
-     * Debounce a collection refetch for a WebSocket subscription.
-     * Coalesces rapid row mutations into a single database query.
-     */
-    private debouncedCollectionRefetch(
-        subscriptionId: string,
-        notifyPath: string,
-        subscription: Subscription
-    ) {
-        const timerKey = `ws_${subscriptionId}`;
-        const existing = this.refetchTimers.get(timerKey);
-        if (existing) clearTimeout(existing);
-
-        this.refetchTimers.set(timerKey, setTimeout(async () => {
-            this.refetchTimers.delete(timerKey);
-            // Cheap bail before spending a query: the client may have
-            // disconnected, or re-subscribed under the same id. It is only an
-            // optimisation — `canDeliver()` after the await is what makes the
-            // delivery safe, because the same things can happen *during* it.
-            if (this._subscriptions.get(subscriptionId) !== subscription) return;
-            // Claimed here rather than when the timer was scheduled: the
-            // debounce coalesces, and no work exists to order until it fires.
-            const canDeliver = this.beginDelivery(subscriptionId, subscription);
-            try {
-                const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
-                const meta = await this.collectionMetaWithAuth(
-                    notifyPath, subscription.collectionRequest!, rows, subscription.authContext
-                );
-                if (canDeliver()) {
-                    this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath, meta);
-                }
-            } catch (error) {
-                this.reportSocketFetchFailure(subscription.clientId, subscriptionId, notifyPath, error, canDeliver);
-            }
-        }, RealtimeService.REFETCH_DEBOUNCE_MS));
-    }
-
-    /**
-     * Debounce a collection refetch for a DataDriver callback subscription.
-     */
-    private debouncedDriverRefetch(
-        subscriptionId: string,
-        notifyPath: string,
-        subscription: Subscription,
-        callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
-    ) {
-        const timerKey = `drv_${subscriptionId}`;
-        const existing = this.refetchTimers.get(timerKey);
-        if (existing) clearTimeout(existing);
-
-        this.refetchTimers.set(timerKey, setTimeout(async () => {
-            this.refetchTimers.delete(timerKey);
-            if (this._subscriptions.get(subscriptionId) !== subscription) return;
-            const canDeliver = this.beginDelivery(subscriptionId, subscription);
-            try {
-                const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
-                if (canDeliver()) callback(rows);
-                // The driver-callback path takes rows only: `DataDriver.listen`
-                // hands its consumer an array, and widening that is a change to
-                // a contract outside this pipeline. The WebSocket path — the
-                // one the SDK uses — carries `meta`.
-            } catch (error) {
-                logger.error(`❌ [RealtimeService] Error in debounced driver refetch for ${subscriptionId}`, { error: error });
-                this.reportDriverFetchFailure(subscriptionId, subscription, canDeliver, error);
-            }
-        }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
 
     /**
@@ -1286,7 +1534,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * a subscription that was cancelled or replaced while it ran.
      */
     private reportDriverFetchFailure(
-        subscriptionId: string,
         subscription: Subscription,
         canDeliver: () => boolean,
         error: unknown
@@ -1297,7 +1544,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         } catch (listenerError) {
             // Contained: this runs in a timer, where a throw would be an
             // unhandled rejection.
-            logger.error(`❌ [RealtimeService] onError threw for DataDriver subscription ${subscriptionId}`, { error: listenerError });
+            logger.error(`❌ [RealtimeService] onError threw for DataDriver subscription ${subscription.subscriptionId}`, { error: listenerError });
         }
     }
 
@@ -1543,62 +1790,6 @@ roles: ["anon"] };
     }
 
     /**
-     * Debounce an row refetch for a WebSocket subscription.
-     */
-    private debouncedSingleRefetch(
-        subscriptionId: string,
-        notifyPath: string,
-        id: string,
-        subscription: Subscription
-    ) {
-        const timerKey = `wse_${subscriptionId}`;
-        const existing = this.refetchTimers.get(timerKey);
-        if (existing) clearTimeout(existing);
-
-        this.refetchTimers.set(timerKey, setTimeout(async () => {
-            this.refetchTimers.delete(timerKey);
-            if (this._subscriptions.get(subscriptionId) !== subscription) return;
-            const canDeliver = this.beginDelivery(subscriptionId, subscription);
-            try {
-                const row = await this.fetchEntityWithAuth(notifyPath, id, subscription.authContext);
-                if (canDeliver()) {
-                    this.sendSingleUpdate(subscription.clientId, subscriptionId, row || null);
-                }
-            } catch (error) {
-                this.reportSocketFetchFailure(subscription.clientId, subscriptionId, notifyPath, error, canDeliver);
-            }
-        }, RealtimeService.REFETCH_DEBOUNCE_MS));
-    }
-
-    /**
-     * Debounce an row refetch for a Driver callback subscription.
-     */
-    private debouncedSingleDriverRefetch(
-        subscriptionId: string,
-        notifyPath: string,
-        id: string,
-        subscription: Subscription,
-        callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
-    ) {
-        const timerKey = `drve_${subscriptionId}`;
-        const existing = this.refetchTimers.get(timerKey);
-        if (existing) clearTimeout(existing);
-
-        this.refetchTimers.set(timerKey, setTimeout(async () => {
-            this.refetchTimers.delete(timerKey);
-            if (this._subscriptions.get(subscriptionId) !== subscription) return;
-            const canDeliver = this.beginDelivery(subscriptionId, subscription);
-            try {
-                const row = await this.fetchEntityWithAuth(notifyPath, id, subscription.authContext);
-                if (canDeliver()) callback(row || null);
-            } catch (error) {
-                logger.error(`❌ [RealtimeService] Error in debounced row driver refetch for ${subscriptionId}`, { error: error });
-                this.reportDriverFetchFailure(subscriptionId, subscription, canDeliver, error);
-            }
-        }, RealtimeService.REFETCH_DEBOUNCE_MS));
-    }
-
-    /**
      * Fetch a single row with optional RLS auth context.
      */
     private async fetchEntityWithAuth(
@@ -1726,6 +1917,19 @@ roles: ["anon"] };
         this.sendMessage(clientId, message);
     }
 
+    /**
+     * Everything in a `collection_update` frame after its subscription id,
+     * serialised once for every member of a group: the same rows, keys and
+     * meta as {@link sendCollectionUpdate} sends, in the same order.
+     */
+    private collectionFrameTail(rows: Record<string, unknown>[], path: string, meta?: CollectionUpdateMeta): string {
+        return JSON.stringify({
+            rows,
+            pks: this.primaryKeysForPath(path),
+            ...(meta && { meta })
+        }).slice(1);
+    }
+
     private sendSingleUpdate(clientId: string, subscriptionId: string, row: Record<string, unknown> | null) {
         const message: SingleUpdateMessage = {
             type: "single_update",
@@ -1788,9 +1992,14 @@ roles: ["anon"] };
     }
 
     private sendMessage(clientId: string, message: CollectionUpdateMessage | SingleUpdateMessage | CollectionPatchMessage | { type: string; subscriptionId?: string; error?: string; payload?: unknown }) {
+        this.sendRaw(clientId, JSON.stringify(message));
+    }
+
+    /** Send an already-serialised frame to a client, if it is still connected. */
+    private sendRaw(clientId: string, frame: string) {
         const client = this.clients.get(clientId);
         if (client && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(message));
+            client.send(frame);
         }
     }
 
@@ -1817,9 +2026,11 @@ roles: ["anon"] };
         if (!slug) return [];
         const aliases = new Set<string>();
         if (slug !== path) aliases.add(slug);
-        for (const subscription of this._subscriptions.values()) {
-            if (subscription.path === path || aliases.has(subscription.path) || !isNestedPath(subscription.path)) continue;
-            if (this.collectionSlugAt(subscription.path) === slug) aliases.add(subscription.path);
+        // The paths subscriptions hold, each resolved once when it was first
+        // subscribed — not every subscription on the server, once per change.
+        for (const [subscribed, held] of this.subscribedPaths) {
+            if (subscribed === path || aliases.has(subscribed) || !isNestedPath(subscribed)) continue;
+            if (held.slug === slug) aliases.add(subscribed);
         }
         return [...aliases];
     }
@@ -2667,14 +2878,19 @@ lastSeen: Date.now() });
      */
     async destroy(): Promise<void> {
         // 1. Cancel every pending debounced refetch timer
-        for (const [key, timer] of this.refetchTimers) {
-            clearTimeout(timer);
-            this.refetchTimers.delete(key);
+        for (const group of this.groups.values()) {
+            if (group.timer) clearTimeout(group.timer);
+            group.timer = undefined;
         }
 
-        // 2. Clear subscriptions and callbacks
+        // 2. Clear subscriptions, callbacks and the groups and indexes over them
         this._subscriptions.clear();
         this.subscriptionCallbacks.clear();
+        this.subscriptionsByClient.clear();
+        this.groups.clear();
+        this.collectionGroupsByPath.clear();
+        this.singleGroupsByAddress.clear();
+        this.subscribedPaths.clear();
 
         // 3. Clear broadcast channels and presence
         this.channels.clear();
@@ -2795,26 +3011,8 @@ lastSeen: Date.now() });
      * subscription's own scope, so this decides only who looks again.
      */
     private resyncSubscriptions(): void {
-        for (const [subscriptionId, subscription] of this._subscriptions.entries()) {
-            try {
-                if (subscription.clientId === "driver") {
-                    const callback = this.subscriptionCallbacks.get(subscriptionId);
-                    if (!callback) continue;
-                    if (subscription.type === "single" && subscription.id !== undefined) {
-                        this.debouncedSingleDriverRefetch(subscriptionId, subscription.path, String(subscription.id), subscription, callback);
-                    } else if (subscription.type === "collection" && subscription.collectionRequest) {
-                        this.debouncedDriverRefetch(subscriptionId, subscription.path, subscription, callback);
-                    }
-                } else if (this.clients.has(subscription.clientId)) {
-                    if (subscription.type === "single" && subscription.id !== undefined) {
-                        this.debouncedSingleRefetch(subscriptionId, subscription.path, String(subscription.id), subscription);
-                    } else if (subscription.type === "collection" && subscription.collectionRequest) {
-                        this.debouncedCollectionRefetch(subscriptionId, subscription.path, subscription);
-                    }
-                }
-            } catch (error) {
-                logger.error(`❌ [RealtimeService] Could not resync subscription ${subscriptionId}`, { error });
-            }
+        for (const group of this.groups.values()) {
+            this.scheduleGroupRefetch(group);
         }
     }
 

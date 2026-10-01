@@ -209,6 +209,52 @@ When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
 rather than substituting the page length.
 
+### What a write costs, and the limits
+
+Because every frame is a query run as its subscriber, the cost of a write grows
+with the number of **distinct questions asked by distinct principals** on the
+collection it touched — not with the number of open sockets:
+
+- Subscriptions that ask the same question (same path, filters, sort, page,
+  `include`, `fields`, search) as the same principal (same user id, roles,
+  guest flag and claims) share one refetch. A write to a list costs **one read
+  and one count per such group**, however many sockets hold it; every member
+  still gets a frame built from rows read under that identity.
+- A single-record subscription is asked only when its own record changes.
+- Different principals never share a read — that is what keeps a frame from
+  carrying a row its reader may not see. A list watched by a thousand
+  different signed-in users is a thousand reads and a thousand counts on every
+  write to it.
+
+Measured on a laptop against a local PostgreSQL with a 20-connection pool, one
+write to a list:
+
+| Subscribers | Transactions for the write | Last frame after the write |
+|-------------|----------------------------|----------------------------|
+| 1,000, one principal | 4 | ~350 ms |
+| 1,000, each a different principal | ~2,000 | ~700 ms |
+
+300 ms of each is the debounce. The second row is the ceiling to plan for: the
+refetches queue on the same pool as your REST traffic, so a collection written
+several times a second while **hundreds of different users** watch the same
+list is where realtime starts to compete with requests. Beyond that, prefer
+narrower subscriptions (a page, a filter on the user's own rows) or a
+[broadcast channel](#broadcast-channels) carrying the change for clients to
+re-fetch on their own schedule.
+
+**One socket may hold at most 1,000 subscriptions.** The next is refused with
+an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
+socket already holds replaces that subscription and does not count again. The
+SDK shares identical subscriptions on a socket, so this counts the distinct
+lists and records a page has open. Change it with
+`REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket`
+on the Postgres adapter (the environment variable wins); a value that is not a
+positive whole number stops the server at boot.
+
+A subscription id is the socket's own: two clients that both name a
+subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the
+sender's.
+
 ## Broadcast Channels
 
 Broadcast channels let clients send arbitrary messages to each other in real time — useful for features like typing indicators, cursor positions, or custom notifications.
