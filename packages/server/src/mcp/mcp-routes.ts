@@ -407,8 +407,14 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             const refusal = error instanceof McpToolError
                 ? error.message
                 : declared && declared.status < 500 ? declared.message : undefined;
+            // What reaches the fallback is never a refusal — the driver
+            // declares those (a policy that hides a row, a write RLS refuses)
+            // and they pass above with their own text. It is a fault: a bug,
+            // the database down. Blaming a permission rule sent the model to
+            // tell its user they lacked access.
             const message = refusal
-                ?? "The call failed. This is usually a permission rule refusing the operation for your account.";
+                ?? "The server could not complete this call. This is an internal error, "
+                    + "not a problem with the request or with your permissions. Try again later.";
             if (refusal === undefined) {
                 logger.error("[mcp] Tool call failed", {
                     tool: name, uid: caller.uid, clientId: caller.clientId, error

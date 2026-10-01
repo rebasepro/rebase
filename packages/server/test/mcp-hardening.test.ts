@@ -22,6 +22,10 @@ import {
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
+/** What the model is told about a failure the server did not declare. */
+const INTERNAL_FAILURE = "The server could not complete this call. This is an internal error, "
+    + "not a problem with the request or with your permissions. Try again later.";
+
 /* ── Bearer token handling ────────────────────────────────────────── */
 
 describe("the bearer gate", () => {
@@ -487,7 +491,10 @@ describe("tool inputs", () => {
         });
         const body = await res.json() as { result: { content: { text: string }[] } };
         expect(body.result.content[0].text).not.toContain("oauth_clients");
-        expect(body.result.content[0].text).toMatch(/permission rule/i);
+        // Nor does it blame a permission rule: what reaches this answer is
+        // everything a server did not declare — a bug, the database down — and
+        // a model told "permission" tells its user they lack access.
+        expect(body.result.content[0].text).toBe(INTERNAL_FAILURE);
     });
 
     it.each([
@@ -531,7 +538,7 @@ describe("tool inputs", () => {
         const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
         expect(body.result.isError).toBe(true);
         expect(body.result.content[0].text).not.toContain("db-3");
-        expect(body.result.content[0].text).toMatch(/permission rule/i);
+        expect(body.result.content[0].text).toBe(INTERNAL_FAILURE);
     });
 
     it("reports an unknown tool by name", async () => {
