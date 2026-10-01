@@ -271,7 +271,14 @@ export class S3StorageController implements StorageController {
             const fileName = resolvedPath.split("/").pop() || resolvedPath;
 
             const blob = new Blob([buffer], { type: contentType });
-            return new File([blob], fileName, { type: contentType });
+            // The object's own version. Left out, `File` stamps `Date.now()`,
+            // and the routes build the `ETag`, `Last-Modified` and the
+            // transform cache key from this — so every read was a new version:
+            // no 304, no cache hit, and a fresh rendition written per request.
+            return new File([blob], fileName, {
+                type: contentType,
+                lastModified: response.LastModified?.getTime()
+            });
         } catch (error: unknown) {
             const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
             if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {

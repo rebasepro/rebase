@@ -289,6 +289,7 @@ export class LocalStorageController implements StorageController {
 
         try {
             await access(fullPath, fs.constants.R_OK);
+            const fileStat = await stat(fullPath);
             const buffer = await readFile(fullPath);
 
             // Try to get content type from metadata
@@ -303,7 +304,12 @@ export class LocalStorageController implements StorageController {
             }
 
             const blob = new Blob([buffer], { type: contentType });
-            return new File([blob], path.basename(resolvedPath), { type: contentType });
+            // The file's own mtime, as the routes' local branch already uses —
+            // without it `File` stamps the time of the read.
+            return new File([blob], path.basename(resolvedPath), {
+                type: contentType,
+                lastModified: Math.trunc(fileStat.mtimeMs)
+            });
         } catch {
             return null;
         }

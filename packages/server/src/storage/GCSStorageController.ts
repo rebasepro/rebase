@@ -213,7 +213,12 @@ export class GCSStorageController implements StorageController {
             const fileName = resolvedPath.split("/").pop() || resolvedPath;
 
             const blob = new Blob([new Uint8Array(contents)], { type: contentType });
-            return new File([blob], fileName, { type: contentType });
+            // The object's own version — see `S3StorageController.getObject`.
+            const updated = typeof fileMetadata.updated === "string" ? Date.parse(fileMetadata.updated) : NaN;
+            return new File([blob], fileName, {
+                type: contentType,
+                lastModified: Number.isNaN(updated) ? undefined : updated
+            });
         } catch (error: unknown) {
             if (isNotFoundError(error)) {
                 return null;
