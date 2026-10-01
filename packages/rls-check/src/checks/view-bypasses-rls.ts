@@ -1,6 +1,6 @@
 import type { Check, DbRelation, DbSnapshot, DbView, Finding } from "../types";
 
-import { exposedGrantees, finding, listAnd, qi, qrel, qrole, relationAt } from "./util";
+import { exposedGrantees, finding, listAnd, qi, qrel, relationAt, revokesReaching } from "./util";
 
 const ID = "view-bypasses-rls";
 
@@ -83,7 +83,7 @@ export const viewBypassesRls: Check = {
                     fix: legacy
                         ? `-- \`security_invoker\` requires PostgreSQL 15 or newer. On this server, either:\n` +
                           `--   1. revoke access and let callers query the base table directly:\n` +
-                          `REVOKE SELECT ON ${qrel(view.schema, view.name)} FROM ${qrole(roles[0])};\n` +
+                          `${revokesReaching(snapshot, view.schema, view.name, roles, ["SELECT"]).join("\n")}\n` +
                           `--   2. or set FORCE ROW LEVEL SECURITY on the base tables and add policies\n` +
                           `--      that apply to ${qi(view.owner)}, so the view's own execution is filtered.`
                         : `ALTER VIEW ${qrel(view.schema, view.name)} SET (security_invoker = true);\n` +

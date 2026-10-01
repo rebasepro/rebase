@@ -176,6 +176,31 @@ export const qrel = (schema: string, name: string): string => `${qi(schema)}.${q
 /** PUBLIC is a keyword, not an identifier — quoting it changes what it means. */
 export const qrole = (role: string): string => (isPublicRole(role) ? "PUBLIC" : qi(role));
 
+/**
+ * The REVOKEs that take `privileges` on a relation away from the exposed roles:
+ * one per grant that reaches them, made to the role the grant names.
+ *
+ * Revoking from the exposed role by name is not the same thing. A grant to
+ * `app_reader` that `anon` inherits survives `REVOKE … FROM anon`, which is a
+ * no-op, and a relation granted to `anon` and `authenticated` keeps the second
+ * grant when the fix names only the first. Every fix that takes a grant away
+ * builds it here, so applying it and rescanning clears the finding.
+ */
+export function revokesReaching(
+    snapshot: DbSnapshot,
+    schema: string,
+    table: string,
+    exposed: string[],
+    privileges: Privilege[]
+): string[] {
+    const reaching = new Set(exposed.flatMap((role) => [...rolesUsableBy(snapshot, role)]));
+    return snapshot.grants
+        .filter((g) => g.schema === schema && g.table === table && reaching.has(g.grantee.toLowerCase()))
+        .map((g) => ({ grantee: g.grantee, held: privileges.filter((p) => g.privileges.includes(p)) }))
+        .filter((g) => g.held.length > 0)
+        .map((g) => `REVOKE ${g.held.join(", ")} ON ${qrel(schema, table)} FROM ${qrole(g.grantee)};`);
+}
+
 // ---------------------------------------------------------------------------
 // Findings
 // ---------------------------------------------------------------------------

@@ -334,6 +334,28 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         ).toBe(1);
     });
 
+    it("prints matview fixes that clear the finding when applied", async () => {
+        const targets = ["vuln_matview_two_grants", "vuln_matview_via_member"];
+        const findings = full.findings.filter(
+            (finding) => finding.id === "matview-bypasses-rls" && targets.includes(objectName(finding))
+        );
+        expect(findings.map(objectName).sort()).toEqual([...targets].sort());
+
+        // Every statement the fix prints, comments left out — what a reader pastes.
+        const statements = findings
+            .flatMap((finding) => (finding.fix ?? "").split("\n"))
+            .filter((line) => line.trim() !== "" && !line.trim().startsWith("--"));
+        await applySql(container.connectionString, statements.join("\n"));
+
+        const rescanned = await scan({
+            connectionString: container.connectionString,
+            only: ["matview-bypasses-rls"]
+        });
+        expect(
+            rescanned.findings.filter((finding) => targets.includes(objectName(finding))).map(describeFinding)
+        ).toEqual([]);
+    });
+
     it("does not flag a junction table that follows its endpoints", () => {
         const flagged = full.findings
             .filter((finding) => finding.id === "junction-table-unprotected")

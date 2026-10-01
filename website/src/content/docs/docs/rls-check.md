@@ -375,7 +375,9 @@ function or upgrade.
 Materialized views cannot have row-level security, and the data in them is a stored
 snapshot taken by whoever refreshed it. If one is granted to an untrusted role and its
 defining query reads an RLS-protected table, no policy can help — revoke the grant, or move
-the matview into a schema that untrusted roles cannot reach.
+the matview into a schema that untrusted roles cannot reach. The suggested fix revokes every
+grant that reaches an untrusted role, from the role each grant names: a grant to a role that
+`anon` inherits is not removed by `REVOKE … FROM anon`.
 
 ```sql
 REVOKE ALL ON "public"."your_matview" FROM "anon";

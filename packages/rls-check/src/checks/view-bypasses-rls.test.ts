@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { grant, snapshot, table, view, viewRelation } from "../../test/fixtures/snapshot";
+import { grant, role, snapshot, table, view, viewRelation, DEFAULT_ROLES } from "../../test/fixtures/snapshot";
 import { viewBypassesRls } from "./view-bypasses-rls";
 
 const scenario = (
@@ -32,6 +32,28 @@ describe("view-bypasses-rls", () => {
         expect(findings[0].fix).toContain(
             'ALTER VIEW "public"."order_summary" SET (security_invoker = true);'
         );
+    });
+
+    it("on a server without security_invoker, revokes from every role the view reaches", () => {
+        const [f] = viewBypassesRls.run(
+            scenario(null, {
+                serverVersionNum: 140010,
+                serverVersion: "14.10",
+                roles: [
+                    ...DEFAULT_ROLES.filter((r) => r.name !== "anon"),
+                    role("anon", { memberOf: ["app_reader"] }),
+                    role("app_reader")
+                ],
+                grants: [
+                    grant("public", "order_summary", "app_reader", ["SELECT"]),
+                    grant("public", "order_summary", "authenticated", ["SELECT"])
+                ]
+            })
+        );
+
+        expect(f.fix).toContain('REVOKE SELECT ON "public"."order_summary" FROM "app_reader";');
+        expect(f.fix).toContain('REVOKE SELECT ON "public"."order_summary" FROM "authenticated";');
+        expect(f.fix).not.toContain('FROM "anon"');
     });
 
     it("does NOT flag a view with security_invoker = true", () => {

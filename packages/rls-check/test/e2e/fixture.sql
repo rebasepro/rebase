@@ -296,6 +296,17 @@ GRANT SELECT ON public.secure_ledger_view_invoker_t TO anon, authenticated;
 CREATE MATERIALIZED VIEW public.vuln_ledger_matview AS SELECT * FROM public.protected_ledger;
 GRANT SELECT ON public.vuln_ledger_matview TO anon, authenticated;
 
+-- matview-bypasses-rls, for the suite that applies the printed fix and scans
+-- again. The fix used to revoke from the first exposed role only: the first
+-- matview kept `authenticated`'s grant, and on the second `REVOKE … FROM anon`
+-- was a no-op, because anon reads it through `app_reader`.
+CREATE ROLE app_reader NOLOGIN;
+GRANT app_reader TO anon;
+CREATE MATERIALIZED VIEW public.vuln_matview_two_grants AS SELECT * FROM public.protected_ledger;
+GRANT SELECT ON public.vuln_matview_two_grants TO anon, authenticated;
+CREATE MATERIALIZED VIEW public.vuln_matview_via_member AS SELECT * FROM public.protected_ledger;
+GRANT SELECT ON public.vuln_matview_via_member TO app_reader;
+
 -- anonymous-write-allowed: an unauthenticated caller can insert.
 CREATE TABLE public.vuln_anon_write (
     id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),

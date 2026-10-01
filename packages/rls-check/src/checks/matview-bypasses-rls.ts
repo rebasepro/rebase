@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { exposedGrantees, finding, listAnd, qrel, qrole, relationAt } from "./util";
+import { exposedGrantees, finding, listAnd, qrel, relationAt, revokesReaching } from "./util";
 import { protectedBaseTables } from "./view-bypasses-rls";
 
 const ID = "matview-bypasses-rls";
@@ -60,7 +60,7 @@ export const matviewBypassesRls: Check = {
                         `REFRESH. No policy can restrict this; only the grant can.`,
                     fix:
                         `-- There is no RLS for materialized views. Restrict the grant:\n` +
-                        `REVOKE SELECT ON ${qrel(view.schema, view.name)} FROM ${qrole(roles[0])};\n` +
+                        `${revokesReaching(snapshot, view.schema, view.name, roles, ["SELECT"]).join("\n")}\n` +
                         `-- and, if callers need this data, expose it through a view that applies the\n` +
                         `-- caller's own privileges:\n` +
                         `-- CREATE VIEW ${qrel(view.schema, `${view.name}_scoped`)} WITH (security_invoker = true)\n` +

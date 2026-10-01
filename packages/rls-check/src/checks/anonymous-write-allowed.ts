@@ -12,7 +12,7 @@ import { callerIdCall,
     managedPolicyFix,
     qi,
     qrel,
-    qrole,
+    revokesReaching,
     type Privilege
 } from "./util";
 
@@ -115,8 +115,7 @@ export const anonymousWriteAllowed: Check = {
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    WITH CHECK (user_id = ${uidCall});\n` +
                         `-- and if anonymous writes are never intended:\n` +
-                        `REVOKE ${commands.join(", ")} ON ${qrel(policy.schema, policy.table)} FROM ` +
-                        `${grantedTo.map(qrole).join(", ")};`
+                        revokesReaching(snapshot, policy.schema, policy.table, grantedTo, commands).join("\n")
                 })
             );
         }

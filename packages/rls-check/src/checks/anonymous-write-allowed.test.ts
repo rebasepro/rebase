@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { grant, policy, snapshot, table } from "../../test/fixtures/snapshot";
+import { grant, policy, role, snapshot, table, DEFAULT_ROLES } from "../../test/fixtures/snapshot";
 import { anonymousWriteAllowed } from "./anonymous-write-allowed";
 
 const scenario = (
@@ -165,6 +165,27 @@ describe("anonymous-write-allowed", () => {
                 )
             ).toEqual([]);
         });
+    });
+
+    it("revokes the write from the role the grant names, when anon holds it through membership", () => {
+        // `REVOKE INSERT … FROM anon` is a no-op when anon holds nothing itself.
+        const [f] = anonymousWriteAllowed.run(
+            snapshot({
+                relations: [table("public", "comments", { rlsEnabled: true, columns: ["id", "user_id"] })],
+                roles: [
+                    ...DEFAULT_ROLES.filter((r) => r.name !== "anon"),
+                    role("anon", { memberOf: ["app_writer"] }),
+                    role("app_writer")
+                ],
+                policies: [
+                    policy("public", "comments", "p", { command: "INSERT", roles: ["anon"], withCheck: "true" })
+                ],
+                grants: [grant("public", "comments", "app_writer", ["INSERT"])]
+            })
+        );
+
+        expect(f.fix).toContain('REVOKE INSERT ON "public"."comments" FROM "app_writer";');
+        expect(f.fix).not.toContain('FROM "anon"');
     });
 
     it("does NOT flag a restrictive policy", () => {

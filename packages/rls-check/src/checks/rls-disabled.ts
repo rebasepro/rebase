@@ -9,7 +9,7 @@ import {
     qi,
     qrel,
     qrole,
-    rolesUsableBy,
+    revokesReaching,
     rowsPhrase,
     scannedForeignTables,
     scannedTables
@@ -94,21 +94,11 @@ export const rlsDisabled: Check = {
     }
 };
 
-/**
- * The REVOKEs that take a foreign table away from the exposed roles: one per
- * grant that reaches them, made to the role the grant names, which is not
- * always the exposed role itself.
- */
+/** Take a foreign table away from the exposed roles: it cannot have row-level security. */
 function foreignTableFix(snapshot: DbSnapshot, schema: string, table: string, exposed: string[]): string {
-    const reaching = new Set(exposed.flatMap((role) => [...rolesUsableBy(snapshot, role)]));
-    const revokes = snapshot.grants
-        .filter((g) => g.schema === schema && g.table === table && reaching.has(g.grantee.toLowerCase()))
-        .map((g) => ({ grantee: g.grantee, privileges: DML.filter((p) => g.privileges.includes(p)) }))
-        .filter((g) => g.privileges.length > 0)
-        .map((g) => `REVOKE ${g.privileges.join(", ")} ON ${qrel(schema, table)} FROM ${qrole(g.grantee)};`);
     return (
         `-- A foreign table cannot have row-level security, so take the grant away:\n` +
-        `${revokes.join("\n")}\n` +
+        `${revokesReaching(snapshot, schema, table, exposed, DML).join("\n")}\n` +
         `-- and keep it in a schema your API does not expose, reading it through a\n` +
         `-- function that checks the caller.`
     );
