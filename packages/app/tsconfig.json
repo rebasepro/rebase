@@ -42,9 +42,6 @@
       "@rebasepro/types": [
         "../types/src"
       ],
-      "@rebasepro/cms": [
-        "../types/src/cms"
-      ],
       "@rebasepro/forms": [
         "../forms/src"
       ],

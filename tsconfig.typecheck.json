@@ -154,9 +154,6 @@
       ],
       "@rebasepro/utils/*": [
         "./packages/utils/src/*"
-      ],
-      "hono": [
-        "./node_modules/hono"
       ]
     },
     "typeRoots": [
@@ -203,7 +200,12 @@
     // purpose: the rest of the template is a project skeleton with placeholder
     // package names, not a program this config can build.
     "packages/cli/templates/template/backend/functions",
-    "e2e"
+    // The Playwright specs, their global setup and the tsx drivers, which import
+    // `packages/client` source directly. This line said "e2e" for five weeks
+    // after the directory moved under tests/ — tsc accepts an include matching
+    // nothing and says nothing — so a renamed client API surfaced minutes into
+    // an e2e job instead of here. `check:tsconfig-entries` now fails on that.
+    "tests/e2e"
   ],
   // Test files are excluded here and type-checked by `tsconfig.tests.json`
   // instead, which `pnpm typecheck` runs straight after this one. See that file

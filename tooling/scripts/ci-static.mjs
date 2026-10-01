@@ -241,6 +241,17 @@ without it is not reported as skipped — it is not reported at all.
 \`@jest/globals\`, that have never executed in any pipeline.`
     },
     {
+        run: "check:tsconfig-entries",
+        why: `TypeScript accepts an \`include\` that matches nothing and says nothing. When
+\`e2e/\` moved to \`tests/e2e/\` the commit updated tsconfig.typecheck.json's
+\`exclude\` and not its \`include\`, and for five weeks \`pnpm typecheck\` read
+none of the e2e drivers — the ones that import \`packages/client\` source
+directly. A \`paths\` target that is not there is just as quiet: \`hono\` was
+mapped to a \`node_modules/hono\` the isolated install never creates. Every
+tracked tsconfig's extends, files, include, references and paths entry has to
+name something on disk.`
+    },
+    {
         run: "check:control-chars",
         why: `A literal NUL inside a sentinel string in \`packages/client/src/collection.ts\`
 made grep and ripgrep classify the file as binary and skip it in silence:

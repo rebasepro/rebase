@@ -31,9 +31,6 @@
       "@rebasepro/types": [
         "../types/src"
       ],
-      "@rebasepro/cms": [
-        "../types/src/cms"
-      ],
       "@rebasepro/common": [
         "../common/src"
       ],

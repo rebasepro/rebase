@@ -29,5 +29,5 @@
       ]
     }
   },
-  "include": ["src/**/*", "../config/**/*", "drizzle.config.ts", "functions/**/*", "crons/**/*"]
+  "include": ["src/**/*", "../config/**/*", "functions/**/*", "crons/**/*"]
 }

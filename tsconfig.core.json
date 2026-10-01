@@ -64,9 +64,6 @@
             ],
             "@rebasepro/mcp": [
                 "./packages/mcp/src"
-            ],
-            "hono": [
-                "./node_modules/hono"
             ]
         },
         "typeRoots": [
