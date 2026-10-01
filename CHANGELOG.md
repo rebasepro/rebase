@@ -27,6 +27,32 @@
   Passing `--generate` or `-g` now stops with a message telling you to drop
   it, and `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` are no longer read.
 
+- **A relative `--collections` path is resolved from the directory you run the
+  command in, on every command that takes one.** This is the rule
+  `generate-sdk` and `db backup --out` already followed; `schema generate`,
+  `db push`/`generate` and `doctor` previously resolved it from `backend/`
+  instead. The same now applies to `schema --output` and
+  `doctor --schema`/`--sdk`. A script written as
+  `--collections ../config/collections` and run from the project root must
+  drop the flag (`config/collections` is the default) or write
+  `config/collections`; the CLI refuses the old spelling and says exactly
+  this. New scaffolds' scripts carry no flag. `generate-sdk` now also accepts
+  `--collections` (`--collections-dir` remains an alias).
+
+- **`rebase generate-sdk` fails on a collection file that does not load,
+  instead of skipping it with a warning.** It now loads every top-level file
+  in `config/collections/` with the same predicate the runtime boot uses, not
+  the `index.ts` barrel, so a file left out of the barrel is still typed, and
+  a broken file stops the command the way it already stops boot. The barrel
+  is a sort order (plus `defaultSecurityRules`), not a registry.
+
+- **`rebase init` and `rebase skills install --mcp` configure your AI agents
+  to start the project's own `@rebasepro/mcp`, pinned as a devDependency with
+  the CLI (`pnpm exec rebase-mcp`; `npx --no rebase-mcp` on npm), instead of
+  `npx -y @rebasepro/mcp` from the registry.** A project already past `init`
+  gets the devDependency added, with a message to install it, the next time
+  `configureAgents` or `skills install --mcp` runs.
+
 #### Server & REST
 
 - **A live schema edit commits the collection and `schema.generated.ts`, and
@@ -34,6 +60,47 @@
   the project root while the CLI writes them next to the backend, so a project
   could hold two copies that disagreed. `SchemaCommitPaths` and
   `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
+
+- **An upsert whose key belongs to a soft-deleted row is refused with
+  `409 ROW_IN_TRASH` on every upsert door** (`?on_conflict=`, `/bulk`,
+  `/_batch`, the SDK, the socket, and `rebase.data`/`context.data`). It used
+  to write the new values into the hidden row and answer `201 Created`.
+
+- **An update that changes a row's key is refused with `400 KEY_IMMUTABLE`,**
+  naming the field, on every door including in-process `rebase.data`. It used
+  to answer `500`, and in-process the row had already moved under its new key
+  when the write threw.
+
+- **`Strict-Transport-Security` no longer sends `includeSubDomains` by
+  default.** A deployment that relies on the parent domain's HSTS header to
+  force HTTPS on a subdomain that cannot itself speak HTTPS yet should set
+  `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` to keep the old header. See the
+  entry under Security.
+
+#### MCP
+
+- **The remote MCP endpoint (`/mcp`) takes the SDK's own arguments:** `where`
+  (was `filter`), `orderBy` as `["field","desc"]` or `"field:desc"` (was
+  `orderBy` + `order`), and `data` (was `values`). `query_collection` answers
+  REST's shape, `{ data, meta }` (was `{ rows, count, truncated }`). An
+  argument a tool does not declare is now refused instead of ignored, and a
+  `limit` above 1000 is refused, as on REST, instead of silently clamped to
+  200.
+
+#### Client SDK
+
+- **A write made through `context.data` or `rebase.data` (in a function, hook
+  or seed) now throws `UNSUPPORTED_OPTION` if it is given `ifMatch` or
+  `idempotencyKey`,** instead of silently ignoring them. Neither option means
+  anything for a write that never leaves the process.
+
+#### UI kit & plugins
+
+- **`Button` and `IconButton` from `@rebasepro/ui` are typed against the
+  element they actually render.** A prop the component does not use,
+  including `IconButton`'s old `color` attribute (which never did anything),
+  is now a compile error. Fix a call site by dropping the prop; nothing about
+  what renders changes.
 
 ### Added
 
@@ -66,6 +133,180 @@
   Before, every app answered on every hostname the project had, so the admin
   could only be a path such as `/admin`.
 
+- **`rebase skills install --mcp` registers the Rebase MCP server in each
+  agent's project config, the way `rebase init --agent` does.** Without
+  `--mcp`, it names the agents whose config is missing the server. Use it for
+  a project that already exists.
+
+#### Admin (CMS & app)
+
+- **A data-import preview lists every value that will not be imported, per
+  column, with its row and the reason, before anything is written.**
+
+- **`admin.filledByServer` on a property lets a record be created without a
+  required field that a server hook fills,** such as a slug computed from the
+  title. The field stays required when editing. The reference app's
+  `posts.slug` uses it, so its auto-slug runs from the panel.
+
+- **The admin shows a "Live updates paused" banner while the realtime
+  connection is down.** Open records and lists keep their data instead of
+  turning into errors.
+
+- **`useCreateFormex({ onBaselineConflict })` and `rebaseEdits` are exported
+  from `@rebasepro/forms`,** for a form that needs to know when someone else
+  changed a field it also touched.
+
+- **`CollectionWindow` and `isPropertyFilterable` are exported from
+  `@rebasepro/app`.** Empty-state overrides now also receive `isFiltered`.
+
+#### MCP
+
+- **Remote MCP gets `count_documents` (REST's `/count`) and `searchString`
+  on `query_collection` and `count_documents`.**
+
+- **Remote MCP's `list_collections` returns each collection's `row` and
+  `create` JSON Schemas** (required fields, enums, foreign keys) and its
+  `softDeleteField`.
+
+#### Studio
+
+- **`@rebasepro/types` exports `diffCollections`, `applyCollectionPatch`,
+  `nestCollectionPatchPaths`, `collectionPatchProblems`, `isCollectionPatch`,
+  `runtimeOnlyKeyIn` and `RUNTIME_ONLY_COLLECTION_KEYS`,** behind the live
+  schema editor's new patch-based writes (see Changed).
+
+- **`SQLAdmin.runSqlScript(sql, { database, role })`** returns rows as
+  Postgres's own text, plus each column's source table and column, the
+  source tables' primary keys, the command, the row count and any database
+  notices. It is also available over the socket as `EXECUTE_SQL` with
+  `mode: "script"`, and as `RebaseWebSocketClient.runSqlScript`.
+
+#### Storage & email
+
+- **`STORAGE_MAX_FILE_SIZE`** (bytes, `__<KEY>` per source) sets the largest
+  file a storage source accepts; refused at boot unless it is a whole number
+  of bytes.
+
+- **`STORAGE_DOWNLOAD_TOKEN_TTL` / `storageDownloadTokenTtl`** sets the
+  lifetime of private download URLs (default 300 seconds, at most a week).
+
+- **`resolveStorageReferences`, `storageReference` and `parseStorageReference`
+  are exported from `@rebasepro/client` and `@rebasepro/types`,** for reading
+  `rebase-storage:` references out of a markdown or text field.
+
+#### Realtime
+
+- **`client.ws.state` and `client.ws.onStateChange()`
+  (`RealtimeConnectionState`).** After an outage of about 15 seconds,
+  `CONNECTION_LOST` is reported once to every live subscription's and joined
+  channel's `onError`. The subscription is kept, and its next `onUpdate` is
+  the recovery signal.
+
+- **`REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` / `realtime.maxSubscriptionsPerSocket`**
+  (default 1000) refuses the next subscription past the ceiling with
+  `TOO_MANY_SUBSCRIPTIONS`; an invalid value stops the server at boot.
+
+#### UI kit & plugins
+
+- **`@rebasepro/ui` exports `isKeyHandled(event)`,** for a component that
+  needs to know whether a keypress was already claimed by something above
+  it. `Dialog` gains `dismissOnBackdrop`, `initialFocus` and
+  `onCloseAutoFocus`; `Sheet` gains `initialFocus`, `onOpenAutoFocus` and
+  `onCloseAutoFocus`; `BooleanSwitch` accepts `aria-label`, `aria-labelledby`
+  and `id`.
+
+#### Server & REST
+
+- **`REBASE_HSTS_INCLUDE_SUBDOMAINS`** opts back into the old
+  `includeSubDomains` behaviour. See the entry under Breaking.
+
+- New docs: "Running more than one instance" and "Backups and restore".
+
+#### CI & tooling
+
+- **`pnpm check:tsconfig-entries`** fails a tsconfig `include`/`paths`/
+  `extends` entry that resolves to nothing. `pnpm typecheck` reads
+  `tests/e2e` again.
+
+### Changed
+
+#### Studio
+
+- **`POST /api/admin/schema/plan|apply` and
+  `/api/admin/schema-editor/collection/save` accept a `patch`** (operations
+  on key paths) for an existing collection, instead of only a whole
+  collection object; `/apply` accepts `sourceOnly: true` and `remove: true`.
+  A whole `collection` posted for an existing collection is now applied as
+  the patch of what differs from it, so handlers, shared properties and
+  anything else defined in code are left alone instead of being overwritten.
+
+- **Renaming a property's key while keeping its column is a safe,
+  no-prompt change; changing or dropping a property's default is applied
+  with `ALTER COLUMN … SET/DROP DEFAULT`** instead of being reported as
+  requiring a migration.
+
+- **`validation.max` on a `text` column is no longer reported as a column
+  change** in the live schema editor's plan.
+
+- **`useLiveSchemaEditing`'s `writeSourceOnly` option is removed.**
+  "Edit source only" is now a committed `/apply` call with `sourceOnly: true`
+  (see Added/Studio and Fixed/Studio).
+
+#### CLI
+
+- **`rebase schema introspect` writes more explicit property keys than
+  before:** `columnType`, `precision`/`scale`, `defaultValue`, `required`,
+  the key's real strategy, `onDelete` and the `search` block. A uuid key with
+  no database default is now written as `isId: "manual"` (it wrote `"uuid"`,
+  which made `db push` add a default that was never there); a serial key is
+  written as `isId: "manual"` with `columnType: "serial"`/`"bigserial"` (it
+  wrote `"increment"`, an INTEGER identity). Re-introspecting overwrites only
+  with `--force`, as before.
+
+- **A boot-provisioned database whose bundle listed a two-sided
+  many-to-many's "later" collection first gets one junction primary-key
+  rebuild on its next `rebase db push`, then none.**
+
+#### Client SDK
+
+- **Generated `database.types.ts` entries carry a `Slug` field** (regenerate
+  with `rebase generate-sdk`; older generated files still work).
+
+- **`onSyncError` reports a write discarded because an earlier write to the
+  same row was refused, with code `DEPENDENCY_REJECTED`** and the earlier
+  refusal as `cause`. Before, the discarded write carried the refused
+  write's own error.
+
+#### Storage & email
+
+- **An upload into a property's `storagePath` that breaks the property's
+  `maxSize`/`acceptedFiles` is refused even when the request names no
+  property.**
+
+- **The TUS upload URL (`Location`) is now a path**, not an absolute URL, so
+  an upload behind a TLS-terminating proxy is no longer sent to an `http://`
+  address the browser blocks.
+
+- **`getSignedUrl`/`deleteObject` given an `s3://bucket/key` or
+  `gs://bucket/key` address the object by key,** so a file stored with
+  `includeBucketUrl` on S3 or GCS can be previewed and deleted.
+
+#### CI & tooling
+
+- **`./tooling/scripts/verify-quality.sh` runs every end-to-end suite CI
+  runs,** through the new `pnpm ci:e2e` (lanes `vitest`, `cli`, `selfhost`,
+  `admin`). No suite stops the ones after it, and nothing is retried. Needs
+  Docker.
+
+- **`pnpm check:api-surface` passes an additive export change and banks it
+  into `contracts/server.api.txt`.** Only a removed export or a lost member
+  still fails it. The canary release runs it with `--strict`, where an
+  unbanked addition fails.
+
+- **The unit test suites run under `TZ=America/Los_Angeles` in CI and in
+  `verify-quality.sh`.** A test that needs a specific zone pins it with
+  `tooling/scripts/jest/zone-environment.cjs`.
+
 ### Fixed
 
 #### Server & REST
@@ -85,26 +326,543 @@
   the app it sits inside, so both apps turned the request down. Each app now
   declines only the apps nested beneath it.
 
-#### Admin (CMS & app)
+- **Editing a row in the trash, other than restoring it, is a `404` through
+  the socket, MCP and `rebase.data`,** as it already was over REST. An
+  update of a missing row no longer runs `beforeSave` before the `404`.
 
-- **The list view keeps its scroll position when you come back from a record
-  opened full screen.** Full screen replaces the collection view, and the list
-  view, unlike the table and card views, never saved or restored its offset.
-  Going back landed at the top with only the first page loaded. It now returns
-  to the same rows. The card view also stops jumping back slightly the first
-  time more rows load after a fresh visit.
+- **Restoring a soft-deleted row is recorded in history as an `update`.** A
+  trashed row's history can be read, and reverting it to a version from
+  before the delete restores it. A delete's history entry now holds the row
+  as REST serves it, not the admin view model, so reverting to the version
+  before a delete works, and entries recorded earlier can still be read.
+
+- **`?include=` together with `?fields=` returns the included relations on
+  REST and the SDK's `find()`,** as `listen()` already did. Naming the
+  relation in `fields` is no longer a `400`.
+
+- **A REST list answer always carries `meta.offset`.** It is `0` when the
+  request named none; before, `meta.offset + meta.limit` was `NaN` on a
+  first page.
+
+- **Sorting a list by an aggregate over a relation
+  (`?orderBy=count(orders):desc`) works again, and pages by cursor.** The
+  list path refused every such sort with `400 ORDER_BY_FIELD_NOT_SORTABLE`,
+  and no `meta.nextCursor` was ever issued for one.
+
+- **`storage.putObject({ file, public: true })` with no `key` stores a
+  public file.** Before, the upload was stored as a private one.
+
+- **The self-hosting VPS systemd unit boots.** It sets
+  `ALLOW_LOCALHOST_IN_PRODUCTION=true` for a database on the same machine,
+  and the production refusal of a loopback address now names that variable.
+
+- **Scheduled backups run in the official image.** `rebasepro/server` ships
+  the PostgreSQL 18 client tools (`pg_dump`, `pg_dumpall`, `pg_restore`);
+  every scheduled backup used to fail with "Could not find the 'pg_dump'
+  binary".
+
+- **Backup listing reads every page of an S3/GCS listing,** so backups past
+  the oldest thousand objects are listed, and pruned, again.
+
+- **Backup download from object storage is held to the backup prefix;** any
+  other `.dump` object in the bucket is refused.
+
+- **An unknown `GET` under `/api` answers the JSON `NOT_FOUND` envelope**
+  when a static app is served at `/`, instead of a plain-text 404.
+
+- **`CORS_ORIGINS` / `FRONTEND_URL` match the browser's `Origin` with a
+  trailing slash, a path, different case or a default port.** A refused
+  origin is now logged once in production too.
+
+- **A full database pool answers `503 DB_POOL_EXHAUSTED` with
+  `Retry-After`** (and a connect timeout answers `503 DB_CONNECT_TIMEOUT`)
+  instead of `500 INTERNAL_ERROR`; `/health` reports the underlying cause.
+
+- **An open Logs Explorer tab no longer holds a shutdown until the force
+  timeout.**
+
+- **`LOG_LEVEL=DEBUG`, in any case, is accepted at boot,** as the logger
+  already read it.
+
+- **A static-only bundle refuses a non-numeric `PORT` and honours
+  `PORT=0`,** as the backend does.
+
+#### Postgres
+
+- **Queues and topics declared in `config/resources.ts` now run.** The
+  worker used to start with 0 tasks and every `enqueue`/`publish` threw "no
+  queue runtime is installed": the server's inlined copy of
+  `@rebasepro/types` and the project's own copy each kept their own
+  registry. A third-party driver's `registerDataSourceCapabilities` had the
+  same split, and is fixed too.
+
+- **`afterSave`, `beforeDelete`, `afterDelete` and history now receive the
+  row as stored, not `afterRead`'s view of it.** A masked field is no longer
+  recorded in history or written back by a revert, and a computed field no
+  longer makes a version un-revertable.
+
+- **On a fresh database, the first boot grants the request role
+  `rebase_user` USAGE on the `rebase` schema, and on collection schemas, as
+  soon as provisioning creates them.** Writes to `history: true` collections,
+  and job enqueues inside a write, no longer fail with "permission denied for
+  schema rebase" until a restart.
+
+- **A `42501` "permission denied for schema/table/function …" is now
+  reported as a missing GRANT,** not as a row-level security policy.
+
+- **A hook can catch a `context.data` delete the database refused,** as it
+  already could a create or update. Relation unlinks and many-to-many pivot
+  writes are contained the same way.
+
+- **A hook whose `context.data` write re-runs itself without end is stopped
+  at depth 16 with `500 CALLBACK_RECURSION`,** naming the hook and the
+  collection, instead of holding the transaction until the process dies.
+  Siblings, such as the rows of a bulk write, are not counted as nesting.
+
+- **A cron `timeoutSeconds` of `0` or `NaN` is refused and listed under
+  `rejected`,** as documented, instead of silently running with the 300
+  second default.
+
+- **A collection that declares no key can take a row.** It used to get an
+  `id TEXT PRIMARY KEY` with no default, and no door fills a key that is not
+  a property, so creating the quickstart's first row failed in the panel,
+  over REST and through the SDK with `Missing required field: "id"`. The
+  implicit key now defaults to `gen_random_uuid()::text`; a table created
+  before this gets the default at its next boot, and a key you send is
+  still used.
 
 #### CLI
 
-- **`rebase skills install --agent codex` writes where Codex reads.** It wrote
-  `.codex/skills`, which Codex never opens: Codex reads repository skills from
-  `.agents/skills`. It now writes there, the directory Gemini CLI and
-  Antigravity read too, and installs it once when both are named.
+- **`rebase db push` stops before a column type change that can lose
+  values** — `numeric(5,2)` to `numeric(4,1)`, `bigint` to `integer`,
+  `jsonb` to `text` — as documented. It never fired on the plan Atlas
+  actually prints, so these changes applied without a prompt, even in CI.
+  Each destructive change is also counted once instead of twice, and a plan
+  the CLI cannot read is refused rather than called safe.
 
-- **The scaffold's `.gitignore` keeps `.vscode/mcp.json`.** It ignored
-  `.vscode/` whole, so the MCP server registered for GitHub Copilot never
-  reached the first commit. Other editor settings in `.vscode/` are still
-  ignored.
+- **`rebase db push` no longer fails forever after you change the type of a
+  column a `search` block reads** ("cannot alter type of a column used by a
+  generated column"): the search column is dropped and rebuilt around the
+  change. If a push fails for another reason, the search columns it moved
+  are put back, and a generated column of your own that blocks a retype is
+  named with the way past it.
+
+- **`rebase db push --dry-run` on a synced database prints "No changes".**
+
+- **`rebase schema introspect` followed by `rebase db push` no longer plans
+  type changes, dropped defaults, dropped NOT NULLs, a phantom `id` key or a
+  dropped search column on the database it just read.** Tables keyed on more
+  than one column are skipped with the reason, and columns no property can
+  describe are listed with what a push would do.
+
+- **`rebase doctor` checks primary keys** (type, columns, a missing key) and
+  junction key columns, finds enum types whose names Postgres truncated to
+  63 bytes, and its type-mismatch remedy is now a statement that actually
+  clears the finding.
+
+- **A many-to-many that both collections declare gets the same junction
+  primary key from `rebase dev` and `rebase db push`,** so a
+  boot-provisioned database no longer has its junction key rebuilt on its
+  first push.
+
+- **`rebase init .` works in a freshly cloned or `git init`-ed directory.**
+  A directory may already hold `.git`, other repository metadata, OS litter
+  files or a `LICENSE`; any other entry is refused by name, with the ways
+  forward. `--git` reuses an existing repository instead of re-initialising
+  it.
+
+- **Saving a collection during `rebase dev` restarts the backend once,**
+  after the schema and SDK are regenerated. It used to restart twice, and
+  the first boot told you to run `rebase schema generate`.
+
+- **`rebase start` warns at the top when it is not running as a production
+  server** (`NODE_ENV` from `.env` or unset), and says what that means: the
+  first account to register becomes the admin.
+
+- **`rebase build` builds each static app once.** It used to run the
+  frontend's `vite build && tsc` twice: once to fold it into the backend
+  bundle, once for its own bundle.
+
+- **`rebase build --help` lists `--output`, `--no-static` and
+  `--skip-static-build`.** `rebase db url --help` lists `--database-url` and
+  `--docker`. `rebase normalize-imports --help` prints its own help instead
+  of the global one.
+
+- **`rebase apps config <app>` prints an empty `VITE_API_URL` for an app the
+  backend bundle serves on its own origin.** It no longer prints the address
+  of a `rebase dev` that has stopped.
+
+- **Printed next steps now work for the reader they target:**
+  `rebase init --yes` ends with an `--agent` command; `rebase start`
+  explains how to reach an app that answers only on its own hostname; a
+  failed `rebase upgrade` install names the command that puts the pins back.
+
+- **The docs, the scaffold and `rebase-server --help` no longer say boot
+  leaves junction-table RLS to `db push`.** Boot applies it.
+
+- **The CLI end-to-end suite passes again,** and no longer leaves the
+  backend it starts running after the suite exits.
+
+#### Admin (CMS & app)
+
+- **The list view keeps its scroll position when you come back from a
+  record opened full screen.** Full screen replaces the collection view, and
+  the list view, unlike the table and card views, never saved or restored
+  its offset. Going back landed at the top with only the first page loaded.
+  It now returns to the same rows. The card view also stops jumping back
+  slightly the first time more rows load after a fresh visit.
+
+- **Collection views scroll past row 1,000.** The table, list and card
+  views used to stop at row 1,000 with the API's "limit above the maximum"
+  error, and each scroll page re-read every row before it. Board columns
+  said they were finished at 1,000 cards while their header counted more,
+  and the relation picker's "load more" failed the same way. Every view now
+  reads one page at a time, never above the read ceiling, and realtime
+  still updates every loaded row. `pagination: false` now loads every row,
+  as documented, instead of the server's default 50.
+
+- **A scrolled collection view keeps its rows while realtime reconnects.**
+  The paged views turned a `CONNECTION_LOST` into an error about 15 seconds
+  into an outage, replacing every loaded row, even though the subscription
+  survives and its first push after reconnecting carries what changed. Rows
+  already on screen now stay there, under the connection banner, as they
+  already did elsewhere in the admin.
+
+- **Filters on a collection with a `fixedFilter` work.** Filters applied in
+  the dialog or the header combine with the fixed filter instead of being
+  silently dropped, and the fixed fields stay locked.
+
+- **Bulk removal on a linked (many-to-many) tab no longer says "Delete …
+  This cannot be undone".** It now says the rows are removed from this
+  record, which is what the server does.
+
+- **A failing `collections` or `views` builder is reported.** The home page
+  and a deep link show "Error loading navigation" with the cause and a
+  retry button, instead of an empty page or "Collection not found".
+
+- **A record deleted by someone else while you edit it keeps your form
+  open.** A banner explains what happened and offers "Save as new", instead
+  of the form being replaced by "Entity not found".
+
+- **An empty collection with a default `sort` offers "Create your first
+  entry"** instead of "No results with the applied filter/sort". A
+  read-only viewer sees "No entries found".
+
+- **The filters dialog and the table header agree on which fields can be
+  filtered.** An array of maps, booleans or geopoints no longer shows an
+  empty, unusable filter row.
+
+- **Duplicating a record no longer moves the original's `hasMany`/`hasOne`
+  children, or a one-to-one `via` target, to the copy.** The copy keeps its
+  own `belongsTo` key and its `manyToMany` links.
+
+- **Property `conditions`** (`required`, `hidden`, `disabled`, `readOnly`,
+  `min`, `max`, `defaultValue`, `acceptedFiles`, `maxFileSize`) **are applied
+  by the record form,** and a `dynamicProps` validation is checked on save.
+  A required field the form keeps hidden, read-only or disabled no longer
+  blocks the save.
+
+- **A record stored before a validation rule existed can still be edited
+  from the panel.** Untouched fields that already broke a rule are listed
+  as a warning instead of blocking the save.
+
+- **Emptying a text field or text cell writes NULL, not an empty string.**
+
+- **A list item or map key deleted in the side panel stays deleted** after
+  "open full screen", a split-view toggle, or a restored draft.
+
+- **A `columnType: "time"` property reads and writes its time of day;** it
+  no longer reads as null.
+
+- **A CSV the admin exported imports its geopoints, key-value maps and
+  arrays of maps back.** A cell that is not one of those is reported before
+  anything is written.
+
+- **An open record form no longer saves back the old value of a nested map
+  field someone else changed while you edited a different field of the same
+  map.**
+
+#### Studio
+
+- **The source-only schema editor no longer overwrites edits made on disk
+  since the server started;** it re-reads every file before each edit.
+
+- **A schema commit refused by a git hook, identity or lock leaves the tree
+  as it was,** and names `git commit` with the hook's output; retrying is no
+  longer refused as a dirty tree.
+
+- **A DDL failure part-way through a schema change reports how many
+  statements ran,** instead of claiming the database was not changed.
+
+- **Saving a collection in the editor writes only the keys you changed:**
+  handlers (`onClick`, a computed `value`), properties shared from another
+  module, imported enums, comments and formatting are kept. An edit that
+  reaches into something defined in code is refused, naming where to make
+  it instead.
+
+- **"Save default filter" no longer writes the runtime view of the
+  collection into its file,** which stopped the file type-checking;
+  failures are now shown instead of silently dropped.
+
+- **The live schema editor classifies changes from the schema each side
+  actually produces:** an integer toggle, string↔enum, an array's element
+  type, a relation's target/kind/key/`onDelete`, a unique toggle, and a
+  `hasMany` over a column nothing creates are no longer reported as "safe,
+  no change".
+
+- **Re-adding a property over a column left behind says it re-uses the
+  column,** and refuses one of another type instead of silently reusing it.
+
+- **"Edit source only" says, change by change, what it leaves in the
+  database** (including a NOT NULL column that will reject every insert),
+  and is committed with a message naming it.
+
+- **A security-rules edit is planned and committed as one change** ("change
+  the security rules of posts"), not reported as "no change to make".
+
+- **Deleting a collection removes it from `index.ts` too,** is refused
+  while another collection links to it, is committed, and keeps the table
+  and its rows, as the confirmation now says. Previously the project stopped
+  loading its collections.
+
+- **The SQL console refuses to edit a JOIN result whose key column name is
+  shared,** or where the edited value has no traceable source column
+  (a computed or literal column). Editing a cell is now refused with the
+  reason when Postgres cannot say which table and column it came from;
+  before, a JOIN edit could silently update the wrong row, or write a
+  computed column's value into a real column of the same name. Identifiers
+  in the generated `UPDATE` are now quoted.
+
+- **A SQL console run that leaves a transaction open (a bare `BEGIN`) is
+  refused and rolled back,** instead of letting a later run's statements
+  land inside it. Splitting `BEGIN`, an `UPDATE` and `ROLLBACK` across three
+  separate runs used to commit the `UPDATE` and report three successes.
+  Database notices such as "there is no transaction in progress" are now
+  shown. The role picked in the console now holds for the whole run; a
+  `COMMIT` inside the script used to drop it, after which later statements
+  ran as the connection's own role.
+
+- **A multi-statement script in the SQL console shows its last statement's
+  rows** instead of "no results". Values round-trip exactly — arrays,
+  `bytea`, `json`, `numeric`, timestamps — because the console now reads and
+  writes Postgres's own text form.
+
+#### Realtime
+
+- **Realtime socket requests are no longer sent twice after a dropped
+  connection.** A request already in flight when the socket closed now
+  fails with `CONNECTION_LOST` instead of being replayed on reconnect — one
+  `save()` used to make two rows, and the Studio SQL console could run a
+  statement twice. A request queued while disconnected fails with
+  `REQUEST_TIMEOUT` after 30 seconds instead of waiting forever.
+
+- **Live views survive a server outage longer than a minute.** While
+  anything is subscribed, the client keeps reconnecting (at most every 30
+  seconds, with jitter) instead of giving up after five attempts, and every
+  subscription and joined channel is re-subscribed and refreshed once the
+  server is back.
+
+- **Signing in over the realtime socket on a project with two
+  realtime-capable data sources no longer fails with `INTERNAL_ERROR`,**
+  and re-scopes subscriptions on every source.
+
+- **Subscribers asking the same question as the same user now share one
+  refetch per write.** One write to a list held by 1,000 identical
+  subscribers now costs 2 queries instead of 2,000, and a large statement
+  under change capture no longer stalls the event loop.
+
+- **Realtime subscription ids belong to the socket that chose them;** two
+  clients that happen to pick the same id no longer steal each other's
+  subscription.
+
+- **A realtime LISTEN connection that goes half-open** (an idle-flow
+  timeout on a load balancer or NAT) **is detected by a heartbeat, replaced,
+  and its subscribers resynced.** `isCdcActive()` and `/health` report it,
+  and `/health` turns degraded after 60 seconds down.
+
+- **Retained channels on the `postgres` bus deliver in sequence order
+  across instances.** Readers could previously see message N+1 before N,
+  and the SDK would drop N.
+
+#### Client SDK
+
+- **`upsert()` without `onConflict` updates the row already at that key,**
+  instead of answering `409`, as documented; it now matches what it already
+  did offline and in a function.
+
+- **A typed `client.batch()` takes the collection accessor** (`orderItems`)
+  **and sends the slug** (`order_items`); every snake_case collection was
+  unusable in a typed batch. Batch values are now typed per collection, so a
+  misspelt column, or a create missing a required one, is a compile error.
+
+- **A browser on another origin can read `ETag`, `Retry-After`,
+  `X-Request-ID`, `X-RateLimit-*` and `Preference-Applied`:** the runtime
+  and the ejected backend now expose them. Before, `etagOf(row)` was always
+  `undefined` cross-origin, and `ifMatch` writes silently went out
+  unconditional.
+
+- **A grouped `aggregate()` says when its groups were cut off**
+  (`result.meta.hasMore`; the HTTP route defaults to 50 groups) **and takes
+  `offset` to page past them.**
+
+- **Generated types no longer let you write a field nobody may write;** a
+  non-required column can be written as `null`, and `hasMany`/`manyToMany`
+  memberships (with `_pivot`) are writable.
+
+- **A typed client refuses an unknown collection accessor and an unknown
+  `include` relation at compile time,** types `returning: false` results as
+  possibly `undefined`, and types `collection("snake_case_slug")` and
+  `client.collection(slug)`.
+
+- **An offline create refused with a 409** (a unique value already taken)
+  **is rolled back and reported to `onSyncError`** instead of being quietly
+  dropped from the queue as synced.
+
+- **With `offline` on, `find({ where: { field: undefined } })` and the bare
+  PostgREST string form no longer throw a `TypeError`.**
+
+- **A request answered after a sign-out/sign-in no longer writes the
+  previous user's rows into the new user's offline database,** and a replay
+  acknowledged after the switch is no longer sent again when the first user
+  comes back.
+
+- **With `offline` on, `listen()` shows the user's queued edits instead of
+  the raw server row, and `listenById()` removes a row deleted elsewhere.**
+
+- **One refused field in a merged offline edit no longer rolls back the
+  user's other edits in that write.**
+
+#### Auth
+
+- **A wrong password or MFA code is no longer answered with a token refresh
+  and a resend.** A mistyped step-up code used to spend two of the
+  challenge's five attempts instead of one.
+
+#### MCP
+
+- **Remote MCP reads return REST's rows** (ISO dates, a `belongsTo` as its
+  foreign key), **not the admin view model.** A row that was read can be
+  sent back in `update_document`.
+
+- **An update or delete of a row in the trash over remote MCP is refused,**
+  as REST refuses it with a 404.
+
+- **Remote MCP no longer tells the model a failure inside the server is
+  "usually a permission rule"** when it is not.
+
+#### UI kit & plugins
+
+- **A dialog or side sheet opened from the keyboard now takes focus,** so it
+  is announced and a second Enter no longer fires the button behind it.
+  Closing it returns focus to the button, or menu, that opened it.
+
+- **A focused primary, secondary or destructive button, any switch, and a
+  multi-select now show a visible focus ring.**
+
+- **Escape on an open dropdown or menu inside a record closes only the
+  dropdown, not the record or the inspector.**
+
+- **A disabled date field can no longer be cleared, and its calendar button
+  no longer throws.**
+
+- **Expandable field groups and home-page groups open and close with Enter
+  and Space.**
+
+- **A boolean field is announced by its label, as one switch.**
+
+- **Pressing Enter in the property editor's Name/ID fields, or the
+  collection details form, submits what is typed,** not the value from
+  before typing.
+
+- **Icon buttons with a tooltip are announced by the tooltip's text.**
+
+- **AI autofill never offers or applies a suggestion for a locked field, or
+  for a key that is not a property of the form.**
+
+#### rls-check
+
+- **`unqualified-column-in-subquery` fires on a live database,** instead of
+  being silently skipped.
+
+- **`security_invoker = 1/yes/'t'` is no longer reported as a bypass.**
+
+- **A write policy with no clause is no longer reported as accepting every
+  row.**
+
+- **Printed REVOKEs revoke every grant that reaches a role.**
+
+- **A table no exposed role can reach is no longer reported.**
+
+- **An UPDATE policy with only `WITH CHECK (true)` is now graded high, not
+  critical.**
+
+- **A 20,000-table catalogue is scanned in about a second,** down from
+  about 34 seconds.
+
+#### CI & tooling
+
+- **The CLI end-to-end suite passes again:** it looks for `db generate`'s
+  output in `.rebase/sql` and `drizzle/migrations`, and it no longer leaves
+  the backend it starts running after the suite exits.
+
+### Security
+
+#### Realtime
+
+- **Change capture no longer broadcasts changed rows.** The `rebase_cdc`
+  NOTIFY payload now carries only the changed row's key (plus a junction's
+  two ids). Previously any database login could `LISTEN` and read every
+  changed row of every instrumented table, including the auth table's
+  password hashes and verification tokens. Existing databases are updated
+  on the next boot, including boots with `REALTIME_CDC=off`.
+
+#### Studio
+
+- **The SQL console's audit log line no longer contains the literals a
+  statement carries.** `ALTER ROLE … PASSWORD '…'`, user-mapping passwords
+  and connection strings were written verbatim to the logs.
+
+#### Admin (CMS & app)
+
+- **The admin's browser bundle no longer ships server-only callback code
+  written as a method, by shorthand, by reference, by spread, or imported
+  from a server module.** Before, the build-time strip recognised only
+  arrow functions, so any other way of writing a server hook shipped its
+  source, and anything that code alone imported, to the browser.
+
+#### Storage & email
+
+- **SVGs are served as `image/svg+xml` under
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
+  on every serving path,** so an SVG opened directly can no longer run
+  script on the API's own origin. Before, it downloaded as
+  `application/octet-stream`.
+
+- **Private file reads (`?token=` URLs, the panel's thumbnails) are charged
+  to the user who minted the token, not to the reader's IP at the anonymous
+  allowance;** the server's own `rebase.storage` calls are never
+  rate-limited; and a refused bearer token is no longer partly written to
+  the error log.
+
+#### MCP
+
+- **The remote MCP endpoint fences the row data it returns in the same
+  untrusted-data envelope the local MCP server uses,** and says so in its
+  instructions and tool descriptions.
+
+#### rls-check
+
+- **rls-check grades `auth.jwt() IS NOT NULL` and `auth.role() IS NOT NULL`
+  policies on Supabase as critical.** They were graded low and described as
+  excluding anonymous callers, which they do not.
+
+#### Server & REST
+
+- **`Strict-Transport-Security` no longer includes `includeSubDomains` by
+  default;** set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` to opt back in (see
+  Breaking). Static apps, the CMS included, now send
+  `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`
+  unless the response already set its own.
 
 ## [0.23.0] - 2026-09-27
 
