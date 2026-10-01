@@ -443,15 +443,17 @@ export async function listBackups(
             `Listing ${dest.kind} backups requires a configured storage backend.`
         );
     }
-    const result = await storage.listObjects(dest.prefix ? `${dest.prefix}/` : "", {
-        bucket: dest.bucket,
-        maxResults: 1000
-    });
-    return result.items
-        .map((item) => item.fullPath)
-        .filter((key) => key.endsWith(".dump"))
-        .map((key) => ({ key, createdAt: parseBackupTimestamp(key) ?? undefined }))
-        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    // The server's lister, not a second copy of it: a listing is paged, in
+    // ascending key order, and this one read a single page of 1,000 — the
+    // OLDEST backups — so `rebase db backups list` stopped showing new ones,
+    // and retention ranked a page that held none of the newest. The two copies
+    // had already drifted apart once (over the roles sidecar).
+    const { listBackupObjects } = await import("@rebasepro/server");
+    const listed = await listBackupObjects(dest, storage);
+    return listed.map((info) => ({
+        key: info.key,
+        createdAt: info.createdAt ? new Date(info.createdAt) : undefined
+    }));
 }
 
 /**

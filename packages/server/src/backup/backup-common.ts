@@ -11,6 +11,7 @@ import fs from "fs";
 import path from "path";
 import type { BackupInfo, BackupDestinationKind } from "@rebasepro/types";
 import type { StorageController } from "../storage";
+import { logger } from "../utils/logger";
 
 export type BackupDestination =
     | { kind: "local"; path: string }
@@ -65,6 +66,41 @@ function isBackupFile(key: string): boolean {
 }
 
 /**
+ * How many pages of an object-storage listing to read before giving up — at
+ * the providers' 1,000 keys a page, 100,000 objects, or 50,000 backups.
+ */
+const MAX_LIST_PAGES = 100;
+
+/**
+ * Every key under a prefix, across pages.
+ *
+ * S3 and GCS answer a listing a page at a time, in ascending key order, and a
+ * backup's key is `rebase-<db>-<UTC timestamp>`. Reading one page therefore
+ * returned the OLDEST thousand objects: with retention unset and an hourly
+ * schedule, the newest backup the panel and `rebase db backups list` showed
+ * stopped advancing after about three weeks, which reads as "backups stopped".
+ */
+export async function listAllObjectKeys(
+    storage: StorageController,
+    prefix: string,
+    bucket: string
+): Promise<string[]> {
+    const keys: string[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+        const result = await storage.listObjects(prefix, { bucket, maxResults: 1000, pageToken });
+        for (const item of result.items) keys.push(item.fullPath);
+        pageToken = result.nextPageToken;
+        if (!pageToken) return keys;
+    }
+    logger.warn(
+        `[backups] Stopped listing ${bucket}/${prefix} after ${MAX_LIST_PAGES} pages (${keys.length} objects). ` +
+        "Set BACKUP_RETENTION_DAYS so old backups are pruned, or give the backups a prefix of their own."
+    );
+    return keys;
+}
+
+/**
  * List the backups at a destination as {@link BackupInfo}, newest first.
  * One entry per `.dump`, with its `.globals.sql` sidecar attached as
  * `globalsKey` when there is one.
@@ -100,11 +136,7 @@ export async function listBackupObjects(
     }
 
     if (!storage) return [];
-    const result = await storage.listObjects(dest.prefix ? `${dest.prefix}/` : "", {
-        bucket: dest.bucket,
-        maxResults: 1000
-    });
-    const keys = result.items.map((item) => item.fullPath);
+    const keys = await listAllObjectKeys(storage, dest.prefix ? `${dest.prefix}/` : "", dest.bucket);
     const present = new Set(keys);
     return keys
         .filter((key) => key.endsWith(DUMP_SUFFIX))

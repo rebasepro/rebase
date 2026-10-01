@@ -131,6 +131,42 @@ describe("server backup-common", () => {
         });
     });
 
+    /**
+     * S3 and GCS list ascending and in pages, and the listing read one page of
+     * 1,000. Keys are `rebase-<db>-<UTC timestamp>`, so that page is the OLDEST
+     * thousand: with retention unset and an hourly schedule, the newest entry
+     * stopped advancing after ~21 days (two objects per backup) and the panel
+     * read as "backups stopped".
+     */
+    describe("object storage, more than one page", () => {
+        const keys: string[] = [];
+        for (let day = 1; day <= 28; day++) {
+            for (let hour = 0; hour < 24; hour++) {
+                const stamp = `202609${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}0000Z`;
+                keys.push(`nightly/rebase-app-${stamp}.dump`, `nightly/rebase-app-${stamp}.globals.sql`);
+            }
+        }
+        const PAGE = 1000;
+        const listObjects = jest.fn(async (_prefix: string, options?: { pageToken?: string; maxResults?: number }) => {
+            const start = options?.pageToken ? Number(options.pageToken) : 0;
+            const end = Math.min(start + Math.min(options?.maxResults ?? PAGE, PAGE), keys.length);
+            return {
+                prefixes: [],
+                items: keys.slice(start, end).map((fullPath) => ({ fullPath })),
+                ...(end < keys.length ? { nextPageToken: String(end) } : {})
+            };
+        });
+        const storage = { listObjects } as unknown as StorageController;
+
+        it("reads every page, so the newest backup is listed first", async () => {
+            const list = await listBackupObjects(parseBackupDestination("s3://bucket/nightly"), storage);
+            expect(list).toHaveLength(28 * 24);
+            expect(list[0].name).toBe("rebase-app-20260928T230000Z.dump");
+            expect(list[0].globalsKey).toBe("nightly/rebase-app-20260928T230000Z.globals.sql");
+            expect(listObjects.mock.calls.length).toBeGreaterThan(1);
+        });
+    });
+
     it("returns empty for object storage without a controller", async () => {
         expect(await listBackupObjects(parseBackupDestination("s3://b/p"))).toEqual([]);
     });
