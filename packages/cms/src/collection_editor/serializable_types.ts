@@ -46,6 +46,8 @@ export interface SerializableAdminBaseOptions {
     hideFromCollection?: boolean;
     readOnly?: boolean;
     disabled?: boolean | SerializablePropertyDisabledConfig;
+    /** The server fills this on create, so the form does not require it then. */
+    filledByServer?: boolean;
     span?: 1 | 2 | 3 | 4;
     /** Opaque props handed to a custom `Field` / `Preview`. Round-tripped as-is. */
     customProps?: unknown;
