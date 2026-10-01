@@ -8,9 +8,24 @@ export function cleanPropertiesFromImport(properties: Properties, parentSlug = "
     idColumn?: ImportConfig["idColumn"],
 } {
 
-    const result = Object.keys(properties).reduce((acc, key) => {
+    // A slug is a property key, so two columns may not share one, and none may
+    // be empty: `First Name` and `first_name` both slug to `first_name`, and
+    // `slugify` strips every non-ASCII character, so `名前` and `価格` both slug
+    // to "". Shared, one column's values silently overwrote the other's. An
+    // empty slug becomes `column_<n>` (its position), and a taken one gets
+    // `_2`, `_3`, … — so every column keeps a property of its own.
+    const taken = new Set<string>();
+    const uniqueSlug = (key: string, index: number): string => {
+        const base = slugify(key) || `column_${index + 1}`;
+        let slug = base;
+        for (let n = 2; taken.has(slug); n++) slug = `${base}_${n}`;
+        taken.add(slug);
+        return slug;
+    };
+
+    const result = Object.keys(properties).reduce((acc, key, index) => {
         const property = properties[key];
-        const slug = slugify(key);
+        const slug = uniqueSlug(key, index);
         const fullSlug = parentSlug ? `${parentSlug}.${slug}` : slug;
 
         if (property.type === "map" && property.properties) {

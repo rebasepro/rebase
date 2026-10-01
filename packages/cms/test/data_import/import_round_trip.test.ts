@@ -52,3 +52,23 @@ describe("creating a collection from a file keeps every value", () => {
         expect(JSON.stringify(properties.nickname)).not.toContain("\"id\":\"\"");
     });
 });
+
+describe("every column gets a property of its own", () => {
+    // Header slugs collided or came out empty: `First Name` and `first_name`
+    // were both `first_name`, `Price ($)` and `Price (€)` both `price_`, and
+    // `名前` and `価格` both `""` — one property with an empty key, so one
+    // column's values silently overwrote the other's.
+    test("headers whose slugs collide or are empty keep their own values", async () => {
+        const result = await importIntoNewCollection("j_keys.csv");
+        const keys = Object.keys(result.properties);
+        expect(keys).not.toContain("");
+        const mapped = ["First Name", "first_name", "名前", "価格", "Price ($)", "Price (€)"]
+            .map(header => result.headersMapping[header]);
+        expect(mapped.every(key => typeof key === "string" && key !== "")).toBe(true);
+        expect(new Set(mapped).size).toBe(mapped.length);
+        expect(mapped.map(key => result.entities[0].values[key as string]))
+            .toEqual(["Ann", "ann", "アン", 100, 1, 2]);
+        // `_private` is left out of a new collection on purpose (AIX-15).
+        expect(lostCells(result).filter(line => !line.includes("'_private'"))).toEqual([]);
+    });
+});
