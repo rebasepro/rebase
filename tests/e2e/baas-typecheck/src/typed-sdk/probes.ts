@@ -81,3 +81,14 @@ export async function neverWritableProbes(): Promise<void> {
     // A field writable by some role stays: the server judges the role.
     await client.data.authors.update(1, { salary: 1 });
 }
+
+/** SDK-6: a column that is not required can be cleared with `null`. */
+export async function nullableProbes(): Promise<void> {
+    await posts.update("p1", { subtitle: null });
+    await posts.update("p1", { authorId: null });
+    await posts.create({ title: "t", publishedAt: null });
+    // @ts-expect-error — `title` is required; null is not one
+    await posts.create({ title: null });
+    // @ts-expect-error — nor can an update clear it
+    await posts.update("p1", { title: null });
+}

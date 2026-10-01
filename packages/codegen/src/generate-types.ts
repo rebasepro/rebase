@@ -249,6 +249,20 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
     return accessors;
 }
 
+/**
+ * A column's type on a write: its own type, or `null` too when it is not
+ * required.
+ *
+ * `Row` has typed a non-required column `T | null` for a while; its write twins
+ * did not, so the one way to clear a value — `update(id, { publishedAt: null })`,
+ * `{ authorId: null }` to unassign, the edit-form round trip of a row that came
+ * back with nulls in it — was a compile error the server would have accepted.
+ * A primary key is never null, required or not.
+ */
+function writableType(prop: Property, tsType: string): string {
+    return prop.validation?.required || isPrimaryKey(prop) ? tsType : `${tsType} | null`;
+}
+
 /** One emitted `key: type;` line, already indented. */
 function line(key: string, type: string, optional: boolean): string {
     return `      ${emitKey(key)}${optional ? "?" : ""}: ${type};`;
@@ -514,7 +528,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             if (notWritable.has(key)) continue;
             const tsType = propertyToTypeScriptType(prop);
             const isOptional = !prop.validation?.required || isAutoAssignedId(prop);
-            lines.push(line(key, tsType, isOptional));
+            lines.push(line(key, writableType(prop, tsType), isOptional));
             emittedKeys.add(key);
         }
 
@@ -534,7 +548,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             if (prop.type === "relation") continue;
             if (isPrimaryKey(prop)) continue;
             if (notWritable.has(key)) continue;
-            lines.push(line(key, propertyToTypeScriptType(prop), true));
+            lines.push(line(key, writableType(prop, propertyToTypeScriptType(prop)), true));
             emittedKeys.add(key);
         }
         emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, true);
@@ -706,8 +720,11 @@ function emitWritableRelations(
     // `string | number` here accepted a string for a numeric-keyed target.
     const emit = (key: string, relation: ResolvedRelation): void => {
         if (emittedKeys.has(key)) return;
-        const optional = allOptional || !isRelationRequired(collection, relation);
-        lines.push(line(key, foreignKeyType(relation), optional));
+        const required = isRelationRequired(collection, relation);
+        // A foreign key that is not required can be unassigned, which is a
+        // write of `null` — see `writableType`.
+        const type = required ? foreignKeyType(relation) : `${foreignKeyType(relation)} | null`;
+        lines.push(line(key, type, allOptional || !required));
         emittedKeys.add(key);
     };
 

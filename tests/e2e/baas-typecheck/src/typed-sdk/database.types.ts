@@ -16,13 +16,13 @@ export interface Database {
     Insert: {
       id?: number;
       name: string;
-      salary?: number;
-      createdAt?: string;
+      salary?: number | null;
+      createdAt?: string | null;
     };
     Update: {
       name?: string;
-      salary?: number;
-      createdAt?: string;
+      salary?: number | null;
+      createdAt?: string | null;
     };
     Relations: {
       posts: "posts";
@@ -35,10 +35,10 @@ export interface Database {
     };
     Insert: {
       id?: string;
-      body?: string;
+      body?: string | null;
     };
     Update: {
-      body?: string;
+      body?: string | null;
     };
     Relations: {
     };
@@ -52,11 +52,11 @@ export interface Database {
     Insert: {
       id?: number;
       sku: string;
-      quantity?: number;
+      quantity?: number | null;
     };
     Update: {
       sku?: string;
-      quantity?: number;
+      quantity?: number | null;
     };
     Relations: {
     };
@@ -78,25 +78,25 @@ export interface Database {
     Insert: {
       id?: string;
       title: string;
-      subtitle?: string;
-      status?: "draft" | "published";
-      views?: number;
-      tagsList?: Array<string>;
-      embedding?: number[];
-      publishedAt?: string;
-      authorId?: number;
-      author?: number;
+      subtitle?: string | null;
+      status?: "draft" | "published" | null;
+      views?: number | null;
+      tagsList?: Array<string> | null;
+      embedding?: number[] | null;
+      publishedAt?: string | null;
+      authorId?: number | null;
+      author?: number | null;
     };
     Update: {
       title?: string;
-      subtitle?: string;
-      status?: "draft" | "published";
-      views?: number;
-      tagsList?: Array<string>;
-      embedding?: number[];
-      publishedAt?: string;
-      authorId?: number;
-      author?: number;
+      subtitle?: string | null;
+      status?: "draft" | "published" | null;
+      views?: number | null;
+      tagsList?: Array<string> | null;
+      embedding?: number[] | null;
+      publishedAt?: string | null;
+      authorId?: number | null;
+      author?: number | null;
     };
     Relations: {
       author: "authors";

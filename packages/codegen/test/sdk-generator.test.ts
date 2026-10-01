@@ -103,13 +103,13 @@ describe("propertyToTypeScriptType mapping", () => {
         } as unknown as CollectionConfig;
 
         const ts = generateTypedefs([col]);
-        expect(ts).toContain("bool?: boolean;");
-        expect(ts).toContain("dt?: string;");
-        expect(ts).toContain("geo?: { latitude: number; longitude: number; };");
-        expect(ts).toContain("ref?: string | number;");
-        expect(ts).toContain("vec?: number[];");
-        expect(ts).toContain("bin?: string;");
-        expect(ts).toContain("unknown?: unknown;");
+        expect(ts).toContain("bool?: boolean | null;");
+        expect(ts).toContain("dt?: string | null;");
+        expect(ts).toContain("geo?: { latitude: number; longitude: number; } | null;");
+        expect(ts).toContain("ref?: string | number | null;");
+        expect(ts).toContain("vec?: number[] | null;");
+        expect(ts).toContain("bin?: string | null;");
+        expect(ts).toContain("unknown?: unknown | null;");
     });
 
     describe("string enum mapping", () => {
@@ -125,7 +125,7 @@ describe("propertyToTypeScriptType mapping", () => {
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain('status?: "draft" | "published";');
+            expect(ts).toContain('status?: "draft" | "published" | null;');
         });
 
         it("maps string array of objects enum", () => {
@@ -145,7 +145,7 @@ label: "Published" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain('status?: "draft" | "published";');
+            expect(ts).toContain('status?: "draft" | "published" | null;');
         });
 
         it("maps string record enum using keys", () => {
@@ -163,7 +163,7 @@ label: "Published" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain('status?: "draft" | "published";');
+            expect(ts).toContain('status?: "draft" | "published" | null;');
         });
     });
 
@@ -180,7 +180,7 @@ label: "Published" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("level?: 1 | 2 | 3;");
+            expect(ts).toContain("level?: 1 | 2 | 3 | null;");
         });
 
         it("maps number array of objects enum", () => {
@@ -200,7 +200,7 @@ label: "High" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("level?: 10 | 20;");
+            expect(ts).toContain("level?: 10 | 20 | null;");
         });
 
         it("maps number record enum using keys", () => {
@@ -218,7 +218,7 @@ label: "High" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("level?: 1 | 2;");
+            expect(ts).toContain("level?: 1 | 2 | null;");
         });
     });
 
@@ -254,7 +254,7 @@ label: "High" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("metadata?: Record<string, unknown>;");
+            expect(ts).toContain("metadata?: Record<string, unknown> | null;");
         });
     });
 
@@ -271,7 +271,7 @@ label: "High" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("tags?: Array<string>;");
+            expect(ts).toContain("tags?: Array<string> | null;");
         });
 
         it("falls back to Array<any> if 'of' property is absent", () => {
@@ -285,7 +285,7 @@ label: "High" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("generic?: Array<unknown>;");
+            expect(ts).toContain("generic?: Array<unknown> | null;");
         });
     });
 });
@@ -302,7 +302,7 @@ describe("generateTypedefs schemas configurations", () => {
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
-            expect(ts).toContain("title?: string;");
+            expect(ts).toContain("title?: string | null;");
         });
 
         it("makes properties required in Insert if validation required is true", () => {
@@ -762,7 +762,7 @@ describe("Row, Insert and Update describe different things", () => {
         expect(update).not.toMatch(/^\s+id\??:/m);
         expect(update).toContain("title?: string;");
         // The foreign key is still writable — it is a column, not the row's own key.
-        expect(update).toContain("authorId?: number;");
+        expect(update).toContain("authorId?: number | null;");
     });
 
     it("accepts both write shapes for a belongsTo relation", () => {
@@ -771,8 +771,8 @@ describe("Row, Insert and Update describe different things", () => {
         // through. Only the second was generated, so the documented form was a
         // type error.
         const insert = block(generateTypedefs([postsCol, authorsCol]), "Insert");
-        expect(insert).toContain("authorId?: number;");
-        expect(insert).toContain("author?: number;");
+        expect(insert).toContain("authorId?: number | null;");
+        expect(insert).toContain("author?: number | null;");
     });
 
     it("offers the relation write key the server actually accepts", () => {
@@ -798,8 +798,8 @@ describe("Row, Insert and Update describe different things", () => {
         } as unknown as CollectionConfig;
 
         const insert = block(generateTypedefs([renamed, authorsCol]), "Insert");
-        expect(insert).toContain("author?: number;");
-        expect(insert).toContain("authorId?: number;");
+        expect(insert).toContain("author?: number | null;");
+        expect(insert).toContain("authorId?: number | null;");
         expect(insert).not.toContain("author_rel");
     });
 
