@@ -1284,7 +1284,7 @@ export class PostgresBackendDriver implements DataDriver {
         }
 
         try {
-            let savedRow = await this.dataService.save<M>(
+            const storedRow = await this.dataService.save<M>(
                 path,
                 updatedValues,
                 writeId,
@@ -1292,8 +1292,19 @@ export class PostgresBackendDriver implements DataDriver {
                 { upsert: upserting, onConflict, insertOnlyKeys }
             );
 
-            if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+            // Two rows from here on, and which one goes where is the point.
+            // `storedRow` is what the table now holds: `afterSave` judges it,
+            // history records it, its address is derived from it. `savedRow` is
+            // what the CALLER reads — `afterRead`'s view, for the response and
+            // its realtime echo. They used to be one variable, so a masking
+            // `afterRead` (`email` → `********`) was what history recorded and
+            // what a revert then wrote into the column, and a computed field it
+            // added made every version un-revertable. A copy goes in, so an
+            // `afterRead` that edits its argument in place edits only the view.
+            let savedRow = storedRow;
+            if (storedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
                 const callbackCollection = requireCallbackCollection(resolvedCollection, path);
+                savedRow = { ...storedRow };
                 // `?? savedRow` on every tier — see the note in `fetchCollection`.
                 // Here it decided what the write's own response body contained.
                 // 1. Global callbacks first
@@ -1326,18 +1337,19 @@ export class PostgresBackendDriver implements DataDriver {
             }
 
             // The row is exactly its columns, so its address is derived, not read
-            // off it: `savedRow.id` is undefined for every table whose key is not
+            // off it: `storedRow.id` is undefined for every table whose key is not
             // literally named `id`, and is ordinary data for a table that has such
-            // a column without it being the key.
+            // a column without it being the key. From the stored row: an
+            // `afterRead` may reshape or mask the key columns of the view.
             const savedId = deriveRowAddress(
-                savedRow,
+                storedRow,
                 (resolvedCollection ?? collection) as CollectionConfig,
                 this.registry
             );
-            // `values` are the row's columns — all of them. For an `id`-keyed table
-            // that includes `id`, which used to be stripped here because it was the
-            // synthesized address rather than the column it now is.
-            const savedValues = savedRow;
+            // `values` are the row's columns — all of them, as stored. For an
+            // `id`-keyed table that includes `id`, which used to be stripped here
+            // because it was the synthesized address rather than the column it now is.
+            const savedValues = storedRow;
 
             // `afterSave` runs INSIDE the write's transaction and is awaited, so a
             // throw here rolls the row back — the write and its consequences
@@ -1847,12 +1859,17 @@ export class PostgresBackendDriver implements DataDriver {
         //
         // The same read the REST route makes, `withDeleted` included: a hard
         // delete of a row already in the trash is how the trash is emptied.
-        const stored = await this.fetchOne<M>({
-            path: targetPath,
-            id: row.id,
-            collection: resolvedCollection,
-            withDeleted: hard ? true : undefined
-        });
+        //
+        // Raw, not through `this.fetchOne`: that runs `afterRead`, which shapes
+        // what a caller reads — and its view (a masked `email`, a computed
+        // field) is not the row being deleted. It was what the delete hooks
+        // judged and what history recorded as the row's final state.
+        const stored = await this.dataService.fetchOne<M>(
+            targetPath,
+            row.id,
+            resolvedCollection?.databaseId,
+            hard ? true : undefined
+        );
         // Not found is answered before any callback runs: a callback handed a
         // row that is not there — or not there for this caller — would be
         // judging something it cannot see.

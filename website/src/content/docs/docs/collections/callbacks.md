@@ -246,7 +246,7 @@ Called after the row is written and before the commit, inside the same transacti
 
 ```typescript
 afterSave: async ({
-    values,         // Saved values
+    values,         // Saved values: the row as stored, not afterRead's view of it
     id,             // Entity ID
     previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
@@ -281,6 +281,12 @@ webhook it enqueues commits and survives the failure it reports. A throw from
 ### `afterRead`
 
 Called after reading entities from the database. Transform the data for display.
+
+It shapes what a caller receives — the response to a read or a write, and its
+realtime frame — and nothing else. `afterSave`, `beforeDelete`, `afterDelete`
+and [history](/docs/backend/history) get the row as stored, so a value masked
+here is never what an audit entry records or what a revert writes back, and a
+computed field added here never reaches a write.
 
 ```typescript
 afterRead: async ({
