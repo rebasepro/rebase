@@ -339,17 +339,30 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * One statement server-side (`INSERT ... ON CONFLICT DO UPDATE`), so
          * unlike a `findById` followed by `create`-or-`update` it cannot lose
          * the race between the two.
+         *
+         * Sent as a one-row bulk write with `upsert: true`, which is what the
+         * in-process accessor and the offline queue already send. It used to be
+         * `POST /data/<slug>` with `?on_conflict=` only when a target was
+         * named — and the route reads that POST without the parameter as the
+         * plain insert a `create` is, so the documented default ("on the
+         * primary key") never happened online: re-upserting an existing row
+         * answered 409, while the same call succeeded offline and in a
+         * function.
          */
         async upsert(data: Partial<M>, options?: UpsertOptions) {
-            const query = options?.onConflict?.length
-                ? `?on_conflict=${encodeURIComponent(options.onConflict.join(","))}`
-                : "";
-            const raw = await transport.request<Record<string, unknown>>(`${basePath}${query}`, {
+            const raw = await transport.request<{ data?: Record<string, unknown>[] } | undefined>(`${basePath}/bulk`, {
                 method: "POST",
-                body: JSON.stringify(data),
+                body: JSON.stringify({
+                    rows: [data],
+                    upsert: true,
+                    ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {})
+                }),
                 ...writeHeaders(options)
             });
-            return raw as M;
+            // With `returning: false` the bulk route answers the id, not the
+            // row — and `create` resolves to nothing there, so this does too.
+            if (options?.returning === false) return undefined as unknown as M;
+            return raw?.data?.[0] as M;
         },
 
         async createMany(

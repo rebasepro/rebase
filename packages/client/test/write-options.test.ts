@@ -145,26 +145,37 @@ describe("write options", () => {
     });
 
     describe("upsert", () => {
-        it("POSTs with the conflict target in the query", async () => {
-            // A query parameter rather than a body field, because the body is
-            // the row: a directive mixed into it collides with a column of the
-            // same name the day someone declares one.
-            await client.upsert({ email: "a@b.c" }, { onConflict: ["email"] });
+        // A one-row bulk write with `upsert: true` — what the in-process
+        // accessor and the offline queue send. The single-row POST reads a
+        // body without `?on_conflict=` as a plain insert, so an upsert sent
+        // there never upserted on the primary key. That half is asserted
+        // through the real route in
+        // packages/server/test/sdk-over-rest-routes.test.ts; these pin the
+        // request only.
+        const bodyOf = (call = 0) => JSON.parse(String(initOf(call).body)) as Record<string, unknown>;
 
-            expect(mockRequest.mock.calls[0][0]).toBe("/data/posts?on_conflict=email");
+        it("POSTs one row to the bulk route with the conflict target in the body", async () => {
+            mockRequest.mockResolvedValue({ data: [{ id: 1, email: "a@b.c" }] } as never);
+
+            const row = await client.upsert({ email: "a@b.c" }, { onConflict: ["email"] });
+
+            expect(mockRequest.mock.calls[0][0]).toBe("/data/posts/bulk");
             expect(initOf()).toMatchObject({ method: "POST" });
+            expect(bodyOf()).toEqual({ rows: [{ email: "a@b.c" }], upsert: true, onConflict: ["email"] });
+            expect(row).toEqual({ id: 1, email: "a@b.c" });
         });
 
         it("upserts on the primary key when no target is named", async () => {
             await client.upsert({ id: 1, title: "x" });
 
-            expect(mockRequest.mock.calls[0][0]).toBe("/data/posts");
+            expect(mockRequest.mock.calls[0][0]).toBe("/data/posts/bulk");
+            expect(bodyOf()).toEqual({ rows: [{ id: 1, title: "x" }], upsert: true });
         });
 
-        it("encodes a composite target", async () => {
+        it("sends a composite target whole", async () => {
             await client.upsert({ tenant_id: "t", slug: "s" }, { onConflict: ["tenant_id", "slug"] });
 
-            expect(mockRequest.mock.calls[0][0]).toBe("/data/posts?on_conflict=tenant_id%2Cslug");
+            expect(bodyOf().onConflict).toEqual(["tenant_id", "slug"]);
         });
 
         it("carries an idempotency key like any other write", async () => {
