@@ -1055,7 +1055,14 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    async save<M extends Record<string, unknown>>({
+    async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
+        // A frame per write, so a hook whose `context.data` write runs that
+        // hook again is refused at a bounded depth instead of looping inside
+        // the request's transaction. See `write-depth.ts`.
+        return inWriteFrame(props.path, "save", frame => this.saveInFrame(props, frame));
+    }
+
+    private async saveInFrame<M extends Record<string, unknown>>({
                                                             path,
                                                             id,
                                                             values,
@@ -1093,7 +1100,8 @@ export class PostgresBackendDriver implements DataDriver {
                 path, resolvedCollection as CollectionConfig, values, id, onConflict
             );
             if (stored) {
-                return this.save<M>({ path, id: stored.id, values: stored.values, collection, status: "existing" });
+                // The same write, continued as an update: the same frame.
+                return this.saveInFrame<M>({ path, id: stored.id, values: stored.values, collection, status: "existing" }, frame);
             }
         }
 
@@ -1185,6 +1193,7 @@ export class PostgresBackendDriver implements DataDriver {
         // failing: a bare `throw` is the documented way to block a write, so it
         // answers 400 with the author's message rather than a masked 500.
         try {
+            frame.stage = "beforeSave";
             if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
                 const callbackCollection = requireCallbackCollection(resolvedCollection, path);
                 // 1. Global callbacks first
@@ -1400,6 +1409,7 @@ export class PostgresBackendDriver implements DataDriver {
             // hold a transaction open (HTTP calls, mail) belong in a job — one
             // enqueued in a transaction that rolls back was never enqueued.
             try {
+                frame.stage = "afterSave";
                 if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
                     const callbackCollection = requireCallbackCollection(resolvedCollection, path);
                     // 1. Global callbacks first
@@ -1522,6 +1532,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // enqueued rode the transaction this failure rolls back, and
                 // vanished with it. Run after, it commits on its own.
                 if (!currentWriteScope()?.afterSettled(runHooks)) {
+                    frame.stage = "afterSaveError";
                     await runHooks(contextForCallback);
                 }
             }
@@ -1871,11 +1882,16 @@ export class PostgresBackendDriver implements DataDriver {
         });
     }
 
-    async delete<M extends Record<string, unknown>>({
+    async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {
+        // A frame per write, as `save` has: see `write-depth.ts`.
+        return inWriteFrame(props.row.path, "delete", frame => this.deleteInFrame(props, frame));
+    }
+
+    private async deleteInFrame<M extends Record<string, unknown>>({
                                                               row,
                                                               collection,
                                                               hard
-                                                          }: DeleteProps<M>): Promise<void> {
+                                                          }: DeleteProps<M>, frame: WriteFrame): Promise<void> {
 
         const targetPath = row.path;
 
@@ -1935,6 +1951,7 @@ export class PostgresBackendDriver implements DataDriver {
         // failing: a bare `throw` is the documented way to block a write, so it
         // answers 400 with the author's message rather than a masked 500.
         try {
+            frame.stage = "beforeDelete";
             if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
                 const callbackCollection = requireCallbackCollection(resolvedCollection, targetPath);
                 let preventDefault = false;
@@ -2026,6 +2043,7 @@ export class PostgresBackendDriver implements DataDriver {
         // throw undoes the delete rather than leaving the row gone and the
         // cleanup half-done. See the comment on the `afterSave` block.
         try {
+            frame.stage = "afterDelete";
             if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
                 const callbackCollection = requireCallbackCollection(resolvedCollection, targetPath);
                 // 1. Global callbacks first
