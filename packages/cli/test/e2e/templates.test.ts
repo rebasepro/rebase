@@ -198,7 +198,7 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         // something and silently got nothing for as long as it existed. The
         // fresh database it pushes into has nothing to destroy, so the
         // destructive gate it was presumably reaching for never fires.
-        await execa("node", [cliBin, "db", "push", "--collections", "../config/collections"], {
+        await execa("node", [cliBin, "db", "push"], {
             cwd: projectDir,
             env
         });

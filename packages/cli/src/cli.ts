@@ -249,7 +249,10 @@ async function dispatch(
             // wherever they appear and rejects the ones nobody declared.
             const { flags: sdkArgs, help: sdkHelp } = parseCommandArgs({
                 spec: {
-                    "--collections-dir": String,
+                    // `--collections`, as every other command spells it; the
+                    // older name stays an alias.
+                    "--collections": String,
+                    "--collections-dir": "--collections",
                     "--output": String,
                     // The alias `build`, `cloud env pull` and `db backup` carry.
                     // Two names for one concept across one CLI is a thing you
@@ -257,7 +260,7 @@ async function dispatch(
                     "--out": "--output",
                     "--from": String,
                     "--token": String,
-                    "-c": "--collections-dir",
+                    "-c": "--collections",
                     "-o": "--output"
                 },
                 rawArgs: args,
@@ -275,7 +278,7 @@ async function dispatch(
             // which is where the person typing it means it.
             const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
             await generateSdkCommand({
-                collectionsDir: sdkArgs["--collections-dir"] || path.join(sdkRoot, "config/collections"),
+                collectionsDir: sdkArgs["--collections"] || path.join(sdkRoot, "config/collections"),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],

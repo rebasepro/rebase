@@ -18,6 +18,17 @@ import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
 import { unknownCommand } from "../utils/unknown-command";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
+import { absolutizeLocalPathArgs } from "./db";
+import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
+
+/**
+ * The line handed to the driver, its paths resolved from where the command was
+ * run (the driver runs in `backend/`). `--schema` is left alone: on
+ * `introspect` it names a Postgres schema, not a file.
+ */
+export function schemaDriverArgs(rawArgs: string[], cwd: string): string[] {
+    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "schema"), cwd, ["--collections", "-c", "--output", "-o", "--out"]);
+}
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     // `--help` is answered here, before `requireProjectRoot` and before the
@@ -81,13 +92,15 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     // side effect nobody asked for.
     env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
+    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir);
+
     try {
         // The one spawn, shared with `db`. This file used to carry its own copy
         // of the tsx-or-node decision; three copies of that rule existed and two
         // were fixed while the third went on spawning plain node.
         await spawnDriverCli(
             { projectRoot, backendDir, pluginCli, env },
-            argsFromCommand(rawArgs, "schema")
+            schemaDriverArgs(rawArgs, process.cwd())
         );
     } catch (error) {
         // A child that ran and exited non-zero already printed its diagnostics
@@ -150,7 +163,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("stale")}       Report generated schema files that no longer match the collections
 
 ${chalk.green.bold("generate Options")}
-  ${chalk.blue("--collections, -c")}  Path to collections directory
+  ${chalk.blue("--collections, -c")}  ${COLLECTIONS_FLAG_HELP}
   ${chalk.blue("--output, -o")}       Output path for generated schema
   ${chalk.blue("--watch, -w")}        Watch for changes and regenerate automatically
 

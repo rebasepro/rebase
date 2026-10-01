@@ -15,6 +15,7 @@ import { CodegenError, generateSDK, GeneratedFile, toSafeIdentifier } from "@reb
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot } from "../utils/project";
 import { readLink } from "./cloud/context";
+import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
 
 interface GenerateSDKArgs {
     collectionsDir: string;
@@ -44,7 +45,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
     const absDir = path.resolve(collectionsDir);
 
     if (!fs.existsSync(absDir)) {
-        throw new Error(`Collections directory not found: ${absDir}`);
+        throw new Error(`Collections directory not found: ${absDir} (${COLLECTIONS_PATH_RULE})`);
     }
 
     // Try to import the index file using jiti (supports TypeScript natively)
@@ -156,7 +157,8 @@ ${chalk.bold("Usage")}
   rebase generate-sdk [options]
 
 ${chalk.bold("Options")}
-  -c, --collections-dir <dir>  Local collections directory (default: ./config/collections)
+  -c, --collections <dir>      ${COLLECTIONS_FLAG_HELP}
+                               (--collections-dir is accepted too)
   -o, --output <dir>           Where to write the SDK (default: ./generated/sdk)
                                (--out is accepted too, as on 'rebase build')
       --from <link|url>        Fetch the schema from a running project instead of

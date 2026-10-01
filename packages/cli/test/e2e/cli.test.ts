@@ -101,9 +101,7 @@ force: true });
         await execa("node", [
             cliBin,
             "schema",
-            "generate",
-            "--collections",
-            "../config/collections"
+            "generate"
         ], {
             cwd: scaffoldedDir,
             env: cleanEnv
@@ -129,9 +127,7 @@ force: true });
         await execa("node", [
             cliBin,
             "db",
-            "push",
-            "--collections",
-            "../config/collections"
+            "push"
         ], {
             cwd: scaffoldedDir,
             stdio: "inherit",
@@ -293,9 +289,7 @@ env: cleanEnv });
         await execa("node", [
             cliBin,
             "db",
-            "generate",
-            "--collections",
-            "../config/collections"
+            "generate"
         ], {
             cwd: scaffoldedDir,
             stdio: "inherit",

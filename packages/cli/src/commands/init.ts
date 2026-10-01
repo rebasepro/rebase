@@ -721,7 +721,9 @@ async function createProject(options: InitOptions) {
     const { pm, pmCommands } = options;
     const installCmd = pmCommands.install;
     const execCmd = pmCommands.exec("rebase", ["schema", "introspect", "--force"]);
-    const generateCmd = pmCommands.exec("rebase", ["schema", "generate", "--collections", "../config/collections"]);
+    // No --collections: config/collections is the default, and a path written
+    // here is resolved from where the reader runs it — the project root.
+    const generateCmd = pmCommands.exec("rebase", ["schema", "generate"]);
 
     if (options.installDeps) {
         console.log("");

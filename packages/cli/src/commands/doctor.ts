@@ -23,6 +23,8 @@ import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
+import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
+import { absolutizeLocalPathArgs } from "./db";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
@@ -431,10 +433,18 @@ export const DOCTOR_FLAGS = {
 /** What each long flag above does, for the Options block. */
 const DOCTOR_FLAG_HELP: Record<string, string> = {
     "--policies": "Also audit the row-level security policies. The form to use as a CI gate.",
-    "--collections": "Path to the collections directory (default: ../config/collections)",
-    "--schema": "Path to the generated Drizzle schema (default: src/schema.generated.ts)",
-    "--sdk": "Path to the generated SDK types (default: ../generated/sdk/database.types.ts)"
+    "--collections": COLLECTIONS_FLAG_HELP,
+    "--schema": "Path to the generated Drizzle schema (default: backend/src/schema.generated.ts)",
+    "--sdk": "Path to the generated SDK types (default: generated/sdk/database.types.ts)"
 };
+
+/**
+ * The line handed to the driver, every path on it resolved from where the
+ * command was run — the driver runs in `backend/`. See `utils/path-flags.ts`.
+ */
+export function doctorDriverArgs(rawArgs: string[], cwd: string): string[] {
+    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "doctor"), cwd, ["--collections", "-c", "--schema", "-s", "--sdk", "-k"]);
+}
 
 /** `--collections, -c` — the aliases, resolved from the spec rather than retyped. */
 function doctorFlagLabel(flag: string): string {
@@ -489,6 +499,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);
+    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir);
 
     const activePlugin = getActiveBackendPlugin(backendDir);
     if (!activePlugin) {
@@ -588,13 +599,13 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
             if (!tsxBin) {
                 exitDependenciesNotInstalled(projectRoot);
             }
-            await execa(tsxBin, [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
+            await execa(tsxBin, [pluginCli, ...doctorDriverArgs(rawArgs, process.cwd())], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         } else {
-            await execa("node", [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
+            await execa("node", [pluginCli, ...doctorDriverArgs(rawArgs, process.cwd())], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env

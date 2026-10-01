@@ -20,6 +20,7 @@ import { reportSpawnFailure } from "../utils/spawn-error";
 import { parseCommandArgs } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
+import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
 import { recordEvent } from "../telemetry";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
@@ -65,6 +66,21 @@ export function databaseUrlOf(
 const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 /**
+ * The flags whose value is a local path, on every line the CLI relays.
+ *
+ * All three spellings of the destination, because the driver accepts all
+ * three: `backup-cli.ts` maps `--output` and `-o` onto `--out`, and `rebase db
+ * backup --help` advertises `--output` as an alias. Only `--out` and `-o` were
+ * absolutised once, so the one spelling the help page names was the one that
+ * landed in `backend/` — and the success line still echoed the path as typed.
+ *
+ * And `--collections`, which was not absolutised at all: from the project root,
+ * `rebase schema generate --collections ./config/collections` was "not found",
+ * while the same spelling worked for `generate-sdk`. See `utils/path-flags.ts`.
+ */
+export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--collections", "-c"];
+
+/**
  * Rewrite local path arguments so they mean what the user typed.
  *
  * The plugin CLI is spawned with `cwd: backendDir` — it has to be, because that
@@ -78,16 +94,12 @@ const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
  * Absolutising here rather than inside the plugin keeps the fix where the cwd
  * is actually changed, and leaves the plugin usable on its own terms.
  */
-export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
-    /**
-     * All three spellings of the destination, because the driver accepts all
-     * three: `backup-cli.ts` maps `--output` and `-o` onto `--out`, and `rebase
-     * db backup --help` advertises `--output` as an alias. Only `--out` and
-     * `-o` were absolutised, so the one spelling the help page names was the
-     * one that landed in `backend/` — and the success line still echoed the
-     * path as typed.
-     */
-    const takesPath = (flag: string) => flag === "--out" || flag === "--output" || flag === "-o";
+export function absolutizeLocalPathArgs(
+    args: string[],
+    cwd: string,
+    pathFlags: readonly string[] = LOCAL_PATH_FLAGS
+): string[] {
+    const takesPath = (flag: string) => pathFlags.includes(flag);
     /**
      * Flags whose next token is a value, not a positional.
      *
@@ -589,6 +601,10 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         if (action === "delete") await refuseDeletingActiveBranch(projectRoot, rawArgs);
         if (action === "list") driverArgs = await listFromParentDatabase(projectRoot, rawArgs);
     }
+
+    // Before the database is resolved — and, for the managed one, started —
+    // and in the reader's terms. See utils/path-flags.ts.
+    refuseMissingCollectionsPath(driverArgs, process.cwd(), requireBackendDir(projectRoot));
 
     try {
         await runDriverDbCommand(driverArgs);
@@ -1253,12 +1269,14 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
-            "A change that would drop data needs --allow-destructive."
+            "A change that would drop data needs --allow-destructive.",
+            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`
         ]
     },
     generate: {
         usage: "rebase db generate [--collections <dir>]",
-        summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections."
+        summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections.",
+        notes: [`--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`]
     },
     migrate: {
         usage: "rebase db migrate [--baseline <version>] [amount]",

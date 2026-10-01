@@ -46,8 +46,8 @@ rebase schema generate
 
 | Flag | Description |
 |------|-------------|
-| `--collections, -c` | Path to collections directory (default: `config/collections/`) |
-| `--output, -o` | Output path for the generated schema file |
+| `--collections, -c` | Collections directory (default: `config/collections/`); relative paths are resolved from where you run the command |
+| `--output, -o` | Output path for the generated schema file; relative paths are resolved from where you run the command |
 | `--watch, -w` | Watch for changes and regenerate automatically |
 
 **Watch mode** is useful during development — edit a collection file and the schema regenerates instantly:
@@ -244,7 +244,7 @@ collections (see `--from` below), or anywhere `rebase dev` is not running.
 
 | Flag | Description |
 |------|-------------|
-| `-c`, `--collections-dir` | Path to the collections directory (default: `config/collections/`) |
+| `-c`, `--collections` | Collections directory (default: `config/collections/`); relative paths are resolved from where you run the command. `--collections-dir` is accepted too. |
 | `-o`, `--output` | Output directory for the SDK (default: `generated/sdk/`) |
 | `--from <link\|url>` | Read the schema from a running project instead of local source. `link` uses this checkout's linked project. |
 | `--token` | Bearer token for the contract endpoint (default: `$REBASE_SERVICE_KEY`) |

@@ -177,7 +177,7 @@ describe("rebase db push on the managed database", () => {
         // DATABASE_URL that is unset precisely because this path is in use.
         const result = await execa(
             "node",
-            [cliBin, "db", "push", "--collections", "../config/collections"],
+            [cliBin, "db", "push"],
             { cwd: projectDir, env, reject: false }
         );
 
