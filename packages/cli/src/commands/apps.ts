@@ -19,6 +19,7 @@ import { failAsJson, requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
+    findBackendApp,
     formatAppAddress,
     loadManifest,
     ManifestError,
@@ -29,6 +30,7 @@ import {
 } from "../manifest";
 import { readLink } from "./cloud/context";
 import { unknownCommand } from "../utils/unknown-command";
+import { foldableApps } from "../fold-static";
 
 function printHelp(): void {
     console.log(`
@@ -226,17 +228,34 @@ async function printAppConfig(appName: string | undefined, asJson: boolean): Pro
     }
 
     const link = readLink(projectRoot);
-    const apiUrl = resolveApiUrl(projectRoot, link);
+    // An app the backend bundle serves calls the API on its own origin, so the
+    // right value is empty — wherever the project is linked, and whatever a
+    // dev server once wrote down. A URL here is baked into the build and
+    // follows the bundle into production.
+    const sameOrigin = servedByBackend(loaded.manifest, appName);
+    const apiUrl = sameOrigin ? "" : resolveApiUrl(projectRoot, link);
 
     const config = {
         app: appName,
         type: app.type,
         apiUrl: apiUrl ?? null,
+        sameOrigin,
         project: link?.projectId ?? link?.slug ?? null
     };
 
     if (asJson) {
         console.log(JSON.stringify(config, null, 2));
+        return;
+    }
+
+    if (sameOrigin) {
+        console.log(chalk.bold(`# ${appName}`));
+        console.log("");
+        console.log("VITE_API_URL=");
+        console.log("");
+        console.log(chalk.dim(`Empty on purpose: \`rebase build\` folds ${appName} into the backend bundle, so it`));
+        console.log(chalk.dim("calls the API on the same origin it is served from, locally and deployed alike."));
+        console.log(chalk.dim("(`rebase dev` points it at the dev backend by itself.)"));
         return;
     }
 
@@ -271,14 +290,37 @@ function resolveApiUrl(projectRoot: string, link: ReturnType<typeof readLink>): 
     const statePath = path.join(projectRoot, ".rebase", "state.json");
     if (fs.existsSync(statePath)) {
         try {
-            const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as { baseUrl?: string };
-            if (state.baseUrl) return state.baseUrl;
+            const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as { baseUrl?: string; pid?: number };
+            // Only a dev server that is still running: the file outlives the
+            // process, and a port nothing listens on is not an address.
+            if (state.baseUrl && typeof state.pid === "number" && isRunning(state.pid)) return state.baseUrl;
         } catch {
             // Stale or partially written state file: fall through.
         }
     }
 
     return undefined;
+}
+
+/** Signal 0 checks a process exists without touching it; EPERM means it does, as someone else. */
+function isRunning(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (err) {
+        return (err as NodeJS.ErrnoException).code === "EPERM";
+    }
+}
+
+/**
+ * Whether `rebase build` folds this static app into the backend bundle, which
+ * then serves it on the API's own origin: a managed backend, and an app with
+ * built output to fold. The same predicate the build folds by.
+ */
+export function servedByBackend(manifest: ReturnType<typeof loadManifest>["manifest"], appName: string): boolean {
+    const backend = findBackendApp(manifest);
+    if (!backend || backend.app.type !== "backend" || backend.app.runtime === "custom") return false;
+    return foldableApps(manifest).apps.some(app => app.name === appName);
 }
 
 function loadManifestOrExit(projectRoot: string, asJson = false): ReturnType<typeof loadManifest> {
