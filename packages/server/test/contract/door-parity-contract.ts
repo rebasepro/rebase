@@ -42,6 +42,18 @@ export type StartingState =
 export const STORED_TITLE = "stored";
 
 /**
+ * Stands for the case's key inside a value, for the cases that are about the
+ * key: `{ id: "<key>-moved" }` names a key derived from the one addressed.
+ */
+export const KEY = "<key>";
+
+/** `values` with {@link KEY} replaced by the key the case addresses. */
+export function bindKey(values: Record<string, unknown>, key: string): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(values).map(([field, value]) =>
+        [field, typeof value === "string" ? value.split(KEY).join(key) : value]));
+}
+
+/**
  * One operation, addressed at the case's key (`id`).
  *
  * `values` never carries the key unless the case is about the key: a door
@@ -190,6 +202,18 @@ export const PARITY_CASES: readonly ParityCase[] = [
         given: "trashed",
         when: { op: "update", values: { deletedAt: null } },
         then: { outcome: "updated", hooks: saveHooks("existing"), history: ["update"], ...live() }
+    },
+
+    {
+        // A 500 on every door, rolled back by the request's transaction; and
+        // through `driver.data`, which has none, the row moved to the new key
+        // and THEN the call threw ("Could not fetch row after save."), with no
+        // `afterSave`, no history and no realtime event for the move.
+        name: "an update that changes the row's key is refused, naming the key",
+        finding: "DD-5",
+        given: "live",
+        when: { op: "update", values: { id: `${KEY}-moved`, title: "moved" } },
+        then: { outcome: "invalid", code: "KEY_IMMUTABLE", hooks: [], history: [], ...live() }
     },
 
     // ── upsert ───────────────────────────────────────────────────────────

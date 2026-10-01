@@ -47,6 +47,7 @@ import {
     DOORS,
     PARITY_CASES,
     STORED_TITLE,
+    bindKey,
     judge,
     type Door,
     type DoorAnswer,
@@ -525,7 +526,10 @@ describe("door parity: one operation, one answer (E2E)", () => {
                     const id = `${door}-${++caseSeq}`;
                     await stage(parity.given, id);
                     hookLog.length = 0;
-                    const answer = await run(id, parity.when);
+                    const operation = "values" in parity.when
+                        ? { ...parity.when, values: bindKey(parity.when.values, id) }
+                        : parity.when;
+                    const answer = await run(id, operation);
                     expect(judge(parity.then, await observe(id, answer))).toEqual([]);
                 });
             }

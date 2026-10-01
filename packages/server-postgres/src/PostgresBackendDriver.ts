@@ -202,6 +202,50 @@ function isPresentKey(id: string | number | undefined | null): id is string | nu
 }
 
 /**
+ * Refuse an update whose values move the row to another key.
+ *
+ * The row is addressed by its key, and everything after the write addresses
+ * it the same way: the read-back, `afterSave`, history, the realtime event.
+ * A key changed underneath them answered 500 "Could not fetch row after save."
+ * on every door — and through `driver.data`, which runs outside a request's
+ * transaction, the row had already moved when the call threw, with no
+ * `afterSave`, no history entry and no event for the move. A key equal to the
+ * address (a form that sends the whole row back) is not a change.
+ *
+ * Asked twice: of what the caller sent, before any hook runs, and of what the
+ * hooks hand on, since a `beforeSave` can set the key too.
+ */
+function assertKeyUnchanged(
+    collection: CollectionConfig | undefined,
+    registry: PostgresCollectionRegistry,
+    id: string | number,
+    values: Record<string, unknown> | undefined,
+    path: string
+): void {
+    if (!collection || !values) return;
+    const primaryKeys = getPrimaryKeys(collection, registry);
+    if (primaryKeys.length === 0) return;
+    let address: Record<string, string | number>;
+    try {
+        address = parseIdValues(id, primaryKeys);
+    } catch {
+        // An address the key cannot parse is the write's own 404 to give.
+        return;
+    }
+    const moved = primaryKeys
+        .map(key => key.fieldName)
+        .filter(field => values[field] !== undefined && String(values[field]) !== String(address[field]));
+    if (moved.length === 0) return;
+    const slug = collection.slug ?? path;
+    const violations = moved.map(field => {
+        const message = `'${field}' is the key of '${slug}', and an update cannot change it: this row is "${id}". `
+            + "Create a row under the new key and delete this one.";
+        return { field, code: "key_immutable", message };
+    });
+    throw ApiError.badRequest(violations[0].message, "KEY_IMMUTABLE", { collection: slug, violations });
+}
+
+/**
  * Refuse a write that would leave a *required* `created_by` / `updated_by`
  * column null because nobody is acting.
  *
@@ -1092,6 +1136,9 @@ export class PostgresBackendDriver implements DataDriver {
         // statement's own conflict branch below.
         if (status === "existing") {
             assertUpdateDoesNotSoftDelete(resolvedCollection as CollectionConfig | undefined, values, path);
+            if (isPresentKey(id)) {
+                assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, values as Record<string, unknown>, path);
+            }
         }
 
         const upserting = upsert === true && status !== "existing";
@@ -1243,6 +1290,9 @@ export class PostgresBackendDriver implements DataDriver {
             throw toCallbackError(callbackError, "beforeSave", path);
         }
         const afterHooks: Partial<EntityValues<M>> = updatedValues;
+        if (status === "existing" && isPresentKey(id)) {
+            assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, updatedValues as Record<string, unknown>, path);
+        }
 
         // Apply autoValue timestamps (on_create / on_update) at the application layer.
         // This handles updated_at fields for all writes that flow through the Rebase backend.

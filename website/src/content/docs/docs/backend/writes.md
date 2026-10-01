@@ -20,6 +20,13 @@ everything in this section applies to them too, except `?on_conflict=`.
 A write's body must be a JSON object. `null`, a number, a string or an array is
 a `400 BAD_REQUEST`.
 
+An update cannot change a row's key. A body that names the key with another
+value is a `400 KEY_IMMUTABLE`, before any hook runs and with nothing written,
+whichever way the update arrives: REST, the realtime socket, MCP or the
+in-process `rebase.data`. The key the row already has is accepted, as a form
+that sends the whole row back sends it. To move a row to a new key, create it
+there and delete the old one.
+
 ### Idempotency
 
 `Idempotency-Key: <uuid>` on any write means "if you have already answered this
@@ -173,7 +180,9 @@ out keep their stored values rather than being reset to their `defaultValue`,
 and history records an update. A row the read could not see, or one inserted
 concurrently, is still caught by `ON CONFLICT … DO UPDATE`, which sets only what
 the body and the hooks wrote, and the `on_update` stamps. A key that names a row
-outside the caller's `beforeQuery` scope answers `404`.
+outside the caller's `beforeQuery` scope answers `404`. A key that belongs to a
+row in the [trash](/docs/collections/soft-delete/) answers `409 ROW_IN_TRASH`
+and writes nothing: restore the row first, or purge it.
 
 A row that already existed keeps its `on_create` timestamp and its
 `user_on_create` creator. A conflict means the row's creation is a fact about the

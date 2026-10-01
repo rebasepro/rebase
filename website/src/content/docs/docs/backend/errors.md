@@ -173,6 +173,7 @@ the ID you got. Read the response header.
 | `INVALID_VECTOR_DISTANCE` | 400 | `?vector_distance=` is not `cosine`, `l2` or `inner_product`. | Use one of those three. |
 | `INVALID_VECTOR_THRESHOLD` | 400 | `?vector_threshold=` is not a number. | Send a number. |
 | `INVALID_WHERE` | 400 | `?where=` is not a JSON object mapping fields to conditions. | Send `{"status":["==","active"]}`. |
+| `KEY_IMMUTABLE` | 400 | An update names the row's key with a value other than the one it is addressed by — in the body, or written by a `beforeSave`. A row cannot move to another key: everything after the write (the read-back, `afterSave`, history, realtime) addresses it by the key it had. Refused before any hook runs, with nothing written, on every door. `details.violations` names the field. | Create the row under the new key and delete this one. Sending the key the row already has is fine. |
 | `MISSING_AGGREGATE_SELECT` | 400 | The aggregate route was called with no `?select=`. | Add one, e.g. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | The project serves no collections: none declared in code, and no tables to derive them from. | Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart. |
 | `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
