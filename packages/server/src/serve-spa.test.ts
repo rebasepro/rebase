@@ -13,6 +13,8 @@ import { Hono } from "hono";
 import { serveSPA } from "./serve-spa";
 import { compareStaticApps } from "./boot/bundle";
 import { planStaticAppMounts } from "./boot/static-routing";
+import { installUnmatchedApiEnvelope } from "./api/root-error-handler";
+import type { HonoEnv } from "./api/types";
 
 interface MountedApp {
     path: string;
@@ -343,5 +345,48 @@ describe("serveSPA cache headers", () => {
         // 404s are not artifacts of the build and must not be remembered as if
         // they were: the next deploy may well add the file.
         expect(await cacheControl(hashedBuild(), "/assets/gone-A1b2C3d4.js")).toBeNull();
+    });
+});
+
+/**
+ * The API's JSON 404 envelope, with a static app at "/".
+ *
+ * The other suites here mount the SPA on a bare Hono, so the interaction with
+ * `installUnmatchedApiEnvelope` was invisible: the envelope leaves alone any
+ * request a route *handled*, and it read "handled" as "a non-middleware route
+ * matched". The SPA fallback was registered with `app.get("/*")`, which matches
+ * every GET — including the `/api/*` paths it then declines — so on the default
+ * self-host (frontend at "/") `GET /api/typo` answered `text/plain` "404 Not
+ * Found" while `POST /api/typo` answered the JSON `NOT_FOUND` envelope, and an
+ * SDK caller saw `code: undefined`.
+ */
+describe("serveSPA at the root and the API's 404 envelope", () => {
+    function wired(): Hono<HonoEnv> {
+        const app = new Hono<HonoEnv>();
+        // The order init.ts installs them in: the envelope first, then routes,
+        // then (in boot) the static mounts.
+        installUnmatchedApiEnvelope(app, "/api");
+        app.get("/api/things", (c) => c.json({ ok: true }));
+        serveSPA(app, {
+            frontendPath: writeApp("web", { "index.html": "<html>WEB</html>" }),
+            basePath: "/",
+            apiBasePath: "/api",
+            excludePaths: ["/health"],
+            spa: true
+        });
+        return app;
+    }
+
+    it.each(["GET", "HEAD", "POST"])("answers an unknown %s under /api with the JSON envelope", async (method) => {
+        const res = await wired().request("http://localhost/api/typo", { method });
+        expect(res.status).toBe(404);
+        expect(res.headers.get("content-type")).toContain("application/json");
+        if (method !== "HEAD") expect(await res.text()).toContain("NOT_FOUND");
+    });
+
+    it("still serves the app's pages and the API's routes", async () => {
+        const app = wired();
+        expect(await get(app, "/some/deep/link")).toEqual({ status: 200, body: "<html>WEB</html>" });
+        expect(await get(app, "/api/things")).toEqual({ status: 200, body: "{\"ok\":true}" });
     });
 });

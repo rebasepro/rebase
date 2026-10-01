@@ -404,8 +404,16 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // Cache the index.html content to avoid re-reading from disk on every navigation request.
     let cachedHtml: string | null = null;
 
-    // SPA fallback - serve index.html for all non-excluded routes under basePath
-    app.get(scope, async (c, next) => {
+    // SPA fallback - serve index.html for all non-excluded routes under basePath.
+    //
+    // Middleware that answers only GET and HEAD, not `app.get(scope)`. A route
+    // is visible in `c.req.matchedRoutes` whether it answered or declined, and
+    // `installUnmatchedApiEnvelope` reads a matched non-middleware route as "a
+    // handler answered this". `app.get("/*")` matches every GET — the `/api/*`
+    // paths it declines included — so with an app at "/" an unknown `GET /api/x`
+    // kept Hono's `text/plain` 404 while `POST /api/x` got the JSON envelope.
+    app.use(scope, async (c, next) => {
+        if (c.req.method !== "GET" && c.req.method !== "HEAD") return next();
         // Skip excluded paths (API, health checks, sibling apps), and requests
         // another app owns.
         if (declines(c) || allExcludePaths.some(p => isUnderPath(c.req.path, p))) {
