@@ -103,6 +103,18 @@ describe("env configuration and localhost validation", () => {
         expect(env.DATABASE_URL).toBe("postgresql://db.my-app.com:5432/rebase");
     });
 
+    it("names the escape hatch for a database on the same host", () => {
+        // A single VPS with Postgres on the same machine is the most common
+        // self-hosted topology, and the refusal used to stop there: it said
+        // what was wrong and nothing about the variable that allows it.
+        process.env.NODE_ENV = "production";
+        process.env.DATABASE_URL = "postgresql://rebase:pw@127.0.0.1:5432/rebase";
+        process.env.JWT_SECRET = "12345678901234567890123456789012";
+        process.env.FRONTEND_URL = "https://my-app.com";
+
+        expect(() => loadEnv()).toThrow(/DATABASE_URL[^]*ALLOW_LOCALHOST_IN_PRODUCTION=true/);
+    });
+
     it("should allow localhost URLs in production if ALLOW_LOCALHOST_IN_PRODUCTION is set to true", () => {
         process.env.NODE_ENV = "production";
         process.env.DATABASE_URL = "postgresql://localhost:5432/rebase";

@@ -31,6 +31,9 @@ Key environment variables:
                         window, requires CORS_ORIGINS, refuses local file
                         storage and turns the OpenAPI docs off
   DATABASE_URL          Connection string for the default database (required)
+  ALLOW_LOCALHOST_IN_PRODUCTION  "true" when the database (or any other
+                        service a variable names) runs on this same machine.
+                        Production refuses localhost addresses without it
   JWT_SECRET            Signing secret, >=32 chars (required in production)
   REBASE_SERVICE_KEY    Server-to-server credential that bypasses row-level
                         security. Treat it like a database superuser password

@@ -265,6 +265,7 @@ ExecStart=/usr/bin/rebase-server /srv/myapp/dist-bundle
 Restart=always
 Environment=NODE_ENV=production
 Environment=DATABASE_URL=postgresql://rebase:...@127.0.0.1:5432/rebase
+Environment=ALLOW_LOCALHOST_IN_PRODUCTION=true
 Environment=JWT_SECRET=...
 Environment=REBASE_SERVICE_KEY=...
 Environment=CORS_ORIGINS=https://app.example.com
@@ -279,6 +280,12 @@ development mode: it reflects localhost origins, serves the OpenAPI spec, and
 sign-up form becomes the administrator. The two `REBASE_ADMIN_*` lines are what
 replace that window; see [Your first
 admin](/docs/getting-started/deployment/#your-first-admin).
+
+`ALLOW_LOCALHOST_IN_PRODUCTION=true` is there because the database is on the
+same machine. In production the runtime refuses any variable that points at
+localhost — in a container, loopback is the container itself, so that address is
+always a mistake — and this line tells it the address is meant. Drop it when the
+database runs elsewhere.
 
 Prefer `EnvironmentFile=/etc/rebase.env` with the file at mode 0600 over
 `Environment=` lines for the secrets: a unit file is world-readable, and

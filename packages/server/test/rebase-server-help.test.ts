@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { loadBootEnv } from "../src/boot/env";
 
 /**
  * `rebase-server --help` is the only reference a VPS deployment has.
@@ -64,6 +65,45 @@ describe("rebase-server --help", () => {
         expect(names.length).toBeGreaterThan(0);
         for (const name of new Set(names)) {
             expect(help).toContain(name);
+        }
+    });
+});
+
+/**
+ * The VPS recipe is a configuration, and a configuration either boots or it
+ * does not. This one did not: it set `NODE_ENV=production` with Postgres on
+ * `127.0.0.1` — the ordinary single-box topology — and the runtime refuses a
+ * loopback database in production unless told otherwise, so following the page
+ * to the letter ended in `points at a local/loopback host` and exit 1.
+ *
+ * Each `Environment=` line of every `ini` fence goes through the same
+ * validation `rebase-server` runs, with `...` placeholders filled in.
+ */
+describe("the documented systemd unit", () => {
+    const originalEnv = { ...process.env };
+    afterEach(() => {
+        process.env = { ...originalEnv };
+    });
+
+    it("passes the runtime's environment validation", () => {
+        if (!fs.existsSync(SELF_HOSTING_DOC)) return; // published-package checkout
+        const doc = fs.readFileSync(SELF_HOSTING_DOC, "utf8");
+        const units = [...doc.matchAll(/```ini[^\n]*\n([^]*?)```/g)]
+            .map(m => m[1])
+            .filter(body => /^Environment=/m.test(body));
+        expect(units.length).toBeGreaterThan(0);
+
+        for (const unit of units) {
+            const env: Record<string, string> = {};
+            for (const [, name, value] of unit.matchAll(/^Environment=([A-Z0-9_]+)=(.*)$/gm)) {
+                // A bare `...` is a secret the reader supplies; one inside a
+                // URL is the password part of it.
+                env[name] = value === "..."
+                    ? "a-placeholder-secret-that-is-long-enough-1234567890"
+                    : value.replace(/\.\.\./g, "placeholder");
+            }
+            process.env = env;
+            expect(() => loadBootEnv()).not.toThrow();
         }
     });
 });

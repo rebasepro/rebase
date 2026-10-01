@@ -403,7 +403,15 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
                         // routinely carry credentials (DATABASE_URL, SMTP_PASS,
                         // OAuth secrets), and a failed production boot is logged
                         // wherever the container's stdout goes.
-                        message: `Environment variable ${key} points at a local/loopback host. Deployed instances must not connect to localhost.`,
+                        //
+                        // The remedy is named because the refusal is right
+                        // only in a container, where loopback is the container
+                        // itself. On a single VPS with Postgres beside the
+                        // runtime, 127.0.0.1 is the correct address.
+                        message: `Environment variable ${key} points at a local/loopback host. ` +
+                            "Deployed instances must not connect to localhost. " +
+                            "If it really runs on this machine (a single server with the database beside the runtime), " +
+                            "set ALLOW_LOCALHOST_IN_PRODUCTION=true.",
                         path: [key]
                     });
                 }
