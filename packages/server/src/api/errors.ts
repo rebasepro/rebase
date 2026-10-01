@@ -504,10 +504,13 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         if (dbError.constraint) parts.push(`Constraint: ${dbError.constraint}`);
         if (dbError.code === "42501") {
             code = "DB_PERMISSION_DENIED";
-            parts.push(
-                "The database rejected the statement for lack of privilege — usually a row-level " +
-                `security policy${dbError.table ? ` on "${dbError.table}"` : ""} denying this role, ` +
-                "or a stale FORCE ROW LEVEL SECURITY flag binding the owner connection."
+            const ungranted = missingGrant(dbError.message);
+            parts.push(ungranted
+                ? `The role this request runs as was never granted ${ungranted.kind} "${ungranted.name}" — ` +
+                  "a missing GRANT, not a row-level security policy."
+                : "The database rejected the statement for lack of privilege — usually a row-level " +
+                  `security policy${dbError.table ? ` on "${dbError.table}"` : ""} denying this role, ` +
+                  "or a stale FORCE ROW LEVEL SECURITY flag binding the owner connection."
             );
         }
         // 25006 read_only_sql_transaction. A request-scoped read opens its
@@ -629,7 +632,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
         clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. ${schemaDriftRemedy().short}`;
     } else if (code === "DB_PERMISSION_DENIED") {
-        clientMessage = `Permission denied by the database${dbError?.table ? ` on "${dbError.table}"` : ""} (row-level security). Check the RLS policies for this table.`;
+        const ungranted = missingGrant(dbError?.message);
+        clientMessage = ungranted
+            ? `Permission denied by the database: the role this request runs as has no privilege on ${ungranted.kind} ` +
+              `"${ungranted.name}". That is a missing GRANT to that role, not a row-level security policy.`
+            : `Permission denied by the database${dbError?.table ? ` on "${dbError.table}"` : ""} (row-level security). Check the RLS policies for this table.`;
     } else if (code === "INTERNAL_ERROR") {
         clientMessage = "Internal Server Error";
     }
@@ -660,6 +667,20 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         }
     } satisfies ErrorResponse, statusCode as ContentfulStatusCode);
 };
+
+/**
+ * The object a `42501` names when no policy was involved.
+ *
+ * One SQLSTATE covers two different failures. A policy refusing a row says
+ * "… violates row-level security policy …"; a role that was never granted an
+ * object says "permission denied for schema rebase" (or table, function, …).
+ * Answering the second with "check the RLS policies" sent people looking at
+ * policies that were fine, for a grant that was missing.
+ */
+function missingGrant(message: string | undefined): { kind: string; name: string } | undefined {
+    const match = message?.match(/^permission denied for (schema|table|relation|view|materialized view|sequence|function|procedure|routine|type|column|database|foreign table|large object|tablespace|language) (.+)$/i);
+    return match ? { kind: match[1].toLowerCase(), name: match[2].replace(/^"|"$/g, "") } : undefined;
+}
 
 /**
  * Map known error codes to HTTP status codes.

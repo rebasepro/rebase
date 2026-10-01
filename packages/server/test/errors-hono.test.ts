@@ -210,6 +210,24 @@ describe("Error Handler (Hono)", () => {
             expect(body.error.details.dbMessage).toContain("row-level security policy");
         });
 
+        // Same SQLSTATE, a different cause: the role was never GRANTed the
+        // object, and no policy was consulted. A fresh database's first boot
+        // answered every history write this way, and the message sent people
+        // to their RLS policies.
+        it.each([
+            ["permission denied for schema rebase", "schema", "rebase"],
+            ["permission denied for table orders", "table", "orders"],
+            ["permission denied for function record_history", "function", "record_history"]
+        ])("says a 42501 '%s' is a missing grant, not a policy", async (message, kind, name) => {
+            const app = createDbApp(nestedDbError({ code: "42501", message }));
+            const res = await app.request("/boom");
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("DB_PERMISSION_DENIED");
+            expect(body.error.message).toContain(`no privilege on ${kind} "${name}"`);
+            expect(body.error.message).toContain("GRANT");
+            expect(body.error.message).not.toContain("RLS policies");
+        });
+
         it("detects schema drift through multiple wrapper levels", async () => {
             const app = createDbApp(nestedDbError({
                 code: "42703",

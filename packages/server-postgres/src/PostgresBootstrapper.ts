@@ -1498,7 +1498,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
         async finalizeSecurityPosture(driverResult: InitializedDriver): Promise<void> {
             const internals = driverResult.internals as PostgresDriverInternals;
             const { driver, realtimeService, registry, db } = internals;
-            if (!db || driver.rlsUserRole) return;
+            if (!db) return;
 
             const runSql: RawSqlRunner = async (text) => {
                 const res = await db.execute(sql.raw(text));
@@ -1509,6 +1509,30 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 .map((c) => (c as { schema?: string }).schema)
                 .filter((s): s is string => typeof s === "string");
             const managedSchemas = ["public", "rebase", ...collectionSchemas];
+
+            // The switch was configured at connect — and its grants were made
+            // then, on the schemas that existed then. On a fresh database that
+            // is `public` alone: `rebase` (the RLS helpers, the history table,
+            // `rebase.record_history`, the job store) and a collection's own
+            // schema are created by provisioning, after. The grant skipped for
+            // a missing schema was never made, so every write to a
+            // `history: true` collection answered "permission denied for schema
+            // rebase" until a restart found the schema at connect time. Made
+            // now, once provisioning has created them; idempotent otherwise.
+            if (driver.rlsUserRole) {
+                try {
+                    await ensureAppRole(runSql, managedSchemas);
+                } catch (err) {
+                    // Fails closed — a missing grant refuses requests, it does
+                    // not widen them — so a warning, not a refusal to serve.
+                    logger.warn(
+                        `⚠️ RLS enforcement: could not grant "${REBASE_USER_ROLE}" on the schemas provisioning ` +
+                        `created (${managedSchemas.join(", ")}). Requests that touch them will be refused with ` +
+                        `"permission denied for schema …" until a boot can: ${err instanceof Error ? err.message : String(err)}`
+                    );
+                }
+                return;
+            }
 
             const posture = await detectConnectionPosture(runSql, managedSchemas);
             // Only ownership matters here. `canCreateTables` was already weighed
