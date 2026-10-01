@@ -1191,6 +1191,7 @@ parentEntityIds,
                 hideToolbar={true}
                 additionalFields={additionalFields}
                 tableController={tableController}
+                fixedFilter={collection.fixedFilter}
                 enablePopupIcon={true}
                 displayedColumnIds={displayedColumnIds}
                 onSizeChanged={onTableSizeChanged}

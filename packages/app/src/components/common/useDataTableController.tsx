@@ -125,7 +125,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         sortBy: sortUrl
     } = parseFilterAndSort(location.search);
 
-    const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(fixedFilter ?? (updateUrl ? filterUrl : undefined) ?? defaultFilter ?? undefined);
+    const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(
+        () => applyFixedFilter((updateUrl ? filterUrl : undefined) ?? defaultFilter ?? undefined, fixedFilter));
     const [sortBy, setSortBy] = React.useState<OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
 
     // Sync filter/sort state from URL on browser navigation (back/forward).
@@ -168,9 +169,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const urlSearchString = parseSearchString(location.search);
         if (encodeListState(urlFilterValues, urlSortBy, urlSearchString) === lastWrittenListStateRef.current) return;
 
-        if (!fixedFilter) {
-            setFilterValues((urlFilterValues ?? defaultFilter) as FilterValues<Extract<keyof M, string> | (string & {})> | undefined);
-        }
+        setFilterValues(applyFixedFilter<Extract<keyof M, string> | (string & {})>(urlFilterValues ?? defaultFilter, fixedFilter));
         if (urlSortBy && fixedFilter && !checkFilterCombination(fixedFilter, urlSortBy)) {
             console.warn("URL sort is not compatible with the force filter.");
         } else {
@@ -269,16 +268,13 @@ export function useDataTableController<M extends Record<string, any> = any, USER
      */
     const clearFilter = useCallback(() => setFilterValues(fixedFilter ?? undefined), [fixedFilter]);
 
+    // The user's filters combine with the collection's `fixedFilter` (AND).
+    // This used to return early with a console warning whenever a fixed
+    // filter was set, while the filters dialog and the header filters went on
+    // offering every other field: the user applied a filter, the dialog
+    // closed, and the rows did not change.
     const updateFilterValues = useCallback((updatedFilter: FilterValues<Extract<keyof M, string> | (string & {})> | undefined) => {
-        if (fixedFilter) {
-            console.warn("Filter is not compatible with the force filter. Ignoring filter");
-            return;
-        }
-        if (updatedFilter && Object.keys(updatedFilter).length === 0) {
-            setFilterValues(undefined);
-        } else {
-            setFilterValues(updatedFilter);
-        }
+        setFilterValues(applyFixedFilter(updatedFilter, fixedFilter));
     }, [fixedFilter]);
 
     // Without realtime the rows are one `find` per query, so nothing tells
@@ -436,6 +432,20 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         checkFilterCombination,
         popupCell
     ]);
+}
+
+/**
+ * The user's filters with the collection's fixed filter applied on top. The
+ * fixed fields are the collection's, so a value the user sends for one of them
+ * never replaces it; every other field is the user's. An empty result is no
+ * filter at all.
+ */
+function applyFixedFilter<K extends string>(
+    filter: FilterValues<K> | undefined,
+    fixedFilter: FilterValues<string> | undefined
+): FilterValues<K> | undefined {
+    const combined: FilterValues<K> = { ...(filter ?? {}), ...(fixedFilter ?? {}) };
+    return Object.keys(combined).length > 0 ? combined : undefined;
 }
 
 function useUpdateUrl<M extends Record<string, any> = any>(

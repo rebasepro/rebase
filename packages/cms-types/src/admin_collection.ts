@@ -315,8 +315,8 @@ export type AdminCollectionOptions<
     selectionController?: SelectionController<M>;
 
     /**
-     * Force a filter in this view. If applied, the rest of the filters will
-     * be disabled. Filters applied with this prop cannot be changed.
+     * Force a filter in this view. Its fields cannot be changed or cleared;
+     * filters the user applies on any other field combine with it (AND).
      * e.g. `fixedFilter: { age: [">", 18] }`
      * e.g. `fixedFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */

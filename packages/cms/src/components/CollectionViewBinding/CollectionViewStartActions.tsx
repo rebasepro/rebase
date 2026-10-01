@@ -234,7 +234,8 @@ parentEntityIds,
             key={"clear_filter"}
             tableController={tableController}
             compact={iconOnlyToolbar}
-            enabled={!collection.fixedFilter}/>,
+            fixedFilter={collection.fixedFilter}
+            enabled={true}/>,
         filterPresetsButton,
         countBadge
     ];

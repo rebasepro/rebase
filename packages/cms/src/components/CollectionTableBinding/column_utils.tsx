@@ -36,7 +36,10 @@ export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
 }
 
 export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, fixedFilter, engine, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
-    const disabledFilter = Boolean(fixedFilter);
+    // A fixed filter locks its own fields, not the table: the user's filters
+    // on every other column combine with it. It used to switch every header
+    // filter off, while the filters dialog went on offering the same fields.
+    const isFixed = (key: string) => Boolean(fixedFilter && key in fixedFilter);
     return Object.entries<Property>(properties)
         .flatMap(([key, property]) => getColumnKeysForProperty(property, key))
         .flatMap(({
@@ -61,7 +64,7 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                 align: getTableCellAlignment(property),
                 title: property.name ?? key as string,
                 sortable: sortable && sortableProperty(property),
-                filter: !disabledFilter && filterable,
+                filter: !isFixed(key) && filterable,
                 width: getTablePropertyColumnWidth(property),
                 resizable: true,
                 custom: {

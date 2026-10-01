@@ -1,14 +1,21 @@
 import { FilterXIcon, iconSize, IconButton, Tooltip } from "@rebasepro/ui";
+import type { FilterValues } from "@rebasepro/types";
 import { EntityTableController } from "@rebasepro/cms-types";
 import { useTranslation } from "@rebasepro/app";
 
 export function ClearFilterSortButton({
     tableController,
     enabled,
+    fixedFilter,
     compact
 }: {
     enabled: boolean;
     tableController: EntityTableController;
+    /**
+     * The collection's fixed filter. Its fields are not the user's to clear,
+     * so they do not count as a filter that is set.
+     */
+    fixedFilter?: FilterValues<string>;
     /**
      * Toolbar showing icon-only controls (split view, or a layout too narrow
      * for the filters button's label). Only decides the icon size, which
@@ -22,7 +29,8 @@ export function ClearFilterSortButton({
         return null;
     }
 
-    const filterIsSet = !!tableController.filterValues && Object.keys(tableController.filterValues).length > 0;
+    const filterIsSet = !!tableController.filterValues &&
+        Object.keys(tableController.filterValues).some(key => !fixedFilter || !(key in fixedFilter));
     const sortIsSet = !!tableController.sortBy && tableController.sortBy.length > 0;
 
     if ((filterIsSet || sortIsSet) && (tableController.clearFilter || tableController.setSortBy)) {

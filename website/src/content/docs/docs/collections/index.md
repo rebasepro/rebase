@@ -465,7 +465,8 @@ const invoices = defineCollection({
         // Default filter — users can change it
         defaultFilter: { active: ["==", true] },
 
-        // Fixed filter — cannot be changed
+        // Fixed filter — cannot be changed; filters the user applies
+        // on other fields combine with it
         fixedFilter: { tenantId: ["==", currentTenantId] },
 
         // Default sort
@@ -473,6 +474,9 @@ const invoices = defineCollection({
     }
 });
 ```
+
+The user can still filter a collection that has a `fixedFilter`: whatever they
+apply on other fields is combined with it (AND), and the fixed fields stay locked.
 
 A `fixedFilter` narrows what the panel *asks for*; it is not a boundary. What a
 caller is allowed to read is a [security rule](/docs/collections/security-rules),
