@@ -152,6 +152,34 @@ export class AstSchemaEditor {
         return resolved;
     }
 
+    /**
+     * Bring the in-memory project back in line with the disk.
+     *
+     * The source-only editor builds ONE of these at boot and serves every
+     * request with it, and ts-morph reads a file once and then trusts its
+     * copy. `project.save()` writes that copy back whole, so anything that
+     * reached the disk in between — the live editor's committed change (it
+     * builds a fresh editor per request), or the developer's own edit in the
+     * IDE — was overwritten by the boot-time copy plus this edit. In `rebase
+     * dev` the tsx-watch restart usually closed the window; outside watch mode
+     * the loss was permanent.
+     *
+     * Called at the top of every public method, so each edit applies to what
+     * is on disk now.
+     */
+    private syncWithDisk(): void {
+        for (const file of this.project.getSourceFiles()) {
+            if (!fs.existsSync(file.getFilePath())) {
+                this.project.removeSourceFile(file);
+            } else {
+                file.refreshFromFileSystemSync();
+            }
+        }
+        if (fs.existsSync(this.collectionsDir)) {
+            this.project.addSourceFilesAtPaths(`${this.collectionsDir}/**/*.ts`);
+        }
+    }
+
     private getCollectionFile(collectionId: string) {
         const safeId = this.sanitizeCollectionId(collectionId);
         const filePath = this.safePath(`${safeId}.ts`);
@@ -402,6 +430,7 @@ export class AstSchemaEditor {
     }
 
     public async saveProperty(collectionId: string, propertyKey: string, propertyConfig: Record<string, unknown>) {
+        this.syncWithDisk();
         try {
             await this.writeProperty(collectionId, propertyKey, propertyConfig);
         } catch (err) {
@@ -464,6 +493,7 @@ export class AstSchemaEditor {
     }
 
     public async deleteProperty(collectionId: string, propertyKey: string) {
+        this.syncWithDisk();
         const collectionObj = this.requireCollectionObject(collectionId);
 
         const propertiesProp = collectionObj.getProperty("properties") as PropertyAssignment;
@@ -495,6 +525,7 @@ export class AstSchemaEditor {
      * default, which in the scaffold is `access: "public"`.
      */
     public async saveCollection(collectionId: string, collectionData: Record<string, unknown>, options: { partial?: boolean } = {}) {
+        this.syncWithDisk();
         try {
             await this.writeCollection(collectionId, collectionData, options);
         } catch (err) {
@@ -847,6 +878,7 @@ export class AstSchemaEditor {
     }
 
     public async deleteCollection(collectionId: string) {
+        this.syncWithDisk();
         const file = this.getCollectionFile(collectionId);
         if (file) {
             file.deleteImmediatelySync();
