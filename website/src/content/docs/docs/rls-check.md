@@ -299,7 +299,10 @@ The severity is platform-dependent, and this distinction matters:
 
 - **On Supabase**, `auth.uid()` returns `NULL` for anonymous callers, so this is a working
   authenticated-only check. Reported as **low** — a data-scoping gap between signed-in
-  users, not an anonymous-access hole.
+  users, not an anonymous-access hole. That holds for `auth.uid()` (and the `sub` claim it
+  reads) only: a signed-out request still carries the project's anon key, so `auth.role()`
+  is `'anon'` and `auth.jwt()` is that key's claims. The same shape built on either of them
+  is *true for signed-out callers*, and is reported as **critical**.
 - **On Rebase or PostgREST**, where a blank caller id is coerced to an `'anonymous'`
   sentinel, the expression is *true for signed-out callers too*. Reported as **critical**.
 - **On an unrecognised platform**, reported as **medium**, since whether it is a hole

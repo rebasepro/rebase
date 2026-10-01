@@ -31,6 +31,28 @@ describe("policy-authenticated-tautology", () => {
         expect(findings[0].impact).toContain("every row");
     });
 
+    it("reads `auth.role() <> 'anon'` as the role guard it is", () => {
+        // A signed-out Supabase request arrives as the role 'anon', so excluding
+        // it does exclude signed-out callers — and leaves every account reading
+        // every row, which is this finding.
+        const findings = policyAuthenticatedTautology.run(
+            snapshot({
+                platform: "supabase",
+                relations: [table("public", "users")],
+                policies: [
+                    policy("public", "users", "users_read", {
+                        using: "((auth.role() IS NOT NULL) AND (auth.role() <> 'anon'::text))",
+                        roles: ["authenticated"]
+                    })
+                ]
+            })
+        );
+
+        expect(findings).toHaveLength(1);
+        expect(findings[0].detail).toContain("auth.role()");
+        expect(findings[0].detail).toContain("is not the anonymous");
+    });
+
     it("recognises the reversed order", () => {
         expect(policyAuthenticatedTautology.run(
             withPolicy("(auth.uid() <> 'anonymous' AND auth.uid() IS NOT NULL)")

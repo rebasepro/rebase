@@ -50,6 +50,11 @@ CREATE FUNCTION auth.role() RETURNS text
     LANGUAGE sql STABLE
     AS $$ SELECT coalesce(current_setting('request.jwt.claim.role', true), 'anon') $$;
 
+-- What a signed-out Supabase request carries: the anon key's claims. Not NULL.
+CREATE FUNCTION auth.jwt() RETURNS jsonb
+    LANGUAGE sql STABLE
+    AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{"role":"anon"}')::jsonb $$;
+
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated;
 
@@ -176,6 +181,38 @@ ALTER TABLE public.vuln_anon_tautology FORCE ROW LEVEL SECURITY;
 CREATE POLICY vuln_anon_tautology_select ON public.vuln_anon_tautology
     FOR SELECT TO public USING (auth.uid() IS NOT NULL);
 GRANT SELECT ON public.vuln_anon_tautology TO anon, authenticated;
+
+-- policy-anonymous-tautology, built on calls that are NOT NULL for a signed-out
+-- Supabase request: it carries the anon key's JWT, so `auth.jwt()` is that key's
+-- claims and `auth.role()` is 'anon'. Unlike the `auth.uid()` table above, these
+-- hand every row to anyone holding the public anon key — critical, not low.
+CREATE TABLE public.vuln_jwt_tautology (
+    id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id uuid,
+    body     text
+);
+ALTER TABLE public.vuln_jwt_tautology ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_jwt_tautology FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_jwt_tautology_select ON public.vuln_jwt_tautology
+    FOR SELECT TO public USING (auth.jwt() IS NOT NULL);
+GRANT SELECT ON public.vuln_jwt_tautology TO anon, authenticated;
+
+CREATE TABLE public.vuln_role_tautology (
+    id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id uuid,
+    body     text
+);
+ALTER TABLE public.vuln_role_tautology ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_role_tautology FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_role_tautology_select ON public.vuln_role_tautology
+    FOR SELECT TO public USING (auth.role() IS NOT NULL);
+GRANT SELECT ON public.vuln_role_tautology TO anon, authenticated;
+
+-- One row each, so the suite can ask Postgres what anon actually reads rather
+-- than trusting the scanner's reading of the policy text.
+INSERT INTO public.vuln_anon_tautology (body) VALUES ('a row');
+INSERT INTO public.vuln_jwt_tautology (body) VALUES ('a row');
+INSERT INTO public.vuln_role_tautology (body) VALUES ('a row');
 
 -- policy-anonymous-tautology: the guard that names the wrong literal.
 --

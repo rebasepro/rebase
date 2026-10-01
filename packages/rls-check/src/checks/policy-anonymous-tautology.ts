@@ -24,7 +24,10 @@ const ID = "policy-anonymous-tautology";
  *   - Supabase: `auth.uid()` reads a JWT claim and returns NULL for an anonymous
  *     caller, so the expression is a legitimate "signed in" test. Its only real
  *     failing is that it does not scope rows to their owner — worth `low`, worded
- *     as a design observation rather than a vulnerability.
+ *     as a design observation rather than a vulnerability. That is a fact about
+ *     `auth.uid()`, not about Supabase: an anonymous caller there still carries
+ *     the anon key's JWT, so `auth.role()` and `auth.jwt()` are non-null for it,
+ *     and the same shape built on them is a bypass — see {@link CallerCall}.
  *   - Rebase / PostgREST-style stacks that coerce a missing id to a sentinel
  *     (`'anonymous'`, `''`): the expression is true for signed-out callers, so it
  *     is a straight authentication bypass. This exact policy shipped in this
@@ -46,7 +49,6 @@ export const policyAnonymousTautology: Check = {
     run(snapshot: DbSnapshot): Finding[] {
         const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
-        const { severity: baseSeverity, meaning, impactSuffix } = platformReading(snapshot.platform);
 
         for (const policy of snapshot.policies) {
             if (!snapshot.schemas.includes(policy.schema)) continue;
@@ -62,7 +64,11 @@ export const policyAnonymousTautology: Check = {
             if (checkMatch) clauses.push("WITH CHECK");
             if (clauses.length === 0) continue;
 
-            const shape = usingMatch?.shape ?? checkMatch?.shape ?? "the caller id";
+            // The worse of the two clauses decides: a WITH CHECK on `auth.jwt()`
+            // is not made safe by a USING on `auth.uid()`.
+            const matched = worstMatch(snapshot.platform, usingMatch, checkMatch);
+            const { severity: baseSeverity, meaning, impactSuffix } = platformReading(snapshot.platform, matched);
+            const shape = matched.shape;
             const decoys = [
                 ...new Set([...(usingMatch?.decoyGuards ?? []), ...(checkMatch?.decoyGuards ?? [])])
             ];
@@ -85,10 +91,13 @@ export const policyAnonymousTautology: Check = {
                         (decoys.length > 0
                             ? `The ${listAnd(clauses)} expression of this ${policy.command} policy reads as ` +
                               `"signed in": it tests that ${shape} is non-null and excludes ` +
-                              `${listAnd(written)}. But the id a signed-out caller actually arrives with is ` +
-                              `${listAnd(CLEARING_SENTINELS.map(describeSentinel))}, and neither is ` +
-                              `${listAnd(decoys.map((d) => `'${d}'`))} — so the guard excludes nobody and the ` +
-                              `null test stands on its own. `
+                              `${listAnd(written)}. But ` +
+                              (matched.call.sentinels.length > 0
+                                  ? `the ${matched.call.noun} a signed-out caller actually arrives with is ` +
+                                    `${listAnd(matched.call.sentinels.map(describeSentinel))}, and neither is ` +
+                                    `${listAnd(decoys.map((d) => `'${d}'`))}`
+                                  : `no literal stands for a signed-out caller in ${shape}`) +
+                              ` — so the guard excludes nobody and the null test stands on its own. `
                             : `The ${listAnd(clauses)} expression of this ${policy.command} policy tests only ` +
                               `that ${shape} is non-null. `) +
                         `It does not compare anything to a column, so every row of the table satisfies it ` +
@@ -143,23 +152,64 @@ function forCommand(base: Severity, command: DbPolicy["command"]): Severity {
 
 const describeSentinel = (s: string) => (s === "" ? "the empty string" : `'${s}'`);
 
-function platformReading(platform: DbSnapshot["platform"]): {
+interface Reading {
     severity: Severity;
     meaning: string;
     impactSuffix: string;
-} {
+}
+
+/** Of the USING and WITH CHECK clauses that matched, the one whose reading is worse. */
+function worstMatch(
+    platform: DbSnapshot["platform"],
+    using: TautologyMatch | null,
+    check: TautologyMatch | null
+): TautologyMatch {
+    if (!using) return check!;
+    if (!check) return using;
+    const rank = (m: TautologyMatch) => SEVERITIES.indexOf(platformReading(platform, m).severity);
+    return rank(check) > rank(using) ? check : using;
+}
+
+/**
+ * What the expression means on this platform, for the call it is built on.
+ *
+ * The platform alone does not decide it. On Supabase `auth.uid()` is NULL for a
+ * signed-out request, so a null test on it is a working "signed in" check — but
+ * a signed-out request there still carries a JWT, the project's public anon
+ * key, so `auth.role()` is `'anon'` and `auth.jwt()` is that key's claims. A
+ * null test on either is true for everyone. This used to be read per platform
+ * only, which graded `USING (auth.jwt() IS NOT NULL)` low and told the reader
+ * that anonymous callers were correctly excluded.
+ */
+function platformReading(platform: DbSnapshot["platform"], match: TautologyMatch): Reading {
+    const { shape, call } = match;
     switch (platform) {
         case "supabase":
-            return {
-                severity: "low",
-                meaning:
-                    `On Supabase, \`auth.uid()\` returns NULL for an anonymous request, so this is a ` +
-                    `working authenticated-only check rather than a bypass. It is listed because it ` +
-                    `only distinguishes signed-in from signed-out; it does not scope rows to their owner.`,
-                impactSuffix:
-                    `Anonymous callers are correctly excluded on Supabase, so this is a data-scoping ` +
-                    `gap between signed-in users, not an anonymous-access hole.`
-            };
+            if (call.onSupabase === "null") {
+                return {
+                    severity: "low",
+                    meaning:
+                        `On Supabase, \`${shape}\` returns NULL for an anonymous request, so this is a ` +
+                        `working authenticated-only check rather than a bypass. It is listed because it ` +
+                        `only distinguishes signed-in from signed-out; it does not scope rows to their owner.`,
+                    impactSuffix:
+                        `Anonymous callers are correctly excluded on Supabase, so this is a data-scoping ` +
+                        `gap between signed-in users, not an anonymous-access hole.`
+                };
+            }
+            if (call.onSupabase === "present") {
+                return {
+                    severity: "critical",
+                    meaning:
+                        `On Supabase a signed-out request still carries a JWT — the project's anon key, which ` +
+                        `ships in every client — and for it \`${shape}\` is ${call.signedOutValue}, not NULL. ` +
+                        `So this expression is true for signed-out callers too: it authorises everyone.`,
+                    impactSuffix:
+                        `That includes unauthenticated callers: the anon key is public, and a request ` +
+                        `carrying nothing else satisfies the expression.`
+                };
+            }
+            return unknownReading(shape);
         case "rebase":
         case "postgrest":
             return {
@@ -173,18 +223,23 @@ function platformReading(platform: DbSnapshot["platform"]): {
                     `includes unauthenticated callers.`
             };
         default:
-            return {
-                severity: "medium",
-                meaning:
-                    `Whether this excludes anonymous callers depends on the layer in front of the ` +
-                    `database: if it leaves the setting unset for signed-out requests the expression is ` +
-                    `false and this is merely loose; if it coerces them to a sentinel id (an empty ` +
-                    `string or 'anonymous') the expression is true and this authorises everyone.`,
-                impactSuffix:
-                    `Whether unauthenticated callers are included depends on whether your stack coerces ` +
-                    `a missing caller id to a sentinel value — check that before judging the severity.`
-            };
+            return unknownReading(shape);
     }
+}
+
+function unknownReading(shape: string): Reading {
+    return {
+        severity: "medium",
+        meaning:
+            `Whether this excludes anonymous callers depends on the layer in front of the ` +
+            `database: if it leaves \`${shape}\` unset for signed-out requests the expression is ` +
+            `false and this is merely loose; if it gives them a value — a sentinel id such as an ` +
+            `empty string or 'anonymous', or the claims of a public anon key — the expression is ` +
+            `true and this authorises everyone.`,
+        impactSuffix:
+            `Whether unauthenticated callers are included depends on whether your stack coerces ` +
+            `a missing caller id to a sentinel value — check that before judging the severity.`
+    };
 }
 
 /**
@@ -196,13 +251,41 @@ function platformReading(platform: DbSnapshot["platform"]): {
  * `auth.*` for good. A security check that stops recognising a dangerous clause
  * because a schema was renamed is a check that silently turned itself off.
  */
-const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string }[] = [
-    { re: /(?:rebase|auth)\.uid\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, "") },
-    { re: /auth\.role\s*\(\s*\)/g, label: () => "auth.role()" },
-    { re: /(?:rebase|auth)\.roles\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, "") },
-    { re: /(?:rebase|auth)\.jwt\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, "") },
-    { re: /current_setting\s*\(\s*('[^']*')\s*(?:,\s*[a-z]+\s*)?\)/g, label: (m) => `current_setting(${m[1]})` }
+const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string; call: (m: RegExpExecArray) => CallerCall }[] = [
+    { re: /(?:rebase|auth)\.uid\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, ""), call: () => CALLER_ID },
+    { re: /auth\.role\s*\(\s*\)/g, label: () => "auth.role()", call: () => CALLER_ROLE },
+    { re: /(?:rebase|auth)\.roles\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, ""), call: () => CALLER_ROLE_LIST },
+    { re: /(?:rebase|auth)\.jwt\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, ""), call: () => CALLER_CLAIMS },
+    {
+        re: /current_setting\s*\(\s*('[^']*')\s*(?:,\s*[a-z]+\s*)?\)/g,
+        label: (m) => `current_setting(${m[1]})`,
+        call: (m) => settingCall(m[1].slice(1, -1))
+    }
 ];
+
+/**
+ * What a caller call hands a signed-out request, which is what decides whether
+ * `<call> IS NOT NULL` keeps that request out.
+ */
+export interface CallerCall {
+    /**
+     * On Supabase, a signed-out request carries the project's anon key — a real
+     * JWT with `role: "anon"` and no user in it. So:
+     *
+     *   - `null`: the call reads something that JWT does not carry (`auth.uid()`
+     *     reads `sub`), and a null test on it does exclude signed-out callers;
+     *   - `present`: the call reads something it does carry, and a null test on
+     *     it excludes nobody;
+     *   - `unknown`: Supabase does not set it, so whatever does decides.
+     */
+    onSupabase: "null" | "present" | "unknown";
+    /** What the call returns for that request, in prose, when it is `present`. */
+    signedOutValue?: string;
+    /** What the call names — "id", "role" — for the sentence about its sentinels. */
+    noun: string;
+    /** Values a signed-out caller arrives with, so a guard excluding one is real. */
+    sentinels: string[];
+}
 
 /**
  * The ids that a signed-out caller can actually arrive with, so excluding one of
@@ -217,9 +300,69 @@ const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string }[] =
  */
 const CLEARING_SENTINELS = ["anonymous", ""];
 
+const CALLER_ID: CallerCall = { onSupabase: "null", noun: "id", sentinels: CLEARING_SENTINELS };
+
+/**
+ * `auth.role()`, and the claim it reads. `'anon'` is a decoy for an *id* — no
+ * signed-out caller arrives with that id — but it is precisely the *role* one
+ * arrives as on Supabase (`web_anon` on a stock PostgREST), so excluding it is
+ * the real guard here.
+ */
+const CALLER_ROLE: CallerCall = {
+    onSupabase: "present",
+    signedOutValue: "'anon'",
+    noun: "role",
+    sentinels: ["anon", "web_anon"]
+};
+
+/** Rebase's `roles()`, which coalesces an unset list to the empty string. */
+const CALLER_ROLE_LIST: CallerCall = {
+    onSupabase: "present",
+    signedOutValue: "the empty string",
+    noun: "role list",
+    sentinels: CLEARING_SENTINELS
+};
+
+const CALLER_CLAIMS: CallerCall = {
+    onSupabase: "present",
+    signedOutValue: "the anon key's claims",
+    noun: "claim set",
+    sentinels: []
+};
+
+/** A setting nothing on Supabase defines: whatever sets it decides. */
+const CALLER_SETTING: CallerCall = { onSupabase: "unknown", noun: "id", sentinels: CLEARING_SENTINELS };
+
+/** The claims Supabase's anon key carries. Every other claim is unset for it. */
+const ANON_KEY_CLAIMS = ["role", "iss", "ref", "iat", "exp"];
+
+/**
+ * `current_setting('…')` by the setting it reads. PostgREST publishes the JWT as
+ * `request.jwt.claims`, and older releases also as one `request.jwt.claim.<name>`
+ * per claim — so the claim name decides whether the anon key fills it.
+ */
+function settingCall(name: string): CallerCall {
+    if (name === "request.jwt.claims") return CALLER_CLAIMS;
+    const claim = /^request\.jwt\.claim\.(.+)$/.exec(name)?.[1];
+    if (claim === undefined) return CALLER_SETTING;
+    if (claim === "sub") return CALLER_ID;
+    if (claim === "role") return CALLER_ROLE;
+    if (ANON_KEY_CLAIMS.includes(claim)) {
+        return {
+            onSupabase: "present",
+            signedOutValue: `the anon key's \`${claim}\` claim`,
+            noun: "claim",
+            sentinels: []
+        };
+    }
+    return { onSupabase: "null", noun: "claim", sentinels: CLEARING_SENTINELS };
+}
+
 export interface TautologyMatch {
     /** How to name the caller-id expression in prose, e.g. `auth.uid()`. */
     shape: string;
+    /** What that call hands a signed-out request. */
+    call: CallerCall;
     /** Literals the policy excludes that exclude nobody. Empty for a bare null test. */
     decoyGuards: string[];
     /**
@@ -274,9 +417,10 @@ export function callerIdOnlyClause(clause: string | null | undefined): Tautology
         .replace(/\s+/g, " ")
         .trim();
 
-    for (const { re, label } of CALLER_ID_CALLS) {
+    for (const { re, label, call: callFor } of CALLER_ID_CALLS) {
         const first = new RegExp(re.source).exec(flat);
         if (!first) continue;
+        const call = callFor(first);
 
         const substituted = flat.replace(new RegExp(re.source, "g"), " callerid ");
         // `OR` changes what the policy admits; this shape no longer describes it.
@@ -297,16 +441,12 @@ export function callerIdOnlyClause(clause: string | null | undefined): Tautology
 
             const excluded = excludedLiterals(conjunct);
             if (!excluded) return null; // something we do not understand: stay quiet
-            if (excluded.some((lit) => CLEARING_SENTINELS.includes(lit))) cleared = true;
+            if (excluded.some((lit) => call.sentinels.includes(lit))) cleared = true;
             decoys.push(...excluded);
         }
 
         if (!sawNullTest) continue;
-        if (cleared) {
-            return { shape: label(first), decoyGuards: [...new Set(decoys)], guardsSentinel: true };
-        }
-
-        return { shape: label(first), decoyGuards: [...new Set(decoys)], guardsSentinel: false };
+        return { shape: label(first), call, decoyGuards: [...new Set(decoys)], guardsSentinel: cleared };
     }
 
     return null;

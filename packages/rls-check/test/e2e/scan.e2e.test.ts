@@ -30,6 +30,7 @@ import {
     applySql,
     isDockerAvailable,
     querySql,
+    querySqlAs,
     startPgContainer,
     stopPgContainer,
     type PgContainer
@@ -212,6 +213,42 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
 
         expect(flagged).toContain("vuln_anon_decoy_guard");
         expect(flagged).not.toContain("secure_anon_real_guard");
+    });
+
+    /**
+     * On Supabase `auth.uid()` is NULL for a signed-out request, so its null
+     * test is a working "signed in" check — but the request still carries the
+     * anon key's JWT, so `auth.jwt()` and `auth.role()` are not NULL, and the
+     * same shape on them lets anon read every row. Both used to be graded low
+     * and described as "anonymous callers are correctly excluded".
+     */
+    it("grades a null test on auth.jwt() or auth.role() critical on Supabase, and auth.uid() low", async () => {
+        const severityOf = (table: string) =>
+            full.findings.find(
+                (finding) => finding.id === "policy-anonymous-tautology" && finding.target.table === table
+            )?.severity;
+
+        expect(severityOf("vuln_jwt_tautology")).toBe("critical");
+        expect(severityOf("vuln_role_tautology")).toBe("critical");
+        expect(severityOf("vuln_anon_tautology")).toBe("low");
+
+        // And the database agrees: as anon, with the anon key's claims and no
+        // `sub`, the first two hand over their row and the third does not.
+        const anonClaims = { "request.jwt.claims": JSON.stringify({ role: "anon" }) };
+        const countAs = async (table: string) =>
+            Number(
+                (
+                    await querySqlAs<{ n: string }>(
+                        container.connectionString,
+                        "anon",
+                        `SELECT count(*) AS n FROM public.${table}`,
+                        anonClaims
+                    )
+                )[0].n
+            );
+        expect(await countAs("vuln_jwt_tautology")).toBe(1);
+        expect(await countAs("vuln_role_tautology")).toBe(1);
+        expect(await countAs("vuln_anon_tautology")).toBe(0);
     });
 
     it("names the useless literal in the finding, so the reader can see the typo", () => {
