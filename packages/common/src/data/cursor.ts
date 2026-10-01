@@ -1,4 +1,4 @@
-import type { OrderByTuple } from "@rebasepro/types";
+import { parseRelationAggregateSort, type OrderByTuple } from "@rebasepro/types";
 
 /**
  * The keyset-cursor wire codec.
@@ -146,10 +146,19 @@ export function encodeCursor(
     // A key whose value is not on the row cannot be seeked past. Rather than
     // emit a cursor that the next request would refuse, emit none — the caller
     // falls back to offset paging, which is what it did before cursors existed.
+    //
+    // An aggregate over a relation (`count(orders)`) is the exception: it is
+    // never on the row, and it needs no value here, because the keyset
+    // comparison recomputes the cursor row's value in SQL from the id.
+    // Refusing it withheld the cursor from every such listing.
     const values: Record<string, unknown> = {};
     for (const [field] of keys) {
-        if (!(field in row)) return undefined;
-        values[field] = encodeValue(row[field]);
+        if (field in row) {
+            values[field] = encodeValue(row[field]);
+            continue;
+        }
+        if (parseRelationAggregateSort(field)) continue;
+        return undefined;
     }
     return toBase64Url(JSON.stringify({ k: keys, v: values, i: encodeValue(id) }));
 }

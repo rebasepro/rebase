@@ -48,6 +48,15 @@ do {
 } while (after);
 ```
 
+`nextCursor` is absent on the last page, and on a page no cursor can describe:
+a relevance-ordered search (`_score`), a vector search, and a `fields` projection
+that leaves out one of the `orderBy` fields — the cursor is built from the last
+row's sort values, and that row does not carry them. There `meta.hasMore` can be
+`true` with no `nextCursor`, and the loop above stops early: add the sort fields
+to `fields`, or page by `offset`. `iterate()` given a `cursor` refuses such a
+listing with `cursor-missing` rather than stopping. A sort by an
+[aggregate over a relation](/docs/sdk/relations/) does page by cursor.
+
 The cursor is **opaque**. It encodes the sort keys *and* the last row's values
 for them, so it can only continue the listing it came from: keep `orderBy`
 identical across pages, or the request is refused with

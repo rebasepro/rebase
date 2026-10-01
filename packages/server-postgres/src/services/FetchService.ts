@@ -2313,7 +2313,11 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         const orderExpressions = vectorMeta
             ? [asc(vectorMeta.orderBy), ...keyColumns.map(column => desc(column))]
             : this.buildOrderExpressions(
-                this.resolveOrderKeys(table, sortKeys, collection, options.searchString),
+                // `collectionPath` too: an aggregate over a relation
+                // (`count(applications)`) resolves its subquery against it, and
+                // without it every such sort on this path — the REST list, the
+                // SDK's `find()` — was refused as a query that "carries none".
+                this.resolveOrderKeys(table, sortKeys, collection, options.searchString, collectionPath),
                 wantsDistinct ? [] : keyColumns
             );
         if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
