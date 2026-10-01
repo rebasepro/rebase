@@ -116,6 +116,9 @@ describe("the payload of a row too wide for pg_notify", () => {
         await db.close();
     });
 
+    // The payload is an identity for every row now (see
+    // `cdc-payload-identity.test.ts`), so a wide row no longer overflows into
+    // a reduced payload: it is sent whole-key, like any other.
     it("keeps every primary-key column, so the row can still be addressed", async () => {
         db = new PGlite();
         await db.waitReady;
@@ -131,7 +134,7 @@ describe("the payload of a row too wide for pg_notify", () => {
         for (let i = 0; i < 50 && payloads.length === 0; i++) await new Promise(resolve => setTimeout(resolve, 10));
 
         const event = parseCdcPayload(payloads[0]);
-        expect(event?.truncated).toBe(true);
+        expect(event?.truncated).toBe(false);
         expect(event?.row).toEqual({ project_id: "p1", user_id: "bob" });
     });
 });

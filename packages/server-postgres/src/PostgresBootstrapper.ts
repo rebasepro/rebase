@@ -43,8 +43,9 @@ import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema"
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
 import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
-import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { provisionTriggerCdc, refreshInstalledCdcFunction, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
+import { collectionKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
 import { isChannelBusInstance } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
@@ -893,6 +894,12 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const explicitCdc = cdcMode === "trigger" || cdcMode === "wal";
             let cdcEnabled = false;
             let provisionCdcForTables: PostgresDriverInternals["provisionCdcForTables"];
+            const cdcRunSql: RawSqlRunner = async (text) => {
+                const res = await schemaAwareDb.execute(sql.raw(text));
+                return (res.rows ?? []) as Record<string, unknown>[];
+            };
+            /** Whether this boot left the trigger function at the current body. */
+            let cdcFunctionCurrent = false;
 
             if (wantsCdc && !directUrl) {
                 const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
@@ -910,14 +917,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     );
                 }
                 try {
-                    const cdcRunSql: RawSqlRunner = async (text) => {
-                        const res = await schemaAwareDb.execute(sql.raw(text));
-                        return (res.rows ?? []) as Record<string, unknown>[];
-                    };
+                    // Each table is attached with the columns its rows are
+                    // addressed by, and the payload carries those and nothing
+                    // else — any login can LISTEN. See `buildCdcFunctionSql`.
                     const cdcTables: CdcTableRef[] = collectionsOnThisSource()
                         .map((c) => ({
                             schema: (c as { schema?: string }).schema ?? "public",
-                            table: getCollectionTableName(c)
+                            table: getCollectionTableName(c),
+                            identityColumns: collectionKeyColumns(c, registry).map((k) => k.columnName)
                         }))
                         .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
                     // Junction tables back no collection, so the list above misses
@@ -932,13 +939,21 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
                     for (const link of collectJunctionLinks(registry)) {
                         if (!ownSlugs.has(link.parentCollection.slug)) continue;
-                        cdcTables.push({ schema: link.schema,
-table: link.table });
+                        // A junction row is addressed by the two ids that name
+                        // the child list it belongs to, whatever its own key is.
+                        cdcTables.push({
+                            schema: link.schema,
+                            table: link.table,
+                            identityColumns: [link.sourceColumn, link.targetColumn]
+                        });
                     }
                     // Provisioning throws only when the connection can't create the
                     // trigger function (insufficient privilege); enableCdc throws when
                     // the LISTEN connection can't be established. Either → fall back.
-                    if (realtimeProvisions) await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    if (realtimeProvisions) {
+                        await provisionTriggerCdc(cdcRunSql, cdcTables);
+                        cdcFunctionCurrent = true;
+                    }
                     if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
                     cdcEnabled = true;
                     // Boot steps that create their own tables (auth) run after
@@ -972,6 +987,25 @@ table: link.table });
                             { detail: err instanceof Error ? err.message : String(err) }
                         );
                     }
+                }
+            }
+
+            // Triggers an earlier boot attached keep firing whether or not this
+            // one provisions capture, so a function from a version that sent
+            // whole rows has to be replaced even when capture is off — any
+            // login can LISTEN to what it sends. Only a function that is
+            // already there: nothing is installed here.
+            if (realtimeProvisions && !cdcFunctionCurrent) {
+                try {
+                    await refreshInstalledCdcFunction(cdcRunSql);
+                } catch (err) {
+                    logger.warn(
+                        "⚠️ [CDC] A change-capture trigger function from an earlier boot is installed and could not be " +
+                        "brought up to date. Older versions of it send every changed row on a channel any database " +
+                        "login can LISTEN to; if capture is not wanted, remove it with " +
+                        "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE`.",
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
                 }
             }
 
@@ -1146,7 +1180,14 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
                     : authCollection.slug;
                 if (authTable) {
                     try {
-                        await internals.provisionCdcForTables([{ schema: authSchema, table: authTable }]);
+                        await internals.provisionCdcForTables([{
+                            schema: authSchema,
+                            table: authTable,
+                            // The auth table above all: its rows carry password
+                            // hashes and verification tokens, and the payload
+                            // names the row by its key and nothing else.
+                            identityColumns: collectionKeyColumns(authCollection, registry).map((k) => k.columnName)
+                        }]);
                     } catch (err) {
                         logger.warn(
                             `⚠️ [CDC] Could not attach change-capture to the auth table "${authSchema}.${authTable}" — ` +

@@ -6,13 +6,14 @@ import { DataService } from "./dataService";
 
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { getTableColumns, sql as drizzleSql } from "drizzle-orm";
+import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
+import { collectionKeyColumns } from "./cdc/identity-columns";
 import { ApiError, logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
@@ -23,7 +24,7 @@ import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
 import type { ChannelHistoryEntry, ChannelRetentionRule, User } from "@rebasepro/types";
-import { toSnakeCase, unref } from "@rebasepro/utils";
+import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -2856,8 +2857,8 @@ lastSeen: Date.now() });
     /**
      * Route a captured database change into the realtime pipeline.
      *
-     * Delivery is RLS-safe by construction: the raw tuple from the WAL/trigger is
-     * NOT forwarded to subscribers. Instead the change is marked invalidated, so
+     * Delivery is RLS-safe by construction: the event carries the changed row's
+     * key and nothing else, and even that is NOT forwarded to subscribers. Instead the change is marked invalidated, so
      * every matching subscription re-reads the row under its own auth context via
      * {@link fetchCollectionWithAuth} / {@link fetchEntityWithAuth}. A subscriber
      * therefore only ever receives rows its RLS policies permit — filtering is per
@@ -2952,15 +2953,10 @@ lastSeen: Date.now() });
      * about any write made outside this server.
      */
     private cdcRowByKeyFields(collection: CollectionConfig, row: Record<string, unknown>): Record<string, unknown> {
-        const table = this.registry.getTable(getTableName(collection));
-        const columns = table ? getTableColumns(table) : undefined;
         const keyed: Record<string, unknown> = { ...row };
-        for (const pk of getPrimaryKeys(collection, this.registry)) {
-            if (pk.fieldName in row) continue;
-            const property = collection.properties?.[pk.fieldName];
-            const declared = property && "columnName" in property ? property.columnName : undefined;
-            const columnName = columns?.[pk.fieldName]?.name ?? declared ?? toSnakeCase(pk.fieldName);
-            if (columnName in row) keyed[pk.fieldName] = row[columnName];
+        for (const { fieldName, columnName } of collectionKeyColumns(collection, this.registry)) {
+            if (fieldName in row) continue;
+            if (columnName in row) keyed[fieldName] = row[columnName];
         }
         return keyed;
     }

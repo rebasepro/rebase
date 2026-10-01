@@ -50,12 +50,40 @@ describe("provisionTriggerCdc", () => {
 
         const result = await provisionTriggerCdc(run, tables);
 
-        // 1 function + 2 unique triggers
-        expect(run).toHaveBeenCalledTimes(3);
+        // 1 function + 2 unique tables, each a catalogue read of its key and a trigger
+        expect(run).toHaveBeenCalledTimes(5);
         expect(calls[0]).toContain("CREATE OR REPLACE FUNCTION");
         expect(result.installed).toHaveLength(2);
         expect(result.skipped).toHaveLength(0);
         expect(calls.filter((c) => c.includes("CREATE TRIGGER"))).toHaveLength(2);
+    });
+
+    it("attaches each table with its primary key and the requested identity columns it has, once per table", async () => {
+        const calls: string[] = [];
+        const run = jest.fn(async (text: string) => {
+            calls.push(text);
+            if (text.includes("pg_attribute") && text.includes("posts_tags")) {
+                return [
+                    { name: "id", is_primary: true },
+                    { name: "post_id", is_primary: false },
+                    { name: "tag_id", is_primary: false },
+                    { name: "note", is_primary: false }
+                ];
+            }
+            return [];
+        });
+
+        await provisionTriggerCdc(run, [
+            // A junction is listed once per direction of its relation.
+            { schema: "public", table: "posts_tags", identityColumns: ["post_id", "tag_id"] },
+            { schema: "public", table: "posts_tags", identityColumns: ["tag_id", "post_id", "gone"] }
+        ]);
+
+        const triggers = calls.filter((c) => c.includes("CREATE TRIGGER"));
+        expect(triggers).toHaveLength(1);
+        // The key, then the two ids; never `note`, and never a column the
+        // table does not have.
+        expect(triggers[0]).toContain(`EXECUTE FUNCTION ${CDC_TRIGGER_FUNCTION}('id', 'post_id', 'tag_id');`);
     });
 
     it("skips (does not abort) a table whose trigger install fails", async () => {

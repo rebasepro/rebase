@@ -11,12 +11,13 @@ export interface CdcChangeEvent {
     table: string;
     op: "INSERT" | "UPDATE" | "DELETE";
     /**
-     * The changed tuple (NEW for insert/update, OLD for delete). May be a
-     * partial identity-only object when the full row overflowed the pg_notify
-     * size cap — see {@link truncated}.
+     * The changed row's identity, by column: its key, and for a junction table
+     * the two ids naming the child list (from NEW for insert/update, OLD for
+     * delete). Never the row's other values — any login can LISTEN; see
+     * `buildCdcFunctionSql`.
      */
     row: Record<string, unknown>;
-    /** True when the row was reduced to its identity because it was too large to notify. */
+    /** True when even the key was too large to notify, so `row` is empty. */
     truncated?: boolean;
 }
 
