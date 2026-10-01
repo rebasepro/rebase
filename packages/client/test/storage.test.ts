@@ -97,6 +97,33 @@ key: "file.bin" });
             expect(formData.get("bucket")).toBeNull();
         });
 
+        it("stores a public file with no key under the public prefix, named after the file", async () => {
+            // The key is optional, and `public: true` promises a permanent,
+            // token-less URL. With no key the prefix was never applied, the
+            // server named the object after the file at the root, and the
+            // "public" upload was a private one.
+            const storage = createStorage(mockTransport);
+            mockTransport.request.mockResolvedValueOnce({ data: { key: "public/avatar.png" } });
+
+            await storage.putObject({ file: new File(["x"], "avatar.png"), public: true });
+
+            const body = mockTransport.request.mock.calls[0][1]?.body as FormData;
+            expect(body.get("key")).toBe("public/avatar.png");
+        });
+
+        it("names a public Blob with no key as the upload names it: `blob`", async () => {
+            // A Blob appended to FormData travels as a file called "blob", which
+            // is the name the server would have stored it under.
+            const storage = createStorage(mockTransport);
+            mockTransport.request.mockResolvedValueOnce({ data: { key: "public/blob" } });
+
+            await storage.putObject({ file: new Blob(["x"]) as File, public: true });
+
+            const body = mockTransport.request.mock.calls[0][1]?.body as FormData;
+            expect((body.get("file") as File).name).toBe("blob");
+            expect(body.get("key")).toBe("public/blob");
+        });
+
         it("skips null/undefined metadata values", async () => {
             const storage = createStorage(mockTransport);
             const mockFile = new File(["data"], "file.bin");

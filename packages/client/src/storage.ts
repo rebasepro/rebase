@@ -104,9 +104,18 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         // token-less via a stable, permanent URL. Normalize the key here so the
         // stored path is self-describing (no server round-trip needed to know
         // it's public).
+        //
+        // With no key, the server names the object after the uploaded file —
+        // at the root, which is not the public prefix. So a public upload with
+        // no key is given that same name here, prefixed: the key is optional,
+        // and `public: true` promised a token-less URL either way. A Blob
+        // travels in the form as a file called "blob".
         let effectiveKey = key;
-        if (isPublic && effectiveKey && !isPublicStoragePath(effectiveKey)) {
-            effectiveKey = `${PUBLIC_STORAGE_PREFIX}${effectiveKey.replace(/^\/+/, "")}`;
+        if (isPublic) {
+            effectiveKey ||= (file instanceof File && file.name) ? file.name : "blob";
+            if (!isPublicStoragePath(effectiveKey)) {
+                effectiveKey = `${PUBLIC_STORAGE_PREFIX}${effectiveKey.replace(/^\/+/, "")}`;
+            }
         }
 
         if (effectiveKey) formData.append("key", effectiveKey);
