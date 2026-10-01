@@ -166,6 +166,33 @@ describe("EntityForm: a record changed elsewhere while the form is open", () => 
         expect(payloads).toEqual([{ title: "T2" }]);
     });
 
+    /**
+     * A map is written whole, so following the change has to happen inside
+     * it: judged only at the top level, `address` was "edited here and
+     * elsewhere", the edit kept the old street, and the save wrote it back.
+     */
+    it("a map edited here in one field and elsewhere in another keeps both", async () => {
+        const v1: Post = { title: "T", address: { street: "Main 1", city: "Rome" } };
+        const v2: Post = { title: "T", address: { street: "Main 2", city: "Rome" } };
+        let stored = v1;
+        const { payloads, onSubmit } = recordingSubmit(() => stored);
+        const view = render(formFor(v1, onSubmit));
+
+        await act(async () => {
+            context.setFieldValue("address.city", "Milan");
+        });
+        stored = v2;
+        await act(async () => {
+            view.rerender(formFor(v2, onSubmit));
+        });
+        expect(context.values.address).toEqual({ street: "Main 2", city: "Milan" });
+
+        await act(async () => {
+            await context.submit();
+        });
+        expect(payloads).toEqual([{ address: { street: "Main 2", city: "Milan" } }]);
+    });
+
     it("an unedited form follows the change and stays clean", async () => {
         const v1: Post = { title: "T", price: 10 };
         const v2: Post = { title: "T", price: 20 };

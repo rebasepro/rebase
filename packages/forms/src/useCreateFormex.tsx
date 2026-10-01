@@ -3,6 +3,7 @@ import { getIn, setIn } from "./utils";
 import { deepEqual as equal } from "fast-equals";
 
 import { FormexController, FormexResetProps } from "./types";
+import { rebaseEdits } from "./rebase";
 
 /**
  * One step of the form's undo history.
@@ -31,6 +32,7 @@ export function useCreateFormex<T = any>({
     onSubmit,
     onReset,
     onValuesChangeDeferred,
+    onBaselineConflict,
     debugId
 }: {
     /**
@@ -68,6 +70,13 @@ export function useCreateFormex<T = any>({
     onValuesChangeDeferred?: (values: T, controller: FormexController<T>) => void;
     onSubmit?: (values: T, controller: FormexController<T>) => void | Promise<void>;
     onReset?: (controller: FormexController<T>) => void | Promise<void>;
+    /**
+     * The baseline moved while the form was edited, and some fields were
+     * changed on both sides. Called with their dotted paths. The form keeps
+     * the user's value for those (see the re-baseline below); this is the
+     * chance to tell them that saving will replace someone else's change.
+     */
+    onBaselineConflict?: (paths: string[], controller: FormexController<T>) => void;
     debugId?: string;
 }): FormexController<T> {
     // The baseline and the current values start apart when the form opens
@@ -96,6 +105,8 @@ export function useCreateFormex<T = any>({
 
     const onValuesChangeRef = useRef(onValuesChangeDeferred);
     onValuesChangeRef.current = onValuesChangeDeferred;
+    const onBaselineConflictRef = useRef(onBaselineConflict);
+    onBaselineConflictRef.current = onBaselineConflict;
     const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const callDebouncedOnValuesChange = useCallback((values: T) => {
@@ -284,17 +295,35 @@ export function useCreateFormex<T = any>({
      * - it overwrote `values`, so anything typed while the record was still
      *   loading was thrown away without a word.
      *
-     * So: move the baseline, leave the edit alone, and re-judge one against
-     * the other. Only an untouched form follows the baseline to its new value.
+     * So: move the baseline, and rebase the edit onto it. Leaving the edit
+     * alone *whole* was the next bug: it kept the old value of every field the
+     * user never touched, and save — which writes the difference from the live
+     * record — wrote those old values back, silently reverting whatever someone
+     * else had just changed. So a field the edit left alone follows the new
+     * baseline, a field it changed keeps the edit, and a field both changed
+     * keeps the edit and is reported through `onBaselineConflict`.
      */
     useEffect(() => {
         if (equal(initialValuesRef.current, initialValues)) return;
 
-        const modified = !equal(initialValuesRef.current, valuesRef.current);
+        const previousBaseline = initialValuesRef.current;
+        const modified = !equal(previousBaseline, valuesRef.current);
         initialValuesRef.current = initialValues;
 
         if (modified) {
-            setDirty(!equal(initialValues, valuesRef.current));
+            const { values: rebased, conflicts } = rebaseEdits(previousBaseline, initialValues, valuesRef.current);
+            valuesRef.current = rebased;
+            setValuesInner(rebased);
+            // Undo must not step back into a stale copy of an untouched field
+            // either, so the history is rebased the same way.
+            historyRef.current = historyRef.current.map((entry) => ({
+                ...entry,
+                values: rebaseEdits(previousBaseline, initialValues, entry.values).values
+            }));
+            setDirty(!equal(initialValues, rebased));
+            if (conflicts.length > 0) {
+                onBaselineConflictRef.current?.(conflicts, controllerRef.current);
+            }
         } else {
             valuesRef.current = initialValues;
             setValuesInner(initialValues);
