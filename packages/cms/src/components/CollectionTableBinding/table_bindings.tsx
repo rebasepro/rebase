@@ -205,7 +205,8 @@ export function getTableBindingForProperty(
                         multiline={multiline}
                         focused={selected}
                         value={internalValue as string}
-                        updateValue={updateValue}
+                        // An emptied cell is NULL, as an emptied form field is.
+                        updateValue={(value) => updateValue(value === "" ? null : value)}
                     />
                 ),
                 allowScroll: true

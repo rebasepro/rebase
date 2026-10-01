@@ -74,7 +74,11 @@ export function TextFieldBinding<T extends string | number>({
                 setValue(null);
             }
         } else {
-            setValue(event.target.value as T);
+            // Emptied is NULL. Writing `""` over a NULL the user only typed
+            // into and deleted made `isNull` filters stop matching the row,
+            // and collided on an optional unique column; `required` already
+            // reads `""` as missing.
+            setValue(event.target.value === "" ? null : event.target.value as T);
         }
     };
 
