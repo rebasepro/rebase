@@ -31,6 +31,7 @@ import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
 import { loadBootEnv, resolveCorsOptions, resolveEnableSwagger, type RebaseBootEnv } from "./env";
+import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { FunctionSelectionError } from "../functions/selection";
 import { CollectionConfigError } from "../collections/validate-config";
@@ -619,6 +620,16 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
  * probes, so a static app is provisioned by the exact same deployment path as a
  * backend — the only difference is what the bundle contains.
  */
+/** PORT for the static-only path, read with the backend schema's own rule. */
+function readStaticPort(): number {
+    const parsed = numericEnvVar("PORT", 3001).safeParse(process.env.PORT);
+    if (parsed.success) return parsed.data;
+    throw new BundleError(
+        `The environment is not valid:\n  PORT: PORT must be a number`,
+        "See https://rebase.pro/docs/getting-started/configuration/ for the variables a deployment reads."
+    );
+}
+
 /**
  * REBASE_HSTS_INCLUDE_SUBDOMAINS for the static-only path, which reads its few
  * variables directly rather than through the backend's schema. Validated the
@@ -651,7 +662,10 @@ async function bootStaticApp(
     // full env schema requires a database and a JWT secret, which this path
     // deliberately does not.
     const isProduction = process.env.NODE_ENV === "production";
-    const requestedPort = Number(process.env.PORT ?? "3001") || 3001;
+    // The backend boot's reading of PORT, not `Number(PORT) || 3001`: that
+    // turned `PORT=abc` (a typo the backend refuses by name) and `PORT=0` (an
+    // explicit request for a free port) both into 3001, silently.
+    const requestedPort = readStaticPort();
     const basePath = process.env.REBASE_BASE_PATH || "/api";
     const metricsEnabled = parseEnvBoolean(process.env.REBASE_METRICS) === true;
     const metricsToken = process.env.REBASE_METRICS_TOKEN;
@@ -712,10 +726,14 @@ async function bootStaticApp(
                 server.once("error", reject);
                 server.listen(requestedPort, () => {
                     server.removeListener("error", reject);
+                    // The bound port, as the backend path reports it: with
+                    // `PORT=0` the requested one is a port nothing listens on.
+                    const address = server.address();
+                    if (address && typeof address === "object") port = address.port;
                     resolve();
                 });
             });
-            logger.info(`Rebase static runtime listening on port ${requestedPort}`);
+            logger.info(`Rebase static runtime listening on port ${port}`);
         } else {
             port = await listenWithPortRetry(server, requestedPort, { portFileDir: devRoot });
             logger.info(`Server running at http://localhost:${port}`);
