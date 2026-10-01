@@ -30,9 +30,15 @@
  */
 import { Hono, type Context } from "hono";
 import {
+    applyCollectionPatch,
+    collectionPatchProblems,
+    diffCollections,
+    isCollectionPatch,
     isSchemaEditingAdmin,
     isSQLAdmin,
+    nestCollectionPatchPaths,
     type ClassifiedSchemaChanges,
+    type CollectionPatch,
     type CollectionConfig,
     type DatabaseAdmin,
     type SchemaChangePlan,
@@ -126,11 +132,25 @@ export interface LiveSchemaRoutesConfig {
     policy?: SchemaEditPolicy;
 }
 
-/** What the panel posts: one collection, in the shape it should end up. */
+/**
+ * What the panel posts about one collection.
+ *
+ * For a collection that exists, a `patch`: what the person changed, as the
+ * difference between the JSON the editor loaded and the JSON it is saving (see
+ * `collection_patch.ts` in `@rebasepro/types`). The whole collection travelled
+ * here once, and the write rewrote every key it carried and deleted whatever
+ * JSON had dropped — handlers, shared properties, imported enums, comments.
+ *
+ * For a collection that does not exist yet, the whole `collection`. A caller
+ * that sends a whole collection for one that exists has it turned into the
+ * patch of what differs (see {@link asPatch}).
+ */
 export interface ProposedChange {
     collectionId: string;
-    /** The whole collection as it should be after the edit. */
-    collection: Record<string, unknown>;
+    /** The whole collection — only for one that does not exist yet. */
+    collection?: Record<string, unknown>;
+    /** What changed about an existing collection. */
+    patch?: CollectionPatch;
 }
 
 /**
@@ -193,9 +213,30 @@ const parseProposed = (body: unknown): ProposedChange => {
             "INVALID_CHANGE"
         );
     }
-    if (!candidate.collection || typeof candidate.collection !== "object") {
-        throw ApiError.badRequest("`collection` is required.", "INVALID_CHANGE");
+    if (candidate.patch !== undefined) {
+        if (candidate.collection !== undefined) {
+            throw ApiError.badRequest("Send `patch` or `collection`, not both.", "INVALID_CHANGE");
+        }
+        const patch: unknown = candidate.patch;
+        if (!isCollectionPatch(patch)) {
+            throw ApiError.badRequest(collectionPatchProblems(patch).join(" "), "INVALID_CHANGE");
+        }
+        return { collectionId: candidate.collectionId, patch: nestCollectionPatchPaths(patch) };
     }
+    if (!candidate.collection || typeof candidate.collection !== "object") {
+        throw ApiError.badRequest("`collection` or `patch` is required.", "INVALID_CHANGE");
+    }
+    assertSafeIdentifiers(candidate.collection);
+    return { collectionId: candidate.collectionId, collection: candidate.collection };
+};
+
+/**
+ * Refuse the names inside a collection that reach SQL as identifiers.
+ *
+ * Run on the posted collection, and on the proposed one a patch produces — a
+ * patch can carry a `columnName` as easily as a whole collection can.
+ */
+function assertSafeIdentifiers(candidate: object): void {
 
     // The names inside the collection reach SQL as identifiers, and only the id
     // above was checked. `table`, `schema` and every property's `columnName` are
@@ -205,7 +246,7 @@ const parseProposed = (body: unknown): ProposedChange => {
     // unsafe identifier now too, but a 500 from the middle of a planner is not
     // an answer a caller can act on, and the boundary is where a bad request
     // belongs.
-    const collection = candidate.collection as {
+    const collection = candidate as {
         table?: unknown;
         schema?: unknown;
         properties?: Record<string, { columnName?: unknown } | undefined>;
@@ -232,9 +273,49 @@ const parseProposed = (body: unknown): ProposedChange => {
             );
         }
     }
+}
 
-    return { collectionId: candidate.collectionId, collection: candidate.collection };
-};
+/** True for a function, or anything holding one at any depth. */
+function holdsCode(value: unknown, seen = new Set<unknown>()): boolean {
+    if (typeof value === "function") return true;
+    if (typeof value !== "object" || value === null || seen.has(value)) return false;
+    seen.add(value);
+    return Object.values(value).some(child => holdsCode(child, seen));
+}
+
+function valueAt(root: unknown, keys: string[]): unknown {
+    let node = root;
+    for (const key of keys) {
+        if (!isRecord(node)) return undefined;
+        node = node[key];
+    }
+    return node;
+}
+
+/**
+ * The change as a patch against the collection as it is.
+ *
+ * A whole collection posted for one that exists is the difference from the
+ * current one: a caller that sends JSON cannot then delete what JSON could not
+ * carry. A key it left out is removed only when its value is pure data — a
+ * key holding code (`callbacks`, a handler, a component) is not something a
+ * JSON caller could have meant to drop.
+ */
+export function asPatch(existing: CollectionConfig, change: ProposedChange): CollectionPatch {
+    if (change.patch) return change.patch;
+    return diffCollections(existing, change.collection ?? {})
+        .filter(op => op.op !== "remove" || !holdsCode(valueAt(existing, op.path)));
+}
+
+/**
+ * What the source writer is handed: the whole collection for a new one, the
+ * patch for an existing one.
+ */
+function sourceChangeFor(current: CollectionConfig[], change: ProposedChange): ProposedChange {
+    const existing = current.find(collection => collection.slug === change.collectionId);
+    if (!existing) return change;
+    return { collectionId: change.collectionId, patch: asPatch(existing, change) };
+}
 
 /**
  * The request body, or a 400 that says it is not JSON.
@@ -406,7 +487,18 @@ export function proposedCollections(
     };
 
     const existing = current.find(collection => collection.slug === change.collectionId);
-    const repaired: Record<string, unknown> = { ...change.collection };
+    if (change.patch && !existing) {
+        throw ApiError.badRequest(
+            `There is no collection "${change.collectionId}" to change. A new collection is sent whole, as \`collection\`.`,
+            "INVALID_CHANGE"
+        );
+    }
+    // An existing collection is the one there is with the change applied, so
+    // everything the change did not touch — a relation's thunk, a handler, a
+    // shared property — is exactly what it was.
+    const repaired: Record<string, unknown> = existing
+        ? applyCollectionPatch({ ...existing } as Record<string, unknown>, asPatch(existing, change))
+        : { ...change.collection };
     if ("properties" in repaired) {
         repaired.properties = repairPropertyRelations(repaired.properties, existing?.properties, "properties", repair);
     }
@@ -418,6 +510,7 @@ export function proposedCollections(
         );
     }
 
+    if (change.patch) assertSafeIdentifiers(repaired);
     const next = { ...repaired, slug: change.collectionId } as CollectionConfig;
     const replaced = current.map(each =>
         each.slug === change.collectionId ? next : each
@@ -699,7 +792,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 // change*, and it refused on the evidence of its own edit.
                 sourcePaths: config.sourcePathsFor?.(change) ?? [],
                 writeSource: config.writeSource
-                    ? () => config.writeSource!(change)
+                    ? () => config.writeSource!(sourceChangeFor(before, change))
                     : undefined,
                 apply: async (statements) => {
                     const sql = config.getAdmin();

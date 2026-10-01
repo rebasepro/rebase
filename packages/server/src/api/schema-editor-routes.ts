@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { collectionPatchProblems, isCollectionPatch } from "@rebasepro/types";
 import { AstSchemaEditor } from "./ast-schema-editor";
 import { ApiError, errorHandler } from "./errors";
 import { HonoEnv } from "./types";
@@ -39,9 +40,14 @@ const propertyDeleteSchema = z.object({
 });
 const collectionSaveSchema = z.object({
     collectionId: collectionIdSchema,
-    collectionData: z.record(z.string(), z.unknown()),
+    collectionData: z.record(z.string(), z.unknown()).optional(),
+    /** What changed about an existing collection — see `collection_patch.ts`. */
+    patch: z.array(z.unknown()).optional(),
     partial: z.boolean().optional()
-});
+}).refine(
+    save => (save.collectionData === undefined) !== (save.patch === undefined),
+    { message: "send `patch` (what changed) or `collectionData` (a new collection), not both" }
+);
 const collectionDeleteSchema = z.object({
     collectionId: collectionIdSchema
 });
@@ -84,9 +90,13 @@ export function createSchemaEditorRoutes(collectionsDir: string): Hono<HonoEnv> 
      * so an older panel keeps the behaviour it was written against.
      */
     router.post("/collection/save", async (c) => {
-        const { collectionId, collectionData, partial } = await body(c, collectionSaveSchema);
-        await refusalsAsBadRequest(() =>
-            editor.saveCollection(collectionId, collectionData, { partial: partial === true }));
+        const { collectionId, collectionData, patch, partial } = await body(c, collectionSaveSchema);
+        if (patch !== undefined && !isCollectionPatch(patch)) {
+            throw ApiError.badRequest(collectionPatchProblems(patch).join(" "), "INVALID_INPUT");
+        }
+        await refusalsAsBadRequest(() => patch
+            ? editor.applyPatch(collectionId, patch)
+            : editor.saveCollection(collectionId, collectionData ?? {}, { partial: partial === true }));
         return c.json({ success: true });
     });
 

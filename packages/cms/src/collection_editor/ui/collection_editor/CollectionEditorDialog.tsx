@@ -419,12 +419,18 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const [error, setError] = React.useState<Error | undefined>();
 
-    const saveCollection = (updatedCollection: AdminCollection<M>): Promise<boolean> => {
+    /**
+     * `baseline` is what the form was loaded with: the controller saves the
+     * difference between it and `updatedCollection`, so only what the person
+     * changed is written. Never for a new collection, which is saved whole.
+     */
+    const saveCollection = (updatedCollection: AdminCollection<M>, baseline?: AdminCollection<M>): Promise<boolean> => {
         const id = updatedCollection.slug;
 
         return configController.saveCollection({
             id,
             collectionData: updatedCollection,
+            baseline: isNewCollection ? undefined : baseline,
             previousId: editedCollectionId,
             parentCollectionSlugs
         })
@@ -535,7 +541,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         try {
 
             if (!isNewCollection) {
-                const success = await saveCollection(newCollectionState);
+                const success = await saveCollection(newCollectionState, formexController.initialValues);
                 if (success) {
                     aiModifiedPaths?.clearAllPaths();
                     formexController.resetForm({ values: newCollectionState });
@@ -858,7 +864,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                         type: "info",
                                         message: "Data imported successfully"
                                     });
-                                    await saveCollection(values);
+                                    await saveCollection(values, formController.initialValues);
                                     handleClose(importedCollection);
                                 }}
                             />}

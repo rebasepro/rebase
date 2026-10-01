@@ -33,7 +33,7 @@ import path from "node:path";
 import type { SchemaChangeFile } from "@rebasepro/types";
 import type { SchemaEditRepository } from "./apply-schema-change";
 
-export interface RemoteSourceOptions {
+export interface RemoteSourceOptions<Edit = Record<string, unknown>> {
     repository: SchemaEditRepository;
     /**
      * Where the collection *source* lives in the repository, as a repo-relative
@@ -44,8 +44,13 @@ export interface RemoteSourceOptions {
      * output, which is a different directory holding different files.
      */
     collectionsPath: string;
-    /** Applies the edit. Injected so this module needs no `ts-morph`. */
-    edit: (collectionsDir: string, collectionId: string, collection: Record<string, unknown>) => Promise<void>;
+    /**
+     * Applies the edit. Injected so this module needs no `ts-morph`.
+     *
+     * `edit` is whatever the caller's editor takes — a whole collection, or the
+     * patch of what changed about an existing one — passed through untouched.
+     */
+    edit: (collectionsDir: string, collectionId: string, edit: Edit) => Promise<void>;
 }
 
 /**
@@ -56,10 +61,10 @@ export interface RemoteSourceOptions {
  * accumulates those on a long-running server is a slow leak of exactly the
  * thing worth not leaking.
  */
-export async function rewriteRemoteCollection(
-    options: RemoteSourceOptions,
+export async function rewriteRemoteCollection<Edit>(
+    options: RemoteSourceOptions<Edit>,
     collectionId: string,
-    collection: Record<string, unknown>
+    change: Edit
 ): Promise<SchemaChangeFile[]> {
     const { repository, collectionsPath, edit } = options;
 
@@ -79,7 +84,7 @@ export async function rewriteRemoteCollection(
             await fs.writeFile(path.join(scratch, `${collectionId}.ts`), existing, "utf8");
         }
 
-        await edit(scratch, collectionId, collection);
+        await edit(scratch, collectionId, change);
 
         const written = await fs.readFile(path.join(scratch, `${collectionId}.ts`), "utf8");
         return [{ path: repoPath, contents: written }];

@@ -36,7 +36,7 @@ migrated to `"cms"` on read.
 
 ### Collection Editor
 
-A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to update your TypeScript source files via AST manipulation — preserving all existing code and custom logic. It is the screenshot at the top of this page.
+A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to write the keys you changed — and only those — into your TypeScript source files, leaving the rest of each file as it was: imports, comments, formatting, handlers, shared properties. A change to something the file defines in code, such as a property imported from another module, is refused with the place to make it. It is the screenshot at the top of this page.
 
 The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
 enough, and there is no prop to add. `collectionEditor` tunes it rather than

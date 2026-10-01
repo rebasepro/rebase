@@ -8,6 +8,7 @@ import {
     CollectionCallbacks,
     AnyCollectionConfig,
     CollectionConfig,
+    CollectionPatch,
     HealthCheckResult,
     HistoryConfig,
     InitializedDriver,
@@ -2324,14 +2325,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     // collection file's imports, comments and formatting, and a
                     // second implementation of that for the remote case would be
                     // a second thing to get wrong.
+                    //
+                    // An existing collection arrives as a patch — what the
+                    // person changed — and only those keys are written; a new
+                    // one arrives whole.
                     const applyEdit = async (
                         dir: string,
                         collectionId: string,
-                        collection: Record<string, unknown>
+                        edit: { collection?: Record<string, unknown>; patch?: CollectionPatch }
                     ) => {
                         const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                        await new AstSchemaEditor(dir)
-                            .saveCollection(collectionId, collection, { partial: false });
+                        const editor = new AstSchemaEditor(dir);
+                        if (edit.patch) await editor.applyPatch(collectionId, edit.patch);
+                        else await editor.saveCollection(collectionId, edit.collection ?? {}, { partial: false });
                     };
 
                     // No source on this machine: fetch it, rewrite it in a
@@ -2356,11 +2362,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                                 edit: applyEdit
                             },
                             change.collectionId,
-                            change.collection
+                            change
                         );
                     }
 
-                    await applyEdit(collectionsDir!, change.collectionId, change.collection);
+                    await applyEdit(collectionsDir!, change.collectionId, change);
 
                     // Read back what it wrote. The editor resolves
                     // `<collectionsDir>/<id>.ts`, and the commit needs the

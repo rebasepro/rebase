@@ -7,18 +7,18 @@
  * try-and-see would be asking somebody to discover that their change is refused
  * by pressing a button on a live database.
  *
- * ## Partial payloads are the caller's problem, not this module's
+ * ## A change to an existing collection is a patch
  *
- * Every call takes the **whole** collection. Live editing computes the proposed
- * state by replacing one collection in the set, so a patch would read as a set
- * of removals — every property it does not mention — and be refused.
- *
- * The editor's own save path posts partials (`saveProperty` follows up with a
- * one-key `collection/save` carrying `partial: true`), so
- * `useLocalCollectionsConfigController` assembles the whole collection before
- * it gets here. Accepting a patch and merging it in this module would put that
- * reconstruction one layer away from the collections it needs to read.
+ * What the person changed — the difference between the collection the editor
+ * loaded and the one it is saving, from `diffCollections` in
+ * `@rebasepro/types` — not the collection. The server applies it to the
+ * collection as it is to plan the change, and writes only those keys into the
+ * file. Posting the whole collection had the server write back the panel's
+ * JSON, which had lost every handler, shared property and imported value.
+ * A new collection is still sent whole.
  */
+
+import type { CollectionPatch } from "@rebasepro/types";
 
 /** A constraint the change asks for that the statements will not carry. */
 export interface WithheldConstraint {
@@ -146,11 +146,10 @@ export interface LiveSchemaClientOptions {
 
 export interface ProposedCollectionChange {
     collectionId: string;
-    /**
-     * The **whole** collection as it should end up — not a patch. See the
-     * module comment: a partial reads as a set of removals.
-     */
-    collection: Record<string, unknown>;
+    /** A new collection, whole. */
+    collection?: Record<string, unknown>;
+    /** What changed about an existing one. See the module comment. */
+    patch?: CollectionPatch;
 }
 
 export function createLiveSchemaClient(options: LiveSchemaClientOptions) {

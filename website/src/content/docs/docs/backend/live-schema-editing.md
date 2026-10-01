@@ -23,8 +23,26 @@ one thing more than being an admin — see [Who may apply](#who-may-apply).
 
 ## Plan before you apply
 
-`/plan` has no side effects. Post the collection as it should end up, and it
-tells you what the change means:
+`/plan` has no side effects. Post the change, and it tells you what the change
+means. A change to an existing collection is a `patch` — what changed, as
+operations on paths of keys — and a new collection is the whole `collection`:
+
+```json
+{ "collectionId": "posts", "patch": [
+    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
+    { "op": "remove", "path": ["admin", "group"] }
+] }
+```
+
+Only the keys a patch names are written into the collection file. Everything
+else stays as it is — imports, comments, formatting, an entity action's
+`onClick`, a property shared from another module, an enum imported from
+elsewhere. A patch that reaches *into* something defined in code
+(`status: statusProperty`, `enum: LOCALE_ENUM`, a `...spread`) is refused with
+the expression it hit, so the change is made where that code lives. A whole
+`collection` posted for a collection that exists is turned into the patch of
+what differs from it, and a key whose value is code is never removed that way.
+The admin panel sends patches.
 
 `$ADMIN_TOKEN` is an admin access token — the `accessToken` a sign-in returns
 for an account with the admin role. Nothing on the machine sets it for you.

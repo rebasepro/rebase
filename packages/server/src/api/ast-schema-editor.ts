@@ -1,5 +1,12 @@
 import { Project, SyntaxKind, Node, ObjectLiteralExpression, ObjectLiteralElementLike, PropertyAssignment, SourceFile, IndentationText } from "ts-morph";
-import { nestAdminCollectionKeys, nestAdminPropertyKeys } from "@rebasepro/types";
+import {
+    collectionPatchProblems,
+    nestAdminCollectionKeys,
+    nestAdminPropertyKeys,
+    nestCollectionPatchPaths,
+    type CollectionPatch,
+    type CollectionPatchOp
+} from "@rebasepro/types";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -294,7 +301,42 @@ export class AstSchemaEditor {
         return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof RawExpression);
     }
 
-    private convertJsonToAstString(obj: unknown, indentLevel = 0, oldAstNode?: ObjectLiteralExpression): string {
+    /**
+     * The field that identifies each element of an array of objects, so an
+     * old element can be found again in the new array.
+     *
+     * Arrays travel whole (see `collection_patch.ts`), and an element's
+     * position is not its identity — adding an entity action at the front
+     * shifts every other one. `key`, `id`, `relationName`, `name`: the first
+     * one every new element carries, distinct, wins.
+     */
+    private static identityField(items: unknown[]): string | undefined {
+        for (const field of ["key", "id", "relationName", "name", "slug"]) {
+            const values = items.map(item => AstSchemaEditor.isPlainObject(item) ? item[field] : undefined);
+            if (values.every(value => typeof value === "string" || typeof value === "number") &&
+                new Set(values).size === values.length) {
+                return field;
+            }
+        }
+        return undefined;
+    }
+
+    /** The old array's object elements, keyed by `field`'s literal value. */
+    private oldElementsBy(oldArray: Node, field: string): Map<string, ObjectLiteralExpression> {
+        const byKey = new Map<string, ObjectLiteralExpression>();
+        const array = oldArray.asKind(SyntaxKind.ArrayLiteralExpression);
+        for (const element of array?.getElements() ?? []) {
+            const object = element.asKind(SyntaxKind.ObjectLiteralExpression);
+            const value = object ? this.initializerOf(object, field) : undefined;
+            const literal = value?.asKind(SyntaxKind.StringLiteral)?.getLiteralValue()
+                ?? value?.asKind(SyntaxKind.NoSubstitutionTemplateLiteral)?.getLiteralValue()
+                ?? value?.asKind(SyntaxKind.NumericLiteral)?.getText();
+            if (object && literal !== undefined) byKey.set(String(literal), object);
+        }
+        return byKey;
+    }
+
+    private convertJsonToAstString(obj: unknown, indentLevel = 0, oldAstNode?: Node): string {
         // Base TS-morph parses arrays as 2 levels deep from the property key:
         // PropertiesObject = level 1, PropertyConfig = level 2.
         // We calibrate the spacing multiples to keep the items flush with standard TS format.
@@ -316,17 +358,26 @@ export class AstSchemaEditor {
         }
         if (Array.isArray(obj)) {
             if (obj.length === 0) return "[]";
-            const items = obj.map(item => this.convertJsonToAstString(item, indentLevel + 1));
+            // Each element written over its old self, so what JSON dropped
+            // from it — an action's `onClick`, a field's `value` — is kept.
+            const field = oldAstNode ? AstSchemaEditor.identityField(obj) : undefined;
+            const old = oldAstNode && field ? this.oldElementsBy(oldAstNode, field) : undefined;
+            const items = obj.map(item => this.convertJsonToAstString(
+                item,
+                indentLevel + 1,
+                old && field && AstSchemaEditor.isPlainObject(item) ? old.get(String(item[field])) : undefined
+            ));
             return `[\n${innerIndent}${items.join(`,\n${innerIndent}`)}\n${indent}]`;
         }
         if (typeof obj === "object") {
             const record = obj as Record<string, unknown>;
             const keys = Object.keys(record);
+            const oldObject = oldAstNode?.asKind(SyntaxKind.ObjectLiteralExpression);
 
             // Collect preserved AST properties
             const preservedProps: string[] = [];
-            if (oldAstNode) {
-                const oldProps = oldAstNode.getProperties();
+            if (oldObject) {
+                const oldProps = oldObject.getProperties();
                 for (const oldProp of oldProps) {
                     if (oldProp.isKind(SyntaxKind.PropertyAssignment)) {
                         const nameNode = oldProp.getNameNode();
@@ -360,12 +411,14 @@ export class AstSchemaEditor {
             const props = keys.map(key => {
                 const keyStr = AstSchemaEditor.quoteKey(key);
 
-                // If the value is an object, pass the old AST node to recurse
-                let childAstNode: ObjectLiteralExpression | undefined;
-                if (oldAstNode && AstSchemaEditor.isPlainObject(record[key])) {
-                    const oldProp = this.findProperty(oldAstNode, key);
+                // If the value is an object or an array, pass the old AST node
+                // to recurse
+                let childAstNode: Node | undefined;
+                if (oldObject && (AstSchemaEditor.isPlainObject(record[key]) || Array.isArray(record[key]))) {
+                    const oldProp = this.findProperty(oldObject, key);
                     if (oldProp && oldProp.isKind(SyntaxKind.PropertyAssignment)) {
-                        childAstNode = oldProp.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
+                        childAstNode = oldProp.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression)
+                            ?? oldProp.getInitializerIfKind(SyntaxKind.ArrayLiteralExpression);
                     }
                 }
 
@@ -532,6 +585,224 @@ export class AstSchemaEditor {
             this.forgetUnsaved(collectionId);
             throw err;
         }
+    }
+
+    /**
+     * Write what changed about a collection, and nothing else.
+     *
+     * The patch is the difference between the collection the panel loaded and
+     * the one it is saving (`diffCollections` in `@rebasepro/types`), so it
+     * names only keys the person changed. Each is written where it is; every
+     * other byte of the file — imports, comments, formatting, handlers,
+     * properties shared from another module — is left as it was.
+     *
+     * A key whose value in the file is code — `status: statusProperty`,
+     * `enum: LOCALE_ENUM`, a spread — is not overwritten with the JSON the
+     * panel saw of it, which is what the whole-collection save did. The edit
+     * is refused, naming the code, so it can be made where that code lives.
+     *
+     * All or nothing: a refused operation leaves the file as it was, including
+     * the operations before it.
+     */
+    public async applyPatch(collectionId: string, patch: CollectionPatch) {
+        this.syncWithDisk();
+        const problems = collectionPatchProblems(patch);
+        if (problems.length > 0) {
+            throw new Error(`Refusing to edit "${collectionId}": ${problems.join(" ")}`);
+        }
+        try {
+            await this.writePatch(collectionId, nestCollectionPatchPaths(patch));
+        } catch (err) {
+            this.forgetUnsaved(collectionId);
+            throw err;
+        }
+    }
+
+    private async writePatch(collectionId: string, patch: CollectionPatch) {
+        this.requireCollectionObject(collectionId);
+        const file = this.getCollectionFile(collectionId)!;
+        for (const op of patch) {
+            // From the root each time: formatting an edited node can forget
+            // the nodes around it.
+            this.applyPatchOp(collectionId, file, this.requireCollectionObject(collectionId), op);
+        }
+        await this.project.save();
+    }
+
+    private applyPatchOp(collectionId: string, file: SourceFile, collectionObj: ObjectLiteralExpression, op: CollectionPatchOp): void {
+        const { path: keys } = op;
+        const dotted = (end: number) => keys.slice(0, end).join(".");
+
+        let target = collectionObj;
+        for (let depth = 0; depth < keys.length - 1; depth++) {
+            const key = keys[depth];
+            const member = this.findMember(target, key);
+            if (!member) {
+                const spread = this.spreadIn(target);
+                if (spread) throw this.codeRefusal(collectionId, file, dotted(depth + 1), spread, "comes from");
+                // Nothing there to remove.
+                if (op.op === "remove") return;
+                target = target.addPropertyAssignment({ name: AstSchemaEditor.quoteKey(key), initializer: "{}" })
+                    .getInitializerIfKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+                continue;
+            }
+            const value = member.isKind(SyntaxKind.PropertyAssignment)
+                ? AstSchemaEditor.unwrapExpression(member.getInitializer())
+                : undefined;
+            const next = value?.asKind(SyntaxKind.ObjectLiteralExpression);
+            if (!next) throw this.codeRefusal(collectionId, file, dotted(depth + 1), value ?? member, "is");
+            target = next;
+        }
+
+        const key = keys[keys.length - 1];
+        const member = this.findMember(target, key);
+
+        if (op.op === "remove") {
+            if (member) {
+                member.remove();
+                return;
+            }
+            const spread = this.spreadIn(target);
+            if (spread) throw this.codeRefusal(collectionId, file, dotted(keys.length), spread, "comes from");
+            return;
+        }
+
+        // The collection's own `relations` pair each entry with its old self
+        // by name, to keep the targets JSON cannot carry.
+        if (keys.length === 1 && key === "relations") {
+            this.writeRelations(collectionId, file, collectionObj, op.value);
+            this.findMember(collectionObj, "relations")?.formatText();
+            return;
+        }
+
+        const old = member?.isKind(SyntaxKind.PropertyAssignment) ? member.getInitializer() : undefined;
+        if (member && (!old || !AstSchemaEditor.isLiteralValue(old))) {
+            throw this.codeRefusal(collectionId, file, dotted(keys.length), old ?? member, "is");
+        }
+        if (old?.isKind(SyntaxKind.ArrayLiteralExpression)) {
+            const code = old.getElements().find(element => !AstSchemaEditor.isLiteralValue(element));
+            if (code) throw this.codeRefusal(collectionId, file, dotted(keys.length), code, "holds");
+        }
+
+        const value = this.patchValueAsSource(collectionId, file, keys, op.value, old);
+        const text = this.convertJsonToAstString(value, 0, old);
+        const written = member?.isKind(SyntaxKind.PropertyAssignment)
+            ? member.setInitializer(text)
+            : target.addPropertyAssignment({ name: AstSchemaEditor.quoteKey(key), initializer: text });
+        // This node only: the rest of the file keeps its own formatting.
+        written.formatText();
+    }
+
+    /**
+     * A patched value with every relation target it carries turned back into
+     * source — `() => xCollection` plus its import — according to where the
+     * path lands: a relation's `target`, a relation, a property, or a map of
+     * properties.
+     */
+    private patchValueAsSource(collectionId: string, file: SourceFile, keys: string[], value: unknown, old: Node | undefined): unknown {
+        // Where the path lands, walked the way `collection_patch.ts` walks it.
+        let position: "collection" | "properties" | "property" | "relation" | "oneOf" | "other" = "collection";
+        for (const key of keys) {
+            switch (position) {
+                case "collection": position = key === "properties" ? "properties" : "other"; break;
+                case "properties": position = "property"; break;
+                case "property":
+                    position = key === "properties" ? "properties"
+                        : key === "of" ? "property"
+                            : key === "oneOf" ? "oneOf"
+                                : key === "relation" ? "relation"
+                                    : "other";
+                    break;
+                case "oneOf": position = key === "properties" ? "properties" : "other"; break;
+                case "relation":
+                    if (key === "target" && typeof value === "string" && value.trim().length > 0) {
+                        const trimmed = value.trim();
+                        return new RawExpression(ARROW_TO_IDENTIFIER.test(trimmed) ? trimmed : this.targetThunk(file, trimmed));
+                    }
+                    position = "other";
+                    break;
+                default: position = "other";
+            }
+        }
+        const oldObject = old?.asKind(SyntaxKind.ObjectLiteralExpression);
+        const where = keys.join(".");
+        if (position === "property") {
+            return this.propertyRelationTargetsAsSource(collectionId, file, value, oldObject, where);
+        }
+        if (position === "properties") {
+            return this.relationTargetsAsSource(collectionId, file, value, oldObject, where);
+        }
+        if (position === "relation" && AstSchemaEditor.isPlainObject(value)) {
+            // A relation on its own: wrap it as the property it belongs to.
+            const wrapped = this.propertyRelationTargetsAsSource(
+                collectionId, file, { type: "relation", relation: value },
+                oldObject ? undefined : undefined, where);
+            const relation = AstSchemaEditor.isPlainObject(wrapped) ? wrapped.relation : value;
+            if (AstSchemaEditor.isPlainObject(relation) && !("target" in relation) &&
+                !(oldObject && this.findProperty(oldObject, "target"))) {
+                throw new Error(`Relation "${where}" on collection "${collectionId}" has no target collection. Pick one before saving.`);
+            }
+            return relation;
+        }
+        return value;
+    }
+
+    /** A member of an object literal by name: an assignment, a shorthand, a method. */
+    private findMember(obj: ObjectLiteralExpression, name: string): ObjectLiteralElementLike | undefined {
+        return obj.getProperties().find(member => {
+            if (member.isKind(SyntaxKind.SpreadAssignment)) return false;
+            const memberName = (member as PropertyAssignment).getName();
+            return memberName === name || memberName === JSON.stringify(name) || memberName === `'${name}'`;
+        });
+    }
+
+    private spreadIn(obj: ObjectLiteralExpression): Node | undefined {
+        return obj.getProperties().find(member => member.isKind(SyntaxKind.SpreadAssignment));
+    }
+
+    /** `x as const`, `x satisfies T`, `(x)` — the value inside. */
+    private static unwrapExpression(node: Node | undefined): Node | undefined {
+        if (!node) return undefined;
+        if (Node.isAsExpression(node) || Node.isSatisfiesExpression(node) || Node.isParenthesizedExpression(node)) {
+            return AstSchemaEditor.unwrapExpression(node.getExpression());
+        }
+        return node;
+    }
+
+    /**
+     * Whether a value in the file is data the panel's JSON fully describes —
+     * a literal — rather than code it saw only the result of.
+     */
+    private static isLiteralValue(node: Node): boolean {
+        const value = AstSchemaEditor.unwrapExpression(node);
+        if (!value) return false;
+        switch (value.getKind()) {
+            case SyntaxKind.ObjectLiteralExpression:
+            case SyntaxKind.ArrayLiteralExpression:
+            case SyntaxKind.StringLiteral:
+            case SyntaxKind.NoSubstitutionTemplateLiteral:
+            case SyntaxKind.NumericLiteral:
+            case SyntaxKind.TrueKeyword:
+            case SyntaxKind.FalseKeyword:
+            case SyntaxKind.NullKeyword:
+                return true;
+            case SyntaxKind.PrefixUnaryExpression:
+                return value.asKindOrThrow(SyntaxKind.PrefixUnaryExpression).getOperand().isKind(SyntaxKind.NumericLiteral);
+            case SyntaxKind.Identifier:
+                return value.getText() === "undefined";
+            default:
+                return false;
+        }
+    }
+
+    /** "`properties.status` is `statusProperty` in posts.ts…" */
+    private codeRefusal(collectionId: string, file: SourceFile, where: string, code: Node, verb: "is" | "holds" | "comes from"): Error {
+        const text = code.getText();
+        const shown = text.length > 60 ? `${text.slice(0, 57)}…` : text;
+        return new Error(
+            `\`${where}\` ${verb} \`${shown}\` in ${path.basename(file.getFilePath())}, which is code the ` +
+            `editor cannot change without losing what it does. Change "${collectionId}" there instead.`
+        );
     }
 
     private async writeCollection(collectionId: string, collectionData: Record<string, unknown>, options: { partial?: boolean }) {

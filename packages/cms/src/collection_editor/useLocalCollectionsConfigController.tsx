@@ -1,5 +1,5 @@
 import { CollectionsConfigController, SaveCollectionParams, UpdateCollectionParams, DeleteCollectionParams, SavePropertyParams, DeletePropertyParams, UpdatePropertiesOrderParams } from "./types/config_controller";
-import { Properties } from "@rebasepro/types";
+import { diffCollections, type CollectionPatch } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -186,8 +186,10 @@ export function useLocalCollectionsConfigController(
         // removing a property, most often, which the ensure path has no way to
         // carry out. Writing the source and leaving the database alone is what
         // the editor did before any of this existed.
-        writeSourceOnly: async ({ collectionId, collection }) => {
-            await request("/collection/save", { collectionId, collectionData: collection });
+        writeSourceOnly: async ({ collectionId, collection, patch }) => {
+            await request("/collection/save", patch
+                ? { collectionId, patch }
+                : { collectionId, collectionData: collection ?? {} });
         }
     });
 
@@ -201,17 +203,24 @@ export function useLocalCollectionsConfigController(
      */
     const write = async (
         collectionId: string,
-        collection: Record<string, unknown>,
-        sourceOnly: () => Promise<void>
+        change: { collection: Record<string, unknown> } | { patch: CollectionPatch }
     ): Promise<void> => {
+        // Nothing changed: nothing to plan, commit or write.
+        if ("patch" in change && change.patch.length === 0) return;
         // `ready()`, not `status` — the rendered status is undefined for one
         // round trip after mount, so reading it here would send a save issued
         // in that window down the source-only path with no confirmation, while
         // the same save a second later would open a dialog. One round trip is
         // cheap; behaviour that depends on how fast somebody clicked is not.
         const available = await liveSchema.ready();
-        if (!available.enabled) return sourceOnly();
-        await liveSchema.reviewChange({ collectionId, collection });
+        const proposed = { collectionId, ...change };
+        if (!available.enabled) {
+            await request("/collection/save", "patch" in change
+                ? { collectionId, patch: change.patch }
+                : { collectionId, collectionData: change.collection });
+            return;
+        }
+        await liveSchema.reviewChange(proposed);
     };
 
     const readOnly = forcedReadOnly
@@ -225,18 +234,29 @@ export function useLocalCollectionsConfigController(
         parsedCollections.find(c => (c as AdminCollection & { id?: string }).id === id || c.slug === id);
 
     /**
-     * The whole collection as it should end up.
+     * What to send for a collection that should end up as `saving`.
      *
-     * Live editing computes the proposed state by replacing one collection in
-     * the set, so it needs all of it: handed a patch, it would read every
-     * property the patch does not mention as a removal and refuse the change.
-     * A collection this does not recognise is a new one, and the patch is the
-     * whole of it.
+     * For one that exists: the difference from `loaded` — what the person
+     * changed — and nothing else. Both sides are the same view model, through
+     * JSON, so whatever JSON cannot carry (a handler, a shared property, an
+     * imported enum) is absent from both and never appears as a change; the
+     * server writes only the keys the patch names. A collection this does not
+     * recognise is a new one, and is sent whole.
      */
-    const wholeCollection = (id: string, patch: Record<string, unknown>): Record<string, unknown> => {
-        const current = findCollection(id) as Record<string, unknown> | undefined;
-        return current ? { ...current, ...patch } : patch;
+    const changeFor = (
+        id: string,
+        saving: Record<string, unknown>,
+        loaded?: Record<string, unknown>
+    ): { collection: Record<string, unknown> } | { patch: CollectionPatch } => {
+        const current = loaded ?? findCollection(id) as Record<string, unknown> | undefined;
+        return current
+            ? { patch: diffCollections(current, saving) }
+            : { collection: saving };
     };
+
+    /** `findCollection`, as the record a patch is computed from. */
+    const currentOf = (id: string): Record<string, unknown> =>
+        (findCollection(id) as Record<string, unknown> | undefined) ?? {};
 
     return useMemo(() => ({
         loading: false,
@@ -250,63 +270,51 @@ export function useLocalCollectionsConfigController(
             throw Error(`Collection ${id} not found in local mode`);
         },
 
-        saveCollection: async ({ id, collectionData }: SaveCollectionParams) => {
-            await write(id, collectionData as Record<string, unknown>, () =>
-                request("/collection/save", { collectionId: id, collectionData }));
+        saveCollection: async ({ id, collectionData, baseline }: SaveCollectionParams) => {
+            await write(id, changeFor(
+                id,
+                collectionData as Record<string, unknown>,
+                baseline as Record<string, unknown> | undefined
+            ));
         },
+        // `collectionData` is a partial: the keys it names, set over the
+        // collection as it is.
         updateCollection: async ({ id, collectionData }: UpdateCollectionParams) => {
-            await write(id, wholeCollection(id, collectionData as Record<string, unknown>), () =>
-                request("/collection/save", { collectionId: id, collectionData }));
+            const current = findCollection(id) as Record<string, unknown> | undefined;
+            await write(id, current
+                ? { patch: diffCollections(current, { ...current, ...(collectionData as Record<string, unknown>) }) }
+                : { collection: collectionData as Record<string, unknown> });
         },
         deleteCollection: async ({ id }: DeleteCollectionParams) => {
             await request("/collection/delete", { collectionId: id });
         },
 
-        // The follow-up write carries exactly one key, and `partial` is what says
-        // so. Read as a whole-collection save it deletes everything it does not
-        // mention — `securityRules` first, which then falls back to the
-        // directory default and widens who can read the collection.
+        // Every write below is the difference between the collection as it is
+        // and as it should end up, through the same door as the editor's own
+        // save: planned and confirmed when live editing is on, written as a
+        // patch when it is not.
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {
-            // Assembled into the whole collection before it is planned. This is
-            // the write that most often *is* a schema change — adding a field
-            // to a collection is adding a column — and the one whose payload
-            // says least about it on its own.
-            const current = findCollection(path) as Record<string, unknown> | undefined;
-            const properties = {
-                ...(current?.properties as Record<string, unknown> | undefined ?? {}),
-                [propertyKey]: property
-            };
-            const proposed = wholeCollection(path, {
-                properties,
+            const current = currentOf(path);
+            await write(path, { patch: diffCollections(current, {
+                ...current,
+                properties: { ...(current.properties as Record<string, unknown> | undefined ?? {}), [propertyKey]: property },
                 ...(newPropertiesOrder ? { propertiesOrder: newPropertiesOrder } : {})
-            });
-
-            await write(path, proposed, async () => {
-                await request("/property/save", { collectionId: path,
-propertyKey,
-propertyConfig: property });
-                if (newPropertiesOrder) {
-                    await request("/collection/save", { collectionId: path,
-collectionData: { propertiesOrder: newPropertiesOrder },
-partial: true });
-                }
-            });
+            }) });
         },
         deleteProperty: async ({ path, propertyKey, newPropertiesOrder }: DeletePropertyParams) => {
-            await request("/property/delete", { collectionId: path,
-propertyKey });
-            if (newPropertiesOrder) {
-                await request("/collection/save", { collectionId: path,
-collectionData: { propertiesOrder: newPropertiesOrder },
-partial: true });
-            }
+            const current = currentOf(path);
+            const { [propertyKey]: _removed, ...properties } = (current.properties as Record<string, unknown> | undefined) ?? {};
+            await write(path, { patch: diffCollections(current, {
+                ...current,
+                properties,
+                ...(newPropertiesOrder ? { propertiesOrder: newPropertiesOrder } : {})
+            }) });
         },
 
         updatePropertiesOrder: async ({ collection, fullPath, newPropertiesOrder }: UpdatePropertiesOrderParams) => {
-            const collectionId = (collection as AdminCollection & { id?: string }).id || fullPath.split("/").pop();
-            await request("/collection/save", { collectionId,
-collectionData: { propertiesOrder: newPropertiesOrder },
-partial: true });
+            const collectionId = (collection as AdminCollection & { id?: string }).id || fullPath.split("/").pop() || "";
+            const current = currentOf(collectionId);
+            await write(collectionId, { patch: diffCollections(current, { ...current, propertiesOrder: newPropertiesOrder }) });
         },
         updateKanbanColumnsOrder: async () => {
             // Kanban order mapping logic can be added later if needed natively.
@@ -319,11 +327,11 @@ partial: true });
         // without them would keep handing back a closed dialog and a stale
         // answer about whether the backend can edit its schema at all.
         //
-        // `write`, `request`, `findCollection` and `wholeCollection` are
+        // `write`, `request`, `findCollection`, `changeFor` and `currentOf` are
         // rebuilt on every render, so listing them would defeat the memo
         // entirely. Each is already covered *transitively* by what is listed:
         // `request` closes over `editorUrl` and a ref, and `editorUrl` derives
-        // from `clientOrUrl`; `findCollection` and `wholeCollection` close over
+        // from `clientOrUrl`; `findCollection`, `changeFor` and `currentOf` close over
         // `parsedCollections`; `write` closes over `liveSchema.status` and
         // `liveSchema.reviewChange`, and the latter is a `useCallback` keyed on
         // a client built from `clientOrUrl`. Every input that can change is in

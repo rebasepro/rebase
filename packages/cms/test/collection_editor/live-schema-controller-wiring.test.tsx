@@ -76,7 +76,9 @@ function Harness({ onSettled }: { onSettled: (outcome: string) => void }) {
     return (
         <div>
             <button onClick={() => {
-                controller.saveCollection({ id: "posts", collectionData: posts as never })
+                // A real change: a save that changes nothing has nothing to
+                // plan, and never reaches either door.
+                controller.saveCollection({ id: "posts", collectionData: { ...posts, name: "Articles" } as never })
                     .then(() => onSettled("resolved"), () => onSettled("rejected"));
             }}>save</button>
             {controller.dialog}

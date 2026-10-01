@@ -79,6 +79,17 @@ export type UpdateCollectionParams<M extends Record<string, unknown> = Record<st
 export type SaveCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
     collectionData: AdminCollection<M>,
+    /**
+     * The collection as the editor loaded it, before the person changed
+     * anything.
+     *
+     * A controller that writes source saves only the difference between this
+     * and `collectionData` — what the person changed. The whole collection is
+     * JSON by the time it is sent, and writing it back whole deleted every
+     * handler, shared property and imported value JSON could not carry.
+     * Absent, the controller's own copy of the collection stands in for it.
+     */
+    baseline?: AdminCollection<M>,
     previousId?: string,
     parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }

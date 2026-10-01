@@ -17,6 +17,7 @@ export * from "./entity_callbacks";
 export * from "./websockets";
 export * from "./backend";
 export * from "./schema_editing";
+export * from "./collection_patch";
 export * from "./channel_bus";
 export * from "./data_source";
 export * from "./resources";
