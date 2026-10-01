@@ -324,3 +324,20 @@ describe("POST /schema-editor/collection/save with a patch", () => {
         }
     });
 });
+
+describe("a whole collection that carries the runtime's view", () => {
+    it("is refused, rather than written into a file that stops type-checking", async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ast-runtime-only-"));
+        try {
+            fs.writeFileSync(path.join(dir, "books.ts"), BOOKS);
+            const editor = new AstSchemaEditor(dir);
+            await expect(editor.saveCollection("books", {
+                name: "Books",
+                properties: { author: { type: "relation", relation: { kind: "belongsTo" }, resolvedRelation: { kind: "belongsTo" } } }
+            })).rejects.toThrow(/resolvedRelation/);
+            expect(fs.readFileSync(path.join(dir, "books.ts"), "utf8")).toBe(BOOKS);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+});

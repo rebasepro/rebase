@@ -234,6 +234,15 @@ export function collectionPatchProblems(patch: unknown): string[] {
     return problems;
 }
 
+/**
+ * The first runtime-only key (see {@link RUNTIME_ONLY_COLLECTION_KEYS}) found
+ * anywhere in a value, or `undefined`. For the doors that take a whole
+ * collection rather than a patch.
+ */
+export function runtimeOnlyKeyIn(value: unknown): string | undefined {
+    return keyIn(value, key => RUNTIME_ONLY_COLLECTION_KEYS.includes(key));
+}
+
 /** A patch every door may apply: {@link collectionPatchProblems} found nothing. */
 export function isCollectionPatch(patch: unknown): patch is CollectionPatch {
     return collectionPatchProblems(patch).length === 0;

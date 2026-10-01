@@ -150,4 +150,49 @@ describe("a collection save", () => {
         });
         expect(posted.some(p => p.url.endsWith("/property/delete"))).toBe(false);
     });
+
+    it("updates a default filter as two `admin` keys, whatever the rendered collection carries", async () => {
+        const posted = backend(false);
+        const rendered = {
+            ...books(),
+            dataSource: "(default)",
+            engine: "postgres",
+            defaultFilter: { status: ["==", "draft"] },
+            properties: {
+                ...books().properties,
+                author: { type: "relation", relation: { kind: "belongsTo" }, resolvedRelation: { kind: "belongsTo" } }
+            }
+        } as unknown as AdminCollection;
+        function Rendered() {
+            controller = useLocalCollectionsConfigController(client, [rendered]);
+            return null;
+        }
+        render(<Rendered/>);
+        await run(() => controller.updateCollection({
+            id: "books",
+            collectionData: { defaultFilter: { status: ["==", "published"] }, sort: ["title", "asc"] } as never
+        }));
+        expect(posted.find(p => p.url.endsWith("/collection/save"))?.body).toEqual({
+            collectionId: "books",
+            patch: [
+                { op: "set", path: ["admin", "defaultFilter", "status"], value: ["==", "published"] },
+                { op: "set", path: ["admin", "sort"], value: ["title", "asc"] }
+            ]
+        });
+    });
+
+    it("removes a cleared default filter rather than writing it as empty", async () => {
+        const posted = backend(false);
+        const rendered = { ...books(), defaultFilter: { status: ["==", "draft"] } } as unknown as AdminCollection;
+        function Rendered() {
+            controller = useLocalCollectionsConfigController(client, [rendered]);
+            return null;
+        }
+        render(<Rendered/>);
+        await run(() => controller.updateCollection({ id: "books", collectionData: { defaultFilter: undefined } as never }));
+        expect(posted.find(p => p.url.endsWith("/collection/save"))?.body).toEqual({
+            collectionId: "books",
+            patch: [{ op: "remove", path: ["admin", "defaultFilter"] }]
+        });
+    });
 });

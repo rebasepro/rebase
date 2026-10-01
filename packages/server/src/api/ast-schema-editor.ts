@@ -4,6 +4,7 @@ import {
     nestAdminCollectionKeys,
     nestAdminPropertyKeys,
     nestCollectionPatchPaths,
+    runtimeOnlyKeyIn,
     type CollectionPatch,
     type CollectionPatchOp
 } from "@rebasepro/types";
@@ -579,6 +580,16 @@ export class AstSchemaEditor {
      */
     public async saveCollection(collectionId: string, collectionData: Record<string, unknown>, options: { partial?: boolean } = {}) {
         this.syncWithDisk();
+        // The registry's resolved form of a relation, written into a file,
+        // stops it type-checking. A collection that carries one is the view
+        // the panel renders, not one somebody authored.
+        const runtimeOnly = runtimeOnlyKeyIn(collectionData);
+        if (runtimeOnly) {
+            throw new Error(
+                `Refusing to write "${collectionId}": it holds "${runtimeOnly}", which the runtime adds to a ` +
+                "collection it has loaded and a collection file must not hold. Save what changed instead."
+            );
+        }
         try {
             await this.writeCollection(collectionId, collectionData, options);
         } catch (err) {

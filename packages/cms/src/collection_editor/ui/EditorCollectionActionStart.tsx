@@ -11,8 +11,8 @@ import { Button, SaveIcon, Tooltip, UndoIcon } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
-import { mergeDeep } from "@rebasepro/utils";
 import { normalizeOrderBy } from "@rebasepro/common";
+import { isSchemaChangeCancelled } from "../liveSchemaClient";
 
 export function EditorCollectionActionStart({
     path,
@@ -39,20 +39,37 @@ export function EditorCollectionActionStart({
                 <Button
                     size={"small"}
                     variant={"text"}
+                    // The two keys this button is about, as an update — not
+                    // the collection the view renders. That one is normalized
+                    // and flattened for the panel, and saving it wrote the
+                    // runtime's `resolvedRelation`, the default `dataSource`
+                    // and the default rules into the file, which then no
+                    // longer type-checked.
                     onClick={() => configController
-                        ?.saveCollection({
+                        ?.updateCollection({
                             id: collection.slug,
                             parentCollectionSlugs,
-parentEntityIds,
-                            collectionData: mergeDeep(collection as AdminCollection,
-                                {
-                                    defaultFilter: tableController.filterValues ?? null,
-                                    sort: tableController.sortBy ?? null
-                                })
+                            parentEntityIds,
+                            // Absent rather than null when cleared: the key is
+                            // removed from the file instead of written as
+                            // `undefined`.
+                            collectionData: {
+                                defaultFilter: tableController.filterValues ?? undefined,
+                                sort: tableController.sortBy ?? undefined
+                            } as Partial<AdminCollection>
                         }).then(() => {
                             snackbarController.open({
                                 type: "success",
                                 message: t("studio_editor_collection_start_saved")
+                            });
+                        }, (error: unknown) => {
+                            // Closing the review is the person's answer, not
+                            // a failure.
+                            if (isSchemaChangeCancelled(error)) return;
+                            console.error(error);
+                            snackbarController.open({
+                                type: "error",
+                                message: error instanceof Error ? error.message : String(error)
                             });
                         })}>
                     <SaveIcon/>
