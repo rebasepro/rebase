@@ -1,7 +1,7 @@
 
-import { Entity, FilterValues, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getRelationIncludeParams, useData, useRebaseContext } from "@rebasepro/app";
+import { CollectionWindow, CollectionWindowState, getRelationIncludeParams, useData, useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -124,6 +124,8 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
     const orderPropertyRef = useRef(orderProperty);
     const searchStringRef = useRef(searchString);
     const resolvedPathRef = useRef(resolvedPath);
+    const pageSizeRef = useRef(pageSize);
+    pageSizeRef.current = pageSize;
     filterValuesRef.current = filterValues;
     columnPropertyRef.current = columnProperty;
     orderPropertyRef.current = orderProperty;
@@ -156,6 +158,9 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
 
     // Track cleanup functions for subscriptions
     const unsubscribersRef = useRef<Record<string, () => void>>({});
+
+    // Each column's rows, read a page at a time — see `CollectionWindow`.
+    const windowsRef = useRef<Record<string, CollectionWindow<Record<string, unknown>>>>({});
 
     // Flag to prevent race conditions during cleanup
     const isCleaningUpRef = useRef(false);
@@ -220,14 +225,6 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         // Skip if we're in the middle of cleanup
         if (isCleaningUpRef.current) return;
 
-        // `itemCount` grows by one page per "load more" click with nothing
-        // stopping it, and a read above `MAX_LIST_LIMIT` is refused rather than
-        // trimmed — a column would stop loading with an error instead of
-        // stopping at the ceiling. Ask for what the platform serves; `hasMore`
-        // below still compares against the count the board asked for, so the
-        // column reports itself exhausted exactly where it did before.
-        const requestedCount = Math.min(itemCount, MAX_LIST_LIMIT);
-
         const currentDataClient = dataClientRef.current;
         const currentCollection = collectionRef.current;
         const currentContext = contextRef.current;
@@ -271,6 +268,9 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         // sets it straight back to false.
         let active = true;
         const isCurrent = () => active && !isCleaningUpRef.current;
+        // `afterRead` below is awaited, so two answers can finish out of
+        // order; only the latest one paints.
+        let updateSequence = 0;
 
         // Mark column as loading
         setColumnData(prev => ({
@@ -283,8 +283,9 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         }));
 
         // onUpdate callback
-        const onUpdate = async (entities: Entity<M>[]) => {
+        const onUpdate = async (entities: Entity<M>[], state: Omit<CollectionWindowState, "rows">) => {
             if (!isCurrent()) return;
+            const sequence = ++updateSequence;
 
             const pendingMap = pendingItemsRef.current;
 
@@ -379,9 +380,13 @@ values: { ...e.values,
 
             // `afterRead` above is awaited; the subscription may have been
             // replaced in the meantime.
-            if (!isCurrent()) return;
+            if (!isCurrent() || sequence !== updateSequence) return;
 
-            const newHasMore = entities.length >= itemCount;
+            // More exists until a page comes back short — never "the rows
+            // asked for did not all fit under the read ceiling". A column
+            // whose next page failed stops asking, rather than retrying on
+            // every scroll.
+            const newHasMore = !state.complete && !state.error;
 
             // Compare with current state — skip update if identical to avoid UI flash
             setColumnData(prev => {
@@ -403,7 +408,7 @@ values: { ...e.values,
                             break;
                         }
                     }
-                    if (identical && existing.hasMore === newHasMore) {
+                    if (identical && existing.hasMore === newHasMore && !state.loading && existing.error === state.error) {
                         // Data is the same — return previous reference to prevent re-render
                         return prev;
                     }
@@ -413,9 +418,9 @@ values: { ...e.values,
                     ...prev,
                     [column]: {
                         entities: processed,
-                        loading: false,
+                        loading: state.loading,
                         hasMore: newHasMore,
-                        error: undefined,
+                        error: state.error,
                         totalCount: prev[column]?.totalCount // Keep existing count
                     }
                 };
@@ -427,47 +432,15 @@ values: { ...e.values,
         // Eagerly include relations to avoid N+1 fetches.
         const includeParams = getRelationIncludeParams(currentCollection);
 
-        const fetchOnce = () => accessor.find({
-            where: whereFilter,
-            limit: requestedCount,
-            orderBy: orderByParam,
-            include: includeParams,
-            searchString: currentSearchString
-        });
-
-        const onError = (error: Error) => {
-            if (!isCurrent()) return;
-
-            console.error(`Error loading column ${column}:`, error);
-
-            // A live subscription that fails is not the same thing as a column
-            // with nothing in it, but that is exactly what this used to render:
-            // entities cleared, no error surfaced, and a column reading "No
-            // items" above a header still counting eleven of them. Read once
-            // over HTTP instead — the board loses its live updates, not its
-            // contents — and only report the failure if that fails too.
-            fetchOnce()
-                .then(res => onUpdate(res.data as Entity<M>[]))
-                .catch(() => {
-                    if (!isCurrent()) return;
-                    setColumnData(prev => ({
-                        ...prev,
-                        [column]: {
-                            ...prev[column],
-                            entities: prev[column]?.entities ?? [],
-                            loading: false,
-                            hasMore: false,
-                            error
-                        }
-                    }));
-                });
-        };
-
-        if (accessor.listen) {
-            let liveDataReceived = false;
-            const unsubscribe = accessor.listen({
+        // The column's first page is live; every later page is read by
+        // offset, only past the rows already held, and never above the API's
+        // read ceiling. The column used to grow one read instead and clamp it
+        // at that ceiling, so it said it was finished at 1,000 cards while its
+        // own header counted thousands more.
+        const collectionWindow = new CollectionWindow({
+            accessor,
+            query: {
                 where: whereFilter,
-                limit: requestedCount,
                 orderBy: orderByParam,
                 include: includeParams,
                 // Read into a local at the top of this function and then used
@@ -475,41 +448,30 @@ values: { ...e.values,
                 // term, re-subscribed every column when it changed, and
                 // returned the same rows.
                 searchString: currentSearchString
-            }, res => {
-                liveDataReceived = true;
-                onUpdate(res.data as Entity<M>[]);
-            }, onError);
-
+            },
+            pageSize: pageSizeRef.current,
+            target: itemCount,
+            // A live subscription that fails is not the same thing as a column
+            // with nothing in it, but that is exactly what this used to render:
+            // entities cleared, no error surfaced, and a column reading "No
+            // items" above a header still counting eleven of them. Read once
+            // over HTTP instead — the board loses its live updates, not its
+            // contents — and only report the failure if that fails too.
+            fallbackToFind: true,
             // A subscription that is never going to answer takes the client's
             // full 30s watchdog to say so, and the board spins the whole time.
             // If the socket has not delivered shortly after mount, read once
             // over HTTP and paint that; the live data still wins whenever it
             // arrives. Costs nothing when realtime is healthy.
-            const firstPaintFallback = setTimeout(() => {
-                if (liveDataReceived || !isCurrent()) return;
-                fetchOnce()
-                    .then(res => {
-                        if (liveDataReceived || !isCurrent()) return;
-                        onUpdate(res.data as Entity<M>[]);
-                    })
-                    .catch(() => undefined);
-            }, LIVE_FIRST_PAINT_TIMEOUT_MS);
-
-            unsubscribersRef.current[column] = () => {
-                active = false;
-                clearTimeout(firstPaintFallback);
-                unsubscribe?.();
-            };
-        } else {
-            // Nothing to unsubscribe from, but the read is still superseded
-            // by whatever replaces this subscription.
-            unsubscribersRef.current[column] = () => {
-                active = false;
-            };
-            fetchOnce()
-                .then(res => onUpdate(res.data as Entity<M>[]))
-                .catch((error: Error) => {
-                    if (!isCurrent()) return;
+            firstPaintTimeoutMs: LIVE_FIRST_PAINT_TIMEOUT_MS,
+            onChange: (state) => {
+                if (!isCurrent()) return;
+                if (state.rows) {
+                    void onUpdate(state.rows as Entity<M>[], state);
+                    return;
+                }
+                if (state.error) {
+                    console.error(`Error loading column ${column}:`, state.error);
                     setColumnData(prev => ({
                         ...prev,
                         [column]: {
@@ -517,11 +479,19 @@ values: { ...e.values,
                             entities: prev[column]?.entities ?? [],
                             loading: false,
                             hasMore: false,
-                            error
+                            error: state.error
                         }
                     }));
-                });
-        }
+                }
+            }
+        });
+        windowsRef.current[column] = collectionWindow;
+        unsubscribersRef.current[column] = () => {
+            active = false;
+            collectionWindow.dispose();
+            if (windowsRef.current[column] === collectionWindow) delete windowsRef.current[column];
+        };
+        collectionWindow.start();
     }, []); // No dependencies - uses refs for all values
 
     // Main effect for all column subscriptions - runs when subscriptionVersion changes (i.e., key params change)
@@ -636,23 +606,10 @@ values: { ...e.values,
             const prevCount = prevCounts[column] ?? pageSize;
             const newCount = columnItemCounts[column] ?? pageSize;
 
-            // Only re-subscribe if this specific column's count increased (load more)
+            // Only this column asked for more: its window reads the next page,
+            // and nothing it already holds is read again.
             if (newCount > prevCount && !isCleaningUpRef.current) {
-                // Unsubscribe only this column
-                if (unsubscribersRef.current[column]) {
-                    try {
-                        unsubscribersRef.current[column]();
-                    } catch (e) {
-                        // Ignore cleanup errors
-                    }
-                    delete unsubscribersRef.current[column];
-                }
-                // Re-subscribe with new limit after a small delay
-                setTimeout(() => {
-                    if (!isCleaningUpRef.current) {
-                        subscribeToColumn(column, newCount);
-                    }
-                }, 0);
+                windowsRef.current[column]?.setTarget(newCount);
             }
         });
 

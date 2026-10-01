@@ -1,5 +1,6 @@
 export * from "./data/useData";
 export * from "./data/useCollection";
+export * from "./data/collectionWindow";
 export * from "./data/useFetch";
 export * from "./data/useRelationSelector";
 export * from "./data/save";

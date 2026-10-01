@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 
 /**
  * Returning to a collection restores how many rows were loaded, so a scrolled
@@ -22,8 +22,11 @@ const mockLocation = { pathname: "/c/customers", search: "", hash: "", state: nu
 jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 
 const find = jest.fn().mockResolvedValue({ data: [] });
+// One client for every render, as the real context provides: a new one per
+// render re-opens the read on every render.
+const mockClient = { collection: () => ({ find }) };
 jest.mock("../../src/hooks", () => ({
-    useData: () => ({ collection: () => ({ find }) }),
+    useData: () => mockClient,
     useRebaseContext: () => ({})
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
@@ -58,7 +61,8 @@ function requestedLimit() {
 describe("useDataTableController — the item count restored from a saved scroll", () => {
 
     beforeEach(() => {
-        find.mockClear();
+        find.mockReset();
+        find.mockResolvedValue({ data: [] });
         mockLocation.search = "";
     });
 
@@ -68,11 +72,19 @@ describe("useDataTableController — the item count restored from a saved scroll
         expect(requestedLimit()).toBe(DEFAULT_PAGE_SIZE);
     });
 
-    it("asks for as many rows as were loaded last time", () => {
+    // As many rows as were on screen, read as pages: the first page, then
+    // only the rows past it — never one read growing with the scroll.
+    it("asks for as many rows as were loaded last time", async () => {
         const rows = Array.from({ length: 120 }, (_, i) => ({ id: `c${i}`, values: {} }));
+        const stored = Array.from({ length: 500 }, (_, i) => ({ id: `c${i}`, path: "customers", values: {} }));
+        find.mockImplementation((params: { limit: number, offset?: number }) =>
+            Promise.resolve({ data: stored.slice(params.offset ?? 0, (params.offset ?? 0) + params.limit) }));
         const { result } = mount(restorationWith({ scrollOffset: 900, data: rows }));
         expect(result.current.itemCount).toBe(120);
-        expect(requestedLimit()).toBe(120);
+        expect(requestedLimit()).toBe(DEFAULT_PAGE_SIZE);
+        await waitFor(() => expect(find).toHaveBeenCalledTimes(2));
+        expect(find.mock.calls[1][0]).toMatchObject({ offset: DEFAULT_PAGE_SIZE, limit: 120 - DEFAULT_PAGE_SIZE });
+        await waitFor(() => expect(result.current.data).toHaveLength(120));
     });
 
     // The regression: an entry saved by a view that matched no rows.
@@ -102,6 +114,7 @@ describe("useDataTableController — the item count restored from a saved scroll
         }));
         expect(result.current.pageSize).toBe(DEFAULT_PAGE_SIZE);
         expect(result.current.itemCount).toBeUndefined();
-        expect(requestedLimit()).toBeUndefined();
+        // Off means "every row", read a page at a time — never `limit=0`.
+        expect(requestedLimit()).toBe(DEFAULT_PAGE_SIZE);
     });
 });

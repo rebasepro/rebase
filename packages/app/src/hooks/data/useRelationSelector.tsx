@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
 import { getRelationIncludeParams } from "../../util/previews";
+import { CollectionWindow } from "./collectionWindow";
 import { useStableFilterValues } from "./useStableFilterValues";
 import type { AdminCollection } from "@rebasepro/cms-types";
 export interface RelationItem {
@@ -158,6 +159,13 @@ export function useRelationSelector<M extends Record<string, any> = any>(
     // it can be a dependency below without re-triggering the fetch.
     const includeParams = getRelationIncludeParams(collection);
 
+    // How many rows the picker wants, read by the window below a page at a
+    // time. A ref so that asking for more grows the window instead of
+    // re-opening it.
+    const limitRef = useRef(limit);
+    limitRef.current = limit;
+    const windowRef = useRef<CollectionWindow<M> | null>(null);
+
     const fetchData = useCallback(() => {
         cleanupSubscription();
         setError(undefined);
@@ -166,67 +174,51 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         // fixedFilter is already FilterValues — pass directly
         const whereParams = stableFixedFilter && Object.keys(stableFixedFilter).length > 0 ? stableFixedFilter : undefined;
 
-        const onEntitiesUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
-            const newItems = res.data.map((e) => entityToRelationItem(e));
-            hasLoadedRef.current = true;
-            setItems(newItems);
-            setHasMore(res.meta.hasMore);
-            setLoading(false);
-        };
-
-        const onErrorUpdate = (fetchError: Error) => {
-            console.error("useRelationSelector: Error fetching data:", fetchError);
-            hasLoadedRef.current = true;
-            setError(fetchError);
-            setLoading(false);
-        };
-
-        const accessor = dataClient.collection(path);
-
-        let unsubscribe: (() => void) | undefined;
-
-        if (accessor.listen) {
-            unsubscribe = accessor.listen({
+        // The first page is live when the client has a socket; every later
+        // page is read by offset, past the rows already held, and never above
+        // the API's read ceiling. "Load more" used to raise one read's
+        // `limit`, which re-read every option before it and was refused once
+        // it passed 1,000.
+        //
+        // `dispose` is what keeps this hook's results matching the query that
+        // asked for them: an answer for "ab" that lands after the window for
+        // "abc" opened is dropped, not painted.
+        const collectionWindow = new CollectionWindow<M>({
+            accessor: dataClient.collection<M>(path),
+            query: {
                 where: whereParams,
-                limit: limit,
-                orderBy: undefined,
-                searchString: currentSearch,
+                searchString: currentSearch || undefined,
                 include: includeParams
-            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
-meta: res.meta }), onErrorUpdate);
-        } else {
-            // The one-shot fallback, taken whenever the client has no socket.
-            // `cleanupSubscription` is what keeps this hook's results matching
-            // the query that asked for them, and it can only do that if the
-            // fallback hands back something that actually cancels. A promise
-            // cannot be unsubscribed, so this disowns its result instead —
-            // otherwise the debounce is the only thing between a slow response
-            // for "ab" and its landing on top of the results for "abc".
-            let cancelled = false;
-            accessor.find({
-                where: whereParams,
-                limit: limit,
-                offset: 0,
-                orderBy: undefined,
-                searchString: currentSearch,
-                include: includeParams
-            })
-                .then((res) => {
-                    if (cancelled) return;
-                    onEntitiesUpdate({ data: res.data as Entity<M>[],
-meta: res.meta });
-                })
-                .catch((e) => {
-                    if (cancelled) return;
-                    onErrorUpdate(e);
-                });
-            unsubscribe = () => {
-                cancelled = true;
-            };
-        }
+            },
+            pageSize,
+            target: limitRef.current,
+            onChange: (state) => {
+                if (state.rows) {
+                    hasLoadedRef.current = true;
+                    setItems(state.rows.map((e) => entityToRelationItem(e)));
+                    setHasMore(!state.complete && !state.error);
+                }
+                if (state.error) {
+                    console.error("useRelationSelector: Error fetching data:", state.error);
+                    hasLoadedRef.current = true;
+                }
+                setError(state.error);
+                setLoading(state.loading);
+            }
+        });
+        windowRef.current = collectionWindow;
+        collectionWindow.start();
 
-        unsubscribeRef.current = unsubscribe || null;
-    }, [dataClient, path, stableFixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading, includeParams]);
+        unsubscribeRef.current = () => {
+            collectionWindow.dispose();
+            if (windowRef.current === collectionWindow) windowRef.current = null;
+        };
+    }, [dataClient, path, stableFixedFilter, pageSize, currentSearch, entityToRelationItem, cleanupSubscription, setLoading, includeParams]);
+
+    // "Load more" asks the open window for the next page.
+    useEffect(() => {
+        windowRef.current?.setTarget(limit);
+    }, [limit]);
 
     // Search function with debouncing
     const search = useCallback((searchString: string) => {

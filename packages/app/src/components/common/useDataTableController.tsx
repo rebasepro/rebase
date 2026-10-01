@@ -6,8 +6,9 @@ import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { populateFetchCache } from "../../hooks/data/useFetch";
 import { toFindParams } from "../../hooks/data/collectionQuery";
+import { CollectionWindow } from "../../hooks/data/collectionWindow";
 import { getRelationIncludeParams } from "../../util/previews";
-import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
 import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
 import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/cms-types";
 import { ScrollRestorationController } from "./useScrollRestoration";
@@ -288,6 +289,13 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const canListen = Boolean(dataClient.collection(path).listen);
     const oneShotReadKey = canListen ? undefined : lastDeleteTimestamp;
 
+    // How many rows the view wants held. Pagination off is a request for all
+    // of them — read in pages the API serves, never as one unbounded read.
+    const target = itemCount ?? Infinity;
+    const targetRef = React.useRef(target);
+    targetRef.current = target;
+    const windowRef = React.useRef<CollectionWindow<M> | undefined>(undefined);
+
     useEffect(() => {
 
         // Cleared by this run's cleanup. A one-shot read has nothing to
@@ -297,17 +305,18 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         setDataLoading(true);
 
-        const onEntitiesUpdate = async (entities: Entity<M>[]) => {
-            // `browserCallbacks`, not `callbacks`: the server has already run
-            // its own `afterRead` before these rows arrived, and running that
-            // one again here applied it twice. This block is the panel's.
-            if (collection.browserCallbacks?.afterRead) {
+        // `browserCallbacks`, not `callbacks`: the server has already run its
+        // own `afterRead` before these rows arrived, and running that one
+        // again here applied it twice. This block is the panel's.
+        const afterRead = collection.browserCallbacks?.afterRead;
+        const process = afterRead
+            ? async (entities: Entity<M>[]): Promise<Entity<M>[]> => {
                 try {
                     // afterRead operates on flat rows; unwrap the Entity view-model
                     // before invoking and re-wrap the processed row after.
-                    entities = await Promise.all(
+                    return await Promise.all(
                         entities.map(async (entity) => {
-                            const processedRow = await collection.browserCallbacks!.afterRead!({
+                            const processedRow = await afterRead({
                                 collection,
                                 path,
                                 row: { id: entity.id, ...entity.values },
@@ -320,31 +329,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                         }));
                 } catch (_e: unknown) {
                     console.error(_e);
+                    return entities;
                 }
             }
-            if (cancelled) return;
-            setDataLoading(false);
-            setDataLoadingError(undefined);
-            setRawData(entities.map(e => ({
-                ...e
-                // values: sanitizeData(e.values, resolvedCollection.properties)
-            })));
-            setNoMoreToLoad(!itemCount || entities.length < itemCount);
-
-            // Pre-populate the entity fetch cache so that navigating to an
-            // entity detail view renders instantly with cached data.
-            populateFetchCache(path, entities);
-        };
-
-        const onError = (error: Error) => {
-            if (cancelled) return;
-            console.error("ERROR", error);
-            setDataLoading(false);
-            setRawData((prev) => prev && prev.length > 0 ? prev : []);
-            setDataLoadingError(error);
-        };
-
-        const accessor = dataClient.collection(path);
+            : undefined;
 
         // filterValues is already FilterValues — pass directly to the accessor
         const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
@@ -352,31 +340,48 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             ? sortBy.map(([field, direction]) => [String(field), direction] as OrderByTuple)
             : undefined;
 
-        let unsubscribe: (() => void) | undefined;
-
         // Eagerly include relations to avoid N+1 fetches.
         const includeParams = getRelationIncludeParams(collection);
 
-        if (accessor.listen) {
-            // Assembled in one place — see `toFindParams`. Listing the fields
-            // here is what let `searchExplain` reach three of four read paths.
-            unsubscribe = accessor.listen(
-                toFindParams({ where: whereParams, limit: itemCount, orderBy: orderByParams,
-                    searchString, include: includeParams }),
-                (res) => onEntitiesUpdate(res.data as Entity<M>[]), onError);
-        } else {
-            accessor.find(
-                toFindParams({ where: whereParams, limit: itemCount, orderBy: orderByParams,
-                    searchString, include: includeParams }))
-                .then((res) => onEntitiesUpdate(res.data as Entity<M>[]))
-                .catch(onError);
-        }
+        // One page at a time: the first page live, every later one read by
+        // offset, none above the API's ceiling — see `CollectionWindow`. The
+        // query is assembled in one place (`toFindParams`); listing the fields
+        // here is what let `searchExplain` reach three of four read paths.
+        const collectionWindow = new CollectionWindow<M>({
+            accessor: dataClient.collection<M>(path),
+            query: toFindParams({ where: whereParams, orderBy: orderByParams, searchString, include: includeParams }),
+            pageSize,
+            target: targetRef.current,
+            process,
+            onChange: (state) => {
+                if (cancelled) return;
+                if (state.rows) {
+                    setRawData(state.rows);
+                    // Pre-populate the entity fetch cache so that navigating to an
+                    // entity detail view renders instantly with cached data.
+                    populateFetchCache(path, state.rows);
+                }
+                if (state.error) console.error("ERROR", state.error);
+                setDataLoading(state.loading);
+                setDataLoadingError(state.error);
+                setNoMoreToLoad(state.complete);
+            }
+        });
+        windowRef.current = collectionWindow;
+        collectionWindow.start();
 
         return () => {
             cancelled = true;
-            unsubscribe?.();
+            collectionWindow.dispose();
+            if (windowRef.current === collectionWindow) windowRef.current = undefined;
         };
-    }, [dataClient, path, itemCount, sortKey, filterValues, searchString, oneShotReadKey]);
+    }, [dataClient, path, pageSize, sortKey, filterValues, searchString, oneShotReadKey]);
+
+    // Scrolling asks for more rows of the same query: only the rows past the
+    // ones held are read.
+    useEffect(() => {
+        windowRef.current?.setTarget(target);
+    }, [target]);
 
     const orderedData = useDataOrder({
         data: rawData,

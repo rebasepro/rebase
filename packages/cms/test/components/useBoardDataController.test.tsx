@@ -3,10 +3,12 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { MAX_LIST_LIMIT, resolveClientListLimit } from "@rebasepro/types";
 
 // The hook reads its data client and context out of `@rebasepro/app`. Only the
-// three bindings it actually imports are stubbed; anything else in that module
-// would drag the whole runtime into a unit test.
+// bindings it actually imports are provided; anything else in that module
+// would drag the whole runtime into a unit test. The paging engine is the real
+// one — how a column pages is what several of these tests are about.
 const listen = jest.fn();
 const find = jest.fn();
 const count = jest.fn();
@@ -16,7 +18,9 @@ jest.mock("@rebasepro/app", () => ({
 find,
 count }) }),
     useRebaseContext: () => ({}),
-    getRelationIncludeParams: () => undefined
+    getRelationIncludeParams: () => undefined,
+    CollectionWindow: jest.requireActual<typeof import("../../../app/src/hooks/data/collectionWindow")>(
+        "../../../app/src/hooks/data/collectionWindow").CollectionWindow
 }));
 
 import { useBoardDataController } from "../../src/components/CollectionViewBinding/useBoardDataController";
@@ -199,20 +203,57 @@ order: "a" })
         expect(result.current.columnData.done.hasMore).toBe(false);
     });
 
-    it("re-subscribes only the column that asked for more, with a larger limit", async () => {
+    it("reads only the next page of the column that asked for more", async () => {
+        find.mockResolvedValue({ data: [entity("3", { status: "todo" })] });
         const { result } = renderBoard({ pageSize: 2 });
         await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        await act(async () => {
+            updateFor("todo")([entity("1", { status: "todo" }), entity("2", { status: "todo" })]);
+            updateFor("done")([]);
+        });
         listen.mockClear();
 
         act(() => {
             result.current.loadMoreColumn("todo");
         });
 
-        await waitFor(() => expect(listen).toHaveBeenCalledTimes(1));
-        expect(listen.mock.calls[0][0]).toMatchObject({
+        await waitFor(() => expect(result.current.columnData.todo.entities).toHaveLength(3));
+        // The rows already on screen are not read again, and the live
+        // subscription is left as it was.
+        expect(find).toHaveBeenCalledTimes(1);
+        expect(find.mock.calls[0][0]).toMatchObject({
             where: { status: ["==", "todo"] },
-            limit: 4
+            offset: 2,
+            limit: 2
         });
+        expect(listen).not.toHaveBeenCalled();
+        expect(result.current.columnData.todo.hasMore).toBe(false);
+    });
+
+    // A column used to grow one read and clamp it at the API's ceiling, so at
+    // 1,000 cards it said it was finished while its header counted thousands.
+    it("pages a column past 1,000 cards, and says there is more until there is not", async () => {
+        const stored = Array.from({ length: 1_030 }, (_, i) => entity(`t${i}`, { status: "todo" }));
+        find.mockImplementation((params: any) => {
+            const limit = resolveClientListLimit(params.limit);
+            const offset = params.offset ?? 0;
+            return Promise.resolve({ data: stored.slice(offset, offset + limit) });
+        });
+        const { result } = renderBoard({ pageSize: 50, columns: ["todo"] });
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(1));
+        await act(async () => updateFor("todo")(stored.slice(0, 50)));
+
+        for (let step = 0; step < 40 && result.current.columnData.todo.hasMore; step++) {
+            act(() => result.current.loadMoreColumn("todo"));
+            await waitFor(() => expect(result.current.columnData.todo.loading).toBe(false));
+        }
+
+        expect(result.current.columnData.todo.error).toBeUndefined();
+        expect(result.current.columnData.todo.entities).toHaveLength(1_030);
+        expect(result.current.columnData.todo.hasMore).toBe(false);
+        for (const [params] of find.mock.calls as any[][]) {
+            expect(params.limit).toBeLessThanOrEqual(MAX_LIST_LIMIT);
+        }
     });
 
     it("moves an entity between columns optimistically and shifts both counts", async () => {
@@ -446,10 +487,14 @@ describe("useBoardDataController — refresh", () => {
     });
 
     it("refreshColumn re-subscribes that column with one page, after a load-more", async () => {
+        find.mockResolvedValue({ data: [] });
         const { result } = renderBoard(2);
         await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+        await act(async () => {
+            latestUpdateFor("todo")([entity("1", { status: "todo" }), entity("2", { status: "todo" })]);
+        });
         act(() => result.current.loadMoreColumn("todo"));
-        await waitFor(() => expect(listen).toHaveBeenCalledTimes(3));
+        await waitFor(() => expect(find).toHaveBeenCalledTimes(1));
         listen.mockClear();
 
         act(() => result.current.refreshColumn("todo"));
