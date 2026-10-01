@@ -25,6 +25,7 @@ import { useRestoreScroll } from "@rebasepro/app";
 import { SchemaDriftBanner } from "@rebasepro/app";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
 import { useAdminContext } from "../../hooks/useAdminContext";
+import { NavigationLoadingErrorView } from "../NavigationLoadingErrorView";
 
 export const DEFAULT_GROUP_NAME = "Views";
 export const ADMIN_GROUP_NAME = "Admin";
@@ -349,6 +350,12 @@ export function ContentHomePage({
                     {additionalActions}
                     {additionalPluginActions}
                 </div>
+
+                {navigationStateController.navigationLoadingError &&
+                    <div className="mb-4">
+                        <NavigationLoadingErrorView error={navigationStateController.navigationLoadingError}
+                            onRetry={navigationStateController.refreshNavigation}/>
+                    </div>}
 
                 <FavouritesView hidden={performingSearch}/>
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { ErrorTooltip } from "./ErrorTooltip";
 import { AlertTriangleIcon, Button, Typography, iconSize } from "@rebasepro/ui";
+import { useTranslation } from "../hooks/useTranslation";
 
 /**
  * @group Components
@@ -28,6 +29,7 @@ export function ErrorView({
     tooltip,
     onRetry
 }: ErrorViewProps): React.ReactElement {
+    const { t } = useTranslation();
     const message = error instanceof Error ? error.message : error;
     // Extract error code from ApiError instances (e.g. PG error codes like "42P01")
     const errorCode = error instanceof Error && "code" in error
@@ -74,7 +76,7 @@ export function ErrorView({
                                 onClick={onRetry}
                                 className="font-semibold"
                             >
-                                Try again
+                                {t("retry")}
                             </Button>
                         </div>
                     )}

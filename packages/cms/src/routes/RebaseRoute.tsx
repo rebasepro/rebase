@@ -17,6 +17,8 @@ import { toArray } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
+import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
+import { NavigationLoadingErrorView } from "../components/NavigationLoadingErrorView";
 
 export function RebaseRoute() {
 
@@ -26,6 +28,7 @@ export function RebaseRoute() {
     const breadcrumbs = useBreadcrumbsController();
     const userConfigPersistence = useUserConfigurationPersistence();
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
+    const navigationState = useNavigationStateController();
 
     const hash = location.hash;
     const isSidePanel = hash.includes("#side");
@@ -67,6 +70,16 @@ export function RebaseRoute() {
             })
         });
     }, [navigationEntries.map(entry => entry.path).join(",")]);
+
+    // The collections failed to load, so this URL cannot resolve to anything:
+    // say why, rather than spin until a registry that will never fill does, or
+    // report the collection as unregistered.
+    if (navigationState.navigationLoadingError && !navigationEntries.some((entry) => entry.type === "collection")) {
+        return <CenteredView>
+            <NavigationLoadingErrorView error={navigationState.navigationLoadingError}
+                onRetry={navigationState.refreshNavigation}/>
+        </CenteredView>;
+    }
 
     if (isNew) {
         // New entities always use full-screen mode, even for split-layout collections
