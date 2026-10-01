@@ -353,7 +353,7 @@ Pruning happens as messages arrive, throttled per channel so cost tracks elapsed
 
 ### Delivery guarantees
 
-- **Ordered.** Sequence numbers are allocated per channel, and delivery order matches sequence order.
+- **Ordered.** Sequence numbers are allocated per channel, and delivery order matches sequence order — on one instance, and across instances on the `postgres` bus, where the statement that numbers a message also announces it, so every instance (the sender's included) receives the announcements in sequence order. A bus you supply yourself carries frames in whatever order it delivers them.
 - **Durable before delivered.** A message that cannot be stored is not delivered to anyone, and the sender is told. Delivering it would put it in front of live subscribers while leaving it out of every future replay, and no later message could repair that gap.
 - **At-least-once on catch-up.** A replay range may overlap messages a client already received; the SDK discards ones it has already delivered.
 

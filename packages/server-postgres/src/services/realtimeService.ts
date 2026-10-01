@@ -22,7 +22,7 @@ import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collect
 import { isNestedPath } from "./nested-path";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
-import { ChannelBus, ChannelBusFrame, MemoryChannelBus, PostgresChannelBus, frameByteLength } from "./channel-bus";
+import { CHANNEL_BUS_NOTIFY_CHANNEL, ChannelBus, ChannelBusFrame, MemoryChannelBus, PostgresChannelBus, frameByteLength } from "./channel-bus";
 import type { ChannelHistoryEntry, ChannelRetentionRule, RealtimeListenerHealth, User } from "@rebasepro/types";
 import { unref } from "@rebasepro/utils";
 
@@ -380,6 +380,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * wait on each other.
      */
     private channelSendQueues = new Map<string, Promise<void>>();
+    /** The receiving half of the same ordering: retained bus frames per channel, one at a time. */
+    private channelReceiveQueues = new Map<string, Promise<void>>();
 
     /**
      * Cross-instance transport for channel frames and presence.
@@ -2330,9 +2332,21 @@ roles: ["anon"] };
         payload: unknown,
         retention: ResolvedRetention
     ): Promise<void> {
+        // Over the Postgres bus the message is announced by the statement that
+        // numbers it, and every instance — this one too — delivers it when the
+        // announcement arrives: in commit order, which is sequence order. Fanned
+        // out here first, a reader on this instance got this instance's N+1
+        // before another's N, and a client that keeps a watermark dropped N for
+        // good. See `ChannelHistoryStore.append`.
+        const ordered = this.bus instanceof PostgresChannelBus;
         let seq: number;
         try {
-            ({ seq } = await this.channelHistory!.append(channel, event, payload, clientId));
+            ({ seq } = await this.channelHistory!.append(channel, event, payload, clientId, ordered ? {
+                notifyChannel: CHANNEL_BUS_NOTIFY_CHANNEL,
+                sid: this.instanceId,
+                // Room for any sequence number in the frame measured here.
+                inline: frameByteLength({ kind: "broadcast", sid: this.instanceId, channel, event, from: clientId, seq: Number.MAX_SAFE_INTEGER, payload }) <= this.bus.maxFrameBytes
+            } : undefined));
         } catch (error) {
             logger.error(`❌ [ChannelHistory] Could not persist broadcast on "${channel}" — message dropped`, { error });
             this.sendError(
@@ -2345,8 +2359,10 @@ roles: ["anon"] };
             return;
         }
 
-        this.fanOutBroadcast(clientId, channel, event, payload, seq);
-        this.publishBroadcast(clientId, channel, event, payload, seq);
+        if (!ordered) {
+            this.fanOutBroadcast(clientId, channel, event, payload, seq);
+            this.publishBroadcast(clientId, channel, event, payload, seq);
+        }
 
         try {
             await this.channelHistory!.prune(channel, retention);
@@ -2531,8 +2547,25 @@ roles: ["anon"] };
      * its own `sid`.
      */
     private async handleBusFrame(frame: ChannelBusFrame): Promise<void> {
-        if (frame.sid === this.instanceId) return;
+        const retained = (frame.kind === "broadcast" || frame.kind === "broadcast_ref") && frame.seq !== undefined;
+        // Our own frames were fanned out before they were published — except a
+        // retained one over the Postgres bus, which reaches this instance's
+        // clients only this way. See `persistAndFanOut`.
+        if (frame.sid === this.instanceId && !(retained && this.bus instanceof PostgresChannelBus)) return;
+        if (!retained) return this.deliverBusFrame(frame);
 
+        // In the order they arrived, per channel: a pointer is read back from
+        // the history table, and the inline frame after it must not overtake it.
+        const previous = this.channelReceiveQueues.get(frame.channel) ?? Promise.resolve();
+        const next = previous.catch(() => { /* reported where it failed */ }).then(() => this.deliverBusFrame(frame));
+        this.channelReceiveQueues.set(frame.channel, next);
+        void next.finally(() => {
+            if (this.channelReceiveQueues.get(frame.channel) === next) this.channelReceiveQueues.delete(frame.channel);
+        }).catch(() => { /* reported where it failed */ });
+        return next;
+    }
+
+    private async deliverBusFrame(frame: ChannelBusFrame): Promise<void> {
         switch (frame.kind) {
             case "broadcast":
                 this.fanOutBroadcast(frame.from ?? "", frame.channel, frame.event, frame.payload, frame.seq);
@@ -2897,8 +2930,9 @@ lastSeen: Date.now() });
         this.presence.clear();
         // Pending history writes hold the pool open; let them settle before the
         // caller closes it, but never let a rejected one break shutdown.
-        await Promise.allSettled([...this.channelSendQueues.values()]);
+        await Promise.allSettled([...this.channelSendQueues.values(), ...this.channelReceiveQueues.values()]);
         this.channelSendQueues.clear();
+        this.channelReceiveQueues.clear();
         this.channelHistory?.clear();
         if (this.presenceInterval) {
             clearInterval(this.presenceInterval);

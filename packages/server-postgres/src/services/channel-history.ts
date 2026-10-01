@@ -102,6 +102,19 @@ export interface ResolvedRetention {
 }
 
 /**
+ * A bus frame to send in the statement that numbers a retained message — see
+ * {@link ChannelHistoryStore.append}.
+ */
+export interface RetainedAnnouncement {
+    /** The NOTIFY channel the bus listens on. */
+    notifyChannel: string;
+    /** The sending instance. */
+    sid: string;
+    /** The whole message, or a pointer receivers read back — for one too large to notify. */
+    inline: boolean;
+}
+
+/**
  * Persistence and replay for retained channels.
  *
  * Inert unless constructed with at least one rule: {@link enabled} is false,
@@ -261,21 +274,53 @@ export class ChannelHistoryStore {
         channel: string,
         event: string,
         payload: unknown,
-        senderId?: string
+        senderId?: string,
+        announce?: RetainedAnnouncement
     ): Promise<{ seq: number; at: string }> {
-        const result = await this.db.execute(sql`
-            WITH next AS (
-                INSERT INTO rebase.channel_cursors (channel, last_seq)
-                VALUES (${channel}, 1)
-                ON CONFLICT (channel)
-                DO UPDATE SET last_seq = rebase.channel_cursors.last_seq + 1
-                RETURNING last_seq
-            )
-            INSERT INTO rebase.channel_messages (channel, seq, event, payload, sender_id)
-            SELECT ${channel}, next.last_seq, ${event}, ${JSON.stringify(payload ?? null)}::jsonb, ${senderId ?? null}
-            FROM next
-            RETURNING seq, created_at
-        `);
+        const payloadJson = JSON.stringify(payload ?? null);
+        // With an announcement, the bus frame is sent by the same statement
+        // that takes the number. The upsert holds the channel's cursor row
+        // until commit, so appends to a channel commit in sequence order — and
+        // a NOTIFY is delivered at commit, in commit order. Sent afterwards, by
+        // whichever instance took the number, two instances' messages reached
+        // a third in whatever order their sends landed.
+        const result = announce
+            ? await this.db.execute(sql`
+                WITH next AS (
+                    INSERT INTO rebase.channel_cursors (channel, last_seq)
+                    VALUES (${channel}, 1)
+                    ON CONFLICT (channel)
+                    DO UPDATE SET last_seq = rebase.channel_cursors.last_seq + 1
+                    RETURNING last_seq
+                ), stored AS (
+                    INSERT INTO rebase.channel_messages (channel, seq, event, payload, sender_id)
+                    SELECT ${channel}, next.last_seq, ${event}, ${payloadJson}::jsonb, ${senderId ?? null}
+                    FROM next
+                    RETURNING seq, created_at
+                )
+                SELECT stored.seq, stored.created_at, pg_notify(${announce.notifyChannel}, (
+                    CASE WHEN ${announce.inline}::boolean
+                        THEN json_build_object('kind', 'broadcast', 'sid', ${announce.sid}::text, 'channel', ${channel}::text,
+                            'event', ${event}::text, 'from', ${senderId ?? null}::text, 'seq', stored.seq, 'payload', ${payloadJson}::jsonb)
+                        ELSE json_build_object('kind', 'broadcast_ref', 'sid', ${announce.sid}::text, 'channel', ${channel}::text,
+                            'from', ${senderId ?? null}::text, 'seq', stored.seq)
+                    END
+                )::text)
+                FROM stored
+            `)
+            : await this.db.execute(sql`
+                WITH next AS (
+                    INSERT INTO rebase.channel_cursors (channel, last_seq)
+                    VALUES (${channel}, 1)
+                    ON CONFLICT (channel)
+                    DO UPDATE SET last_seq = rebase.channel_cursors.last_seq + 1
+                    RETURNING last_seq
+                )
+                INSERT INTO rebase.channel_messages (channel, seq, event, payload, sender_id)
+                SELECT ${channel}, next.last_seq, ${event}, ${payloadJson}::jsonb, ${senderId ?? null}
+                FROM next
+                RETURNING seq, created_at
+            `);
 
         const row = result.rows[0] as { seq: string | number; created_at: Date | string } | undefined;
         if (!row) throw new Error(`Failed to append to channel history for "${channel}"`);
