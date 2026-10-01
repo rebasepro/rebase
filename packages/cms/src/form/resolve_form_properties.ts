@@ -48,19 +48,30 @@ function isEditableInForm(property: Property): boolean {
 export function resolvePropertiesForValidation<M extends Record<string, unknown>>({
     properties,
     propertyKey,
+    isNew,
     ...props
-}: Omit<ResolvePropertyProps<M>, "property"> & { properties: Properties }): Properties {
+}: Omit<ResolvePropertyProps<M>, "property"> & {
+    properties: Properties;
+    /**
+     * Whether the record is being created. A field marked
+     * `admin.filledByServer` is not required then: the server fills it.
+     */
+    isNew?: boolean;
+}): Properties {
     const result: Record<string, Property> = {};
     for (const [key, raw] of Object.entries(properties as Record<string, Property>)) {
         if (!raw) continue;
         const childKey = propertyKey ? `${propertyKey}.${key}` : key;
-        const resolved = resolveFormProperty<M>({
+        const formProperty = resolveFormProperty<M>({
             ...props,
             ignoreMissingFields: true,
             propertyKey: childKey,
             property: raw
         });
-        if (!resolved || !isEditableInForm(resolved)) continue;
+        if (!formProperty || !isEditableInForm(formProperty)) continue;
+        const resolved = isNew && formProperty.admin?.filledByServer && formProperty.validation?.required
+            ? { ...formProperty, validation: { ...formProperty.validation, required: false } } as Property
+            : formProperty;
         if (resolved.type === "map" && resolved.properties) {
             // `resolveProperty` walked the children for their `dynamicProps`
             // but not their conditions. Resolving them again applies both; a
@@ -70,6 +81,7 @@ export function resolvePropertiesForValidation<M extends Record<string, unknown>
                 ...resolved,
                 properties: resolvePropertiesForValidation<M>({
                     ...props,
+                    isNew,
                     propertyKey: childKey,
                     properties: resolved.properties as Properties
                 })

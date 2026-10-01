@@ -61,7 +61,9 @@ const postsCollection: PostgresCollectionConfig = {
                 required: true,
                 unique: true
             },
-            description: "URL-friendly identifier for this blog post"
+            // `beforeSave` below derives it from the title when left empty.
+            admin: { filledByServer: true },
+            description: "URL-friendly identifier for this blog post. Left empty, it is derived from the title"
         },
         hero_image: {
             name: "Hero Image",

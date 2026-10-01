@@ -437,6 +437,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             entityId,
             resolvePropertiesForValidation<M>({
                 properties: collection.properties,
+                isNew: status === "new" || status === "copy",
                 values,
                 previousValues: baseInitialValues as Partial<M>,
                 path,

@@ -59,6 +59,22 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
     disabled?: boolean | PropertyDisabledConfig;
 
     /**
+     * The server fills this field when a new record leaves it empty — a
+     * `beforeSave` hook that derives a slug from the title, a tenant id taken
+     * from the caller. Defaults to `false`.
+     *
+     * The form then lets a record be **created** without it, where it would
+     * otherwise stop on `validation.required`. Everything else about the field
+     * stays: it is shown and can be filled in by hand, it is still required when
+     * a stored record is edited, and the server's own checks — `required`,
+     * `NOT NULL` — still hold, so a hook that does not fill it is still caught.
+     *
+     * Admin form only: it says nothing to the API, which already lets a
+     * collection with a `beforeSave` hook fill a required field on create.
+     */
+    filledByServer?: boolean;
+
+    /**
      * How many of the form grid's {@link FORM_GRID_COLUMNS} columns this field
      * occupies. Omit to let the layout derive one from the property type.
      *

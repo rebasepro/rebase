@@ -103,6 +103,7 @@ export const ADMIN_PROPERTY_KEYS = [
     "disabled",
     "expanded",
     "Field",
+    "filledByServer",
     "Filter",
     "filterOperators",
     "fixedFilter",

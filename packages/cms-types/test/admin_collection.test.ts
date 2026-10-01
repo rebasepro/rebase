@@ -96,7 +96,8 @@ describe("ADMIN_PROPERTY_KEYS", () => {
         // something a count can be the first to notice — `property_options.ts`
         // now asserts the reverse direction at compile time, and this pair is
         // what the assertion found on its first run.
-        expect(ADMIN_PROPERTY_KEYS).toHaveLength(27);
+        // 28: `filledByServer`, a required field a server hook fills on create.
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(28);
     });
 
     it("names nothing that belongs to the property contract", () => {
