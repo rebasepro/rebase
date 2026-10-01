@@ -19,10 +19,17 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
         }
     }, [props.value]);
 
-    // Cleanup timer on unmount
+    // A value still waiting on the timer when the field unmounts is reported,
+    // not dropped: a dialog that closes on Enter unmounts the field it was
+    // typed into. Read through a ref — the cleanup runs once, at unmount.
+    const pendingFlushRef = useRef<(() => void) | undefined>(undefined);
     useEffect(() => {
         return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+                timerRef.current = undefined;
+                pendingFlushRef.current?.();
+            }
         };
     }, []);
 
@@ -59,10 +66,20 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
             }
         };
 
+        pendingFlushRef.current = () => flushChange(newValue, eventCopy as TextFieldChangeEvent);
         timerRef.current = setTimeout(() => {
             flushChange(newValue, eventCopy as TextFieldChangeEvent);
         }, 150);
     }, [flushChange]);
+
+    // Enter submits the form around the field without blurring it, so the
+    // timer had not fired yet and the form submitted the value from before
+    // typing. Report it first: the keydown is handled before the browser's
+    // implicit submission, and React renders the change in between.
+    const internalOnKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (event.key === "Enter" && timerRef.current) flushChange(internalValue);
+        props.onKeyDown?.(event as React.KeyboardEvent<HTMLInputElement>);
+    }, [internalValue, flushChange, props.onKeyDown]);
 
     const internalOnBlur = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
         flushChange(internalValue, event as TextFieldChangeEvent);
@@ -71,6 +88,7 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
 
     return <TextField {...props}
         onChange={internalOnChange}
+        onKeyDown={internalOnKeyDown}
         onBlur={internalOnBlur}
         value={internalValue as T}/>;
 }
