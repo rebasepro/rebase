@@ -1096,6 +1096,7 @@ parentEntityIds,
                         collection={collection}
                         tableController={tableController}
                         onMultipleDeleteClick={onMultipleDeleteClick}
+                        removeUnlinks={isLinkedChildView}
                         onNewClick={onNewClick}
                     onAddExistingClick={linkedTargetSlug ? selectionDialog.open : undefined}
                         openNewDocument={openNewDocument}
@@ -1354,6 +1355,10 @@ parentEntityIds,
                         target={deleteEntityClicked}
                         path={path}
                         collection={collection}
+                        // A linked tab's rows are shared through a junction:
+                        // the server removes them from this record and deletes
+                        // nothing, so the dialog must not say "delete".
+                        variant={isLinkedChildView ? "unlink" : "delete"}
                         open={Boolean(deleteEntityClicked)}
                         onEntityDelete={internalOnEntityDelete}
                         onMultipleEntitiesDelete={internalOnMultipleEntitiesDelete}

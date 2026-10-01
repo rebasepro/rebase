@@ -538,6 +538,10 @@ export interface RebaseTranslations {
     unlink_entity_confirm_title: string;
     unlink_entity_confirm_body: string;
     confirm_multiple_unlink: string;
+    /** The bulk remove button on a linked tab: unlinks the rows, deletes nothing */
+    remove_from_record: string;
+    /** Toast after rows were unlinked from a record */
+    removed_from_record: string;
 
     no_filter: string;
     is_true: string;

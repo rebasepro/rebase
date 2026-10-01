@@ -463,6 +463,8 @@ export const hi: RebaseTranslations = {
     unlink_entity_confirm_title: "इस {{entityName}} को इस रिकॉर्ड से हटाएँ?",
     unlink_entity_confirm_body: "यह {{collectionName}} में बना रहेगा और अन्य रिकॉर्ड के लिए उपलब्ध रहेगा।",
     confirm_multiple_unlink: "क्या इन्हें इस रिकॉर्ड से हटाना है?",
+    remove_from_record: "इस रिकॉर्ड से हटाएँ",
+    removed_from_record: "इस रिकॉर्ड से हटाया गया",
     no_filter: "कोई फ़िल्टर नहीं",
     is_true: "सत्य है",
     is_false: "असत्य है",

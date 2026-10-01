@@ -5,7 +5,7 @@ import React, { Suspense } from "react";
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { Button, IconButton, Tooltip, Popover, iconSize, lazyChunk } from "@rebasepro/ui";
-import { ErrorBoundary, Link2Icon, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
+import { ErrorBoundary, Link2Icon, MoreVerticalIcon, PlusIcon, Trash2Icon, Unlink2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
 // Lazy-load import/export — pulls in exceljs only on demand
@@ -28,6 +28,11 @@ export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
      */
     onAddExistingClick?: () => void;
     onMultipleDeleteClick: () => void;
+    /**
+     * The rows are shared with other records through a junction, so removing
+     * them unlinks them from this record and deletes nothing. The bin says so.
+     */
+    removeUnlinks?: boolean;
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
     collectionEntitiesCount?: number;
@@ -43,6 +48,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     onNewClick,
     onAddExistingClick,
     onMultipleDeleteClick,
+    removeUnlinks,
     selectionEnabled,
     path,
     selectionController,
@@ -128,6 +134,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
 
     let multipleDeleteButton: React.ReactNode | undefined;
     if (hasSelection) {
+        const RemoveIcon = removeUnlinks ? Unlink2Icon : Trash2Icon;
         const button = largeLayout && !compact
             // `min-w`, not `w`. A fixed 80px was enough for the one- and
             // two-digit counts you could reach by ticking rows; "select all
@@ -140,7 +147,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             ? <Button
                 variant={"text"}
                 disabled={!multipleDeleteEnabled}
-                startIcon={<Trash2Icon size={iconSize.small} className={"shrink-0"}/>}
+                startIcon={<RemoveIcon size={iconSize.small} className={"shrink-0"}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
                 className="lg:min-w-20"
@@ -152,11 +159,13 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                 color={"primary"}
                 disabled={!multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
-                <Trash2Icon size={iconSize.small}/>
+                <RemoveIcon size={iconSize.small}/>
             </IconButton>;
         multipleDeleteButton =
             <Tooltip
-                title={multipleDeleteEnabled ? t("delete") : t("delete_not_allowed")}>
+                title={multipleDeleteEnabled
+                    ? (removeUnlinks ? t("remove_from_record") : t("delete"))
+                    : t("delete_not_allowed")}>
                 {button}
             </Tooltip>
     }

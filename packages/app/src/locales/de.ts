@@ -463,6 +463,8 @@ export const de: RebaseTranslations = {
     unlink_entity_confirm_title: "Dieses {{entityName}} aus diesem Datensatz entfernen?",
     unlink_entity_confirm_body: "Es bleibt in {{collectionName}} und steht anderen Datensätzen weiterhin zur Verfügung.",
     confirm_multiple_unlink: "diese aus diesem Datensatz entfernen?",
+    remove_from_record: "Aus diesem Datensatz entfernen",
+    removed_from_record: "Aus diesem Datensatz entfernt",
     no_filter: "Kein Filter",
     is_true: "ist wahr",
     is_false: "ist falsch",

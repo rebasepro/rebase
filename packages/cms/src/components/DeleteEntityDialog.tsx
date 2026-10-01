@@ -142,7 +142,9 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 onEntityDelete?.(path, singleEntity);
                 snackbarController.open({
                     type: "success",
-                    message: t("deleted", { name: collection.singularName ?? collection.name })
+                    message: variant === "unlink"
+                        ? t("removed_from_record")
+                        : t("deleted", { name: collection.singularName ?? collection.name })
                 });
                 onClose();
             }
@@ -224,7 +226,9 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
         if (deleted === entities.length && entities.length > 0) {
             snackbarController.open({
                 type: "success",
-                message: t("multiple_deleted", { collection: collection.name })
+                message: variant === "unlink"
+                    ? t("removed_from_record")
+                    : t("multiple_deleted", { collection: collection.name })
             });
         } else if (deleted > 0) {
             snackbarController.open({
@@ -238,7 +242,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             });
         }
         onClose();
-    }, [singleEntity, selection, performDelete, dataClient, path, onEntityDelete, onMultipleEntitiesDelete, onClose, snackbarController, collection.name, collection.singularName, t]);
+    }, [singleEntity, selection, performDelete, dataClient, path, onEntityDelete, onMultipleEntitiesDelete, onClose, snackbarController, collection.name, collection.singularName, t, variant]);
 
     const entityName = collection.singularName ?? collection.name;
 
