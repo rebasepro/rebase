@@ -95,6 +95,12 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
                 disabled
                     ? (value ? "bg-primary/40 ring-1 ring-transparent" : "bg-surface-field ring-1 ring-hairline")
                     : (value ? "bg-primary ring-1 ring-primary" : "bg-surface-active ring-1 ring-hairline-strong"),
+                // The track's own 1px ring is a utility, so it replaced the default
+                // focus ring's shadow and colour: focused looked exactly like
+                // unfocused. Focus draws a 2px primary ring outside the track,
+                // separated from it by a gap — the switch is small and has room
+                // around it, the same exception Checkbox and Slider take.
+                "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card",
                 className
             )}
             {...props}

@@ -298,7 +298,10 @@ export const MultiSelect = React.forwardRef<
                                     "px-4": size === "medium" || size === "large"
                                 },
                                 "select-none rounded-lg text-sm",
-                                "focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none",
+                                // No `ring-0` here: it removed the only focus
+                                // indicator the trigger had, so tabbing onto an
+                                // enum-array field changed nothing on screen.
+                                "outline-none focus:outline-none focus-visible:outline-none",
                                 invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
                                 // An invisible field has no hover fill of its own: whatever frames it (a table cell) carries the hover.
                 disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin),

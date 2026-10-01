@@ -16,12 +16,21 @@
  *
  * See e2e/focus-ring.ts for why this walks the real tab order and why it waits
  * between stops.
+ *
+ * A whole ring is not yet a visible one. The inset ring is drawn in the primary
+ * colour, and on a primary-filled button, a switch whose own ring utility
+ * replaced it, or a trigger that switched it off, it drew nothing anyone could
+ * see — and the clipping checks passed. The last test compares each control's
+ * pixels focused and blurred, on the design reference, where every kit control
+ * sits in every state.
  */
 import { expect, test } from "@playwright/test";
 import { AUTH_STATE } from "../auth";
 import {
     describeClippedFocusRings,
+    describeInvisibleFocus,
     findClippedFocusRings,
+    findInvisibleFocus,
     focusedRingIsInset
 } from "../focus-ring";
 
@@ -73,5 +82,23 @@ test.describe("focus rings", () => {
 
         const found = await findClippedFocusRings(page);
         expect(found, describeClippedFocusRings(found, "the collection list")).toEqual([]);
+    });
+
+    test("every control on the design reference shows its focus", async ({ page }) => {
+        test.setTimeout(180_000);
+        await page.goto("/debug/ui");
+        await expect(page.getByRole("heading", { name: /Buttons/ }).first()).toBeVisible({ timeout: 30000 });
+        // Start at the buttons: the drawer rail above is covered by the tests above.
+        await page.locator("#buttons").scrollIntoViewIfNeeded();
+        await page.locator("#buttons").evaluate((section) => {
+            // Tab from just before the first control of the section.
+            const marker = document.createElement("span");
+            marker.tabIndex = -1;
+            section.prepend(marker);
+            marker.focus();
+        });
+
+        const found = await findInvisibleFocus(page, { tabStops: 90, fromCurrentFocus: true });
+        expect(found, describeInvisibleFocus(found, "the design reference")).toEqual([]);
     });
 });

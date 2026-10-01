@@ -40,9 +40,13 @@ const ButtonInner = React.memo(React.forwardRef<
         "w-fit": !fullWidth,
 
         // Filled Variants
-        "border border-primary bg-primary focus:ring-primary text-white hover:text-white hover:brightness-105": variant === "filled" && color === "primary" && !disabled,
-        "border border-secondary bg-secondary focus:ring-secondary text-white hover:text-white hover:brightness-105": variant === "filled" && color === "secondary" && !disabled,
-        "border border-red-600 bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white hover:text-white": variant === "filled" && color === "error" && !disabled,
+        // The default focus ring is an inset ring in the primary colour, which on
+        // a fill of that same colour (or the rose, or the red) is invisible: a
+        // keyboard user tabbing to the one main action on a screen saw nothing
+        // change. A white ring inside the fill reads on all three.
+        "border border-primary bg-primary focus-visible:ring-white/90 text-white hover:text-white hover:brightness-105": variant === "filled" && color === "primary" && !disabled,
+        "border border-secondary bg-secondary focus-visible:ring-white/90 text-white hover:text-white hover:brightness-105": variant === "filled" && color === "secondary" && !disabled,
+        "border border-red-600 bg-red-600 hover:bg-red-700 focus-visible:ring-white/90 text-white hover:text-white": variant === "filled" && color === "error" && !disabled,
         "border border-hairline-strong bg-surface-raised hover:bg-surface-raised-hover text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "text" && !disabled,
         "border border-transparent bg-surface-raised hover:bg-surface-raised-hover text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "neutral" && !disabled,
 

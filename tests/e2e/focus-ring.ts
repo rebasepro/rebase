@@ -207,3 +207,137 @@ export async function focusedRingIsInset(page: Page): Promise<boolean> {
             .some(layer => layer.includes("inset") && !/rgba\([^)]*,\s*0\)/.test(layer));
     });
 }
+
+/** A tab stop whose focused and unfocused renderings are (nearly) the same. */
+export type InvisibleFocus = {
+    /** The focused control, as tag + a few classes. */
+    control: string;
+    /** Its accessible name or leading text, for finding it on screen. */
+    label: string;
+    /** Pixels that changed between blurred and focused. */
+    changedPx: number;
+    /** What it had to reach: a quarter of the control's perimeter. */
+    neededPx: number;
+};
+
+/**
+ * Margin around the control's box in each screenshot: an outset ring
+ * (Checkbox, Switch) paints up to 4px outside it.
+ */
+const SHOT_MARGIN = 6;
+
+/**
+ * Counts pixels that differ between two PNG screenshots of the same size, in
+ * the page: the browser decodes PNG, so this needs no image library. A pixel
+ * counts when its summed RGB difference passes 30 — anti-aliasing jitter
+ * stays below, a 2px ring at any contrast worth having does not.
+ */
+async function changedPixels(page: Page, a: Buffer, b: Buffer): Promise<number> {
+    return page.evaluate(async ([first, second]) => {
+        const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = reject;
+            image.src = "data:image/png;base64," + src;
+        });
+        const [A, B] = await Promise.all([load(first), load(second)]);
+        const canvas = document.createElement("canvas");
+        canvas.width = A.width;
+        canvas.height = A.height;
+        const context = canvas.getContext("2d");
+        if (!context) return -1;
+        context.drawImage(A, 0, 0);
+        const da = context.getImageData(0, 0, A.width, A.height).data;
+        context.clearRect(0, 0, A.width, A.height);
+        context.drawImage(B, 0, 0);
+        const db = context.getImageData(0, 0, A.width, A.height).data;
+        let changed = 0;
+        for (let i = 0; i < da.length; i += 4) {
+            const d = Math.abs(da[i] - db[i]) + Math.abs(da[i + 1] - db[i + 1]) + Math.abs(da[i + 2] - db[i + 2]);
+            if (d > 30) changed++;
+        }
+        return changed;
+    }, [a.toString("base64"), b.toString("base64")] as const);
+}
+
+/**
+ * Walks the tab order (from the top of the document, or from whatever has focus
+ * with `fromCurrentFocus`) and returns every stop whose focus indicator cannot be
+ * seen: the control screenshotted focused and then blurred differs in fewer
+ * pixels than a quarter of its perimeter.
+ *
+ * {@link findClippedFocusRings} asks whether a ring is cut off; this asks
+ * whether there is one to see at all. The first question alone let a fix
+ * through that drew the inset ring in the primary colour on a primary fill —
+ * whole, unclipped, and invisible on every main action in the product, every
+ * switch, and the multi-select trigger. Only the rendered pixels can tell a
+ * ring the colour of its background from no ring.
+ */
+export async function findInvisibleFocus(
+    page: Page,
+    { tabStops = DEFAULT_TAB_STOPS, fromCurrentFocus = false }: { tabStops?: number; fromCurrentFocus?: boolean } = {}
+): Promise<InvisibleFocus[]> {
+    await page.mouse.move(0, 0); // no hover state in either shot
+    if (!fromCurrentFocus) await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    const found: InvisibleFocus[] = [];
+    const seen = new Set<string>();
+    const viewport = page.viewportSize();
+    for (let i = 0; i < tabStops; i++) {
+        await page.keyboard.press("Tab");
+        await page.waitForTimeout(SETTLE_MS);
+        const stop = await page.evaluate(() => {
+            const el = document.activeElement as HTMLElement | null;
+            if (!el || el === document.body) return null;
+            const box = el.getBoundingClientRect();
+            const classes = typeof el.className === "string"
+                ? el.className.split(/\s+/).filter(Boolean).slice(0, 5).join(".")
+                : "";
+            return {
+                control: `${el.tagName.toLowerCase()}${classes ? "." + classes : ""}`,
+                label: (el.getAttribute("aria-label") || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40),
+                x: box.x, y: box.y, width: box.width, height: box.height
+            };
+        });
+        if (!stop || stop.width < 4 || stop.height < 4) continue;
+        const key = `${stop.control}|${stop.label}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const clip = {
+            x: Math.max(0, stop.x - SHOT_MARGIN),
+            y: Math.max(0, stop.y - SHOT_MARGIN),
+            width: stop.width + SHOT_MARGIN * 2,
+            height: stop.height + SHOT_MARGIN * 2
+        };
+        // Off screen, or partly: a screenshot would not be of the control.
+        if (viewport && (clip.x + clip.width > viewport.width || clip.y + clip.height > viewport.height)) continue;
+
+        const focused = await page.screenshot({ clip });
+        await page.evaluate(() => {
+            const el = document.activeElement as HTMLElement | null;
+            (window as unknown as { __focusProbe?: HTMLElement | null }).__focusProbe = el;
+            el?.blur();
+        });
+        await page.waitForTimeout(SETTLE_MS);
+        const blurred = await page.screenshot({ clip });
+        // Back onto the same control, so the next Tab continues from it. A
+        // script focus right after a key press still matches :focus-visible.
+        await page.evaluate(() => (window as unknown as { __focusProbe?: HTMLElement | null }).__focusProbe?.focus());
+
+        const changedPx = await changedPixels(page, focused, blurred);
+        const neededPx = Math.round((stop.width + stop.height) * 2 / 4);
+        if (changedPx < neededPx) found.push({ control: stop.control, label: stop.label, changedPx, neededPx });
+    }
+    return found;
+}
+
+/** The assertion message: which controls show nothing when focused. */
+export function describeInvisibleFocus(found: InvisibleFocus[], where: string): string {
+    if (!found.length) return `Every tab stop on ${where} shows its focus.`;
+    const lines = found.map(f =>
+        `  • ${f.control} "${f.label}" — ${f.changedPx}px changed on focus, needed ${f.neededPx}`);
+    return `${found.length} control(s) on ${where} look the same focused and unfocused.\n` +
+        `A ring in the colour of the fill, or a utility ring that replaces the focus ring,\n` +
+        `draws nothing a keyboard user can see. See the :focus-visible rule in packages/ui/src/index.css.\n` +
+        lines.join("\n");
+}
