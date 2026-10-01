@@ -20,11 +20,14 @@
  */
 import {
     diagnoseAtlasFailure,
+    failedStatementTable,
     formatBaselineRemedy,
+    formatGeneratedColumnRefusalBanner,
     formatEnumLabelDropBanner,
     formatNotNullViolationBanner,
     parseAlreadyProvisioned,
     parseEnumLabelDrop,
+    parseFailedStatement,
     parseNotNullViolation
 } from "../src/cli-errors";
 
@@ -134,6 +137,42 @@ describe("an enum option id that was renamed", () => {
     it("says nothing was applied — the push failed safe", () => {
         expect(formatEnumLabelDropBanner({ label: "review", enumType: "posts_status" }))
             .toContain("Nothing was applied");
+    });
+});
+
+/** Verbatim from a real `db push` (Atlas 1.2.3, PostgreSQL 18.4). */
+const GENERATED_COLUMN_REFUSAL =
+    "Error: executing statement \"ALTER TABLE \\\"public\\\".\\\"people\\\" ALTER COLUMN \\\"nickname\\\" TYPE character varying(100);\": "
+    + "pq: cannot alter type of a column used by a generated column (0A000)";
+
+describe("a retype a generated column stands in the way of", () => {
+    it("reads the statement Atlas was running out of the error, unescaped", () => {
+        expect(parseFailedStatement(GENERATED_COLUMN_REFUSAL))
+            .toBe('ALTER TABLE "public"."people" ALTER COLUMN "nickname" TYPE character varying(100);');
+        expect(failedStatementTable('ALTER TABLE "public"."people" ALTER COLUMN "nickname" TYPE text;'))
+            .toEqual({ schema: "public", table: "people" });
+    });
+
+    it("names the statement, says nothing was applied and how to get past it", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "schema",
+            args: ["apply", "--to", "file://.rebase/sql/schema.sql", "--auto-approve"],
+            stderr: GENERATED_COLUMN_REFUSAL
+            // No databaseUrl: the generated column cannot be named, the statement can.
+        });
+        expect(hint).toContain("A generated column reads a column this push retypes");
+        expect(hint).toContain('ALTER TABLE "public"."people" ALTER COLUMN "nickname" TYPE character varying(100);');
+        expect(hint).toContain("nothing in this push was applied");
+        expect(hint).toContain("DROP COLUMN");
+    });
+
+    it("names the generated column when the catalogue could say which", () => {
+        const banner = formatGeneratedColumnRefusalBanner({ statement: null }, [
+            { schema: "public", table: "people", column: "search_vector", reads: "nickname" }
+        ]);
+        expect(banner).toContain("public.people.search_vector");
+        expect(banner).toContain('reads "nickname"');
+        expect(banner).toContain('ALTER TABLE "public"."people" DROP COLUMN "search_vector";');
     });
 });
 

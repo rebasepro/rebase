@@ -665,7 +665,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             }
 
             try {
-                await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath);
+                // Thrown, not exited: an exit from inside runAtlas skipped this
+                // catch entirely, so a failed apply left the search columns it
+                // had just dropped dropped.
+                await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true });
             } catch (err) {
                 // Atlas rolled its transaction back, so the columns those
                 // expressions read are as they were and the definitions in
@@ -1302,7 +1305,16 @@ async function runAtlas(
     domain: "schema" | "migrate",
     args: string[],
     collectionsPath?: string,
-    opts: { captureStdout?: boolean } = {}
+    opts: {
+        captureStdout?: boolean;
+        /**
+         * Throw instead of exiting once the failure has been explained, so a
+         * caller with something to put back — the generated columns a push
+         * dropped out of Atlas's way — gets to do it. The error is marked
+         * `alreadyReported`: everything worth saying is on stderr already.
+         */
+        throwOnFailure?: boolean;
+    } = {}
 ): Promise<string> {
     const atlasBin = resolveLocalBin("atlas");
     if (!atlasBin) {
@@ -1508,6 +1520,9 @@ async function runAtlas(
         const hint = atlasHint ?? diagnoseDbError({ message: stderrText }, databaseUrl);
         if (hint) {
             outError(hint);
+        }
+        if (opts.throwOnFailure) {
+            throw Object.assign(new Error(`atlas ${domain} ${args.join(" ")} failed`), { alreadyReported: true });
         }
         process.exit(1);
     }

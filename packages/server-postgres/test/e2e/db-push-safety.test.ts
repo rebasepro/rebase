@@ -56,7 +56,7 @@ function collectionsIndex(): string {
  * `numeric(precision, scale)`; `nickname` is a `varchar(max)` that a search
  * block reads, so retyping it collides with the generated search column.
  */
-function pricesCollectionJs(opts: { precision: number; scale: number; nicknameMax: number }): string {
+function pricesCollectionJs(opts: { precision: number; scale: number; nicknameMax: number; ratingRequired?: boolean }): string {
     return `
 const pricesCollection = {
     name: "Prices",
@@ -66,7 +66,7 @@ const pricesCollection = {
     properties: {
         id:       { name: "ID", type: "string", isId: "uuid" },
         nickname: { name: "Nickname", type: "string", columnType: "varchar", validation: { max: ${opts.nicknameMax} } },
-        rating:   { name: "Rating", type: "number", precision: ${opts.precision}, scale: ${opts.scale} }
+        rating:   { name: "Rating", type: "number", precision: ${opts.precision}, scale: ${opts.scale}${opts.ratingRequired ? ", validation: { required: true }" : ""} }
     }
 };
 export default pricesCollection;
@@ -235,5 +235,28 @@ describe("db push destructive-change gate E2E", () => {
         const byName = Object.fromEntries(columns.rows.map((r: { attname: string; type: string; generated: boolean }) => [r.attname, r]));
         expect(byName.nickname.type).toBe("character varying(100)");
         expect(Object.values(byName).some((c) => (c as { generated: boolean }).generated)).toBe(true);
+    }, 150_000);
+
+    /**
+     * The push drops the search column before the apply. If the apply then
+     * fails for some other reason, the column must come back: Atlas rolled its
+     * transaction back, so the old definition still fits. The rebuild was
+     * written, and never ran — the failure exited from inside the Atlas runner,
+     * past the `catch` that held it — so search was left gone.
+     */
+    it("puts the search column back when the apply it made room for fails", async () => {
+        await dbClient.query(`INSERT INTO prices (nickname, rating) VALUES ('no rating', NULL)`);
+        fs.writeFileSync(path.join(collectionsDir, "prices.js"),
+            pricesCollectionJs({ precision: 5, scale: 2, nicknameMax: 200, ratingRequired: true }));
+        const failed = await runPush();
+        expect(failed.exitCode).not.toBe(0);
+        expect(failed.all ?? "").toMatch(/contains null values/);
+
+        const columns = await dbClient.query(`SELECT attname, format_type(atttypid, atttypmod) AS type,
+                attgenerated <> '' AS generated
+            FROM pg_attribute WHERE attrelid = 'prices'::regclass AND attnum > 0 AND NOT attisdropped`);
+        const rows = columns.rows as { attname: string; type: string; generated: boolean }[];
+        expect(rows.find(r => r.attname === "nickname")?.type).toBe("character varying(100)");
+        expect(rows.some(r => r.generated)).toBe(true);
     }, 150_000);
 });

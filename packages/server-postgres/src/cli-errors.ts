@@ -510,6 +510,141 @@ export function formatEnumLabelDropBanner(drop: { label: string; enumType: strin
     );
 }
 
+/**
+ * The statement Atlas was running when it failed, unescaped.
+ *
+ * Two spellings, one per phase: the apply quotes it
+ * (`executing statement "ALTER TABLE \"public\".\"people\" …;": pq: …`), and
+ * the dry-run's analysis does not
+ * (`analyzing plan: executing statement: ALTER TABLE "public"."people" …;: pq: …`).
+ */
+export function parseFailedStatement(text: string): string | null {
+    const quoted = /executing statement "((?:[^"\\]|\\.)*)"/.exec(text);
+    if (quoted) return quoted[1].replace(/\\(.)/g, "$1");
+    const bare = /executing statement: ([\s\S]*?;): pq:/.exec(text);
+    return bare ? bare[1] : null;
+}
+
+/** `ALTER TABLE "public"."people" …` → `{ schema: "public", table: "people" }`. */
+export function failedStatementTable(statement: string): { schema?: string; table: string } | null {
+    const ident = String.raw`(?:"((?:[^"]|"")+)"|([A-Za-z_][A-Za-z0-9_$]*))`;
+    const match = new RegExp(String.raw`^\s*(?:ALTER\s+TABLE|CREATE\s+UNIQUE\s+INDEX\s+\S+\s+ON)\s+(?:ONLY\s+)?${ident}(?:\.${ident})?`, "i")
+        .exec(statement);
+    if (!match) return null;
+    const first = (match[1] ?? match[2]).replace(/""/g, "\"");
+    const second = match[3] ?? match[4];
+    return second === undefined
+        ? { table: first }
+        : { schema: first, table: second.replace(/""/g, "\"") };
+}
+
+/** A generated column standing in the way of a retype, as the catalogue has it. */
+export interface GeneratedColumnBlocker {
+    schema: string;
+    table: string;
+    /** The generated column. */
+    column: string;
+    /** The column it reads, which the statement retypes. */
+    reads: string;
+}
+
+/**
+ * PostgreSQL refusing to retype a column a `GENERATED ALWAYS AS … STORED`
+ * expression reads (0A000). `db push` moves Rebase's own search columns out of
+ * the way before the apply; this is what is left when it could not.
+ */
+export function parseGeneratedColumnRefusal(text: string): { statement: string | null } | null {
+    if (!/cannot alter type of a column used by a generated column/.test(text)) return null;
+    return { statement: parseFailedStatement(text) };
+}
+
+/**
+ * Which generated columns read a column the failed statement retypes — read
+ * from the catalogue, because PostgreSQL's DETAIL naming them does not survive
+ * Atlas.
+ */
+async function generatedColumnsBlocking(
+    databaseUrl: string | undefined,
+    statement: string | null
+): Promise<GeneratedColumnBlocker[]> {
+    if (!databaseUrl || !statement) return [];
+    const target = failedStatementTable(statement);
+    if (!target) return [];
+    const retyped = [...statement.matchAll(/ALTER\s+(?:COLUMN\s+)?"((?:[^"]|"")+)"\s+(?:SET\s+DATA\s+)?TYPE\b/gi)]
+        .map(match => match[1].replace(/""/g, "\""));
+    if (retyped.length === 0) return [];
+    try {
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 5000 });
+        await client.connect();
+        try {
+            const res = await client.query<GeneratedColumnBlocker>(`
+                SELECT n.nspname AS "schema", c.relname AS "table", gen.attname AS "column", dep.attname AS "reads"
+                FROM pg_attrdef ad
+                JOIN pg_class c       ON c.oid = ad.adrelid
+                JOIN pg_namespace n   ON n.oid = c.relnamespace
+                JOIN pg_attribute gen ON gen.attrelid = ad.adrelid AND gen.attnum = ad.adnum
+                JOIN pg_depend d      ON d.classid = 'pg_attrdef'::regclass AND d.objid = ad.oid
+                                     AND d.refclassid = 'pg_class'::regclass AND d.refobjid = ad.adrelid
+                JOIN pg_attribute dep ON dep.attrelid = ad.adrelid AND dep.attnum = d.refobjsubid
+                WHERE gen.attgenerated <> '' AND c.relname = $1
+                  AND ($2::text IS NULL OR n.nspname = $2) AND dep.attname = ANY($3::text[])
+                ORDER BY 1, 2, 3, 4`, [target.table, target.schema ?? null, retyped]);
+            return res.rows;
+        } finally {
+            await client.end();
+        }
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * What to do when a generated column stops a retype.
+ *
+ * A collection's own search column should never reach this — `db push` drops
+ * it before the apply and rebuilds it after — so seeing one named here means
+ * that machinery missed it, which is a bug worth a report. Any other generated
+ * column is somebody's, with an expression Rebase holds no copy of.
+ */
+export function formatGeneratedColumnRefusalBanner(
+    refusal: { statement: string | null },
+    blockers: GeneratedColumnBlocker[]
+): string {
+    const named = blockers.length > 0
+        ? blockers.map(b => `    ${chalk.bold(`${b.schema}.${b.table}.${b.column}`)} reads "${b.reads}"`).join("\n") + "\n\n"
+        : refusal.statement
+            ? `  The statement:\n    ${chalk.gray(refusal.statement.replace(/\s+/g, " "))}\n\n`
+            : "";
+    const first = blockers[0];
+    const drop = first
+        ? `ALTER TABLE "${first.schema}"."${first.table}" DROP COLUMN "${first.column}";`
+        : "ALTER TABLE … DROP COLUMN <the generated column>;";
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  A generated column reads a column this push retypes\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        named +
+        `  PostgreSQL will not retype a column while a GENERATED ALWAYS AS …\n` +
+        `  STORED expression reads it, and Atlas applies a push as one\n` +
+        `  transaction — ${chalk.yellow("nothing in this push was applied.")}\n` +
+        `\n` +
+        `  A collection's ${chalk.bold("search")} column is dropped and rebuilt around the apply\n` +
+        `  by the push itself. If that is the column named above, run the push\n` +
+        `  again, and please report it: it should not have got this far.\n` +
+        `\n` +
+        `  Any other generated column is yours. Drop it, push, and put it back\n` +
+        `  with its original expression:\n` +
+        `\n` +
+        `    ${chalk.gray(drop)}\n` +
+        `    ${chalk.gray("rebase db push")}\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
 /** How many rows a table holds, or `null` when we cannot say. */
 async function countRows(databaseUrl: string | undefined, table: string): Promise<number | null> {
     if (!databaseUrl) return null;
@@ -609,6 +744,11 @@ export async function diagnoseAtlasFailure(context: {
 
         const notNull = parseNotNullViolation(stderr);
         if (notNull) return formatNotNullViolationBanner(notNull, await countRows(databaseUrl, notNull.table));
+
+        const generated = parseGeneratedColumnRefusal(stderr);
+        if (generated) {
+            return formatGeneratedColumnRefusalBanner(generated, await generatedColumnsBlocking(databaseUrl, generated.statement));
+        }
     }
 
     return null;
