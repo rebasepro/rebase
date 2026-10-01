@@ -3,7 +3,6 @@
   "packages/cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx::ai_placeholder_modify": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx::generate_collection_with_ai": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/AICollectionGeneratorPopover.tsx::generating": 1,
-  "packages/cms/src/collection_editor/ui/collection_editor/CollectionDetailsForm.tsx::change_icon": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionDetailsForm.tsx::collection_name_description": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionDetailsForm.tsx::default_text": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionDetailsForm.tsx::doc_history_enabled": 1,
@@ -30,7 +29,7 @@
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionEditorWelcomeView.tsx::paste_json_config": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionEditorWelcomeView.tsx::products": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionJsonImportDialog.tsx::products": 1,
-  "packages/cms/src/collection_editor/ui/collection_editor/CollectionPropertiesEditorForm.tsx::studio_property_add_column": 3,
+  "packages/cms/src/collection_editor/ui/collection_editor/CollectionPropertiesEditorForm.tsx::studio_property_add_column": 2,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx::studio_policy_permissive": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx::studio_policy_restrictive": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx::studio_rls_create_policy": 1,
@@ -55,7 +54,6 @@
   "packages/cms/src/collection_editor/ui/collection_editor/EntityCustomViewsSelectDialog.tsx::select_custom_view": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/EnumForm.tsx::enum_form_dialog": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx::advanced_settings": 1,
-  "packages/cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx::change_icon": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx::collection_id": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx::collection_name_description": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/GeneralSettingsForm.tsx::default_text": 1,
@@ -206,6 +204,5 @@
   "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_delete_from": 1,
   "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_insert_into": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::studio_sql_executing_query": 1,
-  "packages/studio/src/components/StorageView/StorageView.tsx::download": 1,
   "packages/studio/src/components/StudioHomePage.tsx::studio_sql_database": 3
 }

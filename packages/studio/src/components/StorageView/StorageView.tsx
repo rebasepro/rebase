@@ -42,7 +42,7 @@ import {
     XIcon,
     isKeyHandled
 } from "@rebasepro/ui";
-import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig } from "@rebasepro/app";
+import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig, useTranslation } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { useSearchParams } from "react-router";
@@ -265,6 +265,7 @@ function FilePreviewPanel({
     const FileIconComponent = getFileIcon(file.contentType);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [urlCopied, setUrlCopied] = useState(false);
+    const { t } = useTranslation();
 
     return (
         <>
@@ -280,8 +281,8 @@ function FilePreviewPanel({
                     </Typography>
                     <div className="flex items-center gap-0.5">
                         {downloadUrl && (
-                            <Tooltip title="Download">
-                                <IconButton aria-label="Download"
+                            <Tooltip title={t("download")}>
+                                <IconButton aria-label={t("download")}
                                     size="small"
                                     onClick={() => window.open(downloadUrl, "_blank")}
                                 >

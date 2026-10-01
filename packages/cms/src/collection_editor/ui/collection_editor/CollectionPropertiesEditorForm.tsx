@@ -3,7 +3,8 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { Field, getIn, useFormex } from "@rebasepro/forms";
 import {
-    useLargeLayout
+    useLargeLayout,
+    useTranslation
 } from "@rebasepro/app";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -86,6 +87,7 @@ export function CollectionPropertiesEditorForm({
     } = useFormex<AdminCollection>();
 
     const snackbarController = useSafeSnackbarController();
+    const { t } = useTranslation();
     const configControllerFromContext = useCollectionsConfigController();
     const configController = standalone ? { readOnly: false } : configControllerFromContext;
 
@@ -464,8 +466,8 @@ export function CollectionPropertiesEditorForm({
                                 </IconButton>
                             </Tooltip>
                         )}
-                        <Tooltip title={"Add new property"} asChild={true}>
-                            <IconButton aria-label={"Add new property"}
+                        <Tooltip title={t("studio_property_add_column")} asChild={true}>
+                            <IconButton aria-label={t("studio_property_add_column")}
                                 size="small"
                                 disabled={configController?.readOnly}
                                 onClick={() => setNewPropertyDialogOpen(true)}

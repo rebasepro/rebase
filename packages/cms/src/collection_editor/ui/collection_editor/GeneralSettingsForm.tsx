@@ -55,6 +55,7 @@ export function GeneralSettingsForm({
         setFieldTouched,
         submitCount
     } = useFormex<AdminPostgresCollection>();
+    const { t } = useTranslation();
 
     const [iconDialogOpen, setIconDialogOpen] = useState(false);
 
@@ -101,9 +102,9 @@ export function GeneralSettingsForm({
                             disabled={configController?.readOnly}
                             onDatabaseIdUpdate={updateDatabaseId}/>
 
-                        <Tooltip title={"Change icon"}
+                        <Tooltip title={t("change_icon")}
                             asChild={true}>
-                            <IconButton aria-label={"Change icon"}
+                            <IconButton aria-label={t("change_icon")}
                                 shape={"square"}
                                 disabled={configController?.readOnly}
                                 onClick={() => setIconDialogOpen(true)}>

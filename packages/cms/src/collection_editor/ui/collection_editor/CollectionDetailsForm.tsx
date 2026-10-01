@@ -60,6 +60,7 @@ export function CollectionDetailsForm({
     } = useFormex<AdminCollection>();
 
     const collectionEditor = useCollectionEditorController();
+    const { t } = useTranslation();
 
     const [iconDialogOpen, setIconDialogOpen] = useState(false);
     const [orderPropertyDialogOpen, setOrderPropertyDialogOpen] = useState(false);
@@ -127,9 +128,9 @@ export function CollectionDetailsForm({
                         <DefaultDatabaseField databaseId={values.databaseId}
                             onDatabaseIdUpdate={updateDatabaseId}/>
 
-                        <Tooltip title={"Change icon"}
+                        <Tooltip title={t("change_icon")}
                             asChild={true}>
-                            <IconButton aria-label={"Change icon"}
+                            <IconButton aria-label={t("change_icon")}
                                 shape={"square"}
                                 onClick={() => setIconDialogOpen(true)}>
                                 {collectionIcon}
