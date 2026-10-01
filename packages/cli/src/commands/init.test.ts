@@ -11,7 +11,8 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps } from "./init.js";
+import { getPMCommands } from "../utils/package-manager.js";
 import { execFileSync } from "child_process";
 import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
 
@@ -1797,5 +1798,38 @@ describe("the template's account of what db push is for", () => {
         const full = path.join(TEMPLATE_DIR, file);
         if (!fs.existsSync(full)) return;
         expect(fs.readFileSync(full, "utf8")).not.toMatch(/junction[- ]table(?:'s)? RLS/i);
+    });
+});
+
+/**
+ * The closing agent step works for whoever reads it.
+ *
+ * `rebase init --yes` — the agent and CI path — ended with a bare `rebase
+ * skills install`, which prompts, and so refuses without a TTY ("Cannot
+ * prompt … Name the agents"). The reader that most needed the step was handed
+ * the one form that cannot run for them.
+ */
+describe("agentNextSteps", () => {
+    const pm = getPMCommands("pnpm");
+    const commands = (lines: string[]) => lines.join("\n").replace(ANSI_ESCAPES, "")
+        .split("\n").filter(line => line.includes("skills install"));
+
+    it("names an agent under --yes, where nothing can prompt", () => {
+        const lines = commands(agentNextSteps([], false, pm));
+        expect(lines.length).toBeGreaterThan(0);
+        for (const line of lines) {
+            for (const command of line.split(/\s{2}or\s{2}/)) expect(command).toMatch(/--agent \S+/);
+        }
+    });
+
+    it("refreshes exactly the agents it set up, Copilot included", () => {
+        const text = commands(agentNextSteps(["claude", "copilot"], false, pm)).join("\n");
+        expect(text).toContain("rebase skills install --agent claude,copilot");
+        expect(text).toContain("pnpm exec rebase skills install --agent claude,copilot");
+    });
+
+    it("lets a person at a terminal choose, and offers the MCP server too", () => {
+        const text = commands(agentNextSteps([], true, pm)).join("\n");
+        expect(text).toContain("rebase skills install --mcp");
     });
 });

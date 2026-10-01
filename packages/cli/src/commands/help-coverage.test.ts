@@ -30,6 +30,7 @@ import { doctorCommand, DOCTOR_FLAGS } from "./doctor";
 import { schemaCommand } from "./schema";
 import { skillsCommand } from "./skills";
 import { telemetryCommand } from "./telemetry";
+import { allParsedCommands } from "./__test_support__/parser-specs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -252,53 +253,7 @@ describe("every command the dispatch answers appears in a help page", () => {
  * The cloud family has its own sweep (`cloud/cloud-help.test.ts`).
  */
 describe("every flag a parser reads appears in its command's help", () => {
-    /** Source with comments blanked, so a commented-out flag is not a flag. */
-    const uncommented = (source: string): string =>
-        source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
-
-    /** The text of the `{ … }` that opens at `open`, braces balanced. */
-    function braced(source: string, open: number): string {
-        let depth = 0;
-        for (let i = open; i < source.length; i++) {
-            if (source[i] === "{") depth++;
-            else if (source[i] === "}" && --depth === 0) return source.slice(open, i + 1);
-        }
-        throw new Error("unbalanced braces");
-    }
-
-    /** Every `parseCommandArgs` call in a file: the command it names and the long flags its spec declares. */
-    function parsedCommands(file: string): Array<{ command: string; flags: string[] }> {
-        const source = uncommented(fs.readFileSync(file, "utf8"));
-        const out: Array<{ command: string; flags: string[] }> = [];
-        for (const call of source.matchAll(/parseCommandArgs\(\{/g)) {
-            const body = braced(source, call.index! + "parseCommandArgs(".length);
-            const command = /command:\s*"([^"]+)"/.exec(body)?.[1];
-            if (!command) throw new Error(`${path.basename(file)}: a parseCommandArgs call names no command`);
-            let spec: string;
-            const inline = /spec:\s*\{/.exec(body);
-            if (inline) {
-                spec = braced(body, inline.index + inline[0].length - 1);
-            } else {
-                const named = /spec:\s*([A-Z_][A-Z0-9_]*)/.exec(body)?.[1];
-                if (!named) throw new Error(`${path.basename(file)}: cannot read the spec of "${command}"`);
-                const declared = new RegExp(`const ${named}\\b[^=]*=\\s*\\{`).exec(source);
-                if (!declared) throw new Error(`${path.basename(file)}: ${named} is not declared in this file`);
-                spec = braced(source, declared.index + declared[0].length - 1);
-            }
-            // Canonical long flags: the value is a type, not another flag's name.
-            const flags = [...spec.matchAll(/"(--[a-z][a-z0-9-]*)"\s*:\s*(?!")/g)].map(m => m[1]);
-            out.push({ command, flags });
-        }
-        return out;
-    }
-
-    const files = [
-        path.join(here, "..", "cli.ts"),
-        ...fs.readdirSync(here)
-            .filter(name => name.endsWith(".ts") && !name.includes(".test."))
-            .map(name => path.join(here, name))
-    ];
-    const calls = files.flatMap(parsedCommands);
+    const calls = allParsedCommands(here);
 
     it("finds the parsers it is checking, so an empty sweep cannot pass", () => {
         const commands = calls.map(c => c.command);

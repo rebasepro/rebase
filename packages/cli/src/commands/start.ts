@@ -16,6 +16,7 @@ import { requireProjectRoot, findEnvFile, readEnvFile } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
+import type { RebaseBundleStatic } from "@rebasepro/types";
 
 function printHelp(): void {
     console.log(`
@@ -75,6 +76,38 @@ export function nonProductionWarning(nodeEnv: StartNodeEnv): string[] | null {
         chalk.yellow("  password-reset links are printed to this log instead of sent."),
         chalk.gray("  For a production server, run it with NODE_ENV=production (in the shell or .env).")
     ];
+}
+
+/**
+ * What to say about the apps a bundle serves only on their own hostname.
+ *
+ * The runtime prints "Server running at http://localhost:<port>", and an app
+ * whose `path` names a hostname answers only requests carrying that `Host` —
+ * so opening the printed URL showed a 404 for an app that was running fine,
+ * and nothing said why. One line per such app, with a command that reaches it.
+ */
+export function hostRoutedNotice(staticApps: readonly RebaseBundleStatic[], port: string | undefined): string[] {
+    const routed = staticApps.filter(app => app.host);
+    if (routed.length === 0) return [];
+    const origin = `http://localhost:${port || "<port>"}`;
+    return [
+        ...routed.map(app => {
+            const name = app.name ?? path.posix.basename(app.dir);
+            return chalk.yellow(`⚠ ${name} answers only on ${app.host}, so ${origin}${app.path} will not show it here. Reach it with:`)
+                + `\n    ${chalk.cyan(`curl -H "Host: ${app.host}" ${origin}${app.path}`)}`;
+        }),
+        chalk.gray(`  (or point ${routed.map(app => app.host).join(", ")} at 127.0.0.1 in /etc/hosts)`),
+        ""
+    ];
+}
+
+function readBundleStatic(bundleDir: string): RebaseBundleStatic[] {
+    try {
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")) as { entry?: { static?: RebaseBundleStatic[] } };
+        return manifest.entry?.static ?? [];
+    } catch {
+        return [];
+    }
 }
 
 function printNonProductionWarning(projectRoot: string): void {
@@ -138,6 +171,8 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     }
 
     process.env.REBASE_BUNDLE = bundleDir;
+
+    for (const line of hostRoutedNotice(readBundleStatic(bundleDir), process.env.PORT)) console.log(line);
 
     try {
         const { runFromBundle } = await import("@rebasepro/server");

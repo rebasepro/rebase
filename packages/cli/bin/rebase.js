@@ -133,7 +133,7 @@ function warnIfStale() {
         : seconds >= 60 ? `${Math.round(seconds / 60)}m` : `${seconds}s`;
     process.stderr.write(
         `${yellow(`⚠ rebase CLI: dist/ is ${ago} older than src/ — you are running a stale build.`)}\n` +
-        `  Rebuild with: (cd ${join(here, "..")} && npm run build)\n`
+        "  Rebuild with: pnpm --filter @rebasepro/cli build\n"
     );
 }
 

@@ -16,7 +16,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { nonProductionWarning, startCommand, startNodeEnv } from "./start";
+import { hostRoutedNotice, nonProductionWarning, startCommand, startNodeEnv } from "./start";
 
 // eslint-disable-next-line no-control-regex
 const ANSI = /\u001b\[[0-9;]*m/g;
@@ -89,5 +89,25 @@ describe("rebase start --help", () => {
         const help = printed.join("\n").replace(ANSI, "");
         expect(help).toContain("NODE_ENV");
         expect(help).toMatch(/NODE_ENV=production/);
+    });
+});
+
+/**
+ * An app on its own hostname is not at the URL the runtime prints.
+ *
+ * `rebase start` with `admin` at `https://admin.example.com` printed "Server
+ * running at http://localhost:3478", and `/` there was a 404: the app answers
+ * only `Host: admin.example.com`. Nothing said so.
+ */
+describe("hostRoutedNotice", () => {
+    it("names the app, its hostname, and a command that reaches it locally", () => {
+        const text = hostRoutedNotice([{ path: "/", host: "admin.example.com", dir: "static/admin", spa: true, name: "admin" }], "3478")
+            .join("\n").replace(ANSI, "");
+        expect(text).toContain("admin answers only on admin.example.com");
+        expect(text).toContain('curl -H "Host: admin.example.com" http://localhost:3478/');
+    });
+
+    it("says nothing for apps served on every hostname", () => {
+        expect(hostRoutedNotice([{ path: "/", dir: "static/web", spa: true, name: "web" }], "3001")).toEqual([]);
     });
 });

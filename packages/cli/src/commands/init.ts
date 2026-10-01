@@ -135,6 +135,8 @@ export interface InitOptions {
     cloudUrl?: string;
     /** AI coding agents to install skills and the MCP server for. */
     agents: AgentKey[];
+    /** Whoever reads the closing steps can answer a prompt (a TTY, not --yes). */
+    interactive?: boolean;
 }
 
 export interface BuildQuestionsParams {
@@ -410,7 +412,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             cloudUrl: resolveCloudUrl(rawArgs),
             // Nothing is guessed without a person to confirm it: the machine's
             // agents are only ever a pre-ticked default in the prompt.
-            agents: namedAgents ?? []
+            agents: namedAgents ?? [],
+            interactive: false
         };
     }
 
@@ -461,7 +464,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         cloudProject: args["--project"] || undefined,
         setupKey: args["--setup-key"] || undefined,
         cloudUrl: resolveCloudUrl(rawArgs),
-        agents
+        agents,
+        interactive: true
     };
 }
 
@@ -562,6 +566,42 @@ async function commitScaffold(targetDirectory: string): Promise<void> {
     } catch {
         console.warn(chalk.yellow("  Warning: Failed to create the initial commit"));
     }
+}
+
+/**
+ * The closing "AI Agent Skills" lines, each command one its reader can run.
+ *
+ * `rebase skills install` with no `--agent` prompts, and refuses without a
+ * TTY — so printing it bare at the end of `rebase init --yes`, the agent and
+ * CI path, told that reader to run a command that answers "Cannot prompt".
+ * Named agents are spelled out (a refresh must not depend on detection, which
+ * never finds Copilot); otherwise a TTY reader gets the prompt, anyone else
+ * the `--agent` form.
+ */
+export function agentNextSteps(agents: readonly AgentKey[], interactive: boolean, pm: PMCommands): string[] {
+    const both = (args: string[]): string =>
+        `  ${chalk.cyan(["rebase", ...args].join(" "))}  ${chalk.gray("or")}  ${chalk.cyan(pm.exec("rebase", args).join(" "))}`;
+    if (agents.length > 0) {
+        return [
+            chalk.gray(`  Set up for ${agents.map(a => AGENTS[a].label).join(", ")}. Commit the files to share them;`),
+            chalk.gray("  after a Rebase upgrade, refresh the skills with:"),
+            "",
+            both(["skills", "install", "--agent", agents.join(",")])
+        ];
+    }
+    if (interactive) {
+        return [
+            chalk.gray("  Install Rebase agent skills, and the Rebase MCP server, for your AI coding assistant:"),
+            "",
+            both(["skills", "install", "--mcp"])
+        ];
+    }
+    return [
+        chalk.gray("  Install Rebase agent skills, and the Rebase MCP server, for your AI coding assistant —"),
+        chalk.gray(`  name it: ${AGENT_KEYS.join(", ")}, or all.`),
+        "",
+        both(["skills", "install", "--agent", "<agent>", "--mcp"])
+    ];
 }
 
 /**
@@ -890,14 +930,7 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(chalk.bold("🤖 AI Agent Skills"));
     console.log("");
-    if (options.agents.length > 0) {
-        console.log(chalk.gray(`  Set up for ${options.agents.map(a => AGENTS[a].label).join(", ")}. Commit the files to share them;`));
-        console.log(chalk.gray("  after a Rebase upgrade, refresh the skills with:"));
-    } else {
-        console.log(chalk.gray("  Install Rebase agent skills for your AI coding assistant:"));
-    }
-    console.log("");
-    console.log(`  ${chalk.cyan("rebase skills install")}  ${chalk.gray("or")}  ${chalk.cyan(pmCommands.run("skills:install").join(" "))}`);
+    for (const line of agentNextSteps(options.agents, options.interactive === true, pmCommands)) console.log(line);
     console.log("");
 
     // Asked here, at the very end, and never before: the project exists, it

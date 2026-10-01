@@ -192,6 +192,20 @@ describe("rebase upgrade --json", () => {
         expect(read("package.json")).toContain("0.21.0");
     });
 
+    it("names the command that undoes it when the install fails", async () => {
+        // A typo in `--to` (0.99.0 for 0.29.0) rewrites every pin and then
+        // fails to install. The remedy used to be "revert the edits with git",
+        // in a project `rebase init --yes` never made a repository — while
+        // the real undo, moving the pins back, is a command this one knows.
+        project();
+        const fake = io({ install: vi.fn(async () => { throw new Error("ERR_PNPM_NO_MATCHING_VERSION"); }) });
+
+        expect(await run(["--to", "0.99.0", "--json"], fake)).toBe(1);
+
+        const doc = JSON.parse(stdout.join("\n"));
+        expect(doc.error.hint).toContain("rebase upgrade --to 0.19.1");
+    });
+
     it("does not install when nothing changed", async () => {
         project();
         const fake = io();

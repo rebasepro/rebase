@@ -29,13 +29,15 @@ Each pointer file is three lines:
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
-Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
+The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-The others differ only in the last word of the third line — `--agent cursor`,
-`--agent windsurf`, `--agent codex`, `--agent copilot` — and in the relative
-path, which is `../ai-instructions.md` in `.github/copilot-instructions.md` and
-`ai-instructions.md` in `AGENTS.md`.
+The others differ only in the agent's skills directory and its `--agent` value —
+`--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — and in
+the relative path, which is `../ai-instructions.md` in
+`.github/copilot-instructions.md` and `ai-instructions.md` in `AGENTS.md`. The
+third line is conditional because `rebase init --agent` may already have
+installed the skills before the assistant ever reads it.
 
 This happens on every `rebase init`, for every preset including `--headless`.
 There is no flag and no prompt.

@@ -123,6 +123,17 @@ export function npmFailure(err: unknown): string {
     return reason ?? (err instanceof Error ? err.message : String(err));
 }
 
+/**
+ * The one release every moved pin came from, or `null` when they disagreed.
+ * A range's `^`/`~` is not part of it: `upgrade --to` keeps each pin's operator.
+ */
+function previousRelease(plan: UpgradePlan): string | null {
+    const versions = new Set(plan.changed.map(pin => pin.from.replace(/^[\^~]/, "")));
+    if (versions.size !== 1) return null;
+    const [version] = versions;
+    return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) ? version : null;
+}
+
 export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultIo): Promise<void> {
     if (wantsHelp(rawArgs)) {
         printHelp();
@@ -188,11 +199,18 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
             await io.install([bin, args], projectRoot, json);
             installed = true;
         } catch {
+            // The undo is a command this one already knows, when every pin it
+            // moved came from one release: a mistyped `--to` (0.99.0 for
+            // 0.29.0) is the commonest way here, and "revert with git" is no
+            // answer in a project `rebase init --yes` never made a repository.
+            const previous = previousRelease(plan);
             refuse(
                 `\`${installLine}\` failed.`,
                 "install_failed",
                 `The package.json edits were kept. Fix what the install reported and run \`${installLine}\` again, ` +
-                    "or revert the edits with git."
+                    (previous
+                        ? `or put every pin back with \`rebase upgrade --to ${previous}\`.`
+                        : "or revert the edits with git.")
             );
         }
     }

@@ -21,6 +21,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { allParsedCommands } from "./__test_support__/parser-specs";
 
 const SRC = path.resolve(__dirname, "..");
 
@@ -119,5 +120,87 @@ describe("commands the CLI prints", () => {
             "these lines tell a user to run something the CLI does not dispatch, and they are "
             + "printed at the moment somebody is stuck"
         ).toEqual([]);
+    });
+});
+
+/**
+ * …and every flag a printed command passes is one that command accepts.
+ *
+ * The first word being real is not enough for a line whose whole job is to be
+ * pasted. Strict parsing turns an undeclared flag into "unknown or unexpected
+ * option", so a hint naming one fails exactly when the reader is stuck. Read
+ * against the same specs `help-coverage.test.ts` holds the help pages to.
+ * Commands whose flags are not parsed here (`schema` and `db` relay to the
+ * driver; `cloud` has its own sweep) are skipped.
+ */
+describe("flags the CLI prints", () => {
+    const specs = allParsedCommands(__dirname);
+    const ALWAYS = new Set(["--help", "-h", "--debug"]);
+    /**
+     * Flags printed in order to say they are refused, each with the reason —
+     * a list, so another one is a decision somebody writes down.
+     */
+    const QUOTED_AS_REFUSED = new Map([
+        ["dev --generate", "the error for the removed flag, which tells the reader to drop it"]
+    ]);
+
+    /** `rebase <rest>` up to the closing delimiter, per printed occurrence. */
+    function printedLines(source: string): Array<{ text: string; line: number }> {
+        const found: Array<{ text: string; line: number }> = [];
+        const lines = source.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
+            if (trimmed.startsWith("*") || trimmed.startsWith("//")) continue;
+            for (const match of lines[i].matchAll(/([`"'])rebase ([^`"'\n]*)/g)) {
+                found.push({ text: match[2], line: i + 1 });
+            }
+        }
+        return found;
+    }
+
+    /** The parser a printed line reaches: the longest run of its leading words that names one. */
+    function specFor(words: string[]): (typeof specs)[number] | undefined {
+        for (let n = Math.min(words.length, 3); n > 0; n--) {
+            const named = specs.find(spec => spec.command === words.slice(0, n).join(" "));
+            if (named) return named;
+        }
+        return undefined;
+    }
+
+    it("reads specs and printed lines, so an empty sweep cannot pass", () => {
+        expect(specs.length).toBeGreaterThan(15);
+        const withFlags = sourceFiles(SRC)
+            .flatMap(file => printedLines(fs.readFileSync(file, "utf8")))
+            .filter(({ text }) => / --[a-z]/.test(text));
+        expect(withFlags.length).toBeGreaterThan(20);
+    });
+
+    it("names only flags the command's parser accepts", () => {
+        const offenders: string[] = [];
+        for (const file of sourceFiles(SRC)) {
+            for (const { text, line } of printedLines(fs.readFileSync(file, "utf8"))) {
+                const tokens = text.split(/\s+/).filter(Boolean);
+                const words = tokens.slice(0, tokens.findIndex(t => t.startsWith("-")) === -1 ? tokens.length : tokens.findIndex(t => t.startsWith("-")));
+                const spec = specFor(words);
+                if (!spec) continue;
+                for (const token of tokens) {
+                    if (!token.startsWith("-") || token.includes("${") || token.includes("<")) continue;
+                    const flag = token.split("=")[0].replace(/[).,;:]+$/, "");
+                    if (!/^--?[a-zA-Z]/.test(flag)) continue;
+                    if (QUOTED_AS_REFUSED.has(`${spec.command} ${flag}`)) continue;
+                    if (!ALWAYS.has(flag) && !spec.accepted.includes(flag)) {
+                        offenders.push(`${path.relative(SRC, file)}:${line} → rebase ${text.trim()} (${flag})`);
+                    }
+                }
+            }
+        }
+        expect(offenders, "these lines tell a user to pass a flag the command refuses").toEqual([]);
+    });
+
+    it("the launcher's own hints name the package manager this repository uses", () => {
+        // `dist/ is stale — Rebuild with: npm run build`, two blocks above a
+        // not-built hint that said `pnpm --filter @rebasepro/cli build`.
+        const launcher = fs.readFileSync(path.join(SRC, "..", "bin", "rebase.js"), "utf8");
+        expect(launcher).not.toMatch(/npm run build/);
     });
 });
