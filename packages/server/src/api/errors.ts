@@ -131,6 +131,59 @@ function extractDbError(error: unknown, depth = 0): PgLikeError | null {
 }
 
 /**
+ * The two ways a request fails before it ever reaches the database, read off
+ * the cause chain by pg-pool's own wording (it sets no code on either).
+ *
+ * - `timeout exceeded when trying to connect` — every pooled connection was
+ *   busy for the whole of `connectionTimeoutMillis`. pg-pool raises it only
+ *   from its wait queue, so it means the pool is exhausted: slow queries
+ *   holding connections, or `DB_POOL_MAX` too small for the load.
+ * - `Connection terminated due to connection timeout` — a fresh connection
+ *   took longer than that to open: the database is slow or far away.
+ *
+ * Either is load, not a fault. Answered as a 500 they read as a crash and gave
+ * a client nothing to back off on; as a 503 with `Retry-After` the SDK's
+ * existing retry path takes them (`offline-connectivity.ts`).
+ */
+const POOL_FAILURES: ReadonlyArray<{ message: string; code: "DB_POOL_EXHAUSTED" | "DB_CONNECT_TIMEOUT" }> = [
+    { message: "timeout exceeded when trying to connect", code: "DB_POOL_EXHAUSTED" },
+    { message: "Connection terminated due to connection timeout", code: "DB_CONNECT_TIMEOUT" }
+];
+
+function poolFailureOf(error: unknown, depth = 0): "DB_POOL_EXHAUSTED" | "DB_CONNECT_TIMEOUT" | undefined {
+    if (!error || typeof error !== "object" || depth > 8) return undefined;
+    const message = Reflect.get(error, "message");
+    if (typeof message === "string") {
+        const match = POOL_FAILURES.find(failure => message === failure.message);
+        if (match) return match.code;
+    }
+    return poolFailureOf(Reflect.get(error, "cause"), depth + 1);
+}
+
+/** Seconds a client is asked to wait after a pool failure — one pool timeout's worth is too long to make a person wait. */
+const POOL_RETRY_AFTER_SECONDS = 1;
+
+/**
+ * The operator's line, at most once a minute. A pool that is exhausted is
+ * exhausted for every request at once, and a line per request buries the one
+ * thing to do about it.
+ */
+const POOL_WARNING_INTERVAL_MS = 60_000;
+let lastPoolWarningAt = 0;
+
+function warnPoolFailure(code: "DB_POOL_EXHAUSTED" | "DB_CONNECT_TIMEOUT"): void {
+    const now = Date.now();
+    if (now - lastPoolWarningAt < POOL_WARNING_INTERVAL_MS) return;
+    lastPoolWarningAt = now;
+    logger.warn(code === "DB_POOL_EXHAUSTED"
+        ? "⚠️ Database pool exhausted: every connection stayed busy for DB_POOL_CONNECT_TIMEOUT, so requests " +
+          "are answered 503. Raise DB_POOL_MAX (default 20; DB_POOL_MAX__<KEY> for another data source), or " +
+          "find the slow queries or long transactions holding connections. Not repeated for a minute."
+        : "⚠️ Opening a database connection took longer than DB_POOL_CONNECT_TIMEOUT, so requests are " +
+          "answered 503. The database is slow to accept connections or far away. Not repeated for a minute.");
+}
+
+/**
  * Extract the missing table or column name from a PG error.
  * PG 42P01 messages look like: 'relation "my_table" does not exist'
  * PG 42703 messages look like: 'column "my_col" does not exist' or 'column my_table.my_col does not exist'
@@ -479,8 +532,17 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Losing it turns a precise failure (e.g. an RLS denial) into an opaque
     // "Failed query: …" 500 that is undiagnosable without direct DB access.
     const dbError = extractDbError(error);
+    const poolFailure = dbError ? undefined : poolFailureOf(error);
 
-    if (resolvedCause && (resolvedCause.code === "ENETUNREACH" || resolvedCause.code === "ECONNREFUSED")) {
+    if (poolFailure) {
+        code = poolFailure;
+        statusCode = 503;
+        logMessage = poolFailure === "DB_POOL_EXHAUSTED"
+            ? "Timed out waiting for a database connection: every pooled connection was busy (DB_POOL_MAX)."
+            : "Timed out opening a database connection (DB_POOL_CONNECT_TIMEOUT).";
+        warnPoolFailure(poolFailure);
+        c.header("Retry-After", String(POOL_RETRY_AFTER_SECONDS));
+    } else if (resolvedCause && (resolvedCause.code === "ENETUNREACH" || resolvedCause.code === "ECONNREFUSED")) {
         const cause = resolvedCause;
         if (cause.code === "ENETUNREACH") {
             logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
@@ -572,6 +634,13 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 ""
             ].join("\n"));
         }
+    } else if (poolFailure) {
+        // Load, said once a minute by `warnPoolFailure`; the request line
+        // carries each occurrence.
+        if (!requestWillBeLogged(c)) logger.warn(
+            `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
+            (reqId ? ` [${reqId}]` : "")
+        );
     } else if (code === "READ_ONLY_TRANSACTION" || code === "INVALID_FILTER_VALUE") {
         // A 4xx: the application's own callback, refused — or a filter value
         // the caller's own request could not have worked with. Not a server
@@ -596,7 +665,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // message and stack it emits, so the fallbacks below (a connection dropped
     // mid-statement carries no SQLSTATE, so `dbError` is null and the stack is
     // logged) are covered too.
-    const suppressStack = isDbSchemaMismatch || dbError !== null || (statusCode < 500 && code === "BAD_REQUEST");
+    const suppressStack = isDbSchemaMismatch || dbError !== null || poolFailure !== undefined ||
+        (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
         // The error goes in as a value, not as `String(error.stack)`. A string
         // is a leaf to the logger: `serialiseError` — the `.cause`/
@@ -631,6 +701,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         const issue = pgErr.code === "42703" ? "column" : "table";
         const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
         clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. ${schemaDriftRemedy().short}`;
+    } else if (poolFailure) {
+        clientMessage = "The database is busy: no connection was free in time. Retry shortly.";
     } else if (code === "DB_PERMISSION_DENIED") {
         const ungranted = missingGrant(dbError?.message);
         clientMessage = ungranted

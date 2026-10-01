@@ -1,5 +1,5 @@
 import { AuthSchemaHealth, DataDriver, HealthCheckResult, isSQLAdmin } from "@rebasepro/types";
-import { logger } from "../utils/logger";
+import { describeCauseChain, logger, redactSensitiveText } from "../utils/logger";
 
 /**
  * @param defaultDriver     — probed for basic database reachability.
@@ -52,11 +52,19 @@ export function createHealthCheck(
                 error: error instanceof Error ? error : new Error(String(error)),
                 latencyMs
             });
+            // The innermost cause, not the wrapper. Drizzle wraps every driver
+            // failure in `Failed query: …`, which the logger redacts — so a
+            // pool that was exhausted reported `Failed query: [redacted]` and
+            // nothing about the pool. The cause chain is redacted too.
+            const causes = describeCauseChain(error);
+            const reason = causes.length > 0
+                ? causes[causes.length - 1].replace(/^caused by: /, "")
+                : redactSensitiveText(error instanceof Error ? error.message : String(error));
             return {
                 healthy: false,
                 latencyMs,
                 details: {
-                    error: error instanceof Error ? error.message : String(error)
+                    error: reason
                 }
             };
         }
