@@ -440,6 +440,28 @@ export function diffPlanAgainstCatalogue(
     };
 
     /**
+     * `SET DEFAULT` on a column that is already there and has none.
+     *
+     * A DEFAULT binds future writes only, so `SET DEFAULT` cannot fail on data
+     * and cannot touch a row that already exists. That makes it the one
+     * convergence this path may do unattended — and it has to, because
+     * `ADD COLUMN IF NOT EXISTS` is a no-op against an existing column, so a
+     * `defaultValue` added to a live collection would otherwise never reach the
+     * database at all.
+     */
+    const planMissingDefault = (table: TablePlan, column: ColumnPlan): void => {
+        if (!column.default || column.default.kind === "identity" || column.generated) return;
+        const key = `${table.qualified}.${column.column}`;
+        if (existing.columnDefaults?.has(key)) return;
+        const expression = column.default.kind === "sql" ? column.default.expression : column.default.sql;
+        actions.push({
+            kind: "set-default",
+            target: key,
+            sql: `ALTER TABLE "${table.schema}"."${table.table}" ALTER COLUMN "${column.column}" SET DEFAULT ${expression};`
+        });
+    };
+
+    /**
      * Plan one column, with the constraints this database can safely take.
      *
      * The definition comes from the same renderer `schema.sql` uses, minus the
@@ -514,23 +536,7 @@ export function diffPlanAgainstCatalogue(
 
         if (!columnExists) return;
 
-        // ── The column is already there and only a modifier differs ──────────
-        // A DEFAULT binds future writes only, so `SET DEFAULT` cannot fail and
-        // cannot touch a row that already exists. That makes it the one
-        // convergence this path may do unattended — and it has to, because
-        // `ADD COLUMN IF NOT EXISTS` is a no-op against an existing column, so
-        // a `defaultValue` added to a live collection would otherwise never
-        // reach the database at all.
-        if (column.default && column.default.kind !== "identity" && !column.generated) {
-            const expression = column.default.kind === "sql" ? column.default.expression : column.default.sql;
-            if (!existing.columnDefaults?.has(key)) {
-                actions.push({
-                    kind: "set-default",
-                    target: key,
-                    sql: `ALTER TABLE "${table.schema}"."${table.table}" ALTER COLUMN "${column.column}" SET DEFAULT ${expression};`
-                });
-            }
-        }
+        planMissingDefault(table, column);
 
         // Two directions on NOT NULL, and they are not equally safe — see
         // `ConstraintPolicy` for why neither runs at an unattended boot.
@@ -582,6 +588,15 @@ export function diffPlanAgainstCatalogue(
         for (const column of table.columns) {
             if (!isScalarProperty(column)) continue;
             planColumn(table, column);
+        }
+        // The implicit key of a collection that declares none. It is created
+        // with the table, so the only thing to plan is the default a table
+        // made before the key had one is missing — without it, nothing can
+        // insert a row there: no door sends a key that is not a property.
+        for (const column of table.columns) {
+            if (column.source.kind !== "implicit-id" || !column.primaryKey) continue;
+            if (existing.tables.get(table.qualified)?.has(column.column) !== true) continue;
+            planMissingDefault(table, column);
         }
         for (const column of table.columns) {
             if (column.source.kind !== "auth") continue;

@@ -185,6 +185,13 @@ const foreignKeyPlan = (
  * the plain integer of the same width — `SERIAL` there would give every
  * referencing column a sequence of its own.
  */
+/**
+ * The DEFAULT of the implicit `id TEXT PRIMARY KEY` a collection that declares
+ * no key gets: a uuid, as text. The same generator `isId: "uuid"` uses, cast to
+ * the column the key has always been.
+ */
+export const IMPLICIT_ID_DEFAULT = "gen_random_uuid()::text";
+
 export const primaryKeyPgType = (collection: CollectionConfig): PgType => {
     const { name, prop } = getPrimaryKeyProp(collection);
     if (prop?.type === "number") {
@@ -867,6 +874,15 @@ function planCollectionTable(
 
     // A collection that declares no primary key gets an implicit `id TEXT
     // PRIMARY KEY`, which is what `derivePrimaryKeys` reads back.
+    //
+    // With a default the database fills. Nothing else can: the key is not a
+    // property, so the admin form has no field for it, and REST, the SDK and
+    // the socket send none. Without one, every insert into a collection that
+    // declares no key — the quickstart's first one among them — was refused
+    // as a missing `id`. The column stays TEXT so a table created before this
+    // keeps its type, and boot's ensure adds the default to it: a DEFAULT binds
+    // only future writes, so it is the one change it makes to an existing
+    // column. A key the caller does supply still wins over the default.
     if (!columns.some(c => c.primaryKey)) {
         columns.unshift({
             key: "id",
@@ -875,6 +891,7 @@ function planCollectionTable(
             nullable: false,
             primaryKey: true,
             unique: false,
+            default: { kind: "sql", expression: IMPLICIT_ID_DEFAULT },
             source: { kind: "implicit-id", slug: collection.slug }
         });
     }

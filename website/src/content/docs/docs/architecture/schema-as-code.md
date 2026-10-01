@@ -113,7 +113,7 @@ export const products = pgTable("products", {
     price: numeric("price"),
     active: boolean("active").default(sql`TRUE`),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    id: text("id").primaryKey()
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`)
 }, (table) => ([
     pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
@@ -128,7 +128,9 @@ export const relations = {  };
 
 Three things in there are worth reading twice. The `id` column you did not
 declare: every collection gets a `text` primary key unless a property claims
-`isId`. The `pgPolicy` block: row level security is enabled on every table, and
+`isId`, and the database fills it with a uuid (`gen_random_uuid()::text`), so a
+row created from the admin panel, the REST API or the SDK needs no key of its
+own. A key you do send is used as given. The `pgPolicy` block: row level security is enabled on every table, and
 those baseline policies are what keep the trusted server context and the `admin`
 role able to read it at all — see
 [Security Rules](/docs/collections/security-rules). And `active`, which carries
@@ -146,7 +148,7 @@ And this SQL, which is what Atlas is handed as the desired state:
 CREATE SCHEMA IF NOT EXISTS "rebase";
 
 CREATE TABLE "public"."products" (
-  "id" TEXT PRIMARY KEY,
+  "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "name" TEXT NOT NULL,
   "price" NUMERIC,
   "active" BOOLEAN DEFAULT TRUE,

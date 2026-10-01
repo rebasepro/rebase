@@ -113,7 +113,7 @@ export const products = pgTable("products", {
     price: numeric("price"),
     active: boolean("active").default(sql`TRUE`),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    id: text("id").primaryKey()
+    id: text("id").primaryKey().default(sql`gen_random_uuid()::text`)
 }, (table) => ([
     pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
@@ -142,7 +142,7 @@ Lo que produce este SQL:
 CREATE SCHEMA IF NOT EXISTS "rebase";
 
 CREATE TABLE "public"."products" (
-  "id" TEXT PRIMARY KEY,
+  "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "name" TEXT NOT NULL,
   "price" NUMERIC,
   "active" BOOLEAN DEFAULT TRUE,

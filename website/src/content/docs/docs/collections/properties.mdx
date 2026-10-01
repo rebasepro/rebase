@@ -295,6 +295,12 @@ load rather than silently ignored: composite primary keys are not supported, and
 a config declaring two has to be read as asking for one Rebase cannot build. If
 what you wanted was a uniqueness constraint over several columns, that is a
 unique [index](/docs/backend/indexes).
+
+A collection where no property claims `isId` gets an `id` column of its own:
+`TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. The database fills it, so a
+row created from the admin panel, the REST API or the SDK needs no key, and a key
+you do send is used as given. A table created before this default existed gets
+it at the next boot.
 :::
 
 ## Number Properties
