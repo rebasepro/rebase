@@ -21,11 +21,45 @@ import {
     type LoadedSkill,
     loadBundledSkills
 } from "./skills";
+import { detectPackageManager, type PackageManager } from "../utils/package-manager";
+import { cliVersion } from "../utils/version";
 
 /** The name the server is registered under, in every config. */
 export const MCP_SERVER_NAME = "rebase";
-const MCP_COMMAND = "npx";
-const MCP_ARGS = ["-y", "@rebasepro/mcp"];
+
+/** The MCP server's package: a devDependency of the project, pinned with the rest. */
+export const MCP_PACKAGE = "@rebasepro/mcp";
+
+/** The bin {@link MCP_PACKAGE} declares. */
+export const MCP_BIN = "rebase-mcp";
+
+/** The command an assistant spawns, and its arguments. */
+export interface McpLaunch {
+    command: string;
+    args: string[];
+}
+
+/**
+ * How an assistant starts the Rebase MCP server: the project's own copy, through
+ * the project's package manager.
+ *
+ * Not `npx -y @rebasepro/mcp`, which fetched the newest release on every first
+ * start. The server drives the project's own CLI (`pnpm exec rebase …`) and calls
+ * the project's own backend (`/api/admin/schema/plan`, …), whose versions the
+ * lockfile pins — so a server from the registry ran ahead of both, at every
+ * start, and downloaded before it could answer. `@rebasepro/mcp` is a
+ * devDependency of the scaffold, pinned to the CLI's version like every other
+ * `@rebasepro` package, and this runs that copy.
+ *
+ * `npx --no`, not `npx`: an assistant spawns the server with no TTY, and npx
+ * then assumes "yes" and installs a missing package from the registry under the
+ * name it was given. `--no` makes a missing install an error instead.
+ */
+export function mcpLaunch(pm: PackageManager): McpLaunch {
+    return pm === "npm"
+        ? { command: "npx", args: ["--no", MCP_BIN] }
+        : { command: "pnpm", args: ["exec", MCP_BIN] };
+}
 
 /** What writing one MCP config did. */
 export type McpWriteStatus =
@@ -81,13 +115,13 @@ function addJsonServer(filePath: string, key: string, entry: Record<string, unkn
  * The Codex block, as TOML. Appended rather than merged: there is no TOML
  * parser here, and an append keeps every byte already in the file.
  */
-export function renderCodexServer(projectDir: string): string {
+export function renderCodexServer(projectDir: string, launch: McpLaunch): string {
     // A JSON string literal is a valid TOML basic string for these values.
     const str = (v: string) => JSON.stringify(v);
     return [
         `[mcp_servers.${MCP_SERVER_NAME}]`,
-        `command = ${str(MCP_COMMAND)}`,
-        `args = [${MCP_ARGS.map(str).join(", ")}]`,
+        `command = ${str(launch.command)}`,
+        `args = [${launch.args.map(str).join(", ")}]`,
         "",
         `[mcp_servers.${MCP_SERVER_NAME}.env]`,
         `REBASE_PROJECT_DIR = ${str(projectDir)}`,
@@ -95,40 +129,112 @@ export function renderCodexServer(projectDir: string): string {
     ].join("\n");
 }
 
-function addCodexServer(filePath: string, projectDir: string): McpWriteStatus {
+function addCodexServer(filePath: string, projectDir: string, launch: McpLaunch): McpWriteStatus {
     const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
     const table = new RegExp(`^\\s*\\[mcp_servers\\.(?:${MCP_SERVER_NAME}|"${MCP_SERVER_NAME}")\\]`, "m");
     if (table.test(existing)) return "present";
 
     const separator = existing === "" ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, `${existing}${separator}${renderCodexServer(projectDir)}`, "utf-8");
+    fs.writeFileSync(filePath, `${existing}${separator}${renderCodexServer(projectDir, launch)}`, "utf-8");
     return "added";
 }
 
 /**
- * Register the Rebase MCP server in the agent's project-level config.
+ * Register the Rebase MCP server in the agent's project-level config, started
+ * through the project's package manager (see {@link mcpLaunch}).
  *
  * Returns null for an agent with no project-level config to write.
  */
-export function writeMcpConfig(agentKey: AgentKey, projectDir: string): McpWriteResult | null {
+export function writeMcpConfig(
+    agentKey: AgentKey,
+    projectDir: string,
+    pm: PackageManager = detectPackageManager(projectDir)
+): McpWriteResult | null {
     const mcp = AGENTS[agentKey].mcp;
     if (!mcp) return null;
 
     const filePath = path.join(projectDir, mcp.file);
     const env = { REBASE_PROJECT_DIR: mcp.projectDir };
+    const { command, args } = mcpLaunch(pm);
     const write = (): McpWriteStatus => {
         switch (mcp.format) {
             case "mcpServers":
-                return addJsonServer(filePath, "mcpServers", { command: MCP_COMMAND, args: MCP_ARGS, env });
+                return addJsonServer(filePath, "mcpServers", { command, args, env });
             case "vscode":
                 // VS Code's own shape: `servers`, and an explicit transport.
-                return addJsonServer(filePath, "servers", { type: "stdio", command: MCP_COMMAND, args: MCP_ARGS, env });
+                return addJsonServer(filePath, "servers", { type: "stdio", command, args, env });
             case "codexToml":
-                return addCodexServer(filePath, mcp.projectDir);
+                return addCodexServer(filePath, mcp.projectDir, { command, args });
         }
     };
     return { file: mcp.file, status: write() };
+}
+
+/** What making sure the project depends on the MCP server did. */
+export type McpDependencyStatus =
+    /** Added to `devDependencies`, at this CLI's version: an install is due. */
+    | "added"
+    /** Already a dependency. Left at the version the project chose. */
+    | "present"
+    /** No `package.json`, or one that is not plain JSON: left alone. */
+    | "unreadable";
+
+/**
+ * Make the project depend on {@link MCP_PACKAGE}, which the config written by
+ * {@link writeMcpConfig} runs from the project's own install.
+ *
+ * Pinned to this CLI's version, as `rebase init` pins every `@rebasepro`
+ * package; a project that already lists it keeps its own choice.
+ */
+export function ensureMcpDependency(projectDir: string): McpDependencyStatus {
+    const manifestPath = path.join(projectDir, "package.json");
+    if (!fs.existsSync(manifestPath)) return "unreadable";
+    const text = fs.readFileSync(manifestPath, "utf-8");
+    let manifest: unknown;
+    try {
+        manifest = JSON.parse(text);
+    } catch {
+        return "unreadable";
+    }
+    if (!isRecord(manifest)) return "unreadable";
+    for (const field of ["dependencies", "devDependencies"] as const) {
+        const deps = manifest[field];
+        if (isRecord(deps) && MCP_PACKAGE in deps) return "present";
+    }
+    const devDependencies = isRecord(manifest.devDependencies) ? manifest.devDependencies : {};
+    const version = cliVersion();
+    manifest.devDependencies = { ...devDependencies, [MCP_PACKAGE]: version === "unknown" ? "latest" : version };
+    // The file's own indentation, so the change is one line in a diff.
+    const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? "  ";
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, indent)}\n`, "utf-8");
+    return "added";
+}
+
+/**
+ * Point the scaffold's `.mcp.json` at the project's package manager.
+ *
+ * The template ships the pnpm spelling (`pnpm exec rebase-mcp`); an npm project
+ * has no pnpm to run it with. Only the entry the template wrote is rewritten.
+ */
+export function retargetScaffoldMcpConfig(projectDir: string, pm: PackageManager): void {
+    const filePath = path.join(projectDir, ".mcp.json");
+    if (!fs.existsSync(filePath)) return;
+    let doc: unknown;
+    try {
+        doc = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    } catch {
+        return;
+    }
+    const servers = isRecord(doc) ? doc.mcpServers : undefined;
+    const entry = isRecord(servers) ? servers[MCP_SERVER_NAME] : undefined;
+    const shipped = mcpLaunch("pnpm");
+    if (!isRecord(doc) || !isRecord(servers) || !isRecord(entry)) return;
+    if (entry.command !== shipped.command || JSON.stringify(entry.args) !== JSON.stringify(shipped.args)) return;
+    const wanted = mcpLaunch(pm);
+    if (wanted.command === shipped.command && JSON.stringify(wanted.args) === JSON.stringify(shipped.args)) return;
+    servers[MCP_SERVER_NAME] = { ...entry, command: wanted.command, args: wanted.args };
+    fs.writeFileSync(filePath, `${JSON.stringify(doc, null, 4)}\n`, "utf-8");
 }
 
 /**
@@ -175,8 +281,9 @@ export interface AgentSetupResult {
 export function configureAgents(
     agents: readonly AgentKey[],
     projectDir: string,
-    load: () => LoadedSkill[] = loadBundledSkills
-): { results: AgentSetupResult[]; skillsError?: string } {
+    load: () => LoadedSkill[] = loadBundledSkills,
+    pm: PackageManager = detectPackageManager(projectDir)
+): { results: AgentSetupResult[]; skillsError?: string; mcpDependency?: McpDependencyStatus } {
     let skillsError: string | undefined;
     let installed: ReturnType<typeof installSkills> = [];
     try {
@@ -191,14 +298,31 @@ export function configureAgents(
             agent,
             skills: skills ? skills.skills : null,
             sharedWith: skills?.sharedWith,
-            mcp: writeMcpConfig(agent, projectDir)
+            mcp: writeMcpConfig(agent, projectDir, pm)
         };
     });
-    return { results, skillsError };
+    // A config that runs the project's copy of the server needs the project to
+    // have one.
+    const registered = results.some(r => r.mcp?.status === "added" || r.mcp?.status === "present");
+    return { results, skillsError, ...(registered && { mcpDependency: ensureMcpDependency(projectDir) }) };
+}
+
+/** The line to print when {@link ensureMcpDependency} changed or could not change the manifest. */
+export function mcpDependencyNote(status: McpDependencyStatus | undefined, pm: PackageManager): string | undefined {
+    if (status === "added") {
+        return `Added ${MCP_PACKAGE} to devDependencies — run \`${pm} install\` before your assistant starts it.`;
+    }
+    if (status === "unreadable") {
+        return `Could not add ${MCP_PACKAGE} to package.json — add it to devDependencies by hand; the MCP config runs the project's own copy.`;
+    }
+    return undefined;
 }
 
 /** One line per agent, for the scaffold's output. */
-export function printAgentSetup({ results, skillsError }: ReturnType<typeof configureAgents>): void {
+export function printAgentSetup(
+    { results, skillsError, mcpDependency }: ReturnType<typeof configureAgents>,
+    pm: PackageManager = "pnpm"
+): void {
     for (const result of results) {
         const agent = AGENTS[result.agent];
         const parts: string[] = [];
@@ -225,6 +349,9 @@ export function printAgentSetup({ results, skillsError }: ReturnType<typeof conf
             console.log(chalk.gray(`    ${agent.label} has no project-level MCP config — add @rebasepro/mcp in its MCP settings.`));
         }
     }
+
+    const dependencyNote = mcpDependencyNote(mcpDependency, pm);
+    if (dependencyNote) console.log(chalk.gray(`  ${dependencyNote}`));
 
     if (skillsError) {
         console.log(chalk.yellow(`  Could not install the Rebase skills: ${skillsError}`));

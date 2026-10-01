@@ -43,14 +43,16 @@ This happens on every `rebase init`, for every preset including `--headless`.
 There is no flag and no prompt.
 
 `rebase init` also writes `.mcp.json`, which points Claude Code, Cursor and
-any other MCP client at the [Rebase MCP server](/docs/ai/mcp):
+any other MCP client at the [Rebase MCP server](/docs/ai/mcp) — the project's
+own copy, a devDependency pinned with the CLI (`npx --no rebase-mcp` in an npm
+project):
 
 ```json title=".mcp.json"
 {
     "mcpServers": {
         "rebase": {
-            "command": "npx",
-            "args": ["-y", "@rebasepro/mcp"],
+            "command": "pnpm",
+            "args": ["exec", "rebase-mcp"],
             "env": {
                 "REBASE_PROJECT_DIR": "."
             }

@@ -664,13 +664,19 @@ async function skillsInstall(rawArgs: string[] = []) {
 
     // The MCP server, as `rebase init --agent` registers it. Imported here
     // rather than at the top: agent-setup imports this module.
-    const { MCP_SERVER_NAME, mcpServerRegistered, writeMcpConfig } = await import("./agent-setup");
+    const {
+        MCP_SERVER_NAME, ensureMcpDependency, mcpDependencyNote, mcpServerRegistered, writeMcpConfig
+    } = await import("./agent-setup");
+    const { detectPackageManager } = await import("../utils/package-manager");
     const shownFile = (file: string) => path.relative(process.cwd(), path.join(projectDir, file)) || file;
     if (withMcp) {
         console.log("");
+        const pm = detectPackageManager(projectDir);
+        let registered = false;
         for (const agentKey of agents) {
             const agent = AGENTS[agentKey];
-            const result = writeMcpConfig(agentKey, projectDir);
+            const result = writeMcpConfig(agentKey, projectDir, pm);
+            if (result && result.status !== "unreadable") registered = true;
             if (!result) {
                 console.log(chalk.gray(`  · ${agent.label} has no project-level MCP config — add @rebasepro/mcp in its MCP settings.`));
             } else if (result.status === "added") {
@@ -681,6 +687,9 @@ async function skillsInstall(rawArgs: string[] = []) {
                 console.log(chalk.yellow(`  ! ${agent.label}: ${shownFile(result.file)} is not plain JSON, so it was left alone — add the "${MCP_SERVER_NAME}" server by hand.`));
             }
         }
+        // The configs run the project's own copy of the server.
+        const note = registered ? mcpDependencyNote(ensureMcpDependency(projectDir), pm) : undefined;
+        if (note) console.log(chalk.yellow(`  ${note}`));
     }
 
     console.log("");

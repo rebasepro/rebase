@@ -21,8 +21,19 @@ see [The remote endpoint](#the-remote-endpoint).
 
 ## Connecting a client
 
-The server is published to npm and needs no install step; `npx` fetches it.
-Every block below is the whole integration.
+The server runs from your project: `@rebasepro/mcp` is a devDependency of every
+project `rebase init` scaffolds, pinned to the same version as the CLI and the
+backend it drives, and each block below starts that copy through the project's
+package manager (`pnpm exec rebase-mcp`; `npx --no rebase-mcp` in an npm
+project). A server fetched from npm at every start would run ahead of the
+project it acts on. Every block below is the whole integration.
+
+In a project made before this, add it once — `rebase skills install --mcp`
+does, or by hand:
+
+```bash
+pnpm add -D @rebasepro/mcp
+```
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` writes the block for each agent you pick when it
 [sets up your AI coding agents](/docs/ai/skills#set-up-by-rebase-init), keeping
@@ -36,8 +47,8 @@ file for you:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -53,8 +64,8 @@ file for you:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
@@ -69,8 +80,8 @@ file for you:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -84,8 +95,8 @@ Codex reads a project config only once you have trusted the project:
 
 ```toml title=".codex/config.toml"
 [mcp_servers.rebase]
-command = "npx"
-args = ["-y", "@rebasepro/mcp"]
+command = "pnpm"
+args = ["exec", "rebase-mcp"]
 
 [mcp_servers.rebase.env]
 REBASE_PROJECT_DIR = "."
@@ -97,8 +108,8 @@ REBASE_PROJECT_DIR = "."
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -115,8 +126,8 @@ an explicit transport:
   "servers": {
     "rebase": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
@@ -126,8 +137,9 @@ an explicit transport:
 ```
 
 **Windsurf** reads MCP servers only from its user-level config, so there is no
-project file to write. Add the server in Windsurf's MCP settings, with an
-absolute `REBASE_PROJECT_DIR`.
+project file to write. Add the server in Windsurf's MCP settings, started from
+the project — `"command": "pnpm", "args": ["--dir", "/absolute/path/to/your/project", "exec", "rebase-mcp"]`
+— with the same absolute path as `REBASE_PROJECT_DIR`.
 
 Any MCP client that can spawn a stdio server works; the shape is the same.
 
@@ -209,8 +221,8 @@ discover a service key:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "/absolute/path/to/your/project",
         "REBASE_API_TOKEN": "rk_live_..."

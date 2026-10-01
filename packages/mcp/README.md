@@ -5,17 +5,21 @@ Model Context Protocol (MCP) server that exposes Rebase schema, database, docume
 ## Installation
 
 ```bash
-pnpm add @rebasepro/mcp
+pnpm add -D @rebasepro/mcp
 ```
+
+A project made by `rebase init` already has it, pinned to the CLI's version: the
+server drives the project's own CLI and calls its own backend, so it should be
+the same release as both.
 
 ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
 `import`. It needs Node `>=22.22.0` (its `engines` floor), where `require()`
 of it resolves too: Node has supported `require(esm)` since 22.12.
 
-Or run directly:
+Run the project's copy:
 
 ```bash
-npx -y @rebasepro/mcp
+pnpm exec rebase-mcp
 ```
 
 ## What This Package Does
@@ -206,8 +210,8 @@ Add to your AI assistant's MCP config (e.g. `.gemini/settings.json`):
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["--dir", "/path/to/your/project", "exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "/path/to/your/project"
       }

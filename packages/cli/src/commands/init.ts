@@ -18,7 +18,7 @@ import { promptForConsent } from "../telemetry/consent";
 import { durationBucket, recordEvent } from "../telemetry";
 import { parseEnvBoolean } from "@rebasepro/types";
 import { AGENT_KEYS, AGENTS, type AgentKey, resolveAgentNames } from "./skills";
-import { configureAgents, printAgentSetup, promptForAgents } from "./agent-setup";
+import { configureAgents, printAgentSetup, promptForAgents, retargetScaffoldMcpConfig } from "./agent-setup";
 
 const access = promisify(fs.access);
 
@@ -747,11 +747,14 @@ async function createProject(options: InitOptions) {
     // frontend` in a pnpm project is a second package manager reading a
     // lockfile it did not write.
     await writeProjectPackageManagerIntoManifest(options.targetDirectory, options.pmCommands);
+    // The scaffold's `.mcp.json` runs the project's own `@rebasepro/mcp`
+    // through the package manager, and it ships spelled for pnpm.
+    retargetScaffoldMcpConfig(options.targetDirectory, options.pm);
 
     // Before git, so the skills and MCP configs are in the initial commit.
     if (options.agents.length > 0) {
         console.log(chalk.gray("  Setting up AI coding agents..."));
-        printAgentSetup(configureAgents(options.agents, options.targetDirectory));
+        printAgentSetup(configureAgents(options.agents, options.targetDirectory, undefined, options.pm), options.pm);
     }
 
     // Create the repository now, but commit at the very end — see

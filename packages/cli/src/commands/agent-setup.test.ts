@@ -12,11 +12,21 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { configureAgents, MCP_SERVER_NAME, writeMcpConfig } from "./agent-setup";
+import {
+    configureAgents,
+    ensureMcpDependency,
+    MCP_BIN,
+    MCP_PACKAGE,
+    MCP_SERVER_NAME,
+    mcpLaunch,
+    retargetScaffoldMcpConfig,
+    writeMcpConfig
+} from "./agent-setup";
 import { AGENT_KEYS, AGENTS, detectInstalledAgents, type LoadedSkill, resolveAgentNames } from "./skills";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = path.resolve(HERE, "../../templates/template");
+const MCP_MANIFEST = path.resolve(HERE, "../../../mcp/package.json");
 
 let scratch: string;
 
@@ -49,13 +59,13 @@ describe("writeMcpConfig", () => {
         } as const;
 
         for (const [agent, { file, key, dir }] of Object.entries(expected)) {
-            const result = writeMcpConfig(agent as keyof typeof expected, scratch);
+            const result = writeMcpConfig(agent as keyof typeof expected, scratch, "pnpm");
             expect(result).toEqual({ file, status: "added" });
             expect(readJson(file)).toMatchObject({
                 [key]: {
                     [MCP_SERVER_NAME]: {
-                        command: "npx",
-                        args: ["-y", "@rebasepro/mcp"],
+                        command: "pnpm",
+                        args: ["exec", "rebase-mcp"],
                         env: { REBASE_PROJECT_DIR: dir }
                     }
                 }
@@ -64,16 +74,16 @@ describe("writeMcpConfig", () => {
     });
 
     it("gives VS Code the explicit stdio transport its format requires", () => {
-        writeMcpConfig("copilot", scratch);
+        writeMcpConfig("copilot", scratch, "pnpm");
         expect(readJson(".vscode/mcp.json")).toMatchObject({ servers: { rebase: { type: "stdio" } } });
     });
 
     it("writes Codex's project config as TOML", () => {
-        expect(writeMcpConfig("codex", scratch)).toEqual({ file: ".codex/config.toml", status: "added" });
+        expect(writeMcpConfig("codex", scratch, "pnpm")).toEqual({ file: ".codex/config.toml", status: "added" });
         expect(fs.readFileSync(path.join(scratch, ".codex/config.toml"), "utf-8")).toBe([
             "[mcp_servers.rebase]",
-            "command = \"npx\"",
-            "args = [\"-y\", \"@rebasepro/mcp\"]",
+            "command = \"pnpm\"",
+            "args = [\"exec\", \"rebase-mcp\"]",
             "",
             "[mcp_servers.rebase.env]",
             "REBASE_PROJECT_DIR = \".\"",
@@ -82,7 +92,7 @@ describe("writeMcpConfig", () => {
     });
 
     it("has nothing to write for Windsurf, which reads only a user-level config", () => {
-        expect(writeMcpConfig("windsurf", scratch)).toBeNull();
+        expect(writeMcpConfig("windsurf", scratch, "pnpm")).toBeNull();
         expect(fs.readdirSync(scratch)).toEqual([]);
     });
 
@@ -93,12 +103,12 @@ describe("writeMcpConfig", () => {
             mcpServers: { github: { command: "gh-mcp" } }
         }));
 
-        expect(writeMcpConfig("gemini", scratch)?.status).toBe("added");
+        expect(writeMcpConfig("gemini", scratch, "pnpm")?.status).toBe("added");
         expect(readJson(".gemini/settings.json")).toEqual({
             theme: "dark",
             mcpServers: {
                 github: { command: "gh-mcp" },
-                rebase: { command: "npx", args: ["-y", "@rebasepro/mcp"], env: { REBASE_PROJECT_DIR: "." } }
+                rebase: { command: "pnpm", args: ["exec", "rebase-mcp"], env: { REBASE_PROJECT_DIR: "." } }
             }
         });
     });
@@ -107,7 +117,7 @@ describe("writeMcpConfig", () => {
         const mine = `${JSON.stringify({ mcpServers: { rebase: { command: "node", env: { REBASE_API_TOKEN: "rk_live_x" } } } })}\n`;
         fs.writeFileSync(path.join(scratch, ".mcp.json"), mine);
 
-        expect(writeMcpConfig("claude", scratch)?.status).toBe("present");
+        expect(writeMcpConfig("claude", scratch, "pnpm")?.status).toBe("present");
         expect(fs.readFileSync(path.join(scratch, ".mcp.json"), "utf-8")).toBe(mine);
     });
 
@@ -116,7 +126,7 @@ describe("writeMcpConfig", () => {
         fs.mkdirSync(path.join(scratch, ".vscode"));
         fs.writeFileSync(path.join(scratch, ".vscode/mcp.json"), jsonc);
 
-        expect(writeMcpConfig("copilot", scratch)?.status).toBe("unreadable");
+        expect(writeMcpConfig("copilot", scratch, "pnpm")?.status).toBe("unreadable");
         expect(fs.readFileSync(path.join(scratch, ".vscode/mcp.json"), "utf-8")).toBe(jsonc);
     });
 
@@ -125,12 +135,12 @@ describe("writeMcpConfig", () => {
         fs.mkdirSync(path.join(scratch, ".codex"));
         fs.writeFileSync(path.join(scratch, ".codex/config.toml"), existing);
 
-        expect(writeMcpConfig("codex", scratch)?.status).toBe("added");
+        expect(writeMcpConfig("codex", scratch, "pnpm")?.status).toBe("added");
         const after = fs.readFileSync(path.join(scratch, ".codex/config.toml"), "utf-8");
         expect(after.startsWith(existing)).toBe(true);
         expect(after).toContain("\n[mcp_servers.rebase]\n");
 
-        expect(writeMcpConfig("codex", scratch)?.status).toBe("present");
+        expect(writeMcpConfig("codex", scratch, "pnpm")?.status).toBe("present");
         expect(fs.readFileSync(path.join(scratch, ".codex/config.toml"), "utf-8")).toBe(after);
     });
 
@@ -138,13 +148,79 @@ describe("writeMcpConfig", () => {
         // `rebase init` copies the template's `.mcp.json` before this runs. If
         // the two ever named the server differently, Claude Code would get two.
         fs.copyFileSync(path.join(TEMPLATE, ".mcp.json"), path.join(scratch, ".mcp.json"));
-        expect(writeMcpConfig("claude", scratch)?.status).toBe("present");
+        expect(writeMcpConfig("claude", scratch, "pnpm")?.status).toBe("present");
+    });
+});
+
+describe("the MCP server is the project's own, pinned copy", () => {
+    // `npx -y @rebasepro/mcp` fetched the newest release on every first start,
+    // ahead of the CLI and the backend the project pins — the server drives the
+    // first and calls the second.
+    it("runs the bin @rebasepro/mcp declares, through the project's package manager", () => {
+        const manifest = JSON.parse(fs.readFileSync(MCP_MANIFEST, "utf-8")) as { name: string; bin: Record<string, string> };
+        expect(manifest.name).toBe(MCP_PACKAGE);
+        expect(Object.keys(manifest.bin)).toContain(MCP_BIN);
+        expect(mcpLaunch("pnpm")).toEqual({ command: "pnpm", args: ["exec", MCP_BIN] });
+        // With no TTY npx assumes "yes" and installs a missing package from the
+        // registry by the name it was given; `--no` refuses instead.
+        expect(mcpLaunch("npm")).toEqual({ command: "npx", args: ["--no", MCP_BIN] });
+    });
+
+    it("is a devDependency of the scaffold, pinned with the other @rebasepro packages", () => {
+        const manifest = JSON.parse(fs.readFileSync(path.join(TEMPLATE, "package.json"), "utf-8")) as {
+            devDependencies: Record<string, string>;
+        };
+        expect(manifest.devDependencies[MCP_PACKAGE]).toBe("workspace:*");
+        const shipped = JSON.parse(fs.readFileSync(path.join(TEMPLATE, ".mcp.json"), "utf-8")) as {
+            mcpServers: Record<string, { command: string; args: string[] }>;
+        };
+        expect(shipped.mcpServers[MCP_SERVER_NAME]).toMatchObject(mcpLaunch("pnpm"));
+    });
+
+    it("writes the npm spelling for an npm project, the scaffold's included", () => {
+        expect(writeMcpConfig("cursor", scratch, "npm")?.status).toBe("added");
+        expect(readJson(".cursor/mcp.json")).toMatchObject({ mcpServers: { rebase: mcpLaunch("npm") } });
+
+        fs.copyFileSync(path.join(TEMPLATE, ".mcp.json"), path.join(scratch, ".mcp.json"));
+        retargetScaffoldMcpConfig(scratch, "npm");
+        expect(readJson(".mcp.json")).toMatchObject({
+            mcpServers: { rebase: { ...mcpLaunch("npm"), env: { REBASE_PROJECT_DIR: "." } } }
+        });
+    });
+
+    it("leaves a .mcp.json the developer changed alone", () => {
+        const mine = `${JSON.stringify({ mcpServers: { rebase: { command: "node", args: ["x.js"] } } })}\n`;
+        fs.writeFileSync(path.join(scratch, ".mcp.json"), mine);
+        retargetScaffoldMcpConfig(scratch, "npm");
+        expect(fs.readFileSync(path.join(scratch, ".mcp.json"), "utf-8")).toBe(mine);
+    });
+
+    it("adds the package to an existing project that lacks it, keeping the file's indentation", () => {
+        fs.writeFileSync(path.join(scratch, "package.json"), `${JSON.stringify({ name: "app", devDependencies: { tsx: "1" } }, null, 2)}\n`);
+        expect(ensureMcpDependency(scratch)).toBe("added");
+        const text = fs.readFileSync(path.join(scratch, "package.json"), "utf-8");
+        expect(text).toContain(`\n  "devDependencies": {\n    "tsx": "1",\n    "${MCP_PACKAGE}": `);
+        expect(ensureMcpDependency(scratch)).toBe("present");
+    });
+
+    it("keeps the version a project already chose", () => {
+        const manifest = `${JSON.stringify({ name: "app", devDependencies: { [MCP_PACKAGE]: "0.1.0" } })}\n`;
+        fs.writeFileSync(path.join(scratch, "package.json"), manifest);
+        expect(ensureMcpDependency(scratch)).toBe("present");
+        expect(fs.readFileSync(path.join(scratch, "package.json"), "utf-8")).toBe(manifest);
+    });
+
+    it("registering a server makes sure the project has it", () => {
+        fs.writeFileSync(path.join(scratch, "package.json"), "{}\n");
+        const { mcpDependency } = configureAgents(["claude"], scratch, oneSkill, "pnpm");
+        expect(mcpDependency).toBe("added");
+        expect(readJson("package.json")).toMatchObject({ devDependencies: { [MCP_PACKAGE]: expect.any(String) } });
     });
 });
 
 describe("configureAgents", () => {
     it("installs the skills and registers the server for each agent", () => {
-        const { results, skillsError } = configureAgents(["claude", "cursor"], scratch, oneSkill);
+        const { results, skillsError } = configureAgents(["claude", "cursor"], scratch, oneSkill, "pnpm");
         expect(skillsError).toBeUndefined();
         expect(results).toEqual([
             { agent: "claude", skills: 1, sharedWith: undefined, mcp: { file: ".mcp.json", status: "added" } },
@@ -155,7 +231,7 @@ describe("configureAgents", () => {
     });
 
     it("writes a skills directory two agents share once", () => {
-        const { results } = configureAgents(["gemini", "codex"], scratch, oneSkill);
+        const { results } = configureAgents(["gemini", "codex"], scratch, oneSkill, "pnpm");
         expect(results.map(r => [r.agent, r.sharedWith])).toEqual([["gemini", undefined], ["codex", "gemini"]]);
         expect(fs.existsSync(path.join(scratch, ".agents/skills/demo/SKILL.md"))).toBe(true);
     });
@@ -163,7 +239,7 @@ describe("configureAgents", () => {
     it("still writes the MCP configs when the skills bundle cannot be loaded", () => {
         const { results, skillsError } = configureAgents(["cursor"], scratch, () => {
             throw new Error("bundle missing");
-        });
+        }, "pnpm");
         expect(skillsError).toBe("bundle missing");
         expect(results).toEqual([{ agent: "cursor", skills: null, sharedWith: undefined, mcp: { file: ".cursor/mcp.json", status: "added" } }]);
     });
