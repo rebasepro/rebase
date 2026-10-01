@@ -33,9 +33,9 @@ my-app/
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 │
 ├── config/                 # Shared by the backend and the admin panel
-│   ├── index.ts            # Re-exports what the runtime reads (collections, storageAuthorize)
+│   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
 │   ├── collections/        # Your data model
-│   │   ├── index.ts        # Exports `collections` and the default security rules
+│   │   ├── index.ts        # Sort order (`collections`) and `defaultSecurityRules` — not a registry
 │   │   ├── posts.ts        # Example collections
 │   │   └── users.ts        # The auth collection
 │   ├── resources.ts        # What this project needs from wherever it runs
@@ -193,8 +193,9 @@ const productsCollection = defineCollection({
     }
 });
 
-// The default export is what the registry picks up — every collection in the
-// scaffold is written this way.
+// The default export is what the loader picks up — every file in this directory
+// is loaded, listed in index.ts or not, and every collection in the scaffold is
+// written this way.
 export default productsCollection;
 ```
 

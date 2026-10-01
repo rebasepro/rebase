@@ -59,18 +59,24 @@ force: true });
         expect(sdkGen.generateSDK).not.toHaveBeenCalled();
     });
 
-    it("orchestrates SDK generation and writes files to output directory", async () => {
-        // Create collections directory
+    /** A collections directory as `rebase init` writes one: a file per collection, and a barrel. */
+    function collectionsDirWith(files: Record<string, string>): string {
         const collectionsDir = path.join(tmpDir, "collections");
         fs.mkdirSync(collectionsDir);
+        for (const [file, source] of Object.entries(files)) {
+            fs.writeFileSync(path.join(collectionsDir, file), source, "utf-8");
+        }
+        return collectionsDir;
+    }
 
-        // Write a mock index.js that exports a default array of collections
-        const indexFile = path.join(collectionsDir, "index.js");
-        fs.writeFileSync(indexFile, `
-            module.exports = [
-                { slug: "posts", name: "Posts", fields: [] }
-            ];
-        `, "utf-8");
+    const collectionFile = (slug: string) =>
+        `export default { slug: "${slug}", name: "${slug}", properties: { title: { type: "string" } } };\n`;
+
+    it("orchestrates SDK generation and writes files to output directory", async () => {
+        const collectionsDir = collectionsDirWith({
+            "posts.ts": collectionFile("posts"),
+            "index.ts": `import posts from "./posts";\nexport const collections = [posts];\n`
+        });
 
         const outputDir = path.join(tmpDir, "out");
 
@@ -92,20 +98,18 @@ force: true });
         expect(sdkGen.generateSDK).toHaveBeenCalledTimes(1);
         const [collections] = vi.mocked(sdkGen.generateSDK).mock.calls[0];
         expect(collections).toHaveLength(1);
-        expect(collections[0]).toMatchObject({ slug: "posts",
-name: "Posts" });
+        expect(collections[0]).toMatchObject({ slug: "posts", name: "posts" });
     });
 
     it("passes every collection through, sorted by slug for a stable SDK", async () => {
-        const collectionsDir = path.join(tmpDir, "collections");
-        fs.mkdirSync(collectionsDir);
-        fs.writeFileSync(path.join(collectionsDir, "index.js"), `
-            module.exports = [
-                { slug: "posts", name: "Posts", fields: [] },
-                { slug: "tags", name: "Tags", fields: [] },
-                { slug: "authors", name: "Authors", fields: [] }
-            ];
-        `, "utf-8");
+        const collectionsDir = collectionsDirWith({
+            "posts.ts": collectionFile("posts"),
+            "tags.ts": collectionFile("tags"),
+            "authors.ts": collectionFile("authors"),
+            "index.ts":
+                `import posts from "./posts";\nimport tags from "./tags";\nimport authors from "./authors";\n` +
+                "export const collections = [posts, tags, authors];\n"
+        });
 
         await generateSdkCommand({
             collectionsDir,
@@ -117,5 +121,44 @@ name: "Posts" });
         // Declaration order is deliberately not preserved: the command sorts by
         // slug so regenerating produces the same file for the same schema.
         expect(collections.map((c) => c.slug)).toEqual(["authors", "posts", "tags"]);
+    });
+
+    it("types a collection file the barrel leaves out, because the backend serves it", async () => {
+        // The barrel is a sort order, not a registry: the runtime, the admin,
+        // `rebase build` and `schema generate` all scan the directory. Reading
+        // the barrel here left `drafts` created, served and listed in the panel,
+        // and missing from the typed client alone.
+        const collectionsDir = collectionsDirWith({
+            "posts.ts": collectionFile("posts"),
+            "drafts.ts": collectionFile("drafts"),
+            "posts.test.ts": "throw new Error(\"a test file is not a collection\");\n",
+            "index.ts": `import posts from "./posts";\nexport const collections = [posts];\n`
+        });
+
+        await generateSdkCommand({
+            collectionsDir,
+            output: path.join(tmpDir, "out"),
+            cwd: tmpDir
+        });
+
+        const [collections] = vi.mocked(sdkGen.generateSDK).mock.calls[0];
+        expect(collections.map((c) => c.slug)).toEqual(["drafts", "posts"]);
+    });
+
+    it("refuses a collection file that does not load rather than typing the rest", async () => {
+        // `rebase dev` runs this on every save. Skipping the broken file would
+        // overwrite good types with a Database silently short a collection; boot
+        // refuses the same file, so this does too.
+        const collectionsDir = collectionsDirWith({
+            "posts.ts": collectionFile("posts"),
+            "broken.ts": "export default { slug: ;\n"
+        });
+
+        await expect(generateSdkCommand({
+            collectionsDir,
+            output: path.join(tmpDir, "out"),
+            cwd: tmpDir
+        })).rejects.toThrow(/broken\.ts/);
+        expect(sdkGen.generateSDK).not.toHaveBeenCalled();
     });
 });

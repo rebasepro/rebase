@@ -232,7 +232,7 @@ rebase generate-sdk
 ```
 
 **What it does:**
-- Reads collections from `config/collections/` (supports `index.ts` barrel exports or individual files)
+- Reads every collection file in `config/collections/` — the files the backend serves, whether or not the `index.ts` barrel lists them — and stops on one that does not load
 - Generates TypeScript types for all entities in `generated/sdk/`
 - Produces a `database.types.ts` file for use with `createRebaseClient<Database>()`
 

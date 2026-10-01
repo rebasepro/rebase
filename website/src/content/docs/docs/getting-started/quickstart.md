@@ -129,7 +129,7 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 
 ## Define Your First Collection
 
-Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up. The table name is optional: it defaults to the slug, so set it only when they differ:
+Open `config/collections/` and create a new file. Export the collection as the **default export** — that's what the backend and the admin panel load from each file in the directory. The table name is optional: it defaults to the slug, so set it only when they differ:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -169,7 +169,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Then register it in `config/collections/index.ts` so both the backend and the admin panel know about it:
+Then add it to the `collections` array in `config/collections/index.ts`. That array is a sort order, not a registry: every collection file in the directory is loaded — by the backend, the admin panel and the SDK generator — whether the array lists it or not, and the array decides where it appears in the navigation. To remove a collection, delete its file:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports

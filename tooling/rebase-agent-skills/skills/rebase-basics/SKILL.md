@@ -78,10 +78,12 @@ section is background; this is the actual sequence.
 
 1. Write `config/collections/<slug>.ts`, default-exporting a `defineCollection`
    call from `@rebasepro/cms-types`.
-2. Add it to the `collections` array in `config/collections/index.ts`. A file
-   that is not in that array does not exist — `rebase generate-sdk`,
-   `rebase build` and the runtime all read the barrel, never the directory
-   listing, so a collection left out of it fails silently rather than loudly.
+2. Add it to the `collections` array in `config/collections/index.ts` — for
+   its place in the admin navigation. The barrel is a sort order, not a
+   registry: the runtime, the admin panel, `rebase build`, `rebase schema
+   generate` and `rebase generate-sdk` all load every collection file in the
+   directory, listed or not. Leaving a file out of the array does not disable
+   it; to remove a collection, delete its file.
 3. `rebase schema generate` — collections become
    `backend/src/schema.generated.ts`. `rebase dev` does this for you on start
    and on every save under `config/collections/`, together with the SDK types in
@@ -160,7 +162,7 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 ├── config/               # Shared between frontend and backend
 │   ├── index.ts          # Exports `collections` and `storageAuthorize`
 │   ├── collections/      # TypeScript collection files (one per collection)
-│   │   └── index.ts      # Barrel export of all collections
+│   │   └── index.ts      # Sort order + defaultSecurityRules (not a registry)
 │   └── storage.ts        # `storageAuthorize` — who may read/write which keys
 ├── scripts/              # Standalone SDK scripts
 ├── rebase.json           # Which apps this project deploys, and how

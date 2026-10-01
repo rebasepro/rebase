@@ -1963,8 +1963,11 @@ internal_note: {
 
 ## Schema Migration Workflow
 
-**A new collection file is invisible until it is in the barrel.** Add it to the
-`collections` array exported by `config/collections/index.ts`:
+**Every collection file in `config/collections/` is loaded, listed or not.** The
+barrel is a sort order, not a registry: the runtime, the admin panel, `rebase
+build`, `schema generate` and `generate-sdk` scan the directory. Add a new file to
+the `collections` array exported by `config/collections/index.ts` to place it in
+the admin navigation; to remove a collection, delete its file:
 
 ```typescript title="config/collections/index.ts"
 import postsCollection from "./posts.js";

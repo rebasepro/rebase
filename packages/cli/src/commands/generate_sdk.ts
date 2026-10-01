@@ -1,8 +1,9 @@
 /**
  * CLI command: generate-sdk
  *
- * Reads collection definitions from a specified directory (default: ./config/collections),
- * generates a typed TypeScript SDK, and writes it to the output directory (default: ./generated/sdk).
+ * Reads every collection file in a directory (default: ./config/collections) —
+ * the files the backend serves, not the barrel's list — generates a typed
+ * TypeScript SDK, and writes it to the output directory (default: ./generated/sdk).
  *
  * Uses jiti for dynamic TypeScript import of collection files.
  */
@@ -16,6 +17,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot } from "../utils/project";
 import { readLink } from "./cloud/context";
 import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
+import { isLoadedCollectionFile } from "../utils/collection-drift";
 
 interface GenerateSDKArgs {
     collectionsDir: string;
@@ -36,10 +38,23 @@ interface GenerateSDKArgs {
 }
 
 /**
- * Dynamically load collection definitions from a directory.
+ * Load the collections the backend serves, the way it finds them.
  *
- * Expects the directory to have an index.ts/index.js that exports a default
- * array of CollectionConfig objects (matching the app/config/collections pattern).
+ * A directory is read as `loadCollectionsFromDirectory` in @rebasepro/server
+ * reads it: every top-level collection file, each default-exporting one
+ * collection. The barrel (`index.ts`) is not a registry. The runtime, the admin
+ * panel, `rebase build` and `rebase schema generate` all scan the directory, and
+ * the barrel only orders the panel's navigation and declares
+ * `defaultSecurityRules`. This command used to read the barrel instead, so a
+ * collection file left out of it was created, served at `/api/data/<slug>` and
+ * listed in the panel, and missing from the typed SDK alone.
+ *
+ * A file that does not load is fatal, as it is at boot: `rebase dev` runs this
+ * on every save, and skipping the file would overwrite good types with a
+ * `Database` that is silently short a collection.
+ *
+ * A path to a single module is read as the runtime reads one: its
+ * `backendCollections`, or its `collections`.
  */
 async function loadCollections(collectionsDir: string): Promise<CollectionConfig[]> {
     const absDir = path.resolve(collectionsDir);
@@ -48,7 +63,6 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
         throw new Error(`Collections directory not found: ${absDir} (${COLLECTIONS_PATH_RULE})`);
     }
 
-    // Try to import the index file using jiti (supports TypeScript natively)
     let jiti: (id: string, userOptions?: Record<string, unknown>) => (modulePath: string) => Record<string, unknown>;
     try {
         const jitiModule = await import("jiti");
@@ -61,73 +75,49 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
         );
     }
 
+    if (!fs.statSync(absDir).isDirectory()) {
+        const mod = jiti(path.dirname(absDir), { interopDefault: true, esmResolve: true })(absDir);
+        const listed = mod.backendCollections ?? mod.collections ?? mod.default;
+        if (Array.isArray(listed)) return listed as CollectionConfig[];
+        throw new Error(
+            `Could not extract collections from ${absDir}.\n` +
+            "A single collections module exports `backendCollections` or `collections`: an array of collections."
+        );
+    }
+
     const jitiInstance = jiti(absDir, {
         interopDefault: true,
         esmResolve: true
     });
 
-    // Look for index file
-    const indexCandidates = ["index.ts", "index.js", "index.mjs"];
-    let indexPath: string | null = null;
+    const collections: CollectionConfig[] = [];
+    const failures: string[] = [];
+    const files = fs.readdirSync(absDir).filter(isLoadedCollectionFile).sort();
 
-    for (const candidate of indexCandidates) {
-        const p = path.join(absDir, candidate);
-        if (fs.existsSync(p)) {
-            indexPath = p;
-            break;
+    for (const file of files) {
+        try {
+            const mod = jitiInstance(path.join(absDir, file));
+            const exported = mod.default ?? mod;
+            if (exported && typeof exported === "object" && "slug" in exported) {
+                collections.push(exported as CollectionConfig);
+            } else {
+                failures.push(`${file}: no default export of a collection`);
+            }
+        } catch (err) {
+            failures.push(`${file}: ${(err as Error).message}`);
         }
     }
 
-    if (!indexPath) {
-        // Fallback: load each .ts/.js file individually
-        console.log(chalk.yellow("  No index file found, scanning individual collection files..."));
-        const collections: CollectionConfig[] = [];
-        const files = fs.readdirSync(absDir).filter(f =>
-            (f.endsWith(".ts") || f.endsWith(".js")) && !f.startsWith(".")
+    if (failures.length > 0) {
+        throw new Error(
+            `Could not load ${failures.length} collection file(s) from ${absDir}:\n` +
+            failures.map(failure => `  • ${failure}`).join("\n") +
+            "\n\nEvery collection file must import cleanly and default-export a collection — " +
+            "the backend refuses to boot on the same file."
         );
-
-        for (const file of files) {
-            try {
-                const mod = jitiInstance(path.join(absDir, file));
-                const exported = mod.default || mod;
-                if (exported && typeof exported === "object" && "slug" in exported) {
-                    collections.push(exported as CollectionConfig);
-                } else if (Array.isArray(exported)) {
-                    collections.push(...exported);
-                }
-            } catch (err) {
-                console.warn(chalk.yellow(`  ⚠ Skipping ${file}: ${(err as Error).message}`));
-            }
-        }
-
-        return collections;
     }
 
-    // Import the index
-    const mod = jitiInstance(indexPath);
-    const exported = mod.default || mod;
-
-    if (Array.isArray(exported)) {
-        return exported as CollectionConfig[];
-    } else if (typeof exported === "object" && exported !== null) {
-        // Could be a named export like { collections: [...] }
-        if ("collections" in exported && Array.isArray(exported.collections)) {
-            return exported.collections;
-        }
-        // Or individual named exports
-        const collections: CollectionConfig[] = [];
-        for (const value of Object.values(exported)) {
-            if (value && typeof value === "object" && "slug" in (value as CollectionConfig)) {
-                collections.push(value as CollectionConfig);
-            }
-        }
-        if (collections.length > 0) return collections;
-    }
-
-    throw new Error(
-        `Could not extract collections from ${indexPath}.\n` +
-        "Expected a default export of CollectionConfig[] or an object with named collection exports."
-    );
+    return collections;
 }
 
 /**

@@ -199,7 +199,7 @@ rebase db branch switch --off   # back to the main database
 | `--collections-dir` | `-c` | `./config/collections` | Path to collections directory |
 | `--output` | `-o` | `./generated/sdk` | Output path for generated SDK |
 
-The SDK generator uses `jiti` for dynamic TypeScript import of collection files. It will look for an `index.ts` barrel export in the collections directory. If no index file is found, it falls back to scanning individual `.ts`/`.js` files.
+The SDK generator uses `jiti` for dynamic TypeScript import of collection files. It loads every top-level collection file in the directory — the same files the backend serves — whether or not the `index.ts` barrel lists them, and a file that does not load is an error, as it is at boot.
 
 ```bash
 rebase generate-sdk --collections-dir ./config/collections --output ./generated/sdk
