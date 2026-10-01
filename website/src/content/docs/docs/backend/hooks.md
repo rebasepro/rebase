@@ -9,12 +9,12 @@ description: Apply cross-cutting lifecycle callbacks to every collection at the 
 Rebase provides two levels of entity lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
 
 - **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
-- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
+- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`). The one writer they do not see is the auth system: sign-up, OAuth sign-in and the admin's user management write user rows directly and run the [auth hooks](/docs/backend/authentication/) (`afterUserCreate`, …) instead.
 
 Use global callbacks for:
 - **Row scoping** — `beforeQuery` on every collection, so a tenant's reads are narrowed in one place instead of per collection. Postgres only: beside a MongoDB or Firestore data source, a global `beforeQuery` refuses to boot rather than leave that source's reads unnarrowed. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **PII masking** — redact sensitive fields for non-admin callers across all collections.
-- **Unified audit logging** — log every create, update, or delete in one place.
+- **Unified audit logging** — log every create, update, or delete in one place. New accounts from sign-up and OAuth are not among them; log those from `afterUserCreate`.
 - **Cross-cutting validation** — enforce invariants that span multiple collections.
 
 :::note

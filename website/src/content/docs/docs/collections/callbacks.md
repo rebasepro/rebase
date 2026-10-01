@@ -28,10 +28,20 @@ executes them.
 | Reaches the browser | no — bodies are stripped from the bundle | yes, in full |
 | Use for | everything below | collections the panel talks to directly |
 
-**`callbacks` is the one you want.** It runs on every path that reaches the
-server, so nothing routes around it, and its body never leaves the machine —
-an API key or a `process.env` read there is safe. The rest of this page is
-about `callbacks`.
+**`callbacks` is the one you want.** It runs on every data path that reaches
+the server — REST, the SDK, realtime, MCP and `rebase.data` — so none of them
+routes around it, and its body never leaves the machine — an API key or a
+`process.env` read there is safe. The rest of this page is about `callbacks`.
+
+One writer is not a data path: **the auth system**. Registration, OAuth sign-in
+and the admin's user management write the users collection's rows directly, and
+run none of its `beforeSave`, `afterSave`, `beforeDelete` or `afterDelete`, so a
+welcome email in `afterSave` on `users` never fires on sign-up. Hang those side
+effects on the
+[auth hooks](/docs/backend/authentication/) — `afterUserCreate`,
+`beforeUserCreate`, `afterUserDelete` — instead. They are functions passed in
+`auth.hooks`, so they take an ejected backend; boot warns when the users
+collection declares callbacks that sign-up will not run.
 
 `admin.browserCallbacks` exists for one case: a collection on a `direct` or
 `custom` transport, which the panel reads and writes *itself* with no Rebase
