@@ -28,7 +28,7 @@ The failures that make a Postgres database leak in practice, rather than the one
 - policies that look like access control but evaluate to `true` for every row;
 - `auth.uid() IS NOT NULL`-shaped policies, which separate signed-in from signed-out callers and scope nothing;
 - views and materialized views that read past the RLS on their base tables because they run as their owner;
-- a bare column inside an `EXISTS` subquery that Postgres silently binds to the *inner* table, turning a tenant filter into a tautology;
+- a bare column inside an `EXISTS` subquery that Postgres silently binds to the *inner* table, turning a tenant filter into a tautology — which the catalog stores as the column compared with itself;
 - many-to-many join tables left unprotected between two protected endpoints — the whole edge list, readable;
 - `SECURITY DEFINER` routines with an unpinned `search_path`;
 - `GRANT`s to `PUBLIC`, and policies pointed at roles nothing can connect as.
@@ -159,7 +159,7 @@ Run `npx @rebasepro/rls-check --list-checks` for the catalog on your installed v
 | `policy-authenticated-tautology` | high | heuristic | The corrected form of the above — `auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'` — which excludes signed-out callers and still scopes no rows. Every account reads every row; with open registration that is everybody. |
 | `anonymous-write-allowed` | high | certain | A permissive INSERT/UPDATE/DELETE policy reachable without authentication whose check expression accepts any row, backed by a matching grant. |
 | `matview-bypasses-rls` | high | certain | A materialized view granted to an untrusted role whose defining query reads an RLS-protected table. Materialized views have no `security_invoker`. |
-| `unqualified-column-in-subquery` | high | heuristic | A bare column name in an `EXISTS`/`IN` subquery that exists on both the inner relation and the policy's own table, so Postgres binds it to the inner one. |
+| `unqualified-column-in-subquery` | high | heuristic | A bare column name in an `EXISTS`/`IN` subquery that exists on both the inner relation and the policy's own table, so Postgres binds it to the inner one. Postgres stores it with every column qualified, so on a live database it is found as the inner column compared with itself (`m.org_id = m.org_id`). |
 | `junction-table-unprotected` | high | heuristic | A table that is essentially two foreign keys pointing at RLS-protected tables, with no row-level security of its own. |
 | `grant-to-public` | medium | certain | A table or foreign-table privilege granted to `PUBLIC`, which includes roles that do not exist yet. |
 | `rls-enabled-no-policies` | medium | certain | RLS enabled and not a single policy defined, so the table denies everything. |

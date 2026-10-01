@@ -64,6 +64,7 @@ const EXPECTED: { id: string; object: string }[] = [
     { id: "view-bypasses-rls", object: "vuln_ledger_view" },
     { id: "matview-bypasses-rls", object: "vuln_ledger_matview" },
     { id: "anonymous-write-allowed", object: "vuln_anon_write" },
+    { id: "unqualified-column-in-subquery", object: "vuln_unqualified" },
     { id: "junction-table-unprotected", object: "vuln_post_tags" },
     { id: "rls-enabled-not-forced", object: "vuln_not_forced" },
     { id: "rls-enabled-no-policies", object: "vuln_no_policies" },
@@ -286,35 +287,27 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
     });
 
     /**
-     * `unqualified-column-in-subquery` is the one check this suite cannot
-     * provoke, and the reason is worth recording rather than papering over.
+     * `unqualified-column-in-subquery` against what Postgres actually stores.
      *
      * The fixture contains the exact bug (`... WHERE memberships.user_id =
      * auth.uid() AND org_id = org_id`, where the second `org_id` was meant to
-     * correlate with the outer row). Postgres accepts it — and then stores the
-     * policy as a parse tree. `pg_policies.qual` is a re-rendering of that tree,
-     * and the renderer qualifies every column reference, so what comes back is
-     * `memberships.org_id = memberships.org_id`: the ambiguity is gone from the
-     * text even though the bug is still in the database.
-     *
-     * So the check can only fire on an ambiguity that survives the rewrite, and
-     * its real coverage is the unit suite, against snapshots written by hand.
-     * This test pins the catalog behaviour that makes that true — if a future
-     * Postgres stops re-qualifying, it fails and the check becomes testable
-     * end to end.
+     * correlate with the outer row). Postgres stores the policy as a parse tree,
+     * and `pg_policies.qual` re-renders it with every column inside the subquery
+     * qualified — `memberships.org_id = memberships.org_id` — so the bare name is
+     * gone from the text. This test used to assert the check could not see it;
+     * the check now reads the self-comparison, which is what the bug leaves.
      */
-    it("cannot see the unqualified-column bug through pg_policies, because Postgres re-qualifies it", async () => {
+    it("finds the unqualified-column bug through pg_policies, where it reads as a self-comparison", async () => {
         const [row] = await querySql<{ qual: string }>(
             container.connectionString,
             "SELECT qual FROM pg_policies WHERE policyname = 'vuln_unqualified_select'"
         );
-
-        // The bug is in the database: this predicate compares a column to
-        // itself, so the subquery is true for anyone who is a member of
-        // anything. The text no longer shows a bare name, which is exactly why
-        // a text-matching check cannot catch it here.
         expect(row.qual).toContain("memberships.org_id = memberships.org_id");
-        expect(full.findings.filter((finding) => finding.id === "unqualified-column-in-subquery")).toEqual([]);
+
+        const hits = full.findings.filter((finding) => finding.id === "unqualified-column-in-subquery");
+        expect(hits.map(objectName)).toEqual(["vuln_unqualified"]);
+        expect(hits[0].target.column).toBe("org_id");
+        expect(hits[0].title).toContain("memberships.org_id");
     });
 
     it("does not flag a junction table that follows its endpoints", () => {

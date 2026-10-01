@@ -9,7 +9,8 @@
  * Everything it reads comes from `pg_policies.qual` / `with_check`, which is
  * Postgres's own re-rendering of the parse tree rather than the SQL anyone
  * typed: parenthesised more heavily, casts made explicit, and — importantly for
- * the unqualified-column check — references usually re-qualified. So a hit here
+ * the unqualified-column check — every column inside a subquery qualified, so a
+ * bare name written there never reaches this scanner from a live catalog. A hit
  * is strong evidence and a miss proves nothing, which is what the checks say.
  */
 

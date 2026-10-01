@@ -30,11 +30,21 @@ const ID = "unqualified-column-in-subquery";
  *     flagging it merely because the outer table also has a `user_id` would fire
  *     on a large fraction of correct policies.
  *
- * Confidence is always heuristic, and the detail says why an absence proves
- * nothing: `pg_policies.qual` is Postgres's re-rendering of the parse tree, and
- * it normally re-qualifies references. A finding here therefore means the
- * ambiguity survived that rewrite, which is strong evidence — but a clean scan
- * is not proof that the original SQL was unambiguous.
+ * What a live database hands this check is not what anyone typed.
+ * `pg_policies.qual` is Postgres's re-rendering of the parse tree, and inside a
+ * subquery it qualifies *every* column — so the bare name is never in the text.
+ * The bare-name scan below only ever fires on text that did not come out of the
+ * catalog. Against a real database the mistake shows up as its effect: the bare
+ * `organization_id` bound to the inner relation, so the stored comparison reads
+ * `m.organization_id = m.organization_id` — a column compared with itself. That
+ * shape is what {@link selfComparisons} looks for, and it is the half of this
+ * check that can fire on a scan. It was the half missing until it was noticed
+ * that the check could not fire at all; the e2e suite now holds it to that.
+ *
+ * Confidence is always heuristic, and an absence still proves nothing: a bare
+ * name compared with a *different* inner column (`organization_id = id`) comes
+ * back as `m.organization_id = m.id`, which is indistinguishable from a
+ * comparison somebody meant.
  */
 export const unqualifiedColumnInSubquery: Check = {
     id: ID,
@@ -67,6 +77,12 @@ export const unqualifiedColumnInSubquery: Check = {
 };
 
 interface Ambiguity {
+    /**
+     * `bare`: the unqualified name is in the text (never, from a live catalog).
+     * `self`: the stored text compares an inner column with itself, which is
+     * what Postgres keeps of a bare name that bound to the inner relation.
+     */
+    kind: "bare" | "self";
     /** The bare name as written. */
     column: string;
     /** The relation Postgres binds it to, as `schema.name` for prose. */
@@ -75,6 +91,8 @@ interface Ambiguity {
     innerRelation: { schema: string; name: string };
     /** What it is compared against, for the report. */
     comparedTo: string;
+    /** The comparison operator, for a `self` hit — `=` admits, `<>` denies. */
+    operator?: string;
 }
 
 interface FromItem {
@@ -109,6 +127,13 @@ function scanExpression(snapshot: DbSnapshot, outer: DbRelation, expr: string): 
         const from = parseFrom(tokens, own);
         if (from.length === 0) continue;
 
+        for (const hit of selfComparisons(snapshot, outer, tokens, own, from)) {
+            const key = `${hit.column}|${hit.inner}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(hit);
+        }
+
         const relations = from
             .map((item) => resolveRelation(snapshot, outer.schema, item))
             .filter((r): r is DbRelation => Boolean(r))
@@ -138,12 +163,73 @@ function scanExpression(snapshot: DbSnapshot, outer: DbRelation, expr: string): 
             seen.add(key);
 
             out.push({
+                kind: "bare",
                 column: token.value,
                 inner: `${inner.schema}.${inner.name}`,
                 innerRelation: { schema: inner.schema, name: inner.name },
                 comparedTo: partner
             });
         }
+    }
+
+    return out;
+}
+
+/**
+ * `q.col <op> q.col` in this subquery's predicate, where `q` is one of the
+ * subquery's own FROM items and the policy's table has a `col` too.
+ *
+ * Nobody writes a column compared with itself; Postgres does, when it stores
+ * `WHERE m.user_id = auth.uid() AND org_id = org_id` and the second `org_id`
+ * bound to `m`. The outer table having the column is what makes it this bug
+ * rather than some other one: it is the column the author could have meant.
+ */
+function selfComparisons(
+    snapshot: DbSnapshot,
+    outer: DbRelation,
+    tokens: SqlToken[],
+    own: number[],
+    from: FromItem[]
+): Ambiguity[] {
+    const inPredicate = new Set(predicateIndices(tokens, own));
+    const out: Ambiguity[] = [];
+    const at = (k: number): SqlToken | undefined => tokens[own[k]];
+    const isDot = (k: number) => at(k)?.kind === "punct" && at(k)?.value === ".";
+    const isIdent = (k: number) => at(k)?.kind === "ident";
+
+    for (let k = 0; k + 6 < own.length; k++) {
+        if (!inPredicate.has(own[k])) continue;
+        // q . col <op> q . col — and not the tail of a longer dotted name.
+        if (isDot(k - 1)) continue;
+        if (!isIdent(k) || !isDot(k + 1) || !isIdent(k + 2)) continue;
+        const op = at(k + 3);
+        if (!op || !COMPARISONS.has(op.value) || op.value === "in" || op.value === "is") continue;
+        if (!isIdent(k + 4) || !isDot(k + 5) || !isIdent(k + 6)) continue;
+        if (isDot(k + 7) || (at(k + 7)?.kind === "punct" && at(k + 7)?.value === "(")) continue;
+
+        const qualifier = at(k)!.value;
+        const column = at(k + 2)!.value;
+        if (at(k + 4)!.value !== qualifier || at(k + 6)!.value !== column) continue;
+        if (!hasColumn(outer, column)) continue;
+
+        // The qualifier has to be this subquery's own relation: the outer row
+        // compared with itself is a different (and odder) mistake.
+        const item = from.find((f) => (f.alias ?? f.name) === qualifier);
+        if (!item) continue;
+
+        const resolved = resolveRelation(snapshot, outer.schema, item);
+        const innerRelation = resolved
+            ? { schema: resolved.schema, name: resolved.name }
+            : { schema: item.schema ?? outer.schema, name: item.name };
+
+        out.push({
+            kind: "self",
+            column,
+            inner: `${innerRelation.schema}.${innerRelation.name}`,
+            innerRelation,
+            comparedTo: `${qualifier}.${column}`,
+            operator: op.value
+        });
     }
 
     return out;
@@ -310,35 +396,55 @@ function buildFinding(
     hit: Ambiguity
 ): Finding {
     const innerSql = qrel(hit.innerRelation.schema, hit.innerRelation.name);
+    const self = hit.kind === "self";
+    // `=`, `<=`, `>=` and LIKE are true whenever the column is not null; `<>`,
+    // `<` and `>` are never true. Either way the row being checked plays no part.
+    const admits = !self || ["=", "<=", ">=", "~~", "like", "ilike"].includes(hit.operator ?? "=");
     return finding({
         id: ID,
         severity: "high",
         confidence: "heuristic",
-        title:
-            `Policy "${policy.name}" on ${policy.schema}.${policy.table}: does \`${hit.column}\` in ` +
-            `the subquery mean ${outer.name}.${hit.column} or ${hit.inner}.${hit.column}?`,
+        title: self
+            ? `Policy "${policy.name}" on ${policy.schema}.${policy.table}: the subquery compares ` +
+              `\`${hit.comparedTo}\` with itself — was one side meant to be ${outer.name}.${hit.column}?`
+            : `Policy "${policy.name}" on ${policy.schema}.${policy.table}: does \`${hit.column}\` in ` +
+              `the subquery mean ${outer.name}.${hit.column} or ${hit.inner}.${hit.column}?`,
         target: {
             schema: policy.schema,
             table: policy.table,
             policy: policy.name,
             column: hit.column
         },
-        detail:
-            `In the ${clause} expression, \`${hit.column}\` is written unqualified inside a subquery ` +
-            `over ${hit.inner}, compared against \`${hit.comparedTo}\`. Both ${hit.inner} and ` +
-            `${policy.schema}.${policy.table} have a column named \`${hit.column}\`, and Postgres ` +
-            `resolves the bare name against the innermost scope that has it — so it binds to ` +
-            `${hit.inner}.${hit.column}, not to the outer row. If the intent was to correlate the ` +
-            `subquery with the row being checked, that correlation is not happening.\n\n` +
-            `Note that \`pg_policies\` shows Postgres's own re-rendering of the policy, which usually ` +
-            `re-qualifies column references. A match here means the ambiguity survived that rewrite, ` +
-            `so it is strong evidence — but the absence of a match on other policies is not proof ` +
-            `that they are unambiguous.`,
-        impact:
-            `The predicate does not mean what it reads like. Depending on the data it either matches ` +
-            `far more rows than intended — exposing other users' or tenants' rows to anyone the policy ` +
-            `applies to — or, if the inner comparison is never satisfiable, matches none, and the table ` +
-            `silently returns empty results.`,
+        detail: self
+            ? `In the ${clause} expression, the subquery over ${hit.inner} compares ` +
+              `\`${hit.comparedTo}\` with itself, so that comparison does not depend on the row being ` +
+              `checked. It is what Postgres stores for a comparison written with a bare ` +
+              `\`${hit.column}\` meant for the outer row: ${hit.inner} has a \`${hit.column}\` too, ` +
+              `Postgres resolves a bare name against the innermost scope that has it, and ` +
+              `\`pg_policies\` shows the result with both sides qualified. If the intent was to ` +
+              `correlate the subquery with ${policy.schema}.${policy.table}.${hit.column}, that ` +
+              `correlation is not happening.`
+            : `In the ${clause} expression, \`${hit.column}\` is written unqualified inside a subquery ` +
+              `over ${hit.inner}, compared against \`${hit.comparedTo}\`. Both ${hit.inner} and ` +
+              `${policy.schema}.${policy.table} have a column named \`${hit.column}\`, and Postgres ` +
+              `resolves the bare name against the innermost scope that has it — so it binds to ` +
+              `${hit.inner}.${hit.column}, not to the outer row. If the intent was to correlate the ` +
+              `subquery with the row being checked, that correlation is not happening.\n\n` +
+              `Note that \`pg_policies\` qualifies every column inside a subquery, so a bare name never ` +
+              `appears in text read from a live database: there the same mistake reads as a column ` +
+              `compared with itself, which this check also reports. A comparison of two different ` +
+              `columns looks deliberate either way, so an absence of this finding is not proof.`,
+        impact: self
+            ? admits
+                ? `The subquery is true for every row of ${policy.schema}.${policy.table} as soon as it is ` +
+                  `true for one: anyone it admits to one row is admitted to all of them, other users' and ` +
+                  `other tenants' rows included.`
+                : `The comparison is never true, so the subquery matches nothing and the policy ` +
+                  `admits no row — the table silently returns empty results to everyone it covers.`
+            : `The predicate does not mean what it reads like. Depending on the data it either matches ` +
+              `far more rows than intended — exposing other users' or tenants' rows to anyone the policy ` +
+              `applies to — or, if the inner comparison is never satisfiable, matches none, and the table ` +
+              `silently returns empty results.`,
         fix: isRebaseManagedPolicy(snapshot, policy)
             ? managedPolicyFix(
                 policy,

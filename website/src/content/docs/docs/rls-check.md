@@ -410,10 +410,17 @@ USING (EXISTS (SELECT 1 FROM memberships WHERE id = organizations.id ...))
 USING (EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = organizations.id ...))
 ```
 
-**An absence of this finding is not proof of safety.** `pg_policies.qual` is Postgres's own
-re-rendering of the parse tree, and it usually re-qualifies column references — so the
-original bare name is frequently no longer visible by the time the catalog is read. When
-this check does fire it is strong evidence; when it does not, it has proved nothing.
+**What the catalog shows is not what you wrote.** `pg_policies.qual` is Postgres's own
+re-rendering of the parse tree, and inside a subquery it always qualifies column
+references, so the bare name is never visible by the time the catalog is read. What
+survives is its effect: the bare `org_id` bound to the inner table, and the stored
+predicate compares that table's column with itself —
+`m.org_id = m.org_id`. That self-comparison is what this check finds on a live database.
+
+**An absence of this finding is not proof of safety.** A bare name compared with a
+*different* inner column (`organization_id = id`) is stored as `m.organization_id = m.id`,
+which reads exactly like a comparison somebody meant. When this check fires it is strong
+evidence; when it does not, it has proved nothing.
 
 ### junction-table-unprotected
 

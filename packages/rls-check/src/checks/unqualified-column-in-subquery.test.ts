@@ -34,7 +34,9 @@ describe("unqualified-column-in-subquery", () => {
         expect(findings[0].confidence).toBe("heuristic");
         expect(findings[0].target.column).toBe("id");
         expect(findings[0].title).toContain("public.org_members");
-        expect(findings[0].detail).toContain("re-rendering");
+        // The note used to say Postgres "usually" re-qualifies; inside a
+        // subquery it always does, and the detail says where to look instead.
+        expect(findings[0].detail).toContain("qualifies every column inside a subquery");
     });
 
     it("words the finding as a question, not an accusation", () => {
@@ -124,5 +126,75 @@ describe("unqualified-column-in-subquery", () => {
 
     it("stays quiet on a policy with no subquery at all", () => {
         expect(run("(user_id = auth.uid())")).toEqual([]);
+    });
+
+    /**
+     * What a live database actually returns.
+     *
+     * Inside a subquery `pg_policies.qual` qualifies every column, so the bare
+     * name the author wrote is never in the text — every case above is a
+     * hand-written string no catalog produces. What survives is its effect: a
+     * bare `organization_id` meant for the outer row bound to the inner one,
+     * and the comparison now reads the inner column against itself.
+     */
+    describe("on the text Postgres stores", () => {
+        const deparsed = (predicate: string) =>
+            run(
+                "(EXISTS ( SELECT 1\n   FROM org_members m\n  WHERE ((" + predicate +
+                    ") AND (m.user_id = auth.uid()))))"
+            );
+
+        it("finds the column compared with itself", () => {
+            const findings = deparsed("m.id = m.id");
+
+            expect(findings).toHaveLength(1);
+            expect(findings[0].target.column).toBe("id");
+            expect(findings[0].severity).toBe("high");
+            expect(findings[0].confidence).toBe("heuristic");
+            expect(findings[0].title).toContain("m.id");
+            expect(findings[0].title).toContain("itself");
+            expect(findings[0].detail).toContain("public.org_members");
+            expect(findings[0].fix).toContain('"organizations"."id"');
+        });
+
+        it("finds it without an alias, as Postgres renders an unaliased FROM", () => {
+            const findings = run(
+                "(EXISTS ( SELECT 1\n   FROM org_members\n  WHERE ((org_members.id = org_members.id) " +
+                    "AND (org_members.user_id = auth.uid()))))"
+            );
+
+            expect(findings).toHaveLength(1);
+            expect(findings[0].target.column).toBe("id");
+        });
+
+        it("finds it in a subquery over the policy's own table", () => {
+            // `FROM organizations o WHERE o.id = o.id`: the bare `id` bound to
+            // the inner copy, which is the same mistake.
+            const findings = run("(EXISTS ( SELECT 1\n   FROM organizations o\n  WHERE (o.id = o.id)))");
+
+            expect(findings).toHaveLength(1);
+        });
+
+        it("does NOT fire on a correlated comparison", () => {
+            expect(deparsed("m.organization_id = organizations.id")).toEqual([]);
+        });
+
+        it("does NOT fire when the outer table has no such column", () => {
+            // `m.organization_id = m.organization_id` is a mistake, but not this
+            // one: no outer column of that name could have been meant.
+            expect(deparsed("m.organization_id = m.organization_id")).toEqual([]);
+        });
+
+        it("does NOT fire on a self-comparison of the outer row", () => {
+            expect(deparsed("organizations.id = organizations.id")).toEqual([]);
+        });
+
+        it("reports the column once when both the bare and the qualified forms appear", () => {
+            expect(
+                run(
+                    "(EXISTS ( SELECT 1 FROM org_members m WHERE ((m.id = m.id) AND (organization_id = id))))"
+                ).filter((f) => f.target.column === "id")
+            ).toHaveLength(1);
+        });
     });
 });
