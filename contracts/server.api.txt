@@ -60,6 +60,7 @@ const requireAdmin
 const requireAuth
 function _resetRebaseMock
 function _setRebaseMock
+function accessModelFromCollections
 function activeDevEmailSink
 function applyCollectionDefaults
 function assertAllowedOutboundUrl
@@ -82,6 +83,7 @@ function classifySurface { collection, surface }
 function cleanupDevPortFile
 function clearActiveDevEmailSink
 function compileStoragePolicies
+function configureAccess
 function configureJwt
 function createAppleProvider
 function createBackupRoutes

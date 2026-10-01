@@ -141,7 +141,12 @@ export {
     // plainly did configure it. `rebase-backend-postgres`'s SKILL.md tells you
     // to call `configureJwt` yourself before init — sound advice that could not
     // be followed, because the symbol was internal.
-    configureJwt
+    configureJwt,
+    // The same, for the access model: a server wired by hand — or a test that
+    // drives a credential through `verifyCredential` without booting — installs
+    // the app's roles and scopes the way `initializeRebaseBackend` does.
+    configureAccess,
+    accessModelFromCollections
 } from "./auth";
 export type {
     // Named by `RebaseAuthConfig.signingKeys`, so it has to be nameable.
