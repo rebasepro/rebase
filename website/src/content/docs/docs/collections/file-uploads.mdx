@@ -126,6 +126,27 @@ expired; re-insert those images to store references.
 upload to that prefix. Deciding who may write where is what a storage
 authorization rule is for — see [Storage](/docs/backend/storage).
 
+### Files are never deleted for you
+
+Clearing a file field, replacing its file, or deleting the row it belongs to
+leaves the stored object where it is. Every upload gets a key of its own, so a
+replacement writes a new object rather than overwriting the old one, and
+nothing removes the previous one: two rows can hold the same key, so the
+panel cannot know a file is unused. Objects no row points at stay in the
+bucket, and are billed, until you delete them — from Studio's storage browser,
+with `client.storage.deleteObject(key)`, or with a lifecycle rule on the
+bucket.
+
+### Moving a property to another storage source
+
+A file field stores the object's key, not its source. Changing a property's
+`storageSource` points every existing value at the new source, where those
+keys do not exist, so previews of files uploaded before the change answer
+"not found". Copy the objects to the new source under the same keys before
+changing the property — with the provider's own tooling, such as
+`aws s3 sync` or `gcloud storage cp` — or keep the old source for the
+existing files.
+
 ## Next Steps
 
 - **[Properties](/docs/collections/properties)** — every property type and its options
