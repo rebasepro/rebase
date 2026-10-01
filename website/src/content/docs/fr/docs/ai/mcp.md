@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a7a97c334fa87c6
+sourceHash: c30cc2c794d1f805
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 42 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
@@ -174,7 +174,7 @@ que combler un manque.
 :::danger[La méthode sans configuration utilise un identifiant administrateur]
 Les options 2 et 3 correspondent à la **clé de service** (`service key`) — un secret administrateur
 sans restriction de portée. Le backend la résout en `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`.
-Cette identité ignore complètement la liste des permissions de clé d'API, et elle satisfait les
+Cette identité détient toutes les [portées](/docs/backend/roles-and-scopes/), et elle satisfait les
 politiques `_default_admin_read` / `_default_admin_write` que Rebase injecte dans chaque collection
 n'ayant pas défini `disableDefaultPolicies`.
 
@@ -191,15 +191,15 @@ résolue par le projet.
 
 ### Lui attribuer un identifiant aux droits restreints
 
-Enregistrez une [clé d'API](/docs/backend/api-keys) restreinte et le modèle à deux verrous s'applique
-réellement. Une clé non-administrateur s'exécute avec les rôles `["service"]`, que les politiques
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Enregistrez une [clé d'API](/docs/backend/api-keys) restreinte et le modèle à deux verrous s'applique
+réellement. Une clé de service s'exécute avec les rôles `["service"]`, que les politiques
 d'administration injectées ne mentionnent **pas** — ainsi, le RLS ne lui accorde rien à moins que l'une
-de vos propres politiques n'en dispose autrement, et la liste des permissions la restreint davantage :
+de vos propres politiques n'en dispose autrement, et ses portées la restreignent davantage :
 
 ```bash
 rebase api-keys create -n "claude-code" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
+  --scopes data:read:articles \
+  --expires-in 30
 ```
 
 Transmettez ensuite la clé `rk_live_…` obtenue au serveur au lieu de le laisser découvrir une clé de service :
@@ -225,18 +225,21 @@ Deux choses que cela ne fait **pas**, toutes deux importantes à savoir avant de
   `rebase_doctor` et les outils de branches lancent la CLI Rebase, qui se connecte avec
   `DATABASE_URL` et ne voit jamais votre jeton. Le verrou loopback ci-dessous est le
   seul garde-fou face à ceux-ci.
-- **Une clé non-admin ne peut pas utiliser les outils d'administration.** `list_users`, `create_user`,
-  `update_user`, `delete_user`, `list_roles` et `rebase_auth_reset_password`
-  sont protégés par `requireAdmin` et échoueront avec une clé restreinte. C'est le
-  fonctionnement normal du système, mais cela implique de choisir entre une portée étendue
-  et une restriction stricte plutôt que d'avoir les deux.
+- **Une clé n'atteint un outil d'administration qu'avec la portée de cet outil.** `list_users` et
+  `list_roles` exigent `users:read` ; `create_user`, `update_user`, `delete_user` et
+  `rebase_auth_reset_password` exigent `users:write` ; les outils de stockage et de cron
+  exigent la portée `storage:*` ou `cron:*` correspondante ; `invoke_function` exige
+  `functions:invoke`. Sans
+  elle, l'appel répond `403 SCOPE_MISSING`. Même avec `users:write`, une clé ne peut pas
+  modifier le compte d'un administrateur : un administrateur détient `keys:read` et `keys:write`,
+  qu'aucune clé ne peut détenir, et personne ne peut gérer un compte qui détient plus que lui.
 
-Une clé d'API avec `admin: true` est une autre affaire : elle porte les rôles
-`["admin", "service"]`, ce qui valide les mêmes politiques admin par défaut que la
-clé de service. Sur le plan des données, sa portée est identique à celle de la clé de service.
-Son avantage est qu'elle est **révocable, dotée d'une expiration et soumise à une limitation de débit par clé**,
-ce qui n'est pas le cas de la clé de service — renouveler cette dernière implique de modifier `.env`
-et de redémarrer le serveur.
+Une clé créée avec `--roles admin` est une autre affaire : elle porte les rôles
+`["service", "admin"]`, ce qui valide les mêmes politiques admin par défaut que la
+clé de service. Ajoutez-lui aussi `--full-access` et sa portée est celle de la clé de service,
+moins la gestion des clés. Son avantage est qu'elle est **révocable, dotée d'une expiration et soumise
+à une limitation de débit par clé**, ce qui n'est pas le cas de la clé de service — renouveler cette
+dernière implique de modifier `.env` et de redémarrer le serveur.
 
 Consultez [Agents et serveurs MCP](/docs/backend/api-keys#agents-and-mcp-servers) pour le guide
 complet sur la restriction des clés.
@@ -544,11 +547,23 @@ Aucun `REBASE_ROLE` ne permet de l'activer.
   dynamique est activé par défaut ; `REBASE_MCP_OPEN_REGISTRATION=false` le limite
   aux clients que vous enregistrez), et redirige la personne vers un écran de consentement qui
   la connecte via votre `/auth/login` existant.
-- **Six outils, deux portées (scopes).** `mcp:read` propose `list_collections`,
-  `query_collection` et `get_document` ; `mcp:write` ajoute `create_document`,
-  `update_document` et `delete_document`. Une portée détermine les outils proposés,
-  pas les lignes accessibles : une liste vide peut simplement être le résultat du RLS,
-  et `mcp:write` ne peut toujours pas écrire une ligne à laquelle la personne n'a pas accès.
+- <span class="since-badge" data-since="0.24">Depuis 0.24</span> **Six outils, trois portées (scopes).** Les mêmes [portées](/docs/backend/roles-and-scopes/)
+  que celles de tous les identifiants. `data:read` propose `list_collections`,
+  `query_collection` et `get_document` ; `data:write` ajoute `create_document` et
+  `update_document` ; `data:delete` ajoute `delete_document`. Un client qui ne demande
+  rien obtient `data:read`. Chacune se restreint à une collection : `data:read:posts`
+  liste et lit `posts` et rien d'autre. Une portée détermine les outils proposés et les
+  collections qu'ils atteignent, pas les lignes accessibles : une liste vide peut simplement
+  être le résultat du RLS, et `data:write` ne peut toujours pas écrire une ligne à laquelle
+  la personne n'a pas accès.
+- **Les autorisations accordées avant 0.24 gardent leur portée.** `mcp:read` est lu comme
+  `data:read`, et `mcp:write` comme `data:write data:delete`, sur les autorisations
+  enregistrées et sur les jetons déjà émis.
+- <span class="since-badge" data-since="0.24">Depuis 0.24</span> **Une clé API fonctionne aussi.** `/mcp` accepte aussi `Authorization: Bearer rk_…`, pour
+  un client configuré avec un en-tête plutôt qu'avec un flux OAuth. La clé atteint
+  les outils que couvrent ses portées `data:*`, en tant que l'identité pour laquelle elle agit : une
+  [clé personnelle](/docs/backend/api-keys/#personal-keys) en tant que son propriétaire, une clé de service
+  en tant que `api-key:<id>`.
 - **Un jeton réservé à ce point de terminaison.** Un jeton d'accès MCP est refusé par
   `/api/data`, `/api/admin` et le WebSocket, de sorte que connecter un assistant ne lui
   confère pas une session complète.

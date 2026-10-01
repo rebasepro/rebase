@@ -1,5 +1,5 @@
 ---
-sourceHash: be8521ab898e66ea
+sourceHash: 52e128ca94563aec
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -146,6 +146,58 @@ Un rollback ajoute un nouveau déploiement plutôt que de rembobiner l'historiqu
 que la version restaurée réponde avant de confirmer le succès. Suivez-le avec
 `rebase cloud logs -f`.
 
+## CI et agents
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un job de CI ou un agent ne devrait pas transporter votre mot de passe. Donnez-lui plutôt un jeton : une clé qui agit en tant que votre compte, restreinte à quelques actions sur un projet. Créez-le depuis un terminal connecté :
+
+```bash
+rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
+```
+
+Le jeton est affiché une seule fois, sous la forme d'une ligne `export REBASE_TOKEN=rk_live_…`. Lorsque `REBASE_TOKEN` est définie, chaque commande `rebase cloud` s'authentifie avec lui au lieu de votre connexion, et ne lit ni n'écrit jamais la session enregistrée. Dans GitHub Actions, stockez-le comme secret du dépôt et exposez-le sous ce nom :
+
+```yaml title=".github/workflows/deploy.yml"
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec rebase cloud deploy --project shop
+        env:
+          REBASE_TOKEN: ${{ secrets.REBASE_TOKEN }}
+```
+
+`--can` prend une ou plusieurs capacités, séparées par des virgules ou répétées :
+
+| Capacité | Ce que le jeton peut faire |
+|---|---|
+| `deploy` | Déployer le projet et suivre ses builds : `deploy`, `deployments` |
+| `logs` | Lire les logs de build et d'exécution, ainsi que les métriques en direct : `logs`, `metrics` |
+| `env` | Lire et modifier les variables d'environnement, secrets compris |
+| `database` | `db list`, `db info` et `db connect`, ce qui inclut le mot de passe de la base de données |
+| `backups` | Lister, créer, consulter et télécharger les sauvegardes, et lire la fenêtre de restauration à un instant donné |
+
+En interne, un jeton est une [clé d'API personnelle](/docs/backend/api-keys/#personal-keys) sur le plan de contrôle. Chaque capacité devient quelques [portées](/docs/backend/roles-and-scopes/) : `deploy` sur `shop` détient `project:deploy:<id>`, avec l'identifiant du projet, plus les portées de données et de fonctions qu'appellent les commandes de déploiement. Le jeton ne détient jamais plus que votre compte au moment où il est utilisé ; il perd donc tout ce que perd votre compte.
+
+Deux choses restent réservées à une personne connectée :
+
+- **Gérer les jetons.** `rebase cloud tokens list`, `create` et `revoke <id>` utilisent votre session `rebase cloud login`. Un jeton ne peut ni lister, ni créer, ni révoquer de jetons, car un jeton capable de créer des jetons pourrait créer son propre successeur.
+- **Restaurer.** Aucune capacité ne permet de restaurer une sauvegarde, ni d'effectuer le `restore` et le `cutover` d'une restauration à un instant donné. Remettre d'anciennes données sur une base en production reste l'affaire d'un propriétaire ou d'un administrateur connecté.
+
+`rebase cloud whoami`, avec un jeton défini, indique ce qu'il peut faire et sur quel projet. `rebase cloud tokens revoke <id> --yes` l'arrête immédiatement.
+
 ## Ressources de calcul et coûts
 
 Le prix d'un projet est basé sur ce qu'il réserve, et non sur un palier forfaitaire. `compute` affiche
@@ -183,6 +235,7 @@ sauf celle qui redémarre la base de données, qui attend une fenêtre de mainte
 | Groupe de commandes | Ce qu'il couvre |
 |---|---|
 | `login`, `logout`, `whoami` | Votre session |
+| `tokens` | Jetons pour la CI et les agents, chacun restreint à un projet. Voir [CI et agents](#ci-et-agents) |
 | `link`, `unlink`, `use`, `open` | Associer ce répertoire à un projet, sélectionner une organisation, ouvrir la console |
 | `projects` | Créer, lister, inspecter, supprimer |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Déploiement et surveillance |
@@ -223,14 +276,14 @@ Exposé clairement, car le découvrir plus tard est bien pire :
   lors de votre demande d'accès plutôt que de le supposer.
 - **Pas de déploiements de prévisualisation ou de branche**, et pas d'application GitHub officielle. Les hooks de déploiement —
   des URL secrètes vers lesquelles vous pointez un webhook de dépôt — constituent l'automatisation prise en charge.
-- **La CI nécessite les identifiants d'un utilisateur humain.** Il n'existe pas encore de jeton machine ;
-  `rebase cloud login` prend une adresse e-mail et un mot de passe. Transmettez-les via
-  `REBASE_CLOUD_EMAIL` et `REBASE_CLOUD_PASSWORD` depuis un gestionnaire de secrets —
-  `--password` place le mot de passe dans l'historique de votre shell et dans la table des processus,
-  et vous en avertit avant de vous connecter. Si le fichier `.rebase/cloud.json` du dépôt
-  désigne un plan de contrôle autre que celui de la plateforme, passez-le aussi avec `--url` :
-  sans terminal, `login` refuse d'envoyer un mot de passe à un hôte que seul le fichier
-  extrait (checkout) désignait.
+- **Les jetons agissent en tant que personne.** Un [jeton](#ci-et-agents) est créé par un compte et agit en son nom ;
+  il n'existe pas encore d'identité machine appartenant à l'organisation. Si vous vous connectez
+  plutôt depuis la CI, transmettez `REBASE_CLOUD_EMAIL` et `REBASE_CLOUD_PASSWORD` depuis un
+  gestionnaire de secrets — `--password` place le mot de passe dans l'historique de votre shell et
+  dans la table des processus, et vous en avertit avant de vous connecter. Si le fichier
+  `.rebase/cloud.json` du dépôt désigne un plan de contrôle autre que celui de la plateforme,
+  passez-le aussi avec `--url` : sans terminal, `login` refuse d'envoyer un mot de passe à un hôte
+  que seul le fichier extrait (checkout) désignait.
 - **La récupération à un point dans le temps (PITR) se fait uniquement via la CLI.** La console affiche les sauvegardes ; le flux de
   travail PITR par étapes s'effectue avec `rebase cloud db pitr`.
 - **Aucun point de terminaison de base de données public.** Une base de données managée n'est pas exposée à

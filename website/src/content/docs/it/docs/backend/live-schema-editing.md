@@ -1,5 +1,5 @@
 ---
-sourceHash: dbaee87f7378ffd7
+sourceHash: 5d7dd80d4991fd97
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -14,13 +14,13 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-Tutte e tre richiedono i privilegi di amministratore, come qualsiasi altra interfaccia di `/api/admin`. L'applicazione richiede un elemento in più oltre a essere amministratore — consulta [Chi può applicare](#chi-può-applicare).
+Status e plan richiedono lo scope `schema:read`, e apply richiede `schema:write`, come qualsiasi altra interfaccia di `/api/admin` che indica uno scope. Un amministratore li possiede entrambi. L'applicazione richiede inoltre un elemento in più oltre allo scope — consulta [Chi può applicare](#chi-può-applicare).
 
 ## Pianifica prima di applicare
 
 `/plan` non ha effetti collaterali. Invia tramite POST la collection come dovrebbe risultare alla fine, e ti indicherà cosa comporta la modifica:
 
-`$ADMIN_TOKEN` è un token di accesso di amministrazione — l'`accessToken` restituito da un accesso per un account con il ruolo di amministratore. Nulla sulla macchina lo imposta per te.
+`$ADMIN_TOKEN` è un token di accesso — l'`accessToken` restituito da un accesso — per un account che possiede `schema:read`: un amministratore, o un ruolo che lo dichiara. Nulla sulla macchina lo imposta per te.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -94,18 +94,18 @@ Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando
 
 Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
 
-Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito all'amministratore che l'ha effettuata. Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo repository.
+Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito alla persona che l'ha effettuata. Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo repository.
 
 ## Chi può applicare
 
-Essere un amministratore è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
+Possedere `schema:read` è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
 
 L'applicazione è un privilegio distinto, poiché applicare scrive un commit e un commit reca con sé un autore:
 
 | Chiamante | Plan | Apply |
 |---|---|---|
-| Un amministratore autenticato | sì | sì |
-| Una chiave API | sì | no |
+| Una persona autenticata che possiede `schema:write` | sì | sì |
+| Una chiave API che possiede `schema:read` / `schema:write` | sì | no |
 | La service key del server | sì | no |
 
 Una credenziale non è un autore. `api-key:7c3f…` nel tuo ambiente di CI non è una persona fisica, e consentirle di scrivere nel repository produrrebbe esattamente quella cronologia non attribuibile che questa funzionalità è stata concepita per rimpiazzare.

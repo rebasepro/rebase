@@ -1,5 +1,5 @@
 ---
-sourceHash: 925edb3f8c355de4
+sourceHash: 094f9184d2977cef
 title: Vue d'ensemble du backend
 sidebar_label: Backend
 description: Le backend Rebase fournit un serveur complet avec API REST, authentification, stockage, temps réel via WebSocket et historique des entités — le tout initialisé avec un seul appel de fonction.
@@ -92,16 +92,16 @@ Après l'initialisation, ces routes sont montées :
 | Chemin | Rôle |
 |------|---------|
 | `/api/auth/*` | Authentification (inscription, connexion, rafraîchissement, OAuth, liens magiques, codes à usage unique, MFA) |
-| `/api/admin/*` | Gestion des utilisateurs et des rôles (réservé aux administrateurs) |
+| `/api/admin/*` | Utilisateurs, rôles, clés de service, cron, sauvegardes, journaux et schéma, chacun derrière sa propre [portée](/docs/backend/roles-and-scopes/) |
 | `/api/storage/*` | Téléversement, téléchargement et suppression de fichiers |
 | `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications de l'entité (si activé) |
 | `/api/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
 | `/api/swagger` | Interface Swagger UI (mode développement, lorsque `enableSwagger: true`) |
-| `/api/meta/contract` | Schéma des collections du projet (réservé aux administrateurs) |
+| `/api/meta/contract` | Schéma des collections du projet (exige `schema:read`) |
 | `/api/meta/schema-version` | Chaîne de version pour ce schéma (non authentifié) |
 | `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functionsDir` est défini) |
-| `/api/cron/*` | Gestion des tâches cron (réservé aux administrateurs, lorsque `cronsDir` est défini) |
+| `/api/cron/*` | Gestion des tâches cron (`cron:read` / `cron:write`, lorsque `cronsDir` est défini) |
 | WebSocket sur mise à niveau (upgrade) | Abonnements en temps réel |
 
 ---
@@ -229,7 +229,6 @@ instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
 instance.auth?.userService       // User management
-instance.auth?.roleService       // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata

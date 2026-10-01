@@ -1,5 +1,5 @@
 ---
-sourceHash: 910d8d1deda89fdd
+sourceHash: cc9569d9e5b15674
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -296,7 +296,8 @@ Hay tres opciones aplicables en todas partes: `--json` para salida legible por m
 ```bash
 rebase cloud login      # sign in to the control plane
 rebase cloud logout     # sign out
-rebase cloud whoami     # show the current session
+rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
+rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
 
 #### Vinculación de proyectos
@@ -451,18 +452,18 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-Gestiona API keys de servicio con ámbito (scoped) — la credencial que utiliza un agente, script u otro servicio, a diferencia de la sesión de un usuario final:
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Gestiona las API keys de servicio del proyecto — la credencial que utiliza un agente, script u otro servicio, a diferencia de la sesión de un usuario final:
 
 ```bash
 rebase api-keys list
-rebase api-keys create --name "Analytics" --permissions '[{"collection":"events","operations":["read"]}]'
-rebase api-keys create --name "Full Access" --full-access --expires 90d
+rebase api-keys create --name "Blog CI" --scopes data:read:posts,data:write:posts --expires-in 90
+rebase api-keys create --name "Ops" --full-access --roles admin --expires-at 2027-01-31
 rebase api-keys revoke abc123-def456
 ```
 
-`--permissions` recibe un array JSON de objetos `{ collection, operations }`, o usa `--full-access` para lectura/escritura/eliminación en todas las colecciones y funciones. `--expires` acepta `7d`, `30d`, `90d`, `1y` o una fecha ISO, y `--rate-limit` establece las solicitudes por ventana de 15 minutos. Una clave solo se muestra una vez, en el momento de su creación.
+`--scopes` nombra lo que la clave puede hacer, separado por comas o repetido; `--full-access` le da todos los alcances que tiene la clave de servicio excepto `keys:*`. `--roles` añade roles de RLS además de `service`, `--expires-in` recibe días y `--expires-at` una fecha ISO. `rebase api-keys scopes` lista todos los alcances que conoce el backend. Una clave solo se muestra una vez.
 
-Las claves cuentan con doble validación: se aplican tanto los permisos propios de la clave como la seguridad a nivel de fila (RLS) de la identidad bajo la que actúa, por lo que una clave nunca puede leer más de lo que dicha identidad permite.
+Las claves cuentan con doble validación: se aplican tanto los alcances de la clave como la seguridad a nivel de fila (RLS) de la identidad bajo la que actúa. Consulta [Claves de API](/docs/backend/api-keys/).
 
 ### `rebase skills install`
 

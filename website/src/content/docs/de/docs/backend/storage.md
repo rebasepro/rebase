@@ -1,5 +1,5 @@
 ---
-sourceHash: 68889c97cefde465
+sourceHash: 2becc78f920b157e
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -425,6 +425,17 @@ Wissenswertes:
 - **`list` wird anhand des Präfixes geprüft.** Über das Auflisten lassen sich Schlüssel ermitteln, die einem zuvor nicht bekannt waren.
 - **Fortsetzbare (TUS) Uploads werden bereits bei der Erstellung geprüft**, sodass ein abgelehnter Upload keine temporären Dateien hinterlässt.
 - Das Weglassen des Hooks behält das bisherige Verhalten bei, sodass Single-Tenant-Anwendungen davon unberührt bleiben.
+
+### API-Schlüssel und Tokens
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine angemeldete Person hält jeden Storage-Scope, für sie entscheiden also der Hook und die Policies oben.
+Ein [API-Schlüssel](/docs/backend/api-keys/) braucht zusätzlich den Storage-Scope
+für die Operation, auf der Quelle, die die Anfrage nennt: `storage:read` für
+Downloads, Metadaten und Auflistungen, `storage:write` für Uploads, Ordner und jeden
+Schritt eines fortsetzbaren Uploads, `storage:delete` für Löschvorgänge. Das Ziel ist die
+Quell-ID, und die der Standardquelle ist `(default)`: `storage:read:(default)`,
+`storage:write:avatars`. Ohne ihn lautet die Antwort `403 SCOPE_MISSING`. Mit ihm
+läuft der Hook weiterhin, als diejenige Identität, als die der Schlüssel handelt.
 
 ## Auf einen Upload reagieren
 

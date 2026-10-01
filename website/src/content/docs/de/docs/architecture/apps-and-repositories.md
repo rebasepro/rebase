@@ -1,5 +1,5 @@
 ---
-sourceHash: 5db546fe110a140a
+sourceHash: 2b5f4b5b83a711a3
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -324,7 +324,7 @@ einschließlich der Relationsziele, die der Typgenerator benötigt, um zu entsch
 ob ein Fremdschlüssel ein String oder eine Zahl ist – und gibt exakt dieselbe Ausgabe
 aus, die es aus lokalen Quelldateien erzeugt hätte.
 
-Der Contract-Endpunkt ist nur für Admins zugänglich. Collection-Definitionen beschreiben
+Der Contract-Endpunkt braucht den Scope `schema:read`, den ein Admin hält. Collection-Definitionen beschreiben
 jede Tabelle, Spalte und Relation im Projekt, einschließlich derer, die keine
 Sicherheitsregel jemals freigeben würde; das ist eine Bestandsaufnahme der Datenbank,
 keine öffentliche API-Dokumentation.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3c25626150027572
+sourceHash: ff7df07f90f558a9
 title: Fichiers d'instructions pour l'IA
 sidebar_label: Fichiers d'instructions pour l'IA
 description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs de trois lignes pour Claude, Cursor, Windsurf, Copilot et AGENTS.md — une source unique de vérité, plusieurs noms de fichiers.
@@ -118,6 +118,10 @@ Cette dernière règle est essentielle. C'est la différence entre un middleware
 qui s'exécute et un qui ne s'exécute pas, et un assistant qui n'a pas été
 prévenu écrira systématiquement la version qui ne s'exécute pas — voir
 [Fonctions personnalisées](/docs/backend/custom-functions).
+
+`requireAdmin` n'admet que le rôle `admin`. Quand un rôle plus restreint ou une clé API
+doit pouvoir appeler une route, la garde à ajouter est `requireScope`, avec une portée
+que l'application déclare — voir [Rôles et portées](/docs/backend/roles-and-scopes/#app-scopes).
 
 ## Personnalisation
 

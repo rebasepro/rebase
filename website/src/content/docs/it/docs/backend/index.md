@@ -1,5 +1,5 @@
 ---
-sourceHash: 925edb3f8c355de4
+sourceHash: 094f9184d2977cef
 title: Panoramica del backend
 sidebar_label: Backend
 description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, WebSocket in tempo reale e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
@@ -92,16 +92,16 @@ Dopo l'inizializzazione, vengono montate queste route:
 | Percorso | Scopo |
 |------|---------|
 | `/api/auth/*` | Autenticazione (registrazione, login, refresh, OAuth, magic link, codici monouso, MFA) |
-| `/api/admin/*` | Gestione di utenti e ruoli (solo admin) |
+| `/api/admin/*` | Utenti, ruoli, chiavi di servizio, cron, backup, log e schema, ciascuno protetto dal proprio [scope](/docs/backend/roles-and-scopes/) |
 | `/api/storage/*` | Caricamento, download ed eliminazione di file |
 | `/api/data/:slug` | Operazioni CRUD per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Cronologia delle modifiche delle entità (se abilitata) |
 | `/api/docs` | Specifica OpenAPI (quando `enableSwagger: true`) |
 | `/api/swagger` | Swagger UI (modalità dev, quando `enableSwagger: true`) |
-| `/api/meta/contract` | Lo schema delle collection del progetto (solo admin) |
+| `/api/meta/contract` | Lo schema delle collection del progetto (richiede `schema:read`) |
 | `/api/meta/schema-version` | Una stringa di versione per tale schema (non autenticato) |
 | `/api/functions/*` | Route di funzioni personalizzate (quando `functionsDir` è impostato) |
-| `/api/cron/*` | Gestione dei cron job (solo admin, quando `cronsDir` è impostato) |
+| `/api/cron/*` | Gestione dei cron job (`cron:read` / `cron:write`, quando `cronsDir` è impostato) |
 | WebSocket su richiesta di upgrade | Sottoscrizioni in tempo reale |
 
 ---
@@ -229,7 +229,6 @@ instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
 instance.auth?.userService       // User management
-instance.auth?.roleService       // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata

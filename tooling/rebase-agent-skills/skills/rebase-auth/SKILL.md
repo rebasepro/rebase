@@ -21,7 +21,7 @@ Rebase ships a complete, built-in authentication system with JWT sessions, OAuth
 - [Row-Level Security (RLS)](#row-level-security)
 - [Rate Limiting](#rate-limiting)
 - [Custom Auth Adapters](#custom-auth-adapters)
-- [Roles & Permissions](#roles--permissions)
+- [Roles & Scopes](#roles--scopes)
 - [Backend Hooks](#backend-hooks)
 - [Email Configuration](#email-configuration)
 - [Security Concepts](#security-concepts)
@@ -138,7 +138,12 @@ const membersCollection: PostgresCollectionConfig = {
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
       resetPassword: true // Or false to disable, or a custom EntityAction
-    }
+    },
+
+    // The access model — see "Roles & Scopes" below
+    roles: { support: { name: "Support", scopes: ["users:read", "users:write"] } },
+    scopes: { "project:deploy": { label: "Deploy projects", target: "project" } },
+    personalKeys: true
   },
   properties: { ... }
 };
@@ -501,7 +506,7 @@ interface MfaChallengeInfo {
 
 ## API Keys
 
-API keys provide machine-to-machine authentication for agents, MCP servers, CI pipelines, cron jobs, and third-party integrations. They are scoped to specific collections and operations, and can optionally be granted full admin access.
+API keys are long-lived bearer credentials (`rk_live_…`) for agents, MCP clients, CI pipelines, cron schedulers and integrations. What a key may do is a list of **scopes** — the same `resource:action[:target]` strings every credential uses (see [Roles & Scopes](#roles--scopes)).
 
 ### Key Format
 
@@ -509,86 +514,118 @@ API keys provide machine-to-machine authentication for agents, MCP servers, CI p
 - Storage: SHA-256 hash of the full key. The plaintext key is returned **exactly once** at creation.
 - Display: Only the first 12 characters (`key_prefix`) are shown in subsequent API responses.
 
-### Admin Access for Agents / MCP
+### Two kinds
 
-By default API keys get the `service` role (data access only). Set `"admin": true` to grant the key the `admin` role, which allows it to call **all admin routes** (`/api/admin/*`) — including schema management, user management, and API key management itself.
+| Kind | Acts as | Holds | Managed at | Who manages |
+|---|---|---|---|---|
+| `service` | `api-key:<id>`, RLS roles `["service", ...key.roles]` | exactly `key.scopes` | `/api/admin/api-keys` | holders of `keys:read` / `keys:write` |
+| `personal` | its owner (uid), with the owner's roles read **live** on every request | `key.scopes` ∩ what the owner holds now | `/api/auth/keys` | the owning account, when the users collection sets `auth.personalKeys: true` |
 
-> **Use `admin: true` for agents, MCP servers, and CI pipelines that need full control over the Rebase instance.**
+> **There is no `admin: true` and no `permissions` list any more.** A key that should run as the `admin` RLS role gets `roles: ["admin"]`; what it may *do* is its `scopes`. A body that sends `permissions`/`admin` instead of `scopes` is refused with `400 INVALID_INPUT`.
 
-```bash
-# CLI — create an admin API key
-rebase api-keys create --name "My Agent" --admin --full-access
+### Scopes a key can hold
 
-# REST
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Agent",
-    "admin": true,
-    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
-  }'
-```
+- **Data plane** — `data:read`, `data:write`, `data:delete` (target: collection slug), `storage:read`, `storage:write`, `storage:delete` (target: storage source id; the default source is `(default)`), `functions:invoke` (target: function name). `data:read:posts` = read `posts` only. The plain scope covers every target.
+- **Admin plane** — `users:read|write`, `schema:read|write`, `database:read|write`, `backups:read`, `cron:read|write`, `logs:read`. A key holding one reaches that admin surface (e.g. a scheduler key with `cron:write`).
+- **App scopes** — whatever the app declares under `auth.scopes` (e.g. `project:deploy:p1`).
+- **Never** `keys:read` / `keys:write` — `400 KEY_MANAGEMENT_SCOPE`. A key that could manage keys could mint its own successor.
 
-### API Key Admin Endpoints
+### Minting rules (both routes)
 
-All endpoints are mounted under `/api/admin/api-keys` and require **admin** authentication (JWT with admin role or service key).
+| Refusal | When |
+|---|---|
+| `400 INVALID_SCOPES` | malformed / unknown scope, or a target on a scope that takes none (`details.validScopes` lists them) |
+| `400 UNKNOWN_SCOPE_TARGET` | the target names a collection, storage source or function this backend does not serve |
+| `400 KEY_MANAGEMENT_SCOPE` | `keys:*` requested |
+| `403 SCOPE_EXCEEDS_CREATOR` | a scope the creator does not hold — a key never holds more than its minter |
+| `403 ROLE_EXCEEDS_CREATOR` | a service-key role the creator does not hold (admins may give any role) |
+| `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN` | the request to a key route was itself made with an API key |
+
+A request the key lacks a scope for answers `403 SCOPE_MISSING` with `details.requiredScope` (target included, e.g. `data:write:orders`).
+
+### Service Key Endpoints
+
+| Method | Endpoint | Needs | Description |
+|---|---|---|---|
+| `GET` | `/api/admin/api-keys` | `keys:read` | List service keys (masked — no hashes). |
+| `POST` | `/api/admin/api-keys` | `keys:write` | Create one. Returns the full plaintext key once. |
+| `GET` | `/api/admin/api-keys/:id` | `keys:read` | One key (masked). |
+| `PUT` | `/api/admin/api-keys/:id` | `keys:write` | Change `name`, `scopes`, `roles`, `rate_limit`, `expires_at` — same minting rules. |
+| `DELETE` | `/api/admin/api-keys/:id` | `keys:write` | Revoke (soft-delete). |
+
+### Personal Key Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/admin/api-keys` | List all API keys (masked — no hashes). |
-| `POST` | `/api/admin/api-keys` | Create a new API key. Returns the full plaintext key once. |
-| `GET` | `/api/admin/api-keys/:id` | Get single API key details (masked). |
-| `PUT` | `/api/admin/api-keys/:id` | Update name, permissions, admin, rate_limit, or expires_at. |
-| `DELETE` | `/api/admin/api-keys/:id` | Revoke (soft-delete) an API key. |
+| `GET` | `/api/auth/keys` | The caller's own keys. |
+| `POST` | `/api/auth/keys` | `{ name, scopes, expires_at? }` — no `roles`, no `rate_limit` (400). |
+| `DELETE` | `/api/auth/keys/:id` | Revoke one of the caller's own. |
+| `GET` | `/api/auth/scopes` | Every scope this backend knows (`ScopeSummary[]`) and the ones the caller holds. |
 
-### Create API Key Request
+`403 PERSONAL_KEYS_DISABLED` unless `auth.personalKeys: true`; `403 PERSONAL_KEY_NEEDS_ACCOUNT` for the service key and guest sessions. Demote the owner and their keys shrink with them; delete the account and they stop.
+
+### Request and response shapes (`@rebasepro/types`)
 
 ```typescript
+type ApiKeyKind = "service" | "personal";
+
 interface CreateApiKeyRequest {
   name: string;
-  permissions: ApiKeyPermission[];
-  admin?: boolean;           // true = grant admin role (access to all admin routes)
-  rate_limit?: number | null;    // Requests per 15-min window. null = unlimited
-  expires_at?: string | null;    // ISO-8601 timestamp. null = no expiration
+  scopes: string[];              // at least one, e.g. ["data:read:orders", "cron:write"]
+  roles?: string[];              // RLS roles beside "service", e.g. ["admin"]
+  rate_limit?: number | null;    // requests per 15-min window; null = server default (1000)
+  expires_at?: string | null;    // ISO-8601; omit for no expiry
 }
 
-interface ApiKeyPermission {
-  collection: string;            // Collection slug, or "*" for all collections
-  operations: ("read" | "write" | "delete")[];
+interface CreatePersonalKeyRequest {
+  name: string;
+  scopes: string[];
+  expires_at?: string | null;
+}
+
+// What list / get / update return. Creation adds `key`, the plaintext, once.
+interface ApiKeyMasked {
+  id: string;
+  name: string;
+  kind: ApiKeyKind;
+  key_prefix: string;
+  scopes: string[];
+  roles: string[];               // always [] on a personal key
+  owner_uid: string | null;      // null on a service key
+  rate_limit: number | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
 }
 ```
 
 ### Examples
 
-**Scoped key (read-only on one collection):**
-
 ```bash
+# A scoped service key (read + write orders, no delete), expiring in 30 days
+rebase api-keys create --name "Order sync" --scopes data:read:orders,data:write:orders --expires-in 30
+
+# A scheduler that triggers cron jobs
+rebase api-keys create --name "Scheduler" --scopes cron:read,cron:write
+
+# CI / migrations: every scope you hold (less keys:*), and the admin RLS role
+rebase api-keys create --name "CI" --full-access --roles admin --expires-in 90
+
+# REST
 curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <admin-token-or-service-key>" \
+  -H "Authorization: Bearer <service-key>" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Analytics Pipeline",
-    "permissions": [
-      { "collection": "events", "operations": ["read", "write"] },
-      { "collection": "users", "operations": ["read"] }
-    ],
-    "rate_limit": 500,
-    "expires_at": "2025-12-31T23:59:59Z"
-  }'
+  -d '{ "name": "Analytics", "scopes": ["data:read:events"], "rate_limit": 500 }'
 ```
 
-**Admin key (for agents / MCP / CI):**
-
-```bash
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <admin-token-or-service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "CI Agent",
-    "admin": true,
-    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
-  }'
+```typescript
+// Client SDK — service keys (needs keys:write) and the caller's own personal keys
+const { key } = await client.apiKeys.createKey({ name: "Order sync", scopes: ["data:read:orders"] });
+const mine = await client.personalKeys.createKey({ name: "Laptop", scopes: ["data:read"] });
+const { scopes, held } = await client.personalKeys.listScopes();
 ```
 
 ### Using an API Key
@@ -598,95 +635,37 @@ curl http://localhost:3000/api/data/events \
   -H "Authorization: Bearer rk_live_abc123..."
 ```
 
-### API Key Middleware Behavior
+The same key works on REST data, storage, functions, the admin surfaces its scopes reach, the realtime WebSocket (sent in `AUTHENTICATE`; channels are refused for keys) and the hosted `/mcp` endpoint.
 
-When a request arrives with a `rk_` prefixed bearer token:
-1. The token is SHA-256 hashed and looked up in the `rebase.api_keys` table.
-2. Expiry and revocation status are checked.
-3. If `admin: true`, the key is assigned `roles: ["admin", "service"]` — granting access to admin routes. Otherwise `roles: ["service"]`.
-4. Permissions are validated against the requested collection and HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`).
-5. The DataDriver is scoped with `withAuth()` using the key's service identity. This does **not** bypass RLS — the statements run as the restricted `rebase_user` role with `app.uid = 'api-key:{id}'`, and your policies are evaluated against that.
-6. Per-key rate limiting is enforced if `rate_limit` is set.
+### What a request with a key goes through
 
-> **WARNING FOR AGENTS:** an API key is a long-lived credential carrying a broad
-> identity (`service`, or `admin` too when `admin: true`). It is for trusted
-> server-side use only — never expose one to client-side code.
+1. The token is SHA-256 hashed and looked up in `rebase.api_keys`; expiry and revocation are checked.
+2. A service key becomes `{ uid: "api-key:<id>", roles: ["service", ...key.roles] }`; a personal key becomes its owner, with the owner's roles read from the database now.
+3. The key's scopes go on the request (`c.get("scopes")`) and are checked by every route: data by HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`; `POST /bulk/delete` is a delete); on a nested path the target collection needs the operation and each parent `data:read`.
+4. The DataDriver is scoped with `withAuth()` to that identity. This does **not** bypass RLS — statements run as `rebase_user` with `app.uid` set, and your policies are evaluated.
+5. Per-key rate limiting applies (`rate_limit`, else the server's API-key default).
+
+> **WARNING FOR AGENTS:** a key is a long-lived credential. Server-side only — never in client code.
 >
-> It does **not** bypass RLS, and assuming it does produces the opposite bug to
-> the one you expect: a non-admin key with `"*"` permissions can read **nothing**,
-> because no policy grants the `service` role. That is RLS working. Either grant
-> `service` in the relevant collections' security rules, or use an admin key,
-> which clears the built-in default policies through their `rolesOverlap(['admin'])`
-> arm. Owner-style rules (`owner_id = rebase.uid()`) never match a key.
+> Scopes and RLS are **two independent gates**. A service key with `data:read` and no `admin` role can read **nothing** on a collection whose policies do not grant `service` — the default policies admit only the server context and `admin`. That is RLS working. Grant `service` in the collection's `securityRules`, or give the key `roles: ["admin"]`. Owner-style rules (`owner_id = rebase.uid()`) never match a service key; they do match a personal key, which runs as its owner.
+>
+> For an agent, mint the narrowest key that works and leave out `data:delete` and `functions:invoke` unless it needs them — a function is code and can write.
 
-### Role Summary
+### Keys made before scopes
 
-| Key type | `roles` assigned | Admin routes | Data routes |
-|---|---|---|---|
-| Default (no `admin`) | `["service"]` | ✗ | ✓ (scoped by `permissions`) |
-| `admin: true` | `["admin", "service"]` | ✓ | ✓ |
-
-### API Key Response Types
-
-```typescript
-// Returned once at creation (includes the full plaintext key)
-interface ApiKeyWithSecret {
-  id: string;
-  name: string;
-  key_prefix: string;       // First 12 chars, for display
-  key: string;              // FULL plaintext key — save this immediately
-  permissions: ApiKeyPermission[];
-  admin: boolean;
-  rate_limit: number | null;
-  created_by: string;
-  createdAt: string;
-  updatedAt: string;
-  last_used_at: string | null;
-  expires_at: string | null;
-  revoked_at: string | null;
-}
-
-// All subsequent reads (no hash, no full key)
-interface ApiKeyMasked {
-  id: string;
-  name: string;
-  key_prefix: string;
-  permissions: ApiKeyPermission[];
-  admin: boolean;
-  rate_limit: number | null;
-  created_by: string;
-  createdAt: string;
-  updatedAt: string;
-  last_used_at: string | null;
-  expires_at: string | null;
-  revoked_at: string | null;
-}
-```
-
-### Also update `admin` on an existing key
-
-```bash
-curl -X PUT http://localhost:3000/api/admin/api-keys/<id> \
-  -H "Authorization: Bearer <admin-token-or-service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{ "admin": true }'
-```
+Old rows (`permissions` + `admin`) are rewritten on boot, never widened: `{collection:"posts", operations:["read","write"]}` → `data:read:posts`, `data:write:posts`; `"*"` → `data:<op>` + `storage:<op>` (+ `functions:invoke` if write); `"storage"` → `storage:<op>`; `"functions"` / `"functions/<name>"` → `functions:invoke[:<name>]` only if write was granted; `admin: true` → roles `["admin"]` + `users:read`, `users:write`, `schema:read`, `schema:write`, `backups:read`, `cron:read`, `cron:write`, `logs:read`. The secret is unchanged.
 
 ### CLI
 
 ```bash
-# List all keys
 rebase api-keys list
-
-# Create a scoped key
-rebase api-keys create --name "Read Only" --permissions '[{"collection":"orders","operations":["read"]}]'
-
-# Create an admin key (for agents / MCP / CI)
-rebase api-keys create --name "My Agent" --admin --full-access
-
-# Revoke a key
+rebase api-keys scopes                       # every scope, and which you hold
+rebase api-keys create --name "Read Only" --scopes data:read:orders
+rebase api-keys get <key-id>
 rebase api-keys revoke <key-id>
 ```
+
+`--scopes` (comma-separated or repeated), `--full-access`, `--roles`, `--rate-limit`, `--expires-in <days>`, `--expires-at <ISO date>`. `--permissions`, `--admin` and `--expires` are gone.
 
 ---
 
@@ -782,6 +761,9 @@ All login/register/OAuth endpoints return:
 | `ALREADY_VERIFIED` | 400 | Email already verified. |
 | `NOT_ANONYMOUS` | 400 | User is not anonymous (cannot link). |
 | `RATE_LIMITED` | 429 | Too many requests. |
+| `SCOPE_MISSING` | 403 | The credential lacks the scope the route needs; `details.requiredScope` names it. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | A `users:write` holder tried to change an account holding more than they do. |
+| `ROLE_EXCEEDS_CALLER` | 403 | The roles being granted hold more than the caller does. |
 
 ---
 
@@ -1124,40 +1106,89 @@ When using `createCustomAuthAdapter`, all capabilities default to `false`/`[]` u
 
 ---
 
-## Roles & Permissions
+## Roles & Scopes
 
-### Role Data Structure
+Every "may this caller do X?" is answered by a **scope**, `resource:action[:target]` — the same strings on a session, a key, an MCP token and a role. Canonical source: `packages/types/src/types/scopes.ts`.
+
+### Two planes
+
+- **Data plane** — `data:read|write|delete` (target: collection), `storage:read|write|delete` (target: storage source id, `(default)` for the default one), `functions:invoke` (target: function name). **Every signed-in person holds all of it.** What a person may do with rows is the collection's `securityRules` (RLS) and storage policies — never a scope. On a key or token these scopes *narrow*.
+- **Admin plane** — `users:read|write`, `schema:read|write`, `database:read|write`, `backups:read`, `cron:read|write`, `logs:read`, `keys:read|write`. **Nobody holds them implicitly.** The built-in `admin` role holds all of them; other roles hold what the app declares.
+
+### Declaring roles and app scopes (users collection)
 
 ```typescript
-interface RoleData {
-  id: string;
-  name: string;
-  isAdmin: boolean;
-  defaultPermissions: {
-    read?: boolean;
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-  } | null;
-  collectionPermissions: Record<string, {
-    read?: boolean;
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-  }> | null;
-}
+import { defineCollection } from "@rebasepro/cms-types";
+
+export const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
+    auth: {
+        enabled: true,
+        roles: {
+            support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] },
+            developer: { name: "Developer", scopes: ["schema:read", "database:read", "logs:read", "cron:read"] }
+        },
+        scopes: {
+            "project:deploy": { label: "Deploy projects", target: "project" }
+        },
+        personalKeys: true
+    },
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+});
 ```
 
-### Built-in Role Behavior
+Boot refuses:
+- declaring `admin` (built in, holds everything);
+- a role listing a **data-plane** scope (`data:write` on a role would grant nothing — use `securityRules`);
+- an unknown scope; an app scope reusing a built-in resource (`data`, `storage`, `functions`, `users`, `schema`, `database`, `backups`, `cron`, `logs`, `keys`) or missing a `label`;
+- a `defaultRole` that is `admin` or holds any admin-plane scope.
 
-- The **first user** in the system is automatically assigned the `"admin"` role.
-- Subsequent users get the `defaultRole` (if configured).
-- Setting `defaultRole: "admin"` throws a startup error to prevent privilege escalation.
-- Admin status is determined by having a role with `id === "admin"` or `id === "schema-admin"`.
+A role nobody declares (e.g. `editor`) holds no admin-plane scope but still means something to RLS policies. **`schema-admin` no longer exists** — a project that used it declares a role with the scopes it meant (e.g. `schema:read`, `schema:write`, `database:read`, `database:write`).
 
-### Admin Routes for User/Role Management
+**App scopes** (`project:deploy`) are held by every signed-in person; they exist so a key can be narrowed to one action. Check them in a function with `requireScope` / `hasScope` / `getScopes` from `@rebasepro/server/functions` (see `rebase-custom-functions`).
 
-Admin user and role management is handled via dedicated admin routes (mounted under `/api/admin`) which require `requireAuth` + `requireAdmin` middleware.
+### What `admin` means
+
+- Holds every admin-plane scope, `keys:*` included.
+- Is the RLS role the default policies admit — an admin reads every row of a collection that keeps them.
+- Only an admin grants `admin`. A role listing every admin-plane scope is still not `admin`.
+- `requireAdmin` checks the role; prefer `requireScope` for anything a narrower role or a key should do.
+
+### Nobody grants more than they hold
+
+- Keys: scopes within the minter's (`SCOPE_EXCEEDS_CREATOR`), service-key roles within the minter's unless admin (`ROLE_EXCEEDS_CREATOR`), never `keys:*` (`KEY_MANAGEMENT_SCOPE`).
+- Accounts: a `users:write` holder cannot edit/reset/delete an account holding anything they don't (`403 ACCOUNT_OUTRANKS_CALLER`) nor grant roles beyond their own (`403 ROLE_EXCEEDS_CALLER`).
+
+### Credentials and what they hold
+
+| Credential | Acts as | Scopes |
+|---|---|---|
+| Person's session (JWT) | the user | data plane + app scopes + their roles' scopes (admin → all) |
+| Service key `rk_live_…` | `api-key:<id>`, roles `["service", ...key.roles]` | exactly `key.scopes` |
+| Personal key `rk_live_…` | its owner, roles read live | `key.scopes` ∩ owner's current scopes |
+| MCP OAuth token | the user | `data:read|write|delete`, optionally per collection |
+| `REBASE_SERVICE_KEY` | `service`, role `admin` | everything |
+
+### Admin routes
+
+| Route | Needs |
+|---|---|
+| `GET /api/admin/users`, `GET /api/admin/users/:uid`, `GET /api/admin/roles` | `users:read` |
+| `POST/PUT/DELETE /api/admin/users…`, `POST /api/admin/users/:uid/reset-password` | `users:write` |
+| `/api/admin/schema-editor` | `schema:read` (GET) / `schema:write` (POST) |
+| `/api/admin/schema/status`, `/plan`, `/api/admin/rls-audit`, `/api/meta/contract` | `schema:read` |
+| `/api/admin/schema/apply` | `schema:write` (and a person, unless machine apply is on) |
+| `/api/admin/cron` | `cron:read` (GET) / `cron:write` (trigger, PUT) |
+| `/api/admin/backups` | `backups:read` |
+| `/api/admin/logs` | `logs:read` |
+| `/api/admin/api-keys` | `keys:read` (GET) / `keys:write` — never an API key |
+| SQL editor / branches over the socket | `database:read` (catalogue, list) / `database:write` (`EXECUTE_SQL`, create/delete branch) |
+
+`GET /api/admin/roles` → `{ roles: RoleSummary[] }` (`admin` + declared roles with their scopes); `client.admin.listRoles()`. Role CRUD (`createRole`/`updateRole`/`deleteRole`, `isAdmin`/`defaultPermissions`/`collectionPermissions`) no longer exists — roles are declared in code. A missing scope anywhere → `403 SCOPE_MISSING` with `details.requiredScope`.
 
 ---
 
@@ -1378,4 +1409,6 @@ All auth endpoints validate input with Zod schemas:
 - Source: `packages/types/src/types/auth_adapter.ts` — `AuthAdapter` interface
 - Source: `packages/server/src/auth/rls-scope.ts` — RLS scoping
 - Source: `packages/server/src/email/types.ts` — Email configuration
+- Source: `packages/types/src/types/scopes.ts` — the scope vocabulary, `scopesForRoles`, `scopeGrants`
+- Source: `packages/server/src/auth/access.ts` — `requireScope`, the access model, the "never more than the caller" checks
 - **Reserved Identities**: `"service"` / `"anon"` / `"api-key:{id}"` — see [Row-Level Security > Reserved System Identities](#reserved-system-identities)

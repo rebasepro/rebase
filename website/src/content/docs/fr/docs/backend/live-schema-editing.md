@@ -1,5 +1,5 @@
 ---
-sourceHash: dbaee87f7378ffd7
+sourceHash: 5d7dd80d4991fd97
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -14,13 +14,13 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-Tous trois sont réservés aux administrateurs, comme toutes les autres interfaces `/api/admin`. L'application nécessite une condition supplémentaire en plus d'être administrateur — voir [Qui peut appliquer](#qui-peut-appliquer).
+Le statut et le plan exigent la portée `schema:read`, et l'application exige `schema:write`, comme toutes les autres interfaces `/api/admin` qui nomment une portée. Un administrateur détient les deux. L'application nécessite aussi une condition de plus que la portée — voir [Qui peut appliquer](#qui-peut-appliquer).
 
 ## Planifier avant d'appliquer
 
 `/plan` n'a pas d'effets secondaires. Envoyez la collection telle qu'elle devrait être au final, et il vous indique ce que la modification implique :
 
-`$ADMIN_TOKEN` est un jeton d'accès administrateur — l'`accessToken` renvoyé lors de la connexion pour un compte avec le rôle d'administrateur. Rien sur la machine ne le définit pour vous.
+`$ADMIN_TOKEN` est un jeton d'accès — l'`accessToken` renvoyé lors de la connexion — pour un compte qui détient `schema:read` : un administrateur, ou un rôle qui la déclare. Rien sur la machine ne le définit pour vous.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -94,18 +94,18 @@ Ces chemins sont relatifs à votre **projet**, et non à votre dépôt. Lorsque 
 
 Aucun SQL n'entre dans le commit. `rebase db push` et `rebase db generate` écrivent le leur à partir des collections à chaque exécution, dans `.rebase/sql/`, qui est ignoré par git.
 
-Le message de commit décrit la modification plutôt que d'en annoncer une, et est attribué à l'administrateur qui l'a effectuée. Une modification de schéma avec un auteur et un diff dans l'historique de votre projet est une chose que ni Firebase ni Supabase ne vous offrent — leurs modifications de tables sont invisibles pour votre dépôt.
+Le message de commit décrit la modification plutôt que d'en annoncer une, et est attribué à la personne qui l'a effectuée. Une modification de schéma avec un auteur et un diff dans l'historique de votre projet est une chose que ni Firebase ni Supabase ne vous offrent — leurs modifications de tables sont invisibles pour votre dépôt.
 
 ## Qui peut appliquer
 
-Être administrateur est suffisant pour **planifier**. La planification n'a aucun effet secondaire, et un job CI demandant si un changement de collection proposé est applicable en est une bonne utilisation.
+Détenir `schema:read` est suffisant pour **planifier**. La planification n'a aucun effet secondaire, et un job CI demandant si un changement de collection proposé est applicable en est une bonne utilisation.
 
 L'application est un second privilège, car appliquer écrit un commit et un commit porte un auteur :
 
 | Appelant | Planifier | Appliquer |
 |---|---|---|
-| Un administrateur connecté | oui | oui |
-| Une clé d'API | oui | non |
+| Une personne connectée qui détient `schema:write` | oui | oui |
+| Une clé d'API qui détient `schema:read` / `schema:write` | oui | non |
 | La clé de service du serveur | oui | non |
 
 Un identifiant n'est pas un auteur. `api-key:7c3f…` dans votre environnement de CI n'est pas une personne physique, et lui permettre d'écrire dans votre dépôt produit exactement l'historique non attribuable que cette fonctionnalité vise à remplacer.

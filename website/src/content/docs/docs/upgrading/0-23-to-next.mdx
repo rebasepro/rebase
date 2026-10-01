@@ -14,9 +14,11 @@ the version that carries them exists on npm. If you installed from npm you are
 on 0.23 and none of this has reached you — read it to know what is coming, and
 come back when you move.
 
-All three are about generated files. None of them changes your schema, your data
-or your API: they change what lands in your repository, and what `rebase dev`
-does without being asked.
+Sections 41, 42 and 49 are about generated files: they change what lands in your
+repository, and what `rebase dev` does without being asked. Sections 43 to 48
+are about access. Permissions are now [scopes](/docs/backend/roles-and-scopes/),
+one vocabulary for sessions, API keys, roles and MCP tokens. If every person who
+uses your admin surfaces holds the `admin` role, most of them ask nothing of you.
 
 ---
 
@@ -64,7 +66,165 @@ not running.
 grep -rnE "rebase dev.*(--generate|-g)|REBASE_(AUTO_)?GENERATE" --exclude-dir=node_modules .
 ```
 
-## 43. A live schema edit commits no SQL
+## 43. `rebase api-keys create` takes scopes
+
+`--scopes` names what the key may do, comma-separated or repeated:
+`--scopes data:read:posts,logs:read`. `--roles` gives the RLS roles it runs as
+beside `service`, and `--expires-in <days>` or `--expires-at <date>` says when
+it stops. `--full-access` is every scope the service key holds, except
+`keys:read` and `keys:write`, which no key may hold. `rebase api-keys scopes`
+lists every scope the backend knows.
+
+`--permissions`, `--admin` and `--expires` are removed. Each one stops the
+command with a message naming its replacement, so a script carrying one fails
+rather than minting a different key than it meant.
+
+**What to change:** in every script that creates keys, replace `--permissions`
+with `--scopes`, `--admin` with `--roles admin` plus the admin-plane scopes the
+key needs, and `--expires 90d` with `--expires-in 90`.
+
+| Before | After |
+|---|---|
+| `--permissions '[{"collection":"orders","operations":["read","write"]}]'` | `--scopes data:read:orders,data:write:orders` |
+| `--full-access` | `--full-access` (now also the admin-plane scopes the service key holds) |
+| `--admin --full-access` | `--full-access --roles admin` |
+| `--expires 30d` | `--expires-in 30` |
+
+```bash
+grep -rnE "api-keys create.*(--permissions|--admin|--expires )" --exclude-dir=node_modules .
+```
+
+## 44. Permissions are scopes
+
+Every "may this caller do this?" now asks for a scope, named `resource:action`:
+`data:read`, `users:write`, `cron:write`. A scope may name one target:
+`data:read:posts` is `data:read` on `posts` alone. A person's session, an API
+key, a role and an MCP token all hold scopes, and they all use the same strings.
+
+Every signed-in person holds the data plane: `data:*`, `storage:*` and
+`functions:invoke`. Their rows are still decided by the collection's
+`securityRules`, so nothing changes there. The admin plane is users, schema,
+database, backups, cron, logs and keys. The `admin` role holds all of it, and
+any role you declare under `auth.roles` on the users collection holds what you
+list. Every admin surface now asks for its own scope instead of "is admin": the
+user routes need `users:read` or `users:write`, cron needs `cron:read` or
+`cron:write`, and so on. The [endpoint index](/docs/backend/endpoints/#admin)
+names the scope on every route. A refusal is `403 SCOPE_MISSING`, with the scope
+in `details.requiredScope`.
+
+**What to change:** nothing, if everyone who uses the admin surfaces holds the
+`admin` role, because an admin holds every scope. If a narrower role should
+reach one — a support team that manages accounts, a developer who reads logs —
+declare it with the scopes it needs. See
+[Roles and scopes](/docs/backend/roles-and-scopes/#declaring-roles). A client
+that branched on `API_KEY_FORBIDDEN`, or on `FORBIDDEN` from an admin route,
+branches on `SCOPE_MISSING`.
+
+```bash
+grep -rnE "API_KEY_FORBIDDEN|Admin privileges required" --exclude-dir=node_modules .
+```
+
+## 45. API keys hold scopes, not a permission list and an `admin` flag
+
+A key now has `scopes` and, for a service key, `roles`: the RLS roles it runs as
+beside `service`. `permissions: [{ collection, operations }]` and `admin: true`
+are gone from `CreateApiKeyRequest`, `UpdateApiKeyRequest` and `ApiKeyMasked`,
+and so are `ApiKeyPermission`, `ApiKeyOperation` and `isOperationAllowed`. A
+request that sends `permissions` or `admin` instead of `scopes` is refused with
+`400 INVALID_INPUT`.
+
+Keys already stored are converted at boot to the scopes they held, and never
+more: `{ collection: "posts", operations: ["read"] }` becomes `data:read:posts`,
+and `admin: true` becomes the `admin` role plus the users, schema, backups, cron
+and logs scopes. The secret does not change. The full table is in
+[API keys](/docs/backend/api-keys/#keys-made-before-scopes).
+
+One grant narrows. A function grant without `write` becomes nothing, because
+calling a function is not a read. A key that called a `GET` function with
+`read` alone is refused after the upgrade.
+
+**What to change:**
+
+- Give any key that calls a custom function `functions:invoke`, or
+  `functions:invoke:<name>`, with `PUT /api/admin/api-keys/:id` or
+  `client.apiKeys.updateKey`.
+- Code that creates keys sends `scopes`, and `roles: ["admin"]` where it sent
+  `admin: true`.
+
+```bash
+grep -rnE "ApiKeyPermission|ApiKeyOperation|isOperationAllowed|api-keys create" --exclude-dir=node_modules .
+```
+
+## 46. `schema-admin` is no longer an administrator, and roles are declared
+
+`admin` is the one built-in role. A role named `schema-admin` used to count as a
+second admin; it now means nothing on its own. Roles are no longer stored
+objects: `createRole`, `updateRole`, `deleteRole`, `getRoleById`,
+`getUserRoles`, `RoleRepository`, `RoleData` and `CreateRoleData` are removed,
+and so is `BootstrappedAuth.roleService`. `getUserWithRoles` returns role ids.
+`GET /api/admin/roles` lists `admin` and the roles you declare, with their
+scopes. The MongoDB driver no longer seeds a `rebase_roles` collection.
+
+**What to change:** if any account holds `schema-admin`, declare the role with
+the scopes it should have:
+
+```typescript
+import { defineCollection } from "@rebasepro/cms-types";
+
+export const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
+    auth: {
+        enabled: true,
+        roles: {
+            "schema-admin": {
+                name: "Schema admin",
+                scopes: ["schema:read", "schema:write", "database:read", "database:write"]
+            }
+        }
+    },
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+});
+```
+
+Code that called the role functions reads the declared roles instead, with
+`client.admin.listRoles()`. A `defaultRole` that holds any admin-plane scope now
+fails the boot.
+
+```bash
+grep -rnE "schema-admin|roleService|RoleData|createRole|getUserRoles|collectionPermissions" --exclude-dir=node_modules .
+```
+
+## 47. The hosted MCP server's scopes are `data:read`, `data:write` and `data:delete`
+
+The [remote MCP endpoint](/docs/ai/mcp/#the-remote-endpoint) used `mcp:read` and
+`mcp:write`. It now uses the data scopes every other credential uses, and each
+can be narrowed to a collection: `data:read:posts`. `delete_document` needs
+`data:delete`, which `data:write` no longer covers.
+
+**What to change:** nothing for clients already connected. A stored grant of
+`mcp:read` is read as `data:read`, and `mcp:write` as `data:write data:delete`,
+so they keep their reach, and a client that still asks for the old names gets
+the same. Code that compares a granted scope string with `mcp:read` or
+`mcp:write` compares it with the new names.
+
+## 48. `RealtimeSocketLimits` is now `RealtimeSocketOptions`
+
+It carries the API-key resolver beside the limits, as the sixth argument of
+`initializeWebsockets`. That is what lets an API key authenticate the realtime
+socket.
+
+**What to change:** nothing, unless you call `initializeWebsockets` from your own
+bootstrapper. Then rename the type.
+
+```bash
+grep -rn "RealtimeSocketLimits" --exclude-dir=node_modules .
+```
+
+## 49. A live schema edit commits no SQL
 
 A change applied from the admin panel's
 [live schema editor](/docs/backend/live-schema-editing/) commits the collection

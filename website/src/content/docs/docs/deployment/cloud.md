@@ -146,6 +146,73 @@ A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
 `rebase cloud logs -f`.
 
+## CI and agents
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A CI job or an agent should not carry your password. Give it a token
+instead: a key that acts as your account, narrowed to a few actions on one
+project. Create it from a signed-in terminal:
+
+```bash
+rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
+```
+
+The token is printed once, as an `export REBASE_TOKEN=rk_live_…` line. With
+`REBASE_TOKEN` set, every `rebase cloud` command authenticates with it instead of
+your login, and never reads or writes the stored session. In GitHub Actions,
+store it as a repository secret and expose it under that name:
+
+```yaml title=".github/workflows/deploy.yml"
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec rebase cloud deploy --project shop
+        env:
+          REBASE_TOKEN: ${{ secrets.REBASE_TOKEN }}
+```
+
+`--can` takes one or more capabilities, comma-separated or repeated:
+
+| Capability | What the token may do |
+|---|---|
+| `deploy` | Deploy the project and follow its builds: `deploy`, `deployments` |
+| `logs` | Read build and runtime logs, and live metrics: `logs`, `metrics` |
+| `env` | Read and change environment variables, secrets included |
+| `database` | `db list`, `db info` and `db connect`, which includes the database password |
+| `backups` | List, create, inspect and download backups, and read the point-in-time window |
+
+Under the hood a token is a [personal API key](/docs/backend/api-keys/#personal-keys)
+on the control plane. Each capability becomes a few
+[scopes](/docs/backend/roles-and-scopes/): `deploy` on `shop` holds
+`project:deploy:<id>`, with the project's id, plus the data and function scopes
+the deploy commands call. The token never holds more than your account does at the moment
+it is used, so it loses whatever your account loses.
+
+Two things stay with a signed-in person:
+
+- **Managing tokens.** `rebase cloud tokens list`, `create` and `revoke <id>` take
+  your `rebase cloud login` session. A token cannot list, create or revoke
+  tokens, because a token that could mint tokens could mint its own successor.
+- **Restoring.** No capability grants a backup restore or a point-in-time
+  `restore` and `cutover`. Putting old data over a live database stays with a
+  signed-in owner or admin.
+
+`rebase cloud whoami` with a token set shows what it may do, and on which
+project. `rebase cloud tokens revoke <id> --yes` stops it at once.
+
 ## Compute, and what it costs
 
 A project is priced from what it reserves, not from a tier. `compute` prints
@@ -183,6 +250,7 @@ except one that restarts the database, which waits for a maintenance window.
 | Command group | What it covers |
 |---|---|
 | `login`, `logout`, `whoami` | Your session |
+| `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
@@ -223,14 +291,14 @@ Stated plainly, because finding out later is worse:
   access rather than assuming.
 - **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
   secret URLs you point a repository webhook at — are the supported automation.
-- **CI needs a human's credentials.** There is no machine token yet;
-  `rebase cloud login` takes an email and a password. Pass them as
-  `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD` from a secret store —
-  `--password` puts the password in your shell history and in the process table,
-  and says so before it signs you in. If the repository's `.rebase/cloud.json`
-  names a control plane other than the platform's own, pass it as `--url` too:
-  without a terminal, `login` refuses to send a password to a host that only
-  the checked-out file named.
+- **Tokens act as a person.** A [token](#ci-and-agents) is minted by an account
+  and acts as it; there is no organization-owned machine identity yet. If you
+  sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`
+  from a secret store — `--password` puts the password in your shell history and
+  in the process table, and says so before it signs you in. If the repository's
+  `.rebase/cloud.json` names a control plane other than the platform's own, pass
+  it as `--url` too: without a terminal, `login` refuses to send a password to a
+  host that only the checked-out file named.
 - **Point-in-time recovery is CLI-only.** The console shows backups; the staged
   PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the

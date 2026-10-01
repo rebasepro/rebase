@@ -373,7 +373,8 @@ specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 ```bash
 rebase cloud login      # sign in to the control plane
 rebase cloud logout     # sign out
-rebase cloud whoami     # show the current session
+rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
+rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
 
 #### Project link
@@ -546,23 +547,22 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-Manage scoped service API keys — the credential an agent, script or another
-service uses, as opposed to an end user's session:
+<span class="since-badge" data-since="0.24">Since 0.24</span> Manage the project's service API keys — the credential an agent, script or
+another service uses, as opposed to an end user's session:
 
 ```bash
 rebase api-keys list
-rebase api-keys create --name "Analytics" --permissions '[{"collection":"events","operations":["read"]}]'
-rebase api-keys create --name "Full Access" --full-access --expires 90d
+rebase api-keys create --name "Blog CI" --scopes data:read:posts,data:write:posts --expires-in 90
+rebase api-keys create --name "Ops" --full-access --roles admin --expires-at 2027-01-31
 rebase api-keys revoke abc123-def456
 ```
 
-`--permissions` takes a JSON array of `{ collection, operations }` objects, or use
-`--full-access` for read/write/delete on every collection and function. `--expires`
-accepts `7d`, `30d`, `90d`, `1y` or an ISO date, and `--rate-limit` sets requests
-per 15-minute window. A key is shown once, at creation.
-
-Keys are double-gated: the key's own permissions and the row-level security of the
-identity it acts as both apply, so a key can never read more than that identity can.
+`--scopes` names what the key may do, comma-separated or repeated; `--full-access`
+gives it every scope the service key holds except `keys:*`. `--roles` adds RLS
+roles beside `service`, `--expires-in` takes days and `--expires-at` an ISO date.
+`rebase api-keys scopes` lists every scope the backend knows. A key is shown once.
+The key's scopes and the row-level security of the identity it acts as both apply.
+See [API keys](/docs/backend/api-keys/).
 
 ### `rebase skills install`
 

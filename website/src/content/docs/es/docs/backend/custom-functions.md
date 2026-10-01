@@ -1,5 +1,5 @@
 ---
-sourceHash: 65910bc3708c9f5d
+sourceHash: ec641aaae29499e9
 title: Funciones personalizadas
 sidebar_label: Funciones personalizadas
 description: Añade endpoints de API de Hono personalizados junto a tus rutas CRUD de Rebase. Detección automática desde un directorio, con acceso completo a la instancia del backend.
@@ -121,7 +121,7 @@ Archivos que se **omiten**:
 - `*.d.ts` — declaraciones de tipos
 - Subdirectorios y archivos `.mts` / `.cts` / `.tsx` / `.jsx` / `.mjs` / `.cjs` — se reportan como problemas, ya que la compilación procesa más de lo que el entorno de ejecución carga
 
-El nombre también define la identidad de la función en todos los demás lugares: es el segmento de la URL, el permiso de clave de API `functions/<name>` y el valor por el cual `REBASE_FUNCTIONS_ONLY` filtra cuando asignas a una función su propio proceso.
+El nombre también define la identidad de la función en todos los demás lugares: es el segmento de la URL, el destino del alcance `functions:invoke:<name>` que necesita una clave para llamarla y el valor por el cual `REBASE_FUNCTIONS_ONLY` filtra cuando asignas a una función su propio proceso.
 
 ## Formatos de exportación
 
@@ -200,18 +200,18 @@ Un emisor que presente un token *inválido* nunca llega a tu manejador: el propi
 ### Lectura del emisor de la solicitud
 
 ```typescript
-import { defineFunction, getUser, getUserId, getRoles, isAdmin } from "@rebasepro/server/functions";
+import { defineFunction, getUser, getUserId, getRoles, getScopes, isAdmin } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
     app.get("/me", (c) => {
         const user = getUser(c);          // { uid, roles, ...claims } | undefined
         if (!user) return c.json({ error: "Unauthorized" }, 401);
-        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c) });
+        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c), scopes: getScopes(c) });
     });
 });
 ```
 
-`getUser` devuelve un objeto tipado de forma más específica: `uid` es un string y `roles` siempre es un array, independientemente del método de autenticación que haya utilizado el emisor. `getUserId(c)` y `getRoles(c)` son atajos.
+`getUser` devuelve un objeto tipado de forma más específica: `uid` es un string y `roles` siempre es un array, independientemente del método de autenticación que haya utilizado el emisor. `getUserId(c)` y `getRoles(c)` son atajos. `getScopes(c)` es todo lo que puede hacer el emisor, como cadenas de [alcance](/docs/backend/roles-and-scopes/): para una persona, el plano de datos, los alcances propios de la aplicación y los alcances de sus roles; para una clave de API, exactamente lo que tiene la clave.
 
 ### Protección de rutas
 
@@ -225,7 +225,7 @@ export default defineFunction((app) => {
     // 401 for anonymous callers.
     app.post("/protected", requireAuth, (c) => c.json({ message: `Hello, ${getUserId(c)}` }));
 
-    // 401 anonymous, 403 without an administrative role. Order matters.
+    // 401 anonymous, 403 without the admin role. Order matters.
     app.post("/admin-only", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 
     // Any one of the named roles.
@@ -238,6 +238,26 @@ Coloca las restricciones (*guards*) en la **propia posición de middleware de la
 :::important
 Leer `getUser(c)` **no** es un guardia de seguridad (*guard*). Un emisor anónimo obtiene `undefined` y tu manejador se ejecuta de todos modos. Solo un guard, o un `if (!user) return 401` explícito, detiene la solicitud.
 :::
+
+### Alcances y alcances de la aplicación
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `requireAdmin` admite el rol `admin` y a nadie más. Para una acción a la que deban llegar un rol más restringido o una clave de API, protege la ruta con `requireScope`. Acepta un [alcance](/docs/backend/roles-and-scopes/) integrado, o uno que la aplicación declara bajo `auth.scopes` en la colección de usuarios, como `"project:deploy": { label: "Deploy projects", target: "project" }`:
+
+```typescript
+import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    // 403 SCOPE_MISSING unless the caller holds project:deploy, or project:deploy:<this project>.
+    app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
+        return c.json({ deploying: c.req.param("project") });
+    });
+
+    // The same question inside a handler.
+    app.get("/:project/can-deploy", requireAuth, (c) => c.json({ allowed: hasScope(c, "project:deploy", c.req.param("project")) }));
+});
+```
+
+Toda persona con la sesión iniciada tiene todos los alcances de la aplicación, así que para una persona `requireScope` no decide nada: comprueba en el manejador si esta persona puede desplegar este proyecto. Lo que añade el alcance es una forma de **restringir una clave**: una clave que tiene `project:deploy:p1` solo pasa para `p1`. Una clave también necesita `functions:invoke`, o `functions:invoke:<name>`, para llegar siquiera a la función. Consulta [Alcances de la aplicación](/docs/backend/roles-and-scopes/#app-scopes).
 
 ### Autenticación mediante Service Key
 
@@ -544,7 +564,7 @@ Si la carga falla, el cargador proporciona información de diagnóstico:
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
 
-El enrutador se monta para el **directorio**, no para las funciones individuales dentro de él. Si todos los archivos fallan al importarse (una sola variable de entorno faltante en el alcance del módulo es suficiente para derribarlos a todos), `GET /api/functions` responderá igualmente con un `200` con una lista vacía más un contador de `skipped`, de modo que "nada cargado" se pueda distinguir de "esta compilación no incluía funciones". El listado en sí requiere un emisor autenticado, una clave de API o la service key; las funciones siguen siendo invocables por quien cada una admita, pero el inventario de las mismas no es público. Los motivos permanecen en el registro de arranque.
+El enrutador se monta para el **directorio**, no para las funciones individuales dentro de él. Si todos los archivos fallan al importarse (una sola variable de entorno faltante en el alcance del módulo es suficiente para derribarlos a todos), `GET /api/functions` responderá igualmente con un `200` con una lista vacía más un contador de `skipped`, de modo que "nada cargado" se pueda distinguir de "esta compilación no incluía funciones". El listado en sí requiere un emisor autenticado, una clave de API que tenga el alcance `functions:invoke` sin destino, o la service key; las funciones siguen siendo invocables por quien cada una admita, pero el inventario de las mismas no es público. Los motivos permanecen en el registro de arranque.
 
 ## Tiempos de espera y límites de tasa (*Rate Limits*)
 

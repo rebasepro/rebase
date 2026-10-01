@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c05763a61028751
+sourceHash: 6e15a506e712f1ad
 title: Runtime und Bundles
 sidebar_label: Runtime & Bundles
 description: Wie ein Rebase-Projekt in ein Projekt-Bundle und eine versionierte Runtime aufgeteilt wird und warum genau diese Trennung Upgrades, Multi-Repo-Apps und Managed Hosting ermöglicht.
@@ -114,5 +114,5 @@ Mehrere Datenbanken und Buckets werden konfiguriert, indem der Source-Key als Su
 | `GET /health` | Readiness (Bereitschaft). Führt einen Round-Trip zur Datenbank durch. |
 | `GET /livez` | Liveness (Lebendigkeit). Berührt bewusst *nicht* die Datenbank, damit ein kurzer Datenbankaussetzer den Orchestrator nicht dazu veranlasst, einen gesunden Prozess zu beenden. |
 | `GET /api/meta/schema-version` | Die aktuelle Schema-Version. Nicht authentifiziert – es handelt sich um einen Versionsstempel, nicht um ein Schema. |
-| `GET /api/meta/contract` | Der vollständige Collection-Contract. Nur für Administratoren. |
+| `GET /api/meta/contract` | Der vollständige Collection-Contract. Braucht `schema:read`. |
 | `GET /metrics` | Prometheus-Metriken, wenn `REBASE_METRICS=true`. |

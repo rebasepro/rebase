@@ -100,7 +100,10 @@ section is background; this is the actual sequence.
 2. Import `requireAuth` / `requireAdmin` from `@rebasepro/server/functions` and
    pass them in the route's own middleware slot: `app.post("/", requireAuth,
    handler)`. A function is **public until you do** — webhook receivers need
-   that — and `app.use()` written after a route never covers it.
+   that — and `app.use()` written after a route never covers it. For an action
+   a narrower role or an API key should reach, declare a scope under
+   `auth.scopes` on the users collection and guard with `requireScope` instead
+   of `requireAdmin` (see `rebase-custom-functions`).
 3. Read configuration inside the handler with `requireEnv(c, "NAME")`. A
    `process.env` read at module scope throws at import time, and the loader
    reports that as a skipped function: the route just 404s.

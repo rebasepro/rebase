@@ -1,5 +1,5 @@
 ---
-sourceHash: b49ac798fe385796
+sourceHash: 4c3ab79cfd150295
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -358,6 +358,15 @@ Le sottoscrizioni WebSocket rispettano automaticamente i criteri di Row-Level Se
 3. Il token viene verificato una sola volta, all'autenticazione del socket, e il server non lo controlla più per l'intera durata della connessione. Un token di accesso che scade, una sessione revocata o un ruolo rimosso non modificano ciò che un socket aperto può leggere fino a quando non si riautentica o si riconnette. L'SDK riautentica il proprio socket ogni volta che aggiorna il token e lo disconnette al logout; un client che implementa direttamente il protocollo mantiene l'identità con cui è stato aperto finché non si riconnette.
 
 Ciò significa che ogni socket riceve aggiornamenti solo per i record che la sua identità autenticata ha il permesso di visualizzare.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Anche una [chiave API](/docs/backend/api-keys/) autentica il socket: invia la chiave
+`rk_…` dove andrebbe l'access token. Il socket verifica quindi ogni frame
+rispetto agli [scope](/docs/backend/roles-and-scopes/) della chiave: un fetch, un conteggio o una
+sottoscrizione richiedono `data:read` sulla loro collezione, un salvataggio `data:write`, un'eliminazione
+`data:delete`. Un percorso annidato richiede lo scope semplice. I canali (broadcast e
+presence) sono rifiutati per una chiave, perché nessuno scope li copre. I messaggi dell'editor SQL e
+dei branch richiedono `database:read` o `database:write`, sia per una chiave sia per una
+persona.
 
 L'esecuzione di più istanze — il bus LISTEN/NOTIFY, il comportamento della presence tra processi e la scrittura di un transport personalizzato — è descritta in una pagina dedicata:
 [Realtime tra istanze](/docs/backend/realtime-transports/).

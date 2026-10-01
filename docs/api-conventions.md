@@ -24,13 +24,18 @@ to it.
 | Data plane | `/data`, `/storage`, `/functions` | Whoever the collection's rules and the API key's scopes allow |
 | Auth | `/auth` | Public by design — this is where a caller *becomes* somebody |
 | Well-known | `/.well-known` | Public, and required to be, by the specs that define it |
-| Admin | `/admin/**` | An admin, always |
+| Admin | `/admin/**` | A caller holding the surface's admin-plane scope (`users:read`, `cron:write`, …) — an admin holds them all |
 | Mixed | `/meta` | Per route, documented at the route |
 
 **An admin-only surface lives under `/admin`.** No exceptions that are not
 listed in §7. This is the rule the codebase most recently broke and the one most
 worth keeping: `/api/cron` looked like a data-plane path and was an admin
 surface, and the only way to know was to read `init.ts`.
+
+**Each admin surface names its scope.** Gate it with
+`applyAdminGate(router, surface, scope)` in `init.ts` — one admin-plane scope, or
+a `{ read, write }` pair split along the HTTP method — rather than `requireAdmin`,
+so a narrower role or a key can be given exactly that surface.
 
 ## 2. Errors
 
@@ -154,7 +159,7 @@ before (`packages/server/src/auth/admin-roles.ts`).
 
 ## 7. The exceptions, and why
 
-**`/api/meta`** is mixed rather than admin. `/meta/contract` is admin-gated —
+**`/api/meta`** is mixed rather than admin. `/meta/contract` is gated on `schema:read` —
 it is a full map of the schema, including tables no security rule would expose.
 `/meta/schema-version` is deliberately open: it returns a version string that
 stands for the schema without describing it, and a CI job holding no credentials
@@ -162,7 +167,9 @@ needs it.
 
 **`/api/auth`** is public because it is where a caller becomes somebody. Its
 admin-only siblings — user management, roles, password resets — live under
-`/api/admin` and are gated there.
+`/api/admin` and are gated there. Two routes under it need a session and no
+scope: `/auth/keys`, a person's own API keys, and `/auth/scopes`, the scope
+catalogue. Neither is an admin surface — each answers about the caller only.
 
 **The client SDK still calls the legacy paths.** `@rebasepro/client` defaults
 `cronPath` to `/cron`, not `/admin/cron`. An SDK that moved first would break
@@ -201,15 +208,15 @@ relative to `basePath` unless they start at `/.well-known`, `/mcp`, `/livez`,
 
 | Path | Gate | Notes |
 |---|---|---|
-| `/admin/api-keys` | admin | ✓ |
-| `/admin/users`, `/admin/roles` | admin | ✓ |
-| `/admin/backups` | admin | ✓ |
-| `/admin/rls-audit` | admin | ✓ |
-| `/admin/cron` | admin | **moved** from `/api/cron`; aliased |
-| `/admin/logs` | admin | **moved** from `/api/logs`; aliased |
-| `/admin/schema-editor` | admin | **moved** from `/api/schema-editor`; aliased |
-| `/admin/schema` | admin | new — live schema editing |
-| `/admin/dev/emails` | admin | the development mailbox; `501 DEV_MAILBOX_UNAVAILABLE` unless mail is being captured (no `SMTP_HOST`, not production) |
+| `/admin/api-keys` | `keys:read` / `keys:write`; never an API key | ✓ |
+| `/admin/users`, `/admin/roles` | `users:read` / `users:write` | ✓ |
+| `/admin/backups` | `backups:read` | ✓ |
+| `/admin/rls-audit` | `schema:read` | ✓ |
+| `/admin/cron` | `cron:read` / `cron:write` | **moved** from `/api/cron`; aliased |
+| `/admin/logs` | `logs:read` | **moved** from `/api/logs`; aliased |
+| `/admin/schema-editor` | `schema:read` / `schema:write` | **moved** from `/api/schema-editor`; aliased |
+| `/admin/schema` | `schema:read`; apply needs `schema:write` | new — live schema editing |
+| `/admin/dev/emails` | `users:write` | the development mailbox; `501 DEV_MAILBOX_UNAVAILABLE` unless mail is being captured (no `SMTP_HOST`, not production) |
 
 ### Data plane
 
@@ -233,7 +240,7 @@ relative to `basePath` unless they start at `/.well-known`, `/mcp`, `/livez`,
 
 | Path | Gate | Notes |
 |---|---|---|
-| `/mcp` | an OAuth access token minted for this resource | not under `basePath`. `POST` is JSON-RPC; `GET` answers 405, since the server opens no streams |
+| `/mcp` | an OAuth access token minted for this resource, or an `rk_` API key | not under `basePath`. `POST` is JSON-RPC; `GET` answers 405, since the server opens no streams |
 | `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server` | none | discovery documents, public by the RFCs that define them (9728, 8414); the protected-resource one is also served at its path-suffixed form |
 | `/oauth/register` | none | dynamic client registration; `REBASE_MCP_OPEN_REGISTRATION=false` turns it off |
 | `/oauth/authorize`, `/oauth/authorize/decision` | a signed-in person's consent | PKCE (`S256`) is mandatory |
@@ -244,8 +251,8 @@ relative to `basePath` unless they start at `/.well-known`, `/mcp`, `/livez`,
 
 | Path | Notes |
 |---|---|
-| `/meta/contract` | admin-gated inside an ungated router — see §7 |
-| `/docs` | the OpenAPI document. Public unless `enableSwagger` is `false` — the production default when `REBASE_ENABLE_SWAGGER` is unset — and then admin-gated. With no collections served it answers `404 NO_COLLECTIONS` |
+| `/meta/contract` | `schema:read`-gated inside an ungated router — see §7 |
+| `/docs` | the OpenAPI document. Public unless `enableSwagger` is `false` — the production default when `REBASE_ENABLE_SWAGGER` is unset — and then gated on `schema:read`. With no collections served it answers `404 NO_COLLECTIONS` |
 | `/swagger` | Swagger UI over `/docs`. Not mounted in production |
 | `/metrics` | Prometheus text, only when `REBASE_METRICS=true`. Bearer `REBASE_METRICS_TOKEN` when that is set; readable by anyone who can reach the port when it is not, which boot warns about |
 

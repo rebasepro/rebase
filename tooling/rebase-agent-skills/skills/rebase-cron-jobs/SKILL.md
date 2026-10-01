@@ -56,7 +56,7 @@ Rebase will:
 3. Register each default export as a cron job
 4. If a **duplicate job ID** is found, the previous job is overwritten with a warning
 5. Auto-create the `rebase.cron_logs` table in PostgreSQL (unless `cronPersistence: false`)
-6. Mount admin REST routes at `/api/admin/cron` (protected by `requireAuth` + `requireAdmin`)
+6. Mount admin REST routes at `/api/admin/cron` (reads need the `cron:read` scope, trigger/pause need `cron:write`)
 7. Seed in-memory counters (`totalRuns`, `totalFailures`, `lastRunAt`) from the database
 8. Start the scheduler
 
@@ -391,9 +391,9 @@ On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` co
 ## REST API
 
 <!-- docs-verify: ignore -->
-All routes are mounted at `/api/admin/cron` and **require admin authentication** (`requireAuth` + `requireAdmin` middleware). `/api/cron` is kept alive as a legacy alias and answers with a `Deprecation` header; write the `/api/admin` path.
+All routes are mounted at `/api/admin/cron`. `GET` routes need the **`cron:read`** scope; `POST /:id/trigger` and `PUT /:id` need **`cron:write`**. `/api/cron` is kept alive as a legacy alias and answers with a `Deprecation` header; write the `/api/admin` path.
 
-> **IMPORTANT FOR AGENTS**: All cron REST endpoints require an admin JWT or service key in the `Authorization` header. Unauthenticated requests will receive 401/403.
+> **IMPORTANT FOR AGENTS**: The caller needs the scope, whoever it is: an admin (holds every scope), a person whose role declares `cron:read`/`cron:write` under `auth.roles` on the users collection, the service key, or an API key minted with them — the right credential for an external scheduler: `rebase api-keys create --name "Scheduler" --scopes cron:read,cron:write`. Unauthenticated requests get 401; a caller without the scope gets `403 SCOPE_MISSING` with `details.requiredScope`.
 
 ### List All Jobs
 

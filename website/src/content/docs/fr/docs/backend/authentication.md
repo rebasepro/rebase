@@ -1,5 +1,5 @@
 ---
-sourceHash: 78b489b0acdcc296
+sourceHash: 2a2328d2d6223346
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -92,7 +92,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Coupe-circuit : ferme également la fenêtre de bootstrap du premier utilisateur laissée ouverte par `allowRegistration: false` |
 | `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes |
 | `allowUserLookup` | `boolean` | `false` | Monter `POST /api/auth/find-user` pour les flux d'invitation par e-mail |
-| `defaultRole` | `string` | — | Rôle attribué à un utilisateur nouvellement inscrit lorsqu'aucun n'est spécifié |
+| `defaultRole` | `string` | — | Rôle attribué à un utilisateur nouvellement inscrit lorsqu'aucun n'est spécifié. Il ne peut pas être `admin`, ni un rôle déclaré qui détient une portée du plan d'administration : le démarrage refuse les deux |
 | `serviceKey` | `string` | — | Clé statique pour les appels de serveur à serveur — voir [Authentification par clé de service](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, pour la réinitialisation de mot de passe, la vérification, les invitations et les liens magiques |
 | `magicLink` | `boolean` | `false` | Activer la connexion sans mot de passe par e-mail. Nécessite la configuration d'`email` ; sinon, les routes répondent `503 EMAIL_NOT_CONFIGURED` |
@@ -199,7 +199,7 @@ DELETE /api/admin/dev/emails      → empties the mailbox
 
 Chaque message comprend `to`, `subject`, `at`, les contenus `html` et `text`, ainsi que `links` — les URL absolues trouvées dans le corps du message, dans l'ordre du document, ce qui représente l'information véritablement recherchée.
 
-Cet accès est réservé aux administrateurs, via la même barrière de sécurité que celle des crons, des logs et des sauvegardes, et il répond `501 DEV_MAILBOX_UNAVAILABLE` lorsqu'il n'y a rien à servir — avec SMTP configuré, le courrier est distribué plutôt que retenu. `NODE_ENV=production` le refuse quelles que soient les autres configurations : le contenu de ces messages permet une connexion directe.
+Cet accès exige la portée `users:write`, via la même barrière de sécurité que celle des crons, des logs et des sauvegardes, et il répond `501 DEV_MAILBOX_UNAVAILABLE` lorsqu'il n'y a rien à servir — avec SMTP configuré, le courrier est distribué plutôt que retenu. `NODE_ENV=production` le refuse quelles que soient les autres configurations : le contenu de ces messages permet une connexion directe.
 
 ### Codes à usage unique par e-mail
 
@@ -403,11 +403,26 @@ const membersCollection = defineCollection({
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
       resetPassword: true // Or false to disable, or a custom EntityAction
-    }
+    },
+
+    // What each role may do beyond its rows, the app's own scopes,
+    // and whether accounts may create personal API keys
+    roles: {
+      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
+    },
+    scopes: {
+      "project:deploy": { label: "Deploy projects", target: "project" }
+    },
+    personalKeys: true
   },
   properties: { ... }
 });
 ```
+
+`roles`, `scopes` et `personalKeys` déclarent le modèle d'accès : les portées du plan
+d'administration que détient chaque rôle, les portées que l'application définit pour ses propres opérations, et
+si chaque compte peut créer des [clés API personnelles](/docs/backend/api-keys/#personal-keys).
+Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 
 Un `temporaryPassword` renvoyé par `onResetPassword` devient le mot de passe du compte. Rebase le hache avec l'algorithme configuré, l'enregistre, déconnecte l'utilisateur de toutes ses sessions existantes et l'affiche à l'administrateur pour qu'il le transmette. Le hook ne le stocke pas, et n'a aucun moyen de le faire. Ne renvoyez pas de `temporaryPassword` lorsque le hook envoie plutôt son propre lien de réinitialisation par e-mail : le mot de passe reste alors inchangé jusqu'à ce que l'utilisateur en définisse un nouveau, mais ses sessions prennent tout de même fin.
 
@@ -421,6 +436,7 @@ Lorsque les hooks personnalisés (`onCreateUser`, `onResetPassword`) sont appel�
 ## Prochaines étapes
 
 - **[Endpoints and tokens](/docs/backend/auth-endpoints/)** — toutes les routes montées par cette configuration
+- **[Rôles et portées](/docs/backend/roles-and-scopes/)** — ce que chaque rôle peut faire, et comment les clés et les jetons le restreignent
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — intégrer votre propre fournisseur d'identité
 - **[Frontend Authentication](/docs/frontend/authentication/)** — interface de connexion, contrôleur d'authentification, gestion des utilisateurs
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — contrôle d'accès au niveau des lignes

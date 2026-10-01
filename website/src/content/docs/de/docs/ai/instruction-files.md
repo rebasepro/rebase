@@ -1,5 +1,5 @@
 ---
-sourceHash: 3c25626150027572
+sourceHash: ff7df07f90f558a9
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
 description: Jedes erstellte Rebase-Projekt enthält ai-instructions.md sowie dreizeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.
@@ -117,6 +117,10 @@ Besonders der letzte Punkt ist entscheidend. Er macht den Unterschied zwischen
 einer Middleware, die ausgeführt wird, und einer, die es nicht wird. Ein Assistent,
 dem dies nicht mitgeteilt wurde, wird verlässlich die Version schreiben, die nicht
 funktioniert – siehe [Custom Functions](/docs/backend/custom-functions).
+
+`requireAdmin` lässt nur die Rolle `admin` zu. Wenn eine engere Rolle oder ein API-Key
+eine Route aufrufen können soll, ist der hinzuzufügende Guard `requireScope`, mit einem Scope,
+den die App deklariert – siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
 ## Individuelle Anpassung
 

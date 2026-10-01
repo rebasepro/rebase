@@ -1,5 +1,5 @@
 ---
-sourceHash: 82e083381f34098d
+sourceHash: 494cc48e060fb2f1
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -550,7 +550,7 @@ Jeder Hook wird abgewartet, und ein Fehler in einem davon macht den gesamten Sch
 | `GET` | `/api/docs` | keine | Die OpenAPI 3.0-JSON-Spezifikation |
 | `GET` | `/api/swagger` | keine | Swagger UI. In der Entwicklung aktiviert, in der Produktion deaktiviert; `REBASE_ENABLE_SWAGGER` überschreibt dies in beiden Richtungen |
 | `GET` | `/api/meta/schema-version` | keine | Der Schema-Hash, aus dem dieses Backend erstellt wurde — bewusst unauthentifiziert, und es wird nur dieser Hash zurückgegeben |
-| `GET` | `/api/meta/contract` | Admin, Service-Key oder Admin-API-Key | Der vollständige Collection-Vertrag für `rebase generate-sdk --from`. Fail-closed: `404`, wenn keine Authentifizierung konfiguriert ist |
+| `GET` | `/api/meta/contract` | `schema:read`: ein Admin, der Service-Key oder ein API-Key, der ihn hält | Der vollständige Collection-Vertrag für `rebase generate-sdk --from`. Fail-closed: `404`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN`, falls gesetzt | Prometheus-Metriken, wenn `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
@@ -569,7 +569,7 @@ wird einem authentifizierten Admin bereitgestellt:
 GET /api/meta/contract
 ```
 
-Es ist **nur für Admins zugänglich** und wird auf einem Deployment ohne konfigurierte
+Es braucht den Scope **`schema:read`**, den ein Admin hält, und wird auf einem Deployment ohne konfigurierte
 Authentifizierung überhaupt nicht bereitgestellt (404 `CONTRACT_UNAVAILABLE`), anstatt
 das Schema für jeden offenzulegen. Das Gegenstück dazu gibt einen Versions-String zurück,
 der das Schema repräsentiert, ohne es zu beschreiben, und bewusst ohne Anmeldedaten

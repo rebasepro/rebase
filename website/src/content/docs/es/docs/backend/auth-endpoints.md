@@ -1,5 +1,5 @@
 ---
-sourceHash: 42389d34a3b37766
+sourceHash: abb4fea850cf0823
 title: Endpoints y tokens de autenticación
 sidebar_label: Endpoints de autenticación
 description: Las rutas de autenticación que monta el backend de Rebase, las estructuras de sus respuestas, autenticación multifactor, el contexto de base de datos que ve una directiva, JWKS y claves de servicio.
@@ -37,6 +37,10 @@ Todos los endpoints de autenticación están montados en `/api/auth/`:
 | `GET` | `/api/auth/sessions` | Listar las sesiones activas del usuario emisor (refresh tokens) |
 | `DELETE` | `/api/auth/sessions` | Revocar todas las sesiones, incluida esta — cierre de sesión remoto en todos los dispositivos |
 | `DELETE` | `/api/auth/sessions/:id` | Revocar una sesión |
+| `GET` | `/api/auth/scopes` | Todos los [alcances](/docs/backend/roles-and-scopes/) que conoce este backend y los que tiene el emisor |
+| `GET` | `/api/auth/keys` | Las [claves de API personales](/docs/backend/api-keys/#personal-keys) propias del emisor |
+| `POST` | `/api/auth/keys` | Crear una clave personal. `403 PERSONAL_KEYS_DISABLED` salvo que la colección de usuarios establezca `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | Revocar una de las claves propias del emisor |
 | `GET` | `/.well-known/jwks.json` | El JWKS público — montado en la raíz, no bajo `basePath`, porque allí es donde busca un verificador. Presente cuando se configura la [firma asimétrica](#asymmetric-tokens-and-jwks) |
 | `POST` | `/api/auth/mfa/enroll` | Iniciar el registro de TOTP (devuelve el secreto y los códigos de recuperación) |
 | `POST` | `/api/auth/mfa/verify` | Confirmar un registro con un código del autenticador |
@@ -45,7 +49,7 @@ Todos los endpoints de autenticación están montados en `/api/auth/`:
 | `POST` | `/api/auth/mfa/challenge/verify` | Responder a un desafío — esto es lo que emite la sesión |
 | `DELETE` | `/api/auth/mfa/unenroll` | Eliminar un factor (requiere una sesión `aal2`) |
 
-La gestión administrativa de usuarios y roles es una **superficie independiente**, montada en `/api/admin/` en lugar de `/api/auth/`, y restringida al rol `admin` o a la clave de servicio:
+La gestión administrativa de usuarios y roles es una **superficie independiente**, montada en `/api/admin/` en lugar de `/api/auth/`. Leer necesita el alcance `users:read` y cambiar necesita `users:write`. Un administrador y la clave de servicio tienen ambos; también los tiene un rol que los declare. Nadie puede cambiar una cuenta que tenga más que él. Consulte [Roles y alcances](/docs/backend/roles-and-scopes/).
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -55,7 +59,7 @@ La gestión administrativa de usuarios y roles es una **superficie independiente
 | `PUT` | `/api/admin/users/:uid` | Actualizar un usuario |
 | `DELETE` | `/api/admin/users/:uid` | Eliminar un usuario |
 | `POST` | `/api/admin/users/:uid/reset-password` | Restablecer la contraseña de un usuario sin su contraseña actual |
-| `GET` | `/api/admin/roles` | Listar los roles que conoce este backend |
+| `GET` | `/api/admin/roles` | `admin` y los roles que declara la colección de usuarios, con sus alcances |
 | `POST` | `/api/admin/bootstrap` | Permitir que el primer usuario registrado reclame el rol de administrador mientras no exista ninguno. Rechazado en producción — consulte [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 Todos los endpoints de la API de datos requieren una cabecera `Authorization: Bearer <token>` válida cuando `requireAuth: true` (el valor predeterminado).

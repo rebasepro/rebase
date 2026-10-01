@@ -45,9 +45,10 @@ zero side does — and whether any test ever reaches it. `first`, `needsSetup`,
 
 **Watch for:** a zero-state branch that opens access rather than closing it. An
 empty permission list must mean *no permissions*, never *all permissions*.
-`api-key-permission-guard.ts` is the reference: it loops and returns `false` at
-the end, so an empty or unparseable list fails closed by construction rather than
-by a check someone has to remember.
+`scopeGrants` in `packages/types/src/types/scopes.ts` is the reference: it loops
+over the held scopes and returns `false` at the end, so an empty or unparseable
+list fails closed by construction rather than by a check someone has to
+remember.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c92103faece259e
+sourceHash: b39d5a790d94c656
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -285,7 +285,15 @@ Le gestionnaire peut renvoyer n'importe quelle valeur sérialisable en JSON. Ell
 
 ## API REST
 
-Toutes les routes cron nécessitent une **authentification administrateur** (`requireAuth` + `requireAdmin`).
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> La lecture exige la portée `cron:read`. Déclencher, mettre en pause et reprendre exigent
+`cron:write`. Un administrateur détient les deux. Une personne dont le rôle les déclare aussi, ainsi
+qu'une clé API créée avec elles, ce que devrait porter un planificateur externe :
+
+```bash
+rebase api-keys create -n "Scheduler" --scopes cron:read,cron:write
+```
+
+Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 
 | Méthode | Chemin | Description |
 |---------|--------|-------------|
@@ -297,8 +305,9 @@ Toutes les routes cron nécessitent une **authentification administrateur** (`re
 
 ### Exemple : Lister toutes les tâches
 
-`$TOKEN` est un jeton d'accès administrateur : connectez-vous et utilisez l'`accessToken` renvoyé
-par la réponse de connexion. `$API_URL` correspond à ce que `rebase dev` a affiché — le port étant dérivé
+`$TOKEN` est un jeton d'accès pour un compte qui détient `cron:read` : connectez-vous et utilisez
+l'`accessToken` renvoyé par la réponse de connexion. Une clé API qui détient cette portée fonctionne
+de la même façon. `$API_URL` correspond à ce que `rebase dev` a affiché — le port étant dérivé
 du chemin du projet, il n'y a pas de port fixe.
 
 ```bash

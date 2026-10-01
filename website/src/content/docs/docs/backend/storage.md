@@ -534,6 +534,17 @@ Worth knowing:
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
 - Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
 
+### API keys and tokens
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in person holds every storage scope, so the hook and the policies above
+decide for them. An [API key](/docs/backend/api-keys/) also needs the storage
+scope for the operation, on the source the request names: `storage:read` for
+downloads, metadata and listings, `storage:write` for uploads, folders and every
+step of a resumable upload, `storage:delete` for deletes. The target is the
+source id, and the default source's is `(default)`: `storage:read:(default)`,
+`storage:write:avatars`. Without it the answer is `403 SCOPE_MISSING`. With it,
+the hook still runs, as whoever the key acts as.
+
 ## Reacting to an upload
 
 Every other write in Rebase can be reacted to — a row has `beforeSave` and

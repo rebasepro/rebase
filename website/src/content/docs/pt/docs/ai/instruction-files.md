@@ -1,5 +1,5 @@
 ---
-sourceHash: 3c25626150027572
+sourceHash: ff7df07f90f558a9
 title: Arquivos de Instruções de IA
 sidebar_label: Arquivos de Instruções de IA
 description: Todo projeto Rebase estruturado inclui ai-instructions.md mais arquivos de ponteiro de três linhas para Claude, Cursor, Windsurf, Copilot e AGENTS.md — uma única fonte de verdade, muitos nomes de arquivo.
@@ -112,6 +112,10 @@ Essa última regra é fundamental. Ela faz a diferença entre um middleware que
 é executado e um que não é, e um assistente que não foi avisado invariavelmente
 escreverá a versão que não executa — consulte
 [Custom Functions](/docs/backend/custom-functions).
+
+`requireAdmin` admite apenas o papel `admin`. Quando um papel mais restrito ou uma chave de API
+deve poder chamar uma rota, a proteção a adicionar é `requireScope`, com um escopo
+que o app declara — consulte [Papéis e escopos](/docs/backend/roles-and-scopes/#app-scopes).
 
 ## Tornando-o seu
 

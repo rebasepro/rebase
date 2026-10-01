@@ -1,5 +1,5 @@
 ---
-sourceHash: 41183c8dc79d618d
+sourceHash: 589741179a41eb37
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escada de extensão do lado do servidor — declaração, callback de coleção, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.
@@ -187,8 +187,9 @@ para entender a estrutura.
 :::caution[Nenhum middleware de autenticação foi executado ali]
 Uma rota registrada dessa forma fica **fora** de todos os roteadores do Rebase, portanto
 `getDriver(c)` não estará definido e nada terá verificado um token. Proteja-a com
-`requireAuth` / `requireAdmin` importados de **`@rebasepro/server`** — a raiz
-do pacote — que verificam o token por conta própria. Os guards exportados de
+`requireAuth` importado de **`@rebasepro/server`** — a raiz do pacote — que
+verifica o token por conta própria, e depois com `requireAdmin` ou `requireScope` do mesmo
+import para decidir o que o chamador pode fazer. Os guards exportados de
 `@rebasepro/server/functions` leem uma identidade que um roteador do Rebase já
 resolveu e retornam 500 em vez de fingir que ela existe.
 :::

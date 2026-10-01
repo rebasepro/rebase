@@ -1,5 +1,5 @@
 ---
-sourceHash: 68889c97cefde465
+sourceHash: 2becc78f920b157e
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -545,6 +545,17 @@ Da sapere:
 - **`list` è regolato in base al prefisso.** L'elenco è il modo in cui si scoprono chiavi di cui nessuno ti ha parlato.
 - **I caricamenti ripristinabili (TUS) vengono regolati al momento della creazione**, evitando che un caricamento negato lasci file temporanei residui.
 - L'omissione dell'hook mantiene il comportamento precedente, non impattando le app single-tenant.
+
+### Chiavi API e token
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Una persona autenticata possiede ogni scope dello storage, quindi per lei decidono l'hook e le policy descritti sopra.
+Una [chiave API](/docs/backend/api-keys/) ha bisogno anche dello scope dello storage
+per l'operazione, sulla sorgente indicata dalla richiesta: `storage:read` per
+download, metadati ed elenchi, `storage:write` per caricamenti, cartelle e ogni
+passaggio di un caricamento ripristinabile, `storage:delete` per le eliminazioni. Il target è
+l'id della sorgente, e quello della sorgente predefinita è `(default)`: `storage:read:(default)`,
+`storage:write:avatars`. Senza di esso la risposta è `403 SCOPE_MISSING`. Con esso,
+l'hook viene comunque eseguito, con l'identità con cui agisce la chiave.
 
 ## Reagire a un Caricamento
 

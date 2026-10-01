@@ -1,5 +1,5 @@
 ---
-sourceHash: dbaee87f7378ffd7
+sourceHash: 5d7dd80d4991fd97
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -14,13 +14,13 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-Las tres están restringidas a administradores, al igual que cualquier otra superficie de `/api/admin`. La aplicación requiere algo más que ser administrador; consulta [Quién puede aplicar cambios](#quién-puede-aplicar-cambios).
+El estado y el plan necesitan el alcance `schema:read`, y aplicar necesita `schema:write`, al igual que cualquier otra superficie de `/api/admin` que nombra un alcance. Un administrador tiene ambos. Aplicar también requiere algo más que el alcance; consulta [Quién puede aplicar cambios](#quién-puede-aplicar-cambios).
 
 ## Planifica antes de aplicar
 
 `/plan` no tiene efectos secundarios. Envía la colección tal como debería quedar y te indicará qué implica el cambio:
 
-`$ADMIN_TOKEN` es un token de acceso de administrador: el `accessToken` que devuelve un inicio de sesión para una cuenta con el rol de administrador. Nada en la máquina lo configura por ti.
+`$ADMIN_TOKEN` es un token de acceso (el `accessToken` que devuelve un inicio de sesión) para una cuenta que tiene `schema:read`: un administrador, o un rol que lo declare. Nada en la máquina lo configura por ti.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -94,18 +94,18 @@ Estas rutas son relativas a tu **proyecto**, no a tu repositorio. Cuando ambos s
 
 El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el suyo a partir de las colecciones en cada ejecución, en `.rebase/sql/`, que Git ignora.
 
-El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye al administrador que lo realizó. Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
+El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye a la persona que lo realizó. Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
 
 ## Quién puede aplicar cambios
 
-Ser administrador es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
+Tener `schema:read` es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
 
 Aplicar los cambios es un privilegio adicional, porque aplicar escribe un commit y un commit lleva un autor:
 
 | Solicitante | Planificar | Aplicar |
 |---|---|---|
-| Un administrador autenticado | sí | sí |
-| Una clave de API | sí | no |
+| Una persona autenticada que tiene `schema:write` | sí | sí |
+| Una clave de API que tiene `schema:read` / `schema:write` | sí | no |
 | La service key del servidor | sí | no |
 
 Una credencial no es un autor. `api-key:7c3f…` en tu entorno de CI no es una persona, y permitirle escribir en tu repositorio produce exactamente el historial sin atribuir que esta característica busca reemplazar.

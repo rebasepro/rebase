@@ -1,5 +1,5 @@
 ---
-sourceHash: 82e083381f34098d
+sourceHash: 494cc48e060fb2f1
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -453,7 +453,7 @@ Ogni hook viene atteso, e un errore lanciato da uno qualsiasi di essi annulla l'
 | `GET` | `/api/docs` | nessuna | La specifica JSON di OpenAPI 3.0 |
 | `GET` | `/api/swagger` | nessuna | Swagger UI. Attivo in fase di sviluppo, disattivato in produzione; `REBASE_ENABLE_SWAGGER` ne sovrascrive lo stato in entrambi i casi |
 | `GET` | `/api/meta/schema-version` | nessuna | L'hash dello schema da cui è stato compilato questo backend — deliberatamente non autenticato, restituisce solo tale hash |
-| `GET` | `/api/meta/contract` | admin, service key o admin API key | Il contratto completo delle collection, per `rebase generate-sdk --from`. Fail-closed: `404` se non è configurata alcuna autenticazione |
+| `GET` | `/api/meta/contract` | `schema:read`: un admin, la service key o una API key che lo possiede | Il contratto completo delle collection, per `rebase generate-sdk --from`. Fail-closed: `404` se non è configurata alcuna autenticazione |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando impostato | Metriche di Prometheus, se `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
@@ -471,7 +471,7 @@ Lo schema completo delle collection del progetto — ogni collection, proprietà
 GET /api/meta/contract
 ```
 
-È accessibile **solo agli amministratori** e, su un deployment privo di autenticazione configurata, non viene restituito affatto (404 `CONTRACT_UNAVAILABLE`) anziché esporre lo schema pubblicamente. Il suo endpoint complementare restituisce una stringa di versione che identifica lo schema senza descriverlo ed è deliberatamente accessibile senza alcuna credenziale — ed è ciò su cui esegue il polling un job di CI:
+Richiede lo scope **`schema:read`**, che un amministratore possiede, e, su un deployment privo di autenticazione configurata, non viene restituito affatto (404 `CONTRACT_UNAVAILABLE`) anziché esporre lo schema pubblicamente. Il suo endpoint complementare restituisce una stringa di versione che identifica lo schema senza descriverlo ed è deliberatamente accessibile senza alcuna credenziale — ed è ciò su cui esegue il polling un job di CI:
 
 ```bash
 GET /api/meta/schema-version

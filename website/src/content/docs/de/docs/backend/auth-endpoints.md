@@ -1,5 +1,5 @@
 ---
-sourceHash: 42389d34a3b37766
+sourceHash: abb4fea850cf0823
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -37,6 +37,10 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `GET` | `/api/auth/sessions` | Aktive Sitzungen (Refresh-Tokens) des Aufrufers auflisten |
 | `DELETE` | `/api/auth/sessions` | Jede Sitzung widerrufen, einschließlich dieser – Remote-Abmeldung auf jedem Gerät |
 | `DELETE` | `/api/auth/sessions/:id` | Eine Sitzung widerrufen |
+| `GET` | `/api/auth/scopes` | Jeder [Scope](/docs/backend/roles-and-scopes/), den dieses Backend kennt, und die, die der Aufrufer hält |
+| `GET` | `/api/auth/keys` | Die eigenen [persönlichen API-Schlüssel](/docs/backend/api-keys/#personal-keys) des Aufrufers |
+| `POST` | `/api/auth/keys` | Einen persönlichen Schlüssel erstellen. `403 PERSONAL_KEYS_DISABLED`, außer die Users-Collection setzt `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | Einen der eigenen Schlüssel des Aufrufers widerrufen |
 | `GET` | `/.well-known/jwks.json` | Das öffentliche JWKS – am Root eingebunden, nicht unter `basePath`, da ein Verifizierer dort sucht. Vorhanden, wenn [asymmetrische Signierung](#asymmetric-tokens-and-jwks) konfiguriert ist |
 | `POST` | `/api/auth/mfa/enroll` | TOTP-Registrierung starten (gibt das Secret und Wiederherstellungscodes zurück) |
 | `POST` | `/api/auth/mfa/verify` | Registrierung mit einem Code aus dem Authentifikator bestätigen |
@@ -45,7 +49,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `POST` | `/api/auth/mfa/challenge/verify` | Challenge beantworten – dies stellt die Sitzung aus |
 | `DELETE` | `/api/auth/mfa/unenroll` | Faktor entfernen (erfordert eine `aal2`-Sitzung) |
 
-Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittstelle**, die unter `/api/admin/` statt `/api/auth/` eingebunden ist und die `admin`-Rolle oder den Service-Schlüssel erfordert:
+Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittstelle**, die unter `/api/admin/` statt `/api/auth/` eingebunden ist. Lesen braucht den Scope `users:read`, Ändern braucht `users:write`. Ein Admin und der Service-Schlüssel halten beide; ebenso eine Rolle, die sie deklariert. Niemand darf ein Konto ändern, das mehr hält als er selbst. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
@@ -55,7 +59,7 @@ Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittste
 | `PUT` | `/api/admin/users/:uid` | Einzelnen Benutzer aktualisieren |
 | `DELETE` | `/api/admin/users/:uid` | Einzelnen Benutzer löschen |
 | `POST` | `/api/admin/users/:uid/reset-password` | Passwort eines Benutzers ohne dessen aktuelles Passwort zurücksetzen |
-| `GET` | `/api/admin/roles` | Rollen auflisten, die diesem Backend bekannt sind |
+| `GET` | `/api/admin/roles` | `admin` und die Rollen, die die Users-Collection deklariert, mit ihren Scopes |
 | `POST` | `/api/admin/bootstrap` | Dem am frühesten registrierten Benutzer erlauben, die Administratorrolle zu beanspruchen, solange keine existiert. In der Produktion abgelehnt – siehe [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 Alle Daten-API-Endpunkte erfordern einen gültigen `Authorization: Bearer <token>`-Header, wenn `requireAuth: true` gesetzt ist (Standardeinstellung).

@@ -1,5 +1,5 @@
 ---
-sourceHash: dbaee87f7378ffd7
+sourceHash: 5d7dd80d4991fd97
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -19,18 +19,18 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-Todas as três rotas são restritas a administradores, como qualquer outra
-superfície de `/api/admin`. A aplicação exige algo além de ser um administrador —
-consulte [Quem pode aplicar](#quem-pode-aplicar).
+Status e plan requerem o escopo `schema:read`, e apply requer `schema:write`, como
+qualquer outra superfície de `/api/admin` que nomeia um escopo. Um administrador tem os dois.
+A aplicação também exige algo além do escopo — consulte [Quem pode aplicar](#quem-pode-aplicar).
 
 ## Planeje antes de aplicar
 
 O `/plan` não tem efeitos colaterais. Envie a coleção como ela deve ficar no
 final, e ele informa o que a alteração significa:
 
-`$ADMIN_TOKEN` é um token de acesso de administrador — o `accessToken` que um
-login retorna para uma conta com a função de administrador. Nada na máquina o
-define para você.
+`$ADMIN_TOKEN` é um token de acesso — o `accessToken` que um login retorna — de uma
+conta que tem `schema:read`: um administrador, ou uma role que o declara. Nada na
+máquina o define para você.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -134,13 +134,13 @@ Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o pr�
 SQL a partir das coleções a cada execução, em `.rebase/sql/`, que fica no gitignore.
 
 A mensagem de commit descreve a alteração em vez de simplesmente anunciar uma, e
-é atribuída ao administrador que a realizou. Uma alteração de schema com autor e
+é atribuída à pessoa que a realizou. Uma alteração de schema com autor e
 diff no histórico do seu projeto é algo que nem o Firebase nem o Supabase
 oferecem — as edições de tabela deles são invisíveis para o seu repositório.
 
 ## Quem pode aplicar
 
-Ser um administrador é suficiente para **planejar** (*plan*). O planejamento
+Ter `schema:read` é suficiente para **planejar** (*plan*). O planejamento
 não tem efeitos colaterais, e uma tarefa de CI verificando se uma alteração de
 coleção proposta é aplicável é um bom uso para ele.
 
@@ -149,8 +149,8 @@ um autor:
 
 | Chamador | Plan | Apply |
 |---|---|---|
-| Um administrador autenticado | sim | sim |
-| Uma chave de API | sim | não |
+| Uma pessoa autenticada que tem `schema:write` | sim | sim |
+| Uma chave de API que tem `schema:read` / `schema:write` | sim | não |
 | A chave de serviço do servidor | sim | não |
 
 Uma credencial não é um autor. `api-key:7c3f…` no seu ambiente de CI não é

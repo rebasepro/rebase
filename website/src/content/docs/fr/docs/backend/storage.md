@@ -1,5 +1,5 @@
 ---
-sourceHash: 68889c97cefde465
+sourceHash: 2becc78f920b157e
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -533,6 +533,17 @@ Bon à savoir :
 - **`list` est filtré selon le préfixe.** L'opération de listage permet de découvrir des clés dont personne ne vous a communiqué l'existence.
 - **Les téléversements avec reprise (TUS) sont filtrés dès la création**, ainsi un téléversement refusé ne laisse aucun fichier temporaire derrière lui.
 - Omettre le hook préserve le comportement antérieur, de sorte que les applications mono-tenant ne sont pas impactées.
+
+### Clés API et jetons
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une personne connectée détient toutes les portées de stockage, donc le hook et les politiques ci-dessus
+décident pour elle. Une [clé API](/docs/backend/api-keys/) a aussi besoin de la portée de
+stockage de l'opération, sur la source que nomme la requête : `storage:read` pour les
+téléchargements, les métadonnées et les listages, `storage:write` pour les téléversements, les dossiers et chaque
+étape d'un téléversement avec reprise, `storage:delete` pour les suppressions. La cible est
+l'identifiant de la source, et celui de la source par défaut est `(default)` : `storage:read:(default)`,
+`storage:write:avatars`. Sans elle, la réponse est `403 SCOPE_MISSING`. Avec elle,
+le hook s'exécute quand même, en tant que l'identité pour laquelle la clé agit.
 
 ## Réagir à un téléversement
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 65910bc3708c9f5d
+sourceHash: ec641aaae29499e9
 title: Benutzerdefinierte Funktionen
 sidebar_label: Benutzerdefinierte Funktionen
 description: Fügen Sie benutzerdefinierte Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -121,7 +121,7 @@ Dateien, die **übersprungen** werden:
 - `*.d.ts` – Typdeklarationen
 - Unterverzeichnisse und `.mts`- / `.cts`- / `.tsx`- / `.jsx`- / `.mjs`- / `.cjs`-Dateien – werden als Probleme gemeldet, da der Build mehr kompiliert, als die Runtime lädt
 
-Der Name ist auch überall sonst die Identität der Funktion: Er ist das URL-Segment, die API-Schlüssel-Berechtigung `functions/<name>` und der Wert, nach dem `REBASE_FUNCTIONS_ONLY` filtert, wenn Sie einer Funktion einen eigenen Prozess zuweisen.
+Der Name ist auch überall sonst die Identität der Funktion: Er ist das URL-Segment, das Ziel des Scopes `functions:invoke:<name>`, den ein Schlüssel braucht, um sie aufzurufen, und der Wert, nach dem `REBASE_FUNCTIONS_ONLY` filtert, wenn Sie einer Funktion einen eigenen Prozess zuweisen.
 
 ## Export-Formate
 
@@ -200,18 +200,18 @@ Ein Aufrufer, der ein *ungültiges* Token vorlegt, erreicht Ihren Handler nie: E
 ### Auslesen des Aufrufers
 
 ```typescript
-import { defineFunction, getUser, getUserId, getRoles, isAdmin } from "@rebasepro/server/functions";
+import { defineFunction, getUser, getUserId, getRoles, getScopes, isAdmin } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
     app.get("/me", (c) => {
         const user = getUser(c);          // { uid, roles, ...claims } | undefined
         if (!user) return c.json({ error: "Unauthorized" }, 401);
-        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c) });
+        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c), scopes: getScopes(c) });
     });
 });
 ```
 
-`getUser` gibt ein eingegrenztes Objekt zurück: `uid` ist ein String und `roles` ist immer ein Array, unabhängig von der vom Aufrufer verwendeten Authentifizierungsmethode. `getUserId(c)` und `getRoles(c)` sind Direktaufrufe.
+`getUser` gibt ein eingegrenztes Objekt zurück: `uid` ist ein String und `roles` ist immer ein Array, unabhängig von der vom Aufrufer verwendeten Authentifizierungsmethode. `getUserId(c)` und `getRoles(c)` sind Direktaufrufe. `getScopes(c)` ist alles, was der Aufrufer darf, als [Scope](/docs/backend/roles-and-scopes/)-Strings: für eine Person die Datenebene, die eigenen Scopes der App und die Scopes ihrer Rollen; für einen API-Schlüssel genau das, was der Schlüssel hält.
 
 ### Routen schützen
 
@@ -225,7 +225,7 @@ export default defineFunction((app) => {
     // 401 for anonymous callers.
     app.post("/protected", requireAuth, (c) => c.json({ message: `Hello, ${getUserId(c)}` }));
 
-    // 401 anonymous, 403 without an administrative role. Order matters.
+    // 401 anonymous, 403 without the admin role. Order matters.
     app.post("/admin-only", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 
     // Any one of the named roles.
@@ -238,6 +238,26 @@ Platzieren Sie Guards wie oben im **eigenen Middleware-Slot der Route** statt `a
 :::important
 Das Auslesen von `getUser(c)` ist **kein** Guard. Ein anonymer Aufrufer erhält `undefined` und Ihr Handler wird trotzdem ausgeführt. Nur ein Guard oder ein explizites `if (!user) return 401` stoppt die Anfrage.
 :::
+
+### Scopes und App-Scopes
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> `requireAdmin` lässt die Rolle `admin` zu und sonst niemanden. Für eine Aktion, die eine engere Rolle oder ein API-Schlüssel erreichen soll, schützen Sie die Route mit `requireScope`. Es nimmt einen integrierten [Scope](/docs/backend/roles-and-scopes/) oder einen, den die App unter `auth.scopes` in der Users-Collection deklariert, etwa `"project:deploy": { label: "Deploy projects", target: "project" }`:
+
+```typescript
+import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    // 403 SCOPE_MISSING unless the caller holds project:deploy, or project:deploy:<this project>.
+    app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
+        return c.json({ deploying: c.req.param("project") });
+    });
+
+    // The same question inside a handler.
+    app.get("/:project/can-deploy", requireAuth, (c) => c.json({ allowed: hasScope(c, "project:deploy", c.req.param("project")) }));
+});
+```
+
+Jede angemeldete Person hält jeden App-Scope, für eine Person entscheidet `requireScope` also nichts: Prüfen Sie im Handler, ob diese Person dieses Projekt deployen darf. Was der Scope hinzufügt, ist eine Möglichkeit, **einen Schlüssel einzuschränken**: Ein Schlüssel, der `project:deploy:p1` hält, kommt nur für `p1` durch. Ein Schlüssel braucht außerdem `functions:invoke` oder `functions:invoke:<name>`, bevor er die Funktion überhaupt erreicht. Siehe [App-Scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
 ### Service-Key-Authentifizierung
 
@@ -544,7 +564,7 @@ Wenn das Laden fehlschlägt, liefert der Loader Diagnoseausgaben:
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
 
-Der Router wird für das **Verzeichnis** eingebunden, nicht für die darin enthaltenen Funktionen. Wenn der Import jeder einzelnen Datei fehlschlägt – eine fehlende Umgebungsvariable auf Modulebene reicht aus, um alle lahmzulegen –, antwortet `GET /api/functions` dennoch mit `200` und einer leeren Liste plus einem `skipped`-Zähler, sodass „nichts geladen“ von „dieser Build enthielt keine Funktionen“ unterschieden werden kann. Das Listing selbst erfordert einen angemeldeten Aufrufer, einen API-Schlüssel oder den Service-Schlüssel – die Funktionen bleiben für jeden aufrufbar, den die jeweilige Funktion zulässt, aber die Übersicht über sie ist nicht öffentlich. Die Gründe verbleiben im Boot-Log.
+Der Router wird für das **Verzeichnis** eingebunden, nicht für die darin enthaltenen Funktionen. Wenn der Import jeder einzelnen Datei fehlschlägt – eine fehlende Umgebungsvariable auf Modulebene reicht aus, um alle lahmzulegen –, antwortet `GET /api/functions` dennoch mit `200` und einer leeren Liste plus einem `skipped`-Zähler, sodass „nichts geladen“ von „dieser Build enthielt keine Funktionen“ unterschieden werden kann. Das Listing selbst erfordert einen angemeldeten Aufrufer, einen API-Schlüssel, der den einfachen Scope `functions:invoke` hält, oder den Service-Schlüssel – die Funktionen bleiben für jeden aufrufbar, den die jeweilige Funktion zulässt, aber die Übersicht über sie ist nicht öffentlich. Die Gründe verbleiben im Boot-Log.
 
 ## Timeouts und Rate-Limits
 

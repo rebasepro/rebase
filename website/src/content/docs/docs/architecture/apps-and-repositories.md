@@ -312,7 +312,7 @@ including relation targets, which the type generator needs to decide whether a
 foreign key is a string or a number — and emits exactly the same output it would
 have produced from local source.
 
-The contract endpoint is admin-only. Collection definitions describe every table,
+The contract endpoint needs the `schema:read` scope, which an admin holds. Collection definitions describe every table,
 column and relation in the project, including ones no security rule would ever
 expose; that is a map of the database, not public API documentation.
 

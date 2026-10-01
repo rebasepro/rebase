@@ -1,5 +1,5 @@
 ---
-sourceHash: b49ac798fe385796
+sourceHash: 4c3ab79cfd150295
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -358,6 +358,15 @@ Las suscripciones WebSocket respetan automáticamente las políticas de Row-Leve
 3. El token se verifica una sola vez, cuando el socket se autentica, y el servidor no vuelve a comprobarlo durante la vida útil de la conexión. Un token de acceso que expire, una sesión que se revoque o un rol que se retire no modifican lo que un socket abierto puede leer hasta que vuelva a autenticarse o a conectarse. El SDK vuelve a autenticar su socket cada vez que actualiza su token y lo desconecta al cerrar sesión; un cliente que utilice el protocolo directamente mantendrá la identidad con la que se abrió hasta que se reconecte.
 
 Esto significa que cada socket solo recibe actualizaciones de los registros que su identidad autenticada tiene permiso para ver.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Una [clave de API](/docs/backend/api-keys/) también autentica el socket: envía la
+clave `rk_…` donde iría el token de acceso. El socket comprueba entonces cada trama
+contra los [alcances](/docs/backend/roles-and-scopes/) de la clave: una lectura, un
+recuento o una suscripción necesitan `data:read` en su colección, un guardado
+`data:write`, una eliminación `data:delete`. Una ruta anidada necesita el alcance sin
+destino. Los canales (difusión y presencia) se rechazan para una clave, porque ningún
+alcance los cubre. El editor SQL y los mensajes de ramas necesitan `database:read` o
+`database:write`, tanto para una clave como para una persona.
 
 Ejecutar más de una instancia —el bus LISTEN/NOTIFY, el comportamiento de la presencia entre procesos y cómo escribir tu propio transporte— tiene su propia página:
 [Tiempo real entre instancias](/docs/backend/realtime-transports/).

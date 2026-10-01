@@ -23,7 +23,7 @@ without appearing here.
 |---|---|
 | **none** | Unauthenticated. Anyone who can reach the host can call it |
 | **session** | A signed-in caller: an access token, or an API key scoped to the operation |
-| **admin** | An admin session, a service key, or an admin-scoped API key |
+| **`resource:action`** | A caller holding that [scope](/docs/backend/roles-and-scopes/): an admin, a person whose role declares it, an API key created with it, or the service key |
 | **RLS** | Authenticated, and then the database decides row by row — see [Security Rules](/docs/collections/security-rules/) |
 | **dev** | Mounted only outside production |
 
@@ -95,50 +95,56 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (a login in progress) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (a challenge id) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `GET` | `/api/auth/scopes` | session | Every scope this backend knows, and the ones the caller holds — [Roles and scopes](/docs/backend/roles-and-scopes/) |
+| `GET` | `/api/auth/keys` | session (an account) | The caller's own [personal keys](/docs/backend/api-keys/#personal-keys) |
+| `POST` | `/api/auth/keys` | session (an account) | The plaintext key is returned once. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | session (an account) | Revokes one of the caller's own keys |
 | `GET` | `/.well-known/jwks.json` | none | The public JWKS, when [asymmetric signing](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) is configured |
 
 ## Admin
 
-Everything under `/api/admin` needs an admin session, a service key, or an
-API key with admin scope. Not one privilege: a key scoped to a collection
-reaches none of this.
+Everything under `/api/admin` needs a scope from the admin plane, and each
+surface names its own: `users:read` lists accounts, `cron:write` triggers a job.
+An admin holds all of them, and so does the service key. A person holds the ones
+their roles declare, and an API key the ones it was created with. A key scoped to
+a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Gate | More |
 |---|---|---|---|
 | `POST` | `/api/admin/bootstrap` | none, and only while no admin exists | Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
-| `GET` | `/api/admin/users` | admin | User management |
-| `POST` | `/api/admin/users` | admin | User management |
-| `GET` | `/api/admin/users/:uid` | admin | User management |
-| `PUT` | `/api/admin/users/:uid` | admin | User management |
-| `DELETE` | `/api/admin/users/:uid` | admin | User management |
-| `POST` | `/api/admin/users/:uid/reset-password` | admin | Issues a temporary password |
-| `GET` | `/api/admin/roles` | admin | The roles the project declares |
-| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api-keys/) |
-| `POST` | `/api/admin/api-keys` | admin | The plaintext key is returned once, on creation |
-| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `GET` | `/api/admin/cron` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `GET` | `/api/admin/cron/:id` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `PUT` | `/api/admin/cron/:id` | admin | Enable or disable a job |
-| `GET` | `/api/admin/cron/:id/logs` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | admin | Run a job now |
-| `GET` | `/api/admin/backups` | admin | Backup inventory |
-| `GET` | `/api/admin/backups/download` | admin | Streams one backup |
-| `GET` | `/api/admin/logs` | admin | The recent log buffer |
-| `GET` | `/api/admin/logs/latest` | admin | The most recent entries |
-| `GET` | `/api/admin/logs/stream` | admin | Server-sent events |
-| `GET` | `/api/admin/rls-audit` | admin | The scheduled audit's latest result |
-| `GET` | `/api/admin/schema/status` | admin | [Live schema editing](/docs/backend/live-schema-editing/) |
-| `POST` | `/api/admin/schema/plan` | admin | Plans a change; never applies one |
-| `POST` | `/api/admin/schema/apply` | admin | Off unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
-| `GET` | `/api/admin/schema-editor/status` | admin | Whether the editor is available, and the reason when it is not |
-| `POST` | `/api/admin/schema-editor/collection/save` | admin | [Studio](/docs/studio/) — rewrites collection source |
-| `POST` | `/api/admin/schema-editor/collection/delete` | admin | [Studio](/docs/studio/) |
-| `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
-| `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
-| `GET` | `/api/admin/dev/emails` | dev | Mail the development transport captured instead of sending |
-| `DELETE` | `/api/admin/dev/emails` | dev | Empties the captured mailbox |
+| `GET` | `/api/admin/users` | `users:read` | User management |
+| `POST` | `/api/admin/users` | `users:write` | User management. Roles beyond the caller's own are refused |
+| `GET` | `/api/admin/users/:uid` | `users:read` | User management |
+| `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
+| `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
+| `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Issues a temporary password |
+| `GET` | `/api/admin/roles` | `users:read` | `admin` and the roles the project declares, with their scopes |
+| `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Never an API key |
+| `POST` | `/api/admin/api-keys` | `keys:write` | The plaintext key is returned once, on creation |
+| `GET` | `/api/admin/api-keys/:id` | `keys:read` | [API keys](/docs/backend/api-keys/) |
+| `PUT` | `/api/admin/api-keys/:id` | `keys:write` | [API keys](/docs/backend/api-keys/) |
+| `DELETE` | `/api/admin/api-keys/:id` | `keys:write` | [API keys](/docs/backend/api-keys/) |
+| `GET` | `/api/admin/cron` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
+| `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
+| `PUT` | `/api/admin/cron/:id` | `cron:write` | Enable or disable a job |
+| `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Run a job now |
+| `GET` | `/api/admin/backups` | `backups:read` | Backup inventory |
+| `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup |
+| `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
+| `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
+| `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
+| `GET` | `/api/admin/rls-audit` | `schema:read` | The scheduled audit's latest result |
+| `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
+| `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
+| `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
+| `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — rewrites collection source |
+| `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |
+| `POST` | `/api/admin/schema-editor/property/save` | `schema:write` | [Studio](/docs/studio/) |
+| `POST` | `/api/admin/schema-editor/property/delete` | `schema:write` | [Studio](/docs/studio/) |
+| `GET` | `/api/admin/dev/emails` | dev + `users:write` | Mail the development transport captured instead of sending |
+| `DELETE` | `/api/admin/dev/emails` | dev + `users:write` | Empties the captured mailbox |
 
 `/api/admin/cron`, `/api/admin/logs` and `/api/admin/schema-editor` are also
 served at their pre-0.17 paths without the `/admin` segment. Those aliases are
@@ -168,7 +174,7 @@ variable it needs, rather than 404ing as if the feature did not exist.
 
 | Method | Path | Gate | More |
 |---|---|---|---|
-| any | `/api/functions/<name>` | whatever the function declares | [Custom Functions](/docs/backend/custom-functions/) |
+| any | `/api/functions/<name>` | whatever the function declares. An API key also needs `functions:invoke` | [Custom Functions](/docs/backend/custom-functions/) |
 
 One route per file under `backend/functions/`, so the paths come from your
 project. `GET /api/functions` does **not** list them: an inventory of a
@@ -180,10 +186,10 @@ deployment's custom endpoints is not public.
 |---|---|---|---|
 | `GET` | `/livez` | none | Liveness alone: is this process running. Does not touch the database, which is why it is the probe path a container should use — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness and readiness. Reports every configured data source, not only the default |
-| `GET` | `/api/docs` | none (admin in production) | The OpenAPI 3.0 document |
+| `GET` | `/api/docs` | none (`schema:read` in production) | The OpenAPI 3.0 document |
 | `GET` | `/api/swagger` | none | Swagger UI. Development only unless `REBASE_ENABLE_SWAGGER` |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and nothing else |
-| `GET` | `/api/meta/contract` | admin | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
+| `GET` | `/api/meta/contract` | `schema:read` | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` when set | The recorded series behind the Studio charts. `501` on a runtime with no backend |
 
@@ -206,8 +212,8 @@ before it holds any token.
 |---|---|---|---|
 | `GET` | `/.well-known/oauth-protected-resource` | none | RFC 9728 metadata naming this resource and its authorization server. Served at the path-suffixed form as well |
 | `GET` | `/.well-known/oauth-authorization-server` | none | RFC 8414 metadata: the endpoints, grant types and PKCE methods this deployment supports |
-| `POST` | `/mcp` | OAuth bearer | The MCP protocol endpoint. Acts **as the signed-in user**, so every read and write is subject to the same RLS |
-| `GET` | `/mcp` | OAuth bearer | Answers `405` with `Allow: POST, DELETE`: this server opens no server-initiated stream. The token is checked first, so a missing or stale one gets the `401` challenge instead |
+| `POST` | `/mcp` | OAuth bearer, or an API key | The MCP protocol endpoint. Acts **as the signed-in user** (or as whoever the key acts as), so every read and write is subject to the same RLS. The `data:*` scopes decide which tools are offered |
+| `GET` | `/mcp` | OAuth bearer, or an API key | Answers `405` with `Allow: POST, DELETE`: this server opens no server-initiated stream. The token is checked first, so a missing or stale one gets the `401` challenge instead |
 | `DELETE` | `/mcp` | none | Answers `204`. The endpoint keeps no session, so there is nothing to end |
 | `POST` | `/api/oauth/register` | rate-limited | RFC 7591 dynamic client registration. Refused when `REBASE_MCP_OPEN_REGISTRATION=false` |
 | `GET` | `/api/oauth/authorize` | session | The consent screen a client is redirected to |

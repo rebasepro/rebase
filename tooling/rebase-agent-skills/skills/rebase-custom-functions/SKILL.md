@@ -125,7 +125,7 @@ export default defineFunction((app) => {
         return c.json({ data: rows });
     });
 
-    // 401 anonymous, then 403 without an administrative role. Order matters.
+    // 401 anonymous, then 403 without the admin role. Order matters.
     app.get("/", requireAuth, requireAdmin, async (c) => {
         return c.json({ data: await requireDriver(c).fetchCollection({ path: "products" }) });
     });
@@ -134,6 +134,43 @@ export default defineFunction((app) => {
     app.post("/publish", requireAuth, requireRole("editor", "admin"), (c) => c.json({ ok: true }));
 });
 ```
+
+### Scopes: `requireScope`, `hasScope`, `getScopes`
+
+`requireAdmin` admits only the built-in `admin` role. When a narrower role or an
+**API key** should reach a route, guard it with a **scope** instead — a built-in
+one (`cron:write`, `users:read`, …) or an **app scope** the project declares under
+`auth.scopes` on the users collection
+(`"project:deploy": { label: "Deploy projects", target: "project" }`):
+
+```typescript
+// backend/functions/deploy.ts
+import { defineFunction, requireAuth, requireScope, hasScope, getScopes } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    // 403 SCOPE_MISSING (details.requiredScope) unless the caller holds
+    // project:deploy, or project:deploy:<this project>.
+    app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
+        return c.json({ deploying: c.req.param("project") });
+    });
+
+    app.get("/whoami", requireAuth, (c) => c.json({
+        scopes: getScopes(c),                       // everything the caller holds
+        canDeployP1: hasScope(c, "project:deploy", "p1")
+    }));
+});
+```
+
+- **Every signed-in person holds every app scope** (and the whole data plane), so
+  for a person `requireScope("project:deploy")` authorizes nothing — still decide
+  in the handler whether *this* person may deploy *this* project. The scope exists
+  to **narrow API keys**: a key holding `project:deploy:p1` passes for `p1` only.
+- An API key must also hold `functions:invoke` (or `functions:invoke:<name>`) or
+  the functions router refuses it before your guard runs. People pass that check.
+- A role may list app scopes and admin-plane scopes, never data-plane ones.
+- These read the identity the router resolved. On a route registered on your own
+  Hono app *outside* the Rebase routers, use `requireAuth` + `requireScope` from
+  `@rebasepro/server` (the root), where `requireAuth` verifies the JWT itself.
 
 Put guards in the **route's own middleware slot**, as above — not
 `app.use("/*", requireAuth)`. `use()` covers only routes declared *below* it, so
@@ -247,8 +284,8 @@ The `user` object set by the auth middleware uses reserved values for system ide
 |---|---|---|
 | JWT (end-user) | Real user ID | User's assigned roles |
 | Service Key | `"service"` | `["admin"]` |
-| API Key (default) | `"api-key:{id}"` | `["service"]` |
-| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` |
+| Service API key | `"api-key:{id}"` | `["service", ...key.roles]` (e.g. `["service", "admin"]`) |
+| Personal API key | the owner's uid | the owner's current roles |
 | Anonymous | `"anon"` | `["anon"]` |
 
 > **TIP:** Use these to differentiate internal vs. external callers in your custom functions:

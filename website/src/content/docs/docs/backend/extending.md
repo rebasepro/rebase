@@ -186,8 +186,9 @@ for the shape.
 :::caution[No auth middleware has run there]
 A route registered this way is **outside** every Rebase router, so
 `getDriver(c)` is unset and nothing has verified a token. Guard it with
-`requireAuth` / `requireAdmin` imported from **`@rebasepro/server`** — the
-package root — which verify the token themselves. The guards exported from
+`requireAuth` imported from **`@rebasepro/server`** — the package root — which
+verifies the token itself, then `requireAdmin` or `requireScope` from the same
+import to decide what the caller may do. The guards exported from
 `@rebasepro/server/functions` read an identity a Rebase router has already
 resolved, and answer 500 rather than pretend one exists.
 :::

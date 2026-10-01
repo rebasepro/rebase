@@ -542,11 +542,36 @@ a command it has not used before.
 
 ---
 
+## CI and agents: `REBASE_TOKEN`
+
+A token acts as the account that created it, narrowed to a few capabilities on
+one project. Create it from a signed-in terminal, then give it to CI as
+`REBASE_TOKEN`:
+
+```bash
+rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
+# → export REBASE_TOKEN=rk_live_…   (printed once)
+```
+
+- With `REBASE_TOKEN` set, every `rebase cloud` command authenticates with it and
+  never reads or writes the stored `cloud login` session. `rebase cloud whoami`
+  then shows what the token may do and on which project.
+- `--can` takes `deploy`, `logs`, `env`, `database`, `backups`. Each becomes
+  scopes narrowed to that project (`project:deploy:<id>`, …) plus the data and
+  function scopes the commands call. The token is a personal API key on the
+  control plane: it never holds more than its account does when used.
+- A token cannot `tokens list` / `create` / `revoke` — those need the signed-in
+  session (`session_required`). No capability grants a backup restore or a PITR
+  `restore` / `cutover`: those stay with a signed-in owner or admin.
+- `token_rejected` means the token expired, was revoked, or is for another
+  control plane. Create a new one; do not fall back to a password.
+
 ## Command reference
 
 | Command | What it does |
 |---|---|
 | `rebase cloud login` / `logout` / `whoami` | Session |
+| `rebase cloud tokens list` / `create --can …` / `revoke <id>` | Tokens for CI and agents (`REBASE_TOKEN`) |
 | `rebase cloud use` | Select the active organization |
 | `rebase cloud link` / `unlink` / `open` | Link this directory to a project |
 | `rebase cloud projects list` / `create` / `info` / `delete` | Projects |
@@ -576,7 +601,7 @@ Global flags on every one of them: `--project, -p <slug>`, `--json`,
 **Never run a command that changes the hosted platform unless the user asked in
 the current conversation.** That includes `deploy`, `projects create`,
 `projects delete`, `db create`, `env set`, `domains add`, `rollback`, `stop`,
-`restart`, `compute set` and `extensions enable`.
+`restart`, `compute set`, `extensions enable` and `tokens create` / `tokens revoke`.
 
 **Never pass these to get past an error:**
 

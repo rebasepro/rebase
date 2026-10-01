@@ -36,6 +36,10 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
 | `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
 | `DELETE` | `/api/auth/sessions/:id` | Revoke one session |
+| `GET` | `/api/auth/scopes` | Every [scope](/docs/backend/roles-and-scopes/) this backend knows, and the ones the caller holds |
+| `GET` | `/api/auth/keys` | The caller's own [personal API keys](/docs/backend/api-keys/#personal-keys) |
+| `POST` | `/api/auth/keys` | Create a personal key. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | Revoke one of the caller's own keys |
 | `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Present when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
 | `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
@@ -45,8 +49,10 @@ All auth endpoints are mounted at `/api/auth/`:
 | `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
 
 Administrative user and role management is a **separate surface**, mounted at
-`/api/admin/` rather than `/api/auth/`, and gated on the `admin` role or the
-service key:
+`/api/admin/` rather than `/api/auth/`. Reading needs the `users:read` scope and
+changing needs `users:write`. An admin and the service key hold both; so does a
+role that declares them. Nobody may change an account that holds more than they
+do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -56,7 +62,7 @@ service key:
 | `PUT` | `/api/admin/users/:uid` | Update one user |
 | `DELETE` | `/api/admin/users/:uid` | Delete one user |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
-| `GET` | `/api/admin/roles` | List the roles this backend knows |
+| `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).

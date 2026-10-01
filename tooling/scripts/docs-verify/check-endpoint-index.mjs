@@ -123,6 +123,8 @@ const MOUNTS = new Map([
     // `**/*route*.ts`, so this file — which mounts a real admin route — was
     // invisible to the completeness rule that was supposed to catch it.
     ["packages/server/src/auth/reset-password-admin.ts#router", "/api/admin"],
+    // `GET /auth/scopes`: the scope catalogue and what the caller holds.
+    ["packages/server/src/auth/scope-routes.ts#router", "/api/auth/scopes"],
 
     // ── The root app ──────────────────────────────────────────────────────
     // `boot.ts` builds the runtime's own Hono app twice: once for a backend
@@ -154,6 +156,9 @@ const MOUNTS = new Map([
     ["packages/server/src/init.ts#devMailRouter", "/api/admin/dev/emails"],
     ["packages/server/src/init.ts#logsRouter", "/api/admin/logs"],
     ["packages/server/src/init.ts#contractRouter", "/api/meta"],
+    // Registers nothing itself: it wraps `createPersonalKeyRoutes`, whose
+    // routes are listed in EXTRA_ROUTES — see there.
+    ["packages/server/src/init.ts#personalKeyRouter", "/api/auth/keys"],
     // Stubs: one `all("/*")` that answers with the reason the surface is off.
     // A 501 explaining itself is not an endpoint anyone looks up.
     ["packages/server/src/init.ts#unconfigured", null],
@@ -212,7 +217,14 @@ const NOT_A_ROUTER = new Set(["c", "ctx", "context"]);
 const EXTRA_ROUTES = [
     { method: "GET", path: "/api/docs" },
     { method: "GET", path: "/api/swagger" },
-    { method: "GET", path: "/api/auth/config" }
+    { method: "GET", path: "/api/auth/config" },
+    // A person's own API keys. `createPersonalKeyRoutes` builds its router in
+    // `api-key-routes.ts` under the same receiver name as the service-key
+    // routes, so MOUNTS — keyed by file and receiver — reads its paths under
+    // `/api/admin/api-keys`; `init.ts` mounts it at `/auth/keys`.
+    { method: "GET", path: "/api/auth/keys" },
+    { method: "POST", path: "/api/auth/keys" },
+    { method: "DELETE", path: "/api/auth/keys/:id" }
 ];
 
 /**

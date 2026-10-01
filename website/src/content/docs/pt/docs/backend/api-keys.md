@@ -1,106 +1,107 @@
 ---
-sourceHash: 166b0a87f16459a1
+sourceHash: 1806e56473009c2c
 title: Chaves de API
 sidebar_label: Chaves de API
-description:"\"Chaves revogáveis e com escopo para chamadores automatizados: o que uma chave pode acessar, como os escopos se combinam com a segurança em nível de linha (RLS) e os endpoints administrativos para gerenciá-las.\""
+description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
 ---
 
 ## Chaves de API
 
-As chaves de API fornecem autenticação máquina a máquina para agentes, servidores MCP, pipelines de CI e integrações externas. Elas oferecem suporte a escopos de permissão por coleção e acesso total de administrador opcional.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma chave de API é uma credencial bearer de longa duração, `rk_live_…`, para um chamador que
+não é uma pessoa em um navegador: um script, um job de CI, um agente, um cliente MCP, outro
+serviço. O que uma chave pode fazer é uma lista de [escopos](/docs/backend/roles-and-scopes/),
+como `data:read:orders` ou `cron:write`.
 
-### Criando uma Chave de API
+Existem dois tipos:
 
-```bash
-# Via CLI
-rebase api-keys create --name "My Integration" \
-  --permissions '[{"collection":"orders","operations":["read","write"]}]'
+- Uma **chave de serviço** é a identidade de máquina do próprio projeto. Ela age como
+  `api-key:<id>`, não como uma pessoa. Quem tem `keys:write` as gerencia, em
+  `/api/admin/api-keys`.
+- Uma **chave pessoal** age como a conta que a criou. Cada conta gerencia as
+  suas, em `/api/auth/keys`, quando o app as ativa.
 
-# Via REST (requires admin auth)
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Integration",
-    "permissions": [{ "collection": "orders", "operations": ["read", "write"] }]
-  }'
-```
+### Usando uma chave
 
-A resposta inclui a chave completa em texto simples (`rk_live_...`) **exatamente uma vez** — armazene-a imediatamente.
-
-### Usando uma Chave de API
+Envie-a como um bearer token, assim como um token de acesso. `$API_URL` é o endereço do seu backend:
+o que o `rebase dev` imprimiu, ou a URL da sua implantação.
 
 ```bash
-curl http://localhost:3000/api/data/orders \
+curl "$API_URL/api/data/orders" \
   -H "Authorization: Bearer rk_live_abc123..."
 ```
 
-### Permissões e RLS: duas verificações independentes
+A mesma chave funciona na REST API, no storage, nas funções personalizadas, nas superfícies
+administrativas que seus escopos alcançam, no WebSocket de realtime e no [endpoint `/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
-A requisição de uma chave de API passa por **duas** verificações de autorização, e ambas devem permitir o acesso:
+## Chaves de serviço
 
-1. **A lista de permissões da chave** — coleção × operação, verificada na camada de rota.
-2. **Row-Level Security (RLS)** — Chaves de API *não* ignoram o RLS. Uma chave é executada como
-   `uid: "api-key:<id>"` com o papel `service` (além de `admin` quando
-   `admin: true`). Chaves de administrador passam pelas políticas de administração integradas; uma
-   chave que não seja de administrador só vê linhas que uma regra de segurança conceder explicitamente
-   ao papel `service` ou ao público. Regras baseadas em proprietário
-   (`owner_id = rebase.uid()`) nunca corresponderão a uma chave de API.
+### Criando uma
 
-Portanto, uma chave não administrativa com permissões `"*"` ainda pode receber resultados vazios — isso é o
-RLS funcionando, não um bug. Conceda o papel `service` nas regras de segurança
-das coleções relevantes ou use uma chave de administrador.
-
-Em um caminho aninhado, a lista de permissões é verificada contra cada coleção que o
-caminho nomeia. A operação é verificada contra a coleção em que o caminho termina, e cada
-pai pelo qual ele passa precisa de `read`: uma chave limitada apenas a `posts` é recusada
-em `/api/data/authors/1/posts` até poder ler também `authors`.
-
-### Funções Personalizadas
-
-Invocação de funções tem escopo definido como coleções, sob o namespace
-`functions`: `{"collection": "functions", "operations": ["write"]}` concede acesso a todas as
-funções, `"functions/<name>"` concede a uma, e o caractere curinga global `"*"` concede a
-todas. Uma chave sem essa entrada não poderá invocar funções de forma alguma.
-
-### Storage
-
-O Storage funciona da mesma forma, sob o namespace `storage`:
-`{"collection": "storage", "operations": ["read", "write"]}` permite que a chave
-baixe/liste (`read`), envie arquivos e crie pastas (`write`), e exclua arquivos
-(`delete`). O caractere curinga global `"*"` também concede acesso ao storage. Uma chave sem
-essa entrada não pode acessar o storage. As rotas de upload retomável via TUS contam como `write`
-para cada etapa (incluindo a verificação de deslocamento e cancelamento), portanto, uma chave com escopo de escrita
-pode concluir um upload por conta própria.
-
-### Agentes e Servidores MCP
-
-Um agente precisa da chave com o escopo mais *restrito* possível para realizar seu trabalho, e não de uma chave de administrador. Comece
-com escopo reduzido e defina uma expiração:
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma chave de serviço precisa de um nome e de pelo menos um escopo.
 
 ```bash
-rebase api-keys create -n "My Agent" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
+# CLI: talks to the backend with the service key from .env
+rebase api-keys create --name "Order sync" --scopes data:read:orders,data:write:orders
+
+# REST: needs keys:write
+curl -X POST "$API_URL/api/admin/api-keys" \
+  -H "Authorization: Bearer $REBASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Order sync",
+    "scopes": ["data:read:orders", "data:write:orders"]
+  }'
 ```
 
-As operações são `read`, `write` e `delete`, derivadas do método HTTP:
-`GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` →
-`delete`.
+Ou com o SDK do cliente:
 
-#### Uma chave com escopo lê zero linhas até que uma regra conceda `service`
+```ts
+const { key } = await client.apiKeys.createKey({
+    name: "Order sync",
+    scopes: ["data:read:orders", "data:write:orders"],
+    expires_at: "2027-01-01T00:00:00.000Z"
+});
+console.log(key.key); // the only time the plaintext is returned
+```
 
-Este é o passo que faz uma chave com escopo correto parecer quebrada. Uma chave não administrativa
-é executada como `uid: "api-key:<id>"` com os papéis `["service"]`, e a política de RLS
-injetada em cada coleção por padrão compila para:
+A resposta inclui a chave completa em texto simples (`rk_live_...`) **exatamente uma vez**.
+Armazene-a imediatamente.
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `name` | `string` | Um rótulo para pessoas |
+| `scopes` | `string[]` | O que a chave pode fazer. Pelo menos um |
+| `roles` | `string[]` | Papéis de RLS com que a chave é executada, além de `service`. Opcional |
+| `rate_limit` | `number \| null` | Requisições por janela de 15 minutos. `null` ou ausente usa o padrão do servidor para chaves de API, 1000 |
+| `expires_at` | `string \| null` | Expiração em ISO-8601. Ausente significa que nunca expira |
+
+### Escopos e RLS: duas verificações independentes
+
+Uma requisição feita com uma chave passa por duas verificações, e ambas devem permiti-la:
+
+1. **Os escopos da chave**, verificados pela rota: `data:write:orders` permite que a chave
+   escreva em `orders` e em nada mais.
+2. **Row-level security**, verificada pelo banco de dados. Uma chave nunca a ignora. Uma
+   chave de serviço é executada como `uid: "api-key:<id>"` com o papel `service`, além de quaisquer
+   `roles` que tenha recebido. Regras baseadas em proprietário (`owner_id = rebase.uid()`) nunca
+   correspondem a ela.
+
+Portanto, uma chave com `data:read` ainda pode receber resultados vazios. Isso é o RLS funcionando,
+não um bug. Conceda o papel `service` nas regras de segurança da coleção, ou dê
+à chave o papel `admin`.
+
+#### Uma chave de serviço lê zero linhas até que uma regra conceda `service`
+
+Este é o passo que faz uma chave com o escopo correto parecer quebrada. A política de RLS
+que o Rebase adiciona a cada coleção por padrão compila para:
 
 ```sql
 rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
-— o contexto do servidor ou um administrador. Uma chave não administrativa não corresponde a nenhuma das duas condições, portanto, em
-uma coleção sem `securityRules`, a requisição é bem-sucedida com um conjunto de resultados vazio
-e sem nenhum erro explicando o motivo. Conceda o papel explicitamente:
+Ou seja, o contexto do servidor ou um administrador. Uma chave de serviço sem o papel `admin`
+não corresponde a nenhuma das duas condições. Em uma coleção sem `securityRules`, a requisição é bem-sucedida
+com um resultado vazio e sem nenhum erro explicando o motivo. Conceda o papel explicitamente:
 
 ```ts
 securityRules: [
@@ -109,7 +110,7 @@ securityRules: [
 ```
 
 Como `rebase.uid()` carrega o id da chave, uma regra também pode restringir linhas a uma
-chave específica:
+chave:
 
 ```ts
 securityRules: [
@@ -120,65 +121,221 @@ securityRules: [
 ]
 ```
 
-#### Não use `"*"` para uma chave somente leitura
+#### O papel `admin`
 
-O caractere curinga `"*"` não significa "todas as coleções" — ele também corresponde ao namespace
-`functions` e ao `storage`. Um `GET` conta como `read`, e o manipulador de uma função personalizada
-é código arbitrário que pode realizar operações de escrita, portanto, uma chave curinga "somente leitura" pode
-realizar mutações por meio de uma função. Nomear coleções explicitamente não dá à chave
-nenhum acesso a funções.
+`roles: ["admin"]` (`--roles admin` na CLI) faz a chave ser executada também com o papel de RLS `admin`,
+de modo que ela passa pelas políticas de administrador padrão e lê todas as linhas de
+todas as coleções que as mantêm. Isso diz respeito a linhas. Não concede nenhum
+escopo: a chave continua alcançando apenas o que seus `scopes` listam.
 
-#### `--admin --full-access`: CI, migrações e ferramentas proprietárias
+Quem cria uma chave só pode dar a ela papéis que ele próprio tem, a menos que seja
+administrador.
 
-`"admin": true` concede à chave o papel de administrador — rotas `/api/admin/*` para gerenciamento
-de esquema, gerenciamento de usuários e muito mais, além de cron, backups e logs. Combinado
-com `--full-access` (`{"collection": "*", "operations": ["read", "write",
-"delete"]}`), a chave tem acesso a todas as coleções, além de todo o storage e cada função personalizada.
-Esse é o formato ideal para CI, migrações e ferramentas proprietárias
-confiáveis — não para agentes.
+### Acesso total, para CI e migrações
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `--full-access` dá à chave todos os escopos que seu criador tem, menos `keys:read` e
+`keys:write`, que nenhuma chave pode ter. Pela CLI, que usa a chave de serviço,
+isso significa todos os escopos do plano de dados e do plano administrativo. Adicione `--roles admin` e a chave
+também lê todas as linhas:
 
 ```bash
-# CLI
-rebase api-keys create -n "CI" --admin --full-access
-
-# REST
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "CI",
-    "admin": true,
-    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
-  }'
+rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 ```
 
-#### Sem realtime via chaves de API
+Esse é o formato certo para CI, migrações e ferramentas próprias confiáveis. Não
+é o formato certo para um agente.
 
-O WebSocket de realtime não processa tokens `rk_` — ele aceita apenas JWTs de usuário e
-a service key. Um agente autenticado com uma chave de API faz polling nos
-endpoints REST em vez de se inscrever.
+## Chaves pessoais
 
-### Opções de Chave
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma chave pessoal age **como seu proprietário**: com o uid dele e com os papéis dele, como estão
+a cada requisição. Regras baseadas em proprietário correspondem a ela, então ela lê exatamente o que seu proprietário
+leria, restringido pelos seus escopos. Ela serve para os scripts de uma pessoa, uma CLI no seu
+laptop ou uma ferramenta que ela conecta à própria conta.
 
-| Campo | Tipo | Descrição |
+Elas vêm desativadas por padrão, porque cada uma é uma credencial de longa duração para uma
+conta. Ative-as no bloco auth da coleção de usuários:
+
+```typescript
+import { defineCollection } from "@rebasepro/cms-types";
+
+export const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
+    auth: { enabled: true, personalKeys: true },
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+});
+```
+
+Depois, uma conta autenticada gerencia as próprias chaves:
+
+```ts
+const { key } = await client.personalKeys.createKey({
+    name: "My laptop",
+    scopes: ["data:read", "functions:invoke:export"]
+});
+console.log(key.key); // shown once
+
+const { keys } = await client.personalKeys.listKeys();
+await client.personalKeys.revokeKey(keys[0].id);
+```
+
+O mesmo via REST. `$ACCESS_TOKEN` é o token de acesso da própria conta, obtido ao
+fazer login:
+
+```bash
+curl -X POST "$API_URL/api/auth/keys" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "My laptop", "scopes": ["data:read"] }'
+```
+
+Uma chave pessoal aceita `name`, `scopes` e `expires_at`. Ela não tem `roles`,
+porque é executada com os do seu proprietário, nem `rate_limit`. Enviar qualquer um dos dois resulta em
+`400 INVALID_INPUT`.
+
+O que uma chave pessoal tem são seus escopos, reduzidos ao que seu proprietário tem **agora**.
+Remova um papel do proprietário e todas as chaves que ele criou encolhem junto. Exclua a
+conta e as chaves dela param de funcionar. Desative `personalKeys` e todas as chaves pessoais
+param de funcionar também.
+
+Apenas uma conta pode ter chaves pessoais. Uma chave de API, a chave de serviço e uma sessão de convidado
+são recusadas: `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN` para uma chave,
+`403 PERSONAL_KEY_NEEDS_ACCOUNT` para as outras duas. Com o recurso desativado, todas
+as rotas respondem `403 PERSONAL_KEYS_DISABLED`.
+
+## O que cada escopo alcança
+
+### Dados
+
+`data:read`, `data:write` e `data:delete`, simples ou restritos a uma coleção
+(`data:read:posts`). A operação vem do método HTTP: `GET`, `HEAD`
+e `OPTIONS` leem, `POST`, `PUT` e `PATCH` escrevem, `DELETE` exclui.
+`POST /api/data/:slug/bulk/delete` conta como exclusão, embora seja um `POST`.
+
+Em um caminho aninhado, a operação é verificada contra a coleção em que o caminho termina,
+e cada coleção pela qual ele passa precisa de `data:read`. Uma chave que tem apenas
+`data:read:posts` é recusada em `/api/data/authors/1/posts` até poder ler também
+`authors`.
+
+### Storage
+
+`storage:read` lista e baixa. `storage:write` envia arquivos e cria pastas,
+e cobre cada etapa de um upload retomável (TUS), incluindo a verificação de deslocamento
+e o cancelamento. `storage:delete` exclui. O alvo é o id de uma fonte de storage. O
+id da fonte padrão é `(default)`, então `storage:read:(default)` lê apenas a fonte padrão,
+e `storage:write:avatars` escreve em uma fonte chamada `avatars`.
+Depois da verificação de escopo, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+ainda é executado, com a identidade da chave.
+
+### Funções
+
+`functions:invoke` chama todas as funções personalizadas. `functions:invoke:<name>` chama
+uma. Listar as funções em `GET /api/functions` requer o escopo simples.
+
+Não dê `functions:invoke` a uma chave que você quer que seja somente leitura. Uma função é
+código, e pode escrever. Dentro de uma função, `getScopes(c)` e `hasScope(c, …)`
+leem o que a chave tem, e um app pode declarar seus próprios escopos para uma função
+verificar. Consulte [Funções Personalizadas](/docs/backend/custom-functions/#scopes-and-app-scopes).
+
+### Superfícies administrativas
+
+Um escopo do plano administrativo em uma chave alcança aquela superfície. Um agendador que dispara
+cron jobs precisa de `cron:write`. Um coletor de logs precisa de `logs:read`. Um job de backup precisa
+de `backups:read`. O [índice de endpoints](/docs/backend/endpoints/#admin) lista o
+escopo que cada rota requer.
+
+`keys:read` e `keys:write` nunca podem ir em uma chave. Uma chave capaz de gerenciar chaves
+poderia criar a própria sucessora, ou se ampliar. Qualquer requisição às rotas de chaves
+feita com uma chave é recusada com `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN`. Gerencie
+as chaves como uma pessoa que tem `keys:write`, ou com a chave de serviço.
+
+### Realtime
+
+Uma chave também autentica o WebSocket: envie-a na mensagem `AUTHENTICATE`.
+Buscas e inscrições precisam de `data:read` na sua coleção, salvamentos de
+`data:write`, exclusões de `data:delete`. Uma inscrição em um caminho aninhado precisa do
+escopo simples. Canais (broadcast e presence) são recusados para chaves. O editor
+SQL e as mensagens de branch precisam de `database:read` ou `database:write`.
+
+## Agentes e servidores MCP
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Um agente precisa da chave *mais restrita* que faz o seu trabalho. Comece com escopo restrito e defina
+uma expiração:
+
+```bash
+rebase api-keys create -n "My Agent" --scopes data:read:articles --expires-in 30
+```
+
+Deixe de fora `data:delete` quando o agente puder editar, mas não deva remover.
+`delete` é separado de `write` exatamente por esse motivo.
+
+## Regras de emissão
+
+Cada chave é verificada contra quem a cria, da mesma forma nas duas rotas:
+
+| Recusa | Quando |
+|---|---|
+| `400 INVALID_SCOPES` | Um escopo está malformado, é desconhecido ou carrega um alvo que não aceita. `details.validScopes` lista todos os válidos |
+| `400 UNKNOWN_SCOPE_TARGET` | Um alvo nomeia uma coleção, fonte de storage ou função que este backend não serve |
+| `400 KEY_MANAGEMENT_SCOPE` | Foi pedido `keys:read` ou `keys:write` |
+| `403 SCOPE_EXCEEDS_CREATOR` | Um escopo que o criador não tem. Uma chave nunca tem mais do que a conta que a criou |
+| `403 ROLE_EXCEEDS_CREATOR` | Um papel de chave de serviço que o criador não tem, quando o criador não é administrador |
+
+Uma requisição para a qual a própria chave não tem o escopo responde `403 SCOPE_MISSING`, com o
+escopo em `details.requiredScope`. Consulte [Códigos de erro](/docs/backend/errors/#authentication-and-accounts).
+
+## Gerenciando chaves
+
+| Método | Caminho | Requer |
 |---|---|---|
-| `name` | `string` | Rótulo legível por humanos |
-| `permissions` | `ApiKeyPermission[]` | Acesso por coleção (`"*"` = tudo; `"functions/<name>"` = uma função; `"storage"` = armazenamento de arquivos) |
-| `admin` | `boolean` | Concede papel de administrador — rotas administrativas + políticas de RLS de administrador |
-| `rate_limit` | `number \| null` | Requisições por janela de 15 min (`null` = o padrão do servidor, 1000) |
-| `expires_at` | `string \| null` | Timestamp de expiração em ISO-8601 |
+| `GET` | `/api/admin/api-keys` | `keys:read` |
+| `GET` | `/api/admin/api-keys/:id` | `keys:read` |
+| `POST` | `/api/admin/api-keys` | `keys:write` |
+| `PUT` | `/api/admin/api-keys/:id` | `keys:write`. Altera `name`, `scopes`, `roles`, `rate_limit` ou `expires_at`, sob as mesmas regras da criação |
+| `DELETE` | `/api/admin/api-keys/:id` | `keys:write`. Revoga |
+| `GET` | `/api/auth/keys` | Uma conta: as próprias chaves pessoais |
+| `POST` | `/api/auth/keys` | Uma conta, com `personalKeys` ativado |
+| `DELETE` | `/api/auth/keys/:id` | Uma conta: revoga uma das suas |
 
-A CLI requer um escopo explícito: passe `--permissions '<json>'` ou opte por
-`--full-access` — não há um padrão silencioso de acesso total.
+Todas as rotas retornam as chaves mascaradas: `key_prefix`, nunca o hash. Cada chave informa
+seu `kind` (`service` ou `personal`), seus `scopes`, seus `roles` e, no caso de uma
+chave pessoal, seu `owner_uid`.
 
-As chaves podem ser listadas, atualizadas e revogadas via `/api/admin/api-keys` ou pelos
-comandos da CLI `rebase api-keys` — mas não por uma chave de API. Qualquer requisição para
-`/api/admin/api-keys` autenticada com uma chave `rk_` é recusada com `403
-API_KEY_SELF_MANAGEMENT_FORBIDDEN`, independentemente de sua flag `admin`. O gerenciamento de chaves
-requer a sessão de um usuário administrador ou a service key.
+A CLI cobre as chaves de serviço: `rebase api-keys list`, `get`, `create`, `revoke`
+e `scopes`, que lista todos os escopos que o backend conhece. Consulte a
+[referência da CLI](/docs/cli/#rebase-api-keys).
+
+## Chaves criadas antes dos escopos
+
+As chaves criadas antes de os escopos existirem carregam uma lista `permissions` e uma flag `admin`.
+Na inicialização, o store dá a cada uma os escopos que ela passa a ter. Nada se amplia;
+onde uma concessão antiga não tem correspondência exata, ela se restringe:
+
+| Concessão antiga | Escopos agora |
+|---|---|
+| `{ "collection": "posts", "operations": ["read", "write"] }` | `data:read:posts`, `data:write:posts` |
+| `"*"` | `data:<op>` e `storage:<op>` para cada operação, mais `functions:invoke` se tinha `write` |
+| `"storage"` | `storage:<op>` para cada operação |
+| `"functions"` | `functions:invoke`, apenas se tinha `write` |
+| `"functions/<name>"` | `functions:invoke:<name>`, apenas se tinha `write` |
+| `admin: true` | o papel `admin`, mais `users:read`, `users:write`, `schema:read`, `schema:write`, `backups:read`, `cron:read`, `cron:write`, `logs:read` |
+
+O segredo não muda, então uma integração continua funcionando. Duas concessões se restringem:
+
+- Uma concessão de função sem `write` vira nada. Um `GET` contava como
+  leitura, mas uma função é código, e chamar uma função não é uma leitura.
+- Uma chave de administrador não recebe nenhum `database:*`, que ela nunca pôde alcançar antes, nem
+  `keys:*`, que nenhuma chave pode ter.
+
+As antigas colunas `permissions` e `admin` são mantidas, para que um rollback para um
+runtime mais antigo ainda leia suas chaves. Uma requisição que envia `permissions` ou
+`admin` em vez de `scopes` é recusada com `400 INVALID_INPUT`.
 
 ## Próximos Passos
 
-- [REST API](/docs/backend/api/) — os endpoints que uma chave chama
-- [Índice de endpoints](/docs/backend/endpoints/) — a barreira de verificação em cada rota, incluindo chaves
-- [Regras de Segurança (RLS)](/docs/collections/security-rules/) — o que o banco de dados impõe além dos escopos de uma chave
+- [Papéis e escopos](/docs/backend/roles-and-scopes/): todos os escopos, e como os papéis os têm
+- [Índice de endpoints](/docs/backend/endpoints/): o escopo que cada rota requer
+- [Regras de Segurança (RLS)](/docs/collections/security-rules/): o que o banco de dados impõe além dos escopos de uma chave

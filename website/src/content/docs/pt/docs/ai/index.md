@@ -1,5 +1,5 @@
 ---
-sourceHash: ec9977f5b00dc133
+sourceHash: 289adf93a568aac7
 title: IA & Agentes
 sidebar_label: Visão Geral
 description: O que o Rebase oferece para assistentes de programação com IA e agentes autônomos — um servidor MCP, skills de agente locais no projeto, arquivos de instrução estruturados e o modelo de credenciais que decide o que um agente pode realmente acessar.
@@ -13,7 +13,7 @@ problemas diferentes. Vale a pena saber qual deles você está buscando:
 | [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 42 ferramentas para seu schema, dados, usuários, storage, cron e servidor de desenvolvimento | Um assistente, em tempo de execução |
 | [**Agent skills**](/docs/ai/skills) | 21 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
 | [**Arquivos de instrução**](/docs/ai/instruction-files) | `ai-instructions.md` mais arquivos de apontamento por assistente, gravados por `rebase init` | Um assistente, como regras ativas contínuas |
-| [**Chaves de API**](/docs/backend/api-keys) | Credenciais de máquina com escopo delimitado, por collection e por operação | Qualquer chamada para a API HTTP |
+| [**Chaves de API**](/docs/backend/api-keys) | Credenciais de máquina que têm [escopos](/docs/backend/roles-and-scopes), por collection e por operação | Qualquer chamada para a API HTTP |
 
 Os três primeiros servem para fornecer ao assistente *conhecimento* e *ferramentas*. O
 quarto é o único que decide o que ele pode de fato fazer.
@@ -28,24 +28,25 @@ restrição precisa existir abaixo do agente, na credencial que ele carrega.
 
 O Rebase aplica a essa credencial duas barreiras independentes:
 
-1. **A lista de permissões da chave de API.** Declarada por collection *e* por operação,
-   onde `delete` é separável de `write` — que geralmente é a permissão que você deseja
-   reter de um agente que, de outra forma, teria permissão para editar.
+1. **Os escopos da chave.** Declarados por operação *e*, quando você quiser, por
+   collection: `data:read:articles`, `data:write:articles`. `data:delete` é
+   separado de `data:write`, e geralmente é ele que você deseja reter de um
+   agente que, de outra forma, teria permissão para editar.
 2. **Row-Level Security (RLS).** As chaves de API não ignoram o RLS. Uma chave se conecta como a
    role Postgres `rebase_user` como qualquer outro chamador, de modo que suas políticas ainda
    decidem quais linhas retornam.
 
 Ambas precisam permitir a requisição. Nenhuma substitui a outra, e a segunda
-é a razão pela qual uma chave com permissões `"*"` ainda pode retornar um conjunto
-de resultados vazio.
+é a razão pela qual uma chave com `data:read` em todas as collections ainda pode retornar
+um conjunto de resultados vazio.
 
 Um detalhe que confunde muitos: o parâmetro `access: "public"` de uma collection expande **quais
 linhas um chamador pode ver**, não **quem pode chamar**. Trata-se de uma declaração sobre
-visibilidade de linhas, não sobre autenticação. Concedê-lo não adiciona um chamador à
-lista de permissões, e retê-lo não bloqueia um chamador.
+visibilidade de linhas, não sobre autenticação. Concedê-lo não dá um escopo a uma chave,
+e retê-lo não bloqueia uma chave.
 
-O funcionamento prático — criação de chaves, o JSON de permissões, rotação, expiração,
-rate limits — é abordado em [REST API → Chaves de API](/docs/backend/api-keys).
+O funcionamento prático — criação de chaves, escolha de escopos, rotação, expiração,
+rate limits — é abordado em [Chaves de API](/docs/backend/api-keys).
 Não deixe de consultar [Regras de Segurança (RLS)](/docs/collections/security-rules);
 a segunda barreira só é tão eficaz quanto as políticas que você escreveu.
 

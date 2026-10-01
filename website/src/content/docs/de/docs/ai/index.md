@@ -1,5 +1,5 @@
 ---
-sourceHash: ec9977f5b00dc133
+sourceHash: 289adf93a568aac7
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent Skills, gerüstartige Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.
@@ -13,7 +13,7 @@ Probleme. Es lohnt sich zu wissen, wonach Sie greifen:
 | [**MCP-Server**](/docs/ai/mcp) | Ein Stdio-Model-Context-Protocol-Server mit 42 Tools für Ihr Schema, Ihre Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent, zur Laufzeit |
 | [**Agent Skills**](/docs/ai/skills) | 21 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repo geschrieben werden | Ein Assistent, als Referenzmaterial |
 | [**Anweisungsdateien**](/docs/ai/instruction-files) | `ai-instructions.md` plus zeigerbasierte Dateien pro Assistent, geschrieben von `rebase init` | Ein Assistent, als dauerhaft aktive Regeln |
-| [**API-Keys**](/docs/backend/api-keys) | Bereichsbezogene (scoped) Maschinen-Anmeldedaten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |
+| [**API-Keys**](/docs/backend/api-keys) | Maschinen-Anmeldedaten, die [Scopes](/docs/backend/roles-and-scopes) halten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |
 
 Bei den ersten dreien geht es darum, einem Assistenten *Wissen* und *Werkzeuge* an
 die Hand zu geben. Das vierte ist das einzige, das entscheidet, was er tatsächlich
@@ -30,25 +30,25 @@ mitführt.
 
 Rebase versieht diese Anmeldedaten mit zwei unabhängigen Schranken:
 
-1. **Die API-Key-Berechtigungsliste.** Deklariert pro Collection *und* pro Operation,
-   wobei `delete` von `write` trennbar ist – was normalerweise die Operation ist,
-   die Sie einem Agenten vorenthalten möchten, der ansonsten bearbeiten darf.
+1. **Die Scopes des Schlüssels.** Deklariert pro Operation *und*, wenn Sie möchten, pro
+   Collection: `data:read:articles`, `data:write:articles`. `data:delete` ist
+   von `data:write` getrennt – was normalerweise die Operation ist, die Sie einem
+   Agenten vorenthalten möchten, der ansonsten bearbeiten darf.
 2. **Row-Level Security.** API-Keys umgehen RLS nicht. Ein Schlüssel verbindet sich wie
    jeder andere Aufrufer als die Postgres-Rolle `rebase_user`, sodass Ihre Richtlinien
    weiterhin bestimmen, welche Zeilen zurückgegeben werden.
 
 Beide müssen eine Anfrage erlauben. Keine ersetzt die andere, und die zweite ist der
-Grund, warum ein Schlüssel mit `"*"`-Berechtigungen dennoch eine leere Ergebnismenge
-zurückgeben kann.
+Grund, warum ein Schlüssel, der `data:read` auf jeder Collection hält, dennoch eine
+leere Ergebnismenge zurückgeben kann.
 
 Ein Punkt, der oft übersehen wird: Das `access: "public"` einer Collection erweitert,
 **welche Zeilen ein Aufrufer sehen darf**, nicht **wer aufrufen darf**. Es ist eine
 Aussage über die Sichtbarkeit von Zeilen, nicht über die Authentifizierung. Die
-Gewährung fügt einen Aufrufer nicht zur Berechtigungsliste hinzu, und das Verweigern
-stoppt ihn nicht.
+Gewährung gibt einem Schlüssel keinen Scope, und das Verweigern stoppt ihn nicht.
 
-Die Funktionsweise – Erstellen von Schlüsseln, das Berechtigungs-JSON, Rotation, Ablauf,
-Rate Limits – wird unter [REST API → API Keys](/docs/backend/api-keys) behandelt.
+Die Funktionsweise – Erstellen von Schlüsseln, die Wahl der Scopes, Rotation, Ablauf,
+Rate Limits – wird unter [API-Schlüssel](/docs/backend/api-keys) behandelt.
 Überspringen Sie auf dem Weg dorthin nicht [Security Rules (RLS)](/docs/collections/security-rules);
 die zweite Schranke ist nur so gut wie die von Ihnen geschriebenen Richtlinien.
 

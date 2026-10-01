@@ -392,6 +392,15 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
+`rk_…` key where the access token would go. The socket then checks each frame
+against the key's [scopes](/docs/backend/roles-and-scopes/): a fetch, a count or a
+subscription needs `data:read` on its collection, a save `data:write`, a delete
+`data:delete`. A nested path needs the plain scope. Channels (broadcast and
+presence) are refused for a key, because no scope covers them. The SQL editor and
+branch messages need `database:read` or `database:write`, for a key and a person
+alike.
+
 Running more than one instance — the LISTEN/NOTIFY bus, what presence does
 across processes, and writing your own transport — has a page of its own:
 [Realtime across instances](/docs/backend/realtime-transports/).

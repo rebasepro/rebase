@@ -11,8 +11,8 @@ not the grant — decides which rows it may see. A table with RLS disabled has n
 authorization model at all, so Rebase **does not serve it**, and says so at boot.
 
 Everything below is **defense in depth on top of that**, not a substitute for it.
-The application layers authenticate the caller, scope the driver, enforce API-key
-permissions and let you mask or reject at the edges — but the answer to "who can
+The application layers authenticate the caller, scope the driver, enforce the
+credential's scopes and let you mask or reject at the edges — but the answer to "who can
 read this row" comes from a policy in the database, and it holds for anything
 that reaches the database, this framework included.
 
@@ -29,7 +29,7 @@ serve.
 - [Security Architecture Overview](#security-architecture-overview)
 - [Request Pipeline](#request-pipeline)
 - [Layer 1: Auth Middleware](#layer-1-auth-middleware)
-- [Layer 2: API Key Permission Guard](#layer-2-api-key-permission-guard)
+- [Layer 2: Scope Checks](#layer-2-scope-checks)
 - [Layer 3: Global callbacks (every data path)](#layer-3-global-callbacks-every-data-path)
 - [Layer 4: Scoped DataDriver](#layer-4-scoped-datadriver)
 - [Layer 5: Collection Callbacks](#layer-5-collection-callbacks)
@@ -58,9 +58,9 @@ Every request — REST and WebSocket — passes through **5 application layers**
 └──────────────┬───────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────┐
-│  Layer 2: API Key Permission Guard                   │
-│  Per-collection, per-operation permission check      │
-│  (only for API key requests)                         │
+│  Layer 2: Scope Checks                               │
+│  data:read:posts, cron:write, users:read …           │
+│  (narrow keys/tokens; gate the admin plane)          │
 └──────────────┬───────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────┐
@@ -94,7 +94,7 @@ All three protocols share the same security middleware stack:
 
 ### REST
 ```
-HTTP Request → Auth Middleware → API Key Guard → Scoped Driver → global callbacks → collection callbacks → property callbacks → Response
+HTTP Request → Auth Middleware → Scope Checks → Scoped Driver → global callbacks → collection callbacks → property callbacks → Response
 ```
 
 ### WebSocket
@@ -102,11 +102,11 @@ HTTP Request → Auth Middleware → API Key Guard → Scoped Driver → global 
 WS Connect → AUTHENTICATE message → Token Verification → Per-Operation Scoped Driver → Response
 ```
 WebSocket auth follows a message-based flow:
-1. Client sends an `AUTHENTICATE` message with a JWT token.
+1. Client sends an `AUTHENTICATE` message with a JWT token — or an `rk_` API key, verified the same way the HTTP middleware verifies it.
 2. Token is verified via `extractUserFromToken(token)`.
-3. Session is marked as authenticated.
-4. Each subsequent data operation calls `getScopedDelegate()` to create a user-scoped driver.
-5. Admin-only operations (e.g., `EXECUTE_SQL`) require `isAdminSession()`.
+3. Session is marked as authenticated; a key's scopes are stored on the session.
+4. Each subsequent data operation calls `getScopedDelegate()` to create a user-scoped driver. A key-authenticated session needs `data:read` / `data:write` / `data:delete` on the frame's collection, and cannot use channels.
+5. Admin-plane operations need their scope, for keys and people alike: `database:write` for `EXECUTE_SQL` and creating/deleting branches, `database:read` for the catalogue and listing branches.
 6. Rate limiting: 2000 messages per 60 seconds.
 
 ---
@@ -150,8 +150,8 @@ export async function scopeDataDriver(
 |---|---|---|---|
 | JWT (authenticated user) | User's ID | User's app roles | Full RLS enforcement |
 | Service Key | `"service"` | `["admin"]` | **RLS is enforced**, against the `admin` role |
-| API Key (default) | `"api-key:{id}"` | `["service"]` | **RLS is enforced**, against the `service` role, *and* the key's permission list |
-| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | **RLS is enforced**, against the `admin` role, *and* the key's permission list |
+| Service API key | `"api-key:{id}"` | `["service", ...key.roles]` | **RLS is enforced**, against `service` (and `admin` when the key was given `roles: ["admin"]`), *and* the key's scopes |
+| Personal API key | the owner's uid | the owner's current roles | **RLS is enforced** as the owner, *and* the key's scopes ∩ the owner's |
 | Anonymous (`requireAuth: false`) | `"anon"` | `["anon"]` | RLS with anonymous identity |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
@@ -166,9 +166,9 @@ export async function scopeDataDriver(
 >   **false** for all of them. A collection with `disableDefaultPolicies: true`
 >   whose only rule is `serverContext()` denies these writes (`42501`) and
 >   returns zero rows — HTTP 200, empty — for these reads.
-> - A non-admin API key with `"*"` permissions can still read nothing. That is
->   RLS working: grant the `service` role in the collection's security rules, or
->   use an admin key.
+> - A service key holding `data:read` and no `admin` role can still read
+>   nothing. That is RLS working: grant the `service` role in the collection's
+>   security rules, or give the key `roles: ["admin"]`.
 >
 > The one genuine, unconditional bypass is `rebase.sql()`, which runs on the
 > owner connection and never goes through `withAuth`. Of the accessors on the
@@ -177,29 +177,24 @@ export async function scopeDataDriver(
 > **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing callbacks, developers should use these identities to gate behavior:
 > - `uid: "service"` + `roles: ["admin"]` — server-side `rebase.dataAsAdmin` calls (cron jobs, custom functions, webhooks). The driver is scoped with this identity once, at boot.
 > - `uid: "anon"` + `roles: ["anon"]` — Unauthenticated requests when `requireAuth: false`. **Note:** for anonymous REST requests, `context.user` in Collection Callbacks may be `undefined`; only the DataDriver is scoped with the anon identity. For WebSocket connections, a full `User` object with `uid: "anon"` is provided.
-> - `uid: "api-key:{id}"` + `roles: ["service"]` (or `["admin", "service"]`) — API key requests.
+> - `uid: "api-key:{id}"` + `roles: ["service", ...key.roles]` — service API key requests. A personal key carries its owner's uid and roles instead.
 > - Real user IDs and roles for JWT-authenticated requests.
 >
 > **Key insight:** `rebase.dataAsAdmin` is not a raw admin driver either. It is the native DataDriver scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is still evaluated and callbacks still fire — they live in the driver, not at the route boundary. Callbacks can therefore distinguish server-internal reads from end-user ones by checking `context.user?.roles?.includes("admin")`.
 
 ---
 
-## Layer 2: API Key Permission Guard
+## Layer 2: Scope Checks
 
-When a request is authenticated via an API key (prefixed `rk_`), the permission guard enforces **per-collection, per-operation** access control:
+Every credential holds **scopes** — `resource:action[:target]`, defined in `packages/types/src/types/scopes.ts` (see `rebase-auth` → Roles & Scopes):
 
-```typescript
-interface ApiKeyPermission {
-    collection: string;        // Collection slug, or "*" for all
-    operations: ("read" | "write" | "delete")[];
-}
-```
+- **Data plane** (`data:*`, `storage:*`, `functions:invoke`): a signed-in person holds all of it — RLS decides their rows. An API key or MCP token holds only what it was given, and these checks narrow it: `data:read:posts` reaches `posts` and nothing else.
+  - REST data: `GET` → `data:read`, `POST`/`PUT`/`PATCH` → `data:write`, `DELETE` (and `POST /bulk/delete`) → `data:delete`, on the target collection; each parent of a nested path needs `data:read`.
+  - Storage: `storage:read|write|delete` on the storage source (`(default)` for the default one), checked before `storageAuthorize`.
+  - Functions: `functions:invoke` or `functions:invoke:<name>`.
+- **Admin plane** (`users:*`, `schema:*`, `database:*`, `backups:read`, `cron:*`, `logs:read`, `keys:*`): nobody holds it implicitly — the `admin` role holds all of it, declared roles hold what `auth.roles` lists, keys what they were minted with (never `keys:*`).
 
-- `GET` → requires `"read"` permission
-- `POST` / `PUT` / `PATCH` → requires `"write"` permission
-- `DELETE` → requires `"delete"` permission
-
-This layer runs on every REST request. If the API key lacks the required permission, the request is rejected with **403 Forbidden**.
+A missing scope is **`403 SCOPE_MISSING`** with `details.requiredScope`. Nothing grants more than its grantor holds: key scopes ⊆ the minter's (`SCOPE_EXCEEDS_CREATOR`), and a `users:write` holder cannot manage an account that outranks them (`ACCOUNT_OUTRANKS_CALLER`) nor grant roles beyond their own (`ROLE_EXCEEDS_CALLER`).
 
 ---
 
@@ -381,7 +376,7 @@ Rebase follows a **fail-closed** security model throughout the stack:
 
 3. **Unauthenticated requests are rejected** — When `requireAuth: true` (the default), requests without a valid token receive 401. The unscoped driver never reaches the handler.
 
-4. **API keys with missing permissions are rejected** — If an API key lacks the required permission for a collection/operation, the request is rejected with 403.
+4. **Credentials missing a scope are rejected** — `scopeGrants` loops over what is held and returns `false` at the end, so an empty or unparseable scope list reaches nothing. The request is rejected with `403 SCOPE_MISSING`.
 
 ---
 
@@ -691,12 +686,12 @@ Use this checklist when setting up security for a Rebase project:
 - [ ] **Auth is configured** — `auth.jwtSecret` is set with a strong secret (≥ 32 chars)
 - [ ] **`requireAuth` is `true`** — The default. Only set to `false` if you explicitly need unauthenticated access
 - [ ] **Service key is set** — `auth.serviceKey` with ≥ 32 chars for server-to-server auth
-- [ ] **Default role is NOT admin** — `auth.defaultRole` must never be `"admin"` (startup error)
+- [ ] **Default role holds no admin-plane scope** — `auth.defaultRole` may not be `"admin"` or a declared role with any admin-plane scope (startup error)
 - [ ] **Callbacks enforce what RLS cannot** — `callbacks` on `initializeRebaseBackend` redact and validate on every data path. Deciding *who may see a row* is RLS's job
 - [ ] **Sensitive fields are masked** — `afterRead` masks PII for non-admin users
 - [ ] **Ownership is enforced** — `beforeSave` stamps `user_id` on creation; Collection Callbacks verify ownership on update/delete
-- [ ] **API keys are scoped** — API keys have minimal permissions (specific collections + operations)
-- [ ] **API keys are never client-side** — a key carries a broad, long-lived identity (`service`, or `admin` for an admin key) and its own permission list; only use server-side
+- [ ] **API keys are scoped** — the narrowest scopes that work (`data:read:orders`, not `data:read`); no `data:delete` or `functions:invoke` unless needed
+- [ ] **API keys are never client-side** — a key is a long-lived credential (a service key acts as `service`, plus `admin` if given that role; a personal key acts as its owner); only use server-side
 - [ ] **CORS is configured** — Restrict origins in production
 - [ ] **Rate limiting is in place** — Default limiters apply to auth endpoints; add custom limiters for sensitive operations
 
@@ -707,7 +702,9 @@ Use this checklist when setting up security for a Rebase project:
 - **RLS Scope**: `packages/server/src/auth/rls-scope.ts` — `scopeDataDriver()` implementation
 - **Auth Middleware**: `packages/server/src/auth/middleware.ts` — JWT/service key/API key middleware
 - **Adapter Middleware**: `packages/server/src/auth/adapter-middleware.ts` — Custom auth adapter middleware
-- **API Key Guard**: `packages/server/src/auth/api-keys/api-key-permission-guard.ts`
+- **Scopes**: `packages/types/src/types/scopes.ts` — the vocabulary, `scopeGrants`, `scopesForRoles`
+- **Access model / `requireScope`**: `packages/server/src/auth/access.ts`
+- **API keys**: `packages/server/src/auth/api-keys/` — `api-key-middleware.ts` (verification), `key-grant.ts` (minting rules)
 - **REST API Generator**: `packages/server/src/api/rest/api-generator.ts` — request/response path
 - **Callback Types**: `packages/types/src/types/entity_callbacks.ts` — `CollectionCallbacks`, `AfterReadProps`, `BeforeSaveProps`
 - **Backend Init**: `packages/server/src/init.ts` — `hooks` config property

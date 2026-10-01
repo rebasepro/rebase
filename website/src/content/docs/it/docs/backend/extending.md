@@ -1,5 +1,5 @@
 ---
-sourceHash: 41183c8dc79d618d
+sourceHash: 589741179a41eb37
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
@@ -180,8 +180,9 @@ per i dettagli sulla struttura.
 :::caution[Nessun middleware di autenticazione è stato eseguito qui]
 Una rotta registrata in questo modo si trova **all'esterno** di ogni router Rebase, quindi
 `getDriver(c)` non è impostato e nessun componente ha verificato il token. Proteggila con
-`requireAuth` / `requireAdmin` importati da **`@rebasepro/server`** — la radice del pacchetto —
-che verificano autonomamente il token. Le guardie esportate da
+`requireAuth` importato da **`@rebasepro/server`** — la radice del pacchetto — che
+verifica autonomamente il token, poi `requireAdmin` o `requireScope` dallo stesso
+import per decidere cosa può fare il chiamante. Le guardie esportate da
 `@rebasepro/server/functions` leggono un'identità che un router Rebase ha già
 risolto, e restituiranno 500 piuttosto che fingere che ne esista una.
 :::

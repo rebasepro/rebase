@@ -1,5 +1,5 @@
 ---
-sourceHash: 42389d34a3b37766
+sourceHash: abb4fea850cf0823
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -37,6 +37,10 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `GET` | `/api/auth/sessions` | Lister les sessions actives de l'appelant (jetons de rafraîchissement) |
 | `DELETE` | `/api/auth/sessions` | Révoquer toutes les sessions, y compris celle-ci — déconnexion à distance sur chaque appareil |
 | `DELETE` | `/api/auth/sessions/:id` | Révoquer une session |
+| `GET` | `/api/auth/scopes` | Toutes les [portées](/docs/backend/roles-and-scopes/) que ce backend connaît, et celles que détient l'appelant |
+| `GET` | `/api/auth/keys` | Les propres [clés API personnelles](/docs/backend/api-keys/#personal-keys) de l'appelant |
+| `POST` | `/api/auth/keys` | Créer une clé personnelle. `403 PERSONAL_KEYS_DISABLED` sauf si la collection des utilisateurs définit `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | Révoquer l'une des propres clés de l'appelant |
 | `GET` | `/.well-known/jwks.json` | Le JWKS public — monté à la racine, et non sous `basePath`, car c'est là qu'un vérificateur regarde. Présent lorsque la [signature asymétrique](#asymmetric-tokens-and-jwks) est configurée |
 | `POST` | `/api/auth/mfa/enroll` | Démarrer l'enrôlement TOTP (renvoie le secret et les codes de récupération) |
 | `POST` | `/api/auth/mfa/verify` | Confirmer un enrôlement avec un code provenant de l'application d'authentification |
@@ -46,8 +50,10 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `DELETE` | `/api/auth/mfa/unenroll` | Supprimer un facteur (nécessite une session `aal2`) |
 
 La gestion administrative des utilisateurs et des rôles est une **surface distincte**, montée sur
-`/api/admin/` plutôt que sur `/api/auth/`, et restreinte au rôle `admin` ou à
-la clé de service :
+`/api/admin/` plutôt que sur `/api/auth/`. La lecture exige la portée `users:read` et
+la modification `users:write`. Un administrateur et la clé de service détiennent les deux ; un
+rôle qui les déclare aussi. Personne ne peut modifier un compte qui détient plus que lui.
+Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
@@ -57,7 +63,7 @@ la clé de service :
 | `PUT` | `/api/admin/users/:uid` | Mettre à jour un utilisateur |
 | `DELETE` | `/api/admin/users/:uid` | Supprimer un utilisateur |
 | `POST` | `/api/admin/users/:uid/reset-password` | Réinitialiser le mot de passe d'un utilisateur sans son mot de passe actuel |
-| `GET` | `/api/admin/roles` | Lister les rôles connus de ce backend |
+| `GET` | `/api/admin/roles` | `admin` et les rôles que déclare la collection des utilisateurs, avec leurs portées |
 | `POST` | `/api/admin/bootstrap` | Permettre au premier utilisateur inscrit de revendiquer le rôle admin tant qu'aucun n'existe. Refusé en production — voir [Amorçage du premier utilisateur](/docs/backend/authentication/#first-user-bootstrap) |
 
 Tous les endpoints de l'API de données nécessitent un en-tête `Authorization: Bearer <token>` valide lorsque `requireAuth: true` (valeur par défaut).

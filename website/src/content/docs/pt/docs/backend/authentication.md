@@ -1,5 +1,5 @@
 ---
-sourceHash: 78b489b0acdcc296
+sourceHash: 2a2328d2d6223346
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -92,7 +92,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: também fecha a janela de bootstrap do primeiro usuário que `allowRegistration: false` deixa aberta |
 | `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente não restrito por `allowRegistration` — um aplicativo público predominantemente de leitura pode querer sessões sem contas |
 | `allowUserLookup` | `boolean` | `false` | Disponibiliza `POST /api/auth/find-user` para fluxos de convite por e-mail |
-| `defaultRole` | `string` | — | Role atribuída a um usuário recém-registrado quando nenhuma for especificada |
+| `defaultRole` | `string` | — | Role atribuída a um usuário recém-registrado quando nenhuma for especificada. Não pode ser `admin`, nem uma role declarada que tenha um escopo do plano administrativo: a inicialização recusa as duas |
 | `serviceKey` | `string` | — | Chave estática para chamadas servidor para servidor — consulte [Autenticação por Chave de Serviço](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, para redefinição de senha, verificação, convites e magic links |
 | `magicLink` | `boolean` | `false` | Habilita login por e-mail sem senha (passwordless). Requer `email` configurado; sem isso, as rotas respondem com `503 EMAIL_NOT_CONFIGURED` |
@@ -262,7 +262,7 @@ Cada mensagem traz `to`, `subject`, `at`, as partes em `html` e `text`, e
 `links` — as URLs absolutas encontradas no corpo, na ordem do documento, que é o
 que realmente interessa.
 
-O acesso é restrito a administradores, através do mesmo controle usado por cron,
+Ele requer o escopo `users:write`, através do mesmo controle usado por cron,
 logs e backups, e responde com `501 DEV_MAILBOX_UNAVAILABLE` quando não há nada a
 exibir — com o SMTP configurado, o e-mail é entregue em vez de retido.
 `NODE_ENV=production` recusa o acesso independentemente de qualquer outra coisa: o
@@ -594,11 +594,26 @@ const membersCollection = defineCollection({
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
       resetPassword: true // Or false to disable, or a custom EntityAction
-    }
+    },
+
+    // What each role may do beyond its rows, the app's own scopes,
+    // and whether accounts may create personal API keys
+    roles: {
+      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
+    },
+    scopes: {
+      "project:deploy": { label: "Deploy projects", target: "project" }
+    },
+    personalKeys: true
   },
   properties: { ... }
 });
 ```
+
+`roles`, `scopes` e `personalKeys` declaram o modelo de acesso: quais escopos do plano
+administrativo cada role tem, os escopos que o app define para as próprias operações, e
+se cada conta pode criar [chaves de API pessoais](/docs/backend/api-keys/#personal-keys).
+Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 
 Um `temporaryPassword` retornado por `onResetPassword` se torna a senha da conta. O Rebase gera o hash dele com o algoritmo configurado, o salva, desconecta o usuário de todas as sessões existentes e o exibe ao administrador para que ele o repasse. O hook não o armazena, nem tem como fazer isso. Não retorne nenhum `temporaryPassword` quando o hook enviar, em vez disso, seu próprio link de redefinição por e-mail: nesse caso, a senha continua a mesma até que o usuário defina uma nova, embora as sessões dele sejam encerradas mesmo assim.
 
@@ -613,6 +628,7 @@ eles recebem uma fachada `AuthCollectionContext` contendo:
 ## Próximos Passos
 
 - **[Endpoints e tokens](/docs/backend/auth-endpoints/)** — cada rota que esta configuração disponibiliza
+- **[Papéis e escopos](/docs/backend/roles-and-scopes/)** — o que cada role pode fazer, e como chaves e tokens o restringem
 - **[Adaptadores de autenticação personalizados](/docs/backend/auth-adapters/)** — trazendo seu próprio provedor de identidade
 - **[Autenticação no Frontend](/docs/frontend/authentication/)** — interface de login, controlador de autenticação, gerenciamento de usuários
 - **[Regras de Segurança (RLS)](/docs/collections/security-rules/)** — controle de acesso a nível de linha

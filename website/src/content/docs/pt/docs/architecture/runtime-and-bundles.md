@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c05763a61028751
+sourceHash: 6e15a506e712f1ad
 title: Runtime e Bundles
 sidebar_label: Runtime & Bundles
 description: Como um projeto Rebase se divide em um bundle de projeto e um runtime versionado, e por que essa separação torna possíveis atualizações, aplicações multi-repositório e hospedagem gerenciada.
@@ -152,5 +152,5 @@ com a chave de origem — consulte [Múltiplos bancos de dados e buckets](/docs/
 | `GET /health` | Readiness (prontidão). Realiza uma comunicação completa (round-trip) com o banco de dados. |
 | `GET /livez` | Liveness (atividade). Deliberadamente *não* consulta o banco de dados, para que uma oscilação momentânea no banco não faça um orquestrador encerrar um processo saudável. |
 | `GET /api/meta/schema-version` | A versão atual do esquema. Sem autenticação — é um carimbo de versão, não um esquema. |
-| `GET /api/meta/contract` | O contrato completo das coleções. Apenas para administradores. |
+| `GET /api/meta/contract` | O contrato completo das coleções. Requer `schema:read`. |
 | `GET /metrics` | Métricas do Prometheus, quando `REBASE_METRICS=true`. |

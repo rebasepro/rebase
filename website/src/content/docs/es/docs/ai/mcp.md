@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a7a97c334fa87c6
+sourceHash: c30cc2c794d1f805
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
@@ -174,8 +174,8 @@ descubrimiento solo llena vacíos.
 :::danger[La vía sin configuración es una credencial de administrador]
 Las opciones 2 y 3 corresponden a la **clave de servicio** (service key): un secreto de
 administrador sin restricciones de alcance. El backend la resuelve a `uid: "service"`,
-`roles: ["admin"]`, `isAdmin: true`. Esa identidad omite la lista de permisos de las claves
-de API por completo y satisface las políticas `_default_admin_read` / `_default_admin_write`
+`roles: ["admin"]`, `isAdmin: true`. Esa identidad tiene todos los
+[alcances](/docs/backend/roles-and-scopes/) y satisface las políticas `_default_admin_read` / `_default_admin_write`
 que Rebase inyecta en cada colección que no haya establecido `disableDefaultPolicies`.
 
 Por lo tanto, la respuesta honesta a "¿RLS sigue restringiéndola?" es: RLS *se ejecuta*
@@ -191,16 +191,16 @@ resuelva el proyecto.
 
 ### Proporcionar una credencial restringida en su lugar
 
-Registra una [clave de API](/docs/backend/api-keys) con alcance restringido y el modelo de dos
-barreras se aplicará de verdad. Una clave que no sea de administrador se ejecuta con los roles
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Registra una [clave de API](/docs/backend/api-keys) con alcance restringido y el modelo de dos
+barreras se aplicará de verdad. Una clave de servicio se ejecuta con los roles
 `["service"]`, los cuales las políticas de administración inyectadas **no** nombran; por lo tanto,
-RLS no le otorga nada a menos que una de tus propias políticas indique lo contrario, y la lista
-de permisos la restringe aún más:
+RLS no le otorga nada a menos que una de tus propias políticas indique lo contrario, y sus
+alcances la restringen aún más:
 
 ```bash
 rebase api-keys create -n "claude-code" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
+  --scopes data:read:articles \
+  --expires-in 30
 ```
 
 Luego, entrega la clave `rk_live_…` resultante al servidor en lugar de dejar que descubra
@@ -227,18 +227,21 @@ Dos cosas que esto **no** hace, ambas importantes antes de depender de ello:
   `rebase_doctor` y las herramientas de ramas inician la CLI de Rebase, la cual se conecta
   con `DATABASE_URL` y nunca ve tu token. La barrera de loopback que se describe a continuación
   es lo único que se interpone frente a ellas.
-- **Una clave que no sea de administrador no puede utilizar las herramientas de administración.**
-  `list_users`, `create_user`, `update_user`, `delete_user`, `list_roles` y `rebase_auth_reset_password`
-  se encuentran tras `requireAdmin` y fallarán con una clave restringida. Esto es el sistema
-  funcionando como debe, pero implica tener que elegir entre alcance amplio o restringido en
-  lugar de disponer de ambos.
+- **Una clave llega a una herramienta de administración solo con el alcance de esa herramienta.**
+  `list_users` y `list_roles` necesitan `users:read`; `create_user`, `update_user`, `delete_user`
+  y `rebase_auth_reset_password` necesitan `users:write`; las herramientas de almacenamiento y
+  de cron necesitan el alcance `storage:*` o `cron:*` correspondiente; `invoke_function`
+  necesita `functions:invoke`. Sin él, la llamada responde `403 SCOPE_MISSING`. Incluso con
+  `users:write`, una clave no puede cambiar la cuenta de un administrador: un administrador
+  tiene `keys:read` y `keys:write`, que ninguna clave puede tener, y nadie puede gestionar una
+  cuenta que tenga más que él.
 
-Una clave de API con `admin: true` es un asunto diferente: cuenta con los roles
-`["admin", "service"]`, lo que cumple las mismas políticas de administración predeterminadas
-que la clave de servicio. En el plano de datos, su alcance es el mismo que el de la clave de
-servicio. La diferencia es que es **revocable, puede expirar y cuenta con límites de tasa por clave**,
-características que no aplican a la clave de servicio; rotar esa última requiere editar `.env`
-y reiniciar el servidor.
+Una clave creada con `--roles admin` es un asunto diferente: cuenta con los roles
+`["service", "admin"]`, lo que cumple las mismas políticas de administración predeterminadas
+que la clave de servicio. Si además le das `--full-access`, su alcance es el de la clave de
+servicio, menos la gestión de claves. La diferencia es que es **revocable, puede expirar y
+cuenta con límites de tasa por clave**, características que no aplican a la clave de servicio;
+rotar esa última requiere editar `.env` y reiniciar el servidor.
 
 Consulta [Agentes y servidores MCP](/docs/backend/api-keys#agents-and-mcp-servers) para ver la
 guía completa sobre el alcance de claves.
@@ -546,11 +549,22 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   activado por defecto; `REBASE_MCP_OPEN_REGISTRATION=false` lo limita a los clientes que
   registres) y envía a la persona a una pantalla de consentimiento que inicia su sesión a
   través de tu `/auth/login` existente.
-- **Seis herramientas, dos ámbitos (scopes).** `mcp:read` ofrece `list_collections`,
-  `query_collection` y `get_document`; `mcp:write` añade `create_document`, `update_document`
-  y `delete_document`. Un ámbito decide qué herramientas se ofrecen, no qué filas: una lista
-  vacía puede ser resultado del funcionamiento de RLS, y `mcp:write` sigue sin poder escribir
-  una fila que la persona no podría.
+- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Seis herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
+  que usa toda credencial. `data:read` ofrece `list_collections`, `query_collection` y
+  `get_document`; `data:write` añade `create_document` y `update_document`; `data:delete`
+  añade `delete_document`. Un cliente que no pide nada recibe `data:read`. Cada uno se
+  restringe a una colección: `data:read:posts` lista y lee `posts` y nada más. Un alcance
+  decide qué herramientas se ofrecen y a qué colecciones llegan, no qué filas: una lista
+  vacía puede ser resultado del funcionamiento de RLS, y `data:write` sigue sin poder
+  escribir una fila que la persona no podría.
+- **Las concesiones anteriores a 0.24 conservan su alcance.** `mcp:read` se lee como
+  `data:read`, y `mcp:write` como `data:write data:delete`, en las concesiones guardadas y en
+  los tokens ya emitidos.
+- <span class="since-badge" data-since="0.24">Desde 0.24</span> **También funciona una clave de API.** `/mcp` acepta además `Authorization: Bearer rk_…`,
+  para un cliente configurado con una cabecera en lugar de un flujo OAuth. La clave llega a
+  las herramientas que cubren sus alcances `data:*`, como quien sea que represente: una
+  [clave personal](/docs/backend/api-keys/#personal-keys) como su propietario, una clave de
+  servicio como `api-key:<id>`.
 - **Un token solo para este endpoint.** Un token de acceso MCP es rechazado por `/api/data`,
   `/api/admin` y el WebSocket, por lo que conectar un asistente no le otorga una sesión.
 

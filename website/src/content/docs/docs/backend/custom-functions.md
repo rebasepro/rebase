@@ -129,7 +129,7 @@ Files that are **skipped**:
 - `*.d.ts` — type declarations
 - Subdirectories, and `.mts` / `.cts` / `.tsx` / `.jsx` / `.mjs` / `.cjs` files — reported as problems, since the build compiles more than the runtime loads
 
-The name is the function's identity everywhere else too: it is the URL segment, the `functions/<name>` API-key permission, and the value `REBASE_FUNCTIONS_ONLY` selects by when you give one function its own process.
+The name is the function's identity everywhere else too: it is the URL segment, the target of the `functions:invoke:<name>` scope a key needs to call it, and the value `REBASE_FUNCTIONS_ONLY` selects by when you give one function its own process.
 
 ## Export Formats
 
@@ -208,18 +208,18 @@ A caller who presents a *bad* token never reaches your handler: an unverifiable 
 ### Reading the caller
 
 ```typescript
-import { defineFunction, getUser, getUserId, getRoles, isAdmin } from "@rebasepro/server/functions";
+import { defineFunction, getUser, getUserId, getRoles, getScopes, isAdmin } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
     app.get("/me", (c) => {
         const user = getUser(c);          // { uid, roles, ...claims } | undefined
         if (!user) return c.json({ error: "Unauthorized" }, 401);
-        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c) });
+        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c), scopes: getScopes(c) });
     });
 });
 ```
 
-`getUser` returns a narrowed object: `uid` is a string and `roles` is always an array, whatever auth method the caller used. `getUserId(c)` and `getRoles(c)` are shortcuts.
+`getUser` returns a narrowed object: `uid` is a string and `roles` is always an array, whatever auth method the caller used. `getUserId(c)` and `getRoles(c)` are shortcuts. `getScopes(c)` is everything the caller may do, as [scope](/docs/backend/roles-and-scopes/) strings: for a person, the data plane, the app's own scopes and their roles' scopes; for an API key, exactly what the key holds.
 
 ### Protecting Routes
 
@@ -233,7 +233,7 @@ export default defineFunction((app) => {
     // 401 for anonymous callers.
     app.post("/protected", requireAuth, (c) => c.json({ message: `Hello, ${getUserId(c)}` }));
 
-    // 401 anonymous, 403 without an administrative role. Order matters.
+    // 401 anonymous, 403 without the admin role. Order matters.
     app.post("/admin-only", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 
     // Any one of the named roles.
@@ -246,6 +246,26 @@ Put guards in the **route's own middleware slot**, as above, rather than `app.us
 :::important
 Reading `getUser(c)` is **not** a guard. An anonymous caller gets `undefined` and your handler runs anyway. Only a guard, or an explicit `if (!user) return 401`, stops the request.
 :::
+
+### Scopes and app scopes
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> `requireAdmin` admits the `admin` role and nobody else. For an action a narrower role or an API key should reach, guard the route with `requireScope`. It takes a built-in [scope](/docs/backend/roles-and-scopes/), or one the app declares under `auth.scopes` on the users collection, such as `"project:deploy": { label: "Deploy projects", target: "project" }`:
+
+```typescript
+import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    // 403 SCOPE_MISSING unless the caller holds project:deploy, or project:deploy:<this project>.
+    app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
+        return c.json({ deploying: c.req.param("project") });
+    });
+
+    // The same question inside a handler.
+    app.get("/:project/can-deploy", requireAuth, (c) => c.json({ allowed: hasScope(c, "project:deploy", c.req.param("project")) }));
+});
+```
+
+Every signed-in person holds every app scope, so for a person `requireScope` decides nothing: check in the handler whether this person may deploy this project. What the scope adds is a way to **narrow a key**: a key holding `project:deploy:p1` passes for `p1` only. A key also needs `functions:invoke`, or `functions:invoke:<name>`, before it reaches the function at all. See [App scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
 ### Service Key Authentication
 
@@ -552,7 +572,7 @@ If loading fails, the loader provides diagnostic output:
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
 
-The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The listing itself requires a signed-in caller, an API key or the service key — the functions stay callable by whoever each one admits, but the inventory of them is not public. The reasons stay in the boot log.
+The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The listing itself requires a signed-in caller, an API key holding the plain `functions:invoke` scope, or the service key — the functions stay callable by whoever each one admits, but the inventory of them is not public. The reasons stay in the boot log.
 
 ## Timeouts and Rate Limits
 

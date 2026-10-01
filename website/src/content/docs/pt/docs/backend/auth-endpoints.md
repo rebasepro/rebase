@@ -1,5 +1,5 @@
 ---
-sourceHash: 42389d34a3b37766
+sourceHash: abb4fea850cf0823
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -37,6 +37,10 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `GET` | `/api/auth/sessions` | Listar as sessões ativas do chamador (refresh tokens) |
 | `DELETE` | `/api/auth/sessions` | Revogar todas as sessões, incluindo esta — logout remoto em todos os dispositivos |
 | `DELETE` | `/api/auth/sessions/:id` | Revogar uma sessão |
+| `GET` | `/api/auth/scopes` | Todos os [escopos](/docs/backend/roles-and-scopes/) que este backend conhece, e os que o chamador tem |
+| `GET` | `/api/auth/keys` | As próprias [chaves de API pessoais](/docs/backend/api-keys/#personal-keys) do chamador |
+| `POST` | `/api/auth/keys` | Criar uma chave pessoal. `403 PERSONAL_KEYS_DISABLED` a menos que a coleção de usuários defina `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | Revogar uma das chaves do próprio chamador |
 | `GET` | `/.well-known/jwks.json` | O JWKS público — montado na raiz, não sob `basePath`, pois é onde um verificador procura. Presente quando o [assinamento assimétrico](#asymmetric-tokens-and-jwks) estiver configurado |
 | `POST` | `/api/auth/mfa/enroll` | Iniciar o cadastro no TOTP (retorna o segredo e os códigos de recuperação) |
 | `POST` | `/api/auth/mfa/verify` | Confirmar o cadastro com um código do aplicativo autenticador |
@@ -46,8 +50,10 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `DELETE` | `/api/auth/mfa/unenroll` | Remover um fator (requer uma sessão `aal2`) |
 
 O gerenciamento administrativo de usuários e papéis (roles) é uma **superfície separada**, montada em
-`/api/admin/` em vez de `/api/auth/`, e restrita à role `admin` ou à
-chave de serviço:
+`/api/admin/` em vez de `/api/auth/`. Ler requer o escopo `users:read` e
+alterar requer `users:write`. Um admin e a chave de serviço têm os dois; o mesmo vale para uma
+role que os declara. Ninguém pode alterar uma conta que tenha mais do que ele próprio.
+Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
@@ -57,7 +63,7 @@ chave de serviço:
 | `PUT` | `/api/admin/users/:uid` | Atualizar um usuário |
 | `DELETE` | `/api/admin/users/:uid` | Excluir um usuário |
 | `POST` | `/api/admin/users/:uid/reset-password` | Redefinir a senha de um usuário sem a senha atual dele |
-| `GET` | `/api/admin/roles` | Listar as roles que este backend reconhece |
+| `GET` | `/api/admin/roles` | `admin` e as roles que a coleção de usuários declara, com seus escopos |
 | `POST` | `/api/admin/bootstrap` | Permitir que o primeiro usuário registrado assuma a role de admin enquanto nenhuma existir. Recusado em produção — veja [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 Todos os endpoints da API de dados requerem um cabeçalho `Authorization: Bearer <token>` válido quando `requireAuth: true` (o padrão).

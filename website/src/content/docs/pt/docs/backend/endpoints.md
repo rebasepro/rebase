@@ -1,5 +1,5 @@
 ---
-sourceHash: 9e712bfba357185d
+sourceHash: 3f722457adc3d8f9
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -24,7 +24,7 @@ sem constar aqui.
 |---|---|
 | **none** | Não autenticado. Qualquer pessoa que alcance o host pode chamar |
 | **session** | Uma chamada autenticada: um token de acesso ou uma chave de API com escopo para a operação |
-| **admin** | Uma sessão de administrador, uma chave de serviço ou uma chave de API com escopo de administração |
+| **`resource:action`** | Um chamador que tem esse [escopo](/docs/backend/roles-and-scopes/): um administrador, uma pessoa cuja role o declara, uma chave de API criada com ele, ou a chave de serviço |
 | **RLS** | Autenticado, e então o banco de dados decide linha por linha — consulte [Security Rules](/docs/collections/security-rules/) |
 | **dev** | Montado apenas fora de produção |
 
@@ -96,50 +96,56 @@ como um único `404 NO_COLLECTIONS`. Consulte [Backend only](/docs/getting-start
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (um login em andamento) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (um id de desafio) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `GET` | `/api/auth/scopes` | session | Todos os escopos que este backend conhece, e os que o chamador tem — [Papéis e escopos](/docs/backend/roles-and-scopes/) |
+| `GET` | `/api/auth/keys` | session (uma conta) | As próprias [chaves pessoais](/docs/backend/api-keys/#personal-keys) do chamador |
+| `POST` | `/api/auth/keys` | session (uma conta) | A chave em texto simples é retornada uma vez. `403 PERSONAL_KEYS_DISABLED` a menos que a coleção de usuários defina `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | session (uma conta) | Revoga uma das chaves do próprio chamador |
 | `GET` | `/.well-known/jwks.json` | none | O JWKS público, quando a [assinatura assimétrica](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) está configurada |
 
 ## Administração
 
-Tudo sob `/api/admin` precisa de uma sessão de administrador, uma chave de serviço ou uma
-chave de API com escopo de administração. Não um privilégio qualquer: uma chave com escopo para uma coleção
-não acessa nada disso.
+Tudo sob `/api/admin` precisa de um escopo do plano administrativo, e cada
+superfície nomeia o seu: `users:read` lista contas, `cron:write` dispara um job.
+Um administrador tem todos eles, assim como a chave de serviço. Uma pessoa tem os que
+suas roles declaram, e uma chave de API, os que recebeu ao ser criada. Uma chave com escopo para
+uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 
 | Método | Caminho | Gate | Mais |
 |---|---|---|---|
 | `POST` | `/api/admin/bootstrap` | none, e apenas enquanto nenhum administrador existir | Recusado em produção — consulte [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
-| `GET` | `/api/admin/users` | admin | Gerenciamento de usuários |
-| `POST` | `/api/admin/users` | admin | Gerenciamento de usuários |
-| `GET` | `/api/admin/users/:uid` | admin | Gerenciamento de usuários |
-| `PUT` | `/api/admin/users/:uid` | admin | Gerenciamento de usuários |
-| `DELETE` | `/api/admin/users/:uid` | admin | Gerenciamento de usuários |
-| `POST` | `/api/admin/users/:uid/reset-password` | admin | Emite uma senha temporária |
-| `GET` | `/api/admin/roles` | admin | As roles que o projeto declara |
-| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api-keys/) |
-| `POST` | `/api/admin/api-keys` | admin | A chave em texto simples é retornada uma vez, na criação |
-| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
-| `GET` | `/api/admin/cron` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `GET` | `/api/admin/cron/:id` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `PUT` | `/api/admin/cron/:id` | admin | Habilita ou desabilita um job |
-| `GET` | `/api/admin/cron/:id/logs` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | admin | Executa um job agora |
-| `GET` | `/api/admin/backups` | admin | Inventário de backups |
-| `GET` | `/api/admin/backups/download` | admin | Transmite um backup via stream |
-| `GET` | `/api/admin/logs` | admin | O buffer de logs recentes |
-| `GET` | `/api/admin/logs/latest` | admin | As entradas mais recentes |
-| `GET` | `/api/admin/logs/stream` | admin | Server-sent events |
-| `GET` | `/api/admin/rls-audit` | admin | O resultado mais recente da auditoria agendada |
-| `GET` | `/api/admin/schema/status` | admin | [Live schema editing](/docs/backend/live-schema-editing/) |
-| `POST` | `/api/admin/schema/plan` | admin | Planeja uma alteração; nunca aplica |
-| `POST` | `/api/admin/schema/apply` | admin | Desativado a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
-| `GET` | `/api/admin/schema-editor/status` | admin | Se o editor está disponível, e a razão quando não está |
-| `POST` | `/api/admin/schema-editor/collection/save` | admin | [Studio](/docs/studio/) — reescreve o código-fonte da coleção |
-| `POST` | `/api/admin/schema-editor/collection/delete` | admin | [Studio](/docs/studio/) |
-| `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
-| `POST` | `/api/admin/schema-editor/property/delete` | admin | [Studio](/docs/studio/) |
-| `GET` | `/api/admin/dev/emails` | dev | E-mails que o transporte de desenvolvimento capturou em vez de enviar |
-| `DELETE` | `/api/admin/dev/emails` | dev | Esvazia a caixa de correio capturada |
+| `GET` | `/api/admin/users` | `users:read` | Gerenciamento de usuários |
+| `POST` | `/api/admin/users` | `users:write` | Gerenciamento de usuários. Roles além das do próprio chamador são recusadas |
+| `GET` | `/api/admin/users/:uid` | `users:read` | Gerenciamento de usuários |
+| `PUT` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |
+| `DELETE` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |
+| `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Emite uma senha temporária |
+| `GET` | `/api/admin/roles` | `users:read` | `admin` e as roles que o projeto declara, com seus escopos |
+| `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Nunca uma chave de API |
+| `POST` | `/api/admin/api-keys` | `keys:write` | A chave em texto simples é retornada uma vez, na criação |
+| `GET` | `/api/admin/api-keys/:id` | `keys:read` | [API keys](/docs/backend/api-keys/) |
+| `PUT` | `/api/admin/api-keys/:id` | `keys:write` | [API keys](/docs/backend/api-keys/) |
+| `DELETE` | `/api/admin/api-keys/:id` | `keys:write` | [API keys](/docs/backend/api-keys/) |
+| `GET` | `/api/admin/cron` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
+| `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
+| `PUT` | `/api/admin/cron/:id` | `cron:write` | Habilita ou desabilita um job |
+| `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Executa um job agora |
+| `GET` | `/api/admin/backups` | `backups:read` | Inventário de backups |
+| `GET` | `/api/admin/backups/download` | `backups:read` | Transmite um backup via stream |
+| `GET` | `/api/admin/logs` | `logs:read` | O buffer de logs recentes |
+| `GET` | `/api/admin/logs/latest` | `logs:read` | As entradas mais recentes |
+| `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
+| `GET` | `/api/admin/rls-audit` | `schema:read` | O resultado mais recente da auditoria agendada |
+| `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
+| `POST` | `/api/admin/schema/plan` | `schema:read` | Planeja uma alteração; nunca aplica |
+| `POST` | `/api/admin/schema/apply` | `schema:write` | Apenas uma pessoa, a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `GET` | `/api/admin/schema-editor/status` | `schema:read` | Se o editor está disponível, e a razão quando não está |
+| `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — reescreve o código-fonte da coleção |
+| `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |
+| `POST` | `/api/admin/schema-editor/property/save` | `schema:write` | [Studio](/docs/studio/) |
+| `POST` | `/api/admin/schema-editor/property/delete` | `schema:write` | [Studio](/docs/studio/) |
+| `GET` | `/api/admin/dev/emails` | dev + `users:write` | E-mails que o transporte de desenvolvimento capturou em vez de enviar |
+| `DELETE` | `/api/admin/dev/emails` | dev + `users:write` | Esvazia a caixa de correio capturada |
 
 `/api/admin/cron`, `/api/admin/logs` e `/api/admin/schema-editor` também são
 disponibilizados em seus caminhos anteriores à versão 0.17 sem o segmento `/admin`. Esses aliases
@@ -169,7 +175,7 @@ variável necessária, em vez de responder com 404 como se o recurso não existi
 
 | Método | Caminho | Gate | Mais |
 |---|---|---|---|
-| any | `/api/functions/<name>` | o que a função declarar | [Custom Functions](/docs/backend/custom-functions/) |
+| any | `/api/functions/<name>` | o que a função declarar. Uma chave de API também precisa de `functions:invoke` | [Custom Functions](/docs/backend/custom-functions/) |
 
 Uma rota por arquivo em `backend/functions/`, logo os caminhos vêm do seu
 projeto. `GET /api/functions` **não** os lista: o inventário de endpoints
@@ -181,10 +187,10 @@ personalizados de uma implantação não é público.
 |---|---|---|---|
 | `GET` | `/livez` | none | Apenas verificação de atividade (liveness): este processo está rodando. Não toca no banco de dados, razão pela qual é o caminho de verificação que um contêiner deve usar — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Atividade (liveness) e prontidão (readiness). Informa todas as fontes de dados configuradas, não apenas a padrão |
-| `GET` | `/api/docs` | none (admin em produção) | O documento OpenAPI 3.0 |
+| `GET` | `/api/docs` | none (`schema:read` em produção) | O documento OpenAPI 3.0 |
 | `GET` | `/api/swagger` | none | Swagger UI. Apenas em desenvolvimento a menos que `REBASE_ENABLE_SWAGGER` |
 | `GET` | `/api/meta/schema-version` | none | O hash de esquema a partir do qual este backend foi construído, e nada mais |
-| `GET` | `/api/meta/contract` | admin | O contrato completo de coleções, para `rebase generate-sdk --from`. `404` quando nenhuma autenticação está configurada |
+| `GET` | `/api/meta/contract` | `schema:read` | O contrato completo de coleções, para `rebase generate-sdk --from`. `404` quando nenhuma autenticação está configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando definido | Métricas Prometheus, quando `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` quando definido | As séries gravadas por trás dos gráficos do Studio. `501` em um runtime sem backend |
 
@@ -207,8 +213,8 @@ antes de possuir qualquer token.
 |---|---|---|---|
 | `GET` | `/.well-known/oauth-protected-resource` | none | Metadados da RFC 9728 nomeando este recurso e seu servidor de autorização. Também disponível no formato com sufixo de caminho |
 | `GET` | `/.well-known/oauth-authorization-server` | none | Metadados da RFC 8414: os endpoints, tipos de concessão (grant types) e métodos PKCE suportados por esta implantação |
-| `POST` | `/mcp` | OAuth bearer | O endpoint do protocolo MCP. Atua **como o usuário conectado**, portanto cada leitura e escrita está sujeita ao mesmo RLS |
-| `GET` | `/mcp` | OAuth bearer | Responde `405` com `Allow: POST, DELETE`: este servidor não abre stream iniciado pelo servidor. O token é verificado primeiro, então um token ausente ou expirado recebe o desafio `401` |
+| `POST` | `/mcp` | OAuth bearer, ou uma chave de API | O endpoint do protocolo MCP. Atua **como o usuário conectado** (ou como quem quer que a chave represente), portanto cada leitura e escrita está sujeita ao mesmo RLS. Os escopos `data:*` decidem quais ferramentas são oferecidas |
+| `GET` | `/mcp` | OAuth bearer, ou uma chave de API | Responde `405` com `Allow: POST, DELETE`: este servidor não abre stream iniciado pelo servidor. O token é verificado primeiro, então um token ausente ou expirado recebe o desafio `401` |
 | `DELETE` | `/mcp` | none | Responde `204`. O endpoint não mantém sessão, portanto não há nada para encerrar |
 | `POST` | `/api/oauth/register` | taxa limitada (rate-limited) | Registro dinâmico de clientes RFC 7591. Recusado quando `REBASE_MCP_OPEN_REGISTRATION=false` |
 | `GET` | `/api/oauth/authorize` | session | A tela de consentimento para a qual o cliente é redirecionado |

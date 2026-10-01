@@ -68,11 +68,12 @@
 - [Rebase doesn't do X](https://rebase.pro/docs/backend/extending): The server-side extension ladder — declaration, collection callback, custom function, your own routes, your own server, eject — with what each one can and cannot reach.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
 - [Writing over REST](https://rebase.pro/docs/backend/writes): Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-collection batches.
-- [API keys](https://rebase.pro/docs/backend/api-keys): Scoped, revocable keys for machine callers: what a key can reach, how scopes compose with row-level security, and the admin endpoints that manage them.
+- [API keys](https://rebase.pro/docs/backend/api-keys): Long-lived keys for scripts, CI, agents and integrations: service keys and personal keys, the scopes they hold, how they compose with row-level security, and the routes that manage them.
 - [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
 - [Endpoint index](https://rebase.pro/docs/backend/endpoints): Every HTTP route a Rebase backend mounts — data, auth, storage, admin, meta — with the gate on each one and the page that explains it.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
 - [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users collection on the Rebase backend.
+- [Roles and scopes](https://rebase.pro/docs/backend/roles-and-scopes): What a caller may do: the data plane every person holds, the admin plane that roles grant, the scopes an app declares for itself, and how each credential carries them.
 - [Auth endpoints and tokens](https://rebase.pro/docs/backend/auth-endpoints): The authentication routes the Rebase backend mounts, their response shapes, multi-factor authentication, the database context a policy sees, JWKS and service keys.
 - [Custom auth adapters](https://rebase.pro/docs/backend/auth-adapters): Replace Rebase's built-in authentication with Clerk, Firebase Auth or your own identity provider by implementing the AuthAdapter contract.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.

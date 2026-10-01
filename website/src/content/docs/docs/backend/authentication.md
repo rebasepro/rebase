@@ -91,7 +91,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
-| `defaultRole` | `string` | — | Role given to a newly registered user when none is specified |
+| `defaultRole` | `string` | — | Role given to a newly registered user when none is specified. It may not be `admin`, or a declared role that holds an admin-plane scope: the boot refuses both |
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
@@ -250,7 +250,7 @@ Each message carries `to`, `subject`, `at`, the `html` and `text` parts, and
 `links` — the absolute URLs found in the body, in document order, which is the
 part anyone actually wants.
 
-It is admin-only, through the same gate cron, logs and backups use, and it
+It needs the `users:write` scope, through the same gate cron, logs and backups use, and it
 answers `501 DEV_MAILBOX_UNAVAILABLE` when there is nothing to serve — with SMTP
 configured, mail was delivered rather than held. `NODE_ENV=production` refuses
 it regardless of anything else: what these messages contain is a working login.
@@ -541,11 +541,26 @@ const membersCollection = defineCollection({
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
       resetPassword: true // Or false to disable, or a custom EntityAction
-    }
+    },
+
+    // What each role may do beyond its rows, the app's own scopes,
+    // and whether accounts may create personal API keys
+    roles: {
+      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
+    },
+    scopes: {
+      "project:deploy": { label: "Deploy projects", target: "project" }
+    },
+    personalKeys: true
   },
   properties: { ... }
 });
 ```
+
+`roles`, `scopes` and `personalKeys` declare the access model: which admin-plane
+scopes each role holds, the scopes the app defines for its own operations, and
+whether each account may mint [personal API keys](/docs/backend/api-keys/#personal-keys).
+See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 A `temporaryPassword` returned from `onResetPassword` becomes the account's password. Rebase hashes it with the configured algorithm, saves it, signs the user out of every existing session, and shows it to the admin to pass on. The hook does not store it, and has no way to. Return no `temporaryPassword` when the hook emails its own reset link instead: the password then stays as it is until the user sets a new one, though their sessions still end.
 
@@ -559,6 +574,7 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 ## Next Steps
 
 - **[Endpoints and tokens](/docs/backend/auth-endpoints/)** — every route this configuration mounts
+- **[Roles and scopes](/docs/backend/roles-and-scopes/)** — what each role may do, and how keys and tokens narrow it
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — bringing your own identity provider
 - **[Frontend Authentication](/docs/frontend/authentication/)** — login UI, auth controller, user management
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — row-level access control
