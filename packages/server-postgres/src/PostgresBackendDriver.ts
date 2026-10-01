@@ -2207,6 +2207,64 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
+     * Run a script a person wrote — the Studio console — and describe its
+     * result. See `SQLAdmin.runSqlScript` and `services/sql-script.ts`.
+     */
+    async runSqlScript(sqlText: string, options?: {
+        database?: string,
+        role?: string
+    }): Promise<SqlScriptResult> {
+        const targetDb = this.getTargetDb(options?.database);
+        const pool = "$client" in targetDb ? targetDb.$client : undefined;
+        if (!(pool instanceof Pool)) {
+            // One session in process: nothing on the wire to read a column's
+            // origin from, so nothing in the result is said to have one.
+            return sqlScriptResultFromRows(await this.executeSql(sqlText, {
+                database: options?.database,
+                role: options?.role,
+                isolateSession: true
+            }));
+        }
+        const role = options?.role;
+        return runSqlScriptOnPool(pool, sqlText, {
+            assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined
+        });
+    }
+
+    /**
+     * `SET ROLE` for the rest of a session of a script's own — not `SET LOCAL`
+     * inside a transaction, which a `COMMIT` in the script ends, and every
+     * statement after it ran as the connection owner. The session is reset
+     * after the script, so the role does not outlive it.
+     *
+     * The same refusals as {@link executeSqlOn}: a role the session already
+     * has is no switch; `DISABLE_DB_ROLE_SWITCHING` runs as the owner on
+     * purpose; and a connection that may not `SET ROLE` refuses, never falls
+     * back to the owner.
+     */
+    private async assumeSessionRole(connection: PoolClient, role: string): Promise<void> {
+        const current = await connection.query<{ role: string }>("SELECT current_user AS role");
+        if (current.rows[0]?.role === role) return;
+        if (isRoleSwitchingOptedOut()) {
+            logger.debug(
+                `[PostgresBackendDriver] DISABLE_DB_ROLE_SWITCHING=true — running as the ` +
+                `connection owner rather than "${role}".`
+            );
+            return;
+        }
+        if (this._roleSwitchingUnavailable) throw new RoleSwitchUnavailableError(role);
+        try {
+            await connection.query(`SET ROLE "${role.replace(/"/g, "\"\"")}"`);
+        } catch (roleError: unknown) {
+            if (isRoleSwitchingPermissionError(roleError)) {
+                this._roleSwitchingUnavailable = true;
+                throw new RoleSwitchUnavailableError(role, roleError);
+            }
+            throw roleError;
+        }
+    }
+
+    /**
      * Run `fn` on a session of its own, and put that session back the way it
      * was handed out before anything else can use it.
      *
