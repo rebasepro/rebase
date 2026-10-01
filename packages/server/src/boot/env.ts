@@ -93,6 +93,18 @@ export const bootEnvExtension = z.object({
      * Only defensible when every signed-in user is trusted with every file.
      */
     STORAGE_ALLOW_ANY_AUTHENTICATED: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * How long a private file's download URL works, in seconds: the lifetime of
+     * the token `/api/storage/metadata` mints. 300 unless set. A private
+     * `<video>` that plays longer than this asks for its next range with an
+     * expired token. Capped at a week, because the token travels in the URL.
+     */
+    STORAGE_DOWNLOAD_TOKEN_TTL: optionalNumericEnvVar(z.coerce
+        .number({ message: "STORAGE_DOWNLOAD_TOKEN_TTL must be a number of seconds (e.g. 3600)" })
+        .int({ message: "STORAGE_DOWNLOAD_TOKEN_TTL must be a whole number of seconds" })
+        .min(1, { message: "STORAGE_DOWNLOAD_TOKEN_TTL must be at least 1 second" })
+        .max(604800, { message: "STORAGE_DOWNLOAD_TOKEN_TTL must be at most 604800 seconds (a week)" })
+        .optional()),
 
     // ── Auth ─────────────────────────────────────────────────────────────────
     AUTH_REQUIRE: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),

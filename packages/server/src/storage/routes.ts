@@ -286,6 +286,34 @@ export interface StorageRoutesConfig {
      * Run something when an object lands, or when one goes. See `triggers.ts`.
      */
     triggers?: StorageTrigger[];
+    /**
+     * How long the download token `/metadata` mints for a private object stays
+     * valid, in seconds. {@link DEFAULT_DOWNLOAD_TOKEN_TTL_SECONDS} unless set;
+     * at most {@link MAX_DOWNLOAD_TOKEN_TTL_SECONDS}.
+     */
+    downloadTokenTtlSeconds?: number;
+}
+
+/** Five minutes: long enough to render a page of thumbnails, short enough to be worthless in a log. */
+export const DEFAULT_DOWNLOAD_TOKEN_TTL_SECONDS = 300;
+
+/**
+ * A week. The token travels in a URL — into access logs, Referer headers and
+ * browser history — so a lifetime past this is a permanent link to a private
+ * file. A file that must be linked forever belongs under the public prefix.
+ */
+export const MAX_DOWNLOAD_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+/** The configured lifetime, or a refusal at boot naming what is wrong with it. */
+function downloadTokenTtlOrThrow(value: number | undefined): number {
+    if (value === undefined) return DEFAULT_DOWNLOAD_TOKEN_TTL_SECONDS;
+    if (!Number.isInteger(value) || value < 1 || value > MAX_DOWNLOAD_TOKEN_TTL_SECONDS) {
+        throw new Error(
+            `The storage download token lifetime must be a whole number of seconds between 1 and ` +
+            `${MAX_DOWNLOAD_TOKEN_TTL_SECONDS}, got ${value}.`
+        );
+    }
+    return value;
 }
 
 /**
@@ -407,6 +435,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
     const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter, authorize, authorizeData } = config;
+    const downloadTokenTtl = downloadTokenTtlOrThrow(config.downloadTokenTtlSeconds);
 
     // Built once per router. Holds only the "already warned" flag; the
     // rendition bytes live in the bucket, which is the entire point.
@@ -983,8 +1012,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // hook above was asked about one object; a key is only unique
                 // within its own source, so a token that named the path alone
                 // would spend against the same key in every other one.
-                downloadConfig.metadata.token = await generateDownloadToken(scopedPath, 300, storageId);
-                downloadConfig.metadata.tokenExpiresIn = 300;
+                downloadConfig.metadata.token = await generateDownloadToken(scopedPath, downloadTokenTtl, storageId);
+                downloadConfig.metadata.tokenExpiresIn = downloadTokenTtl;
             }
         }
 

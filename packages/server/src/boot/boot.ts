@@ -375,6 +375,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         storagePublicRead: env.STORAGE_PUBLIC_READ,
         storageRenditionCache: { enabled: env.STORAGE_RENDITION_CACHE },
         storageInsecureAllowAnyAuthenticated: env.STORAGE_ALLOW_ANY_AUTHENTICATED,
+        storageDownloadTokenTtl: env.STORAGE_DOWNLOAD_TOKEN_TTL,
         callbacks: configExports.callbacks,
         auth: resolveAuthOptions(env, usersCollection),
         history: env.REBASE_HISTORY,

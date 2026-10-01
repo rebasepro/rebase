@@ -602,6 +602,18 @@ export interface RebaseBackendConfig {
     storageRenditionCache?: import("./storage/rendition-cache").RenditionCacheConfig;
 
     /**
+     * How long a private file's download URL works, in seconds — the lifetime
+     * of the token `GET /storage/metadata/*` mints. Default 300; at most a week.
+     * `STORAGE_DOWNLOAD_TOKEN_TTL` on a bundle deployment.
+     *
+     * Five minutes renders a page; a private `<video>` that plays longer asks
+     * for its next range with an expired token. The token travels in the URL,
+     * which is the reason for the ceiling: an object that must be linked
+     * indefinitely belongs under the public prefix instead.
+     */
+    storageDownloadTokenTtl?: number;
+
+    /**
      * Run something when an object lands, or when one goes.
      *
      * Every other write in the product can be reacted to — a row has
@@ -2483,6 +2495,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // after these routes are mounted, but always before a request runs.
             authorizeData: () => storageAuthorizeData.current,
             renditionCache: config.storageRenditionCache,
+            downloadTokenTtlSeconds: config.storageDownloadTokenTtl,
             triggers: config.storageTriggers,
             // The same number the upload route's body limit is derived from.
             // The resumable route only has the global limit in front of it,
