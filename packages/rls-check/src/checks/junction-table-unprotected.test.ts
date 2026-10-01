@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { foreignKey, snapshot, table, type TableSpec } from "../../test/fixtures/snapshot";
-import { junctionTableUnprotected } from "./junction-table-unprotected";
+import { foreignKey, reachable, snapshot, table, type TableSpec } from "../../test/fixtures/snapshot";
+import type { DbSnapshot } from "../types";
+import { junctionTableUnprotected as check } from "./junction-table-unprotected";
+
+// These tests are about the join table's shape; `reachable` grants every table to
+// the exposed roles, because a join table nobody can reach is not reported.
+const junctionTableUnprotected = { run: (s: DbSnapshot) => check.run(reachable(s)) };
 
 const endpoints = [
     table("public", "posts", { rlsEnabled: true }),

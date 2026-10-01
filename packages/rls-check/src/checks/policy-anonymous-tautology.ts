@@ -7,7 +7,7 @@ import {
     isRebaseManagedPolicy,
     listAnd,
     managedPolicyFix,
-    policyTargetsExposedRole,
+    policyReachedBy,
     qi,
     qrel
 } from "./util";
@@ -54,7 +54,7 @@ export const policyAnonymousTautology: Check = {
             if (!snapshot.schemas.includes(policy.schema)) continue;
             if (!policy.permissive) continue;
 
-            const exposed = policyTargetsExposedRole(snapshot, policy);
+            const exposed = policyReachedBy(snapshot, policy);
             if (exposed.length === 0) continue;
 
             const clauses: string[] = [];

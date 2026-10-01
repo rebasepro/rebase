@@ -471,6 +471,39 @@ CREATE POLICY vuln_current_setting_select ON public.vuln_current_setting
 GRANT SELECT ON public.vuln_current_setting TO authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Unreachable, so not exposed. Every check reports a table only when a role an
+-- untrusted caller arrives as can reach it; these three are each one step short
+-- of that, and each used to be reported anyway.
+-- ---------------------------------------------------------------------------
+
+-- `USING (true) TO anon`, and anon holds nothing on the table: anon gets
+-- "permission denied" before the policy is ever consulted.
+CREATE TABLE public.secure_true_ungranted (
+    id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body  text
+);
+ALTER TABLE public.secure_true_ungranted ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.secure_true_ungranted FORCE ROW LEVEL SECURITY;
+CREATE POLICY secure_true_ungranted_select ON public.secure_true_ungranted
+    FOR SELECT TO anon USING (true);
+
+-- A join table between two protected tables, granted to nobody untrusted.
+CREATE TABLE public.secure_post_tags_ungranted (
+    post_id  uuid NOT NULL REFERENCES public.posts (id),
+    tag_id   uuid NOT NULL REFERENCES public.tags (id),
+    PRIMARY KEY (post_id, tag_id)
+);
+
+-- RLS off and granted to anon, in a schema anon has no USAGE on: anon cannot
+-- even name the table.
+CREATE SCHEMA hidden_ops;
+CREATE TABLE hidden_ops.secure_no_schema_usage (
+    id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    note  text
+);
+GRANT SELECT ON hidden_ops.secure_no_schema_usage TO anon;
+
+-- ---------------------------------------------------------------------------
 -- A second schema, so `--schema public` has something to exclude.
 -- ---------------------------------------------------------------------------
 

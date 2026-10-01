@@ -9,7 +9,7 @@ import {
     listAnd,
     managedPolicyFix,
     policiesFor,
-    policyTargetsExposedRole,
+    policyReachedBy,
     qi,
     qrel,
     relationAt,
@@ -47,7 +47,7 @@ export const policyAlwaysTrue: Check = {
             if (!snapshot.schemas.includes(policy.schema)) continue;
             if (!policy.permissive) continue;
 
-            const exposed = policyTargetsExposedRole(snapshot, policy);
+            const exposed = policyReachedBy(snapshot, policy);
             if (exposed.length === 0) continue;
 
             const clauses: string[] = [];

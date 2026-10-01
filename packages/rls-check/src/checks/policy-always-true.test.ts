@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_ROLES, policy, role, snapshot, table } from "../../test/fixtures/snapshot";
-import { policyAlwaysTrue } from "./policy-always-true";
+import { DEFAULT_ROLES, policy, reachable, role, snapshot, table } from "../../test/fixtures/snapshot";
+import type { DbSnapshot } from "../types";
+import { policyAlwaysTrue as check } from "./policy-always-true";
+
+// These tests are about the policy's shape; `reachable` grants every table to
+// the exposed roles, because a policy on a table nobody can reach is not reported.
+const policyAlwaysTrue = { run: (s: DbSnapshot) => check.run(reachable(s)) };
 import { isUnconditionalTrue } from "./sql";
 
 const base = (policies: ReturnType<typeof policy>[]) =>

@@ -10,20 +10,22 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { policy, snapshot, table } from "../../test/fixtures/snapshot";
+import { policy, reachable, snapshot, table } from "../../test/fixtures/snapshot";
 import { anonymousWriteAllowed } from "./anonymous-write-allowed";
 import { policyAlwaysTrue } from "./policy-always-true";
 import { policyAuthenticatedTautology } from "./policy-authenticated-tautology";
 import { isRebaseManagedPolicy } from "./util";
 
-/** A Rebase deployment: `rebase_user` is the role requests arrive as. */
+/** A Rebase deployment: `rebase_user` is the role requests arrive as, and holds the tables. */
 const rebaseDb = (policies: ReturnType<typeof policy>[], relations = [table("public", "posts")]) =>
-    snapshot({
-        platform: "rebase",
-        exposedRoles: ["PUBLIC", "rebase_user"],
-        relations,
-        policies
-    });
+    reachable(
+        snapshot({
+            platform: "rebase",
+            exposedRoles: ["PUBLIC", "rebase_user"],
+            relations,
+            policies
+        })
+    );
 
 describe("isRebaseManagedPolicy", () => {
     it("recognises a generated <table>_<op>_<hash> name", () => {

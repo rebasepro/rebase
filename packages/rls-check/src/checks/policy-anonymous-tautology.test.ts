@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { policy, snapshot, table } from "../../test/fixtures/snapshot";
-import { policyAnonymousTautology } from "./policy-anonymous-tautology";
+import { policy, reachable, snapshot, table } from "../../test/fixtures/snapshot";
+import type { DbSnapshot } from "../types";
+import { policyAnonymousTautology as check } from "./policy-anonymous-tautology";
+
+// These tests are about the policy's shape; `reachable` grants every table to
+// the exposed roles, because a policy on a table nobody can reach is not reported.
+const policyAnonymousTautology = { run: (s: DbSnapshot) => check.run(reachable(s)) };
 
 const withPolicy = (using: string | null, platform: ReturnType<typeof snapshot>["platform"] = "unknown") =>
     snapshot({

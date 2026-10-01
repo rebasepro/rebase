@@ -6,7 +6,7 @@
  * noise, and noise is what gets a tool like this uninstalled — so the helpers
  * below err towards "no" whenever the catalog is ambiguous.
  */
-import type { DbForeignKey, DbGrant, DbPolicy, DbRelation, DbRole, DbSnapshot, Finding, Severity } from "../types";
+import type { DbForeignKey, DbGrant, DbPolicy, DbRelation, DbRole, DbSnapshot, Finding, PolicyCommand, Severity } from "../types";
 
 export const SEVERITY_ORDER: Severity[] = ["info", "low", "medium", "high", "critical"];
 
@@ -67,6 +67,8 @@ const GRANTS = new WeakMap<readonly DbGrant[], Index<DbGrant>>();
 const POLICIES = new WeakMap<readonly DbPolicy[], Index<DbPolicy>>();
 const FOREIGN_KEYS = new WeakMap<readonly DbForeignKey[], Index<DbForeignKey>>();
 const ROLES = new WeakMap<readonly DbRole[], Index<DbRole>>();
+type SchemaUsage = NonNullable<DbSnapshot["schemaUsage"]>[number];
+const SCHEMA_USAGE = new WeakMap<readonly SchemaUsage[], Index<SchemaUsage>>();
 
 /** Every grant on one relation, in snapshot order. */
 export function grantsOn(snapshot: DbSnapshot, schema: string, table: string): readonly DbGrant[] {
@@ -103,15 +105,35 @@ export function rolesUsableBy(snapshot: DbSnapshot, role: string): Set<string> {
     return out;
 }
 
-/** Privileges `role` effectively holds on a relation, memberships included. */
+/**
+ * Can `role` name objects in `schema` at all?
+ *
+ * Without USAGE on the schema a role gets "permission denied for schema" before
+ * any table privilege is looked at, so a grant on a table there reaches
+ * nothing. Unknown — the read failed, or the schema has no record — counts as
+ * yes: a scanner that cannot tell must report, not stay quiet.
+ */
+export function hasSchemaUsage(snapshot: DbSnapshot, schema: string, role: string): boolean {
+    if (!snapshot.schemaUsage) return true;
+    const holders = grouped(SCHEMA_USAGE, snapshot.schemaUsage, (u) => u.schema).get(schema);
+    if (!holders) return true;
+    const via = rolesUsableBy(snapshot, role);
+    return holders.some((u) => via.has(u.grantee.toLowerCase()));
+}
+
+/**
+ * Privileges `role` effectively holds on a relation, memberships included —
+ * and none at all when it cannot use the relation's schema.
+ */
 export function effectivePrivileges(
     snapshot: DbSnapshot,
     schema: string,
     table: string,
     role: string
 ): Set<Privilege> {
-    const via = rolesUsableBy(snapshot, role);
     const out = new Set<Privilege>();
+    if (!hasSchemaUsage(snapshot, schema, role)) return out;
+    const via = rolesUsableBy(snapshot, role);
     for (const g of grantsOn(snapshot, schema, table)) {
         if (!via.has(g.grantee.toLowerCase())) continue;
         for (const p of g.privileges) out.add(p);
@@ -157,6 +179,34 @@ export function policyTargetsExposedRole(snapshot: DbSnapshot, policy: DbPolicy)
         }
     }
     return [...new Set(hits)];
+}
+
+/** The privileges a policy's command is exercised with. */
+const COMMAND_PRIVILEGES: Record<PolicyCommand, Privilege[]> = {
+    ALL: DML,
+    SELECT: ["SELECT"],
+    INSERT: ["INSERT"],
+    UPDATE: ["UPDATE"],
+    DELETE: ["DELETE"]
+};
+
+/**
+ * The exposed callers a policy applies to *and* that can reach its table for
+ * its command: {@link policyTargetsExposedRole}, kept to the roles holding a
+ * privilege the command needs (and USAGE on the schema).
+ *
+ * A policy nobody can reach the table through is a latent problem, not an
+ * exposure, and every check claims an exposure: "a caller can read every row"
+ * is false for a role Postgres answers "permission denied". `PUBLIC` stays when
+ * the policy is TO PUBLIC and any exposed role reaches the table.
+ */
+export function policyReachedBy(snapshot: DbSnapshot, policy: DbPolicy): string[] {
+    const wanted = COMMAND_PRIVILEGES[policy.command] ?? DML;
+    return policyTargetsExposedRole(snapshot, policy).filter((target) =>
+        target === "PUBLIC"
+            ? exposedGrantees(snapshot, policy.schema, policy.table, wanted).length > 0
+            : wanted.some((p) => effectivePrivileges(snapshot, policy.schema, policy.table, target).has(p))
+    );
 }
 
 // ---------------------------------------------------------------------------

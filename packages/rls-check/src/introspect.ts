@@ -482,6 +482,7 @@ async function readSnapshot(
     const relations = await readRelations(db, schemas);
     const policies = await readPolicies(db, schemas);
     const grants = await readGrants(db, schemas);
+    const schemaUsage = await readSchemaUsage(db, diagnostics);
     const views = await readViews(db, schemas, serverVersionNum);
     const foreignKeys = await readForeignKeys(db, schemas);
     const routines = await readRoutines(db, schemas);
@@ -525,6 +526,7 @@ async function readSnapshot(
         policies,
         roles,
         grants,
+        schemaUsage,
         views,
         foreignKeys,
         routines
@@ -867,6 +869,31 @@ export async function readGrants(db: Reader, schemas: string[]): Promise<DbGrant
         if (!privileges.includes(privilege)) privileges.push(privilege);
     }
     return [...map.values()];
+}
+
+/**
+ * Who holds USAGE on each schema. Every schema, not only the scanned ones: a
+ * view or a foreign key can point outside the scan.
+ *
+ * `undefined`, not `[]`, when the read failed — an empty list would say no role
+ * can use any schema and silence every check that gates on a grant, which is
+ * the wrong direction for a scanner to fail in.
+ */
+export async function readSchemaUsage(
+    db: Reader,
+    diagnostics: IntrospectDiagnostics
+): Promise<{ schema: string; grantee: string }[] | undefined> {
+    const what = "schema privileges";
+    const rows = await db.query<{ schema: string; grantee: string }>(
+        what,
+        `SELECT n.nspname AS schema,
+                CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee
+         FROM pg_namespace n
+         CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n'::"char", n.nspowner))) a
+         WHERE a.privilege_type = 'USAGE'`
+    );
+    if (diagnostics.degraded.some((entry) => entry.what === what)) return undefined;
+    return rows.map((r) => ({ schema: r.schema, grantee: r.grantee }));
 }
 
 interface GrantRow extends Record<string, unknown> {

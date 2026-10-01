@@ -1,6 +1,6 @@
 import type { Check, DbRelation, DbSnapshot, Finding } from "../types";
 
-import { finding, foreignKeysOf, qi, qrel, relationAt, scannedTables } from "./util";
+import { DML, exposedGrantees, finding, foreignKeysOf, qi, qrel, relationAt, scannedTables } from "./util";
 
 const ID = "junction-table-unprotected";
 
@@ -48,6 +48,11 @@ export const junctionTableUnprotected: Check = {
             if (!targets.every((t) => t?.rlsEnabled)) continue;
 
             if (!isMostlyKeys(rel, fks.flatMap((fk) => fk.columns))) continue;
+
+            // "The whole edge list, readable" is only true for someone who can
+            // read it: a join table nothing untrusted holds a privilege on is
+            // not exposed, whatever its shape.
+            if (exposedGrantees(snapshot, rel.schema, rel.name, DML).length === 0) continue;
 
             findings.push(
                 finding({

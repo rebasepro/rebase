@@ -191,6 +191,15 @@ export interface DbSnapshot {
     policies: DbPolicy[];
     roles: DbRole[];
     grants: DbGrant[];
+    /**
+     * Who holds USAGE on each schema, from `pg_namespace.nspacl` (`PUBLIC` for
+     * a grant to everyone). A role without it cannot name anything in the
+     * schema, whatever it holds on the tables there. Absent when it could not
+     * be read, and a schema with no entries here counts as unknown: either way
+     * every role is assumed to have USAGE, which widens a scan rather than
+     * narrowing it.
+     */
+    schemaUsage?: { schema: string; grantee: string }[];
     views: DbView[];
     foreignKeys: DbForeignKey[];
     routines: DbRoutine[];

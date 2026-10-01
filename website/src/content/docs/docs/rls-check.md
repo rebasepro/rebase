@@ -253,8 +253,9 @@ A foreign table with such a grant is reported too. Postgres cannot enable RLS on
 grant hands over whatever the remote server returns, and the suggested fix revokes the
 grant instead.
 
-A table with RLS off but no grant to an exposed role is *not* reported. It is not reachable,
-and flagging it would be noise.
+A table with RLS off but no grant to an exposed role is *not* reported, and neither is one in
+a schema that role has no `USAGE` on — Postgres answers "permission denied for schema" before
+it looks at the table. It is not reachable, and flagging it would be noise.
 
 ```sql
 ALTER TABLE "public"."your_table" ENABLE ROW LEVEL SECURITY;
@@ -271,6 +272,10 @@ outage. See [rls-enabled-no-policies](#rls-enabled-no-policies).
 A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth — `true`,
 `(true)`, `1 = 1`. Permissive policies are ORed together, so a single one of these satisfies
 the table's row filter no matter how strict every other policy is.
+
+Like every check, it reports the policy only when a role it applies to can reach the table:
+holds the privilege its command needs, and `USAGE` on the schema. `USING (true) TO anon` on a
+table `anon` holds nothing on is answered "permission denied" before the policy is consulted.
 
 If `RESTRICTIVE` policies on the same command (`ALL` for a permissive `ALL`) apply to every
 exposed role the permissive policy reaches, this is downgraded to medium and reported as
@@ -429,7 +434,8 @@ evidence; when it does not, it has proved nothing.
 **Many-to-many join table without RLS.** High, heuristic.
 
 A table that is essentially just the two endpoints of two foreign keys, both pointing at
-tables that *do* have RLS, with no row-level security of its own. Both sides of the relation
+tables that *do* have RLS, with no row-level security of its own — and readable or writable
+by a role an untrusted caller arrives as. Both sides of the relation
 are locked and the edge between them is open — which is enough to enumerate the relation
 even when neither endpoint can be read.
 

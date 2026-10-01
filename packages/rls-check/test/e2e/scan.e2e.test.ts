@@ -86,7 +86,10 @@ const SECURE_OBJECTS = [
     "secure_ledger_view_invoker_yes",
     "secure_ledger_view_invoker_t",
     "secure_anon_insert_nocheck",
-    "secure_anon_delete_nousing"
+    "secure_anon_delete_nousing",
+    "secure_true_ungranted",
+    "secure_post_tags_ungranted",
+    "secure_no_schema_usage"
 ];
 
 function objectName(finding: Finding): string {
@@ -354,6 +357,18 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         expect(
             rescanned.findings.filter((finding) => targets.includes(objectName(finding))).map(describeFinding)
         ).toEqual([]);
+    });
+
+    it("agrees with Postgres that the unreachable objects are unreachable", async () => {
+        await expect(
+            querySqlAs(container.connectionString, "anon", "SELECT * FROM public.secure_true_ungranted")
+        ).rejects.toThrow(/permission denied for table/);
+        await expect(
+            querySqlAs(container.connectionString, "anon", "SELECT * FROM public.secure_post_tags_ungranted")
+        ).rejects.toThrow(/permission denied for table/);
+        await expect(
+            querySqlAs(container.connectionString, "anon", "SELECT * FROM hidden_ops.secure_no_schema_usage")
+        ).rejects.toThrow(/permission denied for schema/);
     });
 
     it("does not flag a junction table that follows its endpoints", () => {

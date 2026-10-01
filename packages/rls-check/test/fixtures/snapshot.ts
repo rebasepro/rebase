@@ -165,3 +165,27 @@ export function snapshot(overrides: Partial<DbSnapshot> = {}): DbSnapshot {
         ...overrides
     };
 }
+
+/**
+ * `snap` with every relation granted SELECT, INSERT, UPDATE and DELETE to every
+ * named exposed role.
+ *
+ * For tests about a policy's *shape*. Every check that claims an exposure
+ * reports only a table an exposed role can reach, so a policy on a table
+ * nobody holds a privilege on is silent — which is right, and not what those
+ * tests are about. Wrapping the snapshot says "assume the table is served".
+ */
+export function reachable(snap: DbSnapshot): DbSnapshot {
+    const named = snap.exposedRoles.filter((r) => r.toLowerCase() !== "public");
+    // A database with no named API role is served as PUBLIC.
+    const roles = named.length > 0 ? named : ["PUBLIC"];
+    return {
+        ...snap,
+        grants: [
+            ...snap.grants,
+            ...snap.relations.flatMap((rel) =>
+                roles.map((r) => grant(rel.schema, rel.name, r, ["SELECT", "INSERT", "UPDATE", "DELETE"]))
+            )
+        ]
+    };
+}

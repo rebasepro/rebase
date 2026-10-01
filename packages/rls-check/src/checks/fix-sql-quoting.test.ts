@@ -154,6 +154,8 @@ function hostileSnapshot(evil: string): DbSnapshot {
             grant(schema, n("org_people"), "anon", ["SELECT"]),
             grant(schema, n("posts"), "anon", ["SELECT", "INSERT", "UPDATE", "DELETE"]),
             grant(schema, n("posts"), n("api"), ["SELECT", "INSERT"]),
+            // policy-authenticated-tautology reports only a table its role can read.
+            grant(schema, n("posts"), "authenticated", ["SELECT"]),
             grant(schema, n("posts_view"), "anon", ["SELECT"]),
             grant(schema, n("posts_view_pg14"), "anon", ["SELECT"]),
             grant(schema, n("posts_mv"), n("api"), ["SELECT"])
