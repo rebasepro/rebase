@@ -261,9 +261,9 @@ function line(key: string, type: string, optional: boolean): string {
  * property. `Row` already honoured that; `Insert` and `Update` deliberately did
  * not, on the reading that the column is stripped from responses rather than
  * from writes. That left the generated types as the one place a password hash
- * was still named, and it invited a client to send one. The server still
- * *accepts* such a field on a write — this describes the surface, it does not
- * add an enforcement point — but nothing generated advertises it.
+ * was still named, and it invited a client to send one. The server refuses
+ * such a field on a write (`VALIDATION_EXCLUDED_FIELDS`), so nothing generated
+ * advertises it.
  *
  * Read through `effectiveAccess`, so the flag and its longhand
  * `access: { read: [], write: [] }` produce the same file. A *role* rule is
@@ -286,6 +286,29 @@ function excludedApiKeys(properties: Properties): Set<string> {
         if (prop.columnName) excluded.add(prop.columnName);
     }
     return excluded;
+}
+
+/**
+ * The keys nobody may write: `access: { write: [] }`, readable or not.
+ *
+ * Off `Insert` and `Update` for the same reason `excludedApiKeys` takes a
+ * hidden property off all three — except that a field everyone can read but
+ * nobody can write stays on `Row`. The server refuses one on any write with
+ * `VALIDATION_EXCLUDED_FIELDS`, for every caller, `admin` included, so a
+ * generated `create({ computed })` compiled and could only ever be a 400.
+ *
+ * A write rule naming *roles* is not this: some caller can write it, and one
+ * generated shape cannot say which.
+ */
+function unwritableKeys(properties: Properties): Set<string> {
+    const unwritable = new Set<string>();
+    for (const [key, rawProp] of Object.entries(properties)) {
+        const prop = rawProp as Property;
+        if (effectiveAccess(prop)?.write?.length !== 0) continue;
+        unwritable.add(key);
+        if (prop.columnName) unwritable.add(prop.columnName);
+    }
+    return unwritable;
 }
 
 export function generateTypedefs(input: CollectionConfig[]): string {
@@ -477,17 +500,18 @@ export function generateTypedefs(input: CollectionConfig[]): string {
 
         // ── Insert Type ──
         //
-        // What `create()` accepts, minus the `excludeFromApi` columns: the
+        // What `create()` accepts, minus the `excludeFromApi` columns — the
         // property is off the API surface in both directions, so a generated
-        // client never names it.
+        // client never names it — and minus every field nobody may write.
         lines.push("    Insert: {");
+        const notWritable = new Set([...excluded, ...unwritableKeys(properties)]);
         emittedKeys.clear();
-        for (const key of excluded) emittedKeys.add(key);
+        for (const key of notWritable) emittedKeys.add(key);
 
         for (const [key, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             if (prop.type === "relation") continue;
-            if (excluded.has(key)) continue;
+            if (notWritable.has(key)) continue;
             const tsType = propertyToTypeScriptType(prop);
             const isOptional = !prop.validation?.required || isAutoAssignedId(prop);
             lines.push(line(key, tsType, isOptional));
@@ -504,12 +528,12 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // typechecked `update(id, { id: someoneElses })`.
         lines.push("    Update: {");
         emittedKeys.clear();
-        for (const key of excluded) emittedKeys.add(key);
+        for (const key of notWritable) emittedKeys.add(key);
         for (const [key, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             if (prop.type === "relation") continue;
             if (isPrimaryKey(prop)) continue;
-            if (excluded.has(key)) continue;
+            if (notWritable.has(key)) continue;
             lines.push(line(key, propertyToTypeScriptType(prop), true));
             emittedKeys.add(key);
         }

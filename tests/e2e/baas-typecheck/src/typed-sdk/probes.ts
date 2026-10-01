@@ -69,3 +69,15 @@ export async function aggregateProbes(): Promise<boolean> {
     const rows: Record<string, unknown>[] = byStatus;
     return rows.length > 0 && byStatus.meta?.hasMore === true;
 }
+
+const posts = client.data.posts;
+
+/** SDK-24: a field nobody may write (`access: { write: [] }`) is not in Insert or Update. */
+export async function neverWritableProbes(): Promise<void> {
+    // @ts-expect-error — `computed` is never writable (VALIDATION_EXCLUDED_FIELDS)
+    await client.data.authors.create({ name: "a", computed: "x" });
+    // @ts-expect-error — nor on an update
+    await client.data.authors.update(1, { computed: "x" });
+    // A field writable by some role stays: the server judges the role.
+    await client.data.authors.update(1, { salary: 1 });
+}

@@ -17,13 +17,11 @@ export interface Database {
       id?: number;
       name: string;
       salary?: number;
-      computed?: string;
       createdAt?: string;
     };
     Update: {
       name?: string;
       salary?: number;
-      computed?: string;
       createdAt?: string;
     };
     Relations: {
