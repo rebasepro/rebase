@@ -105,9 +105,12 @@ export class WriteTransactionScope implements AmbientTransaction {
      *
      * So one statement is asked of the transaction before its commit. On an
      * aborted one it fails with `25P02`, and the write is refused and rolled
-     * back instead. A failed `context.data` write is not caught by this: it
-     * runs in a savepoint, is undone on its own, and leaves the transaction
-     * usable — which is what makes catching one safe.
+     * back instead. The database refusing a `context.data` create, update or
+     * delete is not caught by this: each of those statements runs in a
+     * savepoint, is undone on its own, and leaves the transaction usable —
+     * which is what makes catching one safe. (Deletes ran without one, so a
+     * caught refused delete landed here, under a message saying catching it
+     * was safe.)
      */
     async assertCommittable(): Promise<void> {
         if (!this.tx) return;
@@ -123,9 +126,10 @@ export class WriteTransactionScope implements AmbientTransaction {
                 500,
                 "TRANSACTION_ABORTED",
                 "A statement on this write's transaction failed and its error was caught. That aborts the " +
-                "transaction in Postgres, so the write was rolled back and nothing was stored. A failed " +
-                "`context.data` write is undone on its own and may be caught; any other failed statement " +
-                "(a read, a job enqueue) has to be let through."
+                "transaction in Postgres, so the write was rolled back and nothing was stored. Only a " +
+                "`context.data` create, update or delete the database refused is undone on its own and may " +
+                "be caught; any other failed statement — a read (including the one an update or delete makes " +
+                "to find its row), a job enqueue — has to be let through."
             );
             refusal.cause = this.failure ?? error;
             throw refusal;

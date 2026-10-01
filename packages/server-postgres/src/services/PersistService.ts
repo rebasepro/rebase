@@ -131,7 +131,9 @@ export class PersistService {
             throw ApiError.notFound(`No row "${targetId}" in "${collectionPath}" to update the link of.`);
         }
 
-        await this.relationWrites.updateRelationPivot(this.db, hop, targetId, pivot);
+        // In a transaction of its own — a savepoint inside a write — like every
+        // write here; see `delete`.
+        await this.db.transaction(tx => this.relationWrites.updateRelationPivot(tx, hop, targetId, pivot));
     }
 
 
@@ -180,7 +182,7 @@ export class PersistService {
                         "RELATION_NOT_UNLINKABLE"
                     );
                 }
-                await this.relationWrites.unlinkRelatedEntity(this.db, hop, id);
+                await this.db.transaction(tx => this.relationWrites.unlinkRelatedEntity(tx, hop, id));
                 return;
             }
             // Owned child (inverse FK): deleting the row is the right meaning,
@@ -202,11 +204,18 @@ export class PersistService {
             conditions.push(eq(field, parsedIdObj[info.fieldName]));
         }
 
+        // In a transaction of its own, as `save` is: inside a write's
+        // transaction that is a SAVEPOINT, so a delete the database refuses (a
+        // foreign key, a trigger) is undone on its own and leaves the write
+        // usable. Without one, a hook that caught a failed
+        // `context.data.<c>.delete()` — which the platform says is safe to
+        // catch — had aborted the whole transaction, and the write answered
+        // TRANSACTION_ABORTED (or a 25P02 from the history entry after it).
         let result;
         try {
-            result = await this.db
+            result = await this.db.transaction(tx => tx
                 .delete(table)
-                .where(and(...conditions));
+                .where(and(...conditions)));
         } catch (error: unknown) {
             throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
         }

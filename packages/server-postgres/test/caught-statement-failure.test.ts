@@ -40,6 +40,7 @@ const docsTable = pgTable("docs", { id: serial("id").primaryKey(), title: varcha
 type Sdk = Record<string, {
     find(p: unknown): Promise<unknown>;
     create(v: unknown): Promise<unknown>;
+    delete(id: unknown): Promise<unknown>;
 }>;
 
 /** What the callback under test does inside its `try`. Swapped per test. */
@@ -118,7 +119,11 @@ beforeEach(async () => {
         "INSERT INTO docs (title) VALUES ('frozen');" +
         "CREATE FUNCTION refuse_doc_update() RETURNS trigger LANGUAGE plpgsql AS " +
         "$$ BEGIN RAISE EXCEPTION 'docs are frozen'; END $$;" +
-        "CREATE TRIGGER docs_frozen BEFORE UPDATE ON docs FOR EACH ROW EXECUTE FUNCTION refuse_doc_update();"
+        "CREATE TRIGGER docs_frozen BEFORE UPDATE ON docs FOR EACH ROW EXECUTE FUNCTION refuse_doc_update();" +
+        // The database refusing a delete — what an FK RESTRICT answers, 23503.
+        "CREATE FUNCTION refuse_audit_delete() RETURNS trigger LANGUAGE plpgsql AS " +
+        "$$ BEGIN RAISE EXCEPTION 'audit rows are kept' USING ERRCODE = '23503'; END $$;" +
+        "CREATE TRIGGER audit_kept BEFORE DELETE ON audit FOR EACH ROW EXECUTE FUNCTION refuse_audit_delete();"
     );
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([orders, customers, audit, owners, docs]);
@@ -193,6 +198,20 @@ describe("a failed statement a callback caught", () => {
 
         expect(caught).toBeDefined();
         expect(await stored("o4")).toBe(1);
+    });
+
+    it("still commits the rest when the caught failure was a nested context.data delete", async () => {
+        // The same contract as a create: a context.data write the database
+        // refuses is undone on its own. The delete ran with no savepoint, so
+        // the refusal aborted the whole write and the answer was a
+        // TRANSACTION_ABORTED telling the developer that catching it was safe.
+        attempt = (data) => data.audit.delete(1);
+
+        await expect(create("o5")).resolves.toMatchObject({ id: "o5" });
+
+        expect((caught as Error | undefined)?.message).toMatch(/foreign key/);
+        expect(await stored("o5")).toBe(1);
+        expect((await db.query<{ c: number }>("SELECT count(*)::int AS c FROM audit")).rows[0].c).toBe(1);
     });
 });
 

@@ -153,6 +153,23 @@ been holding a database transaction open for the length of an HTTP round trip,
 and rolling the row back whenever the remote end was down.
 :::
 
+### When `afterSaveError` runs
+
+It reports a save that failed **at the database or after it** — from the
+INSERT or UPDATE statement on. A save refused before that point never reached
+the database, so the hook is not told about it.
+
+| Runs | Does not run |
+|---|---|
+| The database refuses the statement: a unique or foreign key violation, a check constraint or trigger, a row-level security policy (`WRITE_DENIED`) | A `beforeSave` refusal — the hook that refused is the one that knows |
+| `afterRead` or `afterSave` throws (the caller gets `CALLBACK_REJECTED`) | A request refused before the driver: validation (`VALIDATION_*`), a field the caller may not write, a missing permission |
+| The history entry cannot be recorded | A row the caller cannot address (`404`), a tenant stamp it may not set |
+| | The commit is refused after the save returned: `TRANSACTION_ABORTED` (a failed statement a callback caught), or a deferred constraint checked at `COMMIT` |
+| | A delete — there is no delete counterpart |
+
+In a bulk or `_batch` write it runs for the row that failed; the rows before it
+are rolled back with the batch and are not reported.
+
 ### Side effects that must not hold the transaction
 
 Anything slow, or anything that cannot be undone if the transaction rolls back,

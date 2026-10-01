@@ -272,6 +272,11 @@ afterSaveError: async ({
 }
 ```
 
+It runs for a save that failed at the database or after it — not for a
+`beforeSave` refusal, a request refused before the write (validation, a missing
+permission, a 404), or a commit that is refused after the save returned. The
+full list is in [Hooks](/docs/backend/hooks/#when-aftersaveerror-runs).
+
 On a request, it runs once the failed write's transaction has rolled back, not
 inside it. Its `context.data` is a fresh one for the same caller, where each call
 is a transaction of its own, so a [job](/docs/backend/jobs), queue message or
@@ -502,9 +507,9 @@ So the triggering write and everything its callbacks wrote commit together or no
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
 - A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
 
-Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a failed write is undone on its own, and the rest commits.
+Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
 
-Any other statement that fails on the write's transaction — a lookup, a job enqueue the database refused — aborts that transaction in Postgres, and catching the error in JavaScript does not undo that. The write is refused with **500 `TRANSACTION_ABORTED`** and nothing is stored, rather than answering success for a write that was rolled back. Let such a failure throw, or check for the condition before running the statement.
+Any other statement that fails on the write's transaction — a lookup, the read an update or delete makes to find its row (an id the key column cannot hold), a job enqueue the database refused — aborts that transaction in Postgres, and catching the error in JavaScript does not undo that. The write is refused with **500 `TRANSACTION_ABORTED`** and nothing is stored, rather than answering success for a write that was rolled back. Let such a failure throw, or check for the condition before running the statement.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {
