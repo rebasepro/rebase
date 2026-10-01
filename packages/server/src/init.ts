@@ -3310,17 +3310,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Read the destination lazily from env so config changes don't need a
     // rebuild. Only enabled when BACKUP_DESTINATION is set.
     if (surfaces.admin) {
-        const { createBackupRoutes, parseBackupDestination } = await import("./backup");
+        const { createBackupRoutes, parseBackupDestination, readBackupSchedule } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
 
         applyAdminGate(backupRouter, "Backup");
 
+        // The scheduler, when this process has one, is what knows whether the
+        // nightly backup ran — on the `api` role too, which registers the jobs
+        // without starting them and reads their runs from `cron_logs`.
+        const scheduler = cronScheduler;
         backupRouter.route("/", createBackupRoutes({
             getDestination: () => {
                 const out = process.env.BACKUP_DESTINATION?.trim();
                 return out ? parseBackupDestination(out) : null;
             },
-            storage: storageController
+            storage: storageController,
+            getSchedule: scheduler ? () => readBackupSchedule(scheduler) : undefined
         }));
         config.app.route(`${basePath}/admin/backups`, backupRouter);
         logger.debug("Backup admin routes mounted", { path: `${basePath}/admin/backups` });

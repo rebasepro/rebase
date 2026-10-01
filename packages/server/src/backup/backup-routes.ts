@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { BackupListing, BackupScheduleStatus } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import type { StorageController } from "../storage";
@@ -13,13 +14,19 @@ export interface BackupRoutesConfig {
     getDestination: () => BackupDestination | null;
     /** Storage controller for object-storage destinations. */
     storage?: StorageController;
+    /**
+     * The scheduled backup job and its last run — see `readBackupSchedule`.
+     * Omitted where this process has no cron scheduler; the listing then
+     * answers `schedule: null`.
+     */
+    getSchedule?: () => Promise<BackupScheduleStatus | null>;
 }
 
 /**
  * Admin REST routes for the Backups panel.
  *
  * Routes (mounted under `/admin/backups`, admin-guarded by the caller):
- *   GET /            → list available backups
+ *   GET /            → list available backups, and the scheduled job's last run
  *   GET /download    → download a backup's bytes (?key=…)
  */
 export function createBackupRoutes(config: BackupRoutesConfig): Hono<HonoEnv> {
@@ -27,12 +34,16 @@ export function createBackupRoutes(config: BackupRoutesConfig): Hono<HonoEnv> {
     router.onError(errorHandler);
 
     router.get("/", async (c) => {
+        // Read whether or not a destination is configured: a backup cron with
+        // no BACKUP_DESTINATION fails every run, and that is exactly what the
+        // panel has to be able to say.
+        const schedule = config.getSchedule ? await config.getSchedule() : null;
         const dest = config.getDestination();
         if (!dest) {
-            return c.json({ backups: [], destinationKind: "local" as const, configured: false });
+            return c.json({ backups: [], destinationKind: "local", configured: false, schedule } satisfies BackupListing);
         }
         const backups = await listBackupObjects(dest, config.storage);
-        return c.json({ backups, destinationKind: dest.kind, configured: true });
+        return c.json({ backups, destinationKind: dest.kind, configured: true, schedule } satisfies BackupListing);
     });
 
     router.get("/download", async (c) => {

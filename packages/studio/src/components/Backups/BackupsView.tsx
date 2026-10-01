@@ -15,7 +15,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
-import type { BackupInfo, RebaseClient } from "@rebasepro/types";
+import type { BackupInfo, BackupScheduleStatus, RebaseClient } from "@rebasepro/types";
 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { LoadFailureView } from "../load-failure-view";
@@ -43,6 +43,54 @@ function rolesFileName(dumpName: string): string {
     return dumpName.replace(/\.dump$/, "") + ".globals.sql";
 }
 
+/**
+ * How the scheduled backup is doing, above the list.
+ *
+ * A failed last run is an error, not a footnote: a backup that fails every
+ * night used to leave this panel empty under "wait for the next scheduled run",
+ * with the reason only in the cron history.
+ */
+function BackupScheduleSummary({ schedule }: { schedule: BackupScheduleStatus }) {
+    const { t } = useTranslation();
+    const last = schedule.lastRun;
+
+    if (last && !last.success) {
+        return (
+            <Alert color="error">
+                <Typography variant="body2" className="text-[13px] font-semibold">
+                    {t("studio_backups_last_run_failed", { when: formatDate(last.startedAt) })}
+                </Typography>
+                {last.error && (
+                    <Typography variant="caption" className="font-mono text-[12px] whitespace-pre-wrap break-words">
+                        {last.error}
+                    </Typography>
+                )}
+            </Alert>
+        );
+    }
+
+    if (!schedule.enabled) {
+        return (
+            <Alert color="warning">
+                <Typography variant="body2" className="text-[13px]">
+                    {t("studio_backups_schedule_paused", { job: schedule.jobId })}
+                </Typography>
+            </Alert>
+        );
+    }
+
+    const parts = [
+        last ? t("studio_backups_last_run_ok", { when: formatDate(last.startedAt) }) : t("studio_backups_never_ran"),
+        schedule.nextRunAt ? t("studio_backups_next_run", { when: formatDate(schedule.nextRunAt) }) : null
+    ].filter((part): part is string => Boolean(part));
+
+    return (
+        <Typography variant="caption" color="secondary" className="text-[12px]">
+            {parts.join(" · ")}
+        </Typography>
+    );
+}
+
 export function BackupsView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
@@ -51,6 +99,7 @@ export function BackupsView() {
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [destinationKind, setDestinationKind] = useState<string>("local");
     const [configured, setConfigured] = useState(true);
+    const [schedule, setSchedule] = useState<BackupScheduleStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState<string | null>(null);
     /** Why the listing failed, classified — see `load-failure.ts`. */
@@ -74,6 +123,8 @@ export function BackupsView() {
             setBackups(res.backups);
             setDestinationKind(res.destinationKind);
             setConfigured(res.configured);
+            // Absent from a server that predates the field.
+            setSchedule(res.schedule ?? null);
         } catch (e: unknown) {
             // The snackbar is gone in seconds, and the list underneath it is
             // empty — which is how a refused listing came to read "No backups
@@ -118,9 +169,9 @@ export function BackupsView() {
         return (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
                 <DatabaseIcon size={iconSize.large} className="text-surface-300 dark:text-surface-600"/>
-                <Typography variant="h6" color="secondary">Backups Not Available</Typography>
+                <Typography variant="h6" color="secondary">{t("studio_backups_unavailable_title")}</Typography>
                 <Typography variant="body2" color="disabled" className="max-w-md">
-                    The backups API is not exposed by this backend.
+                    {t("studio_backups_unavailable_body")}
                 </Typography>
             </div>
         );
@@ -144,7 +195,7 @@ export function BackupsView() {
                     <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{backups.length}</Chip>
                     <Chip size="smallest" className="bg-surface-raised text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
                 </div>
-                <IconButton size="small" onClick={load} title="Refresh">
+                <IconButton size="small" onClick={load} title={t("refresh_data")}>
                     <RefreshCwIcon size={iconSize.smallest}/>
                 </IconButton>
             </div>
@@ -158,79 +209,94 @@ export function BackupsView() {
                         deniedHint={t("studio_backups_denied_hint")}
                         onRetry={load}
                     />
-                ) : !configured ? (
-                    <Alert color="info">
-                        <Typography variant="body2" className="text-[13px]">
-                            <strong>{t("studio_backups_not_configured_title")}</strong>{" "}
-                            {t("studio_backups_not_configured_body")}{" "}
-                            <a
-                                href="https://rebase.pro/docs/backend/jobs"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary underline"
-                            >
-                                {t("studio_read_the_docs")}
-                            </a>
-                        </Typography>
-                    </Alert>
-                ) : backups.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-                        <DatabaseIcon size={iconSize.large} className="text-surface-200 dark:text-surface-700"/>
-                        <Typography variant="body2" color="disabled">
-                            No backups found yet. Run <code className="font-mono text-[12px]">rebase db backup</code> or wait for the next scheduled run.
-                        </Typography>
-                    </div>
                 ) : (
-                    <div className="space-y-2 max-w-3xl">
-                        {backups.map(backup => {
-                            // The roles sidecar travels with the dump: a restore
-                            // into a new Postgres needs both files.
-                            const globalsKey = backup.globalsKey;
-                            return (
-                                <div
-                                    key={backup.key}
-                                    className={cls("flex items-center gap-3 px-4 py-3 rounded-lg border bg-surface-card", defaultBorderMixin)}
-                                >
-                                    <DatabaseIcon size={iconSize.small} className="text-surface-400 shrink-0"/>
-                                    <div className="flex-1 min-w-0">
-                                        <Typography variant="body2" className="truncate font-medium font-mono text-[12px]">{backup.name}</Typography>
-                                        <Typography variant="caption" color="secondary" className="text-[11px]">
-                                            {formatDate(backup.createdAt)} · {formatSize(backup.sizeBytes)}
-                                        </Typography>
-                                    </div>
-                                    {globalsKey ? (
-                                        <Tooltip title={t("studio_backups_roles_file_hint")}>
+                    <div className="flex flex-col gap-4 min-h-full">
+                        {schedule && (
+                            <div className="max-w-3xl">
+                                <BackupScheduleSummary schedule={schedule}/>
+                            </div>
+                        )}
+                        {!configured ? (
+                            <Alert color="info">
+                                <Typography variant="body2" className="text-[13px]">
+                                    <strong>{t("studio_backups_not_configured_title")}</strong>{" "}
+                                    {t("studio_backups_not_configured_body")}{" "}
+                                    <a
+                                        href="https://rebase.pro/docs/backend/jobs"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary underline"
+                                    >
+                                        {t("studio_read_the_docs")}
+                                    </a>
+                                </Typography>
+                            </Alert>
+                        ) : backups.length === 0 ? (
+                            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+                                <DatabaseIcon size={iconSize.large} className="text-surface-200 dark:text-surface-700"/>
+                                <Typography variant="body2" color="disabled">
+                                    {t("studio_backups_empty")}
+                                </Typography>
+                                {/* With a schedule, the summary above already says when the next one runs, or why the last one did not. */}
+                                {!schedule && (
+                                    <Typography variant="caption" color="disabled" className="max-w-md">
+                                        {t("studio_backups_empty_hint")}
+                                    </Typography>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-w-3xl">
+                                {backups.map(backup => {
+                                    // The roles sidecar travels with the dump: a restore
+                                    // into a new Postgres needs both files.
+                                    const globalsKey = backup.globalsKey;
+                                    return (
+                                        <div
+                                            key={backup.key}
+                                            className={cls("flex items-center gap-3 px-4 py-3 rounded-lg border bg-surface-card", defaultBorderMixin)}
+                                        >
+                                            <DatabaseIcon size={iconSize.small} className="text-surface-400 shrink-0"/>
+                                            <div className="flex-1 min-w-0">
+                                                <Typography variant="body2" className="truncate font-medium font-mono text-[12px]">{backup.name}</Typography>
+                                                <Typography variant="caption" color="secondary" className="text-[11px]">
+                                                    {formatDate(backup.createdAt)} · {formatSize(backup.sizeBytes)}
+                                                </Typography>
+                                            </div>
+                                            {globalsKey ? (
+                                                <Tooltip title={t("studio_backups_roles_file_hint")}>
+                                                    <Button
+                                                        size="small"
+                                                        variant="text"
+                                                        onClick={() => handleDownload(globalsKey, rolesFileName(backup.name))}
+                                                        disabled={downloading === globalsKey}
+                                                        startIcon={downloading === globalsKey
+                                                            ? <CircularProgress size="smallest"/>
+                                                            : <DownloadIcon size={iconSize.smallest}/>}
+                                                    >
+                                                        {downloading === globalsKey ? t("studio_backups_downloading") : t("studio_backups_roles_file")}
+                                                    </Button>
+                                                </Tooltip>
+                                            ) : (
+                                                <Tooltip title={t("studio_backups_no_roles_file_hint")}>
+                                                    <Chip size="smallest" colorScheme="orangeDarker">{t("studio_backups_no_roles_file")}</Chip>
+                                                </Tooltip>
+                                            )}
                                             <Button
                                                 size="small"
-                                                variant="text"
-                                                onClick={() => handleDownload(globalsKey, rolesFileName(backup.name))}
-                                                disabled={downloading === globalsKey}
-                                                startIcon={downloading === globalsKey
+                                                variant="outlined"
+                                                onClick={() => handleDownload(backup.key, backup.name)}
+                                                disabled={downloading === backup.key}
+                                                startIcon={downloading === backup.key
                                                     ? <CircularProgress size="smallest"/>
                                                     : <DownloadIcon size={iconSize.smallest}/>}
                                             >
-                                                {downloading === globalsKey ? t("studio_backups_downloading") : t("studio_backups_roles_file")}
+                                                {downloading === backup.key ? t("studio_backups_downloading") : t("download")}
                                             </Button>
-                                        </Tooltip>
-                                    ) : (
-                                        <Tooltip title={t("studio_backups_no_roles_file_hint")}>
-                                            <Chip size="smallest" colorScheme="orangeDarker">{t("studio_backups_no_roles_file")}</Chip>
-                                        </Tooltip>
-                                    )}
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => handleDownload(backup.key, backup.name)}
-                                        disabled={downloading === backup.key}
-                                        startIcon={downloading === backup.key
-                                            ? <CircularProgress size="smallest"/>
-                                            : <DownloadIcon size={iconSize.smallest}/>}
-                                    >
-                                        {downloading === backup.key ? t("studio_backups_downloading") : t("download")}
-                                    </Button>
-                                </div>
-                            );
-                        })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

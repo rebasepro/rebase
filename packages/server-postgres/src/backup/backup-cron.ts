@@ -143,7 +143,7 @@ function parseOptionalInt(value: string | undefined): number | null | "invalid" 
 export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
     const dbName = parseDbNameFromUrl(config.connectionString) ?? "database";
 
-    return {
+    const job: CronJobDefinition = {
         name: config.name ?? "Scheduled database backup",
         schedule: config.schedule,
         description: "Dumps the Postgres database and uploads it to the configured backup destination.",
@@ -229,6 +229,14 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
             };
         }
     };
+
+    // How the Backups panel finds this job among the project's crons: its id is
+    // the cron file's name and its display name is configurable. A registry
+    // symbol, so `@rebasepro/server` reads it without importing this package
+    // (it must not), and non-enumerable, so a spread or a JSON dump of the
+    // definition is unchanged. See `readBackupSchedule` in the server package.
+    Object.defineProperty(job, Symbol.for("rebase.backupCron"), { value: true });
+    return job;
 }
 
 function formatBytes(bytes: number): string {

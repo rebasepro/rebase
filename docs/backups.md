@@ -156,8 +156,10 @@ clear, doctor-style message if they're incompatible or the binary is missing:
   client tools.
 ```
 
-Install the client tools with e.g. `brew install libpq` or
-`apt-get install postgresql-client-16`. You can point the CLI at a specific
+The official runtime image (`rebasepro/server`) ships the PostgreSQL 18 client
+tools, so scheduled backups run inside it against any server up to Postgres 18.
+Elsewhere, install them with e.g. `brew install libpq` or
+`apt-get install postgresql-client-18`. You can point the CLI at a specific
 binary with `PG_DUMP_PATH` / `PG_RESTORE_PATH` / `PG_DUMPALL_PATH`.
 
 ## Scheduled backups
@@ -255,6 +257,14 @@ keep them in one directory: `rebase db restore` looks for the sidecar next to
 the `.dump`, and without it a restore into a new Postgres stops at the first
 `GRANT` to a role that does not exist there. A row marked **No roles file** has
 no sidecar, so recreate its roles by hand before restoring it anywhere new.
+
+Above the list the panel reports the scheduled backup job — the cron whose
+definition comes from `createBackupCron` — and how its last run went, read from
+the cron history (`cron_logs`). A failed run is shown as an error with its
+message, so a nightly backup that cannot run (`Could not find the 'pg_dump'
+binary`, an unreachable bucket) is visible where the backups are listed rather
+than only in the Cron Jobs panel. The listing carries it as `schedule`
+(`null` when no backup job is registered).
 
 The panel is enabled by default. To customise the visible tools, pass the
 `tools` array to `<RebaseStudio tools={[…, "backups"]}/>`. When

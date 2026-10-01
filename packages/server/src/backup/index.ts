@@ -5,3 +5,5 @@
 export * from "./backup-common";
 export { createBackupRoutes } from "./backup-routes";
 export type { BackupRoutesConfig } from "./backup-routes";
+export { readBackupSchedule, isBackupCronDefinition, BACKUP_CRON_MARK } from "./backup-schedule";
+export type { BackupScheduleSource } from "./backup-schedule";

@@ -1,5 +1,5 @@
 import { Transport } from "./transport";
-import { RebaseApiError, type BackupInfo, type BackupDestinationKind } from "@rebasepro/types";
+import { RebaseApiError, type BackupListing } from "@rebasepro/types";
 
 export interface CreateBackupsOptions {
     backupsPath?: string;
@@ -8,11 +8,7 @@ export interface CreateBackupsOptions {
 export function createBackups(transport: Transport, options?: CreateBackupsOptions) {
     const backupsPath = options?.backupsPath || "/admin/backups";
 
-    async function list(): Promise<{
-        backups: BackupInfo[];
-        destinationKind: BackupDestinationKind;
-        configured: boolean;
-    }> {
+    async function list(): Promise<BackupListing> {
         return transport.request(backupsPath, { method: "GET" });
     }
 

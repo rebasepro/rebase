@@ -32,3 +32,68 @@ export interface BackupInfo {
      */
     globalsKey?: string;
 }
+
+/**
+ * How one run of the scheduled backup went, read from the cron's run history.
+ */
+export interface BackupRunOutcome {
+    /** ISO timestamp the run started. */
+    startedAt: string;
+
+    /** ISO timestamp the run ended. */
+    finishedAt: string;
+
+    /** Whether the run produced a backup. */
+    success: boolean;
+
+    /** Why it did not, when it failed — e.g. `Could not find the 'pg_dump' binary.` */
+    error?: string;
+
+    /** True when someone triggered the run by hand rather than the schedule. */
+    manual: boolean;
+}
+
+/**
+ * The deployment's scheduled backup job — the cron that default-exports
+ * `createBackupCron` — and the outcome of its last run.
+ *
+ * Shown by the Backups panel so a backup that fails every night is visible
+ * where the backups are listed, rather than only in the cron history.
+ */
+export interface BackupScheduleStatus {
+    /** The cron job's id, which is its file's name. */
+    jobId: string;
+
+    /** The job's display name. */
+    name: string;
+
+    /** Its cron expression. */
+    schedule: string;
+
+    /** False when the job is paused (or declared `enabled: false`). */
+    enabled: boolean;
+
+    /** ISO timestamp of the next scheduled run, when one is armed. */
+    nextRunAt?: string;
+
+    /** The most recent run, absent when the job has never run. */
+    lastRun?: BackupRunOutcome;
+}
+
+/** What the backup listing (`GET /admin/backups`) answers. */
+export interface BackupListing {
+    /** Backups at the destination, newest first. */
+    backups: BackupInfo[];
+
+    /** The kind of destination they were read from. */
+    destinationKind: BackupDestinationKind;
+
+    /** False when `BACKUP_DESTINATION` is unset. */
+    configured: boolean;
+
+    /**
+     * The scheduled backup job, or `null` when the deployment registers none.
+     * Absent from a server that predates the field.
+     */
+    schedule?: BackupScheduleStatus | null;
+}

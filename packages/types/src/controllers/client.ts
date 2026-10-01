@@ -4,7 +4,7 @@ import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
-import type { BackupInfo, BackupDestinationKind } from "../types/backup";
+import type { BackupListing } from "../types/backup";
 import type { ApiKeysAPI } from "../types/api_keys";
 import type { StorageSourceDefinition } from "../types/storage_source";
 
@@ -199,8 +199,11 @@ export interface CronAPI {
  * @group Backups
  */
 export interface BackupsAPI {
-    /** List available backups at the configured destination, newest first. */
-    list(): Promise<{ backups: BackupInfo[]; destinationKind: BackupDestinationKind; configured: boolean }>;
+    /**
+     * List available backups at the configured destination, newest first, and
+     * the scheduled backup job's last run.
+     */
+    list(): Promise<BackupListing>;
     /** Fetch a backup's bytes for download (authenticated). */
     download(key: string): Promise<Blob>;
 }

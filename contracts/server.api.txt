@@ -9,7 +9,7 @@ class ApiError { badRequest, code, conflict, details, expected, forbidden, inter
 class BlockedUrlError
 class BundleError { hint }
 class CollectionConfigError { hint }
-class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
+class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class GCSStorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
@@ -581,6 +581,9 @@ interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackendLifecycle { destroy, healthCheck, initialize }
 interface BackupInfo { createdAt, destinationKind, globalsKey, key, name, sizeBytes }
+interface BackupListing { backups, configured, destinationKind, schedule }
+interface BackupRunOutcome { error, finishedAt, manual, startedAt, success }
+interface BackupScheduleStatus { enabled, jobId, lastRun, name, nextRunAt, schedule }
 interface BackupsAPI { download, list }
 interface BaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, properties, securityRules, singularName, slug, strictWrites }
 interface BaseProperty { access, callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }

@@ -667,6 +667,14 @@ export class CronScheduler {
     }
 
     /**
+     * The ids of the registered jobs whose definition matches — how a surface
+     * finds a job by what it is rather than by the file it happens to live in.
+     */
+    jobIdsWhere(predicate: (definition: CronJobDefinition) => boolean): string[] {
+        return [...this.jobs.values()].filter(job => predicate(job.definition)).map(job => job.id);
+    }
+
+    /**
      * Get a single job status by ID.
      */
     getJob(id: string): CronJobStatus | undefined {
