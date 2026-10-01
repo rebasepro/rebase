@@ -40,8 +40,9 @@ const COMMANDS_FOR: Record<PolicyCommand, Privilege[]> = {
  *      correct one — satisfies condition 1 on almost every project out there.
  *      Flagging it would make this check fire on the whole ecosystem.
  *
- * So what is reported is the narrow, certain case: the check expression is
- * absent or constant-true, which in Postgres means "accept any row". Policies
+ * So what is reported is the narrow, certain case: the clause that decides the
+ * command is constant-true, which in Postgres means "accept any row". An
+ * *absent* clause is the opposite — see {@link writesAcceptingAnyRow}. Policies
  * whose expression is an anonymous *tautology* rather than a constant are the
  * business of `policy-anonymous-tautology`, which can weigh the platform.
  */
@@ -60,13 +61,12 @@ export const anonymousWriteAllowed: Check = {
             if (!snapshot.schemas.includes(policy.schema)) continue;
             if (!policy.permissive) continue;
 
-            const wanted = COMMANDS_FOR[policy.command] ?? [];
+            const open = writesAcceptingAnyRow(policy);
+            const wanted = (COMMANDS_FOR[policy.command] ?? []).filter((p) => open.includes(p));
             if (wanted.length === 0) continue;
 
             const identities = anonymousIdentities(snapshot, policy.roles);
             if (identities.length === 0) continue;
-
-            if (!acceptsAnyRow(policy)) continue;
 
             // Which write privileges those identities genuinely hold on the table.
             const granted = new Set<Privilege>();
@@ -94,10 +94,8 @@ export const anonymousWriteAllowed: Check = {
                     target: { schema: policy.schema, table: policy.table, policy: policy.name },
                     detail:
                         `Policy "${policy.name}" is a permissive ${policy.command} policy for ` +
-                        `${listAnd(grantedTo)}, and its check expression ` +
-                        `${policy.using == null && policy.withCheck == null
-                            ? "is absent, which Postgres treats as accepting every row"
-                            : "is a constant truth, so every row satisfies it"}. ` +
+                        `${listAnd(grantedTo)}, and the expression that decides ` +
+                        `${listAnd(commands)} is a constant truth, so every row satisfies it. ` +
                         `${listAnd(grantedTo)} also ${grantedTo.length > 1 ? "hold" : "holds"} ` +
                         `${listAnd(commands)} on the table, so both the privilege check and the row ` +
                         `check pass for a request that carries no credentials.`,
@@ -148,19 +146,29 @@ function anonymousIdentities(snapshot: DbSnapshot, policyRoles: string[]): strin
 }
 
 /**
- * Does this policy impose no row condition at all?
+ * The writes this policy admits for any row whatsoever.
  *
- * For INSERT, Postgres falls back to USING when WITH CHECK is absent, and a
- * policy with neither clause admits every row. For UPDATE/DELETE the USING
- * clause selects the rows that may be touched.
+ * Postgres ORs together the expressions the permissive policies for a command
+ * *have*, and denies when there are none — so a clause a policy lacks admits
+ * nothing, it does not admit everything. Reading an absent clause as true
+ * reported `FOR INSERT TO anon` with no WITH CHECK (the insert is refused),
+ * `FOR DELETE TO anon` with no USING (no row is deleted) and `FOR UPDATE TO anon
+ * WITH CHECK (true)` with no USING (no row is reached) as open writes.
+ *
+ *   - INSERT is decided by WITH CHECK (USING is not allowed on an INSERT policy,
+ *     and a `FOR ALL` policy's USING stands in for a missing WITH CHECK);
+ *   - UPDATE needs USING to reach the row and the check — WITH CHECK, or USING
+ *     again — to accept the new one;
+ *   - DELETE is decided by USING.
  */
-function acceptsAnyRow(policy: DbPolicy): boolean {
-    const clauses =
-        policy.command === "INSERT"
-            ? [policy.withCheck ?? policy.using]
-            : [policy.using, policy.command === "DELETE" ? null : policy.withCheck];
+function writesAcceptingAnyRow(policy: DbPolicy): Privilege[] {
+    const using = policy.using != null && isUnconditionalTrue(policy.using);
+    const checkExpr = policy.withCheck ?? policy.using;
+    const check = checkExpr != null && isUnconditionalTrue(checkExpr);
 
-    const present = clauses.filter((c): c is string => c != null);
-    if (present.length === 0) return true;
-    return present.every((c) => isUnconditionalTrue(c));
+    const out: Privilege[] = [];
+    if (check) out.push("INSERT");
+    if (using && check) out.push("UPDATE");
+    if (using) out.push("DELETE");
+    return out;
 }

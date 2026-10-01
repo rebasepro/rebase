@@ -27,6 +27,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { renderReport, runCli, scan, type CliIo } from "../../src/index";
 import type { Finding, ScanResult } from "../../src/types";
 import {
+    affectedRowsAs,
     applySql,
     isDockerAvailable,
     querySql,
@@ -83,7 +84,9 @@ const SECURE_OBJECTS = [
     "people",
     "secure_ledger_view_invoker_1",
     "secure_ledger_view_invoker_yes",
-    "secure_ledger_view_invoker_t"
+    "secure_ledger_view_invoker_t",
+    "secure_anon_insert_nocheck",
+    "secure_anon_delete_nousing"
 ];
 
 function objectName(finding: Finding): string {
@@ -311,6 +314,24 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         expect(hits.map(objectName)).toEqual(["vuln_unqualified"]);
         expect(hits[0].target.column).toBe("org_id");
         expect(hits[0].title).toContain("memberships.org_id");
+    });
+
+    it("agrees with Postgres that a write policy with no clause lets anon write nothing", async () => {
+        await expect(
+            affectedRowsAs(
+                container.connectionString,
+                "anon",
+                "INSERT INTO public.secure_anon_insert_nocheck (body) VALUES ('x')"
+            )
+        ).rejects.toThrow(/row-level security/);
+
+        expect(
+            await affectedRowsAs(container.connectionString, "anon", "DELETE FROM public.secure_anon_delete_nousing")
+        ).toBe(0);
+        // The row is there; the policy just reaches none of it.
+        expect(
+            await affectedRowsAs(container.connectionString, "rlscheck", "DELETE FROM public.secure_anon_delete_nousing")
+        ).toBe(1);
     });
 
     it("does not flag a junction table that follows its endpoints", () => {

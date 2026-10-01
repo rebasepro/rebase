@@ -307,6 +307,31 @@ CREATE POLICY vuln_anon_write_insert ON public.vuln_anon_write
     FOR INSERT TO anon WITH CHECK (true);
 GRANT INSERT ON public.vuln_anon_write TO anon;
 
+-- A write policy with no clause is not one whose clause is true. Postgres ORs
+-- the expressions permissive policies have and denies when there are none, so
+-- anon can neither insert here nor delete the row that is there. Both used to
+-- be reported as high, certain anonymous-write-allowed.
+CREATE TABLE public.secure_anon_insert_nocheck (
+    id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body  text
+);
+ALTER TABLE public.secure_anon_insert_nocheck ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.secure_anon_insert_nocheck FORCE ROW LEVEL SECURITY;
+CREATE POLICY secure_anon_insert_nocheck_insert ON public.secure_anon_insert_nocheck
+    FOR INSERT TO anon;
+GRANT INSERT ON public.secure_anon_insert_nocheck TO anon;
+
+CREATE TABLE public.secure_anon_delete_nousing (
+    id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body  text
+);
+ALTER TABLE public.secure_anon_delete_nousing ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.secure_anon_delete_nousing FORCE ROW LEVEL SECURITY;
+CREATE POLICY secure_anon_delete_nousing_delete ON public.secure_anon_delete_nousing
+    FOR DELETE TO anon;
+GRANT SELECT, DELETE ON public.secure_anon_delete_nousing TO anon;
+INSERT INTO public.secure_anon_delete_nousing (body) VALUES ('a row');
+
 -- Membership table for the subquery check. One FK, so it is not junction-shaped.
 CREATE TABLE public.memberships (
     id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),

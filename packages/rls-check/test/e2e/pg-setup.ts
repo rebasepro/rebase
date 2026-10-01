@@ -125,17 +125,18 @@ export async function applySql(connectionString: string, sql: string): Promise<v
 }
 
 /**
- * Run a read query as `role`, the way PostgREST does: `SET LOCAL ROLE` inside a
- * transaction, with `settings` applied as transaction-local GUCs first. For the
- * assertions that ask Postgres what a role actually reads, rather than trusting
- * the scanner's reading of the catalog.
+ * Run a statement as `role`, the way PostgREST does: `SET LOCAL ROLE` inside a
+ * transaction, with `settings` applied as transaction-local GUCs first, and the
+ * transaction rolled back afterwards — so a write can be attempted and leaves
+ * nothing behind. For the assertions that ask Postgres what a role actually
+ * gets, rather than trusting the scanner's reading of the catalog.
  */
-export async function querySqlAs<T extends Record<string, unknown>>(
+async function runAs<T extends Record<string, unknown>>(
     connectionString: string,
     role: string,
     sql: string,
-    settings: Record<string, string> = {}
-): Promise<T[]> {
+    settings: Record<string, string>
+): Promise<pg.QueryResult<T>> {
     const client = new pg.Client({ connectionString });
     await client.connect();
     try {
@@ -144,11 +145,30 @@ export async function querySqlAs<T extends Record<string, unknown>>(
             await client.query("SELECT set_config($1, $2, true)", [name, value]);
         }
         await client.query(`SET LOCAL ROLE "${role.replace(/"/g, '""')}"`);
-        const result = await client.query<T>(sql);
 
-        return result.rows;
+        return await client.query<T>(sql);
     } finally {
         await client.query("ROLLBACK").catch(() => undefined);
         await client.end();
     }
+}
+
+/** The rows a query returns when run as `role`. See {@link runAs}. */
+export async function querySqlAs<T extends Record<string, unknown>>(
+    connectionString: string,
+    role: string,
+    sql: string,
+    settings: Record<string, string> = {}
+): Promise<T[]> {
+    return (await runAs<T>(connectionString, role, sql, settings)).rows;
+}
+
+/** How many rows a write touches when run as `role` — and then rolled back. */
+export async function affectedRowsAs(
+    connectionString: string,
+    role: string,
+    sql: string,
+    settings: Record<string, string> = {}
+): Promise<number> {
+    return (await runAs(connectionString, role, sql, settings)).rowCount ?? 0;
 }
