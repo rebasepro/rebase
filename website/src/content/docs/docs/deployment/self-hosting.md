@@ -391,6 +391,14 @@ to your origin, and restricts nothing else, so inline scripts, workers and
 third-party sign-in keep working. A response that sets its own policy keeps it.
 For anything stricter, put the policy on the reverse proxy in front.
 
+## More than one instance
+
+One container is the default and needs nothing more. Before a second replica
+takes traffic — or a rolling deploy runs two side by side — go through
+[Running more than one instance](/docs/deployment/multiple-instances/): rate
+limits, broadcast channels, local files, resumable uploads and the image cache
+are per process until a setting shares them.
+
 ## Running functions in their own process
 
 Everything above is one container serving the whole project, which is the right

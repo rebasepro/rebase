@@ -181,3 +181,7 @@ realtime: { bus: { type: "postgres" } }
 Set `sharedState.channelBusConfigured: true` to assert that you have — the chart
 uses it only to decide whether to warn. Ordinary collection subscriptions are
 unaffected; those travel through Postgres CDC.
+
+The rest of what a process keeps to itself — local files, resumable uploads,
+the image-transform cache, the Logs Explorer — is listed with the setting that
+shares each in [Running more than one instance](/docs/deployment/multiple-instances/).

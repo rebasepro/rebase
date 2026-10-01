@@ -32,6 +32,9 @@ administrator before the first boot.
 - **[Splitting into several processes](/docs/deployment/split-processes/)** —
   one bundle as an API, a functions tier and a worker, so a heavy function
   stops competing with the data API.
+- **[Running more than one instance](/docs/deployment/multiple-instances/)** —
+  the state each process keeps to itself, and the setting that shares it,
+  before a second replica takes traffic.
 
 ## Platform guides
 

@@ -205,6 +205,9 @@ config) whenever more than one process serves websockets.
 **Scale to zero.** Nothing here scales a process down to nothing or spins one up
 on demand. That is a platform capability, not a runtime one.
 
+Everything else a process keeps to itself is on one list:
+[Running more than one instance](/docs/deployment/multiple-instances/).
+
 ## Releasing one unit on its own
 
 Everything above splits *where the work runs*. All of it still ships as one
