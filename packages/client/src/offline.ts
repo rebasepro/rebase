@@ -166,6 +166,32 @@ function offlineError(message: string): RebaseApiError {
     return new RebaseApiError(message, { status: 0, code: "OFFLINE" });
 }
 
+/**
+ * What a write discarded because an earlier write it depends on was refused is
+ * reported with. It was never sent; the refusal that doomed it is its `cause`.
+ */
+function dependencyRejected(refused: PendingMutation, error: Error): RebaseApiError {
+    return new RebaseApiError(
+        `Not sent: an earlier queued write to the same row was refused (${error.message}).`,
+        {
+            status: error instanceof RebaseApiError ? error.status : undefined,
+            code: "DEPENDENCY_REJECTED",
+            details: { rejectedMutationId: refused.mutationId },
+            cause: error
+        }
+    );
+}
+
+/**
+ * A refusal about what a write contains — a field the collection no longer
+ * has, one the caller may not write, a value a constraint refuses — rather
+ * than about the row or the caller as a whole.
+ */
+function isFieldRefusal(error: unknown): boolean {
+    if (!(error instanceof RebaseApiError)) return false;
+    return error.status === 400 || error.status === 403 || error.status === 422;
+}
+
 function generateOfflineStringId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return crypto.randomUUID();
@@ -1855,6 +1881,13 @@ data: u.data as AnyRow })),
                     // the client-generated id inside its data. The rollback
                     // stays the tail's — the state before the *first* of the
                     // merged writes, which is what undoing them all restores.
+                    //
+                    // An update also remembers the edits it is made of, so a
+                    // refusal of one of them is not a refusal of all (see
+                    // `splitCoalesced`).
+                    if (tail.type === "update") {
+                        tail.parts = [...(tail.parts ?? [{ ...(tail.data as AnyRow) }]), { ...(mutation.data as AnyRow) }];
+                    }
                     tail.data = { ...(tail.data as AnyRow), ...(mutation.data as AnyRow), id: tail.id };
                     await this.store.enqueue(this.queueKey(tail), tail);
                     return;
@@ -2013,6 +2046,13 @@ data: u.data as AnyRow })),
                             this.connectivity.deferRetry();
                             this.patchStatus({ lastError: op.lastError });
                             break;
+                        }
+                        // Several edits merged into one request, refused as a
+                        // whole: maybe over just one of them. Split it back,
+                        // and let each edit stand or fall on its own.
+                        if (isFieldRefusal(error) && (op.parts?.length ?? 0) > 1) {
+                            await this.splitCoalesced(op, ticket);
+                            continue;
                         }
                         await this.rejectMutation(op, error as Error, ticket);
                         continue;
@@ -2315,7 +2355,47 @@ data: u.data as AnyRow })),
         this.patchStatus({ lastError: error.message });
         this.notifyCollection(op.collection);
         this.scheduleRefresh(op.collection);
-        for (const dropped of doomed) this.onSyncError?.(error, dropped);
+        // The refused write is reported with the server's answer; the ones
+        // discarded along with it were never sent, and say so — with that
+        // answer as their cause, so "why" is one property away.
+        for (const dropped of doomed) {
+            this.onSyncError?.(dropped === op ? error : dependencyRejected(op, error), dropped);
+        }
+    }
+
+    /**
+     * Put the separate edits a coalesced `update` was made of back in the
+     * queue, in its place and in their order, each with the row as it stood
+     * before it as its rollback — so a refusal undoes that edit alone.
+     *
+     * Their ids extend the merged op's, which sorts them after it and before
+     * whatever was queued next, so the queue's order survives a reload.
+     */
+    private async splitCoalesced(op: PendingMutation, ticket: ScopeTicket): Promise<void> {
+        const parts = op.parts ?? [];
+        const idKey = String(op.id);
+        let before: AnyRow | null = op.rollback?.rows?.[idKey] ?? null;
+        const pieces: PendingMutation[] = parts.map((part, index) => {
+            const piece: PendingMutation = {
+                mutationId: `${op.mutationId}:${index}`,
+                collection: op.collection,
+                type: "update",
+                id: op.id,
+                data: { ...part },
+                queuedAt: op.queuedAt,
+                rollback: { rows: { [idKey]: before === null ? null : { ...before } } }
+            };
+            if (before !== null) before = { ...before, ...part };
+            return piece;
+        });
+        for (const piece of pieces) {
+            await this.store.enqueue(`${ticket.scope}|${piece.mutationId}`, piece).catch(() => undefined);
+        }
+        await this.store.dequeue(`${ticket.scope}|${op.mutationId}`).catch(() => undefined);
+        if (!this.isCurrent(ticket)) return;
+        const position = this.queue.indexOf(op);
+        this.queue.splice(position < 0 ? 0 : position, position < 0 ? 0 : 1, ...pieces);
+        this.afterQueueChange(false);
     }
 
     /** Every row id a mutation writes to. */

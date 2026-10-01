@@ -68,6 +68,14 @@ export interface PendingMutation {
     generatedId?: boolean;
     /** The payload: a row for create/update, an array of rows for createMany. */
     data?: Record<string, unknown> | Record<string, unknown>[];
+    /**
+     * For an `update` that consecutive edits were coalesced into: each edit,
+     * in the order the app made them. `data` is their merge, and is what is
+     * sent. Kept so a refusal of the merge over one field can be told apart
+     * from a refusal of the rest: the merge is split back into these and each
+     * replayed on its own, so only the edit the server refuses is undone.
+     */
+    parts?: Record<string, unknown>[];
     upsert?: boolean;
     /**
      * The request as it was already sent once, for a write tried online

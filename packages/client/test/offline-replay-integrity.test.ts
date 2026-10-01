@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { RebaseApiError } from "@rebasepro/types";
 import type { PendingMutation } from "../src/offline-store";
-import { fakeServer, manager, networkError, restoreNavigator } from "./support/offline-fake-server";
+import { fakeServer, manager, networkError, restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
 
 /**
  * What the offline queue does with a replay the server answered in a way the
@@ -154,5 +154,68 @@ describe("a request in flight across a change of user (H3)", () => {
         offline.setScope("A");
         await offline.sync();
         expect(creates()).toBe(triedOnline + 1);
+    });
+});
+
+/**
+ * Edits coalesced into one queued op are still separate edits (RTO-18).
+ *
+ * Consecutive offline edits to one row merge into the queued op, so a form
+ * being typed into does not grow the queue. When the server refused the merged
+ * op over one field — a column dropped by a schema change while the user was
+ * offline — the whole op was rolled back, every other field the user edited
+ * with it, and the refusals of the writes discarded along with it were
+ * reported with the same error as the write that was actually refused.
+ */
+describe("a coalesced edit the server refuses over one field (RTO-18)", () => {
+    const unknownField = () => new RebaseApiError("'posts' has no field 'legacy'.", { status: 400, code: "VALIDATION_UNKNOWN_FIELDS" });
+
+    it("keeps the user's other edits, and reports only the refused one", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", title: "old", legacy: "l" });
+        const errors: { error: Error; mutation: PendingMutation }[] = [];
+        const { offline, posts } = manager(server, { onSyncError: (error, mutation) => errors.push({ error, mutation }) });
+        await posts.findById("1");
+        setNavigatorOnLine(false);
+        await posts.update("1", { title: "new title" });
+        await posts.update("1", { legacy: "x" });
+        expect(await offline.api.pending()).toHaveLength(1);
+
+        setNavigatorOnLine(true);
+        server.setReject((op, _id, data) => op === "update" && data && "legacy" in (data as Record<string, unknown>)
+            ? unknownField()
+            : undefined);
+        const result = await offline.sync();
+
+        expect(result.remaining).toBe(0);
+        expect(server.rows.get("1")).toMatchObject({ title: "new title", legacy: "l" });
+        expect(await posts.findById("1")).toMatchObject({ title: "new title", legacy: "l" });
+        expect(errors).toHaveLength(1);
+        expect(errors[0].mutation.data).toEqual({ legacy: "x" });
+        expect((errors[0].error as RebaseApiError).code).toBe("VALIDATION_UNKNOWN_FIELDS");
+    });
+
+    it("a write discarded because an earlier one was refused says so", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", title: "t" });
+        server.rows.set("2", { id: "2", title: "u" });
+        const errors: { error: Error; mutation: PendingMutation }[] = [];
+        const { offline, posts } = manager(server, { onSyncError: (error, mutation) => errors.push({ error, mutation }) });
+        await posts.findById("1");
+        await posts.findById("2");
+        setNavigatorOnLine(false);
+        await posts.update("1", { title: "refused" });
+        await posts.update("2", { title: "fine" });
+        await posts.update("1", { title: "built on the refused one" });
+
+        setNavigatorOnLine(true);
+        server.setReject((op, id) => op === "update" && id === "1"
+            ? new RebaseApiError("Forbidden by policy", { status: 403, code: "FORBIDDEN" })
+            : undefined);
+        await offline.sync();
+
+        expect(errors.map(({ error }) => (error as RebaseApiError).code)).toEqual(["FORBIDDEN", "DEPENDENCY_REJECTED"]);
+        expect(errors[1].error.message).toContain("Forbidden by policy");
+        expect(server.rows.get("2")).toMatchObject({ title: "fine" });
     });
 });
