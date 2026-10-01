@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateParams, type AggregateRow, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -451,8 +451,15 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         // Present only when the driver's fetch service implements it — the SDK
         // wrapper turns an absent one into a stub that names the capability.
         aggregate: driver.restFetchService?.aggregate
-            ? async (params: AggregateParams<M>): Promise<AggregateRow[]> =>
-                driver.restFetchService!.aggregate!(slug, {
+            ? async (params: AggregateParams<M>): Promise<AggregateResult> => {
+                // Paged the way the REST route pages it: one group past the
+                // `limit`, so `meta.hasMore` is known rather than guessed from a
+                // page that happened to come back full. No default limit here —
+                // an in-process caller that names none gets every group, as it
+                // always did — so `meta` is only for a call that named one.
+                const grouped = (params.groupBy?.length ?? 0) > 0;
+                const limit = grouped ? params.limit : undefined;
+                const rows: AggregateResult = await driver.restFetchService!.aggregate!(slug, {
                     aggregates: params.select.map(toDriverAggregate),
                     groupBy: params.groupBy as string[] | undefined,
                     filter: params.where
@@ -460,8 +467,15 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         : undefined,
                     logical: params.logical,
                     searchString: params.searchString,
-                    limit: params.limit
-                })
+                    limit: limit !== undefined ? limit + 1 : params.limit,
+                    offset: params.offset
+                });
+                if (limit === undefined) return rows;
+                const page: AggregateResult = rows.slice(0, limit);
+                const meta: AggregateMeta = { limit, offset: params.offset ?? 0, hasMore: rows.length > limit };
+                Object.defineProperty(page, "meta", { value: meta, enumerable: false });
+                return page;
+            }
             : undefined,
 
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
@@ -820,7 +834,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     /** Aggregate the matching rows. See {@link SDKCollectionClient.aggregate}. */
     async aggregate(
         params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
-    ): Promise<AggregateRow[]> {
+    ): Promise<AggregateResult> {
         return this.client.aggregate({
             ...params,
             where: this.params.where as AggregateParams<M>["where"],

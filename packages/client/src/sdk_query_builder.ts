@@ -13,7 +13,7 @@ import {
     WhereValueFor,
     sortKeyToString,
     type AggregateParams,
-    type AggregateRow,
+    type AggregateResult,
     type ComputedSortField,
     type FieldPath,
     type IncludeSpec,
@@ -297,7 +297,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      */
     async aggregate(
         params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
-    ): Promise<AggregateRow[]> {
+    ): Promise<AggregateResult> {
         return this.collection.aggregate({
             ...params,
             where: this.params.where as AggregateParams<M>["where"],

@@ -498,7 +498,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      * absent implementation in a stub that says so rather than returning a
      * number nothing counted.
      */
-    aggregate?(params: AggregateParams<M>): Promise<AggregateRow[]>;
+    aggregate?(params: AggregateParams<M>): Promise<AggregateResult>;
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): QueryBuilderInterface<M>;
@@ -648,14 +648,15 @@ export type AggregateRow = Record<string, unknown>;
  * What {@link SDKCollectionClient.aggregate} takes: the same narrowing a
  * `find()` takes, minus the parts of it that describe a *page* of rows.
  *
- * `limit` survives and means what it means on the REST route — a bound on the
- * number of **groups**, because grouping by a high-cardinality column is a whole
- * table's worth of rows in one response. It is ignored when there is no
- * `groupBy`, since an ungrouped aggregate is one row.
+ * `limit` and `offset` page through the **groups**, as they page a listing's
+ * rows, because grouping by a high-cardinality column is a whole table's worth
+ * of rows in one response. Over HTTP a grouped aggregate with no `limit` gets
+ * the listing default (50 groups) — read {@link AggregateResult.meta} to know
+ * when there were more. Without `groupBy` there is one row: `limit` does nothing
+ * there and `offset` is refused.
  *
- * `orderBy`, `include`, `after` and the rest are absent on purpose: an
- * aggregate has no rows to sort, no relations to load and no page to continue.
- * They were silently ignored on the REST route; here they do not typecheck.
+ * `include`, `after` and the rest are absent on purpose: an aggregate has no
+ * relations to load and no row to continue after.
  *
  * @group Data
  */
@@ -670,8 +671,38 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
     logical?: LogicalCondition;
     /** Text search, AND-ed with the filters. */
     searchString?: string;
-    /** Most groups to return. Ignored without `groupBy`. */
+    /** Most groups to return. Grouped aggregates only. */
     limit?: number;
+    /** Groups to skip, to page past `limit`. Grouped aggregates only. */
+    offset?: number;
+}
+
+/**
+ * Where a grouped aggregate's page of groups sits: the `limit` it was cut at,
+ * the `offset` it started from, and whether more groups follow.
+ *
+ * @group Data
+ */
+export interface AggregateMeta {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+}
+
+/**
+ * What {@link SDKCollectionClient.aggregate} resolves to: the rows, as an
+ * array, carrying the page they are as `meta`.
+ *
+ * `meta` is present on a grouped aggregate that was cut at a `limit` — which,
+ * over HTTP, is every grouped one, since the route applies the listing default
+ * when none is given. `hasMore: true` means the groups did not all fit: page on
+ * with `offset`, or raise `limit`. It is a non-enumerable property, so a spread,
+ * `JSON.stringify` or `Object.keys` of the result sees only the rows.
+ *
+ * @group Data
+ */
+export interface AggregateResult extends Array<AggregateRow> {
+    readonly meta?: AggregateMeta;
 }
 
 /**
@@ -830,9 +861,10 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
      *
      * The builder's `where`/`logical`/`search` narrow which rows are
      * aggregated; its `orderBy`, `include` and window do not apply and are
-     * ignored, exactly as they are on the REST route.
+     * ignored, exactly as they are on the REST route. Page the groups with the
+     * `limit`/`offset` passed here.
      */
-    aggregate(params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">): Promise<AggregateRow[]>;
+    aggregate(params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">): Promise<AggregateResult>;
 
     /**
      * Page through everything this query matches, one row at a time.
@@ -1498,7 +1530,7 @@ export interface SDKCollectionClient<
      * naming the capability rather than an empty result set, which would read
      * as "nothing matched".
      */
-    aggregate(params: AggregateParams<M>): Promise<AggregateRow[]>;
+    aggregate(params: AggregateParams<M>): Promise<AggregateResult>;
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;

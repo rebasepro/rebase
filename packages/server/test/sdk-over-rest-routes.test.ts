@@ -42,6 +42,9 @@ const orderItems = {
     }
 } as unknown as CollectionConfig;
 
+/** More groups than the list default (50) a grouped aggregate is paged by. */
+const GROUPS = 62;
+
 interface Harness {
     client: ReturnType<typeof createRebaseClient>;
     saves: Record<string, unknown>[];
@@ -84,6 +87,19 @@ function createHarness(
         async batchWrite(props: { operations: Record<string, unknown>[] }) {
             batches.push(props.operations);
             return props.operations.map((operation) => ({ id: 7, ...(operation.values as object) }));
+        },
+        restFetchService: {
+            // 62 groups, one per title, in group-key order — what the Postgres
+            // driver's GROUP BY ... ORDER BY <group keys> returns, windowed by
+            // the limit and offset it is handed.
+            async aggregate(_slug: string, options: { limit?: number; offset?: number }) {
+                const groups = Array.from({ length: GROUPS }, (_, i) => ({
+                    title: `t${String(i).padStart(2, "0")}`,
+                    count: 1
+                }));
+                const from = options.offset ?? 0;
+                return groups.slice(from, options.limit === undefined ? undefined : from + options.limit);
+            }
         }
     } as unknown as DataDriver;
 
@@ -178,5 +194,55 @@ describe("batch() through the REST route", () => {
         await client.batch([{ op: "create", collection: "order_items", values: { sku: "A-3" } }]);
 
         expect(batches[0][0]).toMatchObject({ path: "order_items" });
+    });
+});
+
+describe("aggregate() through the REST route", () => {
+    // A grouped aggregate is paged like a listing: the route applies the list
+    // default (50 groups) and says `hasMore`. The SDK returned `raw.data` and
+    // dropped the `meta`, and had no `offset` to send — so "sum by customer"
+    // over 300 customers came back with 50 and no way to know or to page, and
+    // a dashboard under-reported without a sign of it.
+
+    const byTitle = { select: [{ fn: "count" as const }], groupBy: ["title"] };
+
+    it("says when the groups were cut off at the default", async () => {
+        const { client } = createHarness();
+
+        const rows = await client.data.collection("posts").aggregate(byTitle);
+
+        expect(rows).toHaveLength(50);
+        expect(rows.meta).toEqual({ limit: 50, offset: 0, hasMore: true });
+    });
+
+    it("pages past them with offset", async () => {
+        const { client } = createHarness();
+
+        const rows = await client.data.collection("posts").aggregate({ ...byTitle, offset: 50 });
+
+        expect(rows.map(row => row.title)).toEqual(
+            Array.from({ length: GROUPS - 50 }, (_, i) => `t${50 + i}`)
+        );
+        expect(rows.meta).toEqual({ limit: 50, offset: 50, hasMore: false });
+    });
+
+    it("returns every group under a limit that holds them", async () => {
+        const { client } = createHarness();
+
+        const rows = await client.data.collection("posts").aggregate({ ...byTitle, limit: 100 });
+
+        expect(rows).toHaveLength(GROUPS);
+        expect(rows.meta?.hasMore).toBe(false);
+    });
+
+    it("keeps the metadata off the rows themselves", async () => {
+        // An array that grew an enumerable key would change what a spread, a
+        // `JSON.stringify` or a deep equality of the result sees.
+        const { client } = createHarness();
+
+        const rows = await client.data.collection("posts").aggregate(byTitle);
+
+        expect(Object.keys(rows)).not.toContain("meta");
+        expect(JSON.parse(JSON.stringify(rows))).toHaveLength(50);
     });
 });

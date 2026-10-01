@@ -38,7 +38,10 @@ Results are keyed by function and field — `count()` becomes `count`,
 Groups page like a listing's rows. `limit` bounds them, `offset` (or `page`)
 skips them, and `orderBy` sorts them by a `groupBy` field or a result key. The
 order always ends on the group keys, so every page boundary falls in the same
-place. With a `limit`, the response says whether there are more:
+place. A grouped aggregate with no `limit` is cut at the listing default (50
+groups), the same as a listing. With a `limit` — the default one included — the
+response says whether there are more, and the SDK's `aggregate()` hands it back
+as `meta` on the result:
 
 ```bash
 GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20

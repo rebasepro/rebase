@@ -18,7 +18,9 @@ import {
     WhereFilterOp,
     WhereValueFor,
     WriteOptions,
+    type AggregateMeta,
     type AggregateParams,
+    type AggregateResult,
     type AggregateRow,
     type CollectionUpdateMeta,
     type IncludeSpec,
@@ -660,12 +662,20 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * was to hand-build the URL. `findAll()` and a reduce is the thing this
          * exists to replace: wrong under a `limit`, unaffordable without one.
          */
-        async aggregate(params: AggregateParams<M>): Promise<AggregateRow[]> {
+        async aggregate(params: AggregateParams<M>): Promise<AggregateResult> {
             const qs = buildAggregateQueryString(params);
-            const raw = await transport.request<{ data: AggregateRow[] }>(
+            const raw = await transport.request<{ data: AggregateRow[]; meta?: AggregateMeta }>(
                 `${basePath}/aggregate${qs}`, { method: "GET" }
             );
-            return raw.data || [];
+            // The route pages a grouped aggregate like a listing — the list
+            // default when no `limit` was sent — and says `hasMore`. Returning
+            // `raw.data` alone dropped that, so a "sum by customer" over 300
+            // customers came back as 50 with nothing to say it was cut off.
+            // Non-enumerable, so the result is still just the rows to a spread
+            // or a `JSON.stringify`.
+            const rows: AggregateResult = raw.data || [];
+            if (raw.meta) Object.defineProperty(rows, "meta", { value: raw.meta, enumerable: false });
+            return rows;
         },
 
         // `listen`/`listenById` are part of the contract, so they are always

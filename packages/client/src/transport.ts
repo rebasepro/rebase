@@ -318,6 +318,7 @@ export function buildAggregateQueryString(params: AggregateParams): string {
         parts.push(`groupBy=${encodeURIComponent(params.groupBy.join(","))}`);
     }
     if (params.limit != null) parts.push(`limit=${params.limit}`);
+    if (params.offset != null) parts.push(`offset=${params.offset}`);
     if (params.searchString) {
         parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
     }

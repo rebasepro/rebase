@@ -54,3 +54,18 @@ export async function batchProbes(): Promise<void> {
         { op: "update", collection: "orderItems", id: 1, values: { skuu: "x" } }
     ]);
 }
+
+/**
+ * A grouped aggregate is paged: `offset` is a parameter, and the result says
+ * whether the groups were cut off.
+ */
+export async function aggregateProbes(): Promise<boolean> {
+    const byStatus = await client.data.posts.aggregate({
+        select: [{ fn: "count" }],
+        groupBy: ["status"],
+        limit: 50,
+        offset: 50
+    });
+    const rows: Record<string, unknown>[] = byStatus;
+    return rows.length > 0 && byStatus.meta?.hasMore === true;
+}

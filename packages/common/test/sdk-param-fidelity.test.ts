@@ -127,3 +127,52 @@ describe("in-process SDK: every FindParams field reaches the driver", () => {
         expect(calls.listen[0].logical).toEqual(GROUP);
     });
 });
+
+describe("in-process SDK: a grouped aggregate pages like the REST route", () => {
+    /** 62 groups, windowed by the limit and offset the driver is handed. */
+    function aggregatingDriver() {
+        const calls: Record<string, unknown>[] = [];
+        const groups = Array.from({ length: 62 }, (_, i) => ({ status: `s${i}`, count: 1 }));
+        const driver = {
+            fetchCollection: jest.fn(),
+            fetchOne: jest.fn(),
+            save: jest.fn(),
+            delete: jest.fn(),
+            restFetchService: {
+                aggregate: jest.fn().mockImplementation(async (_slug: string, options: { limit?: number; offset?: number }) => {
+                    calls.push(options);
+                    const from = options.offset ?? 0;
+                    return groups.slice(from, options.limit === undefined ? undefined : from + options.limit);
+                })
+            }
+        } as unknown as DataDriver;
+        return { driver, calls };
+    }
+
+    const byStatus = { select: [{ fn: "count" as const }], groupBy: ["status"] };
+
+    it("forwards offset to the driver", async () => {
+        const { driver, calls } = aggregatingDriver();
+        await sdk(buildSdkData(driver), "posts").aggregate({ ...byStatus, limit: 10, offset: 20 });
+
+        expect(calls[0]).toMatchObject({ offset: 20 });
+    });
+
+    it("says whether more groups follow a limit", async () => {
+        const { driver } = aggregatingDriver();
+        const rows = await sdk(buildSdkData(driver), "posts").aggregate({ ...byStatus, limit: 50 });
+
+        expect(rows).toHaveLength(50);
+        expect(rows.meta).toEqual({ limit: 50, offset: 0, hasMore: true });
+    });
+
+    it("returns every group when no limit is named", async () => {
+        // No default limit in-process, as before: a caller that names none
+        // gets every group, and so there is no page to describe.
+        const { driver } = aggregatingDriver();
+        const rows = await sdk(buildSdkData(driver), "posts").aggregate(byStatus);
+
+        expect(rows).toHaveLength(62);
+        expect(rows.meta).toBeUndefined();
+    });
+});
