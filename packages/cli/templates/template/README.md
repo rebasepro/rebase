@@ -61,10 +61,9 @@ database to compare against, and PGlite serves exactly one:
 pnpm run db:push
 ```
 
-Boot already creates missing tables and columns additively, so `db push` is for
-what it deliberately leaves alone: junction-table RLS on many-to-many relations,
-and any change that is not purely additive — a renamed column, a narrowed type,
-a removed field.
+Boot already creates missing tables and columns, and their row-level security,
+additively, so `db push` is for what it deliberately leaves alone: any change
+that is not purely additive — a renamed column, a narrowed type, a removed field.
 
 The `docker-compose.yml` in this project runs PostgreSQL in a container if you
 would rather not install one:
@@ -163,8 +162,8 @@ compose database is a database of your own, so step 0 is the same one line.
 pnpm run build          # or: npm run build
 
 # 2. Start the database. Boot creates the tables from your collections;
-#    `db:push` is for what it leaves alone — junction-table RLS, and any
-#    change that is not purely additive.
+#    `db:push` is for what it leaves alone — any change that is not purely
+#    additive.
 docker compose up -d db
 pnpm run db:push        # or: npm run db:push
 

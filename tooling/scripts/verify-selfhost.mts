@@ -15,9 +15,8 @@
  *
  * Override the database with ACCEPTANCE_DATABASE_URL. The script pushes the
  * schema itself, up front — that is the self-host recipe, and it exercises the
- * full `db push` path (including junction-table RLS this script's boot does not
- * create). The runtime would otherwise create the collection tables and their
- * RLS at boot (REBASE_MIGRATE_ON_BOOT defaults to "ensure"); pushing first just
+ * full `db push` path. The runtime would otherwise create the collection tables
+ * and their RLS, junction tables included, at boot (REBASE_MIGRATE_ON_BOOT defaults to "ensure"); pushing first just
  * means that boot step finds nothing left to do. The managed equivalent — a
  * fresh database served purely by boot-time provisioning, no push — is pinned
  * in `packages/server-postgres/test/e2e/managed-boot-acceptance.test.ts`.

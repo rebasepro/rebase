@@ -85,14 +85,13 @@ The last three are how this deployment gets an administrator at all: in producti
 
 What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
 
-Two things therefore still need the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at your Flexible Server (add a firewall rule allowing your client IP if needed):
+One thing therefore still needs the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at your Flexible Server (add a firewall rule allowing your client IP if needed):
 
 ```bash
 rebase db push
 ```
 
-- **Junction-table RLS** for many-to-many relations.
-- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+Any change that is not purely additive — a renamed column, a narrowed type, a removed field.
 
 The runtime image ships without the CLI, so this never runs inside the container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
 

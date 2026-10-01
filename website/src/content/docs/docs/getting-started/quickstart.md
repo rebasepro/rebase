@@ -94,12 +94,11 @@ to compare against, and PGlite serves exactly one:
 pnpm run db:push
 ```
 
-Boot already creates missing tables additively, so `db push` is for the two
-things it deliberately leaves alone: junction-table
-[RLS](/docs/collections/security-rules/) — PostgreSQL's row-level security, which is
-how Rebase enforces who may read a row — on many-to-many
-relations, and any change that is not purely additive — a renamed column, a
-narrowed type, a removed field.
+Boot already creates missing tables — and their
+[RLS](/docs/collections/security-rules/) policies, PostgreSQL's row-level
+security, which is how Rebase enforces who may read a row — additively, so
+`db push` is for what it deliberately leaves alone: any change that is not
+purely additive — a renamed column, a narrowed type, a removed field.
 
 The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, if you
 want a container rather than an installed Postgres:
@@ -192,8 +191,7 @@ The same is true of a property added to a collection you already have: save,
 and the column is there.
 
 `rebase db push` is for the changes boot deliberately leaves alone — a renamed
-column, a narrowed type, a removed field, and junction-table RLS on
-many-to-many relations. It needs your own PostgreSQL:
+column, a narrowed type, a removed field. It needs your own PostgreSQL:
 
 ```bash
 pnpm run db:push

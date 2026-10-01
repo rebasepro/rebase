@@ -146,16 +146,13 @@ does not alter a column type, does not drop a table or a column, and does not
 edit an existing enum's labels — because a container restart must not be able to
 reshape a schema as a side effect of a deploy.
 
-So `rebase db push` is still worth running, for the two things boot leaves
-alone:
+So `rebase db push` is still worth running, for what boot leaves alone — any
+change that is not purely additive: a renamed column, a narrowed type, a
+removed field.
 
 ```bash
 rebase db push
 ```
-
-- **Junction-table RLS** for many-to-many relations.
-- **Any change that is not purely additive** — a renamed column, a narrowed
-  type, a removed field.
 
 Run it from a checkout or a CI job, pointed at the deployment's database. It
 dry-runs the change first, refuses destructive ones without explicit

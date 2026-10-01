@@ -84,14 +84,13 @@ AWS handles TLS termination, giving you an `https` URL out of the box.
 
 What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
 
-Two things therefore still need the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at RDS:
+One thing therefore still needs the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at RDS:
 
 ```bash
 rebase db push
 ```
 
-- **Junction-table RLS** for many-to-many relations.
-- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+Any change that is not purely additive — a renamed column, a narrowed type, a removed field.
 
 If the instance is private, run it from CI or a bastion host inside the same VPC. The runtime image ships without the CLI, so this never runs inside the App Runner container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
 

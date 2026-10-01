@@ -15,7 +15,7 @@
 #   docker compose up         # boot creates the tables it is missing
 #
 # `rebase db push` is the separate step for what boot deliberately leaves
-# alone: junction-table RLS, and any change that is not purely additive.
+# alone: any change that is not purely additive.
 #
 # One container then serves the API at /api and the admin at / — same origin, so
 # there is no CORS to configure between them and no second web server.
@@ -132,12 +132,12 @@ services:
       DISABLE_SELF_REGISTRATION: ${DISABLE_SELF_REGISTRATION:-true}
 
       # `ensure` (the default) creates missing tables and columns at boot —
-      # your collections' as well as auth's — and is additive only: nothing is
-      # dropped, narrowed or rewritten, because that must never happen as a
-      # side effect of a container restart.
+      # your collections' as well as auth's — with their row-level security,
+      # and is additive only: nothing is dropped, narrowed or rewritten,
+      # because that must never happen as a side effect of a container restart.
       #
-      # `rebase db push` is still what applies the rest: junction-table RLS on
-      # many-to-many relations, and any change that is not purely additive.
+      # `rebase db push` is still what applies the rest: any change that is not
+      # purely additive.
       # Set this to `none` to take a deployment out of provisioning entirely.
       REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
 

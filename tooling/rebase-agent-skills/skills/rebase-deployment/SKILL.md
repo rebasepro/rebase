@@ -107,8 +107,8 @@ tables, columns and enum types at boot, including your collections', and applies
 their row-level security. It never alters, narrows or drops anything that
 already exists — a container restart must not be able to reshape a schema.
 
-`rebase db push` remains the step for the rest: junction-table RLS on
-many-to-many relations, and any change that is not purely additive.
+`rebase db push` remains the step for the rest: any change that is not purely
+additive. (Boot applies row-level security too, junction tables included.)
 
 ### Uploads
 

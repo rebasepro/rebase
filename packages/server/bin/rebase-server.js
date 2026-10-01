@@ -49,8 +49,7 @@ Key environment variables:
                         tables and columns at boot, INCLUDING your collections',
                         additively, and applies their row-level security. It
                         never alters, drops or narrows: those go through
-                        'rebase db push' from a checkout, along with
-                        junction-table RLS for many-to-many relations
+                        'rebase db push' from a checkout
 
 Additional databases and buckets are configured by suffixing the variable with
 the source key, e.g. DATABASE_URL__ANALYTICS or S3_BUCKET__MEDIA.

@@ -125,8 +125,8 @@ database:
 pnpm run db:push
 ```
 
-Run it for junction-table RLS on many-to-many relations, and for any change that
-is not purely additive — a renamed column, a narrowed type, a removed field.
+Run it for any change that is not purely additive — a renamed column, a
+narrowed type, a removed field.
 
 For a **versioned, team workflow**, commit migration files with
 `pnpm run db:generate` and run `pnpm run db:migrate` as a release step instead.
@@ -199,7 +199,7 @@ Before deploying to production, ensure:
 |------|---------|
 | **First admin** | Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` **before the first boot**, and `DISABLE_SELF_REGISTRATION=true`. In production the first account to register is not promoted — see [Your first admin](#your-first-admin). |
 | **NODE_ENV** | `NODE_ENV=production`. It is what closes the bootstrap window, refuses local file storage, requires `CORS_ORIGINS`, and turns the OpenAPI docs off. A deployment left at the default is running in development mode. |
-| **Database schema** | Boot creates your collection tables additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for junction-table RLS and for anything not purely additive. |
+| **Database schema** | Boot creates your collection tables and their RLS additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for anything not purely additive. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS_ORIGINS** | Always, not only when the frontend is on another domain. The runtime refuses to start in production with neither `CORS_ORIGINS` nor `FRONTEND_URL`, because an API that guesses its allowed origins eventually allows the wrong one. |

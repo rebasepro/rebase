@@ -147,10 +147,7 @@ With `REBASE_MIGRATE_ON_BOOT` at its default of `ensure`, the runtime provisions
 
 What boot deliberately never does is anything destructive: it does not alter a column type, drop a column, or edit an existing enum label. A container restart must not be able to reshape a schema as a side effect.
 
-Two things therefore still need [`rebase db push`](/docs/architecture/schema-as-code), run from a checkout or CI where the destructive-change gate and a backup are in reach:
-
-- junction-table RLS for many-to-many relations;
-- any change that is not purely additive.
+One thing therefore still needs [`rebase db push`](/docs/architecture/schema-as-code), run from a checkout or CI where the destructive-change gate and a backup are in reach: any change that is not purely additive — a renamed column, a narrowed type, a removed field.
 
 If the module or Compose file bound Postgres to loopback — both do — reach it through an SSH tunnel:
 

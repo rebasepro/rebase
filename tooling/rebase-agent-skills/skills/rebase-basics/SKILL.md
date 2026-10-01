@@ -57,8 +57,8 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - **With your own `DATABASE_URL`:** `rebase db push` (development) or
      `rebase db generate && rebase db migrate` (production).
    - What boot's additive apply deliberately leaves alone, on either database:
-     junction-table RLS on many-to-many relations, and any change that is not
-     purely additive — a renamed column, a narrowed type, a removed field. Those
+     any change that is not purely additive — a renamed column, a narrowed
+     type, a removed field. Those
      need `db push` or a migration, which means they need a `DATABASE_URL`.
 
 5. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
@@ -110,8 +110,8 @@ section is background; this is the actual sequence.
 Rules live on the collection in `securityRules` and become Postgres policies
 at boot on the managed database, or when `rebase db push` (or a migration) runs
 against your own. Declaring one is not applying it — the rule takes effect on
-the next start, not on the next save. The one exception boot leaves alone is a
-junction table's RLS on a many-to-many relation; that needs `db push`.
+the next start, not on the next save — junction tables of many-to-many
+relations included.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";

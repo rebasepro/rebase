@@ -94,7 +94,7 @@ session:
    is running, saving the collection file is the whole step: boot regenerates the
    Drizzle schema and creates the missing tables and columns. `pnpm db:push` is
    only for what boot deliberately leaves alone — a renamed column, a narrowed
-   type, a removed field, junction-table RLS — and it needs your own PostgreSQL,
+   type, a removed field — and it needs your own PostgreSQL,
    not the managed development database. Production is `pnpm db:generate` then
    `pnpm db:migrate`.
 3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the

@@ -51,8 +51,13 @@ describe("rebase-server --help", () => {
         // contradicted: `ensure` creates the project's tables too.
         expect(migrate).toMatch(/collections/i);
         expect(migrate).toMatch(/additive/i);
-        // `db push` still has a job, and the help has to say which one.
-        expect(migrate).toMatch(/junction/i);
+        // `db push` still has a job, and the help has to say which one: what
+        // boot will not do. Not junction-table RLS — boot creates the junction
+        // tables and applies their policies with everything else, so naming it
+        // here told an operator their many-to-many tables were unprotected
+        // until a push nobody needed to run.
+        expect(migrate).toMatch(/never alters, drops or narrows: those go through\s+'rebase db push'/);
+        expect(migrate).not.toMatch(/junction/i);
     });
 
     it("covers every variable the documented systemd unit sets", () => {

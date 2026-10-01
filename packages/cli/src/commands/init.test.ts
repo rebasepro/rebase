@@ -1781,3 +1781,21 @@ describe("scaffolding into an existing directory", () => {
 
 // eslint-disable-next-line no-control-regex
 const ANSI_ESCAPES = /\u001b\[[0-9;]*m/g;
+
+/**
+ * The scaffold's own docs do not send the reader to `db push` for junction RLS.
+ *
+ * README, ai-instructions and the compose file all said boot "deliberately
+ * leaves junction-table RLS alone; `db push` applies it". Boot creates the
+ * junction tables and applies their policies with everything else — on the
+ * managed database too, where `db push` cannot run at all — so a newcomer who
+ * believed it thought their many-to-many tables were unprotected until they
+ * moved to their own Postgres.
+ */
+describe("the template's account of what db push is for", () => {
+    it.each(["README.md", "ai-instructions.md", "docker-compose.yml", "AGENTS.md", "CLAUDE.md"])("%s does not claim boot leaves junction RLS alone", file => {
+        const full = path.join(TEMPLATE_DIR, file);
+        if (!fs.existsSync(full)) return;
+        expect(fs.readFileSync(full, "utf8")).not.toMatch(/junction[- ]table(?:'s)? RLS/i);
+    });
+});

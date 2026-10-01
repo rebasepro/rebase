@@ -726,8 +726,8 @@ docker compose up         # boot creates the tables it is missing
 ```
 
 Boot provisions the collection tables itself (`REBASE_MIGRATE_ON_BOOT=ensure`,
-additive only); `rebase db push` remains the step for what it deliberately
-leaves alone — junction-table RLS, and any change that is not purely additive.
+additive only, row-level security included); `rebase db push` remains the step
+for what it deliberately leaves alone — any change that is not purely additive.
 The scaffold has no `backend/src/index.ts`: `backend/` holds the functions and the
 generated schema, and an entrypoint exists only once `rebase eject` writes one.
 
