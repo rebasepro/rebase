@@ -200,10 +200,27 @@ app's hostname, inside that path part. The URL must be `https://` and carry a
 hostname and a path and nothing else — no port, query or fragment. A bare
 `admin.example.com` is refused, with the URL it should have been.
 
-Locally, nothing is routed by hostname. `rebase dev` runs the app in
+Under `rebase dev`, nothing is routed by hostname. It runs the app in
 `frontend/` at the root of a localhost port, as it always has, and for an app
 with a hostname its banner also prints the `https://` address it will have
 once deployed.
+
+`rebase start` is different, because it runs the built bundle through the same
+runtime a deployment does — hostname routing included. An app with a hostname
+answers only to requests whose `Host` is that hostname, so
+`http://localhost:3001/` shows the app without one, and a bundle whose only app
+names a hostname answers 404 there. To reach it locally, send the header
+yourself:
+
+```bash
+curl -H "Host: admin.example.com" http://localhost:3001/
+```
+
+or point the hostname at `127.0.0.1` in `/etc/hosts` and open
+`http://admin.example.com:3001/`. There is deliberately no query parameter or
+header that overrides the routing: one that worked locally would also work
+against a deployment, and choosing the app by anything but the real `Host` is
+what the routing exists to prevent.
 
 Self-hosted, the process makes the same choice from each request's `Host`
 header. Pointing the hostname at the server and giving it a certificate are
